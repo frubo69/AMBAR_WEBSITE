@@ -2852,19 +2852,13 @@ async def _drv_cover(name: str, on: bool) -> None:
 
 
 @require_operator
-async def handle_drv_panic(request):
-    """Включить или снять скрытый режим водителя с планшета."""
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    name = str(body.get("driver") or "").strip()
-    if name not in set(_staff_mod.driver_names()):
-        return web.json_response({"error": "unknown_driver"}, status=400,
-                                 headers=CORS_HEADERS)
-    on = bool(body.get("on"))
+async def drv_panic(name: str, on: bool, кто: str, откуда: str = "планшета") -> None:
+    """Скрытый режим водителя, включённый за него другим человеком.
+
+    Одна механика на всю систему: её зовут и планшет оператора, и локатор
+    владельца. Вторая копия разошлась бы молча — а расходятся такие вещи в
+    сторону «у водителя экран не спрятался, хотя нажали»."""
     now = datetime.now(timezone.utc)
-    кто = _op_name(request["op_user"])
     d = _staff_mod.driver_by_tg(_staff_mod.DRIVER_IDS.get(name)) or {}
     await db.panic_set(name, on, now.isoformat(),
                        {"district": d.get("district", ""), "by": кто, "remote": True})
@@ -2884,7 +2878,7 @@ async def handle_drv_panic(request):
     try:
         from owner_routes import notify_owners_force, _md
         ч = datetime.now(DUBAI_TZ).strftime("%H:%M")
-        строки = ([f"\U0001F198 *Скрытый режим включён с планшета*",
+        строки = ([f"\U0001F198 *Скрытый режим включён с {_md(откуда)}*",
                    f"{_md(name)} · включил {_md(кто)} · {ч}", "",
                    "*Не пишите водителю в приложение и в бот* — уведомление "
                    "всплывёт у него на экране. Позвоните."]
@@ -2894,6 +2888,20 @@ async def handle_drv_panic(request):
         await notify_owners_force("driver.panic", "\n".join(строки))
     except Exception as e:                       # noqa: BLE001
         log.error(f"[where] владельцу не сказали: {e}")
+
+
+async def handle_drv_panic(request):
+    """Включить или снять скрытый режим водителя с планшета."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = str(body.get("driver") or "").strip()
+    if name not in set(_staff_mod.driver_names()):
+        return web.json_response({"error": "unknown_driver"}, status=400,
+                                 headers=CORS_HEADERS)
+    on = bool(body.get("on"))
+    await drv_panic(name, on, _op_name(request["op_user"]))
     return web.json_response({"ok": True, "driver": name, "panic": on},
                              headers=CORS_HEADERS)
 

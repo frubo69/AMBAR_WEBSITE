@@ -1044,6 +1044,35 @@ async def handle_where(request):
 
 
 @require_owner
+async def handle_where_panic(request):
+    """Скрытый режим водителя из локатора владельца.
+
+    Кнопка та же, что на планшете оператора, и механика та же — она вынесена
+    в operator_routes.drv_panic и зовётся отсюда. Владелец видит на карте, что
+    человек молчит третий час, и решает прямо там, не пересказывая это
+    оператору голосом.
+
+    Старший (строка STAR) сюда не попадает: его приложение прячется своим
+    жестом на устройстве и серверного флага не спрашивает — снаружи опустить
+    ему штору нечем."""
+    import operator_routes as pos
+    import config_staff as staff_mod
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = str(body.get("driver") or "").strip()
+    if name not in set(staff_mod.driver_names()):
+        return web.json_response({"error": "unknown_driver"}, status=400,
+                                 headers=CORS_HEADERS)
+    on = bool(body.get("on"))
+    кто = staff.senior_star_by_tg(request.get("owner_id")) or "панель"
+    await pos.drv_panic(name, on, кто, "панели")
+    return web.json_response({"ok": True, "driver": name, "panic": on},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_pos_who(request):
     """Спрашивать ли у этого человека геопозицию. Решает сервер, а не панель:
     у владельцев её не спрашивают вовсе — окно с вопросом у них появлялось,
@@ -3975,6 +4004,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/archive/export", handle_archive_export)
     app.router.add_post(            "/api/owner/archive/export", handle_archive_export)
     app.router.add_get(             "/api/owner/archive/file", handle_archive_file)
+    app.router.add_route("OPTIONS", "/api/owner/where/panic", handle_where_panic)
+    app.router.add_post(            "/api/owner/where/panic", handle_where_panic)
     app.router.add_route("OPTIONS", "/api/owner/panic", handle_owner_panic)
     app.router.add_post(            "/api/owner/panic", handle_owner_panic)
     app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)

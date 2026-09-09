@@ -3574,6 +3574,17 @@ button.path:active{transform:scale(.995)}
 .wh-card.live .wh-card-n{color:#3ddc84}
 .wh-card.snap .wh-card-n{color:var(--gold2)}
 .wh-card.panic .wh-card-n{color:var(--dn)}
+/* Кнопка скрытого режима — красная и во всю ширину, как на планшете
+   оператора: это не действие «между делом», и выглядеть оно должно так же,
+   с какого бы экрана его ни нажимали. */
+.wh-card-go{width:100%;margin-top:11px;padding:12px;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,#c94b4b,#e05555);border:none}
+.wh-card-go:active{transform:scale(.98)}
+.wh-card-go.off{color:var(--text);background:var(--card2);border:1px solid var(--border3)}
+.wh-card-sos{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--dn);background:rgba(224,85,85,.14);border:1px solid rgba(224,85,85,.35);
+  border-radius:999px;padding:2px 8px;margin-left:auto;flex:0 0 auto}
 .wh-card-s{display:block;font-size:12px;color:var(--muted);margin-top:5px;line-height:1.35}
 .wh-facts{display:flex;gap:8px;margin-bottom:8px}
 .wh-facts span{flex:1 1 0;min-width:0;padding:14px 8px;border-radius:16px;text-align:center;
@@ -10778,7 +10789,8 @@ function whCard(){
   else { head = 'не виден'; sub = 'геопозицией не делится'; }
 
   document.getElementById('whList').innerHTML = `
-    <div class="wh-card ${st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : '')}">
+    <div class="wh-card ${r.panic ? 'panic' : st === 'stream' ? 'live'
+        : (st === 'snap' ? 'snap' : '')}">
       <div class="wh-card-top">
         <span class="wh-card-i">${st === 'stream' ? IC_LIVE
           : (st === 'snap' ? IC_SNAP : IC_OFF)}</span>
@@ -10786,6 +10798,7 @@ function whCard(){
           <span class="wh-card-n">${head}</span>
           <span class="wh-card-s">${sub}</span>
         </span>
+        ${r.panic ? '<span class="wh-card-sos">скрытый режим</span>' : ''}
       </div>
       <div class="wh-facts">
         ${r.senior ? '' : `<span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
@@ -10796,8 +10809,37 @@ function whCard(){
         <button class="wh-act${track ? ' on' : ''}" onclick="whTrack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M7.6 16.4c2.2-2.6 3.4-5 6.6-6.8 1.2-.7 2-1.3 2.5-2" stroke-dasharray="1.2 3.4"/></svg>Маршрут</button>
         <button class="wh-act" onclick="whFocus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>Приблизить</button>
       </div>` : ''}
+      ${r.senior ? '' : `<button class="wh-card-go${r.panic ? ' off' : ''}"
+        onclick="whPanic('${escS(r.driver)}', ${r.panic ? 'false' : 'true'})"
+        >${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>`}
     </div>`;
   whMapPaint();
+}
+
+// Скрытый режим за человека — прямо с его карточки в локаторе. Спрашиваем
+// один раз и словами о последствиях: у водителя приложение станет игрой, а
+// переписка бота исчезнет, и написать ему после этого будет нельзя — только
+// позвонить. Кнопки нет только у строки STAR: приложение старшего прячется
+// своим жестом на устройстве и серверного флага не спрашивает.
+async function whPanic(name, on){
+  const ok = await askYes(on
+    ? `Включить скрытый режим у ${name}?\n\nЕго приложение станет игрой, переписка бота исчезнет. `
+      + 'Писать ему в бот будет нельзя — только звонить.'
+    : `Снять скрытый режим у ${name}?`);
+  if(!ok) return;
+  const b = document.querySelector('.wh-card-go');
+  if(b){ b.disabled = true; b.textContent = on ? 'Включаю…' : 'Снимаю…'; }
+  try{
+    await ownerApi.ownerFetch('/api/owner/where/panic',
+      {method:'POST', body:{driver: name, on: !!on}});
+  }catch(e){
+    _toast('Не удалось переключить');
+    if(b){ b.disabled = false; b.textContent = on ? 'Ввести в режим тетриса' : 'Снять скрытый режим'; }
+    return;
+  }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(on ? 'warning' : 'success'); }catch(e){}
+  _toast(on ? 'Скрытый режим включён' : 'Скрытый режим снят');
+  await whereLoad();
 }
 
 // Приблизить — с оглядкой на шторку: центр карты не середина экрана, а

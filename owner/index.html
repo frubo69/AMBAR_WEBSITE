@@ -863,6 +863,24 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .hst-r em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
 .hst-none{padding:16px;font-size:12.5px;color:var(--muted);text-align:center}
+/* Шапка карточки района — кнопка: свёрнута показывает счёт и последний исход. */
+.hst-cap{width:100%;border:0;background:none;color:inherit;text-align:left;cursor:pointer;
+  padding-top:8px;padding-bottom:8px;-webkit-tap-highlight-color:transparent}
+.hst-cap:active{background:var(--card2)}
+.hst-cap > span i{display:block;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.2px;text-transform:none;color:var(--muted);margin-top:2px}
+.hst-cap > span i.ok{color:var(--up)} .hst-cap > span i.dn{color:var(--dn)} .hst-cap > span i.warn{color:var(--warn)}
+.hst-cap em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal;
+  transition:transform .26s var(--e1)}
+.hst.open .hst-cap em{transform:rotate(180deg)}
+.hst:not(.open) .hst-cap{border-bottom-color:transparent}
+.hst-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .26s var(--e1)}
+.hst-body > div{overflow:hidden;min-height:0}
+.hst.open .hst-body{grid-template-rows:1fr}
+.hst-more{display:block;width:100%;padding:12px 16px;border:0;border-top:1px solid rgba(255,255,255,.05);
+  background:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--gold2)}
+.hst-more:active{background:var(--card2)}
 /* Пришли с карточки района — его карточка вспыхивает золотом и гаснет до обычной рамки. */
 .sc.focus{animation:hstFocus 2.4s var(--e1) both}
 @keyframes hstFocus{0%,30%{border-color:rgba(232,201,138,.95);box-shadow:0 0 0 3px rgba(201,169,110,.22)}
@@ -1047,12 +1065,12 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* Две колонки склада: главная плитка сверху, её история — половинкой снизу.
    Колонка одета как карточка «Остатков»: один градиент и одна золотая рамка
    на всю страницу, а не три разных приёма. Плитки тянутся до низа экрана. */
-.stk-tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0;flex:1 1 auto}
+.stk-tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0;flex:0 0 auto}
 .stk-col{display:flex;flex-direction:column;gap:0;min-width:0;border-radius:16px;
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28);overflow:hidden}
-.stk-col .acc-cell{border:0;border-radius:0;background:none;box-shadow:none;min-height:118px;
-  flex:1 1 auto;padding:14px 16px 12px}
+.stk-col .acc-cell{border:0;border-radius:0;background:none;box-shadow:none;min-height:126px;
+  flex:0 0 auto;padding:14px 16px 12px}
 .stk-sub{display:flex;align-items:center;gap:9px;padding:10px 12px 10px 16px;border:0;
   border-top:1px solid rgba(201,169,110,.14);border-radius:0;cursor:pointer;text-align:left;
   font-family:inherit;color:var(--sub);background:rgba(255,255,255,.025);min-width:0;
@@ -14459,6 +14477,8 @@ async function stkAudits(district, from){
   STK.view = 'audits'; _setRail('stkRail', '');
   STK.audFocus = district || null;
   STK.audFrom = from || (district ? 'pick' : 'stock');
+  STK.hstOpen = STK.hstOpen || {};
+  if(district) STK.hstOpen[district] = true;
   _stkHead('История ревизий', 'загрузка…', false);
   const box = document.getElementById('stkMid');
   box.innerHTML = '<div class="stk-empty">Загрузка…</div>';
@@ -14524,14 +14544,52 @@ function hstSummary(list){
   </div>`;
 }
 
+// Карточка района свёрнута по умолчанию: списки бывают длинные, и пять
+// раскрытых районов — это простыня. В шапке видно главное и так: сколько
+// ревизий и чем кончилась последняя. Нажатие раскрывает строки; открытый
+// с полки района или из отчёта — уже раскрыт.
 function hstDistCard(d, list){
   const rows = list.filter(a => a.district === d.id);     // свежие первыми
   const k = rows.length;
-  return `<div class="sc hst" id="hst-${escS(d.id)}">
-    <div class="sc-cap"><span>${escS(d.code || '')} · ${escS(d.name || '')}</span>${
-      k ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>` : ''}</div>
-    ${k ? rows.map(hstRow).join('') : '<div class="hst-none">Ревизий ещё не было</div>'}
+  const open = !!(STK.hstOpen || {})[d.id];
+  const all = !!(STK.hstAll || {})[d.id];
+  const shown = all ? rows : rows.slice(0, 8);
+  const more = k - shown.length;
+  const last = rows[0];
+  let итог = '', cls = '';
+  if(last){
+    const short = +last.short_qty || 0, over = +last.over_qty || 0;
+    if(last.state === 'pending'){ итог = 'ждёт решения'; cls = 'dn'; }
+    else if(!short && !over){ итог = 'всё сошлось'; cls = 'ok'; }
+    else if(short){ итог = `не хватает ${fmt(short)} бут`; cls = 'dn'; }
+    else{ итог = `излишек ${fmt(over)} бут`; cls = 'warn'; }
+    итог = `${_hstDay(last.day)} · ${итог}`;
+  }
+  return `<div class="sc hst${open ? ' open' : ''}" id="hst-${escS(d.id)}">
+    <button class="sc-cap hst-cap" onclick="hstToggle('${escS(d.id)}')" aria-expanded="${open}">
+      <span>${escS(d.code || '')} · ${escS(d.name || '')}${
+        итог ? `<i class="${cls}">${escS(итог)}</i>` : ''}</span>${
+      k ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>` : '<i>ещё не было</i>'}
+      <em>${_CHEV}</em>
+    </button>
+    <div class="hst-body"><div>${k
+      ? shown.map(hstRow).join('') + (more
+          ? `<button class="hst-more" onclick="hstMore('${escS(d.id)}')">Ещё ${fmt(more)}</button>` : '')
+      : '<div class="hst-none">Ревизий ещё не было</div>'}</div></div>
   </div>`;
+}
+function hstToggle(id){
+  STK.hstOpen = STK.hstOpen || {};
+  STK.hstOpen[id] = !STK.hstOpen[id];
+  const el = document.getElementById('hst-' + id); if(!el) return;
+  el.classList.toggle('open', STK.hstOpen[id]);
+  el.querySelector('.hst-cap').setAttribute('aria-expanded', String(STK.hstOpen[id]));
+  _audHap('sel');
+}
+function hstMore(id){
+  STK.hstAll = STK.hstAll || {}; STK.hstAll[id] = true;
+  const d = (STK.districts || []).find(x => x.id === id), el = document.getElementById('hst-' + id);
+  if(d && el) el.outerHTML = hstDistCard(d, STK.audits || []);
 }
 
 // Строка ревизии: день и кто считал, исход цветом, чем кончилось решение.
@@ -14578,6 +14636,7 @@ async function stkAuditOpen(i){
         {params:{district: a.district, day: a.day}}); }
   catch(e){ _toast('Отчёт не найден'); return; }
   STK.district = a.district; STK.repFrom = 'audits';
+  STK.hstOpen = STK.hstOpen || {}; STK.hstOpen[a.district] = true;   // вернёмся — район раскрыт
   audReport(rep);
 }
 

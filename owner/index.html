@@ -224,7 +224,10 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* Page */
 .page{--pad:14px;padding:calc(76px + var(--safe-top)) var(--pad) 20px;
   display:none;animation:fadeIn .3s var(--e1)}
-#pg-overview,#pg-money,#pg-offices{padding-top:calc(122px + var(--safe-top))}
+/* Запас сверху — под полосу периода, а она fixed и есть не у всех: у «Обзора»
+   и «Районов». На «Учёте» полосы дня больше нет, и запас под неё держал
+   чек-лист на пустом месте в палец высотой. */
+#pg-overview,#pg-offices{padding-top:calc(122px + var(--safe-top))}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 

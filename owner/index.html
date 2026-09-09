@@ -4233,7 +4233,10 @@ button.path:active{transform:scale(.995)}
   font-size:calc(9px + var(--fold,0) * 2px)}
 /* Пока развёрнуто — день посередине; сворачиваемся — перестаёт тянуться и
    встаёт справа, рядом со стрелками. */
-.exp-day .ds-txt{flex-grow:calc(1 - var(--fold,0));flex-shrink:1;flex-basis:auto}
+.exp-day .ds-txt{flex-grow:calc(1 - var(--fold,0));flex-shrink:1;flex-basis:auto;
+  padding:0 1px}
+.exp-day .ds-arw{width:calc(30px - var(--fold,0) * 8px)}
+.exp-day .cal-btn{margin-left:6px}
 .exp-day .ds-txt b{font-size:calc(14.5px - var(--fold,0) * 1.5px)}
 .exp-day .ds-txt i{font-size:calc(10.5px - var(--fold,0) * .5px)}
 /* Возврат к сегодня — та же кнопка, что на карточке выручки: круглая, золотом,
@@ -4246,7 +4249,10 @@ button.path:active{transform:scale(.995)}
    не «дату», листают расходы за день, и ехать должно то, на что смотрят.
    Части слайдера разобраны по местам: стрелки по краям строки, день в центре,
    календарь справа за волоском. */
-.exp-day{display:flex;align-items:center;gap:2px;
+/* Стрелки прижаты к слову: между ними было по тридцать точек пустой кнопки, и
+   «Вчера» висело посреди полоски отдельно от них. Сама тройка уезжает вправо,
+   к календарю, — слева её место занял итог. */
+.exp-day{display:flex;align-items:center;gap:0;
   margin:-4px -6px calc(10px * (1 - var(--fold,0)));
   padding-bottom:calc(9px * (1 - var(--fold,0)));
   border-bottom:1px solid rgba(255,255,255,calc(.06 * (1 - var(--fold,0))))}
@@ -15022,25 +15028,31 @@ function pinWatch(){
   // Доля свёрнутости: 0 — числа целиком, 1 — осталась полоска дня. Считается
   // прямо из прокрутки, поэтому останавливается там же, где палец. Порогов и
   // доводки нет: экран не должен доезжать сам, если человек его придержал.
-  const ХОД = 64;                       // на скольких точках прокрутки сворачиваемся
-  const глянуть = () => {
-    const sum = document.getElementById('expSum');
-    if(!sum) return;
-    const fold = sum.querySelector('.exp-fold');
-    // Сколько прокрутки есть НА САМОМ ДЕЛЕ, считая и ту, что сейчас съедена
-    // сжатием: без этой поправки короткий список не даёт досворачиваться, и
-    // плашка застревает на полпути — числа уже не видно, а место они держат.
-    const скрыто = fold ? Math.max(0, (parseFloat(sum.style.getPropertyValue('--foldH')) || 0)
-                                      - fold.offsetHeight) : 0;
-    const запас = (mid.scrollHeight - mid.clientHeight) + скрыто;
-    // Прокручивать почти нечего — сворачиваться незачем: список и так весь на
-    // экране, а полшага сжатия выглядели бы поломкой.
-    const ход = Math.min(ХОД, запас);
-    const t = ход < 24 ? 0 : Math.max(0, Math.min(1, (mid.scrollTop - 4) / ход));
-    sum.style.setProperty('--fold', t.toFixed(3));
-  };
-  mid.addEventListener('scroll', глянуть, {passive:true});
-  глянуть();
+  mid.addEventListener('scroll', глянутьПлашку, {passive:true});
+  глянутьПлашку();
+}
+
+// Доля свёрнутости плашки расходов: 0 — числа целиком, 1 — осталась полоска
+// дня. Считается прямо из прокрутки, поэтому останавливается там же, где
+// палец; порогов и доводки нет. Живёт отдельно от pinWatch: её зовёт и
+// прокрутка, и перерисовка после смены дня.
+const ПИН_ХОД = 64;                   // на скольких точках прокрутки сворачиваемся
+function глянутьПлашку(){
+  const mid = document.getElementById('accMid');
+  const sum = document.getElementById('expSum');
+  if(!mid || !sum) return;
+  const fold = sum.querySelector('.exp-fold');
+  // Сколько прокрутки есть НА САМОМ ДЕЛЕ, считая и ту, что сейчас съедена
+  // сжатием: без этой поправки короткий список не даёт досворачиваться, и
+  // плашка застревает на полпути — числа уже не видно, а место они держат.
+  const скрыто = fold ? Math.max(0, (parseFloat(sum.style.getPropertyValue('--foldH')) || 0)
+                                    - fold.offsetHeight) : 0;
+  const запас = (mid.scrollHeight - mid.clientHeight) + скрыто;
+  // Прокручивать почти нечего — сворачиваться незачем: список и так весь на
+  // экране, а полшага сжатия выглядели бы поломкой.
+  const ход = Math.min(ПИН_ХОД, запас);
+  const t = ход < 24 ? 0 : Math.max(0, Math.min(1, (mid.scrollTop - 4) / ход));
+  sum.style.setProperty('--fold', t.toFixed(3));
 }
 
 function bindDayBars(){
@@ -20834,7 +20846,17 @@ function renderExpenses(){
   requestAnimationFrame(() => {
     bindDayBars();
     const f = sum && sum.querySelector('.exp-fold');
-    if(f) sum.style.setProperty('--foldH', f.scrollHeight + 'px');
+    if(!f) return;
+    // Мерить надо со снятым ограничением. Если день сменили на свёрнутой
+    // плашке, у блока стоит max-height:0 — и его scrollHeight тоже ноль.
+    // Записав такой ноль, мы запирали числа навсегда: высота нулевая, значит
+    // и развернуться некуда. Отсюда «застревает и дальше не едет».
+    const было = f.style.maxHeight;
+    f.style.maxHeight = 'none';
+    const h = f.scrollHeight;
+    f.style.maxHeight = было;
+    if(h > 0) sum.style.setProperty('--foldH', h + 'px');
+    глянутьПлашку();                 // с настоящей высотой доля считается заново
   });
   if(sum) sum.innerHTML = expDayRow(t.all) + `
     <div class="exp-fold">    <div class="exp-fold">

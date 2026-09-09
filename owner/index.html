@@ -1810,6 +1810,14 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-daybar .cal-btn:active{transform:none;background:var(--gold-soft)}
 .ck-daybar .cal-btn.on{background:var(--gold-soft);border-left-color:rgba(201,169,110,.35)}
 .ck-daybar .dayslide.back .cal-btn{border-left-color:rgba(201,169,110,.3);color:var(--gold2)}
+/* Карточка идёт за пальцем целиком — как карточка выручки на «Обзоре». Само
+   окошко внутри уже не двигается: тянуть надпись внутри неподвижной рамки
+   выглядело так, будто едет текст, а не день. */
+.dayslide.day-drag{transition:none}
+.dayslide.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+@media (prefers-reduced-motion:reduce){
+  .dayslide.day-back{transition-duration:.01s}
+}
 .ck-list{display:flex;flex-direction:column;gap:10px}
 /* Строка — та же плитка, что вход в чек-лист и настройки: 66 ростом,
    скруглена на 16, золотая кромка, название заглавными, подпись под ним,
@@ -12694,12 +12702,16 @@ function _setRail(id, html){
   if(el) el.innerHTML = html || '';
 }
 
-async function stkPicker(){
+async function stkPicker(тихо){
   STK.view = 'pick'; STK.sheet = null; STK.vals = {};
   _setRail('stkRail', '');            // обзор — это и есть «все районы»
-  _stkHead('Склад', 'загрузка…', false);
-  document.getElementById('stkMid').innerHTML =
-    '<div class="stk-empty">Загрузка…</div>';
+  // Листаем день — плитки остаются на месте и шиммерят; чистим экран только
+  // при первом заходе, когда показывать ещё нечего.
+  if(!тихо){
+    _stkHead('Склад', 'загрузка…', false);
+    document.getElementById('stkMid').innerHTML =
+      '<div class="stk-empty">Загрузка…</div>';
+  }
   let st, reg;
   try{
     // Реестр кодов — вторым запросом рядом: он отвечает на первый вопрос
@@ -14844,7 +14856,6 @@ function accDayBar(id){
 (function(){
   const ПОРОГ = 34, ПРЕДЕЛ = 70;
   let бар = null, x0 = null, y0 = null, dx = 0, вбок = false, свайпнули = false;
-  const окно = () => бар && бар.querySelector('.ds-win');
   const свой = () => бар && бар.id === 'ckDay';
   const день = () => свой() ? CKL_OFF : DAY_OFFSET;
   const цель = e => (e.target && e.target.closest)
@@ -14855,7 +14866,7 @@ function accDayBar(id){
     if(!бар) return;
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
     dx = 0; вбок = false;
-    const w = окно(); if(w) w.style.transition = '';
+    бар.classList.remove('day-back');
   }, {passive:true});
 
   document.addEventListener('touchmove', e => {
@@ -14871,13 +14882,18 @@ function accDayBar(id){
     }
     // Вперёд из сегодня хода нет — палец упирается в резину, а не уезжает.
     const d = (dx < 0 && день() <= 0) ? dx * 0.22 : dx;
-    const w = окно();
-    if(w) w.style.transform = `translateX(${Math.max(-ПРЕДЕЛ, Math.min(ПРЕДЕЛ, d))}px)`;
+    бар.classList.add('day-drag');
+    бар.style.transform = `translateX(${Math.max(-ПРЕДЕЛ, Math.min(ПРЕДЕЛ, d))}px)`;
   }, {passive:true});
 
   const конец = () => {
-    const w = окно();
-    if(w){ w.style.transition = 'transform .18s var(--e1)'; w.style.transform = ''; }
+    if(бар){
+      бар.classList.remove('day-drag');
+      бар.classList.add('day-back');
+      бар.style.transform = '';
+      const б = бар;
+      setTimeout(() => б.classList.remove('day-back'), 220);
+    }
     свайпнули = !!(бар && вбок && Math.abs(dx) > ПОРОГ);
     if(свайпнули){
       const off = Math.max(0, день() + (dx > 0 ? 1 : -1));
@@ -14898,6 +14914,19 @@ function accDayBar(id){
   }, true);
 })();
 
+// Листаем день — экран не пустеет. Карточки остаются на месте, а числа в них
+// шиммерят своей же шириной, пока едут новые: `is-skel` гасит цвет и красит
+// фон бегущим бликом, поэтому старое число превращается в плашку ровно того
+// размера, что займёт новое, и ничто не прыгает. Пустой экран на полсекунды
+// читается как «всё пропало», и глазу потом заново искать, куда он смотрел.
+//
+// Тот же приём, что на «Обзоре»: там числа выручки шиммерят, а плитки стоят.
+const DAY_SKEL = '.exp-tot-v, .exp-tot-r b, .acc-v, .stk-sub-n, .ck-h-v';
+function daySkel(rootId){
+  const box = document.getElementById(rootId); if(!box) return;
+  box.querySelectorAll(DAY_SKEL).forEach(e => e.classList.add('is-skel'));
+}
+
 // Перевели день — раздел перечитывает себя сам. Какой именно, видно по тому,
 // чья полоса сейчас на экране: обработчик один на оба.
 function accDayGo(off){
@@ -14907,8 +14936,12 @@ function accDayGo(off){
   DAY_OFFSET = off;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accLoadSummaries();                     // плитки учёта — за тот же день
-  if(document.getElementById('stkDay')){ ACC_STOCK = null; stkPicker(); return; }
-  if(document.getElementById('expDay')){ EXP.data = null; ACC_WO = null; accExpenses(); }
+  if(document.getElementById('stkDay')){
+    ACC_STOCK = null; daySkel('stkMid'); stkPicker(true); return;
+  }
+  if(document.getElementById('expDay')){
+    EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true);
+  }
 }
 
 function accDaySet(off){
@@ -15245,6 +15278,7 @@ async function accChecklist(keepDay){
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';
   if(!keepDay) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  else daySkel('accMid');            // листаем день — числа шиммерят на месте
   let _p = {};
   if(CKL_OFF) _p.day = _dayIsoFor(CKL_OFF);
   try{ const c = new URLSearchParams(location.search).get('case'); if(c) _p.case = c; }catch(e){}
@@ -16047,8 +16081,17 @@ function _accClose(){
 // смотрят за день, бой за месяц.
 let SH_TAB = 'exp';            // exp | wo
 
-async function accExpenses(){
+async function accExpenses(тихо){
   _setText('accTitle', 'Расходы смены');
+  // Листаем день — рамку не трогаем: обновляем только полосу дня, а числа уже
+  // шиммерят. Заходим в раздел впервые — собираем всё с нуля.
+  if(тихо){
+    const bar = document.getElementById('accMid').querySelector('.ck-daybar');
+    if(bar) bar.outerHTML = accDayBar('expDay');
+    shCounts();
+    await shTab(SH_TAB, true, true);
+    return;
+  }
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = accDayBar('expDay') + `
     <div class="periods" id="shTabs" style="margin:2px 0 12px">
@@ -16076,7 +16119,7 @@ async function shCounts(){
   });
 }
 
-async function shTab(t, first){
+async function shTab(t, first, тихо){
   SH_TAB = t;
   document.querySelectorAll('#shTabs button').forEach((b,i)=>
     b.classList.toggle('on', (i === 0) === (t === 'exp')));
@@ -16090,15 +16133,17 @@ async function shTab(t, first){
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 7h16M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/></svg>
       Списать самому</button></div>` : '';
-  if(t === 'exp'){ await accExpShell(); return; }
+  if(t === 'exp'){ await accExpShell(тихо); return; }
   await accWoAll();
 }
 
 // Никакого выбора срока: расходы людей смотрят за смену, и второй
 // переключатель поверх первого только заставлял выбирать там, где выбора нет.
-async function accExpShell(){
+async function accExpShell(тихо){
   const body = document.getElementById('expBody'); if(!body) return;
-  body.innerHTML = '<div id="expInner"><div class="exp-empty">Загрузка…</div></div>';
+  // Тихо — значит старое остаётся на экране и шиммерит, пока едет новое.
+  if(!тихо || !document.getElementById('expInner'))
+    body.innerHTML = '<div id="expInner"><div class="exp-empty">Загрузка…</div></div>';
   await accExpDay();
 }
 

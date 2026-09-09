@@ -4182,6 +4182,22 @@ button.path:active{transform:scale(.995)}
 /* Расходы: сводка дня и строки водителей */
 .exp-sum{border:1px solid var(--border2);border-radius:14px;background:var(--card);
   padding:13px 15px;margin-bottom:4px}
+/* День живёт в самой плашке расходов, а не отдельной полосой над ней: листают
+   не «дату», листают расходы за день, и ехать должно то, на что смотрят.
+   Части слайдера разобраны по местам: стрелки по краям строки, день в центре,
+   календарь справа за волоском. */
+.exp-day{display:flex;align-items:center;gap:2px;margin:-4px -6px 10px;
+  padding-bottom:9px;border-bottom:1px solid var(--border2)}
+.exp-day .ds-txt{flex:1;min-width:0}
+.exp-day .ds-txt b{font-size:14.5px}
+.exp-day.back .ds-txt b{color:var(--gold2)}
+.exp-day.back .ds-arw{color:var(--gold2)}
+.exp-day .cal-btn{width:34px;height:32px;margin-left:2px;border:0;
+  border-left:1px solid var(--border2);border-radius:0;background:none}
+.exp-day .cal-btn:active{transform:none;color:var(--gold2)}
+.exp-sum.day-drag{transition:none}
+.exp-sum.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+@media (prefers-reduced-motion:reduce){ .exp-sum.day-back{transition-duration:.01s} }
 .exp-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:8px}
 
 /* ── Журнал смен ─────────────────────────────────────────────────────────
@@ -14816,8 +14832,10 @@ let _dayDir = 0;
 
 // Разметка полосы дня — одна на все места, где она стоит. Различаются они
 // только тем, чей день листают: у чек-листа свой, у расходов и склада общий.
-// Чей день листает эта полоса. У чек-листа свой, у расходов со складом общий.
-function dayBarOff(el){ return el && el.id === 'ckDay' ? CKL_OFF : DAY_OFFSET; }
+// Чей день листает эта карточка. У чек-листа свой, у расходов со складом
+// общий. Хозяин дня помечен data-day: это может быть и отдельная полоса, и
+// плашка раздела — жест и перекраска от формы не зависят.
+function dayBarOff(el){ return el && el.dataset.day === 'ckl' ? CKL_OFF : DAY_OFFSET; }
 
 // Полоса рисуется один раз, дальше только перекрашивается. Заменять её узел на
 // каждый день нельзя: на нём висит жест и на нём же играет полёт карточки —
@@ -14842,7 +14860,9 @@ function dayBarPaint(el){
   const b = el.querySelector('.ds-txt b'), i = el.querySelector('.ds-txt i');
   if(b) b.textContent = имя;
   if(i) i.textContent = дата;
-  el.classList.toggle('back', off > 0);
+  // Золотом горит строка дня: у отдельной полосы это она сама, у плашки
+  // расходов — её верхняя строка, а не вся карточка.
+  (el.querySelector('.exp-day') || el).classList.toggle('back', off > 0);
   const вперёд = el.querySelectorAll('.ds-arw')[1];
   if(вперёд) вперёд.disabled = off <= 0;
 }
@@ -14857,7 +14877,8 @@ function dayBarHtml(id){
   // Разметка встанет в страницу на следующем кадре — тогда и вешаем жест.
   requestAnimationFrame(bindDayBars);
   return `<div class="ck-daybar">
-    <div class="dayslide${off ? ' back' : ''}" id="${id}">
+    <div class="dayslide${off ? ' back' : ''}" id="${id}"
+         data-day="${id === 'ckDay' ? 'ckl' : 'общий'}">
       <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
         >${стрелка('M15 5l-7 7 7 7')}</button>
       <div class="ds-win" onclick="dayBarHome(this)">
@@ -14879,7 +14900,7 @@ function accDayBar(id){ return dayBarHtml(id); }
 // сперва улетает карточка, данные догоняют. Некуда шагать — false, и жест сам
 // вернёт её на место.
 function dayBarStep(el, delta){
-  const свой = el.id === 'ckDay';
+  const свой = el.dataset.day === 'ckl';
   const было = dayBarOff(el);
   const next = Math.max(0, Math.min(365, было + delta));
   if(next === было) return false;
@@ -14891,11 +14912,11 @@ function dayBarStep(el, delta){
   return true;
 }
 function dayBarArrow(btn, delta){
-  const el = btn.closest('.dayslide');
+  const el = btn.closest('[data-day]');
   if(el && !dayBarStep(el, delta)) dayBarPaint(el);
 }
 function dayBarHome(win){
-  const el = win.closest('.dayslide');
+  const el = win.closest('[data-day]');
   if(el && dayBarOff(el)) dayBarStep(el, -dayBarOff(el));
 }
 
@@ -14903,7 +14924,7 @@ function dayBarHome(win){
 // подменённым днём. Полоса переживает смену дня, поэтому вешаем один раз и
 // помечаем; повторный проход по уже помеченным ничего не делает.
 function bindDayBars(){
-  document.querySelectorAll('.ck-daybar .dayslide').forEach(el => {
+  document.querySelectorAll('[data-day]').forEach(el => {
     dayBarPaint(el);
     if(el.dataset.swipe) return;
     el.dataset.swipe = '1';
@@ -14937,7 +14958,7 @@ function accDayGo(off){
   if(document.getElementById('stkDay')){
     ACC_STOCK = null; daySkel('stkMid'); stkPicker(true); return;
   }
-  if(document.getElementById('expDay')){
+  if(document.getElementById('expSum')){
     EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true);
   }
 }
@@ -16082,7 +16103,7 @@ async function accExpenses(тихо){
   // Листаем день — рамку не трогаем: обновляем только полосу дня, а числа уже
   // шиммерят. Заходим в раздел впервые — собираем всё с нуля.
   if(тихо){
-    dayBarPaint(document.getElementById('expDay'));
+    dayBarPaint(document.getElementById('expSum'));
     shCounts();
     await shTab(SH_TAB, true, true);
     return;
@@ -16095,7 +16116,7 @@ async function accExpenses(тихо){
       <div class="period-pill"></div>
       <button class="${SH_TAB === 'exp' ? 'on' : ''}" onclick="shTab('exp')">Водители</button>
       <button class="${SH_TAB === 'wo' ? 'on' : ''}" onclick="shTab('wo')">Брак / бой / утеря<i class="sh-n"></i></button>
-    </div>` + accDayBar('expDay') + `
+    </div>
     <div id="expBody"><div class="exp-empty">Загрузка…</div></div>`;
   const g = document.getElementById('shTabs'); if(g) requestAnimationFrame(()=>movePill(g));
   // Счётчик ждущих решения — на самой вкладке: иначе о заявке, висящей третий
@@ -16152,7 +16173,12 @@ async function accExpDay(){
   // День больше не пишем в шапку: его говорит полоса под ней, и второй раз
   // мелким шрифтом он только спорит сам с собой.
   _setText('accSub', '');
-  body.innerHTML = '<div class="exp-sum" id="expSum"></div><div id="expList"></div>';
+  // Каркас ставим один раз. Пересоздавать его на каждый день нельзя: на
+  // плашке висит жест и на ней же играет полёт — после подмены узла жест
+  // остался бы на элементе, которого на странице уже нет.
+  if(!document.getElementById('expSum'))
+    body.innerHTML = '<div class="exp-sum" id="expSum" data-day="общий"></div>'
+                   + '<div id="expList"></div>';
   renderExpenses();
 }
 
@@ -20677,7 +20703,23 @@ function renderExpenses(){
   const t = d.totals;
   const sum = document.getElementById('expSum');
   if(!sum) return;                    // экран раздела не открыт — рисовать негде
+  const {имя, дата} = dayBarLabels(DAY_OFFSET);
+  const стрелка = p => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+      stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+      ><path d="${p}"/></svg>`;
+  requestAnimationFrame(bindDayBars);
   if(sum) sum.innerHTML = `
+    <div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+      <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
+        >${стрелка('M15 5l-7 7 7 7')}</button>
+      <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
+      <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
+        ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+      <button class="cal-btn" onclick="openDate('expDay')" aria-label="Выбрать день"
+        ><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
+          width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
+    </div>
     <div class="exp-tot">
       <span class="exp-tot-v">${fmt(t.all)}</span>
       <span class="exp-tot-u">AED<br>за день</span>

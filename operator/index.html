@@ -3221,6 +3221,20 @@ function haptic(k){ try{ tg.HapticFeedback[k==='sel'?'selectionChanged':'impactO
 function showOv(id){ $(id).classList.add('show'); }
 function hideOv(id){ $(id).classList.remove('show'); }
 
+// Заказ, названный в адресе: под каждым заказом в боте стоит кнопка «Открыть
+// в приложении», и открывать она должна тот самый заказ, а не список вообще.
+// Номер держим до конца загрузки: карточка тянет заказ отдельным запросом и
+// умеет показать даже тот, которого нет в сегодняшней очереди, но до выбора
+// оператора открывать нечего — действия в ней от его имени.
+let _deepOid = '';
+try{ _deepOid = new URLSearchParams(location.search).get('order') || ''; }catch(e){}
+function deepOpen(){
+  const oid = _deepOid; if(!oid) return;
+  if(!curOp && !PINNED) return;          // сначала пусть скажет, кто он
+  _deepOid = '';                          // один раз за открытие
+  openOrder(oid);
+}
+
 // ── boot / auth gate ──
 async function boot(){
   try{
@@ -3272,6 +3286,7 @@ async function boot(){
     // Смена — первое, что оператор делает за день, и последнее, о чём он сам
     // вспомнит. Проверяем молча; открываем экран, только если открывать нечем.
     shiftCheck();
+    deepOpen();
   }catch(e){
     const denied = e.status===401 || e.status===403;
     $('gateMsg').innerHTML = denied
@@ -3357,6 +3372,7 @@ function pickOp(op){
   // Связь привязана к имени, а не к устройству: встали за другого — и звонки
   // его водителей теперь приходят сюда.
   try{ callInit(); }catch(e){}
+  deepOpen();                 // пришли по ссылке из бота — вот он, заказ
 }
 function pickDist(id){
   if(curDist!==id){

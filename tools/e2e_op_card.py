@@ -23,10 +23,20 @@ check(len(rows) == 1 and len(rows[0]) == 1, "одна кнопка")
 check(rows[0][0]["text"] == "Открыть в приложении", "текст кнопки")
 check("web_app" in rows[0][0], "это мини-апп, а не ссылка")
 check(rows[0][0]["web_app"]["url"].startswith("https://"), "адрес панели")
+check(rows[0][0]["web_app"]["url"].endswith("?order=777"), "адрес ведёт в этот заказ")
+check(op_card.app_url(None).endswith("/"), "без номера — просто панель")
+check(op_card.app_url("A/B 1") .endswith("?order=A%2FB%201"), "номер экранируется")
 
 g = kb(op_card, -100123)
 print("   группа:", json.dumps(g, ensure_ascii=False))
 check("web_app" not in json.dumps(g), "в группе кнопки мини-аппа нет")
+
+os.environ["OPERATOR_BOT_NAME"] = "ambar_op_bot"
+importlib.reload(op_card)
+g2 = kb(op_card, -100123)["inline_keyboard"]
+print("   группа с именем бота:", json.dumps(g2, ensure_ascii=False))
+check(g2[0][0]["url"].endswith("?start=order_777"), "в группе — ссылка на этот заказ в боте")
+os.environ.pop("OPERATOR_BOT_NAME", None)
 
 print("— вид «buttons» (прежний) —")
 os.environ["AMBAR_OP_CARD"] = "buttons"

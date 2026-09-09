@@ -20,6 +20,7 @@ AMBAR — как выглядит карточка нового заказа у 
 авария. Поэтому для группового чата тот же вход даётся ссылкой на бота.
 """
 import os
+from urllib.parse import quote
 
 BUTTONS = "buttons"      # пять кнопок под заказом
 APP = "app"              # заказ и одна кнопка «Открыть в приложении»
@@ -42,18 +43,30 @@ def _kb_buttons(oid, uid) -> dict:
     ]}
 
 
-def _kb_app(chat_id) -> dict:
-    """Новый вид: одна дверь в панель."""
+def app_url(oid=None) -> str:
+    """Адрес панели. С номером заказа — панель откроет сразу его карточку, а
+    не список: кнопка стоит под конкретным заказом, о нём и спрашивают."""
+    url = OPERATOR_WEBAPP_URL
+    if oid in (None, ""):
+        return url
+    склейка = "&" if "?" in url else "?"
+    return f"{url}{склейка}order={quote(str(oid), safe='')}"
+
+
+def _kb_app(oid, chat_id) -> dict:
+    """Новый вид: одна дверь — прямо в этот заказ."""
     try:
         личка = int(chat_id or 0) >= 0
     except (TypeError, ValueError):
         личка = True
     if личка:
         кнопка = {"text": "Открыть в приложении",
-                  "web_app": {"url": OPERATOR_WEBAPP_URL}}
+                  "web_app": {"url": app_url(oid)}}
     elif OPERATOR_BOT_NAME:
+        # В группе мини-апп не открыть, но заказ назвать можно: бот со
+        # /start order_<id> уже умеет показать его карточку.
         кнопка = {"text": "Открыть в приложении",
-                  "url": f"https://t.me/{OPERATOR_BOT_NAME}"}
+                  "url": f"https://t.me/{OPERATOR_BOT_NAME}?start=order_{oid}"}
     else:
         return {"inline_keyboard": []}
     return {"inline_keyboard": [[кнопка]]}
@@ -63,7 +76,7 @@ def order_kb(oid, uid=0, chat_id=None) -> dict:
     """Клавиатура под карточкой нового заказа — та, что выбрана в CARD."""
     if CARD == BUTTONS:
         return _kb_buttons(oid, uid)
-    return _kb_app(chat_id)
+    return _kb_app(oid, chat_id)
 
 
 def order_kb_for(oid, uid=0):

@@ -14833,6 +14833,71 @@ function accDayBar(id){
   return dayBarHtml(id, DAY_OFFSET, 'accDayGo', 'accDayGo(0)');
 }
 
+// Свайп по полосе дня — тот же жест, что на карточке выручки: слева направо
+// листает назад во времени, обратно — к сегодня. Двум разным способам листать
+// день учиться незачем.
+//
+// Слушаем документ, а не саму полосу: полоса перерисовывается целиком на
+// каждый день, и обработчик, повешенный на элемент, пережил бы ровно один
+// свайп. По той же причине здесь один обработчик на все три полосы — расходы,
+// склад и чек-лист, — а чей день листать, решает id.
+(function(){
+  const ПОРОГ = 34, ПРЕДЕЛ = 70;
+  let бар = null, x0 = null, y0 = null, dx = 0, вбок = false, свайпнули = false;
+  const окно = () => бар && бар.querySelector('.ds-win');
+  const свой = () => бар && бар.id === 'ckDay';
+  const день = () => свой() ? CKL_OFF : DAY_OFFSET;
+  const цель = e => (e.target && e.target.closest)
+    ? e.target.closest('.ck-daybar .dayslide') : null;
+
+  document.addEventListener('touchstart', e => {
+    бар = e.touches.length === 1 ? цель(e) : null;
+    if(!бар) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+    dx = 0; вбок = false;
+    const w = окно(); if(w) w.style.transition = '';
+  }, {passive:true});
+
+  document.addEventListener('touchmove', e => {
+    if(!бар || x0 === null) return;
+    dx = e.touches[0].clientX - x0;
+    const dy = e.touches[0].clientY - y0;
+    // Пока непонятно, куда ведут палец, полосу не трогаем: страница под ней
+    // прокручивается, и дёргать день на вертикальном движении нельзя.
+    if(!вбок){
+      if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      вбок = Math.abs(dx) > Math.abs(dy);
+      if(!вбок){ бар = null; return; }
+    }
+    // Вперёд из сегодня хода нет — палец упирается в резину, а не уезжает.
+    const d = (dx < 0 && день() <= 0) ? dx * 0.22 : dx;
+    const w = окно();
+    if(w) w.style.transform = `translateX(${Math.max(-ПРЕДЕЛ, Math.min(ПРЕДЕЛ, d))}px)`;
+  }, {passive:true});
+
+  const конец = () => {
+    const w = окно();
+    if(w){ w.style.transition = 'transform .18s var(--e1)'; w.style.transform = ''; }
+    свайпнули = !!(бар && вбок && Math.abs(dx) > ПОРОГ);
+    if(свайпнули){
+      const off = Math.max(0, день() + (dx > 0 ? 1 : -1));
+      свой() ? ckDaySet(off) : accDayGo(off);
+    }
+    бар = null; x0 = null; y0 = null; dx = 0; вбок = false;
+  };
+  document.addEventListener('touchend', конец);
+  document.addEventListener('touchcancel', конец);
+
+  // После свайпа палец отпускается над окошком, а на нём висит «вернуться к
+  // сегодня». Без этого один жест делал бы два дела сразу: листнул и тут же
+  // прыгнул домой. Гасим этот один клик, до того как он дойдёт до окошка.
+  document.addEventListener('click', e => {
+    if(!свайпнули) return;
+    свайпнули = false;
+    if(цель(e)){ e.stopPropagation(); e.preventDefault(); }
+  }, true);
+})();
+
 // Перевели день — раздел перечитывает себя сам. Какой именно, видно по тому,
 // чья полоса сейчас на экране: обработчик один на оба.
 function accDayGo(off){

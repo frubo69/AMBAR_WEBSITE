@@ -14008,7 +14008,7 @@ async function audReopen(){
   const решено = !!((a.short && a.short.resolved_at) || (a.over && a.over.resolved_at));
   const ok = await askDialog('Возобновить ревизию?',
     решено ? 'Удержание снимется, переезды вернутся, пересчёт запишется заново'
-           : 'Пересчёт запишется заново при завершении', 'Возобновить', 'Не надо');
+           : 'Пересчёт запишется заново при завершении', 'Возобновить', 'Вернуться назад');
   if(!ok) return;
   try{ await ownerApi.ownerFetch('/api/owner/stock/audit/reopen', {method:'POST',
         body:{district: STK.district, day: sh.day, as: _meName()}}); }
@@ -14200,7 +14200,7 @@ async function audShortNone(){
   const rep = STK.report, s = rep && rep.audit && rep.audit.short; if(!s) return;
   const ok = await askDialog('Списать без виновного?',
     `${fmt(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')} · ${fmt(s.aed || 0)} AED за счёт компании`,
-    'Списать', 'Не надо');
+    'Списать', 'Вернуться назад');
   if(!ok) return;
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/short', {method:'POST',
@@ -20824,7 +20824,7 @@ function askDialog(t, sub, okLabel, cancelLabel, okClass){
     box.innerHTML = `<div class="crw-ask-t">${escS(t)}</div>
       ${sub ? `<div class="crw-ask-s">${escS(sub)}</div>` : ''}
       <button class="crw-ask-b ${okClass || 'go'}" id="askOk">${escS(okLabel || 'Да')}</button>
-      <button class="crw-ask-b no" id="askNo">${escS(cancelLabel || 'Не надо')}</button>`;
+      <button class="crw-ask-b no" id="askNo">${escS(cancelLabel || 'Вернуться назад')}</button>`;
     document.body.append(back, box);
     box.querySelector('#askOk').onclick = () => { closePinPop(); resolve(true); };
     box.querySelector('#askNo').onclick = () => { closePinPop(); resolve(false); };
@@ -25639,7 +25639,7 @@ function shEmpty(kind){
 
 // «Списаний не было» — отметка с автором, а не пустота.
 async function woNoneSet(on){
-  if(on && !await askDialog('Списаний не было?', `${accDayWord()} · отметка с вашим именем`, 'Отметить', 'Не надо')) return;
+  if(on && !await askDialog('Списаний не было?', `${accDayWord()} · отметка с вашим именем`, 'Отметить', 'Вернуться назад')) return;
   if(!await accAskBack('Отметка «списаний не было»')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff/none',
@@ -26218,7 +26218,7 @@ async function woDecide(ev, id, ok){
   if(!ok){
     const yes = await askDialog('Отклонить списание?',
       r ? `${r.name} × ${fmt(r.qty)} · останется недостачей${r.by ? ' у ' + r.by : ''}`
-        : 'Бутылки останутся недостачей на водителе', 'Отклонить', 'Не надо', 'bad');
+        : 'Бутылки останутся недостачей на водителе', 'Отклонить', 'Вернуться назад', 'bad');
     if(!yes) return false;
   }
   const box = document.getElementById('wo-' + id);

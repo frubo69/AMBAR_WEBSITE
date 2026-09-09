@@ -4187,14 +4187,32 @@ button.path:active{transform:scale(.995)}
 /* Прилипает к самому краю раздела, а не к его внутреннему полю: липкий
    элемент отсчитывает top от поля контейнера, и в эти десять точек над ним
    пролезал уезжающий список. Поэтому поднимаем блок на них же и возвращаем
-   их своим паддингом — полоса фона закрывает щель. */
-.exp-pin{position:sticky;top:-10px;z-index:4;background:var(--bg);
-  margin:-10px -14px 0;padding:12px 14px 8px}
+   их своим паддингом.
+   Сплошной чёрной плиты за вкладками и плашкой нет: она резала список ровной
+   чертой поперёк экрана. Вместо неё — размытие, и внизу оно сходит на нет:
+   список видно, но он уходит в глубину, а карточки висят над ним. */
+.exp-pin{position:sticky;top:-10px;z-index:4;background:none;
+  margin:-10px -14px 0;padding:12px 14px 10px}
+.exp-pin::before{content:'';position:absolute;inset:0;z-index:-1;
+  background:rgba(0,0,6,.5);
+  -webkit-backdrop-filter:blur(18px) saturate(1.2);
+          backdrop-filter:blur(18px) saturate(1.2);
+  -webkit-mask-image:linear-gradient(#000 76%,transparent);
+          mask-image:linear-gradient(#000 76%,transparent)}
 .exp-sum{border:1px solid var(--border2);border-radius:14px;background:var(--card);
   padding:13px 15px;margin-bottom:0}
 /* Карточки расходов начинаются чуть ниже закреплённой шапки — так видно, что
    они уезжают под неё, а не приклеены к ней. */
 #expList{margin-top:12px}
+/* Листаем вниз — числа уезжают вверх, остаётся полоска дня. Внизу списка они
+   не нужны: там смотрят, кто сколько взял, а итог за день уже прочитан. Назад
+   к началу — возвращаются сами. */
+.exp-fold{overflow:hidden;max-height:320px;opacity:1;
+  transition:max-height .26s var(--e1),opacity .18s var(--e1)}
+.exp-sum.min .exp-fold{max-height:0;opacity:0}
+.exp-sum.min .exp-day{margin-bottom:0;padding-bottom:0;border-bottom-color:transparent}
+.exp-sum{transition:padding .26s var(--e1)}
+.exp-sum.min{padding-top:9px;padding-bottom:9px}
 /* День живёт в самой плашке расходов, а не отдельной полосой над ней: листают
    не «дату», листают расходы за день, и ехать должно то, на что смотрят.
    Части слайдера разобраны по местам: стрелки по краям строки, день в центре,
@@ -14936,6 +14954,29 @@ function dayBarHome(win){
 // Жест вешаем на саму полосу — тот же daySwipe, что у карточки выручки, с
 // подменённым днём. Полоса переживает смену дня, поэтому вешаем один раз и
 // помечаем; повторный проход по уже помеченным ничего не делает.
+// Плашка расходов сворачивается на прокрутке: ушли вниз — числа уезжают
+// вверх, остаётся полоска дня; вернулись к началу — числа приходят обратно.
+// Два порога, а не один: с одним плашка дрожала бы на границе, схлопываясь и
+// разворачиваясь от каждого движения пальца.
+function pinWatch(){
+  const mid = document.getElementById('accMid');
+  if(!mid || mid.dataset.pin) return;
+  mid.dataset.pin = '1';
+  const глянуть = () => {
+    const sum = document.getElementById('expSum');
+    if(!sum) return;
+    const свёрнут = sum.classList.contains('min');
+    const надо = свёрнут ? mid.scrollTop >= 12 : mid.scrollTop > 40;
+    if(надо === свёрнут) return;
+    sum.classList.toggle('min', надо);
+    // Сворачивание укорачивает содержимое, и прокрутка может сама уехать
+    // вверх — нового события при этом не будет, и плашка залипла бы свёрнутой
+    // на самом верху списка. Поэтому дочитываем состояние следующим кадром.
+    requestAnimationFrame(глянуть);
+  };
+  mid.addEventListener('scroll', глянуть, {passive:true});
+}
+
 function bindDayBars(){
   document.querySelectorAll('[data-day]').forEach(el => {
     dayBarPaint(el);
@@ -16194,6 +16235,7 @@ async function accExpDay(){
   // В теле — только список, он и перерисовывается.
   const sum = document.getElementById('expSum');
   if(sum) sum.hidden = false;
+  pinWatch();
   if(!document.getElementById('expList'))
     body.innerHTML = '<div id="expList"></div>';
   renderExpenses();
@@ -20737,6 +20779,7 @@ function renderExpenses(){
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
           width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
     </div>
+    <div class="exp-fold">
     <div class="exp-tot">
       <span class="exp-tot-v">${fmt(t.all)}</span>
       <span class="exp-tot-u">AED<br>за день</span>
@@ -20755,7 +20798,7 @@ function renderExpenses(){
         t.total_drivers ? t.marked / t.total_drivers * 100 : 0}%"></div></div>
       <span>${t.working} на смене · ${t.off} дома</span>
     </div>
-    ${expHeld(d)}`;
+    ${expHeld(d)}</div>`;
 
   // Водители сгруппированы по районам — тем же порядком B1…B5, что и везде.
   const list = document.getElementById('expList');

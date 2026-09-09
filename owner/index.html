@@ -13738,7 +13738,10 @@ function audPage(){
       STK.audMore ? rest.map(audRow).join('') : ''}` : ''}</div>`;
   // Внизу — всегда следующий шаг работы. У завершённой это «возобновить»:
   // забыли полку, спутали район — всякое бывает; отчёт открывается из карточки.
-  const go = st === 'idle'    ? ['audStart()', 'Начать ревизию']
+  // Ни одного кода на районе — камере нечего узнавать, и ревизия сказала бы
+  // «всё пропало» про полку, которую просто не заводили. Сначала вносят.
+  const go = st === 'idle' && !sh.coded ? ['audQrGo()', 'Внести QR коды']
+           : st === 'idle'    ? ['audStart()', 'Начать ревизию']
            : st === 'running' ? ['audScanOpen()', 'Продолжить сканирование']
            :                    ['audReopen()', 'Возобновить ревизию'];
   document.getElementById('stkFoot').innerHTML =
@@ -13773,9 +13776,16 @@ async function audStart(){
 async function audFinish(){
   const sh = STK.sheet; if(!sh) return;
   const t = sh.totals || {};
-  const ok = await askDialog('Завершить ревизию?',
-    `${fmt(t.actual || 0)} из ${fmt(t.expected || 0)} бутылок · не хватает ${fmt(t.short_qty || 0)}`
-    + ` · излишек ${fmt(t.over_qty || 0)}`, 'Завершить', 'Не сейчас');
+  // Ни одного скана при непустой полке — это не итог, а случайное нажатие:
+  // всё, что числится, ушло бы в недостачу. Спрашиваем красным.
+  const пусто = !(t.actual || 0) && (t.expected || 0) > 0;
+  const ok = пусто
+    ? await askDialog('Камера не увидела ни одной бутылки',
+        `Всё, что числится, уйдёт в недостачу: ${fmt(t.expected)} бут${t.short_aed ? ' · ' + fmt(t.short_aed) + ' AED' : ''}`,
+        'Всё равно завершить', 'Вернуться к сканированию', 'bad')
+    : await askDialog('Завершить ревизию?',
+        `${fmt(t.actual || 0)} из ${fmt(t.expected || 0)} бутылок · не хватает ${fmt(t.short_qty || 0)}`
+        + ` · излишек ${fmt(t.over_qty || 0)}`, 'Завершить', 'Не сейчас');
   if(!ok) return;
   const b = document.querySelector('.aud-fin');
   if(b){ b.disabled = true; b.textContent = 'Закрываю…'; }
@@ -20455,7 +20465,7 @@ function supCancelBtn(sup){
 
 // Окно-вопрос с обещанием: «да» — true, всё остальное — false. Родной confirm
 // выглядел чужим окном системы посреди панели.
-function askDialog(t, sub, okLabel, cancelLabel){
+function askDialog(t, sub, okLabel, cancelLabel, okClass){
   return new Promise(resolve => {
     closePinPop();
     const back = document.createElement('div');
@@ -20465,7 +20475,7 @@ function askDialog(t, sub, okLabel, cancelLabel){
     box.className = 'pin-pop crw-ask';
     box.innerHTML = `<div class="crw-ask-t">${escS(t)}</div>
       ${sub ? `<div class="crw-ask-s">${escS(sub)}</div>` : ''}
-      <button class="crw-ask-b go" id="askOk">${escS(okLabel || 'Да')}</button>
+      <button class="crw-ask-b ${okClass || 'go'}" id="askOk">${escS(okLabel || 'Да')}</button>
       <button class="crw-ask-b no" id="askNo">${escS(cancelLabel || 'Не надо')}</button>`;
     document.body.append(back, box);
     box.querySelector('#askOk').onclick = () => { closePinPop(); resolve(true); };

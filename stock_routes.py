@@ -1669,11 +1669,19 @@ async def handle_audit_sheet(request):
         rows, counted = await _audit_lines(district, day)
         totals = _audit_totals(rows)
     stats = await db.audit_scan_stats(district, day)
+    try:
+        coded = sum((await db.qr_by_product_district(district)).values())
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[audit] коды района не посчитаны ({district}): {e}")
+        coded = 0
     return web.json_response({
         "district": district,
         "district_name": OFFICE_NAMES.get(district, district),
         "district_code": OFFICE_CODES.get(district, ""),
         "day": day, "counted": counted, "rows": rows, "totals": totals,
+        # Сколько бутылок на районе заведено кодами. Ноль — ревизии нечего
+        # считать, камера ответит «нет в реестре» на каждую бутылку.
+        "coded": int(coded),
         "audit": _audit_view(a), "scan": stats,
     }, headers=CORS_HEADERS)
 

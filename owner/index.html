@@ -715,6 +715,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-t.tap:active{transform:scale(.98)}
 .aud-t.tap::after{content:'';position:absolute;top:11px;right:10px;width:6px;height:6px;
   border-right:1.8px solid var(--muted);border-top:1.8px solid var(--muted);transform:rotate(45deg)}
+.aud-t.tap .aud-tl{padding-right:14px}
 .aud-tl{display:block;font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
   color:var(--muted);margin-bottom:9px;line-height:1.25;min-height:2.5em}
 .aud-tv{display:block;font-family:'DM Sans',sans-serif;font-size:26px;font-weight:700;line-height:1;
@@ -725,6 +726,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-t.warn .aud-tv{color:var(--warn)}
 .aud-t.ok .aud-tv{color:var(--up)}
 .aud-t.dim .aud-tv{color:var(--dim)}
+.aud-t.gold .aud-tv{color:var(--gold2)}
 /* Завершить — полосой внизу карточки; горит, только когда ревизия идёт. */
 .aud-fin{display:block;width:100%;padding:13px;border:0;
   border-top:1px solid rgba(201,169,110,.14);background:transparent;cursor:pointer;
@@ -770,6 +772,41 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-more.open svg{transform:rotate(180deg)}
 .aud-more:active{background:var(--card2)}
 .qb.quiet{background:var(--card);color:var(--sub);box-shadow:none;border:1px solid var(--border2)}
+
+/* ── Склад: одна анатомия карточек ─────────────────────────────────────────
+   Шапка заглавными с волоском, тело — плитки (та же анатомия, что в ревизии)
+   или строки: слово слева, число справа, кружок-шеврон. Нижние карточки
+   делят свободную высоту, чтобы страница занимала экран целиком. */
+.sc{margin:0 0 10px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+.sc-cap{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 16px;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;border-bottom:1px solid rgba(201,169,110,.14)}
+.sc-cap span{flex:1}
+.sc-cap i{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.2px;
+  text-transform:none;color:var(--muted)}
+.sc-r{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 16px;
+  border:0;border-top:1px solid rgba(255,255,255,.05);background:transparent;cursor:pointer;
+  font-family:inherit;color:var(--text);text-align:left;-webkit-tap-highlight-color:transparent}
+.sc-cap + .sc-r{border-top:0}
+.sc-r:active{background:var(--card2)}
+.sc-r span{flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.sc-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.sc-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:4px;letter-spacing:.2px}
+.sc-r em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
+.sc-r.dn{color:var(--dn)} .sc-r.dn b{color:var(--dn)} .sc-r.dn b u{color:var(--dn);opacity:.8}
+.sc-r.dn em{color:var(--dn);background:var(--dn-soft)}
+.stk-mid:has(> .sc-page){display:flex;flex-direction:column}
+.sc-page{flex:1;display:flex;flex-direction:column;min-height:100%}
+.sc-page .ck-daybar{margin-bottom:10px}
+.sc-page .sc.grow{flex:1 1 0;display:flex;flex-direction:column;min-height:0}
+.sc-page .sc.grow .sc-r{flex:1 1 0;min-height:52px;max-height:80px}
+.sc-page .sc.grow:last-child{margin-bottom:0}
 
 /* Камера ревизии — слоем поверх списка: выезжает снизу и уезжает обратно, а
    список всё это время стоит под ней на своём месте. */
@@ -13022,57 +13059,32 @@ async function stkPicker(тихо){
     return;
   }
   STK.districts = st.districts;
-  // Дата ушла из подписи: её теперь говорит полоса дня под шапкой, и повторять
-  // её вторым мелким шрифтом незачем.
-  _stkHead('Склад', `${st.done} из ${st.total} ${
-    pluralize(st.total || 0, 'район', 'района', 'районов')}`, false);
-  // Плитками, а не строками: пять строк во всю ширину оставляли под собой
-  // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
-  // в деньгах там, где считали, и прочерк там, где ещё нет.
-  // Четыре плитки той же анатомии, что на «Учёте»: две работы и две истории.
-  // Районы с главной ушли: их спрашивает ревизия, когда до них доходит дело,
-  // а числа по районам открывает карточка стоимости.
+  // Подпись — оглавление раздела через косую, как на плитке «Учёта».
+  _stkHead('Склад', 'остатки / ревизия / перемещение', false);
+  // Три карточки одной анатомии: шапка заглавными с волоском, под ней плитки
+  // или строки. Раньше здесь были плитки на три лада — карточка стоимости с
+  // заголовком-простынёй, две большие плитки «Учёта» и их истории половинками,
+  // — и страница читалась как склад разных приёмов, а не одна вещь.
   const today = st.day || accDay();
   const сегодня = (STK.moves30 || []).filter(m => m.day === today)
     .reduce((a, m) => a + (m.bottles || m.qty || 0), 0);
-  const tile = (go, ico, t, v, u, sub) => `<button class="acc-cell" onclick="${go}">
-      <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
-      <span class="acc-t">${t}</span>
-      <span class="acc-n"><span class="acc-v">${v}</span><i>${escS(u)}</i></span>
-      <span class="acc-s">${escS(sub)}</span>
-    </button>`;
-  const I_AUD = '<path d="M9 11l2 2 4-4"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
-  const I_MOV = '<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>';
-  const I_HAUD = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
-  const I_HMOV = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 9l3 3-3 3"/>';
   const nAud = (STK.audits || []).length, nMov = (STK.moves30 || []).length;
-  // Две колонки: слева ревизия, справа перемещение, у каждой под низом
-  // своя история — плиткой вдвое ниже, как дополнение к главной, а не
-  // равная ей.
-  const sub = (go, ico, t, v, u) => `<button class="stk-sub" onclick="${go}">
-      <span class="stk-sub-i"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
-        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
-      <span class="stk-sub-b">
-        <span class="stk-sub-t">${t}</span>
-        <span class="stk-sub-n">${v}<i>${escS(u)}</i></span>
-      </span>
-    </button>`;
-  document.getElementById('stkMid').innerHTML =
-    accDayBar('stkDay') + stkValueCard(reg) +
-    `<div class="stk-tiles2">
-      <div class="stk-col">
-        ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
-               'район / камера / отчёт')}
-        ${sub('stkAudits()', I_HAUD, 'История', fmt(nAud),
-              pluralize(nAud, 'ревизия', 'ревизии', 'ревизий'))}
-      </div>
-      <div class="stk-col">
-        ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(сегодня), 'сегодня',
-               'скан / куда везём')}
-        ${sub('stkMovesHist()', I_HMOV, 'История', fmt(nMov), 'за 30 дней')}
-      </div>
-    </div>`;
+  document.getElementById('stkMid').innerHTML = `<div class="sc-page">` +
+    accDayBar('stkDay') + stkValueCard(reg) + `
+    <div class="sc grow">
+      <div class="sc-cap"><span>Ревизия</span></div>
+      <button class="sc-r" onclick="stkAuditPick()"><span>По районам</span>
+        <b>${fmt(st.done || 0)}<u>из ${st.total || 0}</u></b><em>${_SC_CHEV}</em></button>
+      <button class="sc-r" onclick="stkAudits()"><span>История</span>
+        <b>${fmt(nAud)}<u>${pluralize(nAud, 'ревизия', 'ревизии', 'ревизий')}</u></b><em>${_SC_CHEV}</em></button>
+    </div>
+    <div class="sc grow">
+      <div class="sc-cap"><span>Перемещение</span></div>
+      <button class="sc-r" onclick="stkMoveStart()"><span>Сканировать</span>${
+        сегодня ? `<b>${fmt(сегодня)}<u>сегодня</u></b>` : ''}<em>${_SC_CHEV}</em></button>
+      <button class="sc-r" onclick="stkMovesHist()"><span>История</span>
+        <b>${fmt(nMov)}<u>за 30 дней</u></b><em>${_SC_CHEV}</em></button>
+    </div></div>`;
 }
 
 // ── Ревизия: сперва район ───────────────────────────────────────────────────
@@ -13181,38 +13193,30 @@ async function stkMovesHist(){
 // Закупка бывает известна не по всем полкам: цену части позиций мы просто не
 // знаем, и рядом с суммой стоит, какую долю она покрывает. Сумма без этой
 // оговорки выглядела бы полной, будучи посчитанной по половине склада.
+const _SC_CHEV = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+  stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>`;
 function stkValueCard(reg){
   const v = STK.val, t = (v && v.totals) || null;
   const bottles = t ? t.bottles : ((reg && reg.totals && reg.totals.left) || 0);
   const без = (reg && reg.unscanned_total) || 0;
-  const cover = v ? (v.cost_cover || 0) : 0;
-  return `<div class="stkv">
-    <div class="stkv-cap">Всего на всех складах</div>
-    <div class="stkv-g">
-      <div class="stkv-c gold">
-        <div class="stkv-l">Количество<small>шт</small></div>
-        <div class="stkv-v">${fmt(bottles)}</div>
-      </div>
-      <button class="stkv-c tap gold" onclick="ordPrices()" aria-label="Закупочные цены">
-        <div class="stkv-l">Цена закупки<small>AED</small></div>
-        <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
-      </button>
-      <button class="stkv-c tap gold" onclick="ordPrices()" aria-label="Цены">
-        <div class="stkv-l">Цена продажи<small>AED</small></div>
-        <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
-      </button>
+  // Три величины — три плитки той же анатомии, что в ревизии: подпись,
+  // число, единица. Золото — на деньгах, количество белым. Цены — кнопки:
+  // за ними закупочные цены по позициям.
+  return `<div class="sc">
+    <div class="sc-cap"><span>Остатки</span></div>
+    <div class="aud-g">
+      <div class="aud-t"><span class="aud-tl">Количество</span>
+        <b class="aud-tv">${fmt(bottles)}</b><span class="aud-tu">бут</span></div>
+      <button class="aud-t tap gold" onclick="ordPrices()" aria-label="Закупочные цены">
+        <span class="aud-tl">Цена закупки</span>
+        <b class="aud-tv">${t ? fmt(Math.round(t.cost)) : '—'}</b><span class="aud-tu">AED</span></button>
+      <button class="aud-t tap gold" onclick="ordPrices()" aria-label="Цены">
+        <span class="aud-tl">Цена продажи</span>
+        <b class="aud-tv">${t ? fmt(Math.round(t.list)) : '—'}</b><span class="aud-tu">AED</span></button>
     </div>
-    ${без ? `<button class="stkv-qr" onclick="accOpen('qr')" aria-label="Внести коды">
-      <span>QR код не внесён</span>
-      <b>${fmt(без)}<i>${pluralize(без,'бутылка','бутылки','бутылок')}</i></b>
-      <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-           stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></em>
-    </button>` : ''}
-    <button class="stkv-go" onclick="stkByDistrict()">
-      <span>Список с разбивкой по районам</span>
-      <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-           stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></em>
-    </button>
+    ${без ? `<button class="sc-r dn" onclick="accOpen('qr')"><span>QR код не внесён</span>
+      <b>${fmt(без)}<u>${pluralize(без, 'бутылка', 'бутылки', 'бутылок')}</u></b><em>${_SC_CHEV}</em></button>` : ''}
+    <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>
   </div>`;
 }
 

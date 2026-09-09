@@ -33,6 +33,14 @@ import db
 log = logging.getLogger("supply-nag")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
+
+# Выключено 9 сен 2026 по просьбе владельца: напоминание приходило раз в час и
+# на большом недосканированном районе висело в чате сутками. Код цел и никуда
+# не убран — вернуть значит поставить True (или AMBAR_NOSCAN_NAG=1 в .env на
+# сервере) и перезапустить ambar-api. Чек-лист смены строку по-прежнему
+# показывает: долг виден, просто бот о нём не пишет.
+ON = os.getenv("AMBAR_NOSCAN_NAG", "").strip().lower() in ("1", "true", "yes", "on")
+
 EVERY_MIN = 60
 QUIET_FROM, QUIET_TO = 1, 7          # часы по Дубаю, когда не пишем
 
@@ -115,6 +123,15 @@ async def tick(now: datetime = None) -> dict:
     """Один проход. Возвращает, что нашли, — этим же пользуется проверка."""
     now = now or datetime.now(timezone.utc)
     token = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
+    if not ON:
+        # Выключили при живом сообщении в чате — снимаем его: обновлять его
+        # больше некому, а висеть оно будет как настоящее.
+        for cid in list(_LAST):
+            if token:
+                await _drop(token, cid)
+            else:
+                _LAST.pop(cid, None)
+        return {"tasks": 0, "skip": "выключено"}
     import supply_routes
     tasks = await supply_routes.noscan_tasks()
     if not tasks:
@@ -155,6 +172,8 @@ async def tick(now: datetime = None) -> dict:
 async def loop(app=None):
     """Раз в минуту смотрим, пора ли. Сама частота — час, в tick."""
     await asyncio.sleep(30)            # дать серверу подняться
+    if not ON:
+        log.info("[supply-nag] выключен (AMBAR_NOSCAN_NAG не задан) — не пишем")
     while True:
         try:
             await tick()

@@ -3039,6 +3039,10 @@ button.path:active{transform:scale(.995)}
   letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-top:2px}
 /* Пустой список баз — окошко посреди экрана, а не строка текста. */
 .xs-empty{min-height:62vh;display:flex;align-items:center;justify-content:center}
+/* Сигареты на «Других базах» — карточкой над списком заявок; пустой список
+   под ней не растягивается на весь экран. */
+.xs-tob{margin:0 0 12px}
+.xs-empty.after{min-height:0;padding:22px 0 10px}
 .xs-ecard{width:100%;max-width:320px;margin:0;padding:34px 22px 30px}
 .xs-ecard .sh-empty-i{width:64px;height:64px;border-radius:22px;color:var(--gold2);
   background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
@@ -16222,6 +16226,7 @@ async function chkDot(){
 //
 // Здесь один список на всё окно с разбивкой по районам. Разбивка и есть ответ:
 // сначала район со своим итогом, под ним его заказы.
+let ORD = null;   // расчёт заявки: заполняет accOrder, читают заявка и «Другие базы»
 let ORDS = null, ORDF = {district:'', status:'', q:''}, _ordsQT = null, _ordsWant = null, _ordsSeq = 0;
 // Открыть историю сразу на нужном районе — из карточки района.
 function ordsOpen(d){ _ordsWant = d || ''; try{ closeDetail(); }catch(e){} accOpen('orders'); }
@@ -17564,7 +17569,10 @@ function pathPaint(){
 // Что берём не в магазине. Сигареты считаются тем же расчётом — норма минус
 // остаток, — но в файл магазину не попадают и на общие числа заявки не влияют.
 // Показать их всё равно надо: иначе «сколько докупить» знает только программа.
-function ordSeparate(d, dist){
+// Живёт карточка на экране «Другие базы», а не в заявке магазину: табак и
+// берут на другой базе (владелец: «сигареты спрячь в доп. заявку»). `fn` —
+// кто сворачивает карточку на этом экране: там свой перерисовщик.
+function ordSeparate(d, dist, fn = 'ordFold'){
   const rows = d.tobacco_rows || [];
   if(!rows.length) return '';
   const code = o => (dist.find(x => x.id === o) || {}).code || o;
@@ -17573,9 +17581,9 @@ function ordSeparate(d, dist){
   // Сигареты — той же карточкой, что районы: в квадрате значок вместо кода,
   // название заглавными, оглавление через косую, справа сколько. Слова о том,
   // что их берут не в магазине, тут нет: это и так известно всем, кто закупает.
-  return `<div class="ord-dists" style="margin-top:10px">
+  return `<div class="ord-dists">
     <div class="shl-card ord-dc${open ? ' open' : ''}" data-fold="ordd-tobacco">
-      <button class="shl-h ord-dh" onclick="ordFold('tobacco')">
+      <button class="shl-h ord-dh" onclick="${fn}('tobacco')">
         <span class="shl-code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
           stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="11" width="16" height="5" rx="1.2"/><path d="M20 11v5M15 11v5"/>
@@ -17595,9 +17603,32 @@ function ordSeparate(d, dist){
             .map(([o, c]) => `${escS(code(o))}·${c.need}`).join(' ') || 'по норме хватает'}</span>
           <span class="ord-r-v">${fmt(r.need_total)}</span>
         </div>
-      </div>`).join('')}${foldEnd(rows.length, "ordFold('tobacco', 1)")}</div>` : ''}
+      </div>`).join('')}${foldEnd(rows.length, `${fn}('tobacco', 1)`)}</div>` : ''}
     </div>
   </div>`;
+}
+
+// На «Других базах» карточка сигарет сворачивается сама по себе: ordRender
+// перерисовал бы весь экран заявки поверх списка баз.
+function xTobFold(_, снизу){
+  if(!ORD || !ORD.d) return;
+  if(!ORD.fold) ORD.fold = {};
+  ORD.fold.tobacco = !ORD.fold.tobacco;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const el = document.getElementById('xTob');
+  if(el) el.innerHTML = ordSeparate(ORD.d, ORD.d.districts || [], 'xTobFold');
+  if(снизу) foldSeen('ordd-tobacco');
+}
+
+// Расчёт заявки для «Других баз»: обычно его уже спросил хаб, но если экран
+// открыт до того — спрашиваем сами, без него сигаретам не из чего считаться.
+async function _ordEnsure(){
+  if(ORD && ORD.d) return;
+  try{
+    const d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}});
+    ACC_ORDER = d;
+    ORD = {d, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null, fold:{}};
+  }catch(e){}
 }
 
 // Страница заявки: тот самый список, который раньше лежал под карточкой пути
@@ -17679,9 +17710,7 @@ function ordRender(){
       ? (q ? `<div class="ord-grp">Найдено · ${list.length}</div>` : '')
         + (list.length ? list.map(r => ordRowAll(r, dist, num[r.id])).join('')
            : '<div class="exp-empty">' + (q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает') + '</div>')
-        + ordSeparate(d, dist)
-      : ordDistricts(list, dist, q)}</div>
-    ${общий ? '' : ordSeparate(d, dist)}`;
+      : ordDistricts(list, dist, q)}</div>`;
   // В общем списке листается только каталог: сводка и поиск стоят на месте,
   // иначе, чтобы найти позицию в середине сотни строк, поиск приходится
   // сначала домотать обратно наверх.
@@ -17731,8 +17760,9 @@ function ordDistricts(list, dist, q){
   if(!cards.length) return '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
       : 'Довозить нечего — остатков хватает') + '</div>';
   // Районы — одной слитной карточкой: пять плиток подряд читались как пять
-  // разных вещей, а это один список.
-  return `<div class="ord-dists">${cards.join('')}</div>`;
+  // разных вещей, а это один список. Шапка у карточки та же, что у сводки
+  // «Закупаем» сверху: заглавными, на всю ширину, под ней волосок.
+  return `<div class="ord-dists"><div class="ord-cap">Заявка по районам</div>${cards.join('')}</div>`;
 }
 
 function ordFold(id, снизу){
@@ -19978,6 +20008,10 @@ async function accExtra(){
   try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
   catch(e){ list = (ACC_SUP && ACC_SUP.list) || []; }
   ACC_SUP = {list, open: _supMain(list)};
+  // Сигареты — над списком баз: их берут не в магазине, и «сколько взять»
+  // должно быть там же, где собирают заявку на другую базу.
+  await _ordEnsure();
+  const tob = ORD && ORD.d ? ordSeparate(ORD.d, ORD.d.districts || [], 'xTobFold') : '';
   const ex = _xList();
   const open = ex.filter(x => x.status === 'open'), past = ex.filter(x => x.status !== 'open');
   _setText('accSub', '');
@@ -19993,14 +20027,15 @@ async function accExtra(){
       <span class="pnav-go">${ICO_CHEV}</span>
     </button>`;
   };
-  mid.innerHTML = !ex.length
-    ? `<div class="xs-empty"><div class="sh-empty xs-ecard">
+  mid.innerHTML = (tob ? `<div class="exp-grp">Закупаем отдельно</div><div class="xs-tob" id="xTob">${tob}</div>` : '')
+    + (!ex.length
+    ? `<div class="xs-empty${tob ? ' after' : ''}"><div class="sh-empty xs-ecard">
         <span class="sh-empty-i">${ICO_BASE}</span>
         <div class="sh-empty-t">Пока пусто</div>
         <div class="sh-empty-s">Магазин дал не всё — соберите заявку на другую базу</div>
       </div></div>`
     : (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
-      + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : '');
+      + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : ''));
   mid.innerHTML += xDraftRows();
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
     <button class="qb" onclick="xNew()">${ICO_XPLUS}Новая заявка</button></div>`;

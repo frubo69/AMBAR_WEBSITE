@@ -3854,7 +3854,7 @@ async def handle_checklist(request):
         no_cost = []
     if no_cost:
         n = len(no_cost)
-        row = _chk_row("costs", "Не внесены закупочные цены",
+        row = _chk_row("costs", "Не внесены цены в прайс",
                        f"{n} {_pl_positions(n)} без закупочной цены",
                        False, now, day, plan, go="prices", n=n)
         row.update({"state": "late", "due": "", "late_min": 0})

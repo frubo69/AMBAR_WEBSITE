@@ -406,6 +406,61 @@ async def handle_undo(request):
     return web.json_response({"ok": ok, "code": code}, headers=CORS_HEADERS)
 
 
+@require_owner
+async def handle_history(request):
+    """История внесений: по рабочим дням, внутри дня — позиция на точке, кто и
+    как внёс (приёмка заявки или вручную), сколько бутылок; убранное — тем же
+    списком со знаком минус. Коды в ответ не идут — их сотни, и истории они
+    не нужны."""
+    try:
+        days = max(1, min(180, int(request.query.get("days", "30") or 30)))
+    except ValueError:
+        days = 30
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    added, removed = await db.qr_history(since)
+    import stock_routes as SR
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    names = {}
+    async def who(uid):
+        uid = int(uid or 0)
+        if uid not in names:
+            names[uid] = await _who(uid) if uid else ""
+        return names[uid]
+    def aware(v):
+        if not isinstance(v, datetime): return None
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    groups = {}
+    async def put(doc, kind, when, name):
+        at = aware(when)
+        if not at: return
+        day = SR._biz_day(at.astimezone(SR.DUBAI_TZ))
+        oid = doc.get("district") or ""
+        key = (oid, doc.get("product_id") or "", name, kind)
+        g = groups.setdefault(day, {})
+        r = g.get(key)
+        if not r:
+            r = g[key] = {"district": oid, "code": OFFICE_CODES.get(oid, ""),
+                          "district_name": OFFICE_NAMES.get(oid, oid),
+                          "product_id": doc.get("product_id") or "",
+                          "name": doc.get("product_name") or "", "who": name,
+                          "kind": kind, "n": 0, "at": at}
+        r["n"] += 1
+        if at > r["at"]: r["at"] = at
+    for d in added:
+        kind = "intake" if d.get("src") == "intake" else "manual"
+        name = d.get("driver") or await who(d.get("by")) if kind == "intake" else await who(d.get("by"))
+        await put(d, kind, d.get("at"), name)
+    for d in removed:
+        await put(d, "removed", d.get("del_at"), await who(d.get("del_by")))
+    out = []
+    for day in sorted(groups, reverse=True):
+        rows = sorted(groups[day].values(), key=lambda r: r["at"], reverse=True)
+        for r in rows: r["at"] = r["at"].isoformat()
+        out.append({"day": day, "n": sum(r["n"] for r in rows if r["kind"] != "removed"),
+                    "removed": sum(r["n"] for r in rows if r["kind"] == "removed"), "rows": rows})
+    return web.json_response({"days": days, "groups": out}, headers=CORS_HEADERS)
+
+
 async def _who(uid) -> str:
     """Имя человека по его записи в базе. Номера телеграма в ответе не бывает."""
     try:
@@ -846,6 +901,7 @@ def setup(app):
     routes = (
         ("/api/owner/qr",             handle_stats,  "GET"),
         ("/api/owner/qr/list",        handle_list,   "GET"),
+        ("/api/owner/qr/history",     handle_history, "GET"),
         ("/api/owner/qr/scan",        handle_scan,   "POST"),
         ("/api/owner/qr/lock",        handle_lock,   "POST"),
         ("/api/owner/qr/unlock",      handle_unlock, "POST"),

@@ -830,6 +830,12 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   justify-content:center;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
 .qb.dn{color:#fff;background:linear-gradient(135deg,#c94848,#e05555);box-shadow:0 6px 20px rgba(224,85,85,.22)}
 .qr-hold .rcv-n{margin:12px 16px 0} .qr-hold .rcv-bar{margin:12px 16px 14px}
+.qr-home .sc.grow > .sc-r.qr-hist{flex:0 0 auto;border-top:1px solid rgba(201,169,110,.14)}
+.pk-img{flex:0 0 auto;width:30px;height:30px;border-radius:8px;object-fit:cover;background:var(--card2)}
+.pk-go{flex:0 0 auto;display:flex;color:var(--dim);margin-left:2px}
+.hst-r.plain{cursor:default} .hst-r.plain:active{background:transparent}
+.hst-v b.dn{color:var(--dn)}
+.sc-cap b.dn{color:var(--dn)} .sc-cap b.dn u{color:var(--dn);opacity:.8}
 /* ── Район в ревизии: карточка с полкой «История» внизу ── */
 .stk-drw{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;
   background:var(--card);border:1px solid var(--border2)}
@@ -18088,6 +18094,9 @@ let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = nul
 // второй видит «вносит сейчас» и ход работы, а камеру открыть не может:
 // замок держит сервер, экран лишь показывает его.
 let ACC_IN = null, QR_IN = null, QR_POLL = null;
+// Внесённое за этот заход: с камеры на список и обратно, пока не нажали
+// «Сохранить изменения». «Выйти» откатывает всё внесённое за заход.
+let QR_SESS = [], QR_NEED = false;
 // 18 px в квадрате 38: отступ целый, иначе значок мылится на полпикселя вниз-вправо.
 const _QR_ICO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -18101,7 +18110,7 @@ async function accQR(){
   _setRail('accRail', '');
   _setText('accTitle', 'Внести / удалить товар');
   _setText('accSub', 'загрузка…');
-  QR_DIST = null; QR_IN = null;
+  QR_DIST = null; QR_IN = null; QR_SESS = []; QR_NEED = false;
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
@@ -18111,8 +18120,39 @@ async function accQR(){
     .then(d => { ACC_QR = d; if(document.getElementById('qrList')) qrRenderList(); })
     .catch(() => {});
   // Пришли из ревизии по «QR не внесён» — сразу на ту точку, где стоим.
-  if(QR_WANT){ const want = QR_WANT; QR_WANT = null; qrPick(want); return; }
+  if(QR_WANT){ const want = QR_WANT; QR_WANT = null; QR_NEED = true; qrPick(want); return; }
   await qrHome();
+}
+
+// Уйти со списка позиций. Внесли хоть одну — сперва вопрос: сохранить или
+// выйти; выход откатывает внесённое за заход. Ничего не вносили — просто
+// назад. Куда — говорит next.
+async function qrLeave(next){
+  next = next || (() => qrDistrict(true));
+  if(!QR_SESS.length){ next(); return; }
+  const n = QR_SESS.length;
+  const ans = await askChoice('Сохранить изменения?',
+    `${fmt(n)} ${pluralize(n,'бутылка внесена','бутылки внесены','бутылок внесено')} · «Выйти» уберёт их из реестра`,
+    'Сохранить изменения', 'Выйти', 'go', 'bad');
+  if(ans === 'ok'){ await qrCommit(); return; }
+  if(ans === 'no'){ await qrDiscard(); return; }
+}
+async function qrCommit(){
+  const n = QR_SESS.length; QR_SESS = [];
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  if(n) _toast(`Сохранено · ${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')}`);
+  qrHome();
+}
+async function qrDiscard(){
+  const list = QR_SESS.slice(); QR_SESS = [];
+  for(const x of list){
+    try{ await ownerApi.ownerFetch('/api/owner/qr/undo', {method:'POST', body:{code: x.code}}); }
+    catch(e){}
+    SCAN.seen.delete(x.code); SCAN.seenAt.delete(x.code);
+  }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  if(list.length) _toast(`Внесение отменено · ${fmt(list.length)}`);
+  qrHome();
 }
 
 function _qrHead(title, sub, back){
@@ -18178,6 +18218,7 @@ async function qrHome(тихо){
     <div class="sc grow">
       <div class="sc-cap"><span>Внести QR коды</span><i>с незавершённого приёма</i></div>
       <div class="ord-dists qr-in" id="qrIn">${rows}</div>
+      <button class="sc-r qr-hist" onclick="qrHistory()"><span>История внесений</span><em>${_SC_CHEV}</em></button>
     </div>
   </div>`;
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
@@ -18230,11 +18271,10 @@ function qrFreeStart(){
 // Переключение точки внутри раздела: пустой id — обзор всех точек.
 function qrGo(id){
   distMenuClose();
-  if(!id){ distRemember('qr', ''); qrDistrict(true); return; }
+  if(!id){ distRemember('qr', ''); qrLeave(); return; }
   if(id === QR_DIST) return;
-  distRemember('qr', id);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  qrPick(id);
+  qrLeave(() => { distRemember('qr', id); qrPick(id); });
 }
 
 function qrDistTap(){
@@ -18252,6 +18292,36 @@ function qrDistTap(){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
+// ── История внесений ───────────────────────────────────────────────────
+// По рабочим дням: карточка на день, внутри — позиция на точке, кто и как
+// внёс (приёмка заявки или вручную) и сколько; убранное — тем же списком со
+// знаком минус. Коды в истории не нужны — ими живёт «Проверка бутылки».
+const _QR_KIND = {intake: 'приёмка заявки', manual: 'вручную', removed: 'удалено'};
+async function qrHistory(){
+  QR_IN = null;
+  _qrHead('История внесений', 'загрузка…', () => qrHome());
+  const box = document.getElementById('accMid');
+  box.innerHTML = '<div class="scan-empty">Загрузка…</div>';
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/qr/history', {params:{days: 30}}); }
+  catch(e){ box.innerHTML = '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  if(document.getElementById('qrIn') || QR_IN) return;
+  const groups = r.groups || [];
+  const всего = groups.reduce((a, g) => a + (g.n || 0), 0);
+  _setText('accSub', всего ? `за 30 дней · ${fmt(всего)} ${pluralize(всего,'бутылка','бутылки','бутылок')}` : 'за 30 дней');
+  box.innerHTML = groups.length ? groups.map(g => `<div class="sc">
+      <div class="sc-cap"><span>${escS(_hstDay(g.day))}</span>${g.n ? `<b>${fmt(g.n)}<u>бут</u></b>` : ''}${
+        g.removed ? `<b class="dn">−${fmt(g.removed)}<u>убрано</u></b>` : ''}</div>
+      ${(g.rows || []).map(x => `<div class="hst-r plain">
+        <span class="hst-b"><b>${escS(x.name || x.product_id)}</b>
+          <i>${escS([x.code, x.who, _QR_KIND[x.kind] || x.kind].filter(Boolean).join(' · '))}${
+            x.at ? ' · ' + escS(_hm(x.at)) : ''}</i></span>
+        <span class="hst-v"><b class="${x.kind === 'removed' ? 'dn' : ''}">${x.kind === 'removed' ? '−' : '+'}${fmt(x.n)}<u>бут</u></b></span>
+      </div>`).join('')}
+    </div>`).join('')
+    : '<div class="scan-empty">За 30 дней в реестр ничего не вносили</div>';
+}
+
 // Выбор точки для произвольного внесения. Числа без кодов здесь не пишем —
 // это забота второго сектора; справа лишь сколько бутылок точки в реестре.
 async function qrDistrict(force){
@@ -18262,7 +18332,6 @@ async function qrDistrict(force){
   const last = distSaved('qr');
   if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
   QR_DIST = null;
-  const have = (ACC_QR && ACC_QR.by_district) || {};
   const busy = {};
   (ACC_QR?.locks || []).forEach(l => {
     const d = String(l.key || '').split(':')[0];
@@ -18276,7 +18345,6 @@ async function qrDistrict(force){
       return `<div class="shl-card"><button class="shl-h ord-dh" onclick="qrGo('${d.id}')">
         <span class="shl-code">${escS(d.code || '')}</span>
         <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="warn">${sub}</i>` : ''}</span>
-        ${have[d.id] ? `<span class="shl-v"><b>${fmt(have[d.id])}</b><i>в реестре</i></span>` : ''}
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button></div>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;
@@ -18341,6 +18409,8 @@ function qrInLine(ti, pid){
 }
 
 let QR_CATF = 'all';
+// Серый треугольник справа у строки: видно, что нажимается и ведёт дальше.
+const _PK_TRI = `<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true"><path d="M8 5l8 7-8 7z" fill="currentColor"/></svg>`;
 function qrPick(district){
   QR_DIST = district; QR_CATF = 'all';
   distRemember('qr', district);
@@ -18349,7 +18419,7 @@ function qrPick(district){
   // ревизии. Название точки крупнее «что сканируем» не случайно — на этом
   // экране первым делом отвечают именно на вопрос «где я».
   const head = _qrHead(`${d.code || ''} ${d.name || ''}`.trim() || 'Точка', 'выберите позицию',
-                       () => qrDistrict(true));
+                       () => qrLeave());
   const box = document.querySelector('#accOv .stk-ttl');
   if(box){
     document.getElementById('accTitle').innerHTML =
@@ -18365,6 +18435,10 @@ function qrPick(district){
      </div>
      <div class="pk-cats" id="qrCats"></div>
      <div id="qrList"><div class="scan-empty">Загрузка каталога…</div></div>`;
+  // Внесли хоть одну за заход — внизу золотая «Сохранить изменения»: дальше
+  // либо ещё позиции по кругу, либо она — и на первый экран.
+  document.getElementById('accFoot').innerHTML = QR_SESS.length
+    ? `<div class="qb-wrap"><button class="qb" onclick="qrCommit()">Сохранить изменения</button></div>` : '';
   qrLoadCatalog();
 }
 
@@ -18416,18 +18490,22 @@ function qrRenderList(){
     // Своя бронь — не «занято», а «продолжить»: это та же сессия, просто
     // человек выходил назад посмотреть список.
     const busy = lock && !lock.mine;
-    const n = need[p.id] || 0;
+    // Красное «QR код не внесён» — только когда пришли из ревизии за этим:
+    // произвольное внесение про долги не спрашивает.
+    const n = QR_NEED ? (need[p.id] || 0) : 0;
     const tag = busy ? `<span class="pk-busy">${escS(lock.name)}</span>`
               : lock ? `<span class="pk-mine">вы считаете</span>`
               : n ? `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>`
-              : `<span class="pk-n">${have[p.id] ? fmt(have[p.id]) : '—'}</span>`;
+              : have[p.id] ? `<span class="pk-n">${fmt(have[p.id])}</span>` : '';
     return `<button class="pk-row ${busy ? 'off' : ''}${n ? ' need' : ''}" ${busy ? 'disabled' : ''}
         onclick="qrStart('${p.id}')">
         <span class="pk-no">${p.no || ''}</span>
+        <img class="pk-img" src="/products/${escS(p.id)}.webp" alt="" loading="lazy"
+          onerror="this.style.visibility='hidden'">
         <span class="pk-row-b">
           <span class="pk-name">${escS(p.name || '')}</span>
           <span class="pk-slug">${escS(slugs[p.id] || '')}</span>
-        </span>${tag}</button>`;
+        </span>${tag}<span class="pk-go">${_PK_TRI}</span></button>`;
   }).join('') : '<div class="scan-empty">Ничего не нашлось</div>';
 }
 
@@ -18538,9 +18616,8 @@ function qrScreen(mode){
           <div class="scan-added" id="qrAdded"></div>
           <div class="scan-strip" id="qrFeed"></div>
           <div class="scan-dockbar">
-            <button class="scan-undo" id="qrUndo" onclick="${del ? 'qrDelUndo' : 'qrUndo'}()"
-              disabled>Отменить</button>
-            <button class="scan-go" onclick="${del ? 'qrDelDone' : 'qrDone'}()">Готово</button>
+            <button class="scan-go" id="qrGo" onclick="${del ? 'qrDelDone' : 'qrDone'}()">${
+              del ? 'Вернуться назад' : 'Вернуться к списку'}</button>
           </div>
         </div>
       </div>
@@ -18662,7 +18739,7 @@ SCANQ.onDone = (err, r, job) => {
   const row = QR_ROWS.find(x => x.code === job.code && x.state === 'sending');
   if(!row) return;                       // строку успели удалить руками
   if(err){ row.state = 'fail'; qrFlash('err'); }
-  else if(r.new){ row.state = 'new'; row.label = r.label || ''; }
+  else if(r.new){ row.state = 'new'; row.label = r.label || ''; QR_SESS.push({code: job.code, pid: (job.body || {}).product_id}); }
   else{
     // Бутылка уже в реестре — её посчитали раньше, и в счётчик сессии она
     // попасть не должна: иначе остаток вырастет на пустом месте.
@@ -18717,8 +18794,10 @@ function qrRenderFeed(){
       <span class="scan-state" style="color:${color}">${escS(txt)}${
         r.at ? ' · ' + escS(r.at) : ''}</span>${del}</div>`;
   }).join('');
-  const u = document.getElementById('qrUndo');
-  if(u) u.disabled = !QR_ROWS.some(r => r.state === 'new');
+  // Одна кнопка внизу: ничего не внесли — «Вернуться к списку», внесли —
+  // «Готово». Лишний скан убирает крестик в своей строке.
+  const g = document.getElementById('qrGo');
+  if(g) g.textContent = QR_ROWS.some(r => r.state === 'new' || r.state === 'sending') ? 'Готово' : 'Вернуться к списку';
 }
 
 // Убрать конкретную строку. Код при этом забывается сканером — иначе камера
@@ -18732,6 +18811,7 @@ async function qrDrop(i){
     catch(e){ _toast('Не удалось убрать'); return; }
   }
   SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
+  QR_SESS = QR_SESS.filter(x => x.code !== row.code);
   QR_ROWS.splice(i, 1);
   qrRenderFeed();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -19175,8 +19255,8 @@ function qrDelRenderFeed(){
       </span>
       <span class="scan-state" style="color:${color}">${escS(txt)}</span>${undo}</div>`;
   }).join('');
-  const u = document.getElementById('qrUndo');
-  if(u) u.disabled = !QDEL_ROWS.some(r => r.state === 'gone');
+  const g = document.getElementById('qrGo');
+  if(g) g.textContent = QDEL_ROWS.some(r => r.state === 'gone') ? 'Готово' : 'Вернуться назад';
 }
 
 // Вернуть бутылку в реестр. Код при этом забывается сканером — иначе камера
@@ -21092,6 +21172,28 @@ function askDialog(t, sub, okLabel, cancelLabel, okClass){
     document.body.append(back, box);
     box.querySelector('#askOk').onclick = () => { closePinPop(); resolve(true); };
     box.querySelector('#askNo').onclick = () => { closePinPop(); resolve(false); };
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  });
+}
+
+// Вопрос с двумя настоящими ответами: 'ok', 'no' или null, если ткнули мимо
+// окна. В отличие от askDialog, тап по подложке не считается ответом —
+// когда «нет» означает «выйти и откатить», угадывать за человека нельзя.
+function askChoice(t, sub, okLabel, noLabel, okClass, noClass){
+  return new Promise(resolve => {
+    closePinPop();
+    const back = document.createElement('div');
+    back.className = 'pin-back ask';
+    back.addEventListener('click', () => { closePinPop(); resolve(null); });
+    const box = document.createElement('div');
+    box.className = 'pin-pop crw-ask';
+    box.innerHTML = `<div class="crw-ask-t">${escS(t)}</div>
+      ${sub ? `<div class="crw-ask-s">${escS(sub)}</div>` : ''}
+      <button class="crw-ask-b ${okClass || 'go'}" id="askOk">${escS(okLabel || 'Да')}</button>
+      <button class="crw-ask-b ${noClass || 'no'}" id="askNo">${escS(noLabel || 'Нет')}</button>`;
+    document.body.append(back, box);
+    box.querySelector('#askOk').onclick = () => { closePinPop(); resolve('ok'); };
+    box.querySelector('#askNo').onclick = () => { closePinPop(); resolve('no'); };
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
   });
 }

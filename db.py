@@ -3603,6 +3603,18 @@ async def qr_last(limit: int = 20) -> list:
     return rows
 
 
+async def qr_history(since) -> tuple:
+    """Что вносили и что убирали из реестра с какого-то момента — без самих
+    кодов: истории нужны позиция, точка, кто и когда, а не номера."""
+    db = _db_or_none()
+    if db is None: return [], []
+    f = {"_id": 0, "product_id": 1, "product_name": 1, "district": 1, "by": 1, "at": 1,
+         "src": 1, "driver": 1, "supply_id": 1, "del_at": 1, "del_by": 1, "status": 1}
+    added = await db.qr_codes.find({"at": {"$gte": since}}, f).to_list(length=50000)
+    removed = await db.qr_codes.find({"del_at": {"$gte": since}}, f).to_list(length=50000)
+    return added, removed
+
+
 async def qr_lock_take(key: str, by: int, name: str, now, until):
     """Занять позицию на точке под пересчёт.
 

@@ -69,6 +69,17 @@ EVENT_SENIOR = "drivers.senior_geo"
 # Точка старшего лежит там же, где точки водителей, но под своим ключом:
 # среди водителей бывает тёзка, и имя само по себе ключом быть не может.
 SENIOR_PREFIX = "op:"
+# У старшего два устройства под одним аккаунтом: телефон (трансляция в чате
+# бота) и планшет (точка из панели, пока она открыта). Раньше обе писались в
+# одну запись и сбивали след друг другу; теперь у планшета свой ключ и своя
+# строка в локаторе — «iPad Star». Телефон остаётся под именем.
+IPAD_SUFFIX = "@ipad"
+IPAD_LABEL = "iPad Star"
+
+
+def senior_keys(name: str) -> tuple:
+    """(ключ телефона, ключ планшета) старшего в driver_pos."""
+    return SENIOR_PREFIX + name, SENIOR_PREFIX + name + IPAD_SUFFIX
 
 _STARTED = None
 
@@ -309,11 +320,14 @@ async def _seniors_tick(now: datetime, utc: datetime, day: str, out: dict) -> No
     if not _working_hours(now):
         return
     for name in list(staff.SENIOR_STAR_IDS):
-        key = SENIOR_PREFIX + name
+        key, ipad = senior_keys(name)
         g = await _geo_state(key)
+        # Виден — значит свежая точка с любого устройства: телефон в кармане
+        # молчит, а панель на планшете открыта — старший на месте.
+        fresh = g["fresh"] or (await _geo_state(ipad))["fresh"]
         st = await db.geo_watch_get(key)
         off_since = _dt(st.get("off_since")) if st.get("day") == day else None
-        if not g["fresh"] and not off_since:
+        if not fresh and not off_since:
             seen_today = st.get("day") == day and bool(st.get("seen"))
             why = "stream" if st.get("stream_off") else ("stale" if seen_today else "never")
             await db.geo_watch_set(key, {"day": day, "off_since": utc, "off_why": why},
@@ -321,7 +335,7 @@ async def _seniors_tick(now: datetime, utc: datetime, day: str, out: dict) -> No
             await _owners(text_senior_off(name, why, g), EVENT_SENIOR, exclude=_senior_ids())
             log.info(f"[geo-watch] старший {name}: не виден ({why})")
             out.setdefault("senior_off", []).append(name)
-        elif g["fresh"]:
+        elif fresh:
             fields = {"day": day, "seen": True}
             if off_since:
                 await db.geo_watch_set(key, fields, unset=["off_since", "off_why"])

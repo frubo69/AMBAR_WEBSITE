@@ -4561,3 +4561,108 @@ async def cost_override_set(product_id: str, price, by_name: str = "") -> bool:
                   "at": datetime.now(timezone.utc)}},
         upsert=True)
     return True
+
+
+# ── Книга учёта денег (раздел «Финансы») ─────────────────────────────────────
+# Три коллекции — ровно то, что старший вписывал в отчёт руками; всё, что
+# приложение знает само (наличные, расходы водителей, закупка), сюда не
+# пишется, а считается на лету в finance_routes.
+#   fin_days    {_id: день, handed_fact, ordered_fact, aside, collected,
+#                extra_rp, pay_b, pay_b_extra, note, by, at}
+#   fin_entries {_id, day, book: 'rp' | 'np', amount, comment, who, by, at}
+#   fin_months  {_id: 'YYYY-MM', safe_b_open, debt_b_open, carry_np, storage,
+#                safe_np_fact, safe_b_fact, note, by, at}
+async def fin_days_get(day_from: str, day_to: str) -> dict:
+    d = _db_or_none()
+    if d is None: return {}
+    cur = d.fin_days.find({"_id": {"$gte": day_from, "$lte": day_to}})
+    return {r["_id"]: r for r in await cur.to_list(length=100)}
+
+
+async def fin_day_set(day: str, fields: dict, unset: list | None = None) -> None:
+    d = _db_or_none()
+    if d is None: return
+    upd: dict = {"$set": {**fields, "at": datetime.now(timezone.utc)}}
+    if unset:
+        upd["$unset"] = {k: "" for k in unset}
+    await d.fin_days.update_one({"_id": day}, upd, upsert=True)
+
+
+async def fin_entries_get(day_from: str, day_to: str) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.fin_entries.find({"day": {"$gte": day_from, "$lte": day_to}}).sort("at", 1)
+    return await cur.to_list(length=2000)
+
+
+async def fin_entry_add(doc: dict) -> None:
+    d = _db_or_none()
+    if d is None: return
+    await d.fin_entries.insert_one(doc)
+
+
+async def fin_entry_get(eid: str) -> dict | None:
+    d = _db_or_none()
+    if d is None: return None
+    return await d.fin_entries.find_one({"_id": eid})
+
+
+async def fin_entry_del(eid: str) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.fin_entries.delete_one({"_id": eid})
+    return bool(r.deleted_count)
+
+
+async def fin_month_get(month: str) -> dict:
+    d = _db_or_none()
+    if d is None: return {}
+    return (await d.fin_months.find_one({"_id": month})) or {}
+
+
+async def fin_month_set(month: str, fields: dict, unset: list | None = None) -> None:
+    d = _db_or_none()
+    if d is None: return
+    upd: dict = {"$set": {**fields, "at": datetime.now(timezone.utc)}}
+    if unset:
+        upd["$unset"] = {k: "" for k in unset}
+    await d.fin_months.update_one({"_id": month}, upd, upsert=True)
+
+
+async def fin_months_list() -> list:
+    """Месяцы, в которых книга хоть раз тронута: по дням, записям или итогам."""
+    d = _db_or_none()
+    if d is None: return []
+    out: set = set()
+    async for r in d.fin_days.find({}, {"_id": 1}):
+        out.add(str(r["_id"])[:7])
+    async for r in d.fin_entries.find({}, {"day": 1}):
+        out.add(str(r.get("day") or "")[:7])
+    async for r in d.fin_months.find({}, {"_id": 1}):
+        out.add(str(r["_id"])[:7])
+    return sorted(m for m in out if len(m) == 7)
+
+
+async def orders_between(since_iso: str, until_iso: str) -> list:
+    """Доставленные заказы за окно по времени приёма — без верхней крышки в
+    две тысячи, которой ограничен orders_from: месяц в неё не влезает."""
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.orders.find(
+        {"timestamp": {"$gte": since_iso, "$lt": until_iso}, "status": "delivered"},
+        {"_id": 0, "order_id": 1, "timestamp": 1, "total": 1, "tip": 1,
+         "payment_method": 1, "paid": 1, "prepaid": 1, "crypto_paid": 1,
+         "office_id": 1, "status": 1})
+    return await cur.to_list(length=50000)
+
+
+async def supplies_between(day_from: str, day_to: str) -> list:
+    """Поставки по учётному дню — основная и с других баз."""
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.supplies.find({"day": {"$gte": day_from, "$lte": day_to}},
+                          {"tasks": 0, "dropped": 0, "unknown": 0, "short": 0})
+    rows = await cur.to_list(length=500)
+    for r in rows:
+        r["supply_id"] = r.pop("_id")
+    return rows

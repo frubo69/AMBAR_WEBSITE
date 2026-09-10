@@ -3000,6 +3000,106 @@ button.path:active{transform:scale(.995)}
 .fin-ledger .fin-grp{padding:14px 0 4px}
 .fin-ledger .fin-h{padding:11px 0}
 .fin-ledger .fin-l{padding:0 0 10px 43px}
+/* ── Финансы: книга учёта денег ── Месячный отчёт старшего, перенесённый с
+   листа: касса дня, Баракуда, фонд расходов, чистая прибыль. Карточки — те
+   же .sc / .sc-cap / .sc-r, что на складе; строки книги читаются как чек:
+   слово слева, число справа, знак действия перед строкой, итог — полкой. */
+.fb-cap span{text-align:center}
+.fb-arw{flex:0 0 auto;width:34px;height:34px;margin:0 -8px;border:0;border-radius:9px;
+  background:none;color:var(--sub);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fb-arw:disabled{opacity:.2;pointer-events:none}
+.fb-arw:active{transform:scale(.86);color:var(--gold2)}
+.fb-r{cursor:default}
+.fb-r:active{background:transparent}
+.fb-r > b{margin-right:6px}
+.fb-r.sum{border-top:1px solid rgba(201,169,110,.25);background:rgba(201,169,110,.05)}
+.fb-r.sum span{font-weight:700}
+.fb-r.sub{min-height:40px}
+.fb-r.sub span{font-weight:500;font-size:12.5px;color:var(--sub)}
+.fb-r.sub > b{font-size:14px;color:var(--text)}
+.fb-gut .fb-r{position:relative;padding-left:38px}
+.fb-gut .fb-r em.fb-sign{position:absolute;left:15px;top:50%;width:14px;height:auto;margin:0;
+  transform:translateY(-50%);border-radius:0;background:none;display:block;text-align:center;
+  font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  color:var(--muted);line-height:1}
+.fb-gut .fb-r.sum em.fb-sign{color:var(--gold2)}
+.fb-hub .sc-r b u.warn{color:var(--warn)}
+.fb-r[hidden],.fb-add[hidden]{display:none}
+.sc > .fb-days{border:0;border-radius:0;background:none}
+.sc > .fb-days .shl-card:first-child{border-top:0}
+.fb-r b.ok{color:var(--up)} .fb-r b.ok u{color:var(--up);opacity:.8}
+.fb-r b.dn{color:var(--dn)} .fb-r b.dn u{color:var(--dn);opacity:.8}
+.fb-r b.warn{color:var(--warn)} .fb-r b.warn u{color:var(--warn);opacity:.8}
+.fb-r b.none{color:var(--dim)}
+.fb-r b u.warn{color:var(--warn)}
+.fb-r em.dn{color:var(--dn);background:var(--dn-soft)}
+/* Поле ввода — в той же строке, число справа, единица после него, как у
+   вычисленных строк: правые края чисел совпадают. */
+.fb-i{cursor:text}
+.fb-i > b{display:flex;align-items:center;margin-right:6px}
+.fb-num{width:106px;height:36px;padding:0 6px;border-radius:10px;
+  border:1px solid var(--border2);background:var(--bg2);color:var(--gold2);
+  font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  font-variant-numeric:tabular-nums;text-align:right;-webkit-appearance:none}
+.fb-num::placeholder{color:var(--dim);font-weight:600}
+.fb-num:focus{outline:none;border-color:rgba(201,169,110,.55);background:var(--card)}
+.fb-num.saved{border-color:rgba(76,175,125,.55)}
+.fb-txt{flex:1;min-width:0;height:36px;padding:0 10px;border-radius:10px;
+  border:1px solid var(--border2);background:var(--bg2);color:var(--text);
+  font-family:inherit;font-size:13.5px;font-weight:600}
+.fb-txt::placeholder{color:var(--dim);font-weight:500}
+.fb-txt:focus{outline:none;border-color:rgba(201,169,110,.55);background:var(--card)}
+.fb-txt.saved{border-color:rgba(76,175,125,.55)}
+.fb-i .fb-txt{margin-right:6px}
+/* Строки записей: расход из фонда, выплата из прибыли. Крестик убирает. */
+.fb-e{display:flex;align-items:center;gap:10px;min-height:46px;padding:6px 8px 6px 16px;
+  border-top:1px solid rgba(255,255,255,.05)}
+.fb-e-b{flex:1;min-width:0}
+.fb-e-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.fb-e-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-e-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  color:var(--text);font-variant-numeric:tabular-nums;line-height:1}
+.fb-e-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:4px}
+.fb-e-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;
+  color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.fb-e-x:active{color:var(--dn)}
+.fb-none{padding:13px 16px;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,.05)}
+/* Форма новой записи — под строкой «Добавить», пока не записали. */
+.fb-add{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 14px;
+  border-top:1px solid rgba(255,255,255,.05)}
+.fb-add .fb-num{flex:0 0 96px;width:96px}
+.fb-add .fb-txt{flex:1 1 120px}
+.fb-add .aud-b{flex:0 0 auto;height:36px;padding:0 16px;border-radius:10px;font-size:12.5px}
+.fb-add[hidden]{display:none}
+.sc-r.fb-plus em{color:var(--gold2)}
+/* Карточка дня — та же плашка, что «Остатки всего» на складе: строка дня
+   шапкой, под ней плитки, ниже строки во всю ширину. */
+.exp-sum.fb-daysum{flex:0 0 auto;padding:12px 0 0;margin:0 0 10px}
+.fb-daysum .exp-day{margin:-3px 16px 4px}
+.fb-daysum .exp-day-t{flex-direction:column;align-items:flex-start;gap:1px}
+.fb-daysum .exp-day-l{flex:1 0 auto}
+.fb-daysum .exp-day-nav{flex:0 1 auto;min-width:0}
+.fb-daysum .exp-day .ds-txt i{text-overflow:ellipsis}
+.fb-daysum .aud-g{padding:2px 13px 13px}
+.fb-daysum .sc-r:last-child{border-radius:0 0 15px 15px}
+/* Список дней — одна слитная карточка, как районы в заявке; день — в квадрате
+   слева, подпись переносится, справа остаток после этого дня. */
+.fb-days .shl-card{display:block;width:100%;padding:11px 16px;text-align:left;
+  font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fb-days .shl-card:active{background:var(--card2)}
+.fb-days .shl-card.off{opacity:.42;cursor:default}
+.fb-days .shl-b i.warn{color:var(--warn)}
+.fb-days .shl-v i{display:block;font-style:normal;font-size:9px;font-weight:600;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.fb-days .shl-v b.dn{color:var(--dn)}
+.fb-days .shl-v b.up{color:var(--up)}
+.fb-days .shl-code{font-size:15px}
+/* Плитки книги: отрицательное — красным, сходится — зелёным. */
+.fb-hub .aud-g{padding:12px 13px 8px}
 .fin-a.ini{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.3px}
 .fin-v.up::before{content:'+'}
 .fin-v.dn::before{content:'−'}
@@ -6638,14 +6738,10 @@ button.exp-wait:active{transform:scale(.99)}
 <!-- Финансы: долги и удержания, прайс, курс, кошелёк. Всё карточками, без
      подписей: каждая карточка называет себя сама. -->
 <div class="page" id="pg-finance">
-  <!-- Сводка — четыре числа, ради которых сюда заходят; ячейка ведёт к своему
-       разделу. Ниже — разделы одной анатомии: шапка, полоса чисел, тело. -->
-  <div class="fin-hero" id="finHero">
-    <button class="fin-hero-c" onclick="finGo('finDebts')"><b class="up is-skel" id="finHeroThey">0000</b><i>нам должны</i></button>
-    <button class="fin-hero-c" onclick="finGo('finDebts')"><b class="dn is-skel" id="finHeroWe">0000</b><i>должны мы</i></button>
-    <button class="fin-hero-c" onclick="finGo('walBlock')"><b class="is-skel" id="finHeroUsdt">0000</b><i>USDT на кошельке</i></button>
-    <button class="fin-hero-c" onclick="finGo('prBlock')"><b class="is-skel" id="finHeroMark">0000</b><i>наценка</i></button>
-  </div>
+  <!-- Книга учёта денег — месячный отчёт старшего: месяц со стрелками, три
+       числа месяца и четыре книги строками. Ниже — разделы одной анатомии:
+       шапка, полоса чисел, тело. -->
+  <div id="finBook"></div>
 
   <div id="finDebts"></div>
 
@@ -9966,7 +10062,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
       walBlockRender();
       if(!FX) fxLoad();
       if(!ACC_PERIOD) accLoadSummaries();
-      finLoad(); prLoad();
+      finLoad(); prLoad(); fbHub();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
@@ -10606,7 +10702,7 @@ function dpApply(){
   // Полосы дня внутри разделов — расходы и склад. Из выбранного берём начало
   // и встаём на этот день, как в чек-листе: календарь тут способ уйти дальше,
   // чем удобно листать пальцем, а не выбрать отрезок.
-  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay' || dpTarget === 'shDay'){
+  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay' || dpTarget === 'shDay' || dpTarget === 'finDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     const cal = document.querySelector(`.cal-btn[onclick*="'${dpTarget}'"]`);
     if(cal) cal.classList.remove('on');
@@ -16095,6 +16191,7 @@ function accDayGo(off){
   // списания и расходы стояли на месте. «Учёт» лежит поверх склада, поэтому
   // при обоих открытых он первый.
   const on = id => document.getElementById(id).classList.contains('show');
+  if(on('accOv') && document.getElementById('finDayCard')){ fbDayReload(); return; }
   if(on('accOv') && document.getElementById('shDay')){
     daySkel('accMid'); accShifts(true); return;
   }
@@ -17048,6 +17145,622 @@ function finToggle(n, снизу){
   if(снизу) foldSeen('finr-' + n);
 }
 
+// ── Финансы: книга учёта денег ──────────────────────────────────────────
+// Месячный отчёт старшего, перенесённый с листа в приложение. Четыре книги:
+// касса дня (раскладка сданных денег на сейф Б, фонд и прибыль), Баракуда
+// (заказали / оплатили / долг / сейф Б), фонд расходов предприятия и чистая
+// прибыль с итогом месяца. Считает сервер (finance_calc.py), экран рисует
+// один ответ /api/owner/finance/book на весь месяц. Что приложение знает
+// само — наличные, расходы водителей, закупку в закупочных ценах — руками
+// не вводится. После каждой записи сервер возвращает книгу заново, и числа
+// меняются на месте: поле, в котором человек стоит, фокус не теряет.
+const FB = {month: null, months: {}};
+const FB_T = {handed_fact: 'Сдали по факту', ordered_fact: 'Заказали по счёту',
+              aside: 'Отложили в сейф Б', collected: 'Собрал в фонд',
+              extra_rp: 'Доп. приход в фонд', pay_b: 'Оплатили из сейфа Б',
+              pay_b_extra: 'Оплатили из ЧП / РП', note: 'Заметка'};
+const _FB_L = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`;
+const _FB_R = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
+const _FB_PLUS = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+  stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+
+function fbMonthNow(){ return _dayIsoFor(0).slice(0, 7); }
+function fbMonthT(m){ return `${MONTHS_RU[+m.slice(5, 7) - 1]} ${+m.slice(0, 4)}`; }
+function fbMonthAdd(m, d){
+  const dt = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + d, 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+}
+// Книга всегда в дирхамах: переключатель валют панели к ней не относится,
+// поле ввода и вычисленная строка должны быть в одних деньгах.
+function fbFmt(n){
+  n = Math.round(+n || 0);
+  return (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('ru-RU').replace(/,/g, ' ');
+}
+function fbDayT(day){
+  const d = day ? new Date(day + 'T12:00:00Z') : null;
+  return d && !isNaN(d) ? `${d.getUTCDate()} ${MONTHS_GEN[d.getUTCMonth()]}` : (day || '');
+}
+function fbBook(month){ return FB.months[month] || null; }
+// Прошедший день — спросить, как везде в учёте; владельцу уйдёт уведомление.
+async function fbAskDay(day, что){
+  if(!day || day >= _dayIsoFor(0)) return true;
+  return await askYes(`${что} за ${fbDayT(day)} — это прошедший день, не сегодня.\n\n`
+    + 'Записать? Владельцу уйдёт уведомление о правке.');
+}
+async function fbLoad(month, force){
+  month = month || FB.month || fbMonthNow();
+  if(!force && FB.months[month]) return FB.months[month];
+  const b = await ownerApi.ownerFetch('/api/owner/finance/book', {params:{month}});
+  fbApply(b);
+  return b;
+}
+function fbApply(b){ if(b && b.month) FB.months[b.month] = b; }
+function fbDayOf(book, day){ return book ? (book.days || []).find(x => x.day === day) : null; }
+// День разложен, когда старший вписал хотя бы одну из двух частей.
+function fbLaid(d){ return !!(d && d.manual && (d.manual.aside !== null || d.manual.collected !== null)); }
+
+// ── Кирпичи разметки ──────────────────────────────────────────────────────
+// Цвет числа: neg — минус красным; debt — долг красным, ноль золотом;
+// diff — ноль зелёным (сошлось), иначе красным; null — прочерк.
+function fbCls(v, mode){
+  if(v === null || v === undefined) return 'none';
+  if(mode === 'neg')  return v < 0 ? 'dn' : '';
+  if(mode === 'debt') return v > 0 ? 'dn' : '';
+  if(mode === 'diff') return v === 0 ? 'ok' : 'dn';
+  if(mode === 'pos')  return v > 0 ? 'ok' : v < 0 ? 'dn' : '';
+  return '';
+}
+function fbB(key, v, o){
+  o = o || {};
+  const cls = fbCls(v, o.mode);
+  return `<b data-f="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}${cls ? ` class="${cls}"` : ''}>${
+    v === null || v === undefined ? '—' : fbFmt(v)}<u>${o.unit || 'AED'}</u></b>`;
+}
+function fbRow(label, key, v, o){
+  o = o || {};
+  const cls = ['sc-r', 'fb-r', o.sum ? 'sum' : '', o.sub ? 'sub' : '', o.cls || ''].filter(Boolean).join(' ');
+  return `<div class="${cls}"${o.show ? ` data-show="${o.show}"${o.hide ? ' hidden' : ''}` : ''}>${
+    o.sign ? `<em class="fb-sign">${o.sign}</em>` : ''}<span>${label}</span>${fbB(key, v, o)}</div>`;
+}
+function fbGo(label, key, v, go, o){
+  o = o || {};
+  return `<button class="sc-r fb-r ${o.cls || ''}" onclick="${go}" style="cursor:pointer"><span>${label}</span>${
+    fbB(key, v, o)}<em${o.em ? ` class="${o.em}"` : ''}>${_SC_CHEV}</em></button>`;
+}
+// Поле ввода. val — записанное значение (null — пусто); ph — что показать
+// пустым (для переносов — число прошлого месяца); unit — подпись после поля.
+function fbIn(label, field, val, scope, o){
+  o = o || {};
+  const empty = val === null || val === undefined;
+  return `<label class="sc-r fb-r fb-i${o.cls ? ' ' + o.cls : ''}">${
+    o.sign ? `<em class="fb-sign">${o.sign}</em>` : ''}<span>${label}</span><b>
+    <input class="fb-num" inputmode="decimal" placeholder="${escS(o.ph || '0')}" autocomplete="off"
+      value="${empty ? '' : fbFmt(val)}" data-field="${field}" ${scope}
+      data-was="${empty ? '' : val}" onfocus="this.select()"
+      onkeydown="if(event.key==='Enter'){this.blur()}" onblur="fbSave(this)"><u>${escS(o.unit || 'AED')}</u></b></label>`;
+}
+function fbInTxt(label, field, val, scope){
+  return `<label class="sc-r fb-r fb-i"><span>${label}</span>
+    <input class="fb-txt" placeholder="—" autocomplete="off" maxlength="120"
+      value="${escS(val || '')}" data-field="${field}" ${scope} data-was="${escS(val || '')}"
+      onkeydown="if(event.key==='Enter'){this.blur()}" onblur="fbSave(this)"></label>`;
+}
+function fbFmtN(v, dec){ return v === null || v === undefined ? '—' : dec ? String(v).replace('.', ',').replace('-', '−') : fbFmt(v); }
+function fbTile(t, key, v, o){
+  o = o || {};
+  const cls = fbCls(v, o.mode);
+  return `<div class="aud-t${cls ? ' ' + cls : ''}" data-fr="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}>
+    <span class="aud-tl">${t}</span>
+    <b class="aud-tv" data-f="${key}"${o.dec ? ' data-dec="1"' : ''}>${fbFmtN(v, o.dec)}</b>
+    <span class="aud-tu">${o.unit || 'AED'}</span></div>`;
+}
+function fbCap(month, arrows){
+  const fut = month >= fbMonthNow();
+  if(!arrows) return `<div class="sc-cap"><span>${escS(fbMonthT(month))}</span></div>`;
+  return `<div class="sc-cap fb-cap">
+    <button class="fb-arw" onclick="fbMonthStep(-1)" aria-label="Месяц назад">${_FB_L}</button>
+    <span>${escS(fbMonthT(month))}</span>
+    <button class="fb-arw" onclick="fbMonthStep(1)" aria-label="Месяц вперёд"${fut ? ' disabled' : ''}>${_FB_R}</button>
+  </div>`;
+}
+function fbCapT(title){ return `<div class="sc-cap"><span>${title}</span></div>`; }
+
+// ── Карточка на странице «Финансы» ────────────────────────────────────────
+// Месяц со стрелками, три числа месяца и четыре книги строками; справа у
+// книги — её главное число. «Касса дня» — сегодняшний день: что сдали и
+// разложены ли деньги.
+async function fbHub(force){
+  const box = document.getElementById('finBook'); if(!box) return;
+  FB.month = FB.month || fbMonthNow();
+  if(!fbBook(FB.month) || force){
+    box.innerHTML = fbHubHtml(null);
+    try{ await fbLoad(FB.month, force); }
+    catch(e){ box.innerHTML = fbHubHtml(null, true); return; }
+  }
+  box.innerHTML = fbHubHtml(fbBook(FB.month));
+}
+function fbHubHtml(b, err){
+  const month = FB.month || fbMonthNow();
+  if(!b) return `<div class="sc fb-hub">${fbCap(month, true)}
+    <div class="aud-g">${fbTile('Продали', 't.gross', null)}${fbTile('Купили', 'b.bought', null)}${
+      fbTile('Прибыль', 'np.profit', null)}</div>
+    <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>`;
+  const t = b.totals, today = (b.days || []).find(d => d.today) || null;
+  const laid = fbLaid(today), handed = today ? today.base : 0;
+  const ждёт = today && handed > 0 && !laid;
+  return `<div class="sc fb-hub">${fbCap(month, true)}
+    <div class="aud-g">
+      ${fbTile('Продали', 't.gross', t.gross)}
+      ${fbTile('Купили', 'b.bought', b.b.bought)}
+      ${fbTile('Прибыль', 'np.profit', b.np.profit, {mode: 'neg'})}
+    </div>
+    ${month === fbMonthNow() ? `<button class="sc-r${ждёт ? ' warn' : ''}" onclick="fbOpenToday()"><span>Касса дня</span>
+      <b>${fbFmt(handed)}<u${ждёт ? ' class="warn"' : ''}>${ждёт ? 'не разложено' : 'сдали'}</u></b><em>${_SC_CHEV}</em></button>` : ''}
+    <button class="sc-r" onclick="accOpen('finb')"><span>Баракуда</span>
+      <b${b.b.debt_end > 0 ? ' class="dn"' : ''}>${fbFmt(b.b.debt_end)}<u>долг</u></b><em${b.b.debt_end > 0 ? ' class="dn"' : ''}>${_SC_CHEV}</em></button>
+    <button class="sc-r" onclick="accOpen('finrp')"><span>Расходы предприятия</span>
+      <b>${fbFmt(b.rp.expenses)}<u>AED</u></b><em>${_SC_CHEV}</em></button>
+    <button class="sc-r" onclick="accOpen('finnp')"><span>Чистая прибыль</span>
+      <b${b.np.profit < 0 ? ' class="dn"' : ''}>${fbFmt(b.np.profit)}<u>AED</u></b><em>${_SC_CHEV}</em></button>
+  </div>`;
+}
+// «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
+// внутри, а с главной идут закрывать текущую смену.
+function fbOpenToday(){
+  if(DAY_OFFSET) accDayGo(0);
+  accOpen('finday');
+}
+async function fbMonthStep(d){
+  const m = fbMonthAdd(FB.month || fbMonthNow(), d);
+  if(m > fbMonthNow()) return;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  FB.month = m;
+  fbRepaint();
+  if(!fbBook(m)){
+    try{ await fbLoad(m); }catch(e){ _toast('Не удалось загрузить'); return; }
+    if(FB.month === m) fbRepaint();
+  }
+}
+// Перерисовать всё, что смотрит на месяц: карточку на странице и открытый
+// месячный экран. Экран дня месяц не листает — у него свой день.
+function fbRepaint(){
+  const box = document.getElementById('finBook');
+  if(box) box.innerHTML = fbHubHtml(fbBook(FB.month));
+  if(!document.getElementById('accOv').classList.contains('show')) return;
+  if(ACC_VIEW === 'finb') accFinB();
+  else if(ACC_VIEW === 'finrp') accFinRP();
+  else if(ACC_VIEW === 'finnp') accFinNP();
+}
+
+// ── Запись ───────────────────────────────────────────────────────────────
+// Сохраняем на уходе с поля. Не изменилось — в сеть не ходим. Прошедший
+// день — спрашиваем, как везде в учёте; владельцу уйдёт уведомление.
+async function fbSave(inp){
+  const field = inp.dataset.field, day = inp.dataset.day, month = inp.dataset.month;
+  const text = field === 'note';
+  const was = text ? (inp.dataset.was || '') : (inp.dataset.was === '' ? null : +inp.dataset.was);
+  let now;
+  if(text) now = String(inp.value || '').trim().slice(0, 120);
+  else{
+    const raw = String(inp.value).replace(/\s/g, '').replace(',', '.').replace(/−/g, '-');
+    now = raw === '' ? null : (/^-?\d*\.?\d+$/.test(raw) ? Math.round(+raw * 100) / 100 : NaN);
+  }
+  const back = () => { inp.value = text ? was : (was === null ? '' : fbFmt(was)); };
+  if(Number.isNaN(now)){ back(); _toast('Нужно число'); return; }
+  if(now === was || (!text && now !== null && was !== null && Math.abs(now - was) < .005)){ back(); return; }
+  if(!text && now !== null && Math.abs(now) > 10000000){ back(); _toast('Слишком большое число'); return; }
+  if(day && !await fbAskDay(day, FB_T[field] || 'Запись')){ back(); return; }
+  try{
+    const res = await ownerApi.ownerFetch(day ? '/api/owner/finance/book/day' : '/api/owner/finance/book/month',
+      {method: 'POST', body: day ? {day, field, value: now, as: _meName()}
+                                 : {month, field, value: now, as: _meName()}});
+    inp.dataset.was = text ? now : (now === null ? '' : now);
+    inp.value = text ? now : (now === null ? '' : fbFmt(now));
+    const u = inp.nextElementSibling;
+    if(inp.dataset.carry && u && u.tagName === 'U') u.textContent = now === null ? 'перенос' : 'AED';
+    inp.classList.add('saved');
+    setTimeout(() => inp.classList.remove('saved'), 900);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+  }catch(e){
+    back();
+    _toast('Не удалось сохранить');
+  }
+}
+// Числа на месте: каждое вычисленное число помечено ключом data-f, строки с
+// условием — data-show. Поля ввода не трогаем — там стоит человек.
+function fbValues(){
+  const V = {};
+  const day = accDay(), db = fbBook(day.slice(0, 7)), d = fbDayOf(db, day);
+  if(d) for(const k in d) if(typeof d[k] === 'number' || d[k] === null) V['d.' + k] = d[k];
+  if(d){ V['d.laid'] = fbLaid(d) ? 1 : 0; V['d.gap_on'] = d.handed_fact !== null ? 1 : 0;
+         V['d.ordered_on'] = d.ordered_fact !== null ? 1 : 0; V['d.extra_on'] = d.ordered_extra ? 1 : 0;
+         V['d.cash_on'] = d.cash_need ? 1 : 0; V['d.pend_on'] = d.spend_pending ? 1 : 0; }
+  const mb = fbBook(FB.month || fbMonthNow());
+  if(mb){
+    for(const g of ['totals', 'rp', 'np', 'b']) for(const k in mb[g]) V[(g === 'totals' ? 't' : g) + '.' + k] = mb[g][k];
+    V['econ'] = mb.econ;
+    V['b.debt_delta'] = mb.b.debt_end - mb.b.debt_open;
+  }
+  return V;
+}
+function fbPaint(){
+  const V = fbValues();
+  document.querySelectorAll('#accMid [data-f]').forEach(el => {
+    const v = V[el.dataset.f]; if(v === undefined) return;
+    const u = el.querySelector('u');
+    el.innerHTML = fbFmtN(v, el.dataset.dec) + (u ? u.outerHTML : '');
+    if(el.dataset.fc){ el.classList.remove('dn', 'ok', 'none'); const c = fbCls(v, el.dataset.fc); if(c) el.classList.add(c); }
+  });
+  document.querySelectorAll('#accMid [data-fr]').forEach(el => {
+    const v = V[el.dataset.fr]; if(v === undefined) return;
+    el.classList.remove('dn', 'ok'); const c = fbCls(v, el.dataset.fc); if(c) el.classList.add(c);
+  });
+  document.querySelectorAll('#accMid [data-show]').forEach(el => { el.hidden = !V[el.dataset.show]; });
+  document.querySelectorAll('#accMid [data-frac]').forEach(el => {
+    const [a, b] = el.dataset.frac.split('/');
+    el.innerHTML = `${fbFmt(V[a] || 0)}<s class="sl">/</s>${fbFmt(V[b] || 0)}`;
+  });
+  const day = accDay(), d = fbDayOf(fbBook(day.slice(0, 7)), day);
+  if(d){
+    const rp = document.getElementById('fbList-rp'); if(rp) rp.innerHTML = fbEntries(d.expenses, 'rp');
+    const np = document.getElementById('fbList-np'); if(np) np.innerHTML = fbEntries(d.payouts, 'np');
+  }
+  const mb = fbBook(FB.month || fbMonthNow());
+  const npm = document.getElementById('fbList-npm'); if(npm && mb) npm.innerHTML = fbPayoutsMonth(mb);
+  const box = document.getElementById('finBook'); if(box && mb) box.innerHTML = fbHubHtml(mb);
+}
+
+// ── Записи: расходы из фонда, выплаты из прибыли ──────────────────────────
+function fbEntries(list, book){
+  list = list || [];
+  if(!list.length) return `<div class="fb-none">${book === 'rp' ? 'Расходов за день не записано' : 'Выплат за день не было'}</div>`;
+  return list.map(e => `<div class="fb-e">
+    <span class="fb-e-b"><b>${escS(e.comment || (book === 'rp' ? 'Расход' : 'Выплата'))}</b>${
+      e.who ? `<i>${escS(e.who)}</i>` : ''}</span>
+    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
+    <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
+  </div>`).join('');
+}
+function fbPayoutsMonth(b){
+  const rows = [];
+  (b.days || []).forEach(d => (d.payouts || []).forEach(e => rows.push({...e, day: d.day})));
+  if(!rows.length) return '<div class="fb-none">Выплат из прибыли в этом месяце не было</div>';
+  return rows.map(e => `<div class="fb-e">
+    <span class="fb-e-b"><b>${escS(e.who || e.comment || 'Выплата')}</b><i>${escS(fbDayT(e.day))}${
+      e.who && e.comment ? ' · ' + escS(e.comment) : ''}</i></span>
+    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
+    <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
+  </div>`).join('');
+}
+function fbAddRow(book, day){
+  const rp = book === 'rp';
+  return `<button class="sc-r fb-plus" onclick="fbAddToggle('${book}')"><span>${rp ? 'Добавить расход' : 'Добавить выплату'}</span><em>${_FB_PLUS}</em></button>
+  <div class="fb-add" id="fbAdd-${book}" hidden>
+    <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"
+      onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-${book}').focus()}">
+    ${rp ? '' : `<input class="fb-txt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
+      onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-np').focus()}">`}
+    <input class="fb-txt" placeholder="${rp ? 'На что' : 'За что'}" autocomplete="off" maxlength="120" id="fbCmt-${book}"
+      onkeydown="if(event.key==='Enter'){fbEntryAdd('${book}','${day}')}">
+    <button class="aud-b go" onclick="fbEntryAdd('${book}','${day}')">Записать</button>
+  </div>`;
+}
+function fbAddToggle(book){
+  const f = document.getElementById('fbAdd-' + book); if(!f) return;
+  f.hidden = !f.hidden;
+  if(!f.hidden){ const a = document.getElementById('fbAmt-' + book); if(a) a.focus(); }
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+async function fbEntryAdd(book, day){
+  day = day || accDay();
+  const amtEl = document.getElementById('fbAmt-' + book), cmtEl = document.getElementById('fbCmt-' + book);
+  const whoEl = document.getElementById('fbWho-np');
+  const amount = +String(amtEl && amtEl.value || '').replace(/\s/g, '').replace(',', '.');
+  if(!(amount > 0)){ _toast('Нужна сумма'); if(amtEl) amtEl.focus(); return; }
+  const comment = String(cmtEl && cmtEl.value || '').trim();
+  const who = book === 'np' ? String(whoEl && whoEl.value || '').trim() : '';
+  if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
+  if(!await fbAskDay(day, book === 'rp' ? 'Расход из фонда' : 'Выплата из прибыли')) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
+      {method: 'POST', body: {day, book, amount, comment, who, as: _meName()}});
+    if(amtEl) amtEl.value = ''; if(cmtEl) cmtEl.value = ''; if(whoEl) whoEl.value = '';
+    const f = document.getElementById('fbAdd-' + book); if(f) f.hidden = true;
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+  }catch(e){ _toast('Не удалось записать'); }
+}
+async function fbEntryDel(id){
+  if(!await askDialog('Убрать запись?', 'Сумма уйдёт из книги. Вернуть можно будет только новой записью.',
+                      'Убрать', 'Вернуться назад', 'bad')) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
+      {method: 'DELETE', body: {id, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+  }catch(e){ _toast('Не удалось убрать'); }
+}
+
+// ── Экран «Касса дня» ─────────────────────────────────────────────────────
+// Сверху карточка дня — листается пальцем, как «Остатки всего» на складе.
+// Ниже четыре карточки в порядке работы старшего: разложить сданное,
+// расплатиться с Баракудой, записать расходы фонда, выплаты из прибыли.
+async function accFinDay(){
+  _setText('accTitle', 'Касса дня');
+  _setText('accSub', accDayWord());
+  document.getElementById('accMid').innerHTML =
+    `<div class="exp-sum stk-bysum fb-daysum" id="finDayCard" data-day="общий">${fbDayCardInner(null)}</div>
+     <div id="finDayBody"><div class="exp-empty">Загрузка…</div></div>`;
+  requestAnimationFrame(bindDayBars);
+  await fbDayReload();
+}
+async function fbDayReload(){
+  const day = accDay(), month = day.slice(0, 7);
+  _setText('accSub', accDayWord());
+  if(!fbBook(month)){
+    try{ await fbLoad(month); }
+    catch(e){
+      const body = document.getElementById('finDayBody');
+      if(body) body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      return;
+    }
+  }
+  if(accDay() !== day) return;              // листнули дальше, пока грузилось
+  const card = document.getElementById('finDayCard'), body = document.getElementById('finDayBody');
+  if(!card || !body) return;
+  const d = fbDayOf(fbBook(month), day);
+  card.innerHTML = fbDayCardInner(d);
+  dayBarPaint(card);
+  body.innerHTML = fbDayBodyHtml(d);
+}
+function fbDayCardInner(d){
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+      <span class="exp-day-l"><span class="exp-day-t">Касса<i>дня</i></span></span>
+      ${_dayNav('finDay')}
+    </div>
+    <div class="aud-g">
+      ${fbTile('Сдали', 'd.base', d ? d.base : null)}
+      ${fbTile('Заказали', 'd.ordered', d ? d.ordered : null)}
+      ${fbTile('Прибыль дня', 'd.np_plus', d ? d.np_plus : null, {mode: 'neg'})}
+    </div>`;
+}
+function fbDayBodyHtml(d){
+  if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
+  const day = d.day, sc = `data-day="${day}"`;
+  const laid = fbLaid(d);
+  return `
+  <div class="sc fb-gut">
+    ${fbCapT('Сдали')}
+    ${fbRow('Наличными за день', 'd.cash', d.cash)}
+    ${fbRow('Расходы водителей', 'd.spend', d.spend, {sign: '−'})}
+    ${fbRow('Ждут решения', 'd.spend_pending', d.spend_pending, {sub: true, show: 'd.pend_on', hide: !d.spend_pending})}
+    ${fbRow('Сдали по приложению', 'd.handed', d.handed, {sum: true, sign: '='})}
+    <button class="sc-r fb-r sub" onclick="fbToCash()" style="cursor:pointer" data-show="d.cash_on"${d.cash_need ? '' : ' hidden'}>
+      <span>Получил по районам</span><b data-frac="d.cash_got/d.cash_need">${fbFmt(d.cash_got)}<s class="sl">/</s>${fbFmt(d.cash_need)}</b><em>${_SC_CHEV}</em></button>
+    ${fbIn('Сдали по факту', 'handed_fact', d.handed_fact, sc, {ph: fbFmt(d.handed)})}
+    ${fbRow('Разница с приложением', 'd.gap', d.gap, {sub: true, mode: 'diff', show: 'd.gap_on', hide: d.handed_fact === null})}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Разложили')}
+    ${fbRow('Сдали', 'd.base', d.base)}
+    ${fbIn('Отложили в сейф Б', 'aside', d.manual.aside, sc, {sign: '−'})}
+    ${fbIn('Собрал в фонд', 'collected', d.manual.collected, sc, {sign: '−'})}
+    ${fbRow('Прибыль дня', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
+  </div>
+  <div class="sc">
+    ${fbCapT('Баракуда')}
+    ${fbRow('Заказали по приложению', 'd.ordered_auto', d.ordered_auto)}
+    ${fbIn('Заказали по счёту', 'ordered_fact', d.ordered_fact, sc, {ph: fbFmt(d.ordered_auto)})}
+    ${fbRow('Другие базы', 'd.ordered_extra', d.ordered_extra, {sub: true, show: 'd.extra_on', hide: !d.ordered_extra})}
+    ${fbIn('Оплатили из сейфа Б', 'pay_b', d.manual.pay_b, sc)}
+    ${fbIn('Оплатили из ЧП / РП', 'pay_b_extra', d.manual.pay_b_extra, sc)}
+    ${fbRow('Долг Баракуде', 'd.debt_b', d.debt_b, {sum: true, mode: 'debt'})}
+    ${fbRow('В сейфе Б', 'd.safe_b', d.safe_b, {sum: true})}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Фонд расходов')}
+    ${fbRow('Собрал в фонд', 'd.collected', d.collected, {sign: '+'})}
+    ${fbIn('Доп. приход', 'extra_rp', d.manual.extra_rp, sc, {sign: '+'})}
+    ${fbRow('Расходы за день', 'd.expenses_sum', d.expenses_sum, {sign: '−'})}
+    <div id="fbList-rp">${fbEntries(d.expenses, 'rp')}</div>
+    ${fbAddRow('rp', day)}
+    ${fbRow('В фонде с начала месяца', 'd.rp', d.rp, {sum: true, sign: '=', mode: 'neg'})}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Чистая прибыль')}
+    ${fbRow('Прибыль дня', 'd.np_plus', d.np_plus, {sign: '+', mode: 'neg'})}
+    ${fbRow('Выплаты за день', 'd.payouts_sum', d.payouts_sum, {sign: '−'})}
+    <div id="fbList-np">${fbEntries(d.payouts, 'np')}</div>
+    ${fbAddRow('np', day)}
+    ${fbRow('Накоплено с начала месяца', 'd.np_acc', d.np_acc, {sum: true, sign: '=', mode: 'neg'})}
+  </div>
+  <div class="sc">
+    ${fbCapT('Заметка')}
+    ${fbInTxt('Заметка дня', 'note', d.note, sc)}
+  </div>`;
+}
+// Сбор выручки — тот же день, отсюда и обратно.
+function fbToCash(){
+  accOpen('cashround');
+  ACC_BACK = () => accOpen('finday');
+}
+// Строка дня в месячных списках ведёт в кассу этого дня; стрелка назад
+// возвращает в список.
+function fbGoDay(day){
+  const т = _bizToday(), в = new Date(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10));
+  const off = Math.max(0, Math.round((т - в) / 86400000));
+  const from = ACC_VIEW;
+  if(off !== DAY_OFFSET) accDayGo(off);
+  accOpen('finday');
+  ACC_BACK = () => accOpen(from);
+}
+function fbDayRow(d, sub, v, o){
+  o = o || {};
+  const n = +d.day.slice(8, 10);
+  return `<button class="shl-card${o.off ? ' off' : ''}" onclick="fbGoDay('${d.day}')"${o.off ? ' disabled' : ''}>
+    <div class="shl-h">
+      <span class="shl-code">${n}</span>
+      <span class="shl-b"><b>${escS(fbDayT(d.day))}</b><i${o.warn ? ' class="warn"' : ''}>${sub}</i></span>
+      <span class="shl-v"><b${o.cls ? ` class="${o.cls}"` : ''}>${fbFmt(v)}</b><i>${escS(o.unit || 'AED')}</i></span>
+    </div></button>`;
+}
+function fbDays(rows){
+  return `<div class="sc">${fbCapT('По дням')}${rows.length
+    ? `<div class="ord-dists fb-days">${rows.join('')}</div>`
+    : '<div class="fb-none">В этом месяце записей ещё нет</div>'}</div>`;
+}
+async function fbMonthScreen(title){
+  _setText('accTitle', title);
+  FB.month = FB.month || fbMonthNow();
+  _setText('accSub', fbMonthT(FB.month));
+  if(!fbBook(FB.month)){
+    document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+    try{ await fbLoad(FB.month); }
+    catch(e){
+      document.getElementById('accMid').innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      return null;
+    }
+  }
+  return fbBook(FB.month);
+}
+function fbOpenIn(label, field, b, o){
+  const ex = b.opening_explicit || {}, ca = b.opening_carried || {};
+  const has = ex[field] !== undefined && ex[field] !== null;
+  const carried = ca[field] !== undefined && ca[field] !== null;
+  return fbIn(label, field, has ? ex[field] : null, `data-month="${b.month}"${carried ? ' data-carry="1"' : ''}`,
+              {...(o || {}), ph: carried ? fbFmt(ca[field]) : '0', unit: !has && carried ? 'перенос' : 'AED'});
+}
+
+// ── Экран «Баракуда» ──────────────────────────────────────────────────────
+async function accFinB(){
+  const b = await fbMonthScreen('Баракуда'); if(!b) return;
+  const m = `data-month="${b.month}"`;
+  const days = (b.days || []).filter(d => !d.future && (d.ordered || d.aside || d.pay_b || d.pay_b_extra))
+    .map(d => fbDayRow(d, [d.ordered ? `заказали ${fbFmt(d.ordered)}` : '', d.aside ? `отложили ${fbFmt(d.aside)}` : '',
+                          (d.pay_b || d.pay_b_extra) ? `оплатили ${fbFmt(d.pay_b + d.pay_b_extra)}` : ''].filter(Boolean).join(' / '),
+                       d.debt_b, {unit: 'долг', cls: d.debt_b > 0 ? 'dn' : ''}));
+  document.getElementById('accMid').innerHTML = `
+  <div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Продали', 'b.sold', b.b.sold)}
+      ${fbTile('Купили', 'b.bought', b.b.bought)}
+      ${fbTile('Купили от продаж', 'b.ratio', b.b.ratio, {unit: '%', dec: 1})}
+    </div>
+    ${fbRow('Отложили в сейф Б', 'b.aside', b.b.aside)}
+    ${fbRow('Оплатили из сейфа Б', 'b.pay_safe', b.b.pay_safe, {sub: true})}
+    ${fbRow('Оплатили из ЧП / РП', 'b.pay_extra', b.b.pay_extra, {sub: true})}
+    ${fbRow('Всего оплатили', 'b.paid', b.b.paid, {sum: true, sign: '='})}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Долг Баракуде')}
+    ${fbRow('На начало месяца', 'b.debt_open', b.b.debt_open)}
+    ${fbRow('Заказали', 'b.bought', b.b.bought, {sign: '+'})}
+    ${fbRow('Оплатили', 'b.paid', b.b.paid, {sign: '−'})}
+    ${fbRow('Долг Баракуде', 'b.debt_end', b.b.debt_end, {sum: true, sign: '=', mode: 'debt'})}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Сейф Б')}
+    ${fbRow('На начало месяца', 'b.safe_open', b.b.safe_open)}
+    ${fbRow('Отложили', 'b.aside', b.b.aside, {sign: '+'})}
+    ${fbRow('Оплатили из сейфа Б', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
+    ${fbRow('В сейфе Б должно быть', 'b.safe_end', b.b.safe_end, {sum: true, sign: '='})}
+    ${fbRow('Баланс долга', 'b.balance', b.b.balance, {sum: true, mode: 'neg'})}
+    ${fbIn('В сейфе Б по факту', 'safe_b_fact', b.opening_explicit.safe_b_fact ?? null, m, {ph: '—'})}
+    ${fbRow('Разница', 'b.diff', b.b.diff, {sum: true, mode: 'diff'})}
+  </div>
+  <div class="sc">
+    ${fbCapT('На начало месяца')}
+    ${fbOpenIn('В сейфе Б', 'safe_b_open', b)}
+    ${fbOpenIn('Долг Баракуде', 'debt_b_open', b)}
+    ${fbInTxt('Заметка', 'note', b.month_note, m)}
+  </div>
+  ${fbDays(days)}`;
+}
+
+// ── Экран «Расходы предприятия» ───────────────────────────────────────────
+async function accFinRP(){
+  const b = await fbMonthScreen('Расходы предприятия'); if(!b) return;
+  const days = (b.days || []).filter(d => !d.future && (d.collected || d.extra_rp || d.expenses_sum))
+    .map(d => {
+      const what = (d.expenses || []).map(e => `${escS(e.comment || 'расход')} ${fbFmt(e.amount)}`).join(', ');
+      const sub = [d.collected ? `собрал ${fbFmt(d.collected)}` : '', d.extra_rp ? `доп ${fbFmt(d.extra_rp)}` : '',
+                   d.expenses_sum ? `расходы ${fbFmt(d.expenses_sum)}${what ? ' (' + what + ')' : ''}` : ''].filter(Boolean).join(' / ');
+      return fbDayRow(d, sub, d.rp, {unit: 'в фонде', cls: d.rp < 0 ? 'dn' : ''});
+    });
+  document.getElementById('accMid').innerHTML = `
+  <div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Собрал', 'rp.rp_in', b.rp.rp_in)}
+      ${fbTile('Расходы', 'rp.expenses', b.rp.expenses)}
+      ${fbTile('Результат', 'rp.result', b.rp.result, {mode: 'neg'})}
+    </div>
+    ${fbRow('Собрал в фонд', 'rp.collected', b.rp.collected, {sign: '+'})}
+    ${fbRow('Доп. приход', 'rp.extra', b.rp.extra, {sign: '+'})}
+    ${fbRow('Всего собрал', 'rp.rp_in', b.rp.rp_in, {sum: true, sign: '='})}
+    ${fbRow('Расходы предприятия', 'rp.expenses', b.rp.expenses, {sign: '−'})}
+    ${fbRow('Результат фонда', 'rp.result', b.rp.result, {sum: true, sign: '=', mode: 'neg'})}
+  </div>
+  ${fbDays(days)}`;
+}
+
+// ── Экран «Чистая прибыль» ────────────────────────────────────────────────
+async function accFinNP(){
+  const b = await fbMonthScreen('Чистая прибыль'); if(!b) return;
+  const m = `data-month="${b.month}"`, ex = b.opening_explicit || {};
+  const days = (b.days || []).filter(d => !d.future && (d.base || d.np_plus))
+    .map(d => {
+      const laid = fbLaid(d);
+      const sub = laid ? [`сдали ${fbFmt(d.base)}`, `отложили ${fbFmt(d.aside)}`, `собрал ${fbFmt(d.collected)}`].join(' / ')
+                       : `сдали ${fbFmt(d.base)} / не разложено`;
+      return fbDayRow(d, sub, laid ? d.np_plus : null, {unit: 'прибыль дня', warn: !laid, cls: d.np_plus < 0 ? 'dn' : ''});
+    });
+  document.getElementById('accMid').innerHTML = `
+  <div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Из кассы', 'np.days', b.np.days)}
+      ${fbTile('Фонд', 'np.rp_result', b.np.rp_result, {mode: 'neg'})}
+      ${fbTile('Прибыль', 'np.profit', b.np.profit, {mode: 'neg'})}
+    </div>
+    ${fbRow('Из кассы за месяц', 'np.days', b.np.days, {sign: '+'})}
+    ${fbRow('Результат фонда', 'np.rp_result', b.np.rp_result, {sign: '+', mode: 'neg'})}
+    ${fbRow('Прибыль месяца', 'np.profit', b.np.profit, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbRow('Итого / 2', 'np.half', b.np.half, {sub: true, mode: 'neg'})}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Итог месяца')}
+    ${fbRow('Прибыль месяца', 'np.profit', b.np.profit, {mode: 'neg'})}
+    ${fbRow('Выплаты из прибыли', 'np.payouts', b.np.payouts, {sign: '−'})}
+    ${fbRow('В остатке', 'np.left', b.np.left, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbIn('На хранении', 'storage', ex.storage ?? null, m, {sign: '+'})}
+    ${fbOpenIn('С прошлого месяца', 'carry_np', b, {sign: '+'})}
+    ${fbRow('Всего должно быть', 'np.should_be', b.np.should_be, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbIn('В сейфе по факту', 'safe_np_fact', ex.safe_np_fact ?? null, m, {ph: '—'})}
+    ${fbRow('Разница', 'np.diff', b.np.diff, {sum: true, mode: 'diff'})}
+  </div>
+  <div class="sc">
+    ${fbCapT('Выплаты из прибыли')}
+    <div id="fbList-npm">${fbPayoutsMonth(b)}</div>
+    ${fbAddRow('np', b.today <= b.last ? b.today : b.last)}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('По расчёту')}
+    ${fbRow('Продали', 't.gross', b.totals.gross)}
+    ${fbRow('Купили у Баракуды', 't.ordered', b.totals.ordered, {sign: '−'})}
+    ${fbRow('Расходы предприятия', 't.expenses', b.totals.expenses, {sign: '−'})}
+    ${fbRow('Расходы водителей', 't.spend', b.totals.spend, {sign: '−'})}
+    ${fbRow('Доп. приход', 't.extra_rp', b.totals.extra_rp, {sign: '+'})}
+    ${fbRow('Прибыль по расчёту', 'econ', b.econ, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbRow('Долг Баракуде за месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
+  </div>
+  ${fbDays(days)}`;
+}
+
 // Прайс: закупка и продажа. Сама таблица — на своём экране, здесь три числа.
 let PR_D = null;
 async function prLoad(){
@@ -17209,6 +17922,10 @@ function accOpen(id){
   if(id === 'shifts')   accShifts();
   if(id === 'checklist') accChecklist();
   if(id === 'cashround') accCashRound();
+  if(id === 'finday')   accFinDay();
+  if(id === 'finb')     accFinB();
+  if(id === 'finrp')    accFinRP();
+  if(id === 'finnp')    accFinNP();
   if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
 
@@ -17252,7 +17969,7 @@ function _accClose(){
   if(document.getElementById('stkOv').classList.contains('show')) audRefresh();
   _navSave();
   CREW_D = null;
-  accRender(); mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender();
+  accRender(); mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender(); fbHub();
 }
 
 // День и период — один раздел, а не два: это одни и те же деньги, просто

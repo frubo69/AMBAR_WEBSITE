@@ -2849,6 +2849,12 @@ def main():
         stock_value.setup(app)
     except Exception as e:
         log.error(f"stock value routes setup failed: {e}")
+    # Книга учёта денег: касса дня, Баракуда, фонд расходов, чистая прибыль.
+    try:
+        import finance_routes
+        finance_routes.setup(app)
+    except Exception as e:
+        log.error(f"finance routes setup failed: {e}")
     # Курс валют: рыночный по всем и курс наличных обменника там, где он есть.
     # Зарплаты равняются на доллар, а водители привозят наличные — старшему
     # нужно видеть, по какой цене эти деньги на самом деле поменяются.

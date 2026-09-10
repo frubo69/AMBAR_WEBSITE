@@ -338,6 +338,141 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ord-owe-b:active{transform:scale(.96)}
 
 /* Окно расчёта: одно число крупно, под ним — что оно означает. */
+
+/* ── Карточка заказа: та же кожа .dc, секции подписью капсом, число справа,
+   одна сетка отступов (16 по краям, 12 сверху секции). ── */
+.oc{margin:0 0 12px}
+.oc.next{border-color:rgba(201,169,110,.5);box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.oc .dc-cap i{flex:1;min-width:0;font-style:normal;font-family:'DM Sans',sans-serif;font-size:11.5px;
+  font-weight:600;letter-spacing:.2px;text-transform:none;color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.oc .dc-cap i b{color:var(--gold2);font-weight:700}
+.oc .dc-cap > span{flex:0 0 auto}
+.oc .dc-cap .oc-ago{flex:0 0 auto;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.2px;text-transform:none;color:var(--muted)}
+.oc .dt-g{padding:12px 13px 4px}
+.oc-sec{padding:12px 16px 13px;border-top:1px solid rgba(255,255,255,.05)}
+.oc-sec.first{border-top:0}
+.oc-l{display:flex;align-items:center;gap:8px;min-height:22px;font-size:8.5px;font-weight:700;
+  letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.oc-l b{font-weight:700;color:var(--sub);letter-spacing:.3px;text-transform:none;font-size:11px}
+.oc-l .oc-act{margin-left:auto}
+.oc-act{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;
+  border:1px solid var(--border3);background:var(--card2);color:var(--sub);font-family:inherit;
+  font-size:11.5px;font-weight:700;letter-spacing:.2px;text-transform:none;cursor:pointer}
+.oc-act:active{transform:scale(.96);color:var(--gold2)}
+.oc-addr{display:flex;align-items:center;gap:12px}
+.oc-addr-t{flex:1;min-width:0;font-size:21px;font-weight:800;line-height:1.2;letter-spacing:-.4px}
+.oc-map{flex:0 0 50px;width:50px;height:50px;border-radius:15px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.4);cursor:pointer}
+.oc-map:active{transform:scale(.94)}
+.oc-note{font-size:15px;line-height:1.4}
+.oc-it{display:flex;align-items:center;gap:10px;min-height:32px;font-size:14.5px}
+.oc-it + .oc-it{border-top:1px solid rgba(255,255,255,.04)}
+.oc-it span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc-it span i{font-style:normal;color:var(--muted)}
+.oc-it b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:14.5px;color:var(--gold2);
+  font-variant-numeric:tabular-nums}
+.oc-it b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:3px}
+.oc-sec.pay{background:rgba(201,169,110,.05)}
+.oc-sec.pay.paid{background:var(--up-soft)} .oc-sec.pay.paid .oc-tot{color:var(--up)}
+.oc-sec.pay.debt{background:var(--warn-soft)} .oc-sec.pay.debt .oc-tot{color:var(--warn)}
+.oc-pay{display:flex;align-items:center;gap:12px}
+.oc-pay-m{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700}
+.oc-pay-m > span{min-width:0}
+.oc-pay-m i{display:block;font-style:normal;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:2px}
+.oc-tot{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:30px;
+  font-weight:700;line-height:1;letter-spacing:-.8px;color:var(--gold3);font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.oc-tot u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  color:var(--muted);margin-left:5px;letter-spacing:.2px}
+/* Валюта: строка под итогом — сумма в валюте крупно, курс мелко, справа
+   кнопка выбрать / сменить. */
+.oc-fx{display:flex;align-items:center;gap:10px;margin-top:11px;padding-top:11px;
+  border-top:1px dashed var(--border2)}
+.oc-fx-b{flex:1;min-width:0;font-size:12px;color:var(--muted)}
+.oc-fx-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  color:var(--text);letter-spacing:-.3px;line-height:1;margin-bottom:3px;font-variant-numeric:tabular-nums}
+.oc-fx-b b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  color:var(--muted);margin-left:5px}
+.oc-stl{margin-top:11px;padding-top:11px;border-top:1px dashed var(--border2);display:flex;
+  align-items:center;gap:9px;flex-wrap:wrap;font-size:13px;line-height:1.35}
+.oc-stl .ord-settle-v{flex:1;min-width:0}
+.oc-req{display:flex;gap:9px;align-items:flex-start;padding:11px 16px;font-size:13px;line-height:1.4;
+  border-top:1px solid rgba(255,255,255,.05)}
+.oc-req.warn{color:var(--warn);background:var(--warn-soft)}
+.oc-req.ok{color:var(--up);background:var(--up-soft)}
+.oc-req.no{color:var(--dn);background:var(--dn-soft)}
+.oc-req svg{flex-shrink:0;margin-top:1px}
+.oc-req span{flex:1;min-width:0}
+.oc-req button{flex:0 0 auto;border:0;background:none;color:inherit;font-family:inherit;font-size:12px;
+  font-weight:700;text-decoration:underline;padding:0 0 0 6px;cursor:pointer}
+.oc-op{display:flex;gap:10px;align-items:flex-start;width:100%;padding:11px 16px;font-size:13.5px;
+  line-height:1.4;border:0;border-top:1px solid rgba(255,255,255,.05);background:rgba(201,169,110,.08);
+  color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.oc-op svg{flex-shrink:0;color:var(--gold2);margin-top:1px}
+.oc-op span{flex:1;min-width:0}
+.oc-op b{display:block;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--gold2);
+  margin-bottom:2px}
+.oc-foot{display:flex;align-items:stretch;gap:9px;padding:12px 16px 14px;
+  border-top:1px solid rgba(255,255,255,.05)}
+.oc-foot .btn{flex:1}
+.oc-owe{display:flex;align-items:center;gap:11px;background:var(--warn-soft);
+  border-top:1px solid rgba(255,255,255,.05);padding:12px 16px}
+/* Лист валют: строка на валюту, сумма в ней крупно, курс подписью. */
+.fx-q{width:100%;padding:12px 13px;border-radius:12px;margin:0 0 10px;font-family:inherit;font-size:15px;
+  color:var(--text);background:var(--bg2);border:1px solid var(--border2);outline:none}
+.fx-q:focus{border-color:rgba(201,169,110,.5)}
+.fx-list{max-height:52dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;padding:0 2px}
+.fx-r{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 12px;border-radius:13px;
+  border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;text-align:left;
+  cursor:pointer}
+.fx-r + .fx-r{border-top-color:rgba(255,255,255,.05)}
+.fx-r:active{background:var(--card2)}
+.fx-r.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45)}
+.fx-c{flex:0 0 46px;width:46px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--gold2);background:var(--card2);
+  border:1px solid var(--border3)}
+.fx-b{flex:1;min-width:0}
+.fx-b b{display:block;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.fx-v{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;
+  color:var(--gold2);letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fx-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);
+  margin-left:4px}
+.fx-grp{font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);
+  padding:10px 12px 4px}
+/* Плитки каталога при правке состава — как в заявке на другую базу у старшего:
+   фото, название, цена; тап по фото кладёт одну, «−» и «+» правят число. */
+.pt-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:2px 0 10px}
+.pt{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:14px;
+  padding:0 0 10px;display:flex;flex-direction:column;overflow:hidden;text-align:left}
+.pt.has{border-color:rgba(201,169,110,.45)}
+.pt-img{width:100%;aspect-ratio:1.3;background:var(--card2);overflow:hidden;margin-bottom:8px;cursor:pointer}
+.pt-img img{width:100%;height:100%;object-fit:cover;display:block}
+.pt-img:active{opacity:.75}
+.pt-nm{font-size:13px;font-weight:600;line-height:1.3;padding:0 10px;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.pt-bot{display:flex;align-items:center;gap:6px;padding:0 8px;margin-top:6px;min-height:33px}
+.pt-pr{flex:1;min-width:0;font-size:15px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;
+  white-space:nowrap;padding-left:2px;text-align:center}
+.pt-pr small{font-size:10px;color:var(--muted);font-weight:500}
+.pt-n{flex:1;display:block;font-size:20px;line-height:1;text-align:center;font-variant-numeric:tabular-nums;
+  font-family:'Space Grotesk',sans-serif;font-weight:700}
+.pt-b{width:33px;height:33px;border-radius:10px;background:var(--card2);border:1px solid var(--border3);
+  color:var(--gold2);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  user-select:none;cursor:pointer;flex-shrink:0;font-family:inherit}
+.pt-b:active{transform:scale(.86);background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
+.pt-q{position:absolute;top:6px;left:6px;z-index:2;min-width:26px;height:26px;padding:0 7px;border-radius:13px;
+  background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:13px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.pt-pk{display:flex;gap:6px;padding:0 8px;margin-top:6px}
+.pt-pk button{flex:1;min-height:33px;border-radius:10px;border:1px solid var(--border3);background:var(--card2);
+  color:var(--gold2);font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;padding:0 4px}
+.pt-pk button.on{background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
+.pt-pk button:active{transform:scale(.96)}
 .stl-in{display:flex;align-items:baseline;gap:10px;padding:14px 16px;border-radius:14px;
   background:var(--card2);border:1px solid var(--border3)}
 .stl-in:focus-within{border-color:rgba(201,169,110,.5)}
@@ -2874,6 +3009,25 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   </div>
 </div>
 
+<!-- Клиент платит валютой: список валют с суммой заказа в каждой, курс из
+     «Финансов». Выбор замораживает курс; сменить можно, пока заказ в пути. -->
+<div class="sheet" id="fxSheet" onclick="if(event.target===this)fxClose()">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t">Валюта оплаты</div>
+        <div class="sheet-s" id="fxFor">—</div>
+      </div>
+      <button class="sheet-x" onclick="fxClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off" oninput="fxRender()">
+    <div class="fx-list" id="fxList"><div class="empty" style="padding:18px">Загрузка курсов…</div></div>
+  </div>
+</div>
+
 <!-- Списание: бой, брак, просрочка, потеря. Фотография обязательна — это
      единственное, что отличает списание от способа закрыть недостачу. -->
 <div class="sheet" id="woSheet" onclick="if(event.target===this)woClose()">
@@ -3240,7 +3394,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
         </button>
         <div>
           <div class="sheet-t">Добавить позицию</div>
-          <div class="sheet-s">Цены полные — как при заказе по телефону</div>
+          <div class="sheet-s" id="pkSub">Цены полные — как при заказе по телефону</div>
         </div>
       </div>
       <input class="ed-search" id="edQ" placeholder="Поиск по названию" oninput="pickRender()"
@@ -3796,104 +3950,109 @@ function render(){
 // ── заказы ────────────────────────────────────────────────────────────────
 // Первый в списке выделен: у водителя один следующий адрес, а не пять
 // равнозначных, и решать, куда ехать, приложение должно за него.
+// Карточка заказа — та же кожа .dc, что у остальных экранов: шапка капсом,
+// плитки времени, секции с подписью и числом справа, одна сетка отступов.
+// Порядок секций — порядок работы: куда ехать, что сказал клиент, что везём,
+// как платят, потом действия. Всё, что ждёт решения оператора, — полосой
+// сразу под шапкой: это первое, что должно бросаться в глаза.
+function fxFmt(n, sym){
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const t = v.toLocaleString('ru-RU', {minimumFractionDigits: 0, maximumFractionDigits: 2}).replace(/,/g, ',');
+  return sym ? `${t} ${sym}` : t;
+}
 function orderCard(o, i){
-  const items = o.items.map(it => `<div class="ord-item">
-      <span>${esc(it.name)}${it.pcs ? ` <i>${it.pcs} шт</i>` : ''}</span>
-      <b>${it.qty} шт</b></div>`).join('');
   const addr = esc(o.address) || 'Адрес не указан';
-  // Кнопке карты хватает номера заказа: адрес и точку она возьмёт из него
-  // сама. Раньше сюда подставлялась ссылка целиком — её кавычки обрывали
-  // атрибут onclick, и кнопка не делала ничего.
   const hasMap = !!(o.gmap_link || (o.location && o.location.lat) || o.address);
-  // Решение всегда за оператором: здесь видно только, на какой стадии просьба.
   const req = o.driver_req;
-  const open = req && req.status === 'open';
+  const open = !!(req && req.status === 'open');
   const KIND = {delivered:'Доставка отмечена', cancel:'Просьба отменить заказ',
                 edit:'Правка состава', note:'Сообщение оператору'};
   const DONE = {
     delivered:['ok','Оператор подтвердил доставку'],
     cancel:   ['no','Оператор отменил заказ'],
-    edit:     ['ok','Правка применена — состав выше уже новый'],
+    edit:     ['ok','Правка применена — состав ниже уже новый'],
     note:     ['ok','Оператор принял сообщение'],
   };
   const reqWhat = req ? (req.diff && req.diff.length
       ? `${req.diff.length} ${req.diff.length === 1 ? 'изменение' : 'изменения'} состава`
       : esc(req.text || '')) : '';
-  const reqFlag = !req ? '' : (
+  const reqFlag = !req || req.status === 'withdrawn' ? null : (
       req.status === 'open'
-        ? ['warn', `${KIND[req.kind] || 'Просьба'} — ждём решения оператора${
-             reqWhat ? ': ' + reqWhat : ''}`]
+        ? ['warn', `${KIND[req.kind] || 'Просьба'} — ждём решения оператора${reqWhat ? ': ' + reqWhat : ''}`]
         : req.status === 'rejected'
           ? ['no', `Оператор отклонил: ${(KIND[req.kind] || 'просьбу').toLowerCase()}`]
           : (DONE[req.kind] || ['ok','Оператор принял']));
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
-  const n = (o.items || []).length;
-  // Оплата описывается там же и теми же словами, что на экране приёма.
+  const cash = !paid && !debt && o.payment_method !== 'transfer';
+  const lines = (o.items || []);
+  const n = lines.length;
   const PAY = paid ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
             : (debt ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
-                    : {ico: ICO.cash, t: 'Наличными',       s: ''});
-  // Карточка живёт по той же грамматике, что и экран приёма: строки одна под
-  // другой в порядке работы, с разделителями. Разные оформления у одного и
-  // того же заказа заставляли читать его заново на каждом экране.
+            : (o.payment_method === 'transfer' ? {ico: ICO.ok, t: 'Переводом', s: 'денег не брать'}
+                    : {ico: ICO.cash, t: 'Наличными',       s: ''}));
   const now = o.order_id === OPEN_OID || i === 0;
-  return `<div class="ord ${now ? 'next' : ''}">
-    <div class="ord-row ord-row-hd">
-      <span class="ord-seq">${i + 1}</span>
-      <span class="ord-num">${now ? 'Сейчас' : 'Заказ ' + (i + 1)}</span>
-      <span class="ord-id">#${esc(o.order_id)}</span>
-      <span class="ord-dist">${esc(o.district || '')}</span>
-      <span class="ord-ago">${ago(o.confirmed_at || o.timestamp).replace(' назад', '')}</span>
+  const fx = o.pay_fx || null;
+  const items = lines.map(it => `<div class="oc-it">
+      <span>${esc(it.name)}${it.gift ? ' <i>· подарок</i>' : (it.pcs ? ` <i>· ${it.pcs} шт</i>` : '')}</span>
+      <b>${it.qty}<u>шт</u></b></div>`).join('');
+  const chatBtn = `<button class="ord-chat${o.chat_new ? ' new' : ''}" onclick="caseOpen('${esc(o.order_id)}')"
+        aria-label="Написать оператору">${svg(ICO.chat, 21)}${
+        o.chat_new ? `<span class="ord-chat-b">${o.chat_new}</span>` : ''}</button>`;
+  const waiting = open && (req.kind === 'delivered' || req.kind === 'cancel' || req.kind === 'edit');
+  return `<div class="dc oc ${now ? 'next' : ''}">
+    <div class="dc-cap">
+      <span>${now ? 'Сейчас' : 'Заказ ' + (i + 1)}</span>
+      <i>#${esc(o.order_id)} · <b>${esc(o.district || '')}</b></i>
+      <span class="oc-ago">${ago(o.confirmed_at || o.timestamp).replace(' назад', '')}</span>
     </div>
+    ${reqFlag ? `<div class="oc-req ${reqFlag[0]}">${svg(ICO.edit, 15)}<span>${reqFlag[1]}</span>${
+        open && (req.kind === 'edit' || req.kind === 'cancel')
+          ? `<button onclick="reqWithdraw('${esc(o.order_id)}')">Отозвать</button>` : ''}</div>` : ''}
+    ${o.chat_new && o.chat_last ? `<button class="oc-op" onclick="caseOpen('${esc(o.order_id)}')">
+        ${svg(ICO.chat, 16)}<span><b>Оператор · ${hhmm(o.chat_last.at)}</b>${esc(o.chat_last.text)}</span></button>` : ''}
     ${oweRow(o)}
-
-    <div class="ord-row">
-      <div class="tstrip">${timeStrip(o)}</div>
+    <div class="dt-g">${timeTiles(o)}</div>
+    <div class="oc-sec">
+      <div class="oc-l">Куда</div>
+      <div class="oc-addr"><div class="oc-addr-t">${addr}</div>${hasMap
+        ? `<button class="oc-map" onclick="route('${esc(o.order_id)}')" aria-label="Открыть в картах">${svg(ICO.nav, 22)}</button>` : ''}</div>
     </div>
-
-    <div class="ord-row ord-row-to">
-      <div class="ord-to">
-        <div class="ord-l">Куда</div>
-        <div class="ord-addr-t">${addr}</div>
-      </div>
-      ${hasMap ? `<button class="ord-mapb" onclick="route('${esc(o.order_id)}')"
-        aria-label="Открыть в картах">${svg(ICO.nav, 22)}</button>` : ''}
-    </div>
-
-    ${o.comment ? `<div class="ord-row">
-      <div class="ord-l">Комментарий к заказу</div>
-      <div class="ord-note">${esc(o.comment)}</div>
+    ${o.comment ? `<div class="oc-sec">
+      <div class="oc-l">Комментарий</div>
+      <div class="oc-note">${esc(o.comment)}</div>
     </div>` : ''}
-
-    <div class="ord-row">
-      <div class="ord-l">Что везём <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b>
-        <button class="ord-edit" onclick="openEdit('${esc(o.order_id)}')"
-          aria-label="Изменить состав">${svg(ICO.edit, 15)}Изменить</button></div>
-      <div class="ord-items">${items}</div>
+    <div class="oc-sec">
+      <div class="oc-l">Что везём <b>${n} ${plural(n,'позиция','позиции','позиций')}</b>
+        <button class="oc-act" onclick="openEdit('${esc(o.order_id)}')">${svg(ICO.edit, 13)}Изменить</button></div>
+      ${items}
     </div>
-
-    <div class="ord-row ord-row-pay ${paid ? 'paid' : (debt ? 'debt' : '')}">
-      <div class="ord-l">Оплата</div>
-      <div class="ord-l ord-l-r">Итого</div>
-      <div class="ord-method">${svg(PAY.ico, 17)}${PAY.t}</div>
-      <div class="ord-total">${fmt(o.total)}<i>AED</i></div>
-      ${PAY.s ? `<div class="ord-method-s">${PAY.s}</div>` : ''}
-      ${settleRow(o, paid || debt)}
+    <div class="oc-sec pay ${paid ? 'paid' : (debt ? 'debt' : '')}">
+      <div class="oc-l">Оплата${cash ? `<button class="oc-act" onclick="fxOpen('${esc(o.order_id)}')">${
+          fx ? esc(fx.code) + ' · сменить' : 'Валютой'}</button>` : ''}</div>
+      <div class="oc-pay">
+        <div class="oc-pay-m">${svg(PAY.ico, 17)}<span>${PAY.t}${PAY.s ? `<i>${PAY.s}</i>` : ''}</span></div>
+        <div class="oc-tot">${fmt(o.total)}<u>AED</u></div>
+      </div>
+      ${fx ? `<div class="oc-fx"><div class="oc-fx-b"><b>${fxFmt(fx.amount, fx.sym)}<u>${
+          fmt(o.total)} AED</u></b>курс ${fxFmt(fx.rate)} AED за 1 ${esc(fx.sym)} · ${esc(fx.name)}</div></div>` : ''}
+      ${settleRow(o, !cash)}
     </div>
-
-    ${req ? `<div class="ord-row ord-row-req ${reqFlag[0]}">
-      ${svg(ICO.edit, 15)}<span>${reqFlag[1]}</span></div>` : ''}
-
-    <div class="ord-foot ord-foot-2">
-      <button class="ord-chat${o.chat_new ? ' new' : ''}" onclick="caseOpen('${esc(o.order_id)}')"
-        aria-label="Написать оператору">
-        ${svg(ICO.chat, 21)}
-        ${o.chat_new ? `<span class="ord-chat-b">${o.chat_new}</span>` : ''}
-      </button>
-      ${open && (req.kind === 'delivered' || req.kind === 'cancel')
+    <div class="oc-foot">
+      ${chatBtn}
+      ${waiting
         ? `<button class="btn btn-wait" disabled>${svg(ICO.clock,16)} Ждём оператора</button>`
         : `<button class="btn btn-pri" onclick="askDeliver('${esc(o.order_id)}')">Доставил</button>`}
     </div>
   </div>`;
+}
+// Три плитки времени той же сеткой, что на смене и в истории.
+function timeTiles(o){
+  const took = hhmm(o.confirmed_at || o.timestamp);
+  const late = _isLate(o.deliver_by);
+  const t = (l, v, cls, u) => `<div class="dt ${cls}"><span class="dt-l">${l}</span><b class="dt-v">${v}</b>${
+    u ? `<span class="dt-u">${u}</span>` : ''}</div>`;
+  return t('Принят', took || '—', '') + t('Доставка', o.eta ? o.eta : '—', '', o.eta ? 'минут' : '')
+       + t('Быть до', o.deliver_by ? esc(o.deliver_by) : '—', o.deliver_by ? (late ? 'dn' : 'ok') : 'dim');
 }
 
 // Закрытый заказ — та же карточка, только тише: адрес, что везли и сколько.
@@ -4750,12 +4909,13 @@ function oweRow(o){
 function settleRow(o, hidden){
   if(hidden) return '';                        // онлайн и долг мимо рук водителя
   const st = o.settle;
-  if(!st || !st.diff) return `<div class="ord-settle">
+  if(!st || !st.diff) return `<div class="ord-settle oc-stl">
     <button class="ord-settle-b" onclick="stlOpen('${esc(o.order_id)}')">
       ${svg(ICO.edit, 14)}Рассчитались не ровно</button></div>`;
   const owe = st.diff > 0;                     // взяли больше — должны мы
-  return `<div class="ord-settle">
-    <span class="ord-settle-v ${owe ? 'owe' : 'get'}">Взяли <b>${fmt(st.taken)}</b> —
+  const took = st.fx ? `${fxFmt(st.fx.amount, st.fx.sym)} (${fmt(st.taken)} AED)` : fmt(st.taken);
+  return `<div class="ord-settle oc-stl">
+    <span class="ord-settle-v ${owe ? 'owe' : 'get'}">Взяли <b>${took}</b> —
       ${owe ? 'должны клиенту' : 'клиент должен'} <b>${fmt(Math.abs(st.diff))} AED</b></span>
     <button class="ord-settle-b" onclick="stlOpen('${esc(o.order_id)}')"
       aria-label="Исправить расчёт">${svg(ICO.edit, 14)}Исправить</button>
@@ -4771,22 +4931,35 @@ function stlChips(total){
   return [...new Set([total, up(50), up(100), note])].filter(v => v > 0).slice(0, 4);
 }
 
+// Купюры в валюте: ровно по заказу и ближайшие круглые вверх — шаг по величине суммы.
+function fxChips(amount){
+  const step = amount < 20 ? 1 : amount < 100 ? 5 : amount < 500 ? 10 : 50;
+  const up = k => Math.ceil(amount / k) * k;
+  const notes = [1, 5, 10, 20, 50, 100, 200, 500, 1000].filter(nn => nn >= amount);
+  return [...new Set([Math.round(amount * 100) / 100, up(step), up(step * 2), notes[0]])]
+    .filter(v => v > 0).slice(0, 4);
+}
 function stlOpen(oid){
   const o = _ordById(oid); if(!o) return;
-  STL = {oid, total: o.total || 0, mode: 'take'};
-  const was = (o.settle || {}).taken;
-  document.getElementById('stlT').textContent = 'Сколько взяли наличными';
-  document.getElementById('stlS').textContent =
-    `По заказу ${fmt(STL.total)} AED. Впишите, сколько денег реально у вас на руках — ` +
-    `разницу посчитаем сами.`;
+  const fx = o.pay_fx || null;
+  STL = {oid, total: o.total || 0, mode: 'take', fx};
+  const st = o.settle || {};
+  const was = fx ? (st.fx && st.fx.code === fx.code ? st.fx.amount : null) : st.taken;
+  document.getElementById('stlT').textContent = fx ? `Сколько взяли в ${esc(fx.code)}` : 'Сколько взяли наличными';
+  document.getElementById('stlS').textContent = fx
+    ? `По заказу ${fxFmt(fx.amount, fx.sym)} (${fmt(STL.total)} AED по курсу ${fxFmt(fx.rate)}). ` +
+      `Впишите, сколько ${fx.sym} на руках — разницу посчитаем в дирхамах.`
+    : `По заказу ${fmt(STL.total)} AED. Впишите, сколько денег реально у вас на руках — ` +
+      `разницу посчитаем сами.`;
+  const chips = fx ? fxChips(fx.amount) : stlChips(STL.total);
   document.getElementById('stlBody').innerHTML = `
     <div class="stl-in">
       <input id="stlV" type="text" inputmode="decimal" autocomplete="off"
-        aria-label="Сколько взяли наличными" value="${was != null ? was : ''}"
-        placeholder="${STL.total}"><i>AED</i>
+        aria-label="Сколько взяли" value="${was != null ? was : ''}"
+        placeholder="${fx ? fxFmt(fx.amount) : STL.total}"><i>${fx ? esc(fx.sym) : 'AED'}</i>
     </div>
-    <div class="stl-chips">${stlChips(STL.total).map(v =>
-      `<button class="stl-chip" onclick="stlSet(${v})">${fmt(v)}</button>`).join('')}</div>
+    <div class="stl-chips">${chips.map(v =>
+      `<button class="stl-chip" onclick="stlSet(${v})">${fx ? fxFmt(v) : fmt(v)}</button>`).join('')}</div>
     <div class="stl-out" id="stlOut"></div>`;
   document.getElementById('stlGo').textContent = 'Сохранить';
   document.getElementById('stlV').addEventListener('input', stlPaint);
@@ -4812,16 +4985,30 @@ function stlPaint(){
   const out = document.getElementById('stlOut'); if(!out || !STL) return;
   const go = document.getElementById('stlGo');
   const v = stlNum();
+  const fx = STL.fx;
   document.querySelectorAll('.stl-chip').forEach(c =>
-    c.classList.toggle('on', v !== null && fmt(v) === c.textContent));
+    c.classList.toggle('on', v !== null && (fx ? fxFmt(v) : fmt(v)) === c.textContent));
   if(v === null){
     out.className = 'stl-out';
-    out.innerHTML = 'Сумма наличных, которые вы забрали у клиента';
+    out.innerHTML = fx ? `Сумма в ${esc(fx.sym)}, которую вы забрали у клиента`
+                       : 'Сумма наличных, которые вы забрали у клиента';
     go.disabled = true; return;
   }
-  const d = Math.round((v - STL.total) * 100) / 100;
+  const aed = fx ? Math.round(v * fx.rate * 100) / 100 : v;
+  const d = Math.round((aed - STL.total) * 100) / 100;
   go.disabled = false;
-  if(!d){
+  if(fx && !d){
+    out.className = 'stl-out even';
+    out.innerHTML = `${svg(ICO.ok, 17)}<span>${fxFmt(v, fx.sym)} = ${fmt(aed)} AED. Ровно по заказу.</span>`;
+  }else if(fx && d > 0){
+    out.className = 'stl-out owe';
+    out.innerHTML = `${svg(ICO.warn, 17)}<span>${fxFmt(v, fx.sym)} = ${fmt(aed)} AED. Сдача <b>${fmt(d)} AED</b> — ` +
+      `мы должны клиенту.</span>`;
+  }else if(fx){
+    out.className = 'stl-out get';
+    out.innerHTML = `${svg(ICO.warn, 17)}<span>${fxFmt(v, fx.sym)} = ${fmt(aed)} AED. Клиент недодал <b>${fmt(-d)} AED</b> — ` +
+      `останется за ним.</span>`;
+  }else if(!d){
     out.className = 'stl-out even';
     out.innerHTML = `${svg(ICO.ok, 17)}<span>Ровно по заказу. Долгов не остаётся.</span>`;
   }else if(d > 0){
@@ -4859,6 +5046,7 @@ function stlClose(){
 }
 
 const STL_ERR = {not_yours: 'Это уже не ваш заказ', not_cash: 'Здесь наличные не берут',
+  no_fx: 'Валюта заказа изменилась — откройте окно заново', no_rate: 'Курса сейчас нет',
   bad_amount: 'Проверьте сумму', nothing_owed: 'Клиенту уже ничего не должны',
   no_customer: 'У заказа нет клиента'};
 
@@ -4876,7 +5064,9 @@ async function stlSend(){
       toast(`Отдали ${fmt(r.returned)} AED — долг закрыт`);
     }else{
       const r = await drvApi.drvFetch(`/api/driver/orders/${oid}/settle`,
-        {method: 'POST', body: {taken: v}});
+        {method: 'POST', body: STL.fx
+          ? {taken: Math.round(v * STL.fx.rate * 100) / 100, fx: {code: STL.fx.code, amount: v}}
+          : {taken: v}});
       toast(!r.diff ? 'Расчёт сошёлся'
         : r.diff > 0 ? `Записали: должны клиенту ${fmt(r.diff)} AED`
                      : `Записали: клиент должен ${fmt(-r.diff)} AED`);
@@ -4888,6 +5078,75 @@ async function stlSend(){
     go.disabled = false;
     toast(STL_ERR[(e.payload || {}).error] || 'Не сохранилось, попробуйте ещё раз', 'err');
   }
+}
+
+// ── Оплата валютой ────────────────────────────────────────────────────────
+// Курсы — из «Финансов» владельца (наличные обменника, где свежие, иначе
+// рынок), дирхамов за единицу. В списке сразу видно, сколько это в каждой
+// валюте; выбор замораживает курс на заказе, сменить можно до закрытия.
+let FX = {rates: null, at: 0, oid: null, busy: false};
+async function fxOpen(oid){
+  const o = _ordById(oid); if(!o) return;
+  FX.oid = oid;
+  document.getElementById('fxFor').textContent = `Заказ #${oid} · ${fmt(o.total)} AED`;
+  document.getElementById('fxQ').value = '';
+  document.getElementById('fxSheet').classList.add('show');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(!FX.rates || Date.now() - FX.at > 10 * 60 * 1000){
+    try{
+      const r = await drvApi.drvFetch('/api/driver/rates');
+      FX.rates = r.rates || []; FX.at = Date.now();
+    }catch(e){ FX.rates = FX.rates || []; }
+  }
+  fxRender();
+}
+function fxClose(){ document.getElementById('fxSheet').classList.remove('show'); FX.oid = null; }
+function fxRender(){
+  const o = _ordById(FX.oid); const box = document.getElementById('fxList');
+  if(!o || !box) return;
+  const cur = (o.pay_fx || {}).code || '';
+  const q = (document.getElementById('fxQ').value || '').trim().toLowerCase();
+  const rows = (FX.rates || []).filter(r => !q || r.code.toLowerCase().includes(q)
+                                            || String(r.name || '').toLowerCase().includes(q));
+  if(!FX.rates) { box.innerHTML = '<div class="empty" style="padding:18px">Загрузка курсов…</div>'; return; }
+  if(!FX.rates.length){ box.innerHTML = '<div class="empty" style="padding:18px">Курсов сейчас нет — расчёт в дирхамах</div>'; return; }
+  const row = r => `<button class="fx-r${cur === r.code ? ' on' : ''}" onclick="fxPick('${esc(r.code)}')">
+      <span class="fx-c">${esc(r.sym !== r.code ? r.sym : r.code)}</span>
+      <span class="fx-b"><b>${esc(r.name)}</b><i>${esc(r.code)} · ${fxFmt(r.rate)} AED за 1${r.cash ? ' · обменник' : ''}</i></span>
+      <span class="fx-v">${fxFmt(o.total / r.rate)}<u>${esc(r.sym)}</u></span>
+    </button>`;
+  const main = rows.filter(r => r.main), rest = rows.filter(r => !r.main);
+  box.innerHTML = `<button class="fx-r${cur ? '' : ' on'}" onclick="fxPick('')">
+      <span class="fx-c">AED</span>
+      <span class="fx-b"><b>Дирхамы</b><i>как в заказе</i></span>
+      <span class="fx-v">${fmt(o.total)}<u>AED</u></span></button>`
+    + (main.length ? `<div class="fx-grp">Основные</div>${main.map(row).join('')}` : '')
+    + (rest.length ? `<div class="fx-grp">Остальные</div>${rest.map(row).join('')}` : '')
+    + (!rows.length ? '<div class="empty" style="padding:18px">Ничего не нашлось</div>' : '');
+}
+async function fxPick(code){
+  if(FX.busy || !FX.oid) return; FX.busy = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(FX.oid)}/fx`,
+      {method: 'POST', body: {code}});
+    const o = _ordById(FX.oid); if(o) o.pay_fx = r.pay_fx || null;
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast(r.pay_fx ? `Считаем в ${r.pay_fx.code}: ${fxFmt(r.pay_fx.amount, r.pay_fx.sym)}` : 'Считаем в дирхамах');
+    fxClose(); renderOrders();
+    load();
+  }catch(e){
+    if(shBlocked(e)) return;
+    toast({not_cash: 'Здесь наличные не берут', no_rate: 'Курса этой валюты нет',
+           wrong_status: 'Заказ уже закрыт'}[(e.payload || {}).error] || 'Не получилось', 'err');
+  }finally{ FX.busy = false; }
+}
+// Передумал — отозвать свою просьбу, пока оператор её не решил.
+async function reqWithdraw(oid){
+  try{
+    await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/edit/withdraw`, {method:'POST', body:{}});
+    toast('Просьба отозвана');
+    await load();
+  }catch(e){ toast((e.payload || {}).error === 'no_open_request' ? 'Оператор уже решил' : 'Не получилось', 'err'); }
 }
 
 // Три факта о времени — те же, что и в работе, только уже в прошедшем виде.
@@ -4974,7 +5233,8 @@ function ordMini(o, i){
   const items = (o.items || []).reduce((a, x) => a + (x.qty || 0), 0);
   return `<button class="dc-r${late ? ' dn' : ''}" onclick="ordOpen('${esc(o.order_id)}')">
     <span class="dc-st num">${i + 1}</span>
-    <span class="dc-b">${esc(o.address) || 'Адрес не указан'}<i>${items} ${plural(items,'бутылка','бутылки','бутылок')} · ${fmt(o.total)} AED${
+    <span class="dc-b">${esc(o.address) || 'Адрес не указан'}<i>${items} ${plural(items,'бутылка','бутылки','бутылок')} · ${
+      o.pay_fx ? fxFmt(o.pay_fx.amount, o.pay_fx.sym) + ' · ' : ''}${fmt(o.total)} AED${
       o.deliver_by ? ' · к ' + esc(o.deliver_by) : ''}</i></span>
     <em>${svg('<path d="M9 6l6 6-6 6"/>', 13)}</em>
   </button>`;
@@ -4986,7 +5246,7 @@ function ordOpen(oid){
   OPEN_OID = oid;
   renderOrders();
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-  const el = document.querySelector('.ord.next') || document.querySelector('.ord');
+  const el = document.querySelector('.oc.next') || document.querySelector('.oc');
   if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -5203,7 +5463,7 @@ function histRow(o, withDay){
       <span class="hrow-s">${withDay ? dayLbl(o._day) + ' · ' : ''}${n} ${
         plural(n,'бутылка','бутылки','бутылок')}${o.mins ? ` · ${o.mins} мин` : ''}</span>
     </span>
-    <span class="hrow-v">${fmt(o.total)}</span>
+    <span class="hrow-v">${o.pay_fx ? `${fxFmt(o.pay_fx.amount, o.pay_fx.sym)} <i>· ${fmt(o.total)}</i>` : fmt(o.total)}</span>
   </button>`;
 }
 
@@ -6551,11 +6811,13 @@ function askDeliver(oid){
            + 'по его подтверждению.',
          btn:'Отметил', fn:()=>sendDeliver(oid)};
   if(cash){
+    const fx = o.pay_fx;
     ASK.check = st && st.diff
       ? {t: st.diff > 0 ? `Разница записана: должны клиенту ${fmt(Math.abs(st.diff))} AED`
                         : `Разница записана: клиент должен ${fmt(Math.abs(st.diff))} AED`,
          s: 'Отмечаю, что так и есть'}
-      : {t: 'Рассчитались ровно', s: 'Никто никому не должен'};
+      : {t: fx ? `Рассчитались ровно: ${fxFmt(fx.amount, fx.sym)} (${fmt(o.total)} AED)` : 'Рассчитались ровно',
+         s: 'Никто никому не должен'};
     ASK.alt = {t: st ? 'Исправить расчёт' : 'Рассчитались не ровно',
                fn: () => { askClose(); stlOpen(oid); }};
   }
@@ -6602,7 +6864,9 @@ async function sendDeliver(oid){
     await load();
   }catch(e){
     if(shBlocked(e)) return;
-    toast((e.payload || {}).error === 'need_settle' ? 'Сначала подтвердите расчёт'
+    const err = (e.payload || {}).error;
+    toast(err === 'need_settle' ? 'Сначала подтвердите расчёт'
+          : err === 'req_open' ? 'Сначала решение оператора по вашей просьбе — или отзовите её'
           : e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — повторите');
   }
 }
@@ -8036,6 +8300,8 @@ async function caseOpen(oid){
   caseRender();
   document.getElementById('caseSheet').classList.add('show');
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(CASE_TIMER) clearInterval(CASE_TIMER);
+  CASE_TIMER = setInterval(casePoll, 5000);
   try{
     const r = await drvApi.drvFetch(`/api/driver/orders/${oid}/chat`);
     CASE_CHAT = r.chat || [];
@@ -8050,6 +8316,22 @@ async function caseOpen(oid){
 function caseClose(){
   document.getElementById('caseSheet').classList.remove('show');
   CASE_OID = null;
+  if(CASE_TIMER){ clearInterval(CASE_TIMER); CASE_TIMER = null; }
+}
+// Ответ оператора появляется в открытом окне сам: раз в пять секунд, пока
+// оно открыто. Раньше его показывал только повторный вход.
+let CASE_TIMER = null;
+async function casePoll(){
+  if(!CASE_OID || CASE_BUSY || document.hidden) return;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/orders/${CASE_OID}/chat`);
+    const chat = r.chat || [];
+    if(chat.length !== CASE_CHAT.length){
+      const grew = chat.length > CASE_CHAT.length;
+      CASE_CHAT = chat; caseRender();
+      if(grew) try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    }
+  }catch(e){}
 }
 
 function caseRender(){
@@ -8143,11 +8425,25 @@ let EDIT_LINES = [];       // рабочая копия состава: {id,name
 let EDIT_WAS = 0;          // сумма заказа до правки
 let CATALOG = null;        // грузится один раз за сессию
 
+let EDIT_SRC = 'app';
+// Цена позиции — по источнику заказа: из приложения со скидкой, по телефону
+// полная. Ту же цену посчитает сервер, здесь она только для глаз.
+function pickPrice(p, pcs){
+  const app = EDIT_SRC !== 'manual';
+  if(pcs === 12) return app ? p.app12 : p.p12;
+  if(pcs === 24) return app ? p.app24 : p.p24;
+  return app ? p.app : p.price;
+}
 function openEdit(oid){
   const o = ((ORDERS && ORDERS.active) || []).find(x => x.order_id === oid);
   EDIT_OID = oid; EDIT_TAGS = [];
+  EDIT_SRC = (o && o.source) || 'app';
+  const sub = document.getElementById('pkSub');
+  if(sub) sub.textContent = EDIT_SRC === 'manual' ? 'Цены полные — заказ приняли по телефону'
+                                                  : 'Цены как в приложении — со скидкой';
   // Правим копию: пока оператор не согласился, у заказа прежний состав.
-  EDIT_LINES = (o ? o.items : []).map(it => ({
+  // Подарок не правится: он приложится к заказу сам, как и был.
+  EDIT_LINES = (o ? o.items : []).filter(it => !it.gift).map(it => ({
     id: it.id, name: it.name, qty: it.qty, was: it.qty, price: it.price || 0, pcs: it.pcs}));
   EDIT_WAS = o ? o.total : 0;
   document.getElementById('editFor').textContent = `Заказ #${oid} · решает оператор`;
@@ -8237,28 +8533,50 @@ let PK_CAT = '';
 function pickRender(){
   if(!CATALOG) return;
   const q = (document.getElementById('edQ').value || '').trim().toLowerCase();
-
   // Полки показываем только когда не ищут: при поиске они врут — в них
   // остаются категории, которых в найденном нет.
   const cats = document.getElementById('edCats');
   if(q){ cats.innerHTML = ''; }
   else{
-    const all = [];
-    CATALOG.items.forEach(p => { if(p.cat && !all.includes(p.cat)) all.push(p.cat); });
+    const all = CATALOG.cats && CATALOG.cats.length ? CATALOG.cats
+              : [...new Set(CATALOG.items.map(p => p.cat).filter(Boolean))];
     cats.innerHTML = [['', 'Всё']].concat(all.map(c => [c, c])).map(([v, t]) =>
       `<button class="pk-c ${PK_CAT === v ? 'on' : ''}" onclick="pickCat('${esc(v)}')">${esc(t)}</button>`).join('');
   }
-
   const list = CATALOG.items.filter(p =>
     (!q || p.name.toLowerCase().includes(q)) && (q || !PK_CAT || p.cat === PK_CAT));
-  let html = '', cat = null;
-  for(const p of list.slice(0, 200)){
-    if(!PK_CAT && p.cat !== cat){ cat = p.cat; html += `<div class="ed-cat">${esc(cat || '—')}</div>`; }
-    html += pickRow(p);
-  }
-  document.getElementById('edCat').innerHTML = html ||
-    '<div class="empty" style="padding:18px">Ничего не нашлось</div>';
+  // Плитки — как в заявке на другую базу у старшего: фото, название, цена;
+  // тап по фото кладёт одну, «−» и «+» правят число. Пиво — пачками.
+  document.getElementById('edCat').innerHTML = list.length
+    ? `<div class="pt-g">${list.slice(0, 200).map(pickTile).join('')}</div>`
+    : '<div class="empty" style="padding:18px">Ничего не нашлось</div>';
   pickFoot();
+}
+function pickTile(p){
+  const line = pcs => EDIT_LINES.find(l => l.id === p.id && (l.pcs || 0) === (pcs || 0));
+  const l0 = line(0), n0 = l0 ? l0.qty : 0;
+  const has = p.pack ? !!(line(12) || line(24)) : n0 > 0;
+  const total = p.pack ? ((line(12) || {qty: 0}).qty + (line(24) || {qty: 0}).qty) : n0;
+  const img = `<div class="pt-img" onclick="pickStep('${esc(p.id)}',${p.pack ? 12 : 0},1)">
+      <img src="/products/${esc(p.id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></div>`;
+  let bot;
+  if(p.pack){
+    const pk = pcs => { const l = line(pcs); const pr = pickPrice(p, pcs);
+      return `<button class="${l ? 'on' : ''}" onclick="pickStep('${esc(p.id)}',${pcs},1)">×${pcs} · ${pr}${
+        l ? ` · ${l.qty} шт` : ''}</button>`; };
+    bot = `<div class="pt-pk">${pk(12)}${pk(24)}</div>` + (has ? `<div class="pt-bot">
+      <button class="pt-b" onclick="pickStep('${esc(p.id)}',${line(24) && !line(12) ? 24 : 12},-1)">−</button>
+      <b class="pt-n">${total}</b>
+      <button class="pt-b" onclick="pickStep('${esc(p.id)}',${line(24) && !line(12) ? 24 : 12},1)">+</button></div>` : '');
+  }else{
+    bot = n0 ? `<div class="pt-bot">
+      <button class="pt-b" onclick="pickStep('${esc(p.id)}',0,-1)">−</button>
+      <b class="pt-n">${n0}</b>
+      <button class="pt-b" onclick="pickStep('${esc(p.id)}',0,1)">+</button></div>`
+    : `<div class="pt-bot"><span class="pt-pr">${pickPrice(p, 0)}<small> AED</small></span></div>`;
+  }
+  return `<div class="pt${has ? ' has' : ''}">${total ? `<span class="pt-q">${total}</span>` : ''}${img}
+    <div class="pt-nm">${esc(p.name)}</div>${bot}</div>`;
 }
 
 function pickCat(c){
@@ -8297,7 +8615,7 @@ function pickRow(p){
 function pickStep(pid, pcs, d){
   const p = CATALOG.items.find(x => x.id === pid);
   if(!p) return;
-  const price = pcs === 12 ? p.p12 : (pcs === 24 ? p.p24 : p.price);
+  const price = pickPrice(p, pcs);
   const i = EDIT_LINES.findIndex(l => l.id === pid && (l.pcs || 0) === (pcs || 0));
   if(i < 0){
     if(d < 0) return;

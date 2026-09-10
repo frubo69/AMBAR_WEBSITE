@@ -423,6 +423,9 @@ def _order_summary(o):
         "phone": o.get("phone","—"),
         "total": o.get("total", 0),
         "crypto": bool(o.get("payment_method") == "crypto" and o.get("paid")),
+        # Клиент платил валютой и как рассчитались — отметки водителя.
+        "pay_fx": o.get("pay_fx") or None,
+        "settle": o.get("settle") or None,
         "crypto_usdt": o.get("crypto_amount_usdt") or 0,
         "manual": bool(o.get("source") == "manual"),
         "created_by_name": o.get("created_by_name", ""),

@@ -1232,7 +1232,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
 
         if kind == "edit" and req.get("items"):
-            total = await _pos._pos_total(req["items"])
+            total = await _pos._order_total_for(order, req["items"])
             await db.update_order(oid, items=req["items"], total=total,
                                   driver_req={**req, "status": "applied",
                                               "decided_by": op, "decided_at": now})

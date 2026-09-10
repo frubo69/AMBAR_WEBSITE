@@ -290,6 +290,25 @@ def _full_price(p: dict, pcs=None) -> int:
     return int(p.get("price_full") or 0)
 
 
+def _unit_price_for(source: str, p: dict, pcs=None) -> float:
+    """Цена единицы по источнику заказа. Телефонный — полная (`_full_price`),
+    из приложения — та, что видел клиент, со скидкой (api_server): правка
+    состава водителем не должна менять цену, по которой заказ приняли."""
+    if (source or "app") == "manual":
+        return float(_full_price(p, pcs))
+    from api_server import _catalog_unit_price
+    return float(_catalog_unit_price(p, pcs))
+
+
+async def _order_total_for(o: dict, items: list) -> float:
+    """Итог заказа по его источнику: телефонный — полные цены без чаевых,
+    из приложения — цены приложения плюс чаевые, как при приёме."""
+    if (o.get("source") or "app") == "manual":
+        return await _pos_total(items)
+    from api_server import _recompute_order_total_aed
+    return await _recompute_order_total_aed(items, o.get("tip") or 0)
+
+
 async def _pos_total(items: list) -> int:
     """Итог телефонного заказа по полным ценам каталога. Свой пересчёт, а не
     api_server._recompute_order_total_aed: тот считает по онлайновым ценам и
@@ -342,9 +361,10 @@ def _new_oid() -> str:
     return "AMB" + str(int(time.time() * 1000))[-7:]
 
 
-def _build_items(raw_items: list) -> tuple[list, str]:
+def _build_items(raw_items: list, source: str = "manual") -> tuple[list, str]:
     """Normalize POS ticket lines into order items enriched from the catalog.
-    Returns (items, error). Beer lines carry pcs (12/24) and pack pricing."""
+    Returns (items, error). Beer lines carry pcs (12/24) and pack pricing.
+    source — чей заказ правим: у заказа из приложения цены приложения."""
     by_id = _catalog_by_id()
     items = []
     for line in raw_items or []:
@@ -364,11 +384,12 @@ def _build_items(raw_items: list) -> tuple[list, str]:
         pcs = None
         if is_beer:
             pcs = 24 if str(line.get("pcs", "")) == "24" else 12
-            unit = _full_price(p, pcs)
+            unit = _unit_price_for(source, p, pcs)
             name = f"{p.get('name','')} ×{pcs}"
         else:
-            unit = _full_price(p)
+            unit = _unit_price_for(source, p)
             name = p.get("name", "")
+        unit = int(unit) if float(unit).is_integer() else round(unit, 2)
         item = {"id": pid, "name": name, "price": unit, "qty": qty,
                 "line_total": unit * qty}
         if pcs:
@@ -611,7 +632,34 @@ def _summary(o: dict) -> dict:
         # будет: где он едет — не хранится нигде, чтобы историю перемещений
         # нельзя было ни украсть, ни собрать.
         "driver_ack_at": o.get("driver_ack_at", ""),
+        # Клиент платит валютой: код, курс на момент выбора, сумма в валюте.
+        "pay_fx": _fx_view(o),
+        # Расчёт наличными: сколько реально взяли (водитель).
+        "settle": o.get("settle") or None,
     }
+
+
+FX_SYM = {"USD": "$", "EUR": "€", "GBP": "£", "RUB": "₽", "TRY": "₺", "CNY": "¥",
+          "KZT": "₸", "UAH": "₴", "INR": "₹", "JPY": "¥", "KRW": "₩", "GEL": "₾",
+          "PLN": "zł", "CHF": "₣", "AED": "AED"}
+
+
+def _fx_view(o: dict) -> dict | None:
+    """Оплата в валюте глазами экрана: сумма считается из итога и курса на
+    момент выбора — поправили состав, пересчиталась и она."""
+    fx = o.get("pay_fx") or None
+    if not fx or not fx.get("code") or not fx.get("rate"):
+        return None
+    try:
+        rate = float(fx["rate"])
+        total = float(o.get("total") or 0)
+    except (TypeError, ValueError):
+        return None
+    if rate <= 0:
+        return None
+    return {"code": fx["code"], "name": fx.get("name") or fx["code"],
+            "sym": FX_SYM.get(fx["code"], fx["code"]), "rate": rate,
+            "amount": round(total / rate, 2), "at": fx.get("at", ""), "by": fx.get("by", "")}
 
 
 # ── handlers ─────────────────────────────────────────────────────────────────
@@ -1301,10 +1349,10 @@ async def handle_patch(request):
     items_changed = False
     was_total = order.get("total", 0)
     if "items" in body:
-        items, err = _build_items(body.get("items"))
+        items, err = _build_items(body.get("items"), order.get("source") or "app")
         if err:
             return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
-        total = await _pos_total(items)
+        total = await _order_total_for(order, items)
         items_changed = _items_sig(items) != _items_sig(order.get("items"))
         upd.update(items=items, item_lines=_item_lines(items),
                    subtotal=total, total=total)
@@ -1823,11 +1871,11 @@ async def handle_driver_req(request):
         raw = body.get("items")
         items = None
         if isinstance(raw, list) and raw:
-            items, _ = _build_items(raw)
+            items, _ = _build_items(raw, order.get("source") or "app")
         items = items or req.get("items")
         if not items:
             return web.json_response({"error": "empty_items"}, status=400, headers=CORS_HEADERS)
-        total = await _pos_total(items)
+        total = await _order_total_for(order, items)
         await db.update_order(oid, items=items, total=total, updated_at=now,
                               driver_req={**req, "status": "applied", "decided_by": who,
                                           "decided_at": now, "applied_total": total})

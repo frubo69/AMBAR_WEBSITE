@@ -134,6 +134,38 @@ def _is_prepaid(o: dict) -> bool:
                 or o.get("payment_method") == "crypto")
 
 
+FX_SYM = {"USD": "$", "EUR": "€", "GBP": "£", "RUB": "₽", "TRY": "₺", "CNY": "¥",
+          "KZT": "₸", "UAH": "₴", "INR": "₹", "JPY": "¥", "KRW": "₩", "GEL": "₾",
+          "PLN": "zł", "CHF": "₣"}
+
+
+def _fx_view(o: dict) -> dict | None:
+    """Оплата в валюте: сумма считается из итога и курса на момент выбора —
+    поправили состав, пересчиталась и она. Курс замораживается при выборе:
+    клиент отсчитывает купюры по числу, которое ему назвали."""
+    fx = o.get("pay_fx") or None
+    if not fx or not fx.get("code") or not fx.get("rate"):
+        return None
+    try:
+        rate, total = float(fx["rate"]), float(o.get("total") or 0)
+    except (TypeError, ValueError):
+        return None
+    if rate <= 0:
+        return None
+    return {"code": fx["code"], "name": fx.get("name") or fx["code"],
+            "sym": FX_SYM.get(fx["code"], fx["code"]), "rate": rate,
+            "amount": round(total / rate, 2), "at": fx.get("at", "")}
+
+
+def _chat_last(o: dict) -> dict | None:
+    """Последнее сообщение оператора по заказу — коротко, для строки на карточке."""
+    for m in reversed(o.get("chat") or []):
+        if m.get("by") == "operator" and (m.get("text") or "").strip():
+            return {"text": str(m.get("text") or "")[:160], "at": m.get("at", ""),
+                    "name": m.get("name", "")}
+    return None
+
+
 def _order_view(o: dict) -> dict:
     """Заказ глазами водителя: адрес, состав, сумма.
 
@@ -148,11 +180,24 @@ def _order_view(o: dict) -> dict:
         "location": o.get("location") or {},
         "district": o.get("district") or o.get("office_name", ""),
         "customer_name": o.get("customer_name", ""),
-        "items": [{"name": i.get("name", ""), "qty": i.get("qty", 0), "pcs": i.get("pcs")}
+        # Состав с id и ценой: без id правка состава теряла все прежние
+        # позиции (они уходили на сервер без ключа), без цены экран считал
+        # новую сумму только по добавленному.
+        "items": [{"id": i.get("id", ""), "name": i.get("name", ""), "qty": i.get("qty", 0),
+                   "pcs": i.get("pcs"), "price": i.get("price", 0),
+                   "line_total": i.get("line_total", 0), "gift": bool(i.get("gift"))}
                   for i in (o.get("items") or [])],
         "total": int(o.get("total", 0) or 0),
+        # Откуда заказ: из приложения — цены со скидкой, по телефону — полные.
+        # По этому же признаку водителю показываются цены при добавлении.
+        "source": o.get("source") or "app",
+        "tip": o.get("tip", 0) or 0,
         "comment": o.get("comment", ""),
         "payment_method": o.get("payment_method", ""),
+        # Клиент платит валютой: код, курс на момент выбора, сумма в валюте.
+        "pay_fx": _fx_view(o),
+        # Последний ответ оператора — на карточку, не открывая разговор.
+        "chat_last": _chat_last(o),
         # Оплаченный криптой заказ водитель обязан видеть до выезда: взять
         # наличные там, где уже заплачено, дороже любой ошибки в интерфейсе.
         "prepaid": _is_prepaid(o),
@@ -456,10 +501,30 @@ async def handle_settle(request):
         # Там, где деньги не идут через руки водителя, и расчёта быть не может.
         return web.json_response({"error": "not_cash"}, status=400, headers=CORS_HEADERS)
     try:
-        taken = round(float(body.get("taken")), 2)
+        # Взяли валютой — сумма в дирхамах приходит ниже, из fx.
+        taken = round(float(body.get("taken")), 2) if body.get("taken") is not None \
+            else (0.0 if isinstance(body.get("fx"), dict) else round(float(None), 2))
     except (TypeError, ValueError):
         return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
     total = int(o.get("total") or 0)
+    # Взяли валютой: сумма приходит в ней, в дирхамы переводим по курсу
+    # заказа (зафиксирован при выборе валюты) — тем же, что назвали клиенту.
+    fx_in = body.get("fx") if isinstance(body.get("fx"), dict) else None
+    fx_rec = None
+    if fx_in and fx_in.get("code"):
+        pf = o.get("pay_fx") or {}
+        try:
+            rate = float(pf.get("rate") or 0) if pf.get("code") == fx_in.get("code") else 0.0
+            amount = round(float(fx_in.get("amount")), 2)
+        except (TypeError, ValueError):
+            return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
+        if rate <= 0:
+            return web.json_response({"error": "no_fx"}, status=400, headers=CORS_HEADERS)
+        if amount < 0:
+            return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
+        taken = round(amount * rate, 2)
+        fx_rec = {"code": fx_in["code"], "amount": amount, "rate": rate,
+                  "sym": FX_SYM.get(fx_in["code"], fx_in["code"])}
     if not (0 <= taken <= total + 100000):
         return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
 
@@ -467,7 +532,8 @@ async def handle_settle(request):
     prev = round(float((o.get("settle") or {}).get("diff") or 0), 2)
     now = datetime.now(timezone.utc)
     await db.update_order(oid, settle={
-        "taken": taken, "diff": diff, "by": me["name"], "at": now.isoformat()})
+        "taken": taken, "diff": diff, "by": me["name"], "at": now.isoformat(),
+        **({"fx": fx_rec} if fx_rec else {})})
 
     cid = int(o.get("customer_id") or 0)
     if cid and diff != prev:
@@ -1188,6 +1254,102 @@ KIND_TITLE = {
 }
 
 
+@require_driver
+async def handle_rates(request):
+    """Курсы для расчёта валютой — те же, что в «Финансах» у владельца:
+    наличный курс обменника, где он свежий, иначе рыночный. Дирхамов за
+    единицу валюты. Основные валюты — первыми, остальные по коду."""
+    import rates as _rates
+    try:
+        d = await _rates.get_rates()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[driver] курсы не прочитаны: {e}")
+        d = {"rates": [], "main": []}
+    main = list(d.get("main") or [])
+    out = []
+    for r in d.get("rates") or []:
+        code = str(r.get("code") or "")
+        rate = r.get("cash_aed") or r.get("aed")
+        if not code or not rate or code == "AED":
+            continue
+        out.append({"code": code, "name": r.get("name") or code, "sym": FX_SYM.get(code, code),
+                    "rate": float(rate), "cash": bool(r.get("cash_aed")),
+                    "main": code in main})
+    out.sort(key=lambda r: (0 if r["main"] else 1,
+                            main.index(r["code"]) if r["code"] in main else 0, r["code"]))
+    return web.json_response({"rates": out, "at": d.get("fetched_iso") or "",
+                              "ok": bool(out)}, headers=CORS_HEADERS)
+
+
+@require_driver
+@needs_shift
+async def handle_fx(request):
+    """Клиент платит валютой: {code} — выбрать, {code: ""} — снова дирхамы.
+    Курс замораживается на момент выбора; менять можно, пока заказ в пути."""
+    oid = (request.match_info.get("oid") or "").strip()
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    code = str(body.get("code") or "").strip().upper()[:5]
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    if o.get("status") != "approved":
+        return web.json_response({"error": "wrong_status"}, status=409, headers=CORS_HEADERS)
+    if not _needs_settle(o):
+        return web.json_response({"error": "not_cash"}, status=400, headers=CORS_HEADERS)
+    if not code or code == "AED":
+        await db.update_order(oid, pay_fx=None)
+        log.info(f"[driver] {me['name']} #{oid}: расчёт снова в дирхамах")
+        return web.json_response({"ok": True, "pay_fx": None}, headers=CORS_HEADERS)
+    import rates as _rates
+    try:
+        d = await _rates.get_rates()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[driver] курсы не прочитаны: {e}")
+        d = {"rates": []}
+    row = next((r for r in (d.get("rates") or []) if r.get("code") == code), None)
+    rate = row and (row.get("cash_aed") or row.get("aed"))
+    if not rate:
+        return web.json_response({"error": "no_rate"}, status=503, headers=CORS_HEADERS)
+    fx = {"code": code, "name": row.get("name") or code, "rate": float(rate),
+          "at": datetime.now(timezone.utc).isoformat(), "by": me["name"]}
+    await db.update_order(oid, pay_fx=fx)
+    o["pay_fx"] = fx
+    log.info(f"[driver] {me['name']} #{oid}: оплата в {code} по {rate}")
+    return web.json_response({"ok": True, "pay_fx": _fx_view(o)}, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_req_withdraw(request):
+    """Отозвать свою открытую просьбу (правку или отмену): передумал сам —
+    оператору не нужно решать то, чего уже не просят."""
+    oid = (request.match_info.get("oid") or "").strip()
+    me = request["driver"]
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
+    req = o.get("driver_req") or o.get("edit_request") or {}
+    if req.get("status") != "open" or req.get("kind") not in ("edit", "cancel", "note"):
+        return web.json_response({"error": "no_open_request"}, status=409, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.update_order(oid, driver_req={**req, "status": "withdrawn", "decided_at": now,
+                                           "decided_by": me["name"]})
+    try:
+        from api_server import tg_send, OPERATOR_BOT_TOKEN as _tok
+        from operator_routes import OPERATOR_IDS
+        what = {"edit": "правку состава", "cancel": "просьбу отменить", "note": "сообщение"}
+        for op_id in OPERATOR_IDS:
+            await tg_send(_tok, op_id, f"↩️ Водитель {me['name']} отозвал {what.get(req.get('kind'), 'просьбу')} "
+                                       f"по заказу #{oid} — решать больше нечего.")
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[driver] отзыв просьбы #{oid}: операторам не ушло: {e}")
+    log.info(f"[driver] {me['name']} отозвал просьбу «{req.get('kind')}» по #{oid}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 async def _notify_operators(oid: str, me: dict, req: dict, order: dict):
     """Просьба уходит операторам с кнопками решения — разбирать её руками по
     переписке никто не станет."""
@@ -1254,6 +1416,12 @@ async def handle_delivered(request):
     if _needs_settle(o) and not (body.get("settled") is True or (o.get("settle") or {})):
         return web.json_response({"error": "need_settle", "total": o.get("total") or 0},
                                  status=400, headers=CORS_HEADERS)
+    # Просьба водителя — одна на заказ. Открытая правка состава или отмена
+    # затиралась бы отметкой о доставке молча: сначала решение по ней.
+    cur = o.get("driver_req") or o.get("edit_request") or {}
+    if cur.get("status") == "open" and cur.get("kind") in ("edit", "cancel"):
+        return web.json_response({"error": "req_open", "kind": cur.get("kind")},
+                                 status=409, headers=CORS_HEADERS)
     req = {"kind": "delivered", "text": "", "items": None, "diff": [], "total": None,
            "by": me["name"], "at": datetime.now(timezone.utc).isoformat(), "status": "open"}
     await db.update_order(oid, driver_req=req)
@@ -1307,19 +1475,28 @@ async def handle_catalog(request):
     Цены здесь полные: водитель довозит телефонный заказ, а скидка положена
     только за заказ через приложение."""
     from operator_routes import _load_catalog, _full_price
+    from api_server import _catalog_unit_price
     # Для списания нужен весь список: разбитая бутылка есть на полке и тогда,
     # когда позиция снята с продажи.
     everything = request.query.get("all") == "1"
-    items = []
+    items, cats = [], []
+    # Порядок — как в каталоге у операторов: полки идут как идут, водитель
+    # ищет глазами по знакомому ряду, а не по алфавиту.
     for p in _load_catalog():
         if not (p.get("stock") or everything):
             continue
         pack = bool(p.get("price_24_full"))
-        items.append({"id": p.get("id"), "name": p.get("name", ""), "cat": p.get("cat", ""),
-                      "price": _full_price(p), "pack": pack,
-                      **({"p12": _full_price(p, 12), "p24": _full_price(p, 24)} if pack else {})})
-    items.sort(key=lambda x: (x["cat"], x["name"]))
-    cats = sorted({x["cat"] for x in items if x["cat"]})
+        num = lambda v: int(v) if float(v).is_integer() else round(float(v), 2)
+        row = {"id": p.get("id"), "name": p.get("name", ""), "cat": p.get("cat", ""),
+               # полные цены (телефонный заказ) и цены приложения (со скидкой):
+               # экран берёт те, что у источника заказа
+               "price": _full_price(p), "app": num(_catalog_unit_price(p, None)), "pack": pack}
+        if pack:
+            row.update(p12=_full_price(p, 12), p24=_full_price(p, 24),
+                       app12=num(_catalog_unit_price(p, 12)), app24=num(_catalog_unit_price(p, 24)))
+        items.append(row)
+        if row["cat"] and row["cat"] not in cats:
+            cats.append(row["cat"])
     return web.json_response({"items": items, "cats": cats}, headers=CORS_HEADERS)
 
 
@@ -1373,8 +1550,9 @@ async def handle_edit_request(request):
 
     items, diff, total = None, [], None
     if isinstance(raw_items, list):
-        from operator_routes import _catalog_by_id, _full_price, _pos_total
+        from operator_routes import _catalog_by_id, _unit_price_for, _order_total_for
         cat = _catalog_by_id()
+        source = o.get("source") or "app"
         items = []
         for it in raw_items:
             p = cat.get(it.get("id"))
@@ -1387,16 +1565,23 @@ async def handle_edit_request(request):
             if qty <= 0:
                 continue
             pcs = it.get("pcs")
-            price = _full_price(p, pcs)
+            # Цена — по источнику заказа: из приложения со скидкой, по
+            # телефону полная. Правка водителя цену заказа не меняет.
+            price = _unit_price_for(source, p, pcs)
+            price = int(price) if float(price).is_integer() else round(price, 2)
             items.append({"id": p["id"], "name": p.get("name", ""), "qty": qty,
                           **({"pcs": int(pcs)} if pcs else {}),
-                          "price": price, "line_total": price * qty})
+                          "price": price, "line_total": round(price * qty, 2)})
         if not items:
             return web.json_response({"error": "empty_items"}, status=400, headers=CORS_HEADERS)
+        # Подарок приложения остаётся при заказе: водитель его не правит, а
+        # без этой строки правка «убирала» бы подарок у клиента.
+        gifts = [i for i in (o.get("items") or []) if i.get("gift")]
+        items = gifts + items
         diff = _diff_lines(o.get("items"), items)
         if not diff and not text:
             return web.json_response({"error": "nothing_changed"}, status=400, headers=CORS_HEADERS)
-        total = await _pos_total(items)
+        total = await _order_total_for(o, items)
     elif not text and kind not in ("cancel", "reassign"):
         return web.json_response({"error": "text_or_items_required"}, status=400, headers=CORS_HEADERS)
 
@@ -2021,6 +2206,9 @@ def setup(app):
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),
+        ("/api/driver/orders/{oid}/edit/withdraw", handle_req_withdraw, "POST"),
+        ("/api/driver/orders/{oid}/fx",         handle_fx,          "POST"),
+        ("/api/driver/rates",                   handle_rates,       "GET"),
         ("/api/driver/orders/{oid}/chat",       handle_chat,        "GET"),
         ("/api/driver/orders/{oid}/chat",       handle_chat_send,   "POST"),
         ("/api/driver/supply/{sid}",            handle_supply_task,   "GET"),

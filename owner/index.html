@@ -3900,6 +3900,7 @@ button.path:active{transform:scale(.995)}
   display:flex;align-items:center;justify-content:center;
   font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.wh-grp-c.ico svg{width:15px;height:15px;display:block}
 .wh-grp-n{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--gold2)}
 /* Шапку от строк отделяет волосок, а не смена фона: два тона внутри одной
    карточки — это снова слой поверх слоя. */
@@ -11079,6 +11080,11 @@ function whAgo(sec){
   return h < 24 ? h + ' ч назад' : Math.floor(h / 24) + ' дн назад';
 }
 
+// Группа «Устройства» в списке — с той же иконкой, что на панели: кода
+// района у неё нет, а пустая плашка читалась как сбой.
+const IC_DEVICES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+  + 'stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="13" height="9" rx="1.6"/>'
+  + '<path d="M1.5 17h12"/><rect x="16.5" y="8.5" width="6" height="10.5" rx="1.6"/></svg>';
 const IC_LIVE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" '
   + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
   + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="4"/></svg>';
@@ -11215,7 +11221,7 @@ function whPaint(listOnly){
         const заказы = g.rows.reduce((a, r) => a + (r.orders || 0), 0);
         return `<div class="wh-card-d">
           <div class="wh-grp">
-            <span class="wh-grp-c">${escS(g.code || '')}</span>
+            <span class="wh-grp-c${g.id === 'devices' ? ' ico' : ''}">${g.id === 'devices' ? IC_DEVICES : escS(g.code || '')}</span>
             <span class="wh-grp-n">${escS(g.name || '')}</span>
             <span class="wh-grp-s">${g.id === 'senior' ? 'менеджер панели'
               : g.id === 'devices' ? (живых ? `${живых} на связи`

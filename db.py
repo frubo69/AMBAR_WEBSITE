@@ -63,6 +63,9 @@ async def connect():
         # он переписывается каждой точкой, так что живого водителя это не
         # трогает.
         await _db.driver_pos.create_index("at", expireAfterSeconds=36 * 3600)
+        # Маршруты по дням: живут DAY_TRACK_KEEP дней и уходят сами.
+        await _db.driver_tracks.create_index("exp", expireAfterSeconds=0)
+        await _db.driver_tracks.create_index([("name", 1), ("day", 1)])
         await _db.owner_managers.create_index("telegram_id", unique=True)
         await _db.drivers.create_index("name", unique=True)
         # Один телеграм-аккаунт не может быть двумя водителями. Partial, потому
@@ -2876,6 +2879,8 @@ async def drv_msg_drop(chat_id: int, mid: int) -> None:
 # Чего здесь нет: вечного архива передвижений. Он не нужен для работы, а
 # украсть его можно только тогда, когда он есть.
 TRACK_MAX = 2000              # точек на смену: восемь часов раз в пятнадцать секунд
+DAY_TRACK_MAX = 6000          # точек в маршруте дня: сутки раз в пятнадцать секунд
+DAY_TRACK_KEEP = 30           # дней хранить маршруты по дням; дальше уходят сами
 
 async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
                          until=None, acc=None, stop_live: bool = False) -> None:
@@ -2899,6 +2904,21 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
     if acc is not None:
         doc["$set"]["acc"] = round(float(acc), 1)
     await db.driver_pos.update_one({"_id": name}, doc, upsert=True)
+    # Та же точка — в маршрут дня. Маршруты смотрят по дням (владелец,
+    # 10 сен 2026), а живой трек в driver_pos стирается с закрытием смены.
+    # Дневной документ уходит сам через DAY_TRACK_KEEP дней (TTL по exp):
+    # вечного архива передвижений по-прежнему нет.
+    try:
+        from datetime import timedelta as _td
+        await db.driver_tracks.update_one(
+            {"_id": f"{day}:{name}"},
+            {"$set": {"name": name, "day": day, "at": at},
+             "$setOnInsert": {"exp": at + _td(days=DAY_TRACK_KEEP)},
+             "$push": {"pts": {"$each": [pt], "$slice": -DAY_TRACK_MAX}}},
+            upsert=True)
+    except Exception as e:                       # noqa: BLE001
+        import logging as _lg
+        _lg.getLogger("db").warning(f"маршрут дня не записан ({name}): {e}")
 
 
 async def driver_pos_all(names: list = None) -> list:
@@ -2915,13 +2935,20 @@ async def driver_pos_all(names: list = None) -> list:
 
 
 async def driver_track(name: str, day: str = "") -> list:
+    """Маршрут за день: из дневного документа, а его нет — из живого трека,
+    если он про этот день (точки до появления дневных маршрутов)."""
     db = _db_or_none()
     if db is None or not name: return []
-    d = await db.driver_pos.find_one({"_id": name}, {"track": 1, "day": 1})
-    if not d or (day and d.get("day") != day):
-        return []
-    return [{"lat": p["lat"], "lon": p["lon"], "at": str(p.get("at") or "")}
-            for p in (d.get("track") or [])]
+    pts = []
+    if day:
+        t = await db.driver_tracks.find_one({"_id": f"{day}:{name}"}, {"pts": 1})
+        pts = (t or {}).get("pts") or []
+    if not pts:
+        d = await db.driver_pos.find_one({"_id": name}, {"track": 1, "day": 1})
+        if not d or (day and d.get("day") != day):
+            return []
+        pts = d.get("track") or []
+    return [{"lat": p["lat"], "lon": p["lon"], "at": str(p.get("at") or "")} for p in pts]
 
 
 async def driver_track_clear(names: list) -> int:

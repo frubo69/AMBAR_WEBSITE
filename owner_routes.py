@@ -1073,6 +1073,18 @@ async def handle_where(request):
             data["track_of"] = want
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[where] старший и устройства не прочитаны: {e}")
+    # Маршрут смотрят по дням: ?day=ГГГГ-ММ-ДД — трек за тот день, точки и
+    # список остаются живыми, сегодняшними.
+    q_day = (request.query.get("day") or "").strip()
+    today = str(day)
+    if want and re.fullmatch(r"\d{4}-\d{2}-\d{2}", q_day) and q_day != today:
+        try:
+            data["track"] = await db.driver_track(want_key or want, q_day)
+            data["track_of"] = want
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[where] маршрут за {q_day} не прочитан: {e}")
+            data["track"] = []
+    data["track_day"] = q_day if (want and re.fullmatch(r"\d{4}-\d{2}-\d{2}", q_day)) else today
     return web.json_response(data, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 

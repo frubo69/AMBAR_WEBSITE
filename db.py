@@ -2975,6 +2975,27 @@ async def geo_lock_set(name: str, at, why: str = "") -> str:
     return key
 
 
+# ── Трансляции старшего: с какого устройства ────────────────────────────────
+# Телефон и планшет под одним аккаунтом; бот по id их не отличит. Какое
+# устройство — говорит сам старший кнопкой под ответом бота, а помним это по
+# номеру сообщения трансляции: правки живой точки приходят тем же номером.
+async def geo_stream_set(chat_id, mid, device: str, name: str) -> None:
+    db = _db_or_none()
+    if db is None: return
+    from datetime import datetime as _dt, timezone as _tz
+    await db.geo_streams.update_one(
+        {"_id": f"{int(chat_id)}:{int(mid)}"},
+        {"$set": {"device": device, "name": name, "at": _dt.now(_tz.utc)}}, upsert=True)
+
+
+async def geo_stream_get(chat_id, mid) -> str:
+    """phone / tablet / '' (не спрашивали или не ответили)."""
+    db = _db_or_none()
+    if db is None: return ""
+    d = await db.geo_streams.find_one({"_id": f"{int(chat_id)}:{int(mid)}"}, {"device": 1})
+    return (d or {}).get("device") or ""
+
+
 async def geo_lock_get(name: str) -> dict | None:
     """Замок, если он закрыт. Открытый — не замок."""
     db = _db_or_none()

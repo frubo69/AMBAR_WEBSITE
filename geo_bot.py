@@ -22,9 +22,9 @@ import os
 from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (Application, CommandHandler, MessageHandler,
-                          ContextTypes, filters)
+                          CallbackQueryHandler, ContextTypes, filters)
 
 import config_staff as staff
 import db
@@ -92,19 +92,26 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     _INSTR[update.effective_chat.id] = sent.message_id
 
 
-async def _say(update: Update, ctx, text: str):
+async def _say(update: Update, ctx, text: str, markup=None):
     """Ответить, правя инструкцию, если она ещё на месте, иначе новым сообщением."""
     chat = update.effective_chat.id
     mid = _INSTR.get(chat)
     if mid:
         try:
-            await ctx.bot.edit_message_text(chat_id=chat, message_id=mid, text=text)
+            await ctx.bot.edit_message_text(chat_id=chat, message_id=mid, text=text,
+                                            reply_markup=markup)
             return
         except Exception as e:               # noqa: BLE001
             log.debug(f"инструкция не правится: {e}")
             _INSTR.pop(chat, None)
-    sent = await update.effective_message.reply_text(text)
+    sent = await update.effective_message.reply_text(text, reply_markup=markup)
     _INSTR[chat] = sent.message_id
+
+
+def _device_kb(mid: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("Телефон", callback_data=f"dev:phone:{mid}"),
+        InlineKeyboardButton("iPad", callback_data=f"dev:tablet:{mid}")]])
 
 
 async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -123,7 +130,17 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     until = now + timedelta(seconds=int(period)) if period else None
     # Выключили: телеграм правит то же сообщение, а срока у точки больше нет.
     stop = bool(update.edited_message and not period)
-    key = name if kind == "driver" else geo_watch.SENIOR_PREFIX + name
+    device = ""
+    if kind == "driver":
+        key = name
+    else:
+        # У старшего два устройства под одним аккаунтом, и по id их не
+        # отличить. Какое это — он говорит кнопкой при включении, а помним
+        # мы это по номеру сообщения трансляции: правки приходят им же.
+        # Пока не ответил — телефон.
+        device = await db.geo_stream_get(update.effective_chat.id, msg.message_id)
+        phone, ipad = geo_watch.senior_keys(name)
+        key = ipad if device == "tablet" else phone
     try:
         await db.driver_pos_set(key, geo_watch._biz_day(), loc.latitude, loc.longitude,
                                 now, until=until, stop_live=stop,
@@ -132,7 +149,9 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.warning(f"точка {name} не записана: {e}")
         return
     started = bool(update.message and period)
-    if started or stop:
+    # Сторожу — про телефон: планшет лежит на точке, и его выключенная
+    # трансляция не значит, что старший пропал.
+    if (started or stop) and device != "tablet":
         try:
             if kind == "driver":
                 await geo_watch.on_stream(name, on=started, now=now)
@@ -143,8 +162,12 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if started:
         log.info(f"трансляция включена: {name} · "
                  + ("бессрочно" if period > 86400 else f"{period // 3600} ч"))
-        await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
-                                "не нужно — чат можно убрать в архив.")
+        if kind == "senior":
+            await _say(update, ctx, f"{name} · трансляция идёт. С какого это устройства?",
+                       _device_kb(msg.message_id))
+        else:
+            await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
+                                    "не нужно — чат можно убрать в архив.")
     elif stop:
         log.info(f"трансляция выключена: {name}")
         await _say(update, ctx, f"{name} · трансляция выключена. Чтобы вас снова видели, "
@@ -153,6 +176,36 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         # Разовая точка: дошла, но погаснет через минуты. Нужна трансляция.
         await _say(update, ctx, f"{name} · точка принята, но это разовая точка, она "
                                 f"погаснет. Нужна трансляция:\n\n{HOW}")
+
+
+async def on_device(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Старший ответил, с какого устройства трансляция. Помним по номеру её
+    сообщения; с этой секунды правки идут под ключ того устройства."""
+    q = update.callback_query
+    if not q or not update.effective_user:
+        return
+    try:
+        await q.answer()
+    except Exception:                        # noqa: BLE001
+        pass
+    kind, name = _role(update.effective_user.id)
+    if kind != "senior":
+        return
+    try:
+        _, dev, mid = str(q.data or "").split(":")
+        mid = int(mid)
+    except ValueError:
+        return
+    if dev not in ("phone", "tablet"):
+        return
+    await db.geo_stream_set(update.effective_chat.id, mid, dev, name)
+    label = "iPad" if dev == "tablet" else "телефон"
+    try:
+        await q.edit_message_text(f"{name} · трансляция идёт · {label}. Больше здесь "
+                                  "ничего делать не нужно — чат можно убрать в архив.")
+    except Exception as e:                   # noqa: BLE001
+        log.debug(f"ответ не правится: {e}")
+    log.info(f"устройство трансляции: {name} · {label}")
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -171,9 +224,10 @@ def main():
     app.add_handler(MessageHandler(filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE & filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+    app.add_handler(CallbackQueryHandler(on_device, pattern=r"^dev:"))
     log.info(f"бот геопозиции запущен · водителей {len(staff.DRIVER_IDS)} · "
              f"старших {len(staff.SENIOR_STAR_IDS)}")
-    app.run_polling(allowed_updates=["message", "edited_message"])
+    app.run_polling(allowed_updates=["message", "edited_message", "callback_query"])
 
 
 if __name__ == "__main__":

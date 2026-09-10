@@ -22591,7 +22591,7 @@ async function supCancel(sid, sure){
   // Где мы стоим, надо запомнить до вопроса: после отмены экран перерисуется.
   const onSup = !!document.getElementById('supWho');
   if(!sure && !await askDialog(`Отменить ${_supName(x)}?`,
-      'Задачи исчезнут у водителей. Принятое останется на складе.', 'Отменить')) return;
+      'Задачи исчезнут у водителей. Принятое останется на складе.', 'Подтвердить отмену')) return;
   const btn = document.querySelector('#accAct .acc-act');
   if(btn){ btn.disabled = true; btn.textContent = 'Отменяю…'; }
   const send = force => ownerApi.ownerFetch(

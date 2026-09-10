@@ -3873,10 +3873,12 @@ button.path:active{transform:scale(.995)}
   border-radius:11px;background:rgba(255,255,255,.11);
   will-change:transform;pointer-events:none}
 .wh-seg.grab .wh-seg-pill{background:rgba(255,255,255,.17)}
-.wh-seg button{position:relative;z-index:1;flex:1;padding:8px 4px;border:none;
+.wh-seg button{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;
+  align-items:center;gap:3px;padding:7px 4px 6px;border:none;
   border-radius:11px;background:none;color:var(--muted);font-family:inherit;
-  font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+  font-size:10.5px;font-weight:600;cursor:pointer;white-space:nowrap;
   transition:color .18s var(--e1)}
+.wh-seg button svg{width:21px;height:21px;display:block}
 .wh-seg button.on{color:var(--text)}
 .wh-seg button b{font-variant-numeric:tabular-nums;margin-left:4px;color:var(--muted)}
 .wh-seg button.on b{color:var(--gold2)}
@@ -7865,11 +7867,19 @@ button.exp-wait:active{transform:scale(.99)}
          шторка уезжает вниз, панель поднимается на столько же и остаётся
          у нижнего края экрана, как таб-бар в Find My. -->
     <div class="wh-tabs" id="whTabs">
+      <!-- Три раздела, как в Find My: люди, кто в сети, устройства. У каждого
+           своя иконка над словом и счёт рядом со словом. -->
       <div class="wh-seg" id="whSeg">
         <span class="wh-seg-pill" id="whSegPill"></span>
-        <button data-f="all"  class="on" onclick="whFilter('all')">Все<b id="whCntAll"></b></button>
-        <button data-f="live"          onclick="whFilter('live')">На связи<b id="whCntLive"></b></button>
-        <button data-f="route"         onclick="whFilter('route')">В пути<b id="whCntRoute"></b></button>
+        <button data-f="people" class="on" onclick="whFilter('people')" aria-label="Люди">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.2 19a5.8 5.8 0 0 1 11.6 0"/><circle cx="17" cy="9" r="2.6"/><path d="M15.6 19a4.6 4.6 0 0 1 5.2-4.5"/></svg>
+          <span>Люди<b id="whCntAll"></b></span></button>
+        <button data-f="live" onclick="whFilter('live')" aria-label="В сети">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>
+          <span>В сети<b id="whCntLive"></b></span></button>
+        <button data-f="devices" onclick="whFilter('devices')" aria-label="Устройства">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="13" height="9" rx="1.6"/><path d="M1.5 17h12"/><rect x="16.5" y="8.5" width="6" height="10.5" rx="1.6"/><path d="M19.5 16.8h.01"/></svg>
+          <span>Устройства<b id="whCntRoute"></b></span></button>
       </div>
     </div>
   </div>
@@ -10635,7 +10645,7 @@ const WH_MS = 10000;
 // раскрыта (0), половина, и сложенная, где видно только шапку и панель снизу.
 // Считаем в пикселях от фактической высоты, а не от доли экрана: так шторка
 // одинаково садится и на маленьком телефоне, и на планшете.
-let _whY = 'half', _whDrag = null, _whFilter = 'all';
+let _whY = 'half', _whDrag = null, _whFilter = 'people';
 
 function _whSheet(){ return document.getElementById('whSheet'); }
 
@@ -11128,16 +11138,19 @@ function whPaint(){
   const trackOn = (d.track || []).length > 1;
   // Счётчики на панели снизу: они же и есть фильтр, поэтому цифры живут там,
   // а не отдельной строкой над списком.
-  const routeCnt = rows.filter(r => (r.orders || 0) > 0).length;
-  _setText('whCntAll', ' ' + rows.length);
+  // Три раздела: люди (водители и старший), кто в сети — любой, включая
+  // устройства, — и устройства из бота устройств.
+  const people = rows.filter(r => !r.device), devices = rows.filter(r => r.device);
+  _setText('whCntAll', ' ' + people.length);
   _setText('whCntLive', ' ' + live);
-  _setText('whCntRoute', ' ' + routeCnt);
-  const shown = _whFilter === 'live'  ? rows.filter(r => whState(r) === 'stream')
-              : _whFilter === 'route' ? rows.filter(r => (r.orders || 0) > 0)
-              : rows;
-  const emptyTxt = !rows.length ? 'Водителей нет'
+  _setText('whCntRoute', ' ' + devices.length);
+  const shown = _whFilter === 'live'    ? rows.filter(r => whState(r) === 'stream')
+              : _whFilter === 'devices' ? devices
+              : people;
+  const emptyTxt = _whFilter === 'devices' ? (devices.length ? 'Устройства не транслируют' : 'Устройства не добавлены')
+                 : !people.length ? 'Водителей нет'
                  : _whFilter === 'live' ? 'Сейчас никто не транслирует'
-                 : 'Ни у кого нет заказов в пути';
+                 : 'Водителей нет';
   // По районам, а не сплошным списком. Одиннадцать имён подряд читаются как
   // одна куча, и «кто из Бизнес Бей» приходится собирать глазами по подписям
   // у каждого имени. Заголовок района отвечает на это один раз на группу, и

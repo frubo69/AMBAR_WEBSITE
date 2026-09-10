@@ -8,6 +8,9 @@
 #   sudo systemctl enable --now ambar-geo-bot
 
 [Unit]
+# Предохранитель: пять падений за минуту — юнит останавливается, и это видно.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 Description=AMBAR Geo Bot (live location of drivers and the senior)
 After=network-online.target
 Wants=network-online.target
@@ -20,8 +23,6 @@ EnvironmentFile=/opt/ambar/.env
 ExecStart=/opt/ambar/venv/bin/python /opt/ambar/geo_bot.py
 Restart=always
 RestartSec=3
-StartLimitIntervalSec=60
-StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target

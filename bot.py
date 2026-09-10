@@ -27,6 +27,7 @@ from config import OWNER_IDS, MANAGER_IDS          # свои — те же, ч�
 PUBLIC_ORIGIN        = os.getenv("AMBAR_PUBLIC_ORIGIN", "https://ambar-delivery.com")
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
 log = logging.getLogger(__name__)
 
 

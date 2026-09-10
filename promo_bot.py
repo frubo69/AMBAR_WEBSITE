@@ -31,6 +31,7 @@ OWNER_IDS       = [int(x.strip()) for x in os.getenv("AMBAR_OWNER_IDS", "").spli
                    if x.strip().isdigit()]
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
 log = logging.getLogger("promo")
 
 _admin_in  = {}      # chat_id → (админ ли, до какого времени верим)

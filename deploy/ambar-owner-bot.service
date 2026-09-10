@@ -9,6 +9,9 @@
 #   sudo systemctl restart ambar-api ambar-bot ambar-operator ambar-support ambar-owner-bot
 
 [Unit]
+# Предохранитель: пять падений за минуту — юнит останавливается, и это видно.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 Description=AMBAR Owner/Manager Bot (launcher for the owner dashboard miniapp)
 After=network-online.target
 Wants=network-online.target
@@ -21,9 +24,6 @@ EnvironmentFile=/opt/ambar/.env
 ExecStart=/opt/ambar/venv/bin/python /opt/ambar/owner_bot.py
 Restart=always
 RestartSec=3
-# Crash loop fuse: if the bot dies 5 times in 60s, give up so we notice.
-StartLimitIntervalSec=60
-StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target

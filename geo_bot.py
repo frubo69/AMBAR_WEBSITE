@@ -34,6 +34,7 @@ load_dotenv()
 GEO_BOT_TOKEN = os.getenv("AMBAR_GEO_BOT_TOKEN", "")
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
 log = logging.getLogger("geo-bot")
 
 HOW = ("1. Скрепка слева от поля ввода\n"

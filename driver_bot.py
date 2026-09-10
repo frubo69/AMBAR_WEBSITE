@@ -27,6 +27,7 @@ DRIVER_BOT_TOKEN = os.getenv("DRIVER_BOT_TOKEN", "")
 DRIVER_WEBAPP_URL = os.getenv("DRIVER_WEBAPP_URL", "https://ambar-delivery.com/driver/")
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
 log = logging.getLogger("driver-bot")
 
 

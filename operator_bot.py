@@ -26,6 +26,7 @@ SUPPORT_BOT_USERNAME = "ambar_support_bot"
 _TEST_ACCOUNTS = {8251195567, 6731325660}
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
 log = logging.getLogger(__name__)
 
 PRODUCTS = [

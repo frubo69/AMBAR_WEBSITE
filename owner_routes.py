@@ -3909,7 +3909,8 @@ async def handle_checklist(request):
     # красным с минуты завершения и ведёт прямо в отчёт той ревизии. Ревизий
     # не было или все решения приняты — дело сделано.
     try:
-        pend = await db.audits_pending()
+        import stock_routes as _sr
+        pend = await _sr.audit_sync_pending()
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[chk] ревизии не прочитаны: {e}")
         pend = []
@@ -3922,6 +3923,8 @@ async def handle_checklist(request):
                 parts.append(f"не хватает {int(sh.get('qty') or 0)} {_pl_bottles(int(sh.get('qty') or 0))}")
             if ov and not ov.get("resolved_at"):
                 parts.append(f"излишек {int(ov.get('qty') or 0)}")
+            if int(a.get("alien_left") or 0):
+                parts.append(f"QR код не внесён {int(a['alien_left'])}")
             return " · ".join(parts)
         if len(pend) == 1:
             a = pend[0]

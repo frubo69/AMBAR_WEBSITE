@@ -1328,6 +1328,10 @@ async def handle_status(request):
     day = (request.query.get("day") or "").strip() or _biz_day()
     counts = await db.get_stock_counts_for_day(day)
     by_d = {c["district"]: c for c in counts}
+    try:
+        await audit_sync_pending()
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] состояние не сверено: {e}")
     auds = await db.audits_by_day(day)
     districts = [{
         "id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
@@ -1667,6 +1671,7 @@ def _audit_rows_saved(a: dict) -> list:
 
 async def _audit_report(district: str, day: str, a: dict = None) -> dict:
     a = a if a is not None else (await db.audit_get(district, day) or {})
+    a, alien = await _audit_sync(district, day, a)
     rows = [r for r in _audit_rows_saved(a) if r.get("diff")]
     rows.sort(key=lambda r: (-abs(r.get("loss") or 0), -abs(r["diff"])))
     return {
@@ -1675,6 +1680,7 @@ async def _audit_report(district: str, day: str, a: dict = None) -> dict:
         "district_code": OFFICE_CODES.get(district, ""),
         "day": day, "audit": _audit_view(a), "rows": rows,
         "totals": a.get("result") or {},
+        "alien": alien,
     }
 
 
@@ -1765,6 +1771,7 @@ async def handle_audit_finish(request):
     if not a.get("started_at"):
         return web.json_response({"error": "not_started"}, status=409, headers=CORS_HEADERS)
 
+    await _audit_refresh_alien(district, day)
     lines, counted = await _audit_lines(district, day)
     tot = _audit_totals(lines)
     stats = await db.audit_scan_stats(district, day)
@@ -1829,24 +1836,107 @@ async def handle_audit_finish(request):
         "lines": [{"id": l["id"], "expected": l["expected"], "actual": l["actual"],
                    "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"]} for l in lines],
     }
-    if not short and not over:
+    # Сошлось и чужих кодов нет — закрыта сразу. Чужие коды — это бутылки без
+    # места в учёте; ревизия ждёт, пока их внесут (см. _audit_alien).
+    if not short and not over and not alien:
         fields["closed_at"] = now_iso
     a = await db.audit_set(district, day, fields)
     log.info(f"[audit] {district} {day}: завершена — не хватает {tot['short_qty']} бут "
-             f"/ {tot['short_aed']} AED, излишек {tot['over_qty']}, сканом {stats.get('total', 0)}")
+             f"/ {tot['short_aed']} AED, излишек {tot['over_qty']}, не в реестре {alien}, "
+             f"сканом {stats.get('total', 0)}")
     await backdate.notify(day, who, "ревизия",
                           f"{OFFICE_CODES.get(district, district)} — сканом {stats.get('total', 0)}"
                           + (f", не хватает {tot['short_aed']} AED" if tot["short_aed"] else ""))
     return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
 
 
-def _audit_close_if_done(a: dict, fields: dict, now_iso: str) -> None:
-    """Закрыть ревизию, когда решено всё, что требовало решения."""
+def _audit_close_if_done(a: dict, fields: dict, now_iso: str, alien_left: int = 0) -> None:
+    """Закрыть ревизию, когда решено всё, что требовало решения: недостача,
+    излишек и бутылки, чьих кодов не было в реестре."""
     short = fields.get("short", a.get("short"))
     over = fields.get("over", a.get("over"))
-    if (not short or short.get("resolved_at")) and (not over or over.get("resolved_at")):
+    if ((not short or short.get("resolved_at")) and (not over or over.get("resolved_at"))
+            and not alien_left):
         if not a.get("closed_at"):
             fields["closed_at"] = now_iso
+
+
+# ── коды не из реестра ──────────────────────────────────────────────────
+# Камера увидела код, которого реестр не знает: бутылка стоит на полке, но
+# ни в остатке, ни в пересчёте её нет — приписать её некуда. Такой итог тоже
+# должен кончаться решением, а не строкой «кодов не из реестра: N»: бутылку
+# вносят как новый товар (приход, src=new), и ревизия закрывается, когда
+# внесены все. Решение проверяется по реестру, а не по нажатию кнопки:
+# внесли — значит решено.
+async def _audit_alien(district: str, day: str) -> dict | None:
+    """{qty, left, done, codes:[{code, done, name}]} или None, если чужих кодов не было."""
+    codes = [c for c in await db.audit_scan_codes(district, day)
+             if (c.get("verdict") or "") == "alien"]
+    if not codes:
+        return None
+    out = []
+    for c in codes:
+        code = c.get("code") or ""
+        doc = await db.qr_get(code) or {}
+        done = bool(doc) and (doc.get("status") or "active") != "deleted"
+        out.append({"code": code, "done": done,
+                    "name": (doc.get("product_name") or "") if done else "",
+                    "home_code": OFFICE_CODES.get(doc.get("district") or "", "") if done else ""})
+    left = sum(1 for x in out if not x["done"])
+    return {"qty": len(out), "left": left, "done": len(out) - left, "codes": out}
+
+
+async def _audit_refresh_alien(district: str, day: str) -> int:
+    """Перед подсчётом: коды, внесённые в реестр после скана, получают
+    настоящий вердикт и позицию — иначе возобновлённая ревизия увидела бы
+    в них недостачу (в реестре есть, камерой «не видела»)."""
+    n = 0
+    cat = _catalog()
+    for c in await db.audit_scan_codes(district, day):
+        if (c.get("verdict") or "") != "alien":
+            continue
+        doc = await db.qr_get(c.get("code") or "")
+        v = _scan_verdict(doc, district)
+        if v == "alien":
+            continue
+        pid = (doc or {}).get("product_id") or ""
+        p = cat.get(pid) or {}
+        if await db.audit_scan_update(district, day, c.get("code") or "", {
+                "verdict": v, "product_id": pid,
+                "product_name": (doc or {}).get("product_name") or p.get("name", ""),
+                "label": (doc or {}).get("label") or "",
+                "home": (doc or {}).get("district") or ""}):
+            n += 1
+    return n
+
+
+async def _audit_sync(district: str, day: str, a: dict) -> tuple:
+    """(ревизия, коды не из реестра). Завершённая, где всё решено и чужие коды
+    уже внесены, закрывается здесь — внесение идёт другим экраном, и момент
+    «внесли последнюю» ревизия узнаёт при следующем взгляде на себя."""
+    a = a or {}
+    alien = await _audit_alien(district, day) if int(a.get("alien") or 0) else None
+    if a.get("finished_at") and not a.get("closed_at"):
+        fields: dict = {}
+        _audit_close_if_done(a, fields, datetime.now(timezone.utc).isoformat(),
+                             alien["left"] if alien else 0)
+        if fields:
+            a = await db.audit_set(district, day, fields)
+            log.info(f"[audit] {district} {day}: закрыта — коды внесены")
+    return a, alien
+
+
+async def audit_sync_pending() -> list:
+    """Ревизии, которые всё ещё ждут решения; те, где ждали только внесения
+    чужих кодов и коды внесены, закрываются по пути. У каждой — alien_left."""
+    out = []
+    for a in await db.audits_pending():
+        district, day = a.get("district", ""), a.get("day", "")
+        a, alien = await _audit_sync(district, day, a)
+        if a.get("closed_at"):
+            continue
+        out.append({**a, "alien_left": alien["left"] if alien else 0})
+    return out
 
 
 @require_owner
@@ -1925,7 +2015,8 @@ async def handle_audit_short(request):
              "split": split if blame else None, "note": note, "writeoffs": wids,
              "by_name": by_name}
     fields = {"short": short}
-    _audit_close_if_done(a, fields, now_iso)
+    alien = await _audit_alien(district, day) if int(a.get("alien") or 0) else None
+    _audit_close_if_done(a, fields, now_iso, alien["left"] if alien else 0)
     a = await db.audit_set(district, day, fields)
     base_drop()
     log.info(f"[audit] {district} {day}: недостача — "
@@ -1994,7 +2085,8 @@ async def handle_audit_over(request):
     over = {**over, "resolved_at": now_iso, "moved": moved, "restored": restored,
             "by_name": by_name}
     fields = {"over": over}
-    _audit_close_if_done(a, fields, now_iso)
+    alien = await _audit_alien(district, day) if int(a.get("alien") or 0) else None
+    _audit_close_if_done(a, fields, now_iso, alien["left"] if alien else 0)
     a = await db.audit_set(district, day, fields)
     base_drop()
     log.info(f"[audit] {district} {day}: излишек внесён — перевезено {moved}, "
@@ -2202,6 +2294,7 @@ async def handle_audits(request):
             "over_resolved": bool(over.get("resolved_at")),
             "over_moved": int(over.get("moved") or 0),
             "over_restored": int(over.get("restored") or 0),
+            "alien_open": bool(a and v["alien"] and v["state"] == "pending"),
         })
     return web.json_response({"audits": out}, headers=CORS_HEADERS)
 

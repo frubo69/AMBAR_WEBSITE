@@ -3494,6 +3494,16 @@ async def audit_scan_add(district: str, day: str, code: str, doc: dict) -> bool:
         return False
 
 
+async def audit_scan_update(district: str, day: str, code: str, fields: dict) -> bool:
+    """Поправить вердикт скана: код, которого в реестре не было, внесли —
+    теперь это бутылка с позицией, и в счёт прохода она входит."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.audit_scans.update_one({"_id": _audit_key(district, day, code)},
+                                        {"$set": dict(fields)})
+    return bool(r.matched_count)
+
+
 async def audit_scan_del(district: str, day: str, code: str) -> bool:
     """Убрать последний скан — тот, что человек только что сделал зря."""
     db = _db_or_none()

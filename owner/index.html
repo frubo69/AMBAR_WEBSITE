@@ -13733,8 +13733,10 @@ async function stkAuditPick(){
 // Карточка района: сверху — сам район и состояние ревизии за день, снизу
 // строкой «История» — сколько раз его считали. Обе ведут на страницы, и та,
 // что снизу, открывает общую историю уже на этом районе.
+// Справа у строки только стрелка: число бутылок по реестру там стояло
+// («1 бут») и владелец его снял — «вообще не должно быть никакого текста».
 function audDistRow(d, left, без, hist){
-  const n = left[d.id] || 0, b = (без || {})[d.id] || 0;
+  const b = (без || {})[d.id] || 0;
   hist = hist || [];
   const [sub, cls] = d.audit === 'running' ? ['идёт ревизия', 'run']
     : d.audit === 'pending' ? ['ждёт решения', 'dn']
@@ -13749,7 +13751,6 @@ function audDistRow(d, left, без, hist){
         <span class="stk-dr-n">${escS(d.name || '')}</span>
         <span class="aud-st ${cls}">${sub}</span>
       </span>
-      <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
       <span class="stk-dr-go">›</span>
     </button>
     <button class="stk-dr-h" onclick="stkAudits('${d.id}', 'pick')">
@@ -14305,6 +14306,7 @@ let AUD = {rows:[], counts:{}, total:0};    // проход камерой: ле
 let AUDQ = null;                             // своя очередь отправки (см. SCANQ)
 let HOLD = null;                             // окно удержания: {parts, total}
 let QR_WANT = null;                          // район, на который открыть «Внести товар»
+let QR_WANT_NEW = false;                     // …и сразу как новый товар (приход), не код к остатку
 function audQ(){
   if(!AUDQ) AUDQ = Object.assign({}, SCANQ, {items: [], busy: false, onDone: audDone});
   return AUDQ;
@@ -14374,6 +14376,14 @@ async function audOpen(district, тихо){
 // товар» числа другие, а прокрутку и внимание человека терять незачем.
 async function audRefresh(){
   if(STK.view === 'sheet' && STK.district && STK.audit) await audOpen(STK.district, true);
+  // Отчёт: внесли коды не из реестра — сервер уже сверил и, может быть, закрыл.
+  else if(STK.view === 'report' && STK.report){
+    try{
+      const rep = await ownerApi.ownerFetch('/api/owner/stock/audit/report',
+        {params:{district: STK.report.district, day: STK.report.day}});
+      audReport(rep);
+    }catch(e){}
+  }
 }
 
 // Строка позиции: номер, снимок, название, справа «лежит / числится».
@@ -14451,8 +14461,18 @@ function audMore(){ STK.audMore = !STK.audMore; _audHap('sel'); audPage(); }
 // «QR не внесён» ведёт вносить — на ту же точку, экран склада остаётся под
 // разделом, и по возвращении числа перечитываются (см. _accClose).
 function audQrGo(){
-  QR_WANT = STK.district;
+  QR_WANT = STK.district; QR_WANT_NEW = false;
   distRemember('qr', STK.district);
+  accOpen('qr');
+}
+
+// Коды, которых нет в реестре: бутылка есть, места в учёте нет. Вносят её
+// как новый товар — камерой, на той же точке; ревизия закроется сама, когда
+// внесены все (сервер сверяет по реестру, а не по нажатию).
+function audAlienGo(){
+  const rep = STK.report; if(!rep) return;
+  QR_WANT = rep.district; QR_WANT_NEW = true;
+  distRemember('qr', rep.district);
   accOpen('qr');
 }
 
@@ -14595,12 +14615,29 @@ function audReport(rep){
     secs += `<div class="aud-sec warn"><div class="aud-sec-h"><span>Излишек</span>
       <b>${fmt(over.qty)}<u>бут</u></b></div>${rows}${foot}</div>`;
   }
-  if(a.alien) secs += `<div class="aud-note">Кодов не из реестра: ${fmt(a.alien)}</div>`;
+  // Коды не из реестра — свой раздел с решением, как недостача и излишек:
+  // бутылка на полке есть, в учёте нет — её вносят как новый товар. Раздел
+  // зовётся словами владельца, теми же, что плитка на листе.
+  const al = rep.alien;
+  if(al && al.qty){
+    const rows = (al.codes || []).map(c => {
+      const raw = c.code.length > 26 ? c.code.slice(0, 24) + '…' : c.code;
+      return `<div class="aud-r${c.done ? ' dim' : ''}">
+        <span class="ord-r-n">${escS(c.done ? (c.name || 'внесена') : raw)}<span class="aud-r-s${c.done ? '' : ' dn'}">${
+          c.done ? `внесена${c.home_code ? ' на ' + escS(c.home_code) : ''} · ${escS(raw)}` : 'кода нет в реестре'}</span></span>
+        <span class="aud-d">${c.done ? _AUD_CHECK : '<b class="warn">+1</b>'}</span></div>`;
+    }).join('');
+    const foot = !al.left
+      ? `<div class="aud-done">${_AUD_CHECK}<span>Внесено в реестр · <b>${fmt(al.done)}</b></span></div>`
+      : `<div class="aud-act"><button class="aud-b go" onclick="audAlienGo()">Внести товар</button></div>`;
+    secs += `<div class="aud-sec warn"><div class="aud-sec-h"><span>QR код не внесён</span>
+      <b>${fmt(al.left || al.done)}<u>бут</u></b></div>${rows}${foot}</div>`;
+  }
   document.getElementById('stkMid').innerHTML = head + secs;
   // Внизу — то, что ждёт человека: принять решение, пока оно не принято, и
   // изменить, когда принято. Назад ведёт стрелка в шапке; сошедшейся ревизии
   // решать нечего, и подвала у неё нет.
-  const pend = !!((short && !short.resolved_at) || (over && !over.resolved_at));
+  const pend = !!((short && !short.resolved_at) || (over && !over.resolved_at) || (al && al.left));
   const done = !!((short && short.resolved_at) || (over && over.resolved_at));
   document.getElementById('stkFoot').innerHTML = pend
     ? '<div class="qb-wrap"><button class="qb" onclick="audDecide()">Принять решение</button></div>'
@@ -14656,6 +14693,13 @@ function audDecide(){
       <div class="crw-ask-box">${
         _audRow(true, I_AUD_IN, 'Внести на район', `${rep.district_code} ${rep.district_name}`,
                 fmt(o.qty), 'бут', 'audOver()')}</div>`;
+  }
+  const al = a.alien_codes || rep.alien;
+  if(al && al.left){
+    html += `<div class="crw-ask-g">QR код не внесён · ${fmt(al.left)} ${pluralize(al.left, 'бутылка', 'бутылки', 'бутылок')}</div>
+      <div class="crw-ask-box">${
+        _audRow(true, _QR_ICO, 'Внести товар', `${rep.district_code} ${rep.district_name} · новым товаром`,
+                fmt(al.left), 'бут', 'audAlienGo()')}</div>`;
   }
   if(!html) return;
   _audAsk('Что решаем?', html, 'Позже');
@@ -18629,7 +18673,12 @@ async function accQR(){
     .then(d => { ACC_QR = d; if(document.getElementById('qrList')) qrRenderList(); })
     .catch(() => {});
   // Пришли из ревизии по «QR не внесён» — сразу на ту точку, где стоим.
-  if(QR_WANT){ const want = QR_WANT; QR_WANT = null; QR_NEED = true; qrPick(want); return; }
+  // Из отчёта по кодам не из реестра — тоже на ту точку, но новым товаром:
+  // в пересчёте этих бутылок нет, и на склад они попадут только приходом.
+  if(QR_WANT){
+    const want = QR_WANT, fresh = QR_WANT_NEW;
+    QR_WANT = null; QR_WANT_NEW = false; QR_NEED = !fresh; qrPick(want); return;
+  }
   await qrHome();
 }
 

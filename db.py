@@ -2979,21 +2979,51 @@ async def geo_lock_set(name: str, at, why: str = "") -> str:
 # Телефон и планшет под одним аккаунтом; бот по id их не отличит. Какое
 # устройство — говорит сам старший кнопкой под ответом бота, а помним это по
 # номеру сообщения трансляции: правки живой точки приходят тем же номером.
-async def geo_stream_set(chat_id, mid, device: str, name: str) -> None:
+async def geo_stream_set(chat_id, mid, device: str, name: str, extra: dict = None) -> None:
     db = _db_or_none()
     if db is None: return
     from datetime import datetime as _dt, timezone as _tz
     await db.geo_streams.update_one(
         {"_id": f"{int(chat_id)}:{int(mid)}"},
-        {"$set": {"device": device, "name": name, "at": _dt.now(_tz.utc)}}, upsert=True)
+        {"$set": {"device": device, "name": name, "at": _dt.now(_tz.utc), **(extra or {})}},
+        upsert=True)
+
+
+async def geo_stream_doc(chat_id, mid) -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    return await db.geo_streams.find_one({"_id": f"{int(chat_id)}:{int(mid)}"}) or {}
 
 
 async def geo_stream_get(chat_id, mid) -> str:
     """phone / tablet / '' (не спрашивали или не ответили)."""
+    return (await geo_stream_doc(chat_id, mid)).get("device") or ""
+
+
+async def driver_pos_snapshot(name: str) -> dict | None:
+    """Запись точки без трека — чтобы было к чему вернуться."""
     db = _db_or_none()
-    if db is None: return ""
-    d = await db.geo_streams.find_one({"_id": f"{int(chat_id)}:{int(mid)}"}, {"device": 1})
-    return (d or {}).get("device") or ""
+    if db is None or not name: return None
+    return await db.driver_pos.find_one({"_id": name}, {"track": 0})
+
+
+async def driver_pos_restore(name: str, snap: dict | None, since) -> None:
+    """Вернуть запись к снимку, а точки трека с момента since — убрать.
+    Снимка не было — записи не было, её и не оставляем."""
+    db = _db_or_none()
+    if db is None or not name: return
+    if not snap:
+        await db.driver_pos.delete_one({"_id": name})
+        return
+    fields = {k: snap[k] for k in ("lat", "lon", "at", "day", "acc") if k in snap}
+    doc = {"$set": fields}
+    if since is not None:
+        doc["$pull"] = {"track": {"at": {"$gte": since}}}
+    if snap.get("until") is not None:
+        doc["$set"]["until"] = snap["until"]
+    else:
+        doc["$unset"] = {"until": ""}
+    await db.driver_pos.update_one({"_id": name}, doc)
 
 
 async def geo_lock_get(name: str) -> dict | None:

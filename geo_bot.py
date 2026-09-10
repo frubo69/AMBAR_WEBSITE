@@ -141,6 +141,16 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         device = await db.geo_stream_get(update.effective_chat.id, msg.message_id)
         phone, ipad = geo_watch.senior_keys(name)
         key = ipad if device == "tablet" else phone
+    started = bool(update.message and period)
+    # Первая точка трансляции приходит раньше ответа на вопрос об устройстве,
+    # и ложится в телефон. Запоминаем, каким телефон был до неё: ответит
+    # «iPad» — точку заберём, телефону вернём прежнее.
+    before = None
+    if started and kind == "senior" and not device:
+        try:
+            before = await db.driver_pos_snapshot(phone)
+        except Exception as e:               # noqa: BLE001
+            log.warning(f"снимок точки {name} не взят: {e}")
     try:
         await db.driver_pos_set(key, geo_watch._biz_day(), loc.latitude, loc.longitude,
                                 now, until=until, stop_live=stop,
@@ -148,7 +158,12 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:                   # noqa: BLE001
         log.warning(f"точка {name} не записана: {e}")
         return
-    started = bool(update.message and period)
+    if started and kind == "senior" and not device:
+        try:
+            await db.geo_stream_set(update.effective_chat.id, msg.message_id, "", name,
+                                    extra={"phone_before": before, "started": now})
+        except Exception as e:               # noqa: BLE001
+            log.warning(f"трансляция {name} не записана: {e}")
     # Сторожу — про телефон: планшет лежит на точке, и его выключенная
     # трансляция не значит, что старший пропал.
     if (started or stop) and device != "tablet":
@@ -198,7 +213,24 @@ async def on_device(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     if dev not in ("phone", "tablet"):
         return
-    await db.geo_stream_set(update.effective_chat.id, mid, dev, name)
+    chat = update.effective_chat.id
+    doc = await db.geo_stream_doc(chat, mid)
+    if dev == "tablet" and doc.get("device") != "tablet":
+        # Всё, что эта трансляция успела записать в телефон, — планшету, а
+        # телефону — то, что было до неё. Иначе на карте две одинаковые
+        # точки, и STAR «на связи» там, где лежит планшет.
+        phone, ipad = geo_watch.senior_keys(name)
+        try:
+            cur = await db.driver_pos_snapshot(phone)
+            if cur and cur.get("lat") is not None:
+                await db.driver_pos_set(ipad, geo_watch._biz_day(), cur["lat"], cur["lon"],
+                                        cur.get("at"), until=cur.get("until"),
+                                        acc=cur.get("acc"))
+            if "phone_before" in doc:
+                await db.driver_pos_restore(phone, doc.get("phone_before"), doc.get("started"))
+        except Exception as e:               # noqa: BLE001
+            log.warning(f"точку {name} планшету не передали: {e}")
+    await db.geo_stream_set(chat, mid, dev, name)
     label = "iPad" if dev == "tablet" else "телефон"
     try:
         await q.edit_message_text(f"{name} · трансляция идёт · {label}. Больше здесь "

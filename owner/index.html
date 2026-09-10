@@ -814,6 +814,22 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .sc-page .sc.grow{flex:1 1 0;display:flex;flex-direction:column;min-height:0}
 .sc-page .sc.grow .sc-r{flex:1 1 0;min-height:52px;max-height:80px}
 .sc-page .sc.grow:last-child{margin-bottom:0}
+/* ── Внести / удалить товар: три сектора на весь экран ── */
+.qr-home > .sc{flex:0 0 auto}
+.qr-home > .sc.grow{flex:1 1 0;display:flex;flex-direction:column;min-height:0;margin-bottom:0}
+.qr-home .qr-in{flex:1;display:flex;flex-direction:column;border-radius:0;background:none;border:0}
+.qr-home .qr-in .shl-card{flex:1 1 0;display:flex;align-items:stretch;min-height:56px;padding:8px 16px}
+.qr-home .qr-in .shl-card .shl-h{flex:1}
+.qr-in .shl-card.off{opacity:.42}
+.qr-in .shl-card.off .ord-dh{cursor:default}
+.qr-in .shl-card.off .ord-dh:active{opacity:1}
+.qr-free{min-height:66px;padding:8px 16px;gap:12px}
+.qr-free > span:not(.qr-free-i){display:flex;flex-direction:column;gap:3px;white-space:normal}
+.qr-free > span i{font-style:normal;font-size:11px;font-weight:500;color:var(--muted)}
+.sc-r.qr-free .qr-free-i{flex:0 0 38px;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
+.qb.dn{color:#fff;background:linear-gradient(135deg,#c94848,#e05555);box-shadow:0 6px 20px rgba(224,85,85,.22)}
+.qr-hold .rcv-n{margin:12px 16px 0} .qr-hold .rcv-bar{margin:12px 16px 14px}
 /* ── Район в ревизии: карточка с полкой «История» внизу ── */
 .stk-drw{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;
   background:var(--card);border:1px solid var(--border2)}
@@ -16637,6 +16653,7 @@ function _accClose(){
   CKL_RETURN = false;
   SCAN.stop();
   supPollStop();
+  qrPollStop(); rcvPollStop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
   // Под разделом могла остаться открытая страница ревизии: вносили коды —
@@ -18031,39 +18048,44 @@ let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = nul
 // должны спорить числами. Сюда приходят с одной целью: завести бутылки в
 // реестр, — поэтому открывается сразу список позиций той точки, где считали
 // в прошлый раз. Точка меняется по названию в шапке.
+// ─── QR-коды: три сектора ─────────────────────────────────────────────────
+// Раздел отвечает на три вопроса, и экран разложен на три сектора. Сверху —
+// произвольно внести любую бутылку: район → позиция → камера. В середине, на
+// весь экран, — внести QR коды с незавершённого приёма: район, где товар
+// приняли без сканирования, горит красным числом; район без такого товара
+// серый и не нажимается. Снизу — убрать бутылку из реестра.
+//
+// Второй сектор живёт заявкой, а не реестром: строки — только то, что в
+// задаче ещё не отсканировано, каждый скан уходит в саму задачу
+// (task/scan), и с последней бутылкой приёмка закрывается сама — у всех.
+// Пока задачу сканирует один (старший с полки или водитель из машины),
+// второй видит «вносит сейчас» и ход работы, а камеру открыть не может:
+// замок держит сервер, экран лишь показывает его.
+let ACC_IN = null, QR_IN = null, QR_POLL = null;
+const _QR_ICO = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+  stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/></svg>`;
+const _QR_TRASH = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/></svg>`;
+
 async function accQR(){
   ACC_BACK = null;
   _setRail('accRail', '');
   _setText('accTitle', 'Внести / удалить товар');
   _setText('accSub', 'загрузка…');
-  // Реестр уже пришёл вместе с разделом «Учёт» и лежит в памяти — открываем
-  // экран на нём, а свежий тянем следом. Сводка собирается на сервере не
-  // мгновенно, и ждать её второй раз, стоя у полки, незачем.
-  // Каждый вход — со списка районов, а не с того, где были в прошлый раз:
-  // человек у полки и сам скажет, куда вносит. Запомненный район остаётся
-  // подсказкой в списке, но экран на нём не открывается.
-  QR_DIST = null;
-  const было = !!(ACC_QR && ACC_QR.by_district);
-  if(было) qrDistrict(true);
-  let d;
-  try{ d = await ownerApi.ownerFetch('/api/owner/qr'); }
-  catch(e){
-    if(!было) document.getElementById('accMid').innerHTML =
-      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
-    return;
-  }
-  ACC_QR = d;
+  QR_DIST = null; QR_IN = null;
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
+  // Реестр — фоном: он нужен спискам позиций и броням, а не первому экрану.
+  ownerApi.ownerFetch('/api/owner/qr')
+    .then(d => { ACC_QR = d; if(document.getElementById('qrList')) qrRenderList(); })
+    .catch(() => {});
   // Пришли из ревизии по «QR не внесён» — сразу на ту точку, где стоим.
   if(QR_WANT){ const want = QR_WANT; QR_WANT = null; qrPick(want); return; }
-  if(!было){ qrDistrict(true); return; }
-  // Свежее пришло — числа и брони обновляем на месте. Перерисовывать экран
-  // целиком нельзя: человек уже листает список, и он уедет из-под пальца.
-  if(document.getElementById('qrList')) qrRenderList();
-  else if(!QR_DIST) qrDistrict(true);
+  await qrHome();
 }
 
 function _qrHead(title, sub, back){
@@ -18072,16 +18094,12 @@ function _qrHead(title, sub, back){
   _setRail('accRail', '');
   const box = document.querySelector('#accOv .stk-ttl');
   if(box){ box.classList.remove('pick', 'open'); box.onclick = null; }
-  // Подвал принадлежит экрану, а не разделу: «Сканировать бутылки» имеет смысл
-  // только на первом, и таскать её за собой по выбору точки незачем.
+  // Подвал и действие в шапке принадлежат экрану, а не разделу: «Удалить
+  // товар» стоит внизу первого экрана, дальше его нет.
   document.getElementById('accFoot').innerHTML = '';
-  // Справа сверху — обратное действие раздела: убрать бутылку из реестра.
-  // Оно нужно на обоих экранах: бутылку приносят к столу, и до какой она
-  // позиции и точки — как раз и отвечает её код, а не человек.
-  const act = document.getElementById('accAct');
-  if(act) act.innerHTML =
-    '<button class="acc-act dn" onclick="qrDelStart()">Удалить товар</button>';
+  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
   ACC_BACK = back;
+  qrPollStop();
   return '';
 }
 
@@ -18100,8 +18118,88 @@ function _lockOn(district, product_id){
   return null;
 }
 
-// Точка первой: одна и та же бутылка на разных точках — разные бутылки, и без
-// точки запись бессмысленна.
+// Первый экран: три сектора. Тихо — перечитать сервер и перерисовать только
+// строки районов: человек смотрит на список, и он не должен уезжать из-под
+// пальца.
+async function qrHome(тихо){
+  QR_IN = null; RCV_HOME = null; RCV_EXIT = null;
+  if(!тихо){
+    _qrHead('Внести / удалить товар', 'загрузка…', null);
+    document.getElementById('accMid').innerHTML = '<div class="scan-empty">Загрузка…</div>';
+  }
+  try{ ACC_IN = await ownerApi.ownerFetch('/api/owner/supply/intake', {params:{as: _meName()}}); }
+  catch(e){
+    if(!тихо) document.getElementById('accMid').innerHTML =
+      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  if(QR_IN || document.getElementById('qrList') || RCV_LINE) return;   // ушли дальше, пока ехало
+  const всего = (ACC_IN.districts || []).reduce((a, d) => a + (d.left || 0), 0);
+  _setText('accSub', всего
+    ? `${fmt(всего)} ${pluralize(всего,'бутылка','бутылки','бутылок')} без QR кода`
+    : 'реестр бутылок');
+  const rows = qrInRows();
+  const box = document.getElementById('qrIn');
+  if(тихо && box){ box.innerHTML = rows; return; }
+  document.getElementById('accMid').innerHTML = `<div class="qd-page qr-home">
+    <div class="sc">
+      <button class="sc-r qr-free" onclick="qrFreeStart()">
+        <span class="qr-free-i">${_QR_ICO}</span>
+        <span>Внести товар<i>район → позиция → камера</i></span><em>${_SC_CHEV}</em>
+      </button>
+    </div>
+    <div class="sc grow">
+      <div class="sc-cap"><span>Внести QR коды</span><i>с незавершённого приёма</i></div>
+      <div class="ord-dists qr-in" id="qrIn">${rows}</div>
+    </div>
+  </div>`;
+  document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
+    <button class="qb dn" onclick="qrDelStart()">${_QR_TRASH}Удалить товар</button></div>`;
+  qrPollStart();
+}
+
+// Строки районов второго сектора: серый — нечего вносить; красное число —
+// столько бутылок приняли без кодов; «вносит сейчас» — задачу уже сканируют.
+function qrInRows(){
+  const by = {};
+  ((ACC_IN && ACC_IN.districts) || []).forEach(d => { by[d.id] = d; });
+  return (STK.districts || []).map(d => {
+    const x = by[d.id] || {left: 0, tasks: []};
+    const есть = (x.tasks || []).length > 0;
+    const h = x.hold || {};
+    let sub = 'нет незавершённого приёма', cls = '';
+    if(есть && h.live){ sub = `${h.who} вносит · ${fmt(x.got)} из ${fmt(x.need)}`; cls = 'warn'; }
+    else if(есть){
+      const кто = [...new Set((x.tasks || []).map(t => t.noscan_by || t.driver).filter(Boolean))].join(', ');
+      sub = `без сканирования${кто ? ' · ' + кто : ''}`;
+    }
+    return `<div class="shl-card${есть ? '' : ' off'}">
+      <button class="shl-h ord-dh" ${есть ? `onclick="qrIntake('${d.id}')"` : 'disabled'}>
+        <span class="shl-code">${escS(d.code || '')}</span>
+        <span class="shl-b"><b>${escS(d.name || '')}</b><i class="${cls}">${escS(sub)}</i></span>
+        ${есть ? `<span class="qd-bad"><b>${fmt(x.left)}</b><i>QR код не внесён</i></span>
+        <span class="ord-dh-go">${ICO_CHEV}</span>` : ''}
+      </button></div>`;
+  }).join('');
+}
+
+// Опрос раз в пять секунд — пока открыт первый экран или страница района:
+// водитель мог начать или закончить сканирование, и это видно без перезахода.
+function qrPollStart(){ qrPollStop(); QR_POLL = setInterval(qrPollTick, 5000); }
+function qrPollStop(){ if(QR_POLL){ clearInterval(QR_POLL); QR_POLL = null; } }
+async function qrPollTick(){
+  if(document.hidden) return;
+  if(document.getElementById('qrIn')) return qrHome(true);
+  if(QR_IN && !RCV_LINE) return qrIntake(QR_IN.district, true);
+  qrPollStop();
+}
+
+// Первый сектор: произвольное внесение — с выбора точки.
+function qrFreeStart(){
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  qrDistrict(true);
+}
+
 // Переключение точки внутри раздела: пустой id — обзор всех точек.
 function qrGo(id){
   distMenuClose();
@@ -18127,62 +18225,93 @@ function qrDistTap(){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
+// Выбор точки для произвольного внесения. Числа без кодов здесь не пишем —
+// это забота второго сектора; справа лишь сколько бутылок точки в реестре.
 async function qrDistrict(force){
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
-  // Считают всегда на одной точке и подряд. Спрашивать её на каждом входе —
-  // брать плату за то, что и так известно.
   const last = distSaved('qr');
   if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
-  // На экране выбора точка не выбрана. Если оставить прошлую, qrGo примет
-  // нажатие на неё же за повторный выбор из меню и молча его проглотит:
-  // вышел из «Бизнес Бей» — и обратно в него не попасть.
   QR_DIST = null;
   const have = (ACC_QR && ACC_QR.by_district) || {};
-  const added = (ACC_QR && ACC_QR.added_shift) || {};
   const busy = {};
   (ACC_QR?.locks || []).forEach(l => {
     const d = String(l.key || '').split(':')[0];
     busy[d] = (busy[d] || 0) + 1;
   });
-  // Сводки, в которую раньше вела стрелка назад, больше нет: выбор точки — и
-  // есть первый экран раздела, а назад из него ведёт наружу.
-  // Строками, а не плитками. Точек пять — нечётное число, и в сетке по две
-  // последняя всегда оставалась рядом с пустой клеткой: экран выглядел
-  // недогруженным, а половина его пустовала. В строке помещается то же самое
-  // и читается сверху вниз одним движением.
-  const head = _qrHead('Куда вносим', 'выберите точку хранения', null);
-  _setRail('accRail', '');
-  // Сверху — зачем мы здесь: сколько бутылок уже в реестре и сколько ещё лежит
-  // мимо него. Второе число и есть работа, ради которой открывают этот экран.
-  const t = (ACC_QR && ACC_QR.totals) || {};
-  const без = (ACC_QR && ACC_QR.unscanned_total) || 0;
-  // Сводка — карточкой с шапкой, как «Закупаем» в заявке: в реестре и сколько
-  // не отсканировано. Районы — одной слитной карточкой, как везде.
-  // Сводки сверху нет: работа стоит на каждой точке своим числом, и общая
-  // цифра ничего к этому не добавляла.
-  const безПоТочкам = (ACC_QR && ACC_QR.unscanned) || {};
+  const head = _qrHead('Куда вносим', 'выберите точку хранения', () => qrHome());
   document.getElementById('accMid').innerHTML = head + `<div class="qd-page">` +
     `<div class="ord-dists">` + ((STK.districts || []).map(d => {
-      // Справа — что внесли на этой точке ЗА ЭТУ СМЕНУ, а не весь реестр:
-      // сюда приходят вносить, и число отвечает «сколько я уже занёс». Пока
-      // ничего — пусто, без прочерков; с новой сменой счёт с нуля.
-      // Справа — сколько бутылок на точке лежит мимо реестра, красным: это
-      // и есть работа, ради которой сюда идут. Ноль — ничего не пишем.
-      const без = безПоТочкам[d.id] || 0;
       const b = busy[d.id] || 0;
       const sub = b ? `считают ${b} ${pluralize(b,'позицию','позиции','позиций')}` : '';
       return `<div class="shl-card"><button class="shl-h ord-dh" onclick="qrGo('${d.id}')">
         <span class="shl-code">${escS(d.code || '')}</span>
         <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="warn">${sub}</i>` : ''}</span>
-        ${без ? `<span class="qd-bad"><b>${fmt(без)}</b><i>QR код не внесён</i></span>` : ''}
+        ${have[d.id] ? `<span class="shl-v"><b>${fmt(have[d.id])}</b><i>в реестре</i></span>` : ''}
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button></div>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;
 }
 
+// ── Второй сектор: страница района ─────────────────────────────────────
+// Только то, что в задаче ещё без кодов. Строка — кнопка на камеру; когда
+// задачу сканирует другой, вместо кнопок — кто и сколько уже внёс.
+async function qrIntake(district, тихо){
+  const d0 = ((ACC_IN && ACC_IN.districts) || []).find(x => x.id === district) || {};
+  if(!тихо){
+    QR_IN = {district, tasks: [], sig: ''};
+    _qrHead(`${d0.code || ''} ${d0.name || ''}`.trim(), 'загрузка…', () => qrHome());
+    document.getElementById('accMid').innerHTML = '<div class="scan-empty">Загрузка…</div>';
+    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  }
+  try{ ACC_IN = await ownerApi.ownerFetch('/api/owner/supply/intake', {params:{as: _meName()}}); }
+  catch(e){ if(!тихо) _toast('Не удалось загрузить'); return; }
+  if(!QR_IN || QR_IN.district !== district || RCV_LINE) return;
+  const d = (ACC_IN.districts || []).find(x => x.id === district) || {tasks: [], hold: {}};
+  QR_IN.tasks = d.tasks || [];
+  if(!QR_IN.tasks.length){ _toast('Здесь всё внесено'); qrHome(); return; }
+  const h = d.hold || {};
+  const sig = JSON.stringify([d.left, d.got, !!h.live, h.who || '']);
+  if(тихо && QR_IN.sig === sig) return;
+  QR_IN.sig = sig;
+  _setText('accSub', `внести QR коды · осталось ${fmt(d.left)}`);
+  const pct = d.need ? Math.round(d.got / d.need * 100) : 0;
+  const банер = h.live ? `<div class="sc qr-hold">
+      <div class="sc-cap"><span>${escS(h.who)}</span><i>вносит сейчас</i></div>
+      <div class="rcv-n"><span class="rcv-v">${fmt(d.got)}</span>
+        <span class="rcv-of">из ${fmt(d.need)}</span><span class="rcv-pct">${pct}%</span></div>
+      <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+    </div>` : '';
+  const many = QR_IN.tasks.length > 1;
+  const заявка = t => (t.day === _dayIsoFor(0) ? 'Сегодняшняя заявка' : t.day === _dayIsoFor(1)
+    ? 'Вчерашняя заявка' : 'Заявка от ' + _dayName(t.day)) + (t.extra && t.base ? ' · ' + t.base : '');
+  const body = QR_IN.tasks.map((t, ti) => `${many
+      ? `<div class="stk-grp2"><span>${escS(заявка(t))}</span></div>` : ''}
+    <div class="sc">${(t.lines || []).map(l => `<button class="pk-row need${h.live ? ' off' : ''}"
+        ${h.live ? 'disabled' : ''} onclick="qrInLine(${ti}, '${escS(l.id)}')">
+        <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
+          <span class="pk-slug">внесено ${fmt(l.got)} из ${fmt(l.need)}</span></span>
+        <span class="pk-n dn">${fmt(l.left)}<i>QR код не внесён</i></span></button>`).join('')}</div>`).join('');
+  document.getElementById('accMid').innerHTML = банер + body;
+  document.getElementById('accFoot').innerHTML = h.live ? ''
+    : `<div class="qb-wrap"><button class="qb" onclick="qrInNext()">Сканировать</button></div>`;
+  qrPollStart();
+}
+function qrInNext(){
+  const t = ((QR_IN && QR_IN.tasks) || [])[0];
+  const l = t && (t.lines || []).find(x => x.left > 0);
+  if(t && l) qrInLine(0, l.id);
+}
+// Камера — та же, что у приёмки старшего: скан идёт в задачу, назад — на
+// эту страницу, а с последней бутылкой — на первый экран.
+function qrInLine(ti, pid){
+  const t = ((QR_IN && QR_IN.tasks) || [])[ti]; if(!t) return;
+  RCV = t; RCV_HOME = () => qrIntake(QR_IN.district); RCV_EXIT = () => qrHome();
+  qrPollStop();
+  rcvLine(pid);
+}
 
 let QR_CATF = 'all';
 function qrPick(district){
@@ -19050,7 +19179,7 @@ async function qrDelDone(){
   const n = QDEL_ROWS.filter(r => r.state === 'gone').length;
   if(n) _toast(`Убрано ${n} ${pluralize(n, 'бутылка', 'бутылки', 'бутылок')}`);
   try{ ACC_QR = await ownerApi.ownerFetch('/api/owner/qr'); }catch(e){}
-  if(QR_DIST){ qrPick(QR_DIST); qrRenderList(); } else qrDistrict();
+  if(QR_DIST){ qrPick(QR_DIST); qrRenderList(); } else qrHome();
 }
 
 // Что это за бутылка и что с ней было. История приходит с сервера вместе с
@@ -20363,6 +20492,44 @@ async function supRelease(oid){
 // сервер тот же, документ тот же, и район, взятый отсюда, водители видят
 // занятым. Иначе двое поехали бы за одним ящиком.
 let RCV = null, RCV_LINE = null, RCV_ROWS = [], RCV_BUSY = false;
+// Откуда открыли камеру приёмки и куда уйти, когда приёмка закрылась сама:
+// со страницы района «Внести / удалить товар» — обратно на неё и на первый
+// экран; из приёмки закупки — как раньше, к списку районов.
+let RCV_HOME = null, RCV_EXIT = null, RCV_HOLD = null, RCV_POLL = null;
+
+// Замок сканирования: держим, пока открыта камера, продлеваем раз в десять
+// секунд, отпускаем на выходе. «busy» значит, что задачу сканирует другой.
+async function rcvHoldSend(on){
+  if(!RCV) return null;
+  try{
+    return await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/hold`,
+      {method:'POST', body:{district: RCV.district, on: !!on, as: _rcvMe()}});
+  }catch(e){ return null; }
+}
+function rcvHoldStop(){
+  if(RCV_HOLD){ clearInterval(RCV_HOLD); RCV_HOLD = null; }
+  if(RCV) rcvHoldSend(false);
+}
+
+// Страница приёмки опрашивает задачу раз в пять секунд: водитель мог начать
+// сканировать или закончить, и это должно быть видно без перезахода.
+function rcvPollStart(){ rcvPollStop(); RCV_POLL = setInterval(rcvPollTick, 5000); }
+function rcvPollStop(){ if(RCV_POLL){ clearInterval(RCV_POLL); RCV_POLL = null; } }
+async function rcvPollTick(){
+  if(!RCV || RCV_LINE || RCV_HOME || document.hidden) return;
+  let t;
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/tasks`, {params:{as: _rcvMe()}});
+    t = (r.tasks || []).find(x => x.district === RCV.district);
+  }catch(e){ return; }
+  if(!RCV || RCV_LINE || !t) return;
+  const sig = x => JSON.stringify([x.got, x.left, x.done_at, x.erev, !!(x.hold && x.hold.live), (x.hold || {}).who]);
+  if(sig(t) === sig(RCV)) return;
+  if(t.done_at){ _toast('Приёмка закрыта'); rcvBack(); return; }
+  RCV = t; rcvRender();
+}
 
 // Имя, которым подписан старший. Совпадать оно должно с тем, что уходит в
 // «as»: по нему сервер отличает мою задачу от чужой, и разные имена в claim и
@@ -20450,7 +20617,7 @@ async function rcvOpen(oid){
     RCV = (r.tasks || []).find(t => t.district === oid) || null;
   }catch(e){ RCV = null; }
   if(!RCV) return _toast('Не удалось открыть');
-  RCV_LINE = null; RCV_ROWS = [];
+  RCV_LINE = null; RCV_ROWS = []; RCV_HOME = null; RCV_EXIT = null;
   rcvRender();
 }
 
@@ -20458,7 +20625,8 @@ async function rcvOpen(oid){
 // начало раздела: за одну ходку закрывают несколько районов подряд.
 function rcvBack(){
   SCAN.stop();
-  RCV = null; RCV_LINE = null; RCV_ROWS = [];
+  rcvHoldStop(); rcvPollStop();
+  RCV = null; RCV_LINE = null; RCV_ROWS = []; RCV_HOME = null; RCV_EXIT = null;
   supLoad(SUP_ID);
 }
 
@@ -20476,16 +20644,18 @@ function rcvRender(){
   // район можно вернуть; когда принято не всё — закрыть с недобором. Главная
   // кнопка внизу всегда одна и говорит, что делать дальше.
   const act = document.getElementById('accAct');
-  if(act) act.innerHTML = (t.got === 0 && !ns)
+  const занято0 = !!(t.hold && t.hold.live);
+  if(act) act.innerHTML = занято0 ? '' : (t.got === 0 && !ns)
     ? `<button class="acc-act" onclick="rcvGiveBack()">Вернуть район</button>`
     : (t.left > 0 && t.got > 0)
       ? `<button class="acc-act dn" onclick="rcvFinOpen()">Завершить с недобором</button>`
       : '';
 
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
+  const занято = !!(t.hold && t.hold.live);
   const head = `<div class="rcv">
-    <div class="rcv-h"><span class="rcv-st ${ns ? 'warn' : 'live'}">${
-      ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
+    <div class="rcv-h"><span class="rcv-st ${занято ? 'warn' : ns ? 'warn' : 'live'}">${
+      занято ? `${escS(t.hold.who)} вносит сейчас` : ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
     <div class="rcv-n">
       <span class="rcv-v">${fmt(t.got)}</span>
       <span class="rcv-of">из ${fmt(t.need)}</span>
@@ -20501,7 +20671,7 @@ function rcvRender(){
   const lines = (t.lines || []).slice().sort((a, b) =>
     (a.left === 0) - (b.left === 0) || a.name.localeCompare(b.name, 'ru'));
   const rows = lines.map(l => `
-    <button class="rl ${l.left ? '' : 'done'}" ${l.left ? '' : 'disabled'}
+    <button class="rl ${l.left ? '' : 'done'}" ${l.left && !занято ? '' : 'disabled'}
       onclick="rcvLine('${escS(l.id)}')">
       <span class="rl-b">
         <span class="rl-n">${escS(l.name)}</span>
@@ -20516,7 +20686,8 @@ function rcvRender(){
   // Одна главная кнопка — следующий шаг. Всё отсканировано — завершить;
   // нет — сканировать дальше, и под ней тихая «без сканирования», пока этот
   // путь ещё не выбран.
-  document.getElementById('accFoot').innerHTML = !t.left
+  rcvPollStart();
+  document.getElementById('accFoot').innerHTML = занято ? '' : !t.left
     ? `<button class="qb" onclick="rcvFinOpen()">Завершить приёмку</button>`
     : `<div class="rcv-acts">
         <button class="qb" onclick="rcvNext()">${t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>
@@ -20566,6 +20737,15 @@ async function rcvNoscanSend(){
 async function rcvLine(pid){
   const l = (RCV.lines || []).find(x => x.id === pid);
   if(!l || !l.left) return;
+  rcvPollStop();
+  // Сначала замок, потом камера: занято — говорим кем и остаёмся на списке.
+  const h = await rcvHoldSend(true);
+  if(h && !h.ok){
+    _toast(h.verdict === 'busy' ? `${h.by || 'Другой'} вносит сейчас`
+         : h.verdict === 'closed' ? 'Приёмка уже закрыта' : 'Не удалось начать');
+    return (RCV_HOME || rcvRender)();
+  }
+  RCV_HOLD = setInterval(() => rcvHoldSend(true), 10000);
   RCV_LINE = {...l}; RCV_ROWS = [];
   rcvCam();
   try{
@@ -20583,8 +20763,9 @@ async function rcvLine(pid){
 
 function rcvLineClose(){
   SCAN.stop();
+  rcvHoldStop();
   RCV_LINE = null; RCV_ROWS = [];
-  rcvRender();
+  (RCV_HOME || rcvRender)();
 }
 
 // Разметка сканера — та же, что у кодов: одна камера в приложении, и второй её
@@ -20650,6 +20831,7 @@ function rcvScan(code){
 }
 
 const RCV_MSG = {
+  busy:          'Задачу сейчас сканирует другой',
   known:         'Эта бутылка уже в реестре',
   full:          'По этой позиции уже всё',
   not_mine:      'Район забрал другой',
@@ -20666,6 +20848,20 @@ function rcvDone(err, r, job){
     if(RCV_LINE){ RCV_LINE.got = r.got; RCV_LINE.left = r.left; }
     rcvSync(r);
     rcvFeed();
+    // Последняя бутылка приёма без кодов — задача закрылась сама. Уходим
+    // туда, откуда пришли: со страницы района — на первый экран.
+    if(r.finished){
+      qrFlash('ok', 'всё внесено');
+      setTimeout(() => {
+        SCAN.stop(); rcvHoldStop(); rcvPollStop();
+        RCV_LINE = null; RCV_ROWS = [];
+        try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+        _toast('Приёмка завершена');
+        const f = RCV_EXIT; RCV_HOME = null; RCV_EXIT = null;
+        if(f) f(); else rcvBack();
+      }, 700);
+      return;
+    }
     // Строка добрана — держать камеру включённой значит ждать лишнего действия.
     if(r.left === 0){
       qrFlash('ok', 'всё, ' + r.need);
@@ -20675,6 +20871,15 @@ function rcvDone(err, r, job){
     return;
   }
   if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }
+  // Задачу перехватил другой — камеру закрываем: дальше здесь только смотреть.
+  if(r.verdict === 'busy'){
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
+    qrFlash('err', `вносит ${r.by || 'другой'}`);
+    _toast(`${r.by || 'Другой'} вносит сейчас`);
+    rcvFeed();
+    setTimeout(() => { if(RCV_LINE) rcvLineClose(); }, 600);
+    return;
+  }
   qrFlash(r.verdict === 'known' ? 'dup' : r.verdict === 'full' ? 'again' : 'err',
           r.verdict === 'known' ? 'уже в реестре' : r.verdict === 'full' ? 'по этой всё' : null);
   if(RCV_MSG[r.verdict] && r.verdict !== 'known') _toast(RCV_MSG[r.verdict]);

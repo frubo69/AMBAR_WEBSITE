@@ -22,7 +22,7 @@ import io
 import logging
 import re
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from aiohttp import web
 
@@ -617,6 +617,24 @@ async def _known_sigs(pid: str) -> set:
     return sigs
 
 
+# Замок сканирования живёт недолго: продлевает его каждый скан и пульс экрана
+# камеры раз в десять секунд. Пропала связь или закрыли камеру — через
+# полминуты задача снова свободна, и никого не надо просить «отпустить».
+HOLD_SEC = 40
+
+
+def _hold_view(task: dict, me: str, now=None) -> dict:
+    """Кто сейчас сканирует задачу — глазами того, кто спрашивает."""
+    now = now or datetime.now(timezone.utc)
+    h = task.get("hold") or {}
+    until = db._dt_aware(h.get("until"))
+    live = bool(h) and until is not None and until >= now
+    who = h.get("who") or "" if live else ""
+    return {"who": who, "kind": (h.get("kind") or "") if live else "",
+            "at": str(h.get("at") or "") if live else "",
+            "live": bool(live and who != me), "mine": bool(live and who == me)}
+
+
 def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
     """Задача глазами водителя: что забрать и сколько уже принято."""
     lines = []
@@ -661,6 +679,8 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "need": need, "got": got, "left": max(0, need - got),
         "positions": len(lines),
         "lines": lines,
+        # Кто сканирует прямо сейчас — и что это не мы.
+        "hold": _hold_view(task, me),
     }
 
 
@@ -739,6 +759,13 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
+    # Задачу сейчас сканирует другой — старший с полки или водитель из
+    # машины. Двух рук на одной задаче не бывает: бутылку не принимаем и
+    # говорим, кто занят.
+    hv = _hold_view(task, me)
+    if hv["live"]:
+        return {"ok": False, "verdict": "busy", "by": hv["who"], "kind": hv["kind"],
+                "task": _task_view(sid, sup, oid, task, me)}
     # Водитель сканирует по той версии задачи, которую видит. Старший успел
     # поправить состав — бутылку не принимаем, отдаём свежую задачу: сначала
     # человек видит, что изменилось, потом продолжает.
@@ -813,10 +840,30 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     line = next((i for i in (upd.get("items") or []) if i["id"] == pid), {})
     got = int((line.get("got") or {}).get(oid) or got + 1)
     t = (upd.get("tasks") or {}).get(oid) or {}
+    # Скан — это присутствие: замок продлевается сам, без отдельного пульса.
+    try:
+        await db.supply_task_hold(sid, oid, me, "senior" if owner else "driver", tg_id,
+                                  now, now + timedelta(seconds=HOLD_SEC))
+    except Exception as e:                                       # noqa: BLE001
+        log.warning(f"[supply] замок не продлён: {e}")
+    # Принятое без кодов досканировали до последней бутылки — задача закрыта
+    # сама, у всех сразу: ждать от человека ещё одного «Завершить» незачем,
+    # недобора здесь быть не может.
+    finished, supply_done = False, False
+    if task.get("noscan_at"):
+        осталось = sum(max(0, int((i.get("by_district") or {}).get(oid) or 0)
+                              - int((i.get("got") or {}).get(oid) or 0))
+                       for i in (upd.get("items") or []))
+        if осталось == 0:
+            fin = await task_finish(sid, oid, me, "", owner)
+            finished = bool(fin.get("ok")); supply_done = bool(fin.get("supply_done"))
+            if finished:
+                await db.supply_task_unhold(sid, oid, me)
     return {"ok": True, "verdict": "taken", "label": label, "code": code,
             "name": item.get("name", ""), "need": need, "got": got,
             "left": max(0, need - got), "flags": flags,
-            "task_got": int(t.get("scanned") or 0)}
+            "task_got": int(t.get("scanned") or 0),
+            "finished": finished, "supply_done": supply_done}
 
 
 async def task_undo(sid: str, oid: str, code: str, me: str,
@@ -831,6 +878,9 @@ async def task_undo(sid: str, oid: str, code: str, me: str,
     task = (sup.get("tasks") or {}).get(oid) or {}
     if not _can_touch(task, me, owner) or task.get("done_at"):
         return {"ok": False, "verdict": "not_mine"}
+    hv = _hold_view(task, me)
+    if hv["live"]:
+        return {"ok": False, "verdict": "busy", "by": hv["who"], "kind": hv["kind"]}
     if int(task.get("undo") or 0) >= UNDO_MAX:
         return {"ok": False, "verdict": "undo_limit", "limit": UNDO_MAX}
     doc = await db.qr_get(code)
@@ -932,6 +982,61 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
     except Exception as e:
         log.error(f"[supply] уведомление о приёмке без кодов: {e}")
     return {"ok": True, **v}
+
+
+async def task_hold(sid: str, oid: str, me: str, tg_id: int, on: bool,
+                    owner: bool = False) -> dict:
+    """Занять задачу под сканирование (on) или отпустить (off).
+
+    Экран камеры шлёт это при открытии и раз в десять секунд, а при выходе —
+    отпускает. Ответ «busy» значит, что задачу уже сканирует другой: экран
+    показывает, кто и сколько уже внёс, а камеру не открывает."""
+    sup = await db.supply_get(sid)
+    if not sup or sup.get("status") != "open":
+        return {"ok": False, "verdict": "no_supply"}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    now = datetime.now(timezone.utc)
+    if not on:
+        await db.supply_task_unhold(sid, oid, me)
+        return {"ok": True, "hold": _hold_view({}, me, now)}
+    if not _can_touch(task, me, owner):
+        return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
+    if task.get("done_at"):
+        return {"ok": False, "verdict": "closed"}
+    kind = "senior" if owner else "driver"
+    ok, h = await db.supply_task_hold(sid, oid, me, kind, tg_id, now,
+                                      now + timedelta(seconds=HOLD_SEC))
+    if not ok:
+        return {"ok": False, "verdict": "busy", "by": (h or {}).get("who") or "",
+                "kind": (h or {}).get("kind") or ""}
+    return {"ok": True, "sec": HOLD_SEC,
+            "hold": {"who": me, "kind": kind, "at": str(now), "live": False, "mine": True}}
+
+
+async def intake_by_district(me: str = "") -> dict:
+    """Что принято без кодов и ещё не отсканировано — по районам, с задачами
+    и их строками. Этим живёт сектор «внести QR коды с незавершённого приёма»:
+    район без такого товара там серый, с товаром — число и кто сканирует."""
+    out = {oid: {"id": oid, "code": OFFICE_CODES.get(oid, ""),
+                 "name": OFFICE_NAMES.get(oid, oid), "left": 0, "need": 0, "got": 0,
+                 "tasks": [], "hold": {"who": "", "kind": "", "live": False, "mine": False}}
+           for oid in OFFICE_IDS}
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        sid = sup.get("_id")
+        for oid, t in (sup.get("tasks") or {}).items():
+            if oid not in out or not t.get("noscan_at") or t.get("done_at"):
+                continue
+            v = _task_view(sid, sup, oid, t, me)
+            if v["left"] <= 0:
+                continue
+            v["lines"] = [l for l in v["lines"] if l["left"] > 0]
+            d = out[oid]
+            d["tasks"].append(v)
+            d["left"] += v["left"]; d["need"] += v["need"]; d["got"] += v["got"]
+            if v["hold"]["live"] or v["hold"]["mine"]:
+                d["hold"] = v["hold"]
+    return {"districts": [out[o] for o in OFFICE_IDS],
+            "now": datetime.now(timezone.utc).isoformat()}
 
 
 async def noscan_tasks() -> list:
@@ -1874,6 +1979,28 @@ async def handle_own_noscan(request):
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
+@require_owner
+async def handle_own_hold(request):
+    """Занять задачу под сканирование или отпустить: {district, on, as}."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await task_hold(request.match_info.get("sid") or "",
+                          str(body.get("district") or "").strip(),
+                          _owner_name(request, body), int(request.get("owner_id") or 0),
+                          bool(body.get("on", True)), owner=True)
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_intake(request):
+    """Незавершённый приём по районам — для «Внести / удалить товар»."""
+    me = str(request.query.get("as") or "").strip()[:60] or "старший"
+    return web.json_response(await intake_by_district(me), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 # ── закупка на других базах ─────────────────────────────────────────────────
 # Магазин дал не всё — за остальным едут на другую базу. Заявку туда старший
 # собирает сам, без файла: назвал базу, отметил, что и куда. Дальше это
@@ -1972,6 +2099,7 @@ def setup(app):
         ("/api/owner/supply/send",   handle_send,   "POST"),
         ("/api/owner/supply/import", handle_import, "POST"),
         ("/api/owner/supply/extra",  handle_extra_create, "POST"),
+        ("/api/owner/supply/intake", handle_own_intake, "GET"),
         ("/api/owner/supply",        handle_list,   "GET"),
         ("/api/owner/supply/{sid}",                 handle_one,          "GET"),
         ("/api/owner/supply/{sid}/buy",             handle_buy,          "POST"),
@@ -1990,6 +2118,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/undo",       handle_own_undo,     "POST"),
         ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
         ("/api/owner/supply/{sid}/task/noscan",     handle_own_noscan,   "POST"),
+        ("/api/owner/supply/{sid}/task/hold",       handle_own_hold,     "POST"),
         ("/api/owner/supply/{sid}/task/line",       handle_own_line,     "POST"),
         ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),
     ):

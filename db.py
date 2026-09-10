@@ -2419,6 +2419,53 @@ async def supply_task_finish(sid: str, district: str, gaps: list,
     return doc
 
 
+async def supply_task_hold(sid: str, district: str, who: str, kind: str,
+                           tg: int, now, until) -> tuple:
+    """Занять приёмку района под сканирование: (заняли ли, кем занято).
+
+    Двое у одной задачи — это не удвоенная скорость, а накладки: старший
+    вносит коды с полки, водитель в это же время досканирует ту же заявку
+    из машины. Живой замок другого человека не перебивается, свой —
+    продлевается. Срок короткий, продлевает его каждый скан и пульс экрана:
+    ушёл с камеры или пропала связь — замок отпадает сам."""
+    db = _db_or_none()
+    if db is None: return True, None
+    cur = await db.supplies.find_one({"_id": sid}, {f"tasks.{district}": 1})
+    task = ((cur or {}).get("tasks") or {}).get(district) or {}
+    hold = task.get("hold") or {}
+    live = bool(hold) and _dt_aware(hold.get("until")) is not None \
+        and _dt_aware(hold.get("until")) >= now
+    if live and hold.get("who") != who:
+        return False, hold
+    at = hold.get("at") if (live and hold.get("who") == who) else now
+    r = await db.supplies.update_one(
+        {"_id": sid, "status": "open", f"tasks.{district}.done_at": None,
+         "$or": [{f"tasks.{district}.hold": None},
+                 {f"tasks.{district}.hold.until": {"$lt": now}},
+                 {f"tasks.{district}.hold.who": who}]},
+        {"$set": {f"tasks.{district}.hold": {"who": who, "kind": kind, "tg": int(tg or 0),
+                                              "at": at, "until": until}}})
+    if r.matched_count == 0:
+        cur = await db.supplies.find_one({"_id": sid}, {f"tasks.{district}.hold": 1})
+        return False, (((cur or {}).get("tasks") or {}).get(district) or {}).get("hold")
+    return True, {"who": who, "kind": kind, "at": at, "until": until}
+
+
+async def supply_task_unhold(sid: str, district: str, who: str) -> bool:
+    """Отпустить приёмку — только свой замок."""
+    db = _db_or_none()
+    if db is None: return True
+    r = await db.supplies.update_one({"_id": sid, f"tasks.{district}.hold.who": who},
+                                     {"$unset": {f"tasks.{district}.hold": ""}})
+    return r.modified_count > 0
+
+
+def _dt_aware(v):
+    """Дата из базы бывает без пояса — сравнивать её с now() нельзя."""
+    if not isinstance(v, datetime): return None
+    return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+
+
 async def supply_task_flag(sid: str, district: str, flag: dict) -> None:
     """Пометка о странном на приёмке. Не блокирует — показывает старшему."""
     db = _db_or_none()

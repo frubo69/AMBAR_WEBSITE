@@ -1939,6 +1939,23 @@ async def handle_expense_photo(request):
 
 
 @require_driver
+async def handle_supply_hold(request):
+    """Занять задачу под сканирование (камера открыта) или отпустить."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await supply_routes.task_hold(
+        request.match_info.get("sid") or "",
+        str(body.get("district") or "").strip(), me["name"],
+        request["tg"].get("id") or 0, bool(body.get("on", True)))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_driver
 async def handle_supply_noscan(request):
     """Товар забрали, коды не читали. Задача остаётся открытой — досканировать."""
     import supply_routes
@@ -1997,6 +2014,7 @@ def setup(app):
         ("/api/driver/supply/{sid}/undo",       handle_supply_undo,   "POST"),
         ("/api/driver/supply/{sid}/finish",     handle_supply_finish, "POST"),
         ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
+        ("/api/driver/supply/{sid}/hold",       handle_supply_hold,   "POST"),
     )
     seen = set()
     for path, handler, method in routes:

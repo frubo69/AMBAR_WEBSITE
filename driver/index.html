@@ -1213,6 +1213,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .dcard.noscan{border-color:rgba(243,180,74,.42)}
 .dcard.noscan .dcard-b i,.dcard.noscan .dcard-n,.dtop-n.warn{color:var(--warn)}
 .dchip.warn{color:var(--warn);background:var(--warn-soft);border-color:rgba(243,180,74,.35)}
+.sup-held{color:var(--warn)}
+.dc-btn.dim{opacity:.6}
+.dupd.dhold{background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
+.dupd.dhold .dupd-h{color:var(--gold2)}
+.dupd-s{margin-top:8px;font-size:12.5px;line-height:1.45;color:var(--sub)}
+.dpl.dli:disabled{opacity:.55}
 /* Обходной путь — справа в шапке, а не среди кнопок внизу: внизу одна
    главная кнопка, и она говорит, что делать дальше. */
 .sup-act{flex-shrink:0;height:34px;padding:0 12px;border-radius:11px;cursor:pointer;
@@ -6875,7 +6881,9 @@ function supCard(t){
   const key = t.supply_id + '/' + t.district;
   const open = t.extra ? !SUP_FOLD.has(key) : SUP_FOLD.has(key);
   const lines = t.lines || [];
-  const sub = ns ? 'принято без сканирования'
+  const held = !!(t.hold && t.hold.live);
+  const sub = held ? `<span class="sup-held">${esc(t.hold.who)} вносит сейчас</span>`
+    : ns ? 'принято без сканирования'
     : t.stale
     ? `незакончено <span class="sup-old">с ${esc(supWhen(t).split(' · ')[0])}</span>`
     : t.mine ? (started ? 'ваша приёмка идёт' : 'ваша приёмка')
@@ -6904,8 +6912,8 @@ function supCard(t){
     </button>
     ${open ? `<div class="dfold-b">${list}</div>` : ''}
     ${t.mine
-      ? `<button class="dc-btn" onclick="supOpen('${t.supply_id}','${t.district}')">${
-          ns ? 'Сканировать' : started ? 'Продолжить приёмку' : 'Начать приёмку'}</button>`
+      ? `<button class="dc-btn${held ? ' dim' : ''}" onclick="supOpen('${t.supply_id}','${t.district}')">${
+          held ? 'Смотреть' : ns ? 'Сканировать' : started ? 'Продолжить приёмку' : 'Начать приёмку'}</button>`
       : `<button class="dc-btn" onclick="supClaim('${t.supply_id}','${t.district}')">Взять</button>`}
   </div>`;
 }
@@ -7055,7 +7063,11 @@ async function supPollTick(){
   _supPollBusy = true;
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}`, {params:{district: TASK.district}});
-    if(TASK && r && r.erev !== TASK.erev) supTaskApply(r);
+    if(!TASK || !r) return;
+    // Приёмку закрыли без нас: старший внёс последнюю бутылку с полки.
+    if(r.done_at){ toast('Приёмка завершена'); try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){} supBack(); return; }
+    const sig = x => JSON.stringify([x.erev, x.got, x.left, !!(x.hold && x.hold.live), (x.hold || {}).who]);
+    if(sig(r) !== sig(TASK)) supTaskApply(r);
   }catch(e){}
   finally{ _supPollBusy = false; }
 }
@@ -7100,7 +7112,9 @@ function supRenderTask(){
   // принято не всё — закрыть с недобором. Главная кнопка внизу всегда одна.
   document.getElementById('supV').style.display = 'none';
   const act = document.getElementById('supAct');
-  if(t.got === 0 && !ns){
+  const занято = !!(t.hold && t.hold.live);
+  if(занято){ act.style.display = 'none'; }
+  else if(t.got === 0 && !ns){
     act.textContent = 'Вернуть задачу'; act.className = 'sup-act';
     act.onclick = supGiveBack; act.style.display = '';
   }else if(t.left > 0 && t.got > 0){
@@ -7126,7 +7140,13 @@ function supRenderTask(){
         <span class="dupd-q">${c.was ? c.was : '—'} → <b>${c.now ? c.now : 'убрали'}</b></span></span>`).join('')}</div>
       <button class="dupd-ok" onclick="supUpdOk()">Понятно</button>
     </div>` : '';
-  document.getElementById('supMid').innerHTML = upd + `<div class="dtop">
+  const held = !!(t.hold && t.hold.live);
+  const holdCard = held ? `<div class="dupd dhold">
+      <div class="dupd-h">${svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 18)}
+        <b>${esc(t.hold.who)} вносит сейчас</b><i>${fmt(t.got)} из ${fmt(t.need)}</i></div>
+      <div class="dupd-s">Коды с полки вносит старший. Здесь видно, сколько уже внесено; сканировать можно будет, когда он закончит.</div>
+    </div>` : '';
+  document.getElementById('supMid').innerHTML = upd + holdCard + `<div class="dtop">
       <span class="dtop-b"><span class="dchip ${t.left ? (ns ? 'warn' : '') : 'ok'}">${
           t.left ? (ns ? 'без сканирования' : t.got ? 'идёт приёмка' : 'ждёт')
                  : (ns ? 'всё отсканировано' : 'взято полностью')}</span>
@@ -7136,7 +7156,7 @@ function supRenderTask(){
       <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
     </div>
     <div class="dcard dlist">${lines.map(l => `
-      <button class="dpl dli ${l.left ? '' : 'ok'}" onclick="supLineOpen('${l.id}')">
+      <button class="dpl dli ${l.left ? '' : 'ok'}" ${held ? 'disabled' : ''} onclick="supLineOpen('${l.id}')">
         <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
              onerror="this.style.visibility='hidden'">
         <span class="dpl-n">${esc(l.name)}${l.left && l.got ? `<i>осталось ${fmt(l.left)}</i>` : ''}</span>
@@ -7152,12 +7172,23 @@ function supRenderTask(){
                                     : (ns ? 'Не отсканировано' : 'Осталось забрать')}</span>
       <span class="sup-tot-v">${all ? fmt(t.got) : fmt(t.left)}<u> ${all ? 'бут.' : 'из ' + fmt(t.need)}</u></span>
     </div>
-    ${all
+    ${held ? '' : all
       ? `<button class="btn btn-pri" onclick="finOpen()">Завершить приёмку</button>`
       : `<button class="btn btn-pri" onclick="supNext()">${
            t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>${
          ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}`}`;
 }
+
+// Замок сканирования: держим, пока открыта камера, продлеваем раз в десять
+// секунд, отпускаем на выходе. «busy» — задачу уже сканирует старший.
+var _holdT = null;
+async function holdSend(on){
+  if(!TASK) return null;
+  try{ return await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}/hold`,
+    {method:'POST', body:{district: TASK.district, on: !!on}}); }
+  catch(e){ return null; }
+}
+function holdStop(){ if(_holdT){ clearInterval(_holdT); _holdT = null; } if(TASK) holdSend(false); }
 
 // Следующая позиция, по которой ещё есть что сканировать, — та же, что первой
 // стоит в списке: искать её глазами не приходится.
@@ -7205,6 +7236,15 @@ const _setText = (id, v) => { const e = document.getElementById(id); if(e) e.tex
 async function supLineOpen(pid){
   const l = (TASK.lines || []).find(x => x.id === pid);
   if(!l || !l.left) return;
+  // Сначала замок, потом камера: занято — говорим кем и остаёмся на списке.
+  const h = await holdSend(true);
+  if(h && !h.ok){
+    toast(h.verdict === 'busy' ? `${h.by || 'Старший'} вносит сейчас`
+        : h.verdict === 'closed' ? 'Приёмка уже закрыта' : 'Не удалось начать', 'err');
+    if(h.verdict === 'busy' && TASK){ TASK.hold = {live: true, who: h.by || 'старший'}; supRenderTask(); }
+    return;
+  }
+  _holdT = setInterval(() => holdSend(true), 10000);
   LINE = {...l};
   SCAN_ROWS = [];
   supRenderCam();
@@ -7220,6 +7260,7 @@ async function supLineOpen(pid){
 
 function supLineClose(){
   SCAN.stop();
+  holdStop();
   LINE = null; SCAN_ROWS = [];
   supRenderTask();
 }
@@ -7333,6 +7374,20 @@ SCANQ.onDone = (err, r, job) => {
     if(LINE){ LINE.got = r.got; LINE.left = r.left; }
     supSyncLine(r);
     camFeed();
+    // Последняя бутылка приёма без кодов — задача закрылась сама, у всех.
+    if(r.finished){
+      camFlash('ok', 'всё внесено');
+      setTimeout(() => {
+        SCAN.stop(); holdStop(); LINE = null; SCAN_ROWS = [];
+        supPollStop();
+        document.getElementById('supScr').classList.remove('show');
+        TASK = null;
+        try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+        toast('Приёмка завершена');
+        supLoad();
+      }, 700);
+      return;
+    }
     // Строка добрана — водителю больше нечего здесь делать, и держать камеру
     // включённой значит ждать от него лишнего действия.
     if(r.left === 0){
@@ -7353,6 +7408,16 @@ SCANQ.onDone = (err, r, job) => {
     return;
   }
   if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }
+  // Задачу перехватил старший — камеру закрываем, дальше здесь только смотреть.
+  if(r.verdict === 'busy'){
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
+    camFlash('err', `вносит ${r.by || 'старший'}`);
+    toast(`${r.by || 'Старший'} вносит сейчас`, 'err');
+    camFeed();
+    if(r.task) TASK = r.task;
+    setTimeout(() => { if(LINE) supLineClose(); }, 600);
+    return;
+  }
   const MSG = {
     known: 'Эта бутылка уже в реестре',
     full:  'По этой позиции уже всё',

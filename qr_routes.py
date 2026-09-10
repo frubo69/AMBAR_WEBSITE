@@ -364,7 +364,18 @@ async def handle_scan(request):
     # страшен, а вот две бутылки с одним номером — уже беда.
     seq = await db.qr_next_seq(product_id)
     label = f"{product_slug(product_id, p.get('name',''))}#{seq:06d}"
-    added = await db.qr_add(code, product_id, p.get("name", ""), district, me, now, label)
+    # «Внести новый товар» — приход на склад (src=new, его считает
+    # _district_base); из ревизии по «QR не внесён» — код к бутылке, которая
+    # в пересчёте уже есть (src=cover), приходом не считается.
+    src = "cover" if str(body.get("mode") or "") == "cover" else "new"
+    added = await db.qr_add(code, product_id, p.get("name", ""), district, me, now, label,
+                            extra={"src": src})
+    if added and src == "new":
+        try:
+            import stock_routes
+            stock_routes.base_drop()             # склад должен увидеть бутылку сразу
+        except Exception:                        # noqa: BLE001
+            pass
     if not added:
         old = await db.qr_get(code)
         return web.json_response({

@@ -1083,6 +1083,16 @@ async def _district_base(day: str) -> dict:
             # Приёмка считает бутылки, склад — учётные единицы: ящик пива это
             # одна единица и двадцать четыре кода.
             have[pid] = (have.get(pid) or 0) + n / _unit(cat.get(pid) or {})
+        # «Внести новый товар» — тоже приход: бутылку завели кодом руками,
+        # значит она лежит на полке, и склад обязан её показать — даже там,
+        # где пересчёта не было. Коды, которыми лишь закрывали долг «QR не
+        # внесён», сюда не идут: те бутылки в пересчёте уже есть.
+        try:
+            for pid, n in (await db.qr_manual_since(oid, since[oid])).items():
+                if pid in cat:
+                    have[pid] = (have.get(pid) or 0) + n / _unit(cat.get(pid) or {})
+        except Exception as e:
+            log.warning(f"[stock] внесённое руками не учтено ({oid}): {e}")
         for pid, n in gone.items():
             have[pid] = max(0, (have.get(pid) or 0) - n)
         # Разбитая бутылка ушла со склада так же честно, как проданная. Без

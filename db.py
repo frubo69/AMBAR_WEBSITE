@@ -3639,6 +3639,23 @@ async def qr_last(limit: int = 20) -> list:
     return rows
 
 
+async def qr_manual_since(district: str, since) -> dict:
+    """{позиция: бутылок}, внесённых руками как новый товар (src=new) после
+    момента since (None — за всё время). Удалённые из реестра не в счёт:
+    убрали бутылку — убрали и приход."""
+    db = _db_or_none()
+    if db is None: return {}
+    q = {"district": district, "src": "new", "status": {"$ne": "deleted"}}
+    if since is not None:
+        q["at"] = {"$gt": since}
+    out = {}
+    async for d in db.qr_codes.find(q, {"_id": 0, "product_id": 1}):
+        pid = d.get("product_id") or ""
+        if pid:
+            out[pid] = out.get(pid, 0) + 1
+    return out
+
+
 async def qr_history(since) -> tuple:
     """Что вносили и что убирали из реестра с какого-то момента — без самих
     кодов: истории нужны позиция, точка, кто и когда, а не номера."""

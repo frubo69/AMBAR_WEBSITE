@@ -830,7 +830,12 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   justify-content:center;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
 .qb.dn{color:#fff;background:linear-gradient(135deg,#c94848,#e05555);box-shadow:0 6px 20px rgba(224,85,85,.22)}
 .qr-hold .rcv-n{margin:12px 16px 0} .qr-hold .rcv-bar{margin:12px 16px 14px}
-.qr-home .sc.grow > .sc-r.qr-hist{flex:0 0 auto;border-top:1px solid rgba(201,169,110,.14)}
+.stk-mid:has(> .qr-home){padding-bottom:12px}
+.qr-home .sc.grow > .sc-r.qr-hist{flex:0 0 auto;min-height:58px;border-top:1px solid rgba(201,169,110,.25);
+  background:rgba(201,169,110,.07)}
+.qr-hist > span:not(.qr-hist-i){color:var(--gold2)}
+.qr-hist .qr-hist-i{flex:0 0 30px;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.25)}
 .pk-img{flex:0 0 auto;width:30px;height:30px;border-radius:8px;object-fit:cover;background:var(--card2)}
 .pk-go{flex:0 0 auto;display:flex;color:var(--dim);margin-left:2px}
 .hst-r.plain{cursor:default} .hst-r.plain:active{background:transparent}
@@ -18213,7 +18218,9 @@ async function qrHome(тихо){
     <div class="sc grow">
       <div class="sc-cap"><span>Внести QR коды</span><i>с незавершённого приёма</i></div>
       <div class="ord-dists qr-in" id="qrIn">${rows}</div>
-      <button class="sc-r qr-hist" onclick="qrHistory()"><span>История внесений</span><em>${_SC_CHEV}</em></button>
+      <button class="sc-r qr-hist" onclick="qrHistory()"><span class="qr-hist-i"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <span>История внесений</span><em>${_SC_CHEV}</em></button>
     </div>
   </div>`;
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
@@ -18722,8 +18729,10 @@ function qrSave(code){
   // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
   // бутылке. Если сервер возразит, цвет сменится — но это редкий случай.
   qrFlash('ok');
+  // Откуда бутылка: новый товар — приход на склад; из ревизии по «QR не
+  // внесён» — код к бутылке, которая в пересчёте уже есть.
   SCANQ.push({path:'/api/owner/qr/scan',
-              body:{code, product_id: QR_PROD.id, district: QR_DIST}, code});
+              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new'}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {

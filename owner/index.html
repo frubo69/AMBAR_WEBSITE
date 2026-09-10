@@ -3832,6 +3832,11 @@ button.path:active{transform:scale(.995)}
 .wh-ttl{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
   letter-spacing:-.3px}
 .wh-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.wh-sub[hidden]{display:none}
+/* Заголовок списка — как имена разделов: заглавными, с разрядкой, крупно.
+   В карточке человека тот же узел несёт имя — и класс снимается. */
+.wh-ttl.hero{font-size:21px;letter-spacing:1.8px;text-transform:uppercase;line-height:1.1;
+  padding:2px 0 3px}
 .wh-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
   /* Снизу ровно столько, сколько закрыто панелью и ушло за край экрана.
      Число пересчитывается на каждой посадке шторки — оттого последняя
@@ -11174,16 +11179,14 @@ function whPaint(listOnly){
   if(WH.view === 'card') return whCard();
   // Вернулись к списку — вернулся и заголовок: иначе в шапке остаётся имя
   // человека, которого на экране уже нет.
+  // В списке заголовок — один, крупный, заглавными, как у разделов; подписи
+  // «N из M видно» под ним нет (владелец, 10 сен 2026): счёт и так стоит на
+  // панели снизу. В карточке человека заголовок — его имя, обычным начертанием.
   _setText('whTtl', 'Локатор');
+  const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.add('hero');
+  const sub = document.getElementById('whSub'); if(sub) sub.hidden = true;
   const rows = d.drivers || [];
   const live = rows.filter(r => whState(r) === 'stream').length;
-  const snap = rows.filter(r => whState(r) === 'snap').length;
-  const work = rows.reduce((a, r) => a + (r.orders || 0), 0);
-  // Подзаголовок отвечает на вопрос «сколько машин видно», а видно —
-  // это и трансляции, и те, кто только что был в приложении.
-  _setText('whSub', (live + snap) ? `${live + snap} из ${rows.length} видно`
-                         + (snap ? ` · ${live} на связи` : '')
-                         : (rows.length ? 'никого не видно' : 'водителей нет'));
   const trackOn = (d.track || []).length > 1;
   // Счётчики на панели снизу: они же и есть фильтр, поэтому цифры живут там,
   // а не отдельной строкой над списком.
@@ -11342,6 +11345,8 @@ function whCard(){
   const st = whState(r);
   const track = (d.track || []).length > 1;
   _setText('whTtl', r.driver);
+  { const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.remove('hero');
+    const sub = document.getElementById('whSub'); if(sub) sub.hidden = false; }
   _setText('whSub', r.device ? 'устройство' : r.senior ? 'менеджер панели'
                     : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));
   // Крупно — состояние, под ним одной строкой — почему. Бессрочная

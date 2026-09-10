@@ -18088,7 +18088,8 @@ let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = nul
 // второй видит «вносит сейчас» и ход работы, а камеру открыть не может:
 // замок держит сервер, экран лишь показывает его.
 let ACC_IN = null, QR_IN = null, QR_POLL = null;
-const _QR_ICO = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+// 18 px в квадрате 38: отступ целый, иначе значок мылится на полпикселя вниз-вправо.
+const _QR_ICO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
   <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/></svg>`;
 const _QR_TRASH = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -18171,7 +18172,7 @@ async function qrHome(тихо){
     <div class="sc">
       <button class="sc-r qr-free" onclick="qrFreeStart()">
         <span class="qr-free-i">${_QR_ICO}</span>
-        <span>Внести товар<i>район → позиция → камера</i></span><em>${_SC_CHEV}</em>
+        <span>Внести новый товар<i>район → позиция → камера</i></span><em>${_SC_CHEV}</em>
       </button>
     </div>
     <div class="sc grow">

@@ -77,6 +77,41 @@ IPAD_SUFFIX = "@ipad"
 IPAD_LABEL = "iPad Star"
 
 
+_GEO_BOT = {"at": 0.0, "link": ""}
+
+
+async def geo_bot_link() -> str:
+    """Ссылка на бот геопозиции — туда водители и старший включают трансляцию.
+    Имя бота спрашиваем у телеграма по токену один раз и помним; токена нет
+    или телеграм не ответил — пусто, и тексты обходятся без ссылки."""
+    import time as _t
+    now = _t.monotonic()
+    if _GEO_BOT["link"] or now - _GEO_BOT["at"] < 300:
+        return _GEO_BOT["link"]
+    _GEO_BOT["at"] = now
+    token = os.getenv("AMBAR_GEO_BOT_TOKEN", "")
+    if not token:
+        return ""
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
+            async with s.get(f"https://api.telegram.org/bot{token}/getMe") as r:
+                d = await r.json()
+        u = ((d or {}).get("result") or {}).get("username") or ""
+        if u:
+            _GEO_BOT["link"] = f"https://t.me/{u}"
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[geo] имя бота геопозиции не узнали: {e}")
+    return _GEO_BOT["link"]
+
+
+async def geo_how() -> str:
+    """Как включить трансляцию — словами, с ссылкой на бот, если она известна."""
+    link = await geo_bot_link()
+    return ("В боте геопозиции" + (f" {link}" if link else "") + ": "
+            "📎 → «Геопозиция» → «Транслировать» → «Пока не выключу». Один раз.")
+
+
 def senior_keys(name: str) -> tuple:
     """(ключ телефона, ключ планшета) старшего в driver_pos."""
     return SENIOR_PREFIX + name, SENIOR_PREFIX + name + IPAD_SUFFIX

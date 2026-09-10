@@ -3344,7 +3344,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <div class="tut-m" id="tutM"></div>
   <div class="tut-f">
     <div class="tut-note">Выключить можно там же и в любой момент — например в отпуске.</div>
-    <button class="btn btn-pri" style="width:100%" onclick="drvChat()">Открыть чат с ботом</button>
+    <button class="btn btn-pri" style="width:100%" onclick="drvChat()">Открыть бот геопозиции</button>
   </div>
 </div>
 
@@ -4016,11 +4016,13 @@ function _geoWay(){
 }
 
 // Чат с ботом. Отправлять геопозицию некуда, если человек не понял, в какой
-// именно чат, — а из приложения он видит только приложение.
+// именно чат, — а из приложения он видит только приложение. Трансляцию
+// включают в отдельном боте геопозиции: его адрес приходит с состоянием
+// смены (SH.geo_bot); нет его — ведём в бот водителя, как раньше.
 const DRV_BOT = 'https://t.me/ambardriver_bot';
 function drvChat(){
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
-  try{ tg.openTelegramLink(DRV_BOT); }
+  try{ tg.openTelegramLink((SH && SH.geo_bot) || DRV_BOT); }
   catch(e){ try{ tg.close(); }catch(e2){} }
 }
 
@@ -4028,8 +4030,8 @@ function drvChat(){
 // сразу на двух языках: телеграм у водителей английский, а инструкция была
 // русской, и «Геопозиции» они там не находили.
 const TUT_STEPS = [
-  {ic:'clip', t:'Откройте чат с ботом и нажмите скрепку',
-   s:'Скрепка — слева от поля ввода сообщения.'},
+  {ic:'clip', t:'Откройте чат с ботом геопозиции и нажмите скрепку',
+   s:'Это отдельный бот, кнопка ниже ведёт в него. Скрепка — слева от поля ввода.'},
   {ic:'pin',  t:'Выберите «Геопозиция»', w:'Геопозиция', e:'Location'},
   {ic:'live', t:'Нажмите «Транслировать мою геопозицию»', live:true,
    w:'Транслировать', e:'Share My Live Location', s:'Зелёная иконка с волнами.'},

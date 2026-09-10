@@ -299,6 +299,8 @@ async def _shift_view(me: dict) -> dict:
         "opened": bool(opened), "opened_at": _iso_at(opened),
         "closed": bool(closed), "closed_at": _iso_at(closed),
         "geo": geo, "must": must,
+        # Куда включать трансляцию: приложение ведёт в бот геопозиции.
+        "geo_bot": await __import__("geo_watch").geo_bot_link(),
         "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
         "in_route": route,
         "can_open": d.get("working") is True and geo["ok"] and not opened,
@@ -879,11 +881,14 @@ async def handle_geo_help(request):
     token = _os.getenv("DRIVER_BOT_TOKEN", "")
     if not (tid and token):
         return web.json_response({"ok": False}, headers=CORS_HEADERS)
-    text = ("Чтобы оператор видел, где вы, включите трансляцию геопозиции:\n\n"
-            "скрепка (📎) → «Геопозиция» → «Транслировать» → «Пока не выключу».\n\n"
-            "Включить хватит один раз: телефон будет присылать точку сам, даже "
-            "когда телеграм свёрнут. Маршрут за смену стирается, когда её "
-            "закрывают, а в отпуске трансляцию выключают тем же меню.")
+    import geo_watch as _gw
+    link = await _gw.geo_bot_link()
+    text = ("Чтобы оператор видел, где вы, включите трансляцию геопозиции в "
+            "отдельном боте" + (f": {link}" if link else " геопозиции") + "\n\n"
+            "Там: скрепка (📎) → «Геопозиция» → «Транслировать» → «Пока не выключу».\n\n"
+            "Один раз: телефон будет присылать точку сам, даже когда телеграм "
+            "свёрнут, а тот чат можно убрать в архив. Маршрут за смену стирается, "
+            "когда её закрывают.")
     kb = {"remove_keyboard": True}
     # Ответ телеграма проверяем: он умеет отвечать «принято» кодом 200 и
     # отказом внутри тела. Молча отрапортовать успех и не отправить — худшее из

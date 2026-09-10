@@ -79,12 +79,9 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Открыть панель", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
     await _remember(sent)
-    # Заодно снимаем старую клавиатуру, если она осталась с прошлых версий.
-    kb = await update.message.reply_text(
-        "Чтобы оператор видел вас всю смену, включите трансляцию: "
-        "скрепка → «Геопозиция» → «Транслировать» → 8 часов.",
-        reply_markup=drop_keyboard())
-    await _remember(kb)
+    # Про трансляцию здесь больше не говорим: её включают в отдельном боте
+    # геопозиции (владелец, 10 сен 2026: «оно уже неактуально»), а этот чат
+    # стирается скрытым режимом, и трансляции в нём не место.
     log.info(f"вход: {me['name']} ({uid})")
 
 
@@ -187,15 +184,16 @@ async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not staff.driver_by_tg(update.effective_user.id):
         return
     await _remember(update.message)
+    import geo_watch
+    link = await geo_watch.geo_bot_link()
     sent = await update.message.reply_text(
-        "Чтобы оператор видел вас всю смену:\n\n"
-        "1. Нажмите 📎 слева от поля ввода\n"
-        "2. «Геопозиция»\n"
+        "Трансляцию геопозиции включают в отдельном боте"
+        + (f": {link}" if link else " геопозиции") + "\n\n"
+        "1. Откройте его и нажмите /start\n"
+        "2. 📎 слева от поля ввода → «Геопозиция»\n"
         "3. «Транслировать» → «Пока не выключу»\n\n"
-        "Включить хватит один раз: телефон будет сам присылать точку, даже "
-        "когда телеграм свёрнут. Маршрут стирается, когда закрывают смену, "
-        "а в отпуске трансляцию можно выключить тем же меню.\n\n"
-        "Пока приложение открыто, точка уходит и без трансляции — сама.",
+        "Один раз: телефон будет сам присылать точку, даже когда телеграм "
+        "свёрнут, а тот чат можно убрать в архив.",
         reply_markup=drop_keyboard())
     await _remember(sent)
 

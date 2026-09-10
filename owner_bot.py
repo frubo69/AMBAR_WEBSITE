@@ -348,9 +348,11 @@ async def on_geo_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if tid and token:
         try:
             from telegram import Bot
+            import geo_watch as _gw
+            link = await _gw.geo_bot_link()
             sent = await Bot(token).send_message(
                 tid, "✅ Доступ в приложение открыт. Включите трансляцию геопозиции "
-                     "и откройте смену.")
+                     "в боте геопозиции" + (f" {link}" if link else "") + " и откройте смену.")
             # В реестр чата водителя: сообщение шлёт STAR-бот, а приходит оно
             # в водительский чат, и скрытый режим водителя должен его стирать.
             if sent:

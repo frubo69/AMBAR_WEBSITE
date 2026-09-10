@@ -2184,12 +2184,6 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-r.done .ck-t{color:var(--sub)}
 .ck-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ck-due{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:14px;
-  font-weight:700;letter-spacing:-.2px;color:var(--muted);white-space:nowrap;
-  font-variant-numeric:tabular-nums}
-.ck-r.now .ck-due{color:var(--gold2)}
-.ck-r.late .ck-due{color:var(--dn)}
-.ck-r.done .ck-due{color:var(--up)}
 .ck-go{flex:0 0 auto;color:var(--muted);display:flex;align-items:center}
 
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
@@ -15968,18 +15962,9 @@ function ckDaySet(off){
 
 function chkRow(r){
   const st = CK_ST[r.state] || CK_ST.soon;
-  // Опоздание словами: «три часа» и «минута» требуют разной реакции, а одно и
-  // то же красное — нет.
-  const late = r.state === 'late' && r.late_min
-    ? (r.late_min < 60 ? `${r.late_min} мин` : `${Math.floor(r.late_min / 60)} ч`)
-    : '';
-  // У сделанного справа пусто: зелёная галочка слева уже ответила, а слово
-  // «готово» отнимало место у названия — «Смена открыта / закрыта» резалось.
-  // Строка без срока (закупочные цены) — не «просрочено к часу», а просто
-  // не сделано.
-  const справа = r.state === 'done' ? ''
-    : (r.state === 'late' ? (late ? `+${late}` : (r.due ? 'просрочено' : 'не сделано'))
-    : (r.due ? 'к ' + r.due : 'пора'));
+  // Справа времени нет (владелец, 10 сен 2026: «убери отсюда время»): «к 21:00»
+  // и «+9 мин» отнимали место у названия, а состояние и так говорит цвет
+  // точки слева и подпись под названием.
   return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
     <span class="ck-dot">${r.state === 'done'
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -15990,7 +15975,6 @@ function chkRow(r){
       <span class="ck-t">${escS(r.t)}</span>
       <span class="ck-s">${escS(r.s)}</span>
     </span>
-    <span class="ck-due">${справа}</span>
     <span class="ck-go">${ICO_CHEV}</span>
   </button>`;
 }

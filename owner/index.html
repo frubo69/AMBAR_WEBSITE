@@ -3807,9 +3807,9 @@ button.path:active{transform:scale(.995)}
      разделяет материал, а не тени: их у стекла быть не должно. */
   box-shadow:0 -1px 24px rgba(0,0,0,.35);
   transform:translateY(0);
-  /* Переходов здесь нет намеренно: CSS-переход нельзя перехватить пальцем на
-     лету — он доигрывает и только потом отдаёт управление. Движение считает
-     пружина покадрово, ровно как в панели оператора. */
+  /* Переход на снап ставит скрипт на время движения (см. whSpring): лист
+     едет на композиторе, а на касании переход снимается и лист берётся с
+     того места, где он есть, — перехват пальцем не теряется. */
   overflow:hidden;touch-action:none;will-change:transform}
 .wh-hd{position:relative;z-index:2;flex:0 0 auto;padding:7px 18px 11px;cursor:grab;
   user-select:none;-webkit-user-select:none}
@@ -10682,14 +10682,39 @@ function whCardStop(h, hdH, tbH, peek){
 // Шторка едет вниз — панель управления ровно на столько же вверх, и потому
 // стоит у нижнего края экрана в любом положении. Оба сдвига идут одним
 // кадром и целиком на композиторе.
-const WH_SH = {y: 0, v: 0, raf: 0};
+const WH_SH = {y: 0, v: 0, raf: 0, tt: 0};
 
-function _whPut(dy){
+function _whPut(dy, d){
   const sh = _whSheet(), tb = _whFoot();
   WH_SH.y = dy;
   if(sh) sh.style.transform = `translateY(${dy}px)`;
   if(tb) tb.style.transform = `translateY(${-dy}px)`;
-  whToolsFade(dy);
+  whToolsFade(dy, d);
+}
+
+// Снап — CSS-переходом на композиторе. Пружина на requestAnimationFrame
+// рвалась на каждом тяжёлом кадре главного потока: пересборка списка, метки
+// карты, сборка мусора — а переход композитор рисует сам, что бы ни делал
+// скрипт. Перехват пальцем не потерян: на касании берём текущее положение
+// из вычисленного transform, снимаем переход и ведём дальше рукой.
+const WH_GLIDE = 'transform .38s cubic-bezier(.22,1,.36,1)';
+function _whSetGlide(on){
+  const sh = _whSheet(), tb = _whFoot(), tools = document.querySelector('.wh-tools');
+  if(sh) sh.style.transition = on ? WH_GLIDE : '';
+  if(tb) tb.style.transition = on ? WH_GLIDE : '';
+  if(tools) tools.style.transition = on
+    ? 'opacity .38s cubic-bezier(.22,1,.36,1), transform .38s cubic-bezier(.22,1,.36,1)' : '';
+}
+// Где шторка прямо сейчас — из вычисленного transform, а не из цели: во время
+// перехода WH_SH.y уже равен цели, а лист ещё в пути.
+function _whLiveY(){
+  const sh = _whSheet(); if(!sh) return WH_SH.y;
+  const m = getComputedStyle(sh).transform;
+  if(!m || m === 'none') return WH_SH.y;
+  try{ return new DOMMatrix(m).m42; }catch(e){}
+  const p = m.match(/matrix\(([^)]+)\)/);
+  if(p){ const a = p[1].split(',').map(Number); return a[5] || 0; }
+  return WH_SH.y;
 }
 
 const _whCalm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -10700,26 +10725,15 @@ const _whCalm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // панели оператора: разъезжаться двум шторкам нельзя.
 function whSpring(to, v0, конец){
   cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
+  clearTimeout(WH_SH.tt);
   if(!_whSheet()) return;
-  if(_whCalm()){ _whPut(to); WH_SH.v = 0; (конец || whRest)(); return; }
-  const w = 2 * Math.PI / 0.32, z = 0.86;
-  WH_SH.v = v0 || 0;
-  let было = performance.now();
-  const шаг = сейчас => {
-    const dt = Math.min(0.032, (сейчас - было) / 1000); было = сейчас;
-    const n = Math.max(1, Math.ceil(dt / 0.006)), h = dt / n;
-    let y = WH_SH.y;
-    for(let i = 0; i < n; i++){
-      const a = -w * w * (y - to) - 2 * z * w * WH_SH.v;
-      WH_SH.v += a * h; y += WH_SH.v * h;
-    }
-    _whPut(y);
-    if(Math.abs(y - to) < 0.4 && Math.abs(WH_SH.v) < 25){
-      WH_SH.v = 0; _whPut(to); WH_SH.raf = 0; (конец || whRest)(); return;
-    }
-    WH_SH.raf = requestAnimationFrame(шаг);
-  };
-  WH_SH.raf = requestAnimationFrame(шаг);
+  WH_SH.v = 0;
+  if(_whCalm()){ _whSetGlide(false); _whPut(to); (конец || whRest)(); return; }
+  _whSetGlide(true);
+  _whPut(to);
+  // Встала — снимаем переход (чтобы жест вёл её без задержки) и даём карте
+  // и списку новый размер. Не раньше: и то и другое требует раскладки.
+  WH_SH.tt = setTimeout(() => { _whSetGlide(false); (конец || whRest)(); }, 400);
 }
 
 // Шторка встала — считаем, сколько списку оставить снизу, и отдаём карте её
@@ -10759,6 +10773,7 @@ function whSnap(pos, smooth){
   if(smooth) whSpring(d[pos], WH_SH.v);
   else{
     cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0;
+    clearTimeout(WH_SH.tt); _whSetGlide(false);
     _whPut(d[pos]); whRest();
   }
 }
@@ -10766,11 +10781,13 @@ function whSnap(pos, smooth){
 // Кнопки карты не ездят — они гаснут. Двигать их вместе со шторкой значит
 // однажды вытолкнуть за край экрана; а когда карты почти не видно, они и не
 // нужны: место освобождается ровно тогда, когда перестаёт быть полезным.
-function whToolsFade(y){
+function whToolsFade(y, d){
   const tools = document.querySelector('.wh-tools');
   const sh = _whSheet();
   if(!tools || !sh) return;
-  const d = whDetents();
+  // Высоты во время жеста берём готовыми: считать их — читать раскладку на
+  // каждом движении пальца.
+  d = d || whDetents();
   // Полностью видны на половине и ниже, полностью скрыты в раскрытой.
   const k = d.half ? Math.max(0, Math.min(1, y / d.half)) : 1;
   tools.style.opacity = k.toFixed(2);
@@ -10796,8 +10813,14 @@ function whDragInit(){
     // Пружину перехватываем на лету: шторка уже едет, а палец опустился —
     // она должна пойти за ним с того места, где была, а не доигрывать.
     cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
+    // Лист мог ехать переходом: берём, где он сейчас, и снимаем переход —
+    // дальше он идёт строго за пальцем с этого места.
+    clearTimeout(WH_SH.tt);
+    const live = _whLiveY();
+    _whSetGlide(false);
     const y = e.touches ? e.touches[0].clientY : e.clientY;
     const d0 = whDetents();
+    _whPut(live, d0);
     // Откуда начали — запоминаем СРАЗУ. Считать это в конце жеста нельзя:
     // к тому моменту палец уже утащил шторку, ближайшим оказывается соседнее
     // положение, и «шаг на одно» отсчитывается от него — бросок из сложенной
@@ -10816,7 +10839,7 @@ function whDragInit(){
     _whDrag.moved = y - _whDrag.y0;
     // Тянут вверх из списка, который уже вверху, — это прокрутка, не шторка.
     if(_whDrag.fromList && _whDrag.moved < 0 && _whY === 'full'){ _whDrag = null; return; }
-    _whPut(clamp(_whDrag.base + _whDrag.moved, _whDrag.d));
+    _whPut(clamp(_whDrag.base + _whDrag.moved, _whDrag.d), _whDrag.d);
     if(e.cancelable) e.preventDefault();
   };
 

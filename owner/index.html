@@ -3834,8 +3834,9 @@ button.path:active{transform:scale(.995)}
 .wh-sub{font-size:12px;color:var(--muted);margin-top:3px}
 .wh-sub[hidden]{display:none}
 /* Заголовок списка — как имена разделов: заглавными, с разрядкой, крупно.
-   В карточке человека тот же узел несёт имя — и класс снимается. */
-.wh-ttl.hero{font-size:21px;letter-spacing:1.8px;text-transform:uppercase;line-height:1.1;
+   В карточке человека тот же узел несёт имя — и класс снимается. Класс свой,
+   не «hero»: так зовётся карточка выручки, и её стили налезали на заголовок. */
+.wh-ttl.wh-big{font-size:21px;letter-spacing:1.8px;text-transform:uppercase;line-height:1.1;
   padding:2px 0 3px}
 .wh-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
   /* Снизу ровно столько, сколько закрыто панелью и ушло за край экрана.
@@ -11183,7 +11184,7 @@ function whPaint(listOnly){
   // «N из M видно» под ним нет (владелец, 10 сен 2026): счёт и так стоит на
   // панели снизу. В карточке человека заголовок — его имя, обычным начертанием.
   _setText('whTtl', 'Локатор');
-  const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.add('hero');
+  const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.add('wh-big');
   const sub = document.getElementById('whSub'); if(sub) sub.hidden = true;
   const rows = d.drivers || [];
   const live = rows.filter(r => whState(r) === 'stream').length;
@@ -11345,7 +11346,7 @@ function whCard(){
   const st = whState(r);
   const track = (d.track || []).length > 1;
   _setText('whTtl', r.driver);
-  { const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.remove('hero');
+  { const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.remove('wh-big');
     const sub = document.getElementById('whSub'); if(sub) sub.hidden = false; }
   _setText('whSub', r.device ? 'устройство' : r.senior ? 'менеджер панели'
                     : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));

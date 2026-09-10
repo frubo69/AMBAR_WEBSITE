@@ -548,7 +548,8 @@ async def handle_list(request):
                               "qty": int(t.get("qty") or 0),
                               "done_at": str(t.get("done_at") or ""),
                               "noscan_at": str(t.get("noscan_at") or ""),
-                              "noscan_by": t.get("noscan_by") or ""}
+                              "noscan_by": t.get("noscan_by") or "",
+                              "cancelled_at": str(t.get("cancelled_at") or "")}
                           for o, t in (r.get("tasks") or {}).items()}
         out.append(brief)
     return web.json_response({"supplies": out}, headers=CORS_HEADERS,
@@ -674,6 +675,9 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         # Пока left > 0, это долг — досканировать.
         "noscan_at": str(task.get("noscan_at") or ""),
         "noscan_by": task.get("noscan_by") or "",
+        # Район отменили отдельно от заявки: за ним не едем, принятое стоит.
+        "cancelled_at": str(task.get("cancelled_at") or ""),
+        "cancelled_by": task.get("cancelled_by") or "",
         "note": task.get("note") or "",
         "gaps": task.get("gaps") or [],
         "need": need, "got": got, "left": max(0, need - got),
@@ -702,7 +706,8 @@ async def tasks_for_driver(me: str, district: str) -> dict:
     бутылки, она остаётся — те бутылки записаны в тот документ, и бросить его
     значит потерять приёмку на полпути. Закрыть её должен человек."""
     sups = [s for s in await db.supplies_with_open_tasks(limit=12)
-            if any(not t.get("done_at") for t in (s.get("tasks") or {}).values())]
+            if any(not t.get("done_at") and not t.get("cancelled_at")
+                   for t in (s.get("tasks") or {}).values())]
     if not sups:
         return {"mine": [], "free": [], "extra": [], "taken": []}
     is_extra = lambda s: (s.get("kind") or "main") == "extra"
@@ -712,7 +717,7 @@ async def tasks_for_driver(me: str, district: str) -> dict:
         sid = sup.get("_id")
         свежее = is_extra(sup) or sup is main
         for oid, task in (sup.get("tasks") or {}).items():
-            if task.get("done_at"):
+            if task.get("done_at") or task.get("cancelled_at"):
                 continue
             v = _task_view(sid, sup, oid, task, me)
             # Принятое без кодов держим и в старой поставке: товар на полке,
@@ -755,6 +760,8 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("cancelled_at"):
+        return {"ok": False, "verdict": "cancelled"}
     if not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
     if task.get("done_at"):
@@ -956,6 +963,8 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("cancelled_at"):
+        return {"ok": False, "verdict": "cancelled"}
     if task.get("driver") != me and not owner:
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
     if task.get("done_at"):
@@ -1308,11 +1317,15 @@ def _money(sup: dict) -> dict:
 def _sup_brief(sup: dict) -> dict:
     """Строка закупа в истории. Без items и без задач целиком: список читают
     ради «когда, на сколько и чем кончилось», а весит поставка сотни строк."""
-    tasks = sup.get("tasks") or {}
+    all_tasks = sup.get("tasks") or {}
+    # Отменённые районы — не в счёт: «N районов», «свободных», «принято»
+    # считаются по тем, за которыми едут.
+    tasks = {o: t for o, t in all_tasks.items() if not t.get("cancelled_at")}
     took = sum(sum(int(v or 0) for v in (it.get("got") or {}).values())
                for it in (sup.get("items") or []))
     return {
         "supply_id": sup.get("_id") or sup.get("supply_id") or "",
+        "cancelled": len(all_tasks) - len(tasks),
         "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
         "status": sup.get("status") or "open",
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
@@ -1688,36 +1701,60 @@ async def handle_cancel(request):
         # Уже закрыта или уже отменена — второе нажатие ничего не меняет.
         return web.json_response({"error": "not_open", "status": st},
                                  status=409, headers=CORS_HEADERS)
-    took = sum(sum(int(v or 0) for v in (it.get("got") or {}).values())
+    tasks = sup.get("tasks") or {}
+    # Отменить можно и часть заявки — районы, за которыми не едем: body
+    # {districts: [...]}. Без списка — вся заявка. Принятый район отменить
+    # нельзя: он уже на полке; уже отменённый — второй раз нечего.
+    want = [str(o) for o in (body.get("districts") or []) if str(o) in tasks]
+    partial = bool(want)
+    targets = [o for o in (want if partial else list(tasks))
+               if not tasks[o].get("done_at") and not tasks[o].get("cancelled_at")]
+    if partial and not targets:
+        return web.json_response({"error": "nothing_to_cancel"}, status=409,
+                                 headers=CORS_HEADERS)
+    took = sum(sum(int(v or 0) for o, v in (it.get("got") or {}).items() if o in targets)
                for it in (sup.get("items") or []))
     if took and not body.get("force"):
         return web.json_response({"error": "already_taken", "took": took},
                                  status=409, headers=CORS_HEADERS)
-    sup["status"] = "cancelled"
-    sup["cancelled_at"] = datetime.now(timezone.utc).isoformat()
-    sup["cancelled_by"] = str(body.get("as") or "")[:60]
+    now = datetime.now(timezone.utc).isoformat()
+    who = str(body.get("as") or "")[:60]
     # Задачи освобождаем: водитель не должен увидеть в списке отменённое, а
     # если он держал её взятой — она просто исчезнет, и это правильно.
     told = []
-    for t in (sup.get("tasks") or {}).values():
-        if not t.get("done_at"):
-            if t.get("driver"):
-                told.append(t["driver"])
-            t.pop("driver", None)
-            t.pop("claimed_at", None)
+    for o in targets:
+        t = tasks[o]
+        if t.get("driver"):
+            told.append((t["driver"], o))
+        t.pop("driver", None)
+        t.pop("claimed_at", None)
+        t["cancelled_at"] = now
+        t["cancelled_by"] = who
+    left = [o for o, t in tasks.items() if not t.get("done_at") and not t.get("cancelled_at")]
+    if not left:
+        # Ехать больше некуда. Если что-то принято — приём закончен, иначе
+        # заявка отменена целиком: это разные записи в истории.
+        if any(t.get("done_at") for t in tasks.values()):
+            sup["status"] = "done"
+            sup["done_at"] = now
+        else:
+            sup["status"] = "cancelled"
+            sup["cancelled_at"] = now
+            sup["cancelled_by"] = who
     await db.supply_save(sup)
     # Задача, исчезнувшая из приложения без слова, — это повод приехать в
     # магазин и не понять, что происходит. Кто держал её взятой, узнаёт первым.
-    await _cancel_tell(told)
-    log.info(f"[supply] {sid}: заявка отменена ({sup['cancelled_by'] or '—'}), "
-             f"принято до отмены: {took}")
-    return web.json_response({"ok": True, "supply_id": sid,
-                              "status": "cancelled", "took": took},
+    await _cancel_tell(told, whole=not partial)
+    log.info(f"[supply] {sid}: отменено {'всё' if not partial else ', '.join(targets)} "
+             f"({who or '—'}), принято до отмены: {took}, статус {sup['status']}")
+    return web.json_response({"ok": True, "supply_id": sid, "status": sup["status"],
+                              "cancelled": targets, "took": took},
                              headers=CORS_HEADERS)
 
 
-async def _cancel_tell(drivers: list):
-    """Сказать водителям, что заявку отменили."""
+async def _cancel_tell(drivers: list, whole: bool = True):
+    """Сказать водителям, что заявку (или их район) отменили.
+    drivers — пары (имя, район)."""
     if not drivers:
         return
     try:
@@ -1727,13 +1764,18 @@ async def _cancel_tell(drivers: list):
         token = _os.getenv("DRIVER_BOT_TOKEN", "")
         if not token:
             return
-        for name in sorted(set(drivers)):
+        by: dict = {}
+        for name, oid in drivers:
+            by.setdefault(name, []).append(OFFICE_NAMES.get(oid, oid))
+        for name, where in sorted(by.items()):
             tid = _staff.DRIVER_IDS.get(name)
-            if tid:
-                await tg_send(token, tid,
-                              "Заявка на сегодня отменена — в магазин не едем.\n"
-                              "Задача пропала из приложения, это не сбой.",
-                              parse_mode=None)
+            if not tid:
+                continue
+            text = ("Заявка на сегодня отменена — в магазин не едем.\n"
+                    "Задача пропала из приложения, это не сбой." if whole else
+                    f"Приёмка на {', '.join(where)} отменена — за этим районом не "
+                    "едем.\nЗадача пропала из приложения, это не сбой.")
+            await tg_send(token, tid, text, parse_mode=None)
     except Exception as e:
         log.warning(f"[supply] про отмену водителям не ушло: {e}")
 

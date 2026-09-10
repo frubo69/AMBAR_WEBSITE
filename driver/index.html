@@ -7104,6 +7104,7 @@ async function supPollTick(){
     if(!TASK || !r) return;
     // Приёмку закрыли без нас: старший внёс последнюю бутылку с полки.
     if(r.done_at){ toast('Приёмка завершена'); try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){} supBack(); return; }
+    if(r.cancelled_at){ toast('Приёмка по этому району отменена — за ним не едем'); supBack(); return; }
     const sig = x => JSON.stringify([x.erev, x.got, x.left, !!(x.hold && x.hold.live), (x.hold || {}).who]);
     if(sig(r) !== sig(TASK)) supTaskApply(r);
   }catch(e){}
@@ -7463,6 +7464,7 @@ SCANQ.onDone = (err, r, job) => {
     closed: 'Приёмка уже закрыта',
     not_in_supply: 'Этой позиции нет в поставке',
     no_supply: 'Поставка закрыта',
+    cancelled: 'Приёмка по этому району отменена',
   };
   camFlash(r.verdict === 'full' ? 'full' : r.verdict === 'known' ? 'dup' : 'err',
            r.verdict === 'known' ? 'уже в реестре' : null);

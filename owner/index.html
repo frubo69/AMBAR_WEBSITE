@@ -3100,6 +3100,34 @@ button.path:active{transform:scale(.995)}
 .fb-days .shl-code{font-size:15px}
 /* Плитки книги: отрицательное — красным, сходится — зелёным. */
 .fb-hub .aud-g{padding:12px 13px 8px}
+
+/* ── Отмена заявки: экран вместо окна. Карточка на заявку, строка на район с
+   кружком-отметкой; принятые и уже отменённые районы гаснут. ── */
+.supc .sc-cap .supc-ico{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.22)}
+.supc .sc-cap .supc-ico svg{width:16px;height:16px}
+/* .sc-r раздаёт flex:1 всем span — здесь тянется только середина. */
+.supc-r > span,.supc-all > span{flex:0 0 auto;white-space:normal;overflow:visible}
+.supc-r .shl-code{flex:0 0 36px;width:36px;height:36px;border-radius:11px;font-size:12.5px}
+.supc-r > .supc-b{flex:1 1 auto;min-width:0}
+.supc-all > span:first-child{flex:1 1 auto}
+.supc-b b{display:block;font-size:14px;font-weight:700;line-height:1.2;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.supc-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.supc-b i.warn{color:var(--warn)} .supc-b i.no{color:var(--dn)}
+.supc-r > .supc-chk,.supc-all > .supc-chk{flex:0 0 26px}
+.supc-chk{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;border:1.6px solid var(--border3);color:transparent;
+  transition:background .15s var(--e1),border-color .15s var(--e1)}
+.supc-r.on .supc-chk,.supc-all.on .supc-chk{color:#1a1408;border-color:var(--dn);
+  background:linear-gradient(135deg,#c94848,#e05555)}
+.supc-r.on .supc-b b{color:var(--dn)}
+.supc-r.off{opacity:.45;cursor:default}
+.supc-r.off:active{background:transparent}
+.supc-all span{color:var(--sub);font-size:12.5px}
+.supc-all.on span{color:var(--dn);font-weight:700}
 .fin-a.ini{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.3px}
 .fin-v.up::before{content:'+'}
 .fin-v.dn::before{content:'−'}
@@ -17937,6 +17965,7 @@ function accOpen(id){
   if(id === 'shifts')   accShifts();
   if(id === 'checklist') accChecklist();
   if(id === 'cashround') accCashRound();
+  if(id === 'supcancel') accSupCancel();
   if(id === 'finday')   accFinDay();
   if(id === 'finb')     accFinB();
   if(id === 'finrp')    accFinRP();
@@ -18134,7 +18163,7 @@ function supStage(){
   const sup = (ACC_SUP && ACC_SUP.open) || list.find(x => x.kind !== 'extra') || null;
   if(!sup) return {k:'none', sup:null, all:0, done:0, took:0,
                    t:'Магазин ещё не ответил', s:'загрузите ответ — появятся задачи'};
-  const tasks = Object.values(sup.tasks || {});
+  const tasks = Object.values(sup.tasks || {}).filter(t => !t.cancelled_at);
   const all = tasks.length;
   const done = tasks.filter(t => t.done_at).length;
   const busy = tasks.filter(t => t.driver && !t.done_at).length;
@@ -18223,13 +18252,14 @@ function pathDistricts(){
   // где район: везут, приняли, приняли без сканирования.
   const rows = dist.map(x => {
     const t = sup && (sup.tasks || {})[x.id];
-    const cls = !t ? '' : t.done_at ? 'ok' : t.noscan_at ? 'warn' : t.driver ? 'live' : '';
+    const cls = !t ? '' : t.cancelled_at ? 'no' : t.done_at ? 'ok' : t.noscan_at ? 'warn' : t.driver ? 'live' : '';
     const кто = t ? (t.driver || t.noscan_by || '') : '';
     const go = st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`;
     return `<button class="pd-r ${cls}" ${go}>
       <span class="shl-code">${escS(x.code || '')}</span>
       <span class="pnav-b"><b>${escS(x.name || x.id)}</b></span>
-      ${кто ? `<span class="shl-p on pd-who">${escS(кто)}</span>` : ''}
+      ${t && t.cancelled_at ? '<span class="pstat-c no">отменён</span>'
+        : кто ? `<span class="shl-p on pd-who">${escS(кто)}</span>` : ''}
       ${st.k === 'none' ? '' : `<span class="pnav-go">${ICO_CHEV}</span>`}
     </button>`;
   }).join('');
@@ -20871,23 +20901,26 @@ function xSupRender(d){
   const extra = d.kind === 'extra';
   const D = d.districts || {};
   const tasks = d.tasks || [];
-  const all = tasks.length;
-  const done = tasks.filter(t => t.done_at).length;
-  const busy = tasks.filter(t => t.driver && !t.done_at).length;
-  const need = tasks.reduce((a, t) => a + (t.need || 0), 0);
-  const got  = tasks.reduce((a, t) => a + (t.got || 0), 0);
+  // Отменённые районы — не в счёт: ни в «N из M», ни в бутылках к приёму.
+  const live_ = tasks.filter(t => !t.cancelled_at);
+  const all = live_.length;
+  const done = live_.filter(t => t.done_at).length;
+  const busy = live_.filter(t => t.driver && !t.done_at).length;
+  const need = live_.reduce((a, t) => a + (t.need || 0), 0);
+  const got  = live_.reduce((a, t) => a + (t.got || 0), 0);
   const st = d.status === 'cancelled' ? ['отменена', 'no']
            : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
            : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
   _setText('accTitle', extra ? (d.base || 'Другая база') : 'Приёмка');
   _setText('accSub', extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
-  const order = t => t.done_at ? 2 : (t.driver ? 1 : 0);
+  const order = t => t.cancelled_at ? 3 : t.done_at ? 2 : (t.driver ? 1 : 0);
   const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {
     const x = D[t.district] || {};
     // Принято без кодов — своё состояние между «везёт» и «принято»: товар на
     // полке, задача открыта, пока всё не отсканируют.
     const ns = !t.done_at && !!t.noscan_at;
-    const who = t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
+    const who = t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
+              : t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
               : ns ? `без сканирования · ${escS(t.noscan_by || t.driver)} · ${_hm(t.noscan_at)}`
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
               : 'никто не взял';
@@ -20901,7 +20934,7 @@ function xSupRender(d){
     // Пока район не начали принимать, состав правится прямо тут: − n +.
     // Первый скан (или «принято без сканирования») запирает район — замок в
     // подписи, кнопки исчезают, а водитель у себя видит, что именно поменяли.
-    const edit = !extra && d.status === 'open' && !t.locked;
+    const edit = !extra && d.status === 'open' && !t.locked && !t.cancelled_at;
     // Район заперли, пока правили черновик: правки по нему пропадают, и об
     // этом говорим сразу, а не в момент сохранения.
     if(t.locked && XS_DRAFT[t.district] && Object.keys(XS_DRAFT[t.district]).length){
@@ -20927,7 +20960,7 @@ function xSupRender(d){
       </div>`).join('') + (edit ? xsAddRow(t.district) : '');
     const lock = t.locked && !t.done_at
       ? `<span class="xs-lock">${IC('lock', 12)}правки закрыты${t.lock_at ? ' · с ' + _hm(t.lock_at) : ''}</span>` : '';
-    return `<div class="xs-dcard ${t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}"
+    return `<div class="xs-dcard ${t.cancelled_at || t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}"
       id="xsd-${escS(t.district)}" data-fold="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
@@ -21889,7 +21922,7 @@ async function supImport(inp, btnId){
 // себе — тогда водители увидят его занятым и не поедут за тем же ящиком.
 // Свой — продолжить. Чужой — только снять с водителя, как и раньше.
 function rtActs(t, d){
-  if(d.status !== 'open' || t.done_at) return '';
+  if(d.status !== 'open' || t.done_at || t.cancelled_at) return '';
   const мой = t.driver && t.driver === _rcvMe();
   // Принято без кодов — досканировать может любой, кто дошёл до полки: и тот
   // водитель из своего списка, и старший отсюда. Снимать с водителя нечего —
@@ -22475,11 +22508,13 @@ function supCancelBtn(sup){
   if(DAY_OFFSET !== 0) return '';
   // Экран назвал заявку — кнопка только про неё. В истории открыт закуп,
   // который давно закрыт, и отменять там нечего: кнопки нет вовсе.
+  // Кнопка ведёт на экран отмены: там заявки с районами, отметить можно
+  // и часть. Откуда пришли — туда стрелка и вернёт.
   if(sup) return (sup.status === 'open' && sup.supply_id)
-    ? `<button class="acc-act dn" onclick="supCancel('${escS(sup.supply_id)}')"
+    ? `<button class="acc-act dn" onclick="supCancelOpen('${sup.kind === 'extra' ? 'extra' : 'sup'}')"
         >Отменить заявку</button>` : '';
   if(!_supOpenAll().length) return '';
-  return `<button class="acc-act dn" onclick="supCancelAsk()">Отменить заявку</button>`;
+  return `<button class="acc-act dn" onclick="supCancelOpen('')">Отменить заявку</button>`;
 }
 
 // Окно-вопрос с обещанием: «да» — true, всё остальное — false. Родной confirm
@@ -22528,7 +22563,8 @@ function askChoice(t, sub, okLabel, noLabel, okClass, noClass){
 // Какую отменить: основную или доп. на другие базы. Их бывает две сразу, и
 // «Отменить заявку» без вопроса отменяло бы ту, о которой человек не думал.
 // Открытая одна — вопроса нет: спрашиваем только «точно ли», как раньше.
-function supCancelAsk(){
+function supCancelAsk(){ supCancelOpen(''); }
+function _supCancelAskOld(){
   const all = _supOpenAll();
   if(!all.length) return;
   if(all.length === 1){ supCancel(all[0].supply_id); return; }
@@ -22576,6 +22612,143 @@ function _supName(x, caps){
 function supActShow(sup){
   const el = document.getElementById('accAct');
   if(el) el.innerHTML = supCancelBtn(sup);
+}
+
+
+// ── Отмена заявки: по районам ────────────────────────────────────────────
+// Раньше отмена была окном «какую заявку» и отменяла целиком. Теперь это
+// экран: карточка на каждую открытую заявку (основная и другие базы), строка
+// на район с отметкой. Отменяют выбранные районы; отмечены все — отменяется
+// заявка. Принятый район отменить нельзя: товар уже на полке.
+let SUPC = {sups: [], sel: {}, from: ''};
+function supCancelOpen(from){
+  SUPC = {sups: [], sel: {}, from: from || ''};
+  accOpen('supcancel');
+}
+async function accSupCancel(){
+  ACC_BACK = SUPC.from === 'sup' ? accSupply : SUPC.from === 'extra' ? accExtra : accOrder;
+  _setText('accTitle', 'Отмена заявки');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  let list = ACC_SUP && ACC_SUP.list;
+  if(!list){
+    try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
+    catch(e){ list = []; }
+    ACC_SUP = {list, open: _supMain(list)};
+  }
+  const open = _supOpenAll();
+  let sups = [];
+  try{
+    sups = await Promise.all(open.map(x =>
+      ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(x.supply_id))));
+  }catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    _setText('accSub', '');
+    return;
+  }
+  SUPC.sups = sups.filter(Boolean);
+  supcRender();
+}
+function _supcActive(d){ return (d.tasks || []).filter(t => !t.done_at && !t.cancelled_at && !t.noscan_at); }
+function _supcSelN(){
+  return SUPC.sups.reduce((n, d) => n + _supcActive(d).filter(t => (SUPC.sel[d.supply_id] || {})[t.district]).length, 0);
+}
+function supcRender(){
+  const n = _supcSelN();
+  const cards = SUPC.sups.map(d => {
+    const main = d.kind !== 'extra', D = d.districts || {}, sid = d.supply_id;
+    const sel = SUPC.sel[sid] || {};
+    const active = _supcActive(d);
+    const allOn = active.length > 0 && active.every(t => sel[t.district]);
+    const order = t => t.cancelled_at ? 3 : t.done_at ? 2 : t.driver ? 1 : 0;
+    const rows = [...(d.tasks || [])].sort((a, b) => order(a) - order(b)).map(t => {
+      const x = D[t.district] || {};
+      // Принятый район (и принятый без сканирования — товар уже на полке)
+      // отменить нельзя; уже отменённый — второй раз нечего.
+      const off = !!t.done_at || !!t.cancelled_at || !!t.noscan_at;
+      const on = !off && !!sel[t.district];
+      let st, cls = '';
+      if(t.cancelled_at){ st = `отменён · ${_hm(t.cancelled_at)}`; cls = 'no'; }
+      else if(t.done_at){ st = t.got < t.need ? `принято с недобором · ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`; }
+      else if(t.noscan_at){ st = `без сканирования · ${escS(t.noscan_by || t.driver)}`; cls = 'warn'; }
+      else if(t.driver){ st = `везёт ${escS(t.driver)}`; }
+      else st = 'ждёт водителя';
+      if(!off && t.got) st += ` · принято ${fmt(t.got)} из ${fmt(t.need)}`;
+      return `<button class="sc-r supc-r${on ? ' on' : ''}${off ? ' off' : ''}"${
+          off ? ' disabled' : ` onclick="supcToggle('${escS(sid)}','${escS(t.district)}')"`}>
+        <span class="shl-code">${escS(x.code || '')}</span>
+        <span class="supc-b"><b>${escS(x.name || t.district)}</b><i class="${cls}">${st}</i></span>
+        <span class="supc-chk">${IC('check', 14)}</span>
+      </button>`;
+    }).join('');
+    const qty = d.total_qty || 0;
+    return `<div class="sc supc">
+      <div class="sc-cap"><span class="supc-ico">${main ? ICO_LIST : ICO_BASE}</span>
+        <span>${escS(main ? 'Заявка' : (d.base || 'База'))}</span>
+        <b>${fmt(qty)}<u>${pluralize(qty,'бутылка','бутылки','бутылок')}</u></b></div>
+      ${rows || '<div class="fb-none">Районов нет</div>'}
+      ${active.length > 1 ? `<button class="sc-r supc-all${allOn ? ' on' : ''}" onclick="supcAll('${escS(sid)}')">
+        <span>${allOn ? 'Вся заявка' : 'Все районы'}</span><span class="supc-chk">${IC('check', 14)}</span></button>` : ''}
+    </div>`;
+  });
+  document.getElementById('accMid').innerHTML = cards.join('')
+    || '<div class="exp-empty">Открытых заявок нет — отменять нечего</div>';
+  _setText('accSub', n ? `${n} ${pluralize(n,'район','района','районов')} к отмене` : 'выберите районы');
+  document.getElementById('accFoot').innerHTML = SUPC.sups.length ? `<div class="qb-wrap">
+    <button class="qb dn" ${n ? '' : 'disabled'} onclick="supcGo()">Отменить${
+      n ? ` · ${n} ${pluralize(n,'район','района','районов')}` : ''}</button></div>` : '';
+}
+function supcToggle(sid, oid){
+  const s = SUPC.sel[sid] = SUPC.sel[sid] || {};
+  if(s[oid]) delete s[oid]; else s[oid] = true;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  supcRender();
+}
+function supcAll(sid){
+  const d = SUPC.sups.find(x => x.supply_id === sid); if(!d) return;
+  const active = _supcActive(d), s = SUPC.sel[sid] || {};
+  const allOn = active.length > 0 && active.every(t => s[t.district]);
+  SUPC.sel[sid] = allOn ? {} : Object.fromEntries(active.map(t => [t.district, true]));
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  supcRender();
+}
+async function supcGo(){
+  const jobs = SUPC.sups.map(d => {
+    const active = _supcActive(d), s = SUPC.sel[d.supply_id] || {};
+    const picked = active.filter(t => s[t.district]);
+    return {d, picked, whole: picked.length && picked.length === active.length,
+            took: picked.reduce((a, t) => a + (t.got || 0), 0)};
+  }).filter(j => j.picked.length);
+  if(!jobs.length) return;
+  const n = jobs.reduce((a, j) => a + j.picked.length, 0);
+  const took = jobs.reduce((a, j) => a + j.took, 0);
+  const wholeAll = jobs.every(j => j.whole);
+  const title = wholeAll
+    ? (jobs.length === 1 ? `Отменить ${_supName(jobs[0].d)}?` : 'Отменить обе заявки?')
+    : `Отменить ${n} ${pluralize(n,'район','района','районов')}?`;
+  const sub = 'Задачи исчезнут у водителей. ' + (took
+    ? `Уже принято ${fmt(took)} ${pluralize(took,'бутылка','бутылки','бутылок')} — останется на складе.`
+    : 'Принятое останется на складе.');
+  if(!await askDialog(title, sub, 'Подтвердить отмену')) return;
+  const btn = document.querySelector('#accFoot .qb');
+  if(btn){ btn.disabled = true; btn.textContent = 'Отменяю…'; }
+  let bad = 0;
+  for(const j of jobs){
+    try{
+      await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(j.d.supply_id) + '/cancel',
+        {method:'POST', body:{districts: j.picked.map(t => t.district), force: true, as: _meName()}});
+    }catch(e){ bad++; }
+  }
+  if(bad){ _toast('Не всё удалось отменить'); }
+  else{
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast(wholeAll ? 'Заявка отменена' : `Отменено: ${n} ${pluralize(n,'район','района','районов')}`);
+  }
+  // Перечитываем всё, от чего зависит статус, и возвращаемся туда, откуда пришли.
+  ACC_SUP = null;
+  const back = ACC_BACK; ACC_BACK = null;
+  await (back || accOrder)();
 }
 
 async function supCancel(sid, sure){

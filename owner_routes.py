@@ -3636,7 +3636,7 @@ async def _chk_supply(day: str):
     sup = next((r for r in rows if (r.get("day") or "") == day), None)
     if not sup:
         return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0}
-    tasks = (sup.get("tasks") or {})
+    tasks = {o: t for o, t in (sup.get("tasks") or {}).items() if not t.get("cancelled_at")}
     free = sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at"))
     return {"exists": True, "free": free, "gap": int(sup.get("gap_qty") or 0),
             "done": (sup.get("status") or "open") != "open", "total": len(tasks)}

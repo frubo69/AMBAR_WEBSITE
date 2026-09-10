@@ -2284,7 +2284,8 @@ async def supply_task_claim(sid: str, district: str, driver: str,
     from pymongo import ReturnDocument
     doc = await db.supplies.find_one_and_update(
         {"_id": sid, "status": "open",
-         f"tasks.{district}.driver": "", f"tasks.{district}.done_at": None},
+         f"tasks.{district}.driver": "", f"tasks.{district}.done_at": None,
+         f"tasks.{district}.cancelled_at": None},
         {"$set": {f"tasks.{district}.driver": driver,
                   f"tasks.{district}.driver_id": driver_id,
                   f"tasks.{district}.claimed_at": now}},
@@ -2442,7 +2443,7 @@ async def supply_task_finish(sid: str, district: str, gaps: list,
     if db is None: return None
     from pymongo import ReturnDocument
     doc = await db.supplies.find_one_and_update(
-        {"_id": sid, f"tasks.{district}.done_at": None},
+        {"_id": sid, f"tasks.{district}.done_at": None, f"tasks.{district}.cancelled_at": None},
         {"$set": {f"tasks.{district}.done_at": now,
                   f"tasks.{district}.gaps": gaps,
                   f"tasks.{district}.note": note}},
@@ -2450,8 +2451,9 @@ async def supply_task_finish(sid: str, district: str, gaps: list,
     if not doc:
         return None
     # Поставка закрыта, когда закрыт последний район: пока хоть один в работе,
-    # она остаётся открытой и видна водителям.
-    if all((t or {}).get("done_at") for t in (doc.get("tasks") or {}).values()):
+    # она остаётся открытой и видна водителям. Отменённый район — закрыт.
+    if all((t or {}).get("done_at") or (t or {}).get("cancelled_at")
+           for t in (doc.get("tasks") or {}).values()):
         await db.supplies.update_one({"_id": sid},
                                      {"$set": {"status": "done", "done_at": now}})
         doc["status"] = "done"

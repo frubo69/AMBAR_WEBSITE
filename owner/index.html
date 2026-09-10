@@ -1115,8 +1115,8 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
   border:1px solid rgba(201,169,110,.22)}
 .stk-sub-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.stk-sub-t{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
-  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stk-sub-t{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stk-sub-n{display:flex;align-items:baseline;gap:4px;line-height:1;
   font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
   font-variant-numeric:tabular-nums}
@@ -13188,12 +13188,10 @@ async function stkPicker(тихо){
   // Подпись — оглавление раздела через косую, как на плитке «Учёта».
   _stkHead('Склад', 'остатки / ревизия / перемещение', false);
   // На плитках — сколько раз за последние 30 дней: ревизий и перемещений.
-  // На полке «История» — когда было последнее, чтобы число не повторялось.
+  // Полка «История» — только слово и стрелка: число уже стоит на плитке.
   const с30 = _dayIsoFor(30);
   const nAud = (STK.audits || []).filter(a => (a.day || '') >= с30).length;
   const nMov = (STK.moves30 || []).length;
-  const lastAud = (STK.audits || []).map(a => a.day || '').sort().pop() || '';
-  const lastMov = (STK.moves30 || []).map(m => m.day || '').sort().pop() || '';
   // Две колонки, как плитки «Учёта»: сверху главное действие — ревизия и
   // перемещение, — под каждым его история половинкой. Карточки со строками
   // здесь не прижились: «кнопки на панели» читаются с одного взгляда.
@@ -13204,13 +13202,10 @@ async function stkPicker(тихо){
       <span class="acc-n"><span class="acc-v">${v}</span><i>${escS(u)}</i></span>
       <span class="acc-s">${escS(sub)}</span>
     </button>`;
-  const sub = (go, ico, t, v, u) => `<button class="stk-sub" onclick="${go}">
+  const sub = (go, ico, t) => `<button class="stk-sub" onclick="${go}">
       <span class="stk-sub-i"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
-      <span class="stk-sub-b">
-        <span class="stk-sub-t">${t}</span>
-        <span class="stk-sub-n">${v}<i>${escS(u)}</i></span>
-      </span>
+      <span class="stk-sub-b"><span class="stk-sub-t">${t}</span></span>
       <em>${_SC_CHEV}</em>
     </button>`;
   const I_AUD = '<path d="M9 11l2 2 4-4"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
@@ -13223,12 +13218,12 @@ async function stkPicker(тихо){
       <div class="stk-col">
         ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(nAud), 'в месяц',
                'район / камера / отчёт')}
-        ${sub('stkAudits()', I_HAUD, 'История', lastAud ? escS(_hstDay(lastAud)) : '—', '')}
+        ${sub('stkAudits()', I_HAUD, 'История')}
       </div>
       <div class="stk-col">
         ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(nMov), 'в месяц',
                'скан / куда везём')}
-        ${sub('stkMovesHist()', I_HMOV, 'История', lastMov ? escS(_hstDay(lastMov)) : '—', '')}
+        ${sub('stkMovesHist()', I_HMOV, 'История')}
       </div>
     </div></div>`;
 }

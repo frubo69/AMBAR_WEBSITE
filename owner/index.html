@@ -16631,7 +16631,7 @@ async function geoUnlock(name){
 async function chkCash(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'cash')) || {};
   const было = r.state === 'done';
-  if(!confirm(было ? 'Снять отметку «деньги собраны»?'
+  if(!confirm(было ? 'Снять отметку «выручка получена»?'
                    : 'Выручка за смену получена?')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/checklist/mark',
@@ -16762,7 +16762,7 @@ async function crToggle(id){
   const all = CR.need > 0 && CR.done >= CR.need;
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(all ? 'success' : 'warning'); }catch(e){}
   if(all && !wasAll) _toast('Выручка получена по всем районам');
-  // Чек-лист перечитается при возврате — строка «Деньги собраны» считается
+  // Чек-лист перечитается при возврате — строка «Выручка получена» считается
   // на сервере из этих же отметок.
   CKL = null;
 }

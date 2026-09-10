@@ -13074,6 +13074,8 @@ function closeStock(){
   document.getElementById('stkOv').classList.remove('show');
   _navSave();
   accLoadSummaries();              // плитка «Пересчёт склада» в «Учёте» — с новыми цифрами
+  // Пришли из чек-листа — он под нами, и строка про ревизию уже могла позеленеть.
+  if(CKL_RETURN){ CKL_RETURN = false; accChecklist(); }
 }
 // Крестик уводит на шаг назад, а не сразу из экрана: из списка — к районам,
 // из списка районов — наружу.
@@ -15995,7 +15997,31 @@ const CK_GO = {
   // Принято без кодов: строка ведёт прямо в район той поставки, где это
   // случилось, — и там уже кнопка «Сканировать».
   noscan:    () => chkNoscan(),
+  // Ревизия ждёт решения: строка ведёт прямо в её отчёт, где решение и
+  // принимают. Решать нечего — просто на склад.
+  audit:     () => chkAudit(),
 };
+
+async function chkAudit(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'audit')) || {};
+  const t = (r.tasks || [])[0];
+  if(!t){ openStock(); return; }
+  // Раздел склада открываем без списка районов: он бы приехал позже отчёта
+  // и лёг поверх него.
+  document.getElementById('stkOv').classList.add('show');
+  _navSave();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  STK.view = 'report';
+  _stkHead('Ревизия', 'загрузка…', false);
+  document.getElementById('stkMid').innerHTML = '<div class="stk-empty">Загрузка…</div>';
+  let rep;
+  try{ rep = await ownerApi.ownerFetch('/api/owner/stock/audit/report',
+        {params:{district: t.district, day: t.day}}); }
+  catch(e){ _toast('Отчёт не найден'); stkPicker(); return; }
+  await stkLoadContext();
+  STK.district = t.district; STK.repFrom = 'audits'; STK.audFocus = t.district; STK.audFrom = 'stock';
+  audReport(rep);
+}
 
 function chkNoscan(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'noscan')) || {};

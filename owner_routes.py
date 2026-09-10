@@ -3544,6 +3544,7 @@ CHK_PLAN = [
     ("order_sent",  12.0, 15.0, False),
     ("supply_in",   12.0, 21.0, False),
     ("noscan",      12.0, 12.0, False),   # горит с минуты приёмки; срок — сама приёмка
+    ("audit",       12.0, 12.0, False),   # горит с минуты завершения ревизии
     ("unscanned",   12.0, 21.0, False),
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
@@ -3761,6 +3762,52 @@ async def handle_checklist(request):
     # убери из чек листа»): о ней напоминает почасовое сообщение в STAR, а в
     # приёмке район и так помечен «без сканирования». _chk_noscan остаётся
     # для напоминания.
+
+    # Ревизия завершена, а недостача или излишек ждут решения: строка горит
+    # красным с минуты завершения и ведёт прямо в отчёт той ревизии. Ревизий
+    # не было или все решения приняты — дело сделано.
+    try:
+        pend = await db.audits_pending()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] ревизии не прочитаны: {e}")
+        pend = []
+    pend.sort(key=lambda a: str(a.get("finished_at") or ""))
+    if pend:
+        def _what(a):
+            sh, ov = a.get("short") or {}, a.get("over") or {}
+            parts = []
+            if sh and not sh.get("resolved_at"):
+                parts.append(f"не хватает {int(sh.get('qty') or 0)} {_pl_bottles(int(sh.get('qty') or 0))}")
+            if ov and not ov.get("resolved_at"):
+                parts.append(f"излишек {int(ov.get('qty') or 0)}")
+            return " · ".join(parts)
+        if len(pend) == 1:
+            a = pend[0]
+            hint = f"{OFFICE_CODES.get(a.get('district'), '')} {OFFICE_NAMES.get(a.get('district'), a.get('district', ''))}" \
+                   + (f" · {_what(a)}" if _what(a) else "")
+        else:
+            hint = " · ".join(f"{OFFICE_CODES.get(a.get('district'), '')} {OFFICE_NAMES.get(a.get('district'), '')}".strip()
+                              for a in pend)
+        row = _chk_row("audit", "Решения по ревизиям", hint, False, now, day, plan,
+                       go="audit", n=len(pend))
+        first = min((_geo_dt(a.get("finished_at")) for a in pend if _geo_dt(a.get("finished_at"))),
+                    default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ))
+                                           .total_seconds() // 60)) if first else 0,
+                    "tasks": [{"district": a.get("district", ""), "day": a.get("day", ""),
+                               "code": OFFICE_CODES.get(a.get("district"), ""),
+                               "name": OFFICE_NAMES.get(a.get("district"), "")} for a in pend]})
+    else:
+        try:
+            были = await db.audits_by_day(day)
+        except Exception:                        # noqa: BLE001
+            были = []
+        row = _chk_row("audit", "Решения по ревизиям",
+                       "все решения приняты" if были else "ревизий не было",
+                       True, now, day, plan, go="audit")
+    rows.append(row)
 
     # Порядок задан планом и не пляшет по цвету: список должен читаться как
     # один и тот же список, а не пересобираться каждый час.

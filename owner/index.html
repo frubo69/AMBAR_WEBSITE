@@ -645,7 +645,6 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   font-variant-numeric:tabular-nums;color:var(--sub)}
 .off-side b.gold{color:var(--gold2)}
 .off-side b.dn{color:var(--dn)}
-.qr-cover-wait{padding:14px 16px;font-size:12px;color:var(--muted)}
 
 /* ревизия */
 .stk-aud-btn{width:38px;height:38px;flex-shrink:0;border-radius:10px;cursor:pointer;
@@ -18246,7 +18245,7 @@ async function accQR(){
   }
   // Реестр — фоном: он нужен спискам позиций и броням, а не первому экрану.
   ownerApi.ownerFetch('/api/owner/qr')
-    .then(d => { ACC_QR = d; if(document.getElementById('qrList')) qrRenderList(); qrCoverPaint(); })
+    .then(d => { ACC_QR = d; if(document.getElementById('qrList')) qrRenderList(); })
     .catch(() => {});
   // Пришли из ревизии по «QR не внесён» — сразу на ту точку, где стоим.
   if(QR_WANT){ const want = QR_WANT; QR_WANT = null; QR_NEED = true; qrPick(want); return; }
@@ -18319,7 +18318,6 @@ function _lockOn(district, product_id){
 // пальца.
 async function qrHome(тихо){
   QR_IN = null; RCV_HOME = null; RCV_EXIT = null;
-  QR_NEED = false;                 // домой — режим покрытия долга снят
   if(!тихо){
     _qrHead('Внести / удалить товар', 'загрузка…', null);
     document.getElementById('accMid').innerHTML = '<div class="scan-empty">Загрузка…</div>';
@@ -18345,10 +18343,6 @@ async function qrHome(тихо){
         <span>Внести новый товар<i>район → позиция → скан</i></span><em>${_SC_CHEV}</em>
       </button>
     </div>
-    <div class="sc" id="qrCoverCard">
-      <div class="sc-cap"><span>QR код не внесён</span><i>по пересчёту</i></div>
-      <div class="ord-dists qr-in" id="qrCover">${qrCoverRows()}</div>
-    </div>
     <div class="sc grow">
       <div class="sc-cap"><span>Внести QR коды</span><i>с незавершённого приёма</i></div>
       <div class="ord-dists qr-in" id="qrIn">${rows}</div>
@@ -18360,43 +18354,6 @@ async function qrHome(тихо){
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
     <button class="qb dn" onclick="qrDelStart()">${_QR_TRASH}Удалить товар</button></div>`;
   qrPollStart();
-}
-
-// Бутылки, которые числятся по пересчёту, но кодов у них нет, — по точкам.
-// Отсюда и приходят с карточки склада («QR код не внесён · 995»): раньше
-// строка вела на этот экран, а здесь были только незавершённые приёмки, и
-// девятьсот бутылок Тикома было негде взять. Нажатие — та же камера покрытия
-// долга, что из карточки района (QR_NEED): код к бутылке, которая в
-// пересчёте уже есть, приходом не считается.
-function qrCoverRows(){
-  const без = (ACC_QR && ACC_QR.unscanned) || null;
-  if(!без) return '<div class="qr-cover-wait">считаю…</div>';
-  const rows = (STK.districts || []).filter(d => (без[d.id] || 0) > 0).map(d => {
-    const n = без[d.id];
-    return `<div class="shl-card">
-      <button class="shl-h ord-dh" onclick="qrCoverGo('${d.id}')">
-        <span class="shl-code">${escS(d.code || '')}</span>
-        <span class="shl-b"><b>${escS(d.name || '')}</b><i>числится по пересчёту, кодов нет</i></span>
-        <span class="qd-bad"><b>${fmt(n)}</b><i>${pluralize(n,'бутылка','бутылки','бутылок')}</i></span>
-        <span class="ord-dh-go">${ICO_CHEV}</span>
-      </button></div>`;
-  }).join('');
-  return rows;
-}
-function qrCoverPaint(){
-  const box = document.getElementById('qrCover'), card = document.getElementById('qrCoverCard');
-  if(!box || !card) return;
-  const rows = qrCoverRows();
-  box.innerHTML = rows;
-  // Реестр прочитан и долга нет — карточки нет: пустая карточка о работе,
-  // которой нет, только занимает место.
-  card.hidden = !!(ACC_QR && ACC_QR.unscanned) && !rows;
-}
-function qrCoverGo(id){
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  QR_NEED = true;
-  distRemember('qr', id);
-  qrPick(id);
 }
 
 // Строки районов второго сектора: серый — нечего вносить; красное число —

@@ -1,0 +1,27 @@
+# Systemd unit for the AMBAR geo bot — принимает живую трансляцию геопозиции
+# водителей и старшего (geo_bot.py). Отдельный бот, чтобы трансляцию не
+# стирали чистильщик и скрытый режим рабочих чатов.
+#
+# Install on VPS (после того как AMBAR_GEO_BOT_TOKEN добавлен в /opt/ambar/.env):
+#   sudo cp /opt/ambar/deploy/ambar-geo-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ambar-geo-bot
+
+[Unit]
+Description=AMBAR Geo Bot (live location of drivers and the senior)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ambar
+EnvironmentFile=/opt/ambar/.env
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/geo_bot.py
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

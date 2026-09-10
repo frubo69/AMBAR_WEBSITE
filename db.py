@@ -2241,6 +2241,21 @@ async def supply_list(limit: int = 30, status: str = None) -> list:
     return rows
 
 
+async def supplies_children(sids: list) -> dict:
+    """Заявки, собранные из недобора указанных: {родитель: [дети]}. Дети —
+    без задач целиком: нужен состав по районам, статус и база."""
+    db = _db_or_none()
+    if db is None or not sids: return {}
+    cur = db.supplies.find({"from_supply": {"$in": list(sids)}},
+                           {"items": 1, "status": 1, "base": 1, "from_supply": 1, "at": 1,
+                            "tasks": 1, "total_qty": 1})
+    out: dict = {}
+    for r in await cur.to_list(length=200):
+        r["supply_id"] = r.pop("_id")
+        out.setdefault(r.get("from_supply") or "", []).append(r)
+    return out
+
+
 async def supply_buy_set(sid: str, product_id: str, doc: dict | None) -> bool:
     """Записать закупку позиции на доп. складе. doc=None — стереть запись.
 

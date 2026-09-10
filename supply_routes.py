@@ -538,9 +538,21 @@ async def handle_list(request):
     Задачи остаются: по ним считается, кто поехал и сколько уже принято, — а
     это и есть то, ради чего в список смотрят."""
     rows = await db.supply_list(limit=30)
+    try:
+        kids = await db.supplies_children([r.get("supply_id") for r in rows])
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[supply] дочерние заявки не прочитаны: {e}")
+        kids = {}
     out = []
     for r in rows:
         brief = _sup_brief(r)
+        # Осталось докупить: недобор минус то, что уже ушло в заявки на другие
+        # базы. Хаб и список баз показывают это число у каждой заявки.
+        short = _cover(_shortfall(r), kids.get(r.get("supply_id")) or [])
+        brief["short_qty"] = int(short.get("qty") or 0)
+        brief["short_left"] = int(short.get("qty_left") or 0)
+        brief["children"] = [{"base": k["base"], "status": k["status"], "qty": k["qty"]}
+                             for k in short.get("children") or []]
         # Задачи нужны шапке пути на «Закупе»: она считает по ним принятое и
         # незанятые районы. Оставляем их, но без списков товара внутри.
         brief["tasks"] = {o: {"driver": t.get("driver", ""),
@@ -1178,7 +1190,7 @@ def _shortfall(sup: dict) -> dict:
                 r["by_district"][oid] = r["by_district"].get(oid, 0) + n
         # Позиция может недобрать дважды: магазин урезал, а остаток ещё и не
         # выдал. Причину показываем последнюю — она ближе к делу.
-        if why == "gap":
+        if why in ("gap", "cancelled"):
             r["why"] = why
 
     for d in sup.get("dropped") or []:
@@ -1191,10 +1203,69 @@ def _shortfall(sup: dict) -> dict:
         for g in t.get("gaps") or []:
             put(g["id"], g.get("name", ""), "gap", g.get("gap") or 0,
                 {oid: g.get("gap") or 0})
+        # Район отменили — за ним не поехали, а товар нужен по-прежнему: всё,
+        # что не успели принять, идёт в недобор, как и «не выдали».
+        if t.get("cancelled_at"):
+            for it in sup.get("items") or []:
+                need = int((it.get("by_district") or {}).get(oid) or 0)
+                got = int((it.get("got") or {}).get(oid) or 0)
+                if need > got:
+                    put(it["id"], it.get("name", ""), "cancelled", need - got, {oid: need - got})
 
     out = [r for r in rows.values() if r["gap"] > 0]
     out.sort(key=lambda r: (-r["gap"], r["name"]))
     return {"rows": out, "qty": sum(r["gap"] for r in out)}
+
+
+def _cover(short: dict, children: list) -> dict:
+    """Сколько из недобора уже ушло в заявки на другие базы — по цепочке
+    «из какой заявки». Одну бутылку нельзя заказать дважды: мастер новой
+    заявки подставляет только остаток (left), а список недобора пишет, куда
+    что уже уехало. Отменённые заявки и отменённые районы в них не покрывают."""
+    cov: dict = {}
+    bases: dict = {}
+    kids = []
+    for ch in children or []:
+        if (ch.get("status") or "open") == "cancelled":
+            continue
+        ctasks = ch.get("tasks") or {}
+        qty = 0
+        for it in ch.get("items") or []:
+            for oid, n in (it.get("by_district") or {}).items():
+                if (ctasks.get(oid) or {}).get("cancelled_at"):
+                    continue
+                n = int(n or 0)
+                if n <= 0:
+                    continue
+                cov.setdefault(it["id"], {})
+                cov[it["id"]][oid] = cov[it["id"]].get(oid, 0) + n
+                bases.setdefault(it["id"], set()).add(ch.get("base") or "")
+                qty += n
+        kids.append({"supply_id": ch.get("supply_id") or ch.get("_id") or "",
+                     "base": ch.get("base") or "", "status": ch.get("status") or "open",
+                     "qty": qty, "at": str(ch.get("at") or "")})
+    left_total = 0
+    for r in short.get("rows") or []:
+        c = cov.get(r["id"]) or {}
+        by = r.get("by_district") or {}
+        covered_by, left_by = {}, {}
+        for oid, n in by.items():
+            k = min(int(n or 0), int(c.get(oid) or 0))
+            if k:
+                covered_by[oid] = k
+            if int(n or 0) - k > 0:
+                left_by[oid] = int(n or 0) - k
+        # Без разбивки по районам считаем по сумме.
+        covered = sum(covered_by.values()) if by else min(r["gap"], sum(c.values()))
+        r["covered"] = covered
+        r["covered_by"] = covered_by
+        r["left_by"] = left_by
+        r["left"] = max(0, r["gap"] - covered)
+        r["bases"] = sorted(b for b in bases.get(r["id"], set()) if b)
+        left_total += r["left"]
+    short["qty_left"] = left_total
+    short["children"] = sorted(kids, key=lambda k: k["at"])
+    return short
 
 
 def _short_book(sup: dict, short: dict):
@@ -1361,8 +1432,22 @@ async def _supply_view(sup: dict) -> dict:
     tasks.sort(key=lambda t: OFFICE_IDS.index(t["district"])
                if t["district"] in OFFICE_IDS else 99)
     short = _shortfall(sup)
+    try:
+        _cover(short, (await db.supplies_children([sid])).get(sid) or [])
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[supply] дочерние заявки {sid} не прочитаны: {e}")
+        _cover(short, [])
+    # Откуда состав: из недобора магазина или такой-то базы.
+    from_base = ""
+    if sup.get("from_supply"):
+        try:
+            parent = await db.supply_get(sup["from_supply"]) or {}
+            from_base = parent.get("base") or ("магазина" if parent else "")
+        except Exception:                        # noqa: BLE001
+            from_base = ""
     return {
         "supply_id": sid, "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
+        "from_base": from_base,
         "unmarked": await _unmarked(sup, short),
         "status": sup.get("status") or "open",
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",

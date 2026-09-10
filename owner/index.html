@@ -3100,6 +3100,8 @@ button.path:active{transform:scale(.995)}
 .fb-days .shl-code{font-size:15px}
 /* Плитки книги: отрицательное — красным, сходится — зелёным. */
 .fb-hub .aud-g{padding:12px 13px 8px}
+.sh-cov{font-weight:700;color:var(--gold2)} .sh-cov.warn{color:var(--warn)}
+.sh-kid{font-style:normal;font-weight:500;color:var(--muted)}
 
 /* ── Отмена заявки: экран вместо окна. Карточка на заявку, строка на район с
    кружком-отметкой; принятые и уже отменённые районы гаснут. ── */
@@ -18302,16 +18304,19 @@ const ICO_TG    = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" s
 // внутрь приёмки, а стоит на пути отдельным шагом.
 function pathShort(){
   const st = supStage();
-  const gap = st.sup && st.sup.status === 'open' ? (st.sup.gap_qty || 0) : 0;
+  const gap = st.sup && st.sup.status === 'open' ? (st.sup.short_qty != null ? st.sup.short_qty : (st.sup.gap_qty || 0)) : 0;
   if(!gap) return '';
+  // Число справа — что ещё не заказано; ушедшее в доп. заявки не считается.
+  const left = st.sup.short_left != null ? st.sup.short_left : gap;
   return `<button class="pnav-r" onclick="accShort()">
     <span class="pnav-i warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
       <path d="M3 6h18"/><path d="M12 11v6M9 14h6"/></svg></span>
     <span class="pnav-b"><b>Докупить на доп. складах</b>
-      <i>магазин не дал ${fmt(gap)} ${pluralize(gap,'бутылку','бутылки','бутылок')}</i></span>
-    <span class="pstat-c no">${fmt(gap)}</span>
+      <i>магазин не дал ${fmt(gap)} ${pluralize(gap,'бутылку','бутылки','бутылок')}${
+        left < gap ? ` · в заявках ${fmt(gap - left)}` : ''}</i></span>
+    <span class="pstat-c ${left ? 'no' : 'done'}">${left ? fmt(left) : 'в заявках'}</span>
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }
@@ -20711,9 +20716,11 @@ async function accSupply(goto, district, sid){
 // То, чего магазин не дал, — отдельный экран, а не хвост приёмки. Это другое
 // дело и другой день: приёмка про «как идёт», а здесь про «куда ехать ещё,
 // пока склады открыты». Списком внизу и уезжают — файлом в чат или наружу.
-async function accShort(){
-  ACC_BACK = accOrder;
-  _setText('accTitle', 'Докупить на доп. складах');
+// sid задан — недобор конкретной заявки (доп. заявка на базу, где купили не
+// всё или отменили район); без sid — основной. Тот же список, та же кнопка
+// «на другую базу»: цепочка баз строится из одного экрана.
+async function accShort(sid){
+  _setText('accTitle', sid ? 'Осталось докупить' : 'Докупить на доп. складах');
   supActShow();
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
@@ -20724,7 +20731,9 @@ async function accShort(){
     catch(e){ list = []; }
     ACC_SUP = {list, open: _supMain(list)};
   }
-  const cur = _supMain(list) || list.find(x => x.kind !== 'extra');
+  const cur = sid ? (list.find(x => x.supply_id === sid) || {supply_id: sid, kind: 'extra'})
+                  : (_supMain(list) || list.find(x => x.kind !== 'extra'));
+  ACC_BACK = cur && cur.kind === 'extra' ? (() => xOpen(cur.supply_id)) : accOrder;
   if(!cur){ shortBody(null); return; }
   if(!SUP_D || SUP_D.supply_id !== cur.supply_id){
     SUP_ID = cur.supply_id;
@@ -20740,45 +20749,71 @@ function shortBody(d){
   const rows = short.rows || [];
   const D = {};
   ((d && d.tasks) || []).forEach(t => { D[t.district] = {code: t.district_code}; });
+  const extra = !!(d && d.kind === 'extra');
+  const kids = short.children || [];
+  const left = short.qty_left != null ? short.qty_left : short.qty;
+  const OK = `<span class="sh-empty-i"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>`;
   if(!rows.length){
     _setText('accSub', 'ничего не нужно');
-    mid.innerHTML = `<div class="sh-empty">
-      <span class="sh-empty-i"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"
-        stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
-        stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
-      <div class="sh-empty-t">Магазин дал всё</div>
+    mid.innerHTML = `<div class="sh-empty">${OK}
+      <div class="sh-empty-t">${extra ? 'Купили всё' : 'Магазин дал всё'}</div>
       <div class="sh-empty-s">Докупать нечего — по этой заявке недобора нет.</div>
-      <div class="sh-empty-h">Здесь появляется то, что магазин урезал, отказал
-        или не выдал при отгрузке. С этим списком едут на доп. склад.</div>
     </div>`;
     document.getElementById('accFoot').innerHTML = '';
     return;
   }
-  _setText('accSub', `${fmt(short.qty)} ${
-    pluralize(short.qty,'бутылка','бутылки','бутылок')} · заявка ${String(d.day || '').slice(0,10)}`);
-  const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
+  // Всё, чего не хватило, уже ушло в заявки на другие базы — здесь только
+  // сказать, куда именно.
+  const kidRows = kids.length ? `<div class="sc" style="margin-top:10px">
+      <div class="sc-cap"><span>Уже в заявках</span></div>
+      ${kids.map(k => `<button class="sc-r" onclick="xOpen('${escS(k.supply_id)}')">
+        <span>${escS(k.base || 'База')}<i class="sh-kid"> · ${
+          k.status === 'open' ? 'в работе' : k.status === 'cancelled' ? 'отменена' : 'принята'}</i></span>
+        <b>${fmt(k.qty)}<u>${pluralize(k.qty,'бутылка','бутылки','бутылок')}</u></b><em>${_SC_CHEV}</em>
+      </button>`).join('')}</div>` : '';
+  if(!left){
+    _setText('accSub', 'всё уже в заявках');
+    mid.innerHTML = `<div class="sh-empty">${OK}
+      <div class="sh-empty-t">Всё уже заказано</div>
+      <div class="sh-empty-s">Недобор ${fmt(short.qty)} ${pluralize(short.qty,'бутылка','бутылки','бутылок')} целиком ушёл в заявки на другие базы.</div>
+    </div>${kidRows}`;
+    document.getElementById('accFoot').innerHTML = '';
+    return;
+  }
+  _setText('accSub', `${fmt(left)} ${pluralize(left,'бутылка','бутылки','бутылок')}${
+    short.qty !== left ? ` из ${fmt(short.qty)}` : ''} · ${extra ? (d.base || 'база') : 'заявка ' + String(d.day || '').slice(0,10)}`);
+  const why = {dropped:'магазин отказал', short:'урезал', gap: extra ? 'не выдали на базе' : 'не выдал при отгрузке',
+               cancelled:'район отменили'};
   // Цены докупа приходят с заявкой: они её часть, а не отдельная книга.
   SUP_BUYS = (d && d.buys) || {};
   if(d && d.supply_id) SUP_ID = d.supply_id;   // сохранять цену некуда без него
+  // Строки — только то, что ещё не заказано; покрытое другой заявкой уходит в
+  // подпись «в заявке на …», а его число — из большого.
+  const live = rows.filter(r => (r.left != null ? r.left : r.gap) > 0);
   mid.innerHTML = `
     <div class="wo-q-head">
-      <span class="wo-q-v">${fmt(short.qty)}</span>
-      <span class="wo-q-u">${pluralize(short.qty,'бутылка','бутылки','бутылок')}<br>не доехало</span>
-      <span class="wo-q-aed"><b>${rows.length}</b>${
-        pluralize(rows.length,'позиция','позиции','позиций')}</span>
+      <span class="wo-q-v">${fmt(left)}</span>
+      <span class="wo-q-u">${pluralize(left,'бутылка','бутылки','бутылок')}<br>осталось докупить</span>
+      <span class="wo-q-aed"><b>${live.length}</b>${
+        pluralize(live.length,'позиция','позиции','позиций')}</span>
     </div>
     <div class="sup-short">
-      ${rows.map((r, i) => {
+      ${live.map((r, i) => {
         const b = SUP_BUYS[r.id] || {};
+        const by = r.left_by && Object.keys(r.left_by).length ? r.left_by : (r.by_district || {});
+        const n = r.left != null ? r.left : r.gap;
         return `<div class="sup-srw"><div class="sup-sr">
         <span class="sup-sr-i">${i + 1}</span>
         <span class="sup-sr-b">
           <span class="sup-sr-n">${escS(r.name)}</span>
           <span class="sup-sr-s">${escS(why[r.why] || '')}${
-            Object.keys(r.by_district || {}).length ? ' · ' + Object.entries(r.by_district)
-              .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ') : ''}</span>
+            Object.keys(by).length ? ' · ' + Object.entries(by)
+              .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ') : ''}${
+            r.covered ? ` · <b class="sh-cov">в заявке на ${escS((r.bases || []).join(', ') || 'базу')} ${fmt(r.covered)}</b>` : ''}</span>
         </span>
-        <span class="sup-sr-v">${r.gap}</span></div>
+        <span class="sup-sr-v">${n}</span></div>${extra ? '' : `
         <div class="sup-buy">
           <input class="sup-bp" inputmode="decimal" enterkeyhint="done" placeholder="цена"
                  data-p="${escS(r.id)}" value="${b.price != null ? b.price : ''}"
@@ -20786,20 +20821,25 @@ function shortBody(d){
                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
           <span class="sup-bx">×</span>
           <input class="sup-bq" inputmode="numeric" enterkeyhint="done"
-                 data-q="${escS(r.id)}" value="${b.qty != null ? b.qty : r.gap}"
+                 data-q="${escS(r.id)}" value="${b.qty != null ? b.qty : n}"
                  onfocus="this.select()" onchange="supBuySave('${escS(r.id)}')"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
           <span class="sup-bs" id="supBS-${escS(r.id)}">${_supSum(b)}</span>
-        </div></div>`;
+        </div>`}</div>`;
       }).join('')}
-      <div class="sup-btot"><span>докупили на</span>
-        <b id="supBTot">${fmt(_supTotal())} AED</b></div>
-    </div>`;
+      ${extra ? '' : `<div class="sup-btot"><span>докупили на</span>
+        <b id="supBTot">${fmt(_supTotal())} AED</b></div>`}
+    </div>${kidRows}`;
+  // Главное действие — заявка на другую базу с этим остатком; список файлом —
+  // рядом, второй строкой.
   document.getElementById('accFoot').innerHTML = `
-    <div class="qb-wrap qb-row">
-      <button class="qb" id="supShare" onclick="supShare()">${ICO_SHARE}Список для доп. склада</button>
-      <button class="qb qb-ico" id="supSend" onclick="supSend()"
-              aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
+    <div class="qb-wrap">
+      <button class="qb" onclick="xNew('${escS(d.supply_id)}')">${ICO_XPLUS}Заявка на другую базу · ${fmt(left)}</button>
+      <div class="qb-row" style="margin-top:9px">
+        <button class="qb quiet" id="supShare" onclick="supShare()">${ICO_SHARE}Список для склада</button>
+        <button class="qb qb-ico" id="supSend" onclick="supSend()"
+                aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
+      </div>
     </div>`;
 }
 
@@ -20861,7 +20901,8 @@ async function accExtra(){
       <span class="pnav-i ${st[1] === 'live' ? 'live' : st[1] === 'done' ? 'ok' : ''}">${ICO_BASE}</span>
       <span class="pnav-b"><b>${escS(x.base || 'База')}</b>
         <i>${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')} · ${
-          x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')} · ${_dayName(dt)}</i></span>
+          x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')} · ${_dayName(dt)}${
+          x.short_left ? ` · <b class="sh-cov warn">докупить ${fmt(x.short_left)}</b>` : ''}</i></span>
       <span class="pstat-c ${st[1]}">${st[0]}</span>
       <span class="pnav-go">${ICO_CHEV}</span>
     </button>`;
@@ -21146,9 +21187,12 @@ function xSupToggle(oid, снизу){
 // ── мастер: куда → что → готово ──
 let XS = null;
 
-async function xNew(){
+// from — заявка, чей остаток недобора подставить (основная или доп. база,
+// где купили не всё). Без from — с чистого листа, руками; недобор основной
+// подставится сам, как раньше, но только его незаказанный остаток.
+async function xNew(from){
   XS = {step: 1, di: 0, base: '', q: '', cat: '', rows: {}, dist: null, all: null, order: {},
-        src: 'manual', from: ''};
+        src: from ? 'shortfall' : 'manual', from: from || ''};
   document.getElementById('accAct').innerHTML = '';
   xRender();
   xLoad();
@@ -21173,21 +21217,25 @@ async function xLoad(){
   XS.order = {}; (PRODUCTS || []).forEach((p, i) => { XS.order[p.id] = i; });
   const ord = r => XS.order[r.id] != null ? XS.order[r.id] : 9999;
   XS.all = [...XS.all].sort((a, b) => ord(a) - ord(b) || a.name.localeCompare(b.name));
-  // Недобор основной заявки — готовый список того, за чем едут. Подставляем
-  // его только в пустую заявку: чужие числа поверх своих не кладём.
+  // Недобор — готовый список того, за чем едут: указанной заявки (кнопка
+  // «на другую базу») или основной, если заявку собирают с нуля и у магазина
+  // был недобор. Подставляется только незаказанный остаток и только в пустую
+  // заявку: чужие числа поверх своих не кладём.
   const main = ACC_SUP && ACC_SUP.open;
-  if(main && main.gap_qty && !Object.keys(XS.rows).length){
+  const fromSid = XS.from || (main && (main.short_left || main.gap_qty) ? main.supply_id : '');
+  if(fromSid && !Object.keys(XS.rows).length){
     try{
-      const sd = (SUP_D && SUP_D.supply_id === main.supply_id) ? SUP_D
-               : await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(main.supply_id));
+      const sd = (SUP_D && SUP_D.supply_id === fromSid) ? SUP_D
+               : await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(fromSid));
       if(XS && !Object.keys(XS.rows).length)
         (((sd || {}).shortfall || {}).rows || []).forEach(r => {
           const by = {};
-          Object.entries(r.by_district || {}).forEach(([o, n]) => { if(n > 0) by[o] = n; });
+          const src = r.left_by || r.by_district || {};
+          Object.entries(src).forEach(([o, n]) => { if(n > 0) by[o] = n; });
           if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
         });
-      // Состав пришёл из недобора магазина — так и подпишем заявку.
-      if(XS && Object.keys(XS.rows).length){ XS.src = 'shortfall'; XS.from = main.supply_id; }
+      // Состав пришёл из недобора — так и подпишем заявку, с той заявкой, чей он.
+      if(XS && Object.keys(XS.rows).length){ XS.src = 'shortfall'; XS.from = fromSid; }
     }catch(e){}
   }
   if(XS && XS.step === 2) xRender();
@@ -21767,8 +21815,20 @@ function xFlow(d){
 function xFlowCard(d){
   const f = xFlow(d);
   const when = `${_dayName(d.day || String(d.at || '').slice(0, 10))}${d.at ? ' ' + _hm(d.at) : ''}`;
-  const src = d.source === 'shortfall' ? 'из недобора магазина' : 'вручную';
+  const src = d.source === 'shortfall' ? `из недобора · ${d.from_base || 'магазина'}` : 'вручную';
   const meta = [when, d.by_name, src].filter(Boolean).join(' · ');
+  // Не купили всё (не выдали на базе или отменили район) — остаток едет на
+  // следующую базу тем же экраном, что недобор магазина.
+  const sh = d.shortfall || {}, left = sh.qty_left != null ? sh.qty_left : (sh.qty || 0);
+  const kids = sh.children || [];
+  const more = left ? `<button class="xf-prices warn" onclick="accShort('${escS(d.supply_id)}')">
+      <span>Осталось докупить</span>
+      <b>${fmt(left)} ${pluralize(left,'бутылка','бутылки','бутылок')}</b>
+      <em>${ICO_CHEV}</em></button>`
+    : kids.length ? `<button class="xf-prices" onclick="accShort('${escS(d.supply_id)}')">
+      <span>Докупаем на ${escS(kids.map(k => k.base).filter(Boolean).join(', ') || 'другой базе')}</span>
+      <b>${fmt(kids.reduce((a, k) => a + (k.qty || 0), 0))}</b>
+      <em>${ICO_CHEV}</em></button>` : '';
   const STEPS = ['Взять', 'Цены', 'Приём', 'Готово'];
   const HINT = {
     0: 'Заявка отменена',
@@ -21788,7 +21848,7 @@ function xFlowCard(d){
       <span>Цены закупки</span>
       <b>${f.priced} из ${f.n}${f.cost ? ` · ${fmt(Math.round(f.cost))} AED` : ''}</b>
       <em>${ICO_CHEV}</em>
-    </button>
+    </button>${more}
   </div>`;
 }
 function xFlowFoot(d){

@@ -644,6 +644,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .off-side b{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
   font-variant-numeric:tabular-nums;color:var(--sub)}
 .off-side b.gold{color:var(--gold2)}
+.off-side b.dn{color:var(--dn)}
 
 /* ревизия */
 .stk-aud-btn{width:38px;height:38px;flex-shrink:0;border-radius:10px;cursor:pointer;
@@ -22886,6 +22887,7 @@ function renderOffices(rows){
         <span class="off-side">
           <span><i>вал</i><b data-aed="${r.gross != null ? r.gross : aed}">${r.gross != null ? r.gross : aed}</b></span>
           <span><i>чай</i><b class="gold" data-aed="${r.tips||0}">${r.tips||0}</b></span>
+          ${r.legacy ? '' : `<span><i>расход</i><b class="dn" data-aed="${r.spend||0}">${r.spend||0}</b></span>`}
         </span>
       </div>
       <div class="off-track"><div class="off-fill" style="width:${width}%"></div></div>

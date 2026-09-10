@@ -468,12 +468,16 @@ async def _drivers_spend(start, end) -> dict:
         rows = await db.get_driver_days_range(d_from, d_to)
     except Exception as e:
         log.warning(f"[finance] расходы водителей не прочитаны: {e}")
-        return {"total": 0, "meal": 0, "extra": 0}
+        return {"total": 0, "meal": 0, "extra": 0, "by_district": {}}
     # Кроме суммы отдаём и её состав: «расход 1 550» без ответа на вопрос
     # «из чего» — повод открыть базу руками, а не показатель.
     meal = extra = 0.0
     days_working = days_off = 0
     by_driver: dict = {}
+    # И по районам: карточке района нужна своя чистая цифра, а расход
+    # водителя — это расход его района.
+    home = {n: oid for oid, names in _staff.DISTRICT_DRIVERS.items() for n in (names or [])}
+    by_district: dict = {}
     items = []
     for r in rows:
         name = (r.get("driver") or "").strip() or "—"
@@ -498,6 +502,8 @@ async def _drivers_spend(start, end) -> dict:
                           "comment": (e.get("comment") or "").strip()[:80],
                           "amount": round(amt)})
         extra += ex
+        oid = home.get(name) or ""
+        by_district[oid] = by_district.get(oid, 0.0) + m + ex
         d = by_driver.setdefault(name, {"name": name, "meal": 0.0, "extra": 0.0, "days": 0})
         d["meal"] += m
         d["extra"] += ex
@@ -513,7 +519,8 @@ async def _drivers_spend(start, end) -> dict:
     return {"total": round(meal + extra), "meal": round(meal), "extra": round(extra),
             "days_working": days_working, "days_off": days_off,
             "meal_rates": {"working": _staff.MEAL_WORKING, "off": _staff.MEAL_OFF},
-            "by_driver": drivers, "items": items[:60]}
+            "by_driver": drivers, "items": items[:60],
+            "by_district": {k: round(v) for k, v in by_district.items()}}
 
 
 @require_owner
@@ -687,22 +694,29 @@ async def handle_finance(request):
         _live_by[_k] = _live_by.get(_k, 0) + 1
 
     await _staff_fresh()
+    # Расходы водителей за окно — один раз: и в шапку, и по районам.
+    _spend_out = await _drivers_spend(start, end)
+    _spend_by = _spend_out.get("by_district") or {}
     offices_block = []
     for _oid in OFFICE_IDS:
         _dl = _deliv_by.get(_oid, [])
         _ds = _delivery_stats([(None, x) for x in _dl])
         _revs = [int(x["review_score"]) for x in _dl if x.get("review_score")]
         # Валовая по району и чаевые его людей: как на главной карточке, чтобы
-        # «выручка района» не значила два разных числа на двух экранах.
+        # «выручка района» не значила два разных числа на двух экранах. Чистая
+        # цифра района — вал минус чай минус расход его водителей (владелец,
+        # 10 сен 2026: «мне там тоже нужна чистая цифра»).
         _gross = sum(int(x.get("total", 0) or 0) for x in _dl)
         _tips = _tips_for(_dl)["total"]
+        _spend = int(_spend_by.get(_oid) or 0)
         offices_block.append({
             "id":           _oid,
             "code":         OFFICE_CODES.get(_oid, ""),
             "name":         OFFICE_NAMES[_oid],
-            "aed":          _gross - _tips,
+            "aed":          _gross - _tips - _spend,
             "gross":        _gross,
             "tips":         _tips,
+            "spend":        _spend,
             "orders":       len(_all_by.get(_oid, [])),
             "delivered":    len(_dl),
             "avg_min":      _ds["avg_min"],
@@ -785,7 +799,7 @@ async def handle_finance(request):
         # чего он получился: иначе «валовая 25 475» и «в руках 24 725» выглядят
         # как ошибка.
         "tips_out": (lambda t: {**t, "net": rev_curr - t["total"]})(_tips_for(curr_orders)),
-        "spend_out": await _drivers_spend(start, end),
+        "spend_out": _spend_out,
         "profit": {
             "current":    round(rev_curr * MARGIN_PCT / 100),
             "margin_pct": MARGIN_PCT,

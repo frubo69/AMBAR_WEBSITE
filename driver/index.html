@@ -23,6 +23,126 @@ html.hid-boot #gameApp *{visibility:visible}
    чата в листе не прячется: в ней и стоит поле. ── */
 html.kb .tabbar,html.kb .exp-bar,html.kb .wo-fix,html.kb .shbtn{display:none}
 html.kb body{padding-bottom:50vh}
+
+/* ═══ Одна анатомия карточек — как в панели владельца ═══════════════════
+   Карточка с шапкой заглавными и волоском, под ней плитки или строки; строка
+   — слово слева, число золотом справа, кружок-шеврон. Всё, что раньше было
+   плашками разных форм и цветов, собирается из этих четырёх деталей. */
+.dc{margin:0 0 10px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+.dc.dn{border-color:rgba(224,85,85,.4)}
+.dc-cap{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 16px;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;border-bottom:1px solid rgba(201,169,110,.14)}
+.dc-cap > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-cap i{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.2px;
+  text-transform:none;color:var(--muted)}
+.dc-cap b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
+  letter-spacing:0;font-variant-numeric:tabular-nums}
+.dc-cap b + b{margin-left:12px}
+.dc-cap b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
+  color:var(--muted);margin-left:4px;letter-spacing:.2px}
+.dc-cap b.dn{color:var(--dn)} .dc-cap b.dn u{color:var(--dn);opacity:.8}
+.dc-r{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 16px;
+  border:0;border-top:1px solid rgba(255,255,255,.05);background:transparent;cursor:pointer;
+  font-family:inherit;color:var(--text);text-align:left}
+.dc-cap + .dc-r{border-top:0}
+.dc-r:active{background:var(--card2)}
+.dc-r.plain{cursor:default} .dc-r.plain:active{background:transparent}
+.dc-r .dc-b{flex:1;min-width:0;font-size:13.5px;font-weight:600;line-height:1.25}
+.dc-r .dc-b i{display:block;font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.dc-r .dc-b i.dn{color:var(--dn)} .dc-r .dc-b i.warn{color:var(--warn)} .dc-r .dc-b i.ok{color:var(--up)}
+.dc-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.dc-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:4px;letter-spacing:.2px}
+.dc-r em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
+.dc-r em svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round}
+.dc-r.dn .dc-b{color:var(--dn)} .dc-r.dn b{color:var(--dn)} .dc-r.dn em{color:var(--dn);background:var(--dn-soft)}
+.dc-r.off{opacity:.45}
+/* Кружок состояния слева в строке чек-листа: сделано / держит / ждёт. */
+.dc-st{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:var(--card2);color:var(--muted)}
+.dc-st svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.dc-st.ok{color:var(--up);background:var(--up-soft)}
+.dc-st.no{color:var(--dn);background:var(--dn-soft)}
+.dc-st.warn{color:var(--warn);background:var(--warn-soft)}
+.dc-st.num{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--gold2);background:var(--gold-soft)}
+/* Плитки: подпись капсом, число, единица. */
+.dt-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:12px 13px 13px}
+.dt-g.two{grid-template-columns:1fr 1fr}
+.dt{min-width:0;padding:11px 10px 12px;border-radius:14px;background:var(--card2);
+  border:1px solid var(--border2);text-align:left;font-family:inherit;color:var(--text)}
+.dt.tap{cursor:pointer} .dt.tap:active{transform:scale(.98)}
+.dt-l{display:block;font-size:8.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-v{display:block;font-family:'DM Sans',sans-serif;font-size:26px;font-weight:700;line-height:1;
+  margin-top:9px;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.dt-u{display:block;font-size:9.5px;font-weight:600;color:var(--muted);margin-top:5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.dt.gold .dt-v{color:var(--gold2)} .dt.dn .dt-v{color:var(--dn)} .dt.ok .dt-v{color:var(--up)}
+.dt.warn .dt-v{color:var(--warn)} .dt.dim .dt-v{color:var(--dim)}
+/* Плашка состояния с точкой. */
+.dst{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;
+  font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;
+  color:var(--muted);background:var(--card2);border:1px solid var(--border2);font-family:'DM Sans',sans-serif}
+.dst::before{content:'';flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:currentColor}
+.dst.run,.dst.warn{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
+.dst.dn{color:var(--dn);background:var(--dn-soft);border-color:rgba(224,85,85,.3)}
+.dst.ok{color:var(--up);background:var(--up-soft);border-color:rgba(76,175,125,.3)}
+/* Действия под карточкой. */
+.dc-act{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.05)}
+.db{flex:1;padding:13px 10px;border-radius:13px;border:0;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:700;color:var(--text);background:var(--card2)}
+.db.go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.db.soft{color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
+.db.soft.dn{color:var(--dn);background:var(--dn-soft);border-color:rgba(224,85,85,.3)}
+.db:active{transform:scale(.98)} .db:disabled{opacity:.45;pointer-events:none}
+/* Главная кнопка экрана — закреплена над вкладками, одна. */
+.dv-foot{position:fixed;left:13px;right:13px;bottom:calc(var(--tabbar) + 10px);z-index:20}
+.dv-foot .btn{width:100%;height:54px;padding:0 14px;border-radius:15px;font-size:15px;
+  box-shadow:0 6px 20px rgba(201,169,110,.22)}
+.dv-foot .btn:disabled{opacity:.45;box-shadow:none}
+.dv-foot .btn.dn{color:#fff;background:linear-gradient(135deg,#c94848,#e05555);box-shadow:0 6px 20px rgba(224,85,85,.22)}
+.dv-sp{height:74px}
+/* Пустой экран — карточкой тех же пропорций, а не серым текстом в воздухе. */
+.dc-empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.5}
+
+/* Старые элементы, которым достаётся та же кожа: карточки заказа, приёмки,
+   расходов, строки истории. Свои цвета и тени они больше не носят. */
+.ord{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.28);
+  border-radius:16px;margin-bottom:10px;box-shadow:none}
+.ord.next{border-color:rgba(201,169,110,.55);box-shadow:none}
+.ord-row-hd{background:none;border-bottom:1px solid rgba(201,169,110,.14);padding:12px 16px}
+.ord.next .ord-row-hd{background:none}
+.ordm + .ord{margin-top:10px}
+.dcard{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.28)}
+.dcard.mine{border-color:rgba(201,169,110,.55)}
+.card{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.28)}
+.exp-card{padding:0 0 13px}
+.exp-hd{min-height:46px;margin:0 0 12px;padding:0 16px;border-bottom:1px solid rgba(201,169,110,.14);
+  font-family:'Space Grotesk',sans-serif;letter-spacing:.6px;text-transform:uppercase;color:var(--gold2)}
+.exp-hd .exp-t{font-family:'Space Grotesk',sans-serif;font-size:15px;letter-spacing:.6px}
+.exp-hd .exp-sum{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);text-transform:none;letter-spacing:0}
+.exp-card .exp-row,.exp-card .exp-tiles,.exp-card .exp-why,.exp-card .exp-row-c{margin-left:13px;margin-right:13px}
+.exp-card .exp-tiles{margin-bottom:10px}
+.exp-fix-v{padding-left:13px}
+.sect{margin:14px 2px 8px}
+.sect-t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text)}
+.hnav{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.28);
+  border-radius:16px;padding:4px;margin-bottom:10px}
+.hnav-t{font-size:14px} .hnav-s{font-size:10.5px}
+.hfind{background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:10px}
+.hrow{padding:11px 16px;border-radius:0}
+.hrow + .hrow{box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.hrow-v{color:var(--gold2)}
+.shscr .shc{border-radius:0;background:none;border:0;border-top:1px solid rgba(255,255,255,.05);padding:12px 16px}
+.shscr .shc:first-child{border-top:0}
+#shList{border-radius:16px;overflow:hidden;background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28);margin:14px 0 16px}
 </style>
 
 <meta charset="UTF-8">
@@ -600,9 +720,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .blank b{font-size:17px;font-weight:700;letter-spacing:-.2px}
 .blank i{font-style:normal;font-size:13px;line-height:1.5;color:var(--muted);
   max-width:270px;margin-top:-6px}
-.sect{display:flex;align-items:baseline;gap:8px;margin:16px 2px 9px}
-.sect-t{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
-.sect-v{margin-left:auto;font-size:11px;color:var(--muted)}
+.sect{display:flex;align-items:baseline;gap:8px;margin:18px 4px 10px}
+.sect-t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text)}
+.sect-v{margin-left:auto;font-size:12px;color:var(--muted)}
 .sect-i{margin-left:auto;width:28px;height:28px;flex-shrink:0;border-radius:50%;cursor:pointer;
   display:flex;align-items:center;justify-content:center;color:var(--muted);
   background:var(--card2);border:1px solid var(--border3)}
@@ -3407,6 +3527,7 @@ async function boot(){
   setInterval(panicWatch, 10000);
   // Смена и трансляция — раз в полминуты: если трансляция погасла, экран
   // должен закрыться сам, а не ждать, пока водитель что-нибудь нажмёт.
+  setInterval(()=>{ if(!document.hidden && !PANIC && !LOCKED && (TAB === 'shift' || document.getElementById('shScr').classList.contains('show'))) shLoad(); }, 5000);
   setInterval(()=>{ if(!document.hidden && !PANIC && !LOCKED) shLoad(); }, 30000);
   // Точка — раз в минуту, пока приложение открыто: чаще незачем, а батарея у
   // водителя должна дожить до конца смены.
@@ -4785,68 +4906,40 @@ function renderOrders(){
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
   if(!active.length){
-    // Без пояснения: водитель и так знает, что заказ придёт сообщением, — это
-    // его работа, а не новость.
     box.innerHTML = geoBar() + blank(ICO.box, 'Заказов нет');
     return;
   }
-  // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные
-  // строкой: карточка в тысячу пикселей хороша, пока она одна, а на трёх
-  // заказах до второго приходится листать полэкрана вслепую.
-  //
-  // Свёрнутая строка отвечает на единственный вопрос, который возникает про
-  // следующий заказ: куда и к какому времени. Всё прочее нужно уже в работе,
-  // а не при выборе.
+  // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные —
+  // строками одной карточки: адрес, время и номер в очереди.
   if(active.length && !active.some(o => o.order_id === OPEN_OID)) OPEN_OID = active[0].order_id;
-  box.innerHTML = geoBar() + ordHead(active) +
-    (active.length
-      ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
-        + active.map((o, i) => o.order_id === OPEN_OID || active.length === 1
-            ? orderCard(o, i) : ordMini(o, i)).join('')
-      : '');
-  // Закрытых здесь нет: эта вкладка про то, что ещё надо сделать. Закрытое за
-  // смену — во вкладке «История», а сколько сдано, говорит строка сверху.
+  const cur = active.find(o => o.order_id === OPEN_OID) || active[0];
+  const rest = active.filter(o => o !== cur);
+  box.innerHTML = geoBar() + ordHead(active) + orderCard(cur, active.indexOf(cur)) +
+    (rest.length ? `<div class="dc">
+      <div class="dc-cap"><span>Следующие</span><b>${rest.length}<u>${plural(rest.length,'заказ','заказа','заказов')}</u></b></div>
+      ${rest.map(o => ordMini(o, active.indexOf(o))).join('')}
+    </div>` : '');
 }
 
-// Строка о геопозиции. Прятать её нельзя: человек имеет право знать, что его
-// видно, — и это же единственное место, где он может дать разрешение, если
-// однажды отказал. Когда всё в порядке, строка молчит и не занимает места.
+// Строка о геопозиции. Когда всё в порядке — молчит и не занимает места.
 function geoBar(){
-  // Видно ли водителя, знает сервер: точка приходит либо из трансляции, либо
-  // из приложения, и обе ложатся в одно место. Пока сервер говорит «видно»,
-  // строка молчит — даже если само приложение точку взять не смогло. Раньше
-  // она в этом случае писала «оператор не видит», хотя трансляция шла.
   const g = (SH || {}).geo;
   if(g ? g.ok : GEO.state !== 'off') return '';
   const mins = Math.floor(((g || {}).age_sec || 0) / 60);
   const sub = g && g.stream
-    ? `Трансляция включена, но точек нет уже ${mins} мин. Проверьте геолокацию в телефоне`
-    : 'Нажмите — пришлём в чат, как включить трансляцию «Пока не выключу»';
-  return `<button class="geo-bar" onclick="geoFix()">
-    <span class="geo-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-      stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
-      stroke-linejoin="round">${ICO.pin}</svg></span>
-    <span class="geo-b">
-      <b>Оператор не видит, где вы</b>
-      <i>${sub}</i>
-    </span>
-    <span class="geo-go">›</span>
-  </button>`;
+    ? `трансляция есть, точек нет уже ${mins} мин — проверьте геолокацию в телефоне`
+    : 'нажмите — пришлём в чат, как включить трансляцию';
+  return `<div class="dc dn"><button class="dc-r" onclick="geoFix()">
+    <span class="dc-st no">${svg(ICO.pin, 13)}</span>
+    <span class="dc-b">Оператор не видит, где вы<i class="dn">${sub}</i></span>
+    <em>${svg('<path d="M9 6l6 6-6 6"/>', 13)}</em>
+  </button></div>`;
 }
 
-// Шапка вкладки. Вопрос, на который она отвечает, — не «сколько я уже сделал»
-// (это позади и живёт в истории), а «что у меня на руках прямо сейчас».
-//
-// Крупно — деньги, которые предстоит собрать. Их водитель посчитать в уме не
-// может: заказов три, часть оплачена онлайн, а отвечает он ровно за наличные.
-// Число заказов рядом мельче — оно и так видно по карточкам под шапкой, там
-// свои номера 1-2-3.
-//
-// Долг и предоплата из суммы вычтены: «денег не брать» написано на карточке, и
-// шапка не должна обещать того, чего водитель не привезёт.
+// Шапка вкладки: что на руках прямо сейчас. Крупно — наличные, которые
+// предстоит собрать; рядом оплаченное заранее и бутылки. Просрочка — строкой.
 function ordHead(active){
   if(!active.length) return '';
-  // Оплачено онлайн или в долг — этих денег водитель не касается.
   const free = o => !!o.prepaid || o.payment_method === 'crypto'
                  || o.payment_method === 'debt' || o.payment_method === 'transfer';
   const cash = active.filter(o => !free(o)).reduce((a, o) => a + (o.total || 0), 0);
@@ -4854,51 +4947,27 @@ function ordHead(active){
   const units = active.reduce((a, o) =>
     a + (o.items || []).reduce((b, i) => b + (i.qty || 0), 0), 0);
   const late = active.filter(o => _isLate(o.deliver_by)).length;
-  const zero = cash === 0;
-  const foot = [];
-  // Не «прошло мимо рук» и не «без оплаты на месте»: водителю важно, что с
-  // этих денег он ничего не берёт, — так и пишем, называя причину.
-  const pre = active.filter(o => o.prepaid || o.payment_method === 'crypto')
-    .reduce((a, o) => a + (o.total || 0), 0);
-  const debt = paid - pre;
-  // Перевод стоит рядом с оплаченным онлайн: денег в руках водителя нет и там
-  // и там, а разбираться, каким именно способом, ему незачем.
-  const tr = active.filter(o => o.payment_method === 'transfer')
-    .reduce((a, o) => a + (o.total || 0), 0);
-  const debtOnly = debt - tr;
-  const почему = [pre && 'оплачено онлайн', tr && 'переводом', debtOnly > 0 && 'в долг']
-    .filter(Boolean).join(' и ');
-  if(!zero && paid) foot.push(`<span>${fmt(paid)} AED не берём: ${почему}</span>`);
-  if(late) foot.push(`<span class="warn">${late === 1
-    ? 'один заказ просрочен' : late + ' заказа просрочено'}</span>`);
-  return `<div class="hsum${late ? ' late' : ''}">
-    <div class="hsum-top">
-      <span class="hsum-b">
-        <span class="hsum-k">${zero ? 'Оплачено заранее' : 'Собрать наличными'}</span>
-        <span class="hsum-v">${fmt(zero ? paid : cash)}<i>AED</i></span>
-      </span>
-      <span class="hsum-r">
-        <b>${active.length}</b> ${plural(active.length,'заказ','заказа','заказов')}
-        <i>${units} ${plural(units,'бутылка','бутылки','бутылок')}</i>
-      </span>
+  return `<div class="dc${late ? ' dn' : ''}">
+    <div class="dc-cap"><span>В работе</span><b>${active.length}<u>${plural(active.length,'заказ','заказа','заказов')}</u></b></div>
+    <div class="dt-g">
+      <div class="dt gold"><span class="dt-l">Наличными</span><b class="dt-v">${fmt(cash)}</b><span class="dt-u">AED собрать</span></div>
+      <div class="dt${paid ? '' : ' dim'}"><span class="dt-l">Оплачено</span><b class="dt-v">${fmt(paid)}</b><span class="dt-u">AED не берём</span></div>
+      <div class="dt"><span class="dt-l">Бутылок</span><b class="dt-v">${units}</b><span class="dt-u">везём</span></div>
     </div>
-    ${foot.length ? `<div class="hsum-f">${foot.join('')}</div>` : ''}
+    ${late ? `<div class="dc-r plain dn"><span class="dc-st no">${svg(ICO.clock, 13)}</span>
+      <span class="dc-b">${late === 1 ? 'Один заказ просрочен' : late + ' заказа просрочено'}</span></div>` : ''}
   </div>`;
 }
 
-// Свёрнутый заказ. Номер в очереди слева — тот же, что и на раскрытом: по
-// нему видно, какой это по счёту, без пересчёта карточек глазами.
+// Свёрнутый заказ — строка карточки «Следующие».
 function ordMini(o, i){
   const late = _isLate(o.deliver_by);
   const items = (o.items || []).reduce((a, x) => a + (x.qty || 0), 0);
-  return `<button class="ordm${late ? ' late' : ''}" onclick="ordOpen('${esc(o.order_id)}')">
-    <span class="ordm-n">${i + 1}</span>
-    <span class="ordm-b">
-      <span class="ordm-a">${esc(o.address) || 'Адрес не указан'}</span>
-      <span class="ordm-s">${items} ${plural(items,'бутылка','бутылки','бутылок')} · ${fmt(o.total)} AED</span>
-    </span>
-    ${o.deliver_by ? `<span class="ordm-t${late ? ' late' : ''}">${esc(o.deliver_by)}</span>` : ''}
-    <span class="ordm-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+  return `<button class="dc-r${late ? ' dn' : ''}" onclick="ordOpen('${esc(o.order_id)}')">
+    <span class="dc-st num">${i + 1}</span>
+    <span class="dc-b">${esc(o.address) || 'Адрес не указан'}<i>${items} ${plural(items,'бутылка','бутылки','бутылок')} · ${fmt(o.total)} AED${
+      o.deliver_by ? ' · к ' + esc(o.deliver_by) : ''}</i></span>
+    <em>${svg('<path d="M9 6l6 6-6 6"/>', 13)}</em>
   </button>`;
 }
 
@@ -5040,25 +5109,6 @@ function renderHistory(){
   const found = HIST_BUSY ? null : histFound();
 
   const head = `
-    <div class="hsum">
-      <div class="hsum-top">
-        <span class="hsum-b">
-          <span class="hsum-k">Сдал наличными</span>
-          <span class="hsum-v">${HIST_BUSY ? sk('120px','big') : fmt(t.cash || t.aed)}<i>AED</i></span>
-        </span>
-        <span class="hsum-r">
-          ${HIST_BUSY ? sk('64px') : `<b>${fmt(t.count)}</b> ${plural(t.count,'заказ','заказа','заказов')}`}
-          <i>${HIST_BUSY ? sk('54px','sm') : (t.worked
-            ? t.worked + ' ' + plural(t.worked,'смена','смены','смен') : 'смен нет')}</i>
-        </span>
-      </div>
-      ${HIST_BUSY || t.online || t.avg_min ? `<div class="hsum-f">
-        ${HIST_BUSY ? sk('120px','sm') + sk('92px','sm')
-          : (t.online ? `<span>${fmt(t.online)} AED оплатили без вас</span>` : '')
-            + (t.avg_min ? `<span>${t.avg_min} мин в среднем в пути</span>` : '')}
-      </div>` : ''}
-    </div>
-
     <div class="hnav">
       <button class="hnav-b" onclick="histStep(1)" aria-label="Предыдущий день">
         ${svg('<path d="M15 5l-7 7 7 7"/>', 16)}</button>
@@ -5069,6 +5119,17 @@ function renderHistory(){
       <button class="hnav-b" onclick="histStep(-1)" ${HIST_OFF ? '' : 'disabled'}
         aria-label="Следующий день">${svg('<path d="M9 5l7 7-7 7"/>', 16)}</button>
       ${HIST_OFF ? `<button class="hnav-home" onclick="histHome()">Сегодня</button>` : ''}
+    </div>
+    <div class="dc">
+      <div class="dc-cap"><span>Итог дня</span>${t.worked ? '' : '<i>смен нет</i>'}</div>
+      <div class="dt-g">
+        <div class="dt gold"><span class="dt-l">Наличными</span>
+          <b class="dt-v">${HIST_BUSY ? sk('60px','big') : fmt(t.cash || t.aed)}</b><span class="dt-u">AED сдал</span></div>
+        <div class="dt"><span class="dt-l">Заказов</span>
+          <b class="dt-v">${HIST_BUSY ? sk('30px','big') : fmt(t.count)}</b><span class="dt-u">${t.online ? fmt(t.online) + ' AED онлайн' : 'за день'}</span></div>
+        <div class="dt${t.avg_min ? '' : ' dim'}"><span class="dt-l">В пути</span>
+          <b class="dt-v">${HIST_BUSY ? sk('30px','big') : (t.avg_min || '—')}</b><span class="dt-u">мин в среднем</span></div>
+      </div>
     </div>
 
     <div class="hfind">
@@ -5081,17 +5142,15 @@ function renderHistory(){
 
   if(found){
     box.innerHTML = head + (found.length
-      ? `<div class="sect"><span class="sect-t">Нашлось</span>
-           <span class="sect-v">${found.length}</span></div>`
-        + found.map(o => histRow(o, true)).join('')
+      ? `<div class="dc"><div class="dc-cap"><span>Нашлось</span><b>${found.length}</b></div>`
+        + found.map(o => histRow(o, true)).join('') + '</div>'
       : blank(ICO.search, 'Ничего не нашлось',
-          'Искать можно по части адреса или по номеру заказа'));
+          'Искать можно по части адреса или по номеру заказа', 'short'));
     _histFocus();
     return;
   }
 
   if(HIST_BUSY){
-    // День ещё едет — вместо него строки того же роста.
     box.innerHTML = head + Array.from({length: 3}, () =>
       '<div class="hday sk-row"></div>').join('');
     _histFocus();
@@ -5101,15 +5160,14 @@ function renderHistory(){
   if(!g){
     box.innerHTML = head + blank(ICO.clock,
       HIST_OFF ? 'В этот день заказов не было' : 'Сегодня заказов ещё не было',
-      'Листайте стрелками — соседние дни рядом');
+      'Листайте стрелками — соседние дни рядом', 'short');
     _histFocus();
     return;
   }
 
   box.innerHTML = head
-    + `<div class="sect"><span class="sect-t">Что возили</span>
-         <span class="sect-v">${g.count}</span></div>`
-    + (g.orders || []).map(o => histRow(o)).join('');
+    + `<div class="dc"><div class="dc-cap"><span>Что возили</span><b>${g.count}<u>${plural(g.count,'заказ','заказа','заказов')}</u></b></div>`
+    + (g.orders || []).map(o => histRow(o)).join('') + '</div>';
   _histFocus();
 }
 
@@ -5934,93 +5992,72 @@ function renderShift(){
   const on = SH.opened && !SH.closed;
   const geo = SH.geo || {};
   const must = SH.must || [];
+  const route = SH.in_route || [];
   const mustNames = (SH.must_names || must).join(', ');
 
-  // Счёт смены. Считаем ровно то, что знаем точно: заказы из своего же списка
-  // и расходы из своих же ответов. Придумывать недостающее нельзя — это цифры,
-  // по которым с человеком считаются деньгами.
+  // Счёт смены — ровно то, что известно точно: заказы из своего списка и
+  // расходы из своих ответов. Питание не расход, а выплата, его здесь нет.
   const done = ((ORDERS || {}).done || []).length;
   const live = ((EXP || {}).extras || []).filter(x => EXP_ST(x) !== 'rejected');
-  // Питание сюда не идёт. Это не трата водителя, а то, что ему платят: считать
-  // его расходом — значит показывать человеку минус восемьдесят за то, что он
-  // вышел на работу. В счёте смены остаётся только то, что он отдал сам.
   const spent = live.reduce((a, x) => a + (x.amount || 0), 0);
-
-  // Подпись под заголовком отвечает на «что это значит», и отвечать ей надо
-  // коротко: фразу с точкой читают один раз, а место она занимает всегда.
-  const stat = on
-    ? {t:`Смена идёт с ${hhmm(SH.opened_at)}`, s:'заказы приходят'}
-    : SH.closed
-      ? {t:`Смена закрыта в ${hhmm(SH.closed_at)}`, s:'можно открыть снова'}
-      : {t:'Смена не открыта', s:'заказы не приходят'};
-
-  // Сколько идёт смена — число, и место ему среди чисел, а не в подписи.
   const мин = on && SH.opened_at
     ? Math.max(0, Math.round((Date.now() - new Date(SH.opened_at)) / 60000)) : 0;
-  const вСмене = мин >= 60 ? `${Math.floor(мин/60)} ч ${String(мин%60).padStart(2,'0')}`
-                           : `${мин} мин`;
+  const вСмене = мин >= 60 ? `${Math.floor(мин/60)}:${String(мин%60).padStart(2,'0')}` : `0:${String(мин).padStart(2,'0')}`;
 
-  // Строка условия. В открытой смене всё, что держит закрытие, — красным, а
-  // не серым «ещё не»: зелёное и красное различают не читая.
-  const row = (ok, t, sub, action, hard) => `
-    <div class="shx ${ok ? 'ok' : (hard ? 'no' : '')}">
-      <span class="shx-i">${svg(ok ? ICO.ok : (hard ? ICO.close : ICO.clock), 13)}</span>
-      <span class="shx-b"><span class="shx-t">${t}</span>
-        <span class="shx-s">${sub}</span></span>
-      ${action || ''}
-    </div>`;
+  // Состояние — плашкой в шапке карточки, а не заголовком с подписью.
+  const st = on ? ['run', `идёт с ${hhmm(SH.opened_at)}`]
+    : SH.closed ? ['ok', `закрыта в ${hhmm(SH.closed_at)}`] : ['', 'не открыта'];
 
-  // Закрыть можно, когда оператор закрыл день, расходы отвечены и ничего не
-  // едет. Кнопка нажимается всегда — shClose сам скажет, что мешает.
-  const canClose = on && !must.length && !(SH.in_route||[]).length;
+  // Строка чек-листа: кружок состояния, слово, что мешает, и стрелка туда,
+  // где это делают. Порядок — порядок дня: сперва оператор, потом
+  // геопозиция, потом смена; в открытой — сперва заказы, потом расходы.
+  const row = (state, t, sub, go) => `<${go ? 'button' : 'div'} class="dc-r${go ? '' : ' plain'}"${
+      go ? ` onclick="${go}"` : ''}>
+      <span class="dc-st ${state}">${svg(state === 'ok' ? ICO.ok : state === 'no' ? ICO.close : ICO.clock, 13)}</span>
+      <span class="dc-b">${t}<i class="${state === 'no' ? 'dn' : state === 'warn' ? 'warn' : ''}">${sub}</i></span>
+      ${go ? `<em>${svg('<path d="M9 6l6 6-6 6"/>', 13)}</em>` : ''}
+    </${go ? 'button' : 'div'}>`;
+
+  const canOpen = SH.working === true && !!geo.ok;
+  const canClose = on && !must.length && !route.length;
+
+  const условия = on
+    ? row(route.length ? 'warn' : 'ok', 'Заказы в пути',
+          route.length ? `${route.length} ${plural(route.length,'заказ','заказа','заказов')} — отметьте доставку` : 'все доставлены',
+          route.length ? "setTab('orders')" : '')
+      + row(must.length ? 'no' : 'ok', 'Расходы за день',
+          must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'заполнены',
+          must.length ? "setTab('expenses')" : '')
+    : row(SH.working === true ? 'ok' : SH.working === false ? 'no' : '', 'Оператор отметил вас',
+          SH.working === true ? 'отмечено'
+            : SH.working === false ? 'сегодня выходной — если ошибка, напишите оператору'
+            : 'оператор отмечает бригаду в начале смены', '')
+      + row(geo.ok ? 'ok' : 'no', 'Геопозиция',
+          geo.ok ? (geo.endless ? 'транслируется, не кончится сама' : `транслируется ещё ${_hleft(geo.left_min)}`)
+                 : 'оператор не видит, где вы — включите трансляцию',
+          geo.ok ? '' : 'tutOpen()');
 
   box.innerHTML = `
-    <div class="shd ${on ? 'live' : ''}">
-      <span class="shd-b">
-        <span class="shd-t">${stat.t}</span>
-        <span class="shd-s">${stat.s}</span>
-      </span>
-      ${on ? `<button class="shd-close ${canClose ? 'ok' : ''}" onclick="shClose()">Закрыть смену</button>` : ''}
+    <div class="dc">
+      <div class="dc-cap"><span>Смена</span><span class="dst ${st[0]}" style="flex:0 0 auto">${st[1]}</span></div>
+      <div class="dt-g">
+        <button class="dt tap" onclick="setTab('history')"><span class="dt-l">Доставлено</span>
+          <b class="dt-v">${done}</b><span class="dt-u">${plural(done,'заказ','заказа','заказов')}</span></button>
+        <button class="dt tap gold" onclick="setTab('expenses')"><span class="dt-l">Расход</span>
+          <b class="dt-v">${fmt(spent)}</b><span class="dt-u">AED</span></button>
+        <div class="dt${on ? '' : ' dim'}"><span class="dt-l">В смене</span>
+          <b class="dt-v">${on ? вСмене : '—'}</b><span class="dt-u">${on ? 'часов' : 'не идёт'}</span></div>
+      </div>
     </div>
-
-    ${on ? `<div class="shsum">
-      <div class="shsum-c" onclick="setTab('history')"><b>${done}</b><i>доставлено</i></div>
-      <div class="shsum-c" onclick="setTab('expenses')"><b>${fmt(spent)}</b><i>расход, AED</i></div>
-      <div class="shsum-c"><b>${вСмене}</b><i>в смене</i></div>
-    </div>` : ''}`
-    /* «Трансляция: да» отсюда убрана. Пока смена не открыта, про геопозицию
-       сказано строкой ниже, в списке условий: без неё смена не откроется. В
-       открытой смене этой строки нет вовсе — здесь только то, что мешает
-       закрыть день, а трансляция ему не мешает. */ + `
-
-    <div class="sect"><span class="sect-t">${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span></div>
-    ${on
-      ? row(!must.length, 'Расходы за день',
-            must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'заполнены',
-            must.length ? `<button class="shx-go" onclick="setTab('expenses')">Заполнить</button>` : '',
-            true)
-      : row(SH.working === true, 'Оператор отметил вас',
-            SH.working === true ? 'отмечено'
-              : SH.working === false ? 'сегодня выходной'
-              : 'оператор отмечает бригаду в начале смены')
-        + row(!!geo.stream, 'Геопозиция',
-            geo.stream ? (geo.endless ? 'транслируется и не кончится сама' : 'транслируется')
-                       : 'оператор не видит, где вы',
-            geo.stream ? '' : `<button class="shx-go" onclick="tutOpen()">Как включить</button>`)}
-
-    ${on && (SH.in_route||[]).length
-      ? row(false, 'Заказы в пути',
-            `${(SH.in_route||[]).length} ${plural((SH.in_route||[]).length,'заказ','заказа','заказов')}`
-            + ' — отметьте доставку',
-            `<button class="shx-go" onclick="setTab('orders')">Открыть</button>`) : ''}
-
-    <div class="shsp"></div>
-    <div class="shbtn">
-      ${on ? '' : `<button class="btn btn-pri"
-             ${(SH.working === true && geo.ok) ? '' : 'disabled'}
-             onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}
-      <button class="shx-alt" onclick="shLoad(true)">${svg(ICO.refresh, 15)} Обновить</button>
-    </div>`;
+    <div class="dc">
+      <div class="dc-cap"><span>${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span><i>по порядку</i></div>
+      ${условия}
+    </div>
+    <div class="dv-sp"></div>
+    <div class="dv-foot">${on
+      ? `<button class="btn btn-pri" ${canClose ? '' : 'disabled'} onclick="shClose()">Закрыть смену</button>`
+      : `<button class="btn btn-pri" ${canOpen ? '' : 'disabled'} onclick="shOpen()">${
+          SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}</div>`;
 }
 
 function renderExpenses(){
@@ -6040,15 +6077,13 @@ function renderExpenses(){
   // закреплено единственное действие, которое нужно в любой момент, —
   // списать бой или брак.
   box.innerHTML = `
-    <div class="exp-top">
-      <div class="exp-bar-l">Всего за смену${pend ? `<i>ждут решения ${fmt(pend)} AED</i>` : ''}</div>
-      <div class="exp-bar-v ${total ? '' : 'zero'}">${total ? '−' + fmt(total) : '0'}<i>AED</i></div>
-    </div>
-    <div class="sect"><span class="sect-t">Каждый день</span>
-      ${(EXP.pending_answer || []).length
-        ? `<span class="sect-v ask">не сдано: ${(EXP.pending_answer || [])
-             .map(k => ({fuel:'бензин', wash:'мойка'})[k] || k).join(', ')}</span>` : ''}
-      <button class="sect-i" onclick="infoOpen()" aria-label="Что значат значки">${svg(ICO.info, 15)}</button>
+    <div class="dc">
+      <div class="dc-cap"><span>Расходы за смену</span><b>${fmt(total)}<u>AED</u></b></div>
+      ${pend || (EXP.pending_answer || []).length ? `<div class="dc-r plain">
+        <span class="dc-st ${(EXP.pending_answer || []).length ? 'no' : 'warn'}">${svg((EXP.pending_answer || []).length ? ICO.close : ICO.clock, 13)}</span>
+        <span class="dc-b">${(EXP.pending_answer || []).length
+          ? `Не сдано: ${(EXP.pending_answer || []).map(k => ({fuel:'бензин', wash:'мойка'})[k] || k).join(', ')}<i class="dn">ответьте — иначе смену не закрыть</i>`
+          : `Ждут решения старшего<i>${fmt(pend)} AED</i>`}</span></div>` : ''}
     </div>
     ${mealBox()}
     ${expBox('fuel', 'Бензин', ICO.fuel)}
@@ -6063,8 +6098,6 @@ function renderExpenses(){
         ${expKindCards()}`
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
-    <!-- Бой и брак — тоже потеря за смену, и искать её на «Закупке» водитель
-         не должен: кнопка закреплена внизу, тем же листом, что на «Закупке». -->
     <div class="wo-sp"></div>
     <div class="wo-fix"><button class="wo-btn" onclick="woOpen()">
       ${svg(ICO.trash, 19)}<span>Списать бой или брак</span></button></div>`;

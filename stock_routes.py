@@ -1846,7 +1846,7 @@ async def handle_audit_finish(request):
              f"сканом {stats.get('total', 0)}")
     await backdate.notify(day, who, "ревизия",
                           f"{OFFICE_CODES.get(district, district)} — сканом {stats.get('total', 0)}"
-                          + (f", не хватает {tot['short_aed']} AED" if tot["short_aed"] else ""))
+                          + (f", недостача {tot['short_aed']} AED" if tot["short_aed"] else ""))
     return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
 
 

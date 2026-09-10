@@ -3920,9 +3920,9 @@ async def handle_checklist(request):
             sh, ov = a.get("short") or {}, a.get("over") or {}
             parts = []
             if sh and not sh.get("resolved_at"):
-                parts.append(f"не хватает {int(sh.get('qty') or 0)} {_pl_bottles(int(sh.get('qty') or 0))}")
+                parts.append(f"недостача {int(sh.get('qty') or 0)} {_pl_bottles(int(sh.get('qty') or 0))}")
             if ov and not ov.get("resolved_at"):
-                parts.append(f"излишек {int(ov.get('qty') or 0)}")
+                parts.append(f"излишки {int(ov.get('qty') or 0)}")
             if int(a.get("alien_left") or 0):
                 parts.append(f"QR код не внесён {int(a['alien_left'])}")
             return " · ".join(parts)

@@ -13523,7 +13523,7 @@ function stkDistTap(){
     info[d.id] = d.audit === 'running' ? {sub: 'идёт ревизия', cls: 'warn'}
       : d.audit === 'pending' ? {sub: 'ждёт решения', cls: 'dn'}
       : d.audit === 'closed'
-        ? {sub: d.short_aed ? 'не хватает ' + fmt(d.short_aed) + ' AED' : 'всё сошлось',
+        ? {sub: d.short_aed ? 'недостача ' + fmt(d.short_aed) + ' AED' : 'всё сошлось',
            cls: d.short_aed ? 'dn' : 'ok', value: d.short_aed ? '' : '✓'}
         : {sub: 'не начата'};
   });
@@ -13741,7 +13741,7 @@ function audDistRow(d, left, без, hist){
   const [sub, cls] = d.audit === 'running' ? ['идёт ревизия', 'run']
     : d.audit === 'pending' ? ['ждёт решения', 'dn']
     : d.audit === 'closed'
-      ? (d.short_aed ? [`не хватает <u>${fmt(d.short_aed)} AED</u>`, 'dn'] : ['закрыта · всё сошлось', 'ok'])
+      ? (d.short_aed ? [`недостача <u>${fmt(d.short_aed)} AED</u>`, 'dn'] : ['закрыта · всё сошлось', 'ok'])
     : b ? [`QR код не внесён <u>${fmt(b)}</u>`, 'warn'] : ['не начата', 'idle'];
   const k = hist.length;
   return `<div class="stk-drw">
@@ -13879,7 +13879,7 @@ function stkDistRow(d, left, без, go){
   const [sub, cls] = b
     ? [`QR код не внесён · ${fmt(b)}`, 'warn']
     : (d.done
-        ? (d.short_aed ? [`не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
+        ? (d.short_aed ? [`недостача ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
         : ['ещё не считали', '']);
   return `<button class="stk-dr" onclick="${go}('${d.id}')">
     <span class="stk-dr-c">${escS(d.code || '')}</span>
@@ -14284,7 +14284,7 @@ async function stkHistPaint(){
       <span class="stk-dr-b">
         <span class="stk-dr-n">${escS(a.district_name || '')}</span>
         <span class="stk-dr-s ${a.mismatched ? 'dn' : 'ok'}">${escS(a.day || '')} · ${
-          a.mismatched ? `не хватает ${fmt(a.short_aed || 0)} AED` : 'всё сошлось'}</span>
+          a.mismatched ? `недостача ${fmt(a.short_aed || 0)} AED` : 'всё сошлось'}</span>
       </span>
       <span class="stk-dr-go">›</span>
     </button>`).join('') + '</div>'
@@ -14415,10 +14415,10 @@ function audCard(sh){
     <div class="aud-prog"><b>${fmt(t.actual || 0)} / ${fmt(t.expected || 0)}</b>
       <div class="aud-bar"><u class="${full ? 'ok' : ''}" style="width:${idle ? 0 : pct}%"></u></div><i>бут</i></div>
     <div class="aud-g">
-      <div class="aud-t ${idle ? 'dim' : t.short_qty ? 'dn' : 'ok'}"><span class="aud-tl">Не хватает</span>
+      <div class="aud-t ${idle ? 'dim' : t.short_qty ? 'dn' : 'ok'}"><span class="aud-tl">Недостача</span>
         <b class="aud-tv">${idle ? '—' : fmt(t.short_qty || 0)}</b>
         <span class="aud-tu">${!idle && t.short_aed ? fmt(t.short_aed) + ' AED' : 'бут'}</span></div>
-      <div class="aud-t ${idle ? 'dim' : t.over_qty ? 'warn' : ''}"><span class="aud-tl">Излишек</span>
+      <div class="aud-t ${idle ? 'dim' : t.over_qty ? 'warn' : ''}"><span class="aud-tl">Излишки</span>
         <b class="aud-tv">${idle ? '—' : fmt(t.over_qty || 0)}</b><span class="aud-tu">бут</span></div>
       <button class="aud-t tap ${noqr ? 'dn' : ''}" onclick="audQrGo()"><span class="aud-tl">QR не внесён</span>
         <b class="aud-tv">${fmt(noqr)}</b><span class="aud-tu">бут</span></button>
@@ -14503,8 +14503,8 @@ async function audFinish(){
         `Всё, что числится, уйдёт в недостачу: ${fmt(t.expected)} бут${t.short_aed ? ' · ' + fmt(t.short_aed) + ' AED' : ''}`,
         'Всё равно завершить', 'Вернуться к сканированию', 'bad')
     : await askDialog('Завершить ревизию?',
-        `${fmt(t.actual || 0)} из ${fmt(t.expected || 0)} бутылок · не хватает ${fmt(t.short_qty || 0)}`
-        + ` · излишек ${fmt(t.over_qty || 0)}`, 'Завершить', 'Не сейчас');
+        `${fmt(t.actual || 0)} из ${fmt(t.expected || 0)} бутылок · недостача ${fmt(t.short_qty || 0)}`
+        + ` · излишки ${fmt(t.over_qty || 0)}`, 'Завершить', 'Не сейчас');
   if(!ok) return;
   const b = document.querySelector('.aud-fin');
   if(b){ b.disabled = true; b.textContent = 'Закрываю…'; }
@@ -14572,10 +14572,10 @@ function audReport(rep){
     <div class="aud-res-s">${escS(_dayName(rep.day))} · ${fmt(t.positions || 0)} ${
       pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmt(t.scan_qty || 0)}</div>
     ${allOk ? '' : `<div class="aud-res-g">
-      <div class="aud-t ${t.short_qty ? 'dn' : ''}"><span class="aud-tl">Не хватает</span>
+      <div class="aud-t ${t.short_qty ? 'dn' : ''}"><span class="aud-tl">Недостача</span>
         <b class="aud-tv">${fmt(t.short_qty || 0)}</b>
         <span class="aud-tu">${t.short_aed ? fmt(t.short_aed) + ' AED' : 'бут'}</span></div>
-      <div class="aud-t ${t.over_qty ? 'warn' : ''}"><span class="aud-tl">Излишек</span>
+      <div class="aud-t ${t.over_qty ? 'warn' : ''}"><span class="aud-tl">Излишки</span>
         <b class="aud-tv">${fmt(t.over_qty || 0)}</b><span class="aud-tu">бут</span></div></div>`}
   </div>`;
   let secs = '';
@@ -14612,7 +14612,7 @@ function audReport(rep){
       ? `<div class="aud-done">${_AUD_CHECK}<span>Внесено на <b>${escS(rep.district_code)}</b>${
           (over.moved || over.restored) ? ` · перевезено ${fmt(over.moved || 0)} · возвращено ${fmt(over.restored || 0)}` : ''}</span></div>`
       : `<div class="aud-act"><button class="aud-b go" onclick="audOver()">Внести на район</button></div>`;
-    secs += `<div class="aud-sec warn"><div class="aud-sec-h"><span>Излишек</span>
+    secs += `<div class="aud-sec warn"><div class="aud-sec-h"><span>Излишки</span>
       <b>${fmt(over.qty)}<u>бут</u></b></div>${rows}${foot}</div>`;
   }
   // Коды не из реестра — свой раздел с решением, как недостача и излишек:
@@ -14689,7 +14689,7 @@ function audDecide(){
         _audRow(false, I_AUD_NONE, 'Без виновного', 'за счёт компании', '', '', 'audShortNone()')}</div>`;
   }
   if(o && !o.resolved_at){
-    html += `<div class="crw-ask-g">Излишек · ${fmt(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
+    html += `<div class="crw-ask-g">Излишки · ${fmt(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
       <div class="crw-ask-box">${
         _audRow(true, I_AUD_IN, 'Внести на район', `${rep.district_code} ${rep.district_name}`,
                 fmt(o.qty), 'бут', 'audOver()')}</div>`;
@@ -14717,7 +14717,7 @@ function audRedo(){
               s.blame ? (s.who || '') : 'за счёт компании', '', '', 'audShortUndo()')}</div>`;
   }
   if(o && o.resolved_at){
-    html += `<div class="crw-ask-g">Излишек</div><div class="crw-ask-box">${
+    html += `<div class="crw-ask-g">Излишки</div><div class="crw-ask-box">${
       _audRow(true, I_AUD_IN, `Внесено на ${rep.district_code}`,
               `перевезено ${fmt(o.moved || 0)} · возвращено ${fmt(o.restored || 0)}`, '', '', 'audOverUndo()')}</div>`;
   }
@@ -14741,14 +14741,14 @@ async function audShortUndo(){
 
 async function audOverUndo(){
   const rep = STK.report, o = rep && rep.audit && rep.audit.over; if(!o) return;
-  const ok = await askDialog('Вернуть излишек?',
+  const ok = await askDialog('Вернуть излишки?',
     'Переезды вернутся, списанное снова будет списанным', 'Вернуть', 'Оставить');
   if(!ok) return;
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/over/undo', {method:'POST',
         body:{district: rep.district, day: rep.day, as: _meName()}}); }
   catch(e){ _toast('Не удалось — попробуйте ещё раз'); return; }
-  _audHap('warn'); _toast('Излишек возвращён — решите заново');
+  _audHap('warn'); _toast('Излишки возвращены — решите заново');
   audReport(r); audDecide();
 }
 
@@ -14768,7 +14768,7 @@ async function audShortNone(){
 
 async function audOver(){
   const rep = STK.report, o = rep && rep.audit && rep.audit.over; if(!o) return;
-  const ok = await askDialog('Внести излишек на район?',
+  const ok = await askDialog('Внести излишки на район?',
     `${fmt(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')} · ${rep.district_code} ${rep.district_name}`,
     'Внести', 'Не сейчас');
   if(!ok) return;
@@ -15177,8 +15177,8 @@ function hstDistCard(d, list){
     const short = +last.short_qty || 0, over = +last.over_qty || 0;
     if(last.state === 'pending'){ итог = 'ждёт решения'; cls = 'dn'; }
     else if(!short && !over){ итог = 'всё сошлось'; cls = 'ok'; }
-    else if(short){ итог = `не хватает ${fmt(short)} бут`; cls = 'dn'; }
-    else{ итог = `излишек ${fmt(over)} бут`; cls = 'warn'; }
+    else if(short){ итог = `недостача ${fmt(short)} бут`; cls = 'dn'; }
+    else{ итог = `излишки ${fmt(over)} бут`; cls = 'warn'; }
     итог = `${_hstDay(last.day)} · ${итог}`;
   }
   return `<div class="sc hst${open ? ' open' : ''}" id="hst-${escS(d.id)}">
@@ -15218,8 +15218,8 @@ function hstRow(a){
   if(!short && !over){ res = 'всё сошлось'; cls = 'ok'; }
   else{
     const p = [];
-    if(short) p.push(`не хватает ${fmt(short)} бут · ${fmt(a.short_aed || 0)} AED`);
-    if(over) p.push(`излишек ${fmt(over)} бут`);
+    if(short) p.push(`недостача ${fmt(short)} бут · ${fmt(a.short_aed || 0)} AED`);
+    if(over) p.push(`излишки ${fmt(over)} бут`);
     res = p.join(' · '); cls = short ? 'dn' : 'warn';
   }
   const tail = [];

@@ -6164,9 +6164,9 @@ button.exp-wait:active{transform:scale(.99)}
            «в руках» без «вала, чая, расхода и долга» ничего не говорит.
            Строкой, а не столбиком: столбик не помещался рядом с датой. -->
       <div class="hero-side" id="heroSide" style="display:none">
-        <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="heroGross" data-aed="">—</b></span>
-        <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="heroTips" data-aed="">—</b></span>
-        <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="heroSpend" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">валовая</span></i><b id="heroGross" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чаевые</span></i><b class="gold" id="heroTips" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расход</span></i><b class="dn" id="heroSpend" data-aed="">—</b></span>
       </div>
     </div>
     <div class="hero-row">
@@ -6424,9 +6424,9 @@ button.exp-wait:active{transform:scale(.99)}
          в руках, а валовая ушла в столбец: из неё складываются карточки
          районов, и сверять их теперь есть с чем именно там, где они лежат. -->
     <div class="hero-side" id="offSide">
-      <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="offGross" data-aed="">—</b></span>
-      <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
-      <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">валовая</span></i><b id="offGross" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чаевые</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расход</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
     </div>
     <span class="day-nav" id="offHeroNav">
       <button class="dn-b" aria-label="Предыдущий день"
@@ -16464,7 +16464,7 @@ function crRender(){
     <div class="ck-track"><i style="width:${доля}%"></i></div>
     <div class="cr-tot">
       <span><i>выручка</i><b${d.net_total < 0 ? ' class="dn"' : ''}>${d.net_total < 0 ? '−' : ''}${fmt(Math.abs(d.net_total))}</b></span>
-      <span><i>чай</i><b class="gold">${fmt(d.tips_total)}</b></span>
+      <span><i>чаевые</i><b class="gold">${fmt(d.tips_total)}</b></span>
       <span><i>наличные</i><b>${fmt(d.cash_total)}</b></span>
       <span><i>расход</i><b class="dn">${fmt(d.spend_total)}</b></span>
     </div>
@@ -16495,7 +16495,7 @@ function crCard(x){
     </div>
     <div class="cr-main">
       <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${net < 0 ? '−' : ''}${fmt(Math.abs(net))}<u>AED</u></b></span>
-      <span class="cr-big"><i>Чай</i><b class="gold">${fmt(x.tips)}<u>AED</u></b></span>
+      <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(x.tips)}<u>AED</u></b></span>
     </div>
     <div class="cr-sub">наличные <b>${fmt(x.cash)}</b> · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · расход <b>${fmt(x.spend)}</b> за смену${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}</div>
@@ -23171,8 +23171,8 @@ function renderOffices(rows){
         <span class="off-cur cur-unit">AED</span>
         <span class="off-share">${share}%</span>
         <span class="off-side">
-          <span><i>вал</i><b data-aed="${r.gross != null ? r.gross : aed}">${r.gross != null ? r.gross : aed}</b></span>
-          <span><i>чай</i><b class="gold" data-aed="${r.tips||0}">${r.tips||0}</b></span>
+          <span><i>валовая</i><b data-aed="${r.gross != null ? r.gross : aed}">${r.gross != null ? r.gross : aed}</b></span>
+          <span><i>чаевые</i><b class="gold" data-aed="${r.tips||0}">${r.tips||0}</b></span>
           ${r.legacy ? '' : `<span><i>расход</i><b class="dn" data-aed="${r.spend||0}">${r.spend||0}</b></span>`}
         </span>
       </div>

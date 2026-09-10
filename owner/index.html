@@ -512,6 +512,30 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .off-tot-go .off-tot-l{font-size:10.5px;letter-spacing:1.2px}
 .off-tot-go .off-tot-v b{color:var(--gold2);font-weight:700}
 .off-tot-of{color:var(--text);margin-left:2px}
+/* Полка смен под плитками: высота едет, содержимое не прыгает. Закрытая —
+   ноль высоты, карточка ровно та же, что без полки. */
+.osh{overflow:hidden;max-height:0;opacity:0;
+  transition:max-height .24s var(--e1),opacity .18s var(--e1)}
+.osh.open{opacity:1}
+.osh-in{margin-top:12px;padding-top:6px;border-top:1px solid var(--border2)}
+.osh-r{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2)}
+.osh-r:last-of-type{border-bottom:0}
+.osh-n{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.osh-n i{display:block;font-style:normal;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.osh-s{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.osh-s .op{color:var(--up)}
+.osh-s .cl{color:var(--dn)}
+.osh-s .no{color:var(--muted);font-weight:500}
+.osh-e{padding:10px 0 4px;font-size:12px;color:var(--muted)}
+.osh-more{display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:10px 0 2px;border:0;background:none;color:var(--gold2);font-family:inherit;
+  font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer}
+.osh-more:active{opacity:.7}
+.ohero-stats .off-tot-go.on .off-tot-l{color:var(--gold2)}
 .off-tot-l{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .off-tot-v{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px;margin-top:3px;
@@ -6363,8 +6387,8 @@ button.exp-wait:active{transform:scale(.99)}
     <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
     <div class="off-tot-c"><div class="off-tot-l">Ср. время</div><div class="off-tot-v" id="offTotMin">—</div></div>
     <!-- Смена по районам вместо среднего чека: сколько открыто или закрыто из
-         пяти. Нажатие ведёт в историю смен. -->
-    <button class="off-tot-c off-tot-go" id="offTotShift" onclick="accOpen('shifts')" aria-label="История смен">
+         пяти. Нажатие раскрывает полку по районам; история смен — из неё. -->
+    <button class="off-tot-c off-tot-go" id="offTotShift" onclick="offShiftToggle()" aria-label="Смены по районам">
       <div class="off-tot-l" id="offTotShiftL">Смена</div><div class="off-tot-v" id="offTotShiftV">—</div></button>
     <!-- Порядок районов меняют редко, а пять чипов занимали ряд каждый раз.
          Кнопка на том же уровне, что и цифры; выбор — списком по касанию. -->
@@ -6374,6 +6398,9 @@ button.exp-wait:active{transform:scale(.99)}
         <path d="M4 6h16M7 12h10M10 18h4"/></svg>
     </button>
    </div>
+   <!-- Полка смен по районам: раскрывается плиткой «Смена», сворачивается
+        сама при листании дня — карточка возвращается ровно к прежнему виду. -->
+   <div class="osh" id="offShelf"></div>
   </div>
 
 
@@ -12368,6 +12395,7 @@ function dayStep(delta){
   if(next === DAY_OFFSET) return false;
   DAY_OFFSET = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  if(typeof offShelfClose === 'function') offShelfClose();   // полка смен — в плитку
   _heroFlip(delta).then(()=>_paintDay(p));
   // Команда считается за тот же день, что и выручка над ней.
   if(typeof loadOperators === 'function' && window.ownerApi) loadOperators();
@@ -12380,6 +12408,7 @@ function dayReset(){
   const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
   DAY_OFFSET = 0;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  if(typeof offShelfClose === 'function') offShelfClose();
   _heroFlip(-1).then(()=>_paintDay(p));
   if(typeof loadOperators === 'function' && window.ownerApi) loadOperators();
 }
@@ -12448,6 +12477,7 @@ daySwipe(document.getElementById('offHero'));
 function applyPeriod(p){
   const d = PERIOD_DATA[p]; if(!d) return;
   DAY_OFFSET = 0;   // any period pill resets the day browser — pre-swipe behaviour
+  if(typeof offShelfClose === 'function') offShelfClose();
   // Нажали пресет — выбранный в календаре отрезок больше не действует.
   // Иначе кнопка «Сегодня» подсвечивается, а цифры остаются от диапазона.
   if(RANGE){ RANGE = null; _clearRangeChip(); }
@@ -22725,6 +22755,59 @@ async function offShiftLoad(){
   const closing = r.phase === 'closing';
   const v = document.getElementById('offTotShiftV');
   if(v) v.innerHTML = `<b>${closing ? r.closed : r.open}</b><span class="off-tot-of">/${r.total}</span>`;
+}
+
+// Полка смен по районам под плитками карточки. Плитка «Смена» её открывает и
+// закрывает; листание дня закрывает само — карточка, которая улетает и
+// прилетает, всегда обычного размера, и плитка возвращается на своё место.
+let OFF_SHELF = false;
+async function offShiftToggle(){
+  if(OFF_SHELF){ offShelfClose(); return; }
+  const sh = document.getElementById('offShelf'); if(!sh) return;
+  OFF_SHELF = true;
+  const tile = document.getElementById('offTotShift'); if(tile) tile.classList.add('on');
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  sh.innerHTML = '<div class="osh-in"><div class="osh-e">Загрузка…</div></div>';
+  offShelfSize();
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/shift-state', {params:{day: accDay(), full: 1}}); }
+  catch(e){
+    if(OFF_SHELF){ sh.innerHTML = '<div class="osh-in"><div class="osh-e">Не удалось загрузить</div></div>'; offShelfSize(); }
+    return;
+  }
+  if(!OFF_SHELF) return;
+  sh.innerHTML = offShelfHtml(r);
+  offShelfSize();
+}
+function offShelfHtml(r){
+  const rows = (r.districts || []).map(d => {
+    const st = d.close_at ? `<b class="cl">закрыта в ${_hmDubai(d.close_at)}</b>`
+             : d.open_at ? `<b class="op">открыта в ${_hmDubai(d.open_at)}</b>`
+             : '<b class="no">не открыта</b>';
+    const who = [d.open_by ? `открыл ${d.open_by}` : '', d.close_by ? `закрыл ${d.close_by}` : '']
+      .filter(Boolean).join(' · ');
+    return `<div class="osh-r">
+      <span class="off-code" style="--tone:${OFF_TONE({id: d.id})}">${escS(d.code || '')}</span>
+      <span class="osh-n">${escS(d.name || d.id)}${who ? `<i>${escS(who)}</i>` : ''}</span>
+      <span class="osh-s">${st}</span></div>`;
+  }).join('');
+  return `<div class="osh-in">${rows || '<div class="osh-e">Районов нет</div>'}
+    <button class="osh-more" onclick="offShelfClose();accOpen('shifts')"><span>История смен</span>${_SC_CHEV}</button>
+  </div>`;
+}
+function offShelfSize(){
+  const sh = document.getElementById('offShelf'); if(!sh) return;
+  sh.classList.toggle('open', OFF_SHELF);
+  sh.style.maxHeight = OFF_SHELF ? sh.scrollHeight + 'px' : '0px';
+  // Карточка стала выше или ниже — полоска под её кромкой меряется заново.
+  setTimeout(() => { if(window.OFF_HERO_APPLY) OFF_HERO_APPLY(); }, 260);
+}
+function offShelfClose(){
+  if(!OFF_SHELF) return;
+  OFF_SHELF = false;
+  const tile = document.getElementById('offTotShift'); if(tile) tile.classList.remove('on');
+  offShelfSize();
+  setTimeout(() => { const sh = document.getElementById('offShelf'); if(sh && !OFF_SHELF) sh.innerHTML = ''; }, 260);
 }
 
 function renderOffices(rows){

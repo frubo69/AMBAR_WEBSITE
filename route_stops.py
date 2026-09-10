@@ -1,30 +1,36 @@
-"""Маршрут за день из точек трека: остановки, разрывы, расстояние, подписи.
+"""Маршрут за день из точек трека: остановки, стоянки, разрывы, отрезки пути,
+расстояние, подписи, состояние «сейчас».
 
 Чистая арифметика без базы — её гоняют стендом на синтетических треках.
 Точки приходят как есть: раз в несколько секунд в движении и редко на
 стоянке (телеграм шлёт точку, когда она сменилась), с выбросами GPS и
-дырами, когда телефон молчал. Отсюда четыре правила:
+дырами, когда телефон молчал. Правила (владелец, 10 сен 2026):
 
-  остановка — точки не выходят из круга STOP_RADIUS_M дольше STOP_MIN_S;
-             стоянка с двумя точками за сорок минут — тоже остановка,
-             а не разрыв: телефон молчал, потому что не двигался;
-  разрыв    — точек нет дольше GAP_MIN_S, а следующая далеко: ехал без
-             сигнала; на карте это пунктир, в списке — «без сигнала»;
-  выброс    — отрезок быстрее GLITCH_KMH в расстояние не идёт;
+  остановка — три минуты подряд точки не выходят из круга ста метров;
+              стоянка с двумя точками за сорок минут — тоже остановка, а не
+              разрыв: телефон молчал, потому что не двигался;
+  стоянка   — та же остановка, но от десяти минут: «прибыл куда-то»;
+  разрыв    — точек нет дольше пятнадцати минут, а следующая далеко: ехал без
+              сигнала; на карте это пунктир, на полоске — красный отрезок;
+  выброс    — отрезок быстрее 150 км/ч в расстояние не идёт;
   подпись   — остановка у адреса заказа этого дня — «Заказ N», у первой или
-             последней точки дня — «База», остальное — «Остановка».
+              последней точки дня — «База»;
+  сейчас    — последняя точка не финиш: сегодня это «в пути», «стоит здесь
+              с …» или «сигнал пропал в …»; за прошлый день — последняя точка.
 """
 import math
 from datetime import datetime, timezone
 
-STOP_RADIUS_M = 60          # в этом круге — стоит
-STOP_MIN_S = 240            # стоит не меньше четырёх минут — остановка
-GAP_MIN_S = 900             # точек нет дольше четверти часа — разрыв
+STOP_RADIUS_M = 100         # в этом круге — стоит
+STOP_MIN_S = 180            # три минуты — остановка
+VISIT_MIN_S = 600           # десять минут — уже стоянка, прибыл
+GAP_MIN_S = 900             # точек нет дольше четверти часа — разрыв (в пути)
+LOST_S = 900                # последней точке больше четверти часа — сигнал пропал
 GLITCH_KMH = 150            # быстрее — сбой GPS, отрезок не считаем
 NEAR_ORDER_M = 150          # остановка у адреса заказа
 NEAR_BASE_M = 150           # остановка у старта или финиша дня — база
 ORDER_WINDOW_S = 3600       # заказ считается доставленным с этой остановки в пределах часа
-DRAW_MAX = 1500             # точек в линии для карты: больше телефону не надо
+DRAW_MAX = 400              # точек в одном отрезке линии для карты
 
 
 def haversine_m(lat1, lon1, lat2, lon2) -> float:
@@ -104,23 +110,20 @@ def _glitch(a, b) -> bool:
     return sec >= 0 and d / max(sec, 1.0) * 3.6 > GLITCH_KMH
 
 
-def distance_m(pts: list, gaps: list, stops: list = None) -> float:
-    """Путь: без разрывов, без выбросов и без дрожания на стоянках — стоящий
-    телефон рисует точки вокруг себя, и за час такого «пути» набегал километр."""
-    skip = {g["i"] for g in gaps}
-    for st in stops or []:
-        skip.update(range(st["i0"] + 1, st["i1"] + 1))
+def _dist(pts: list, i0: int, i1: int) -> float:
+    """Путь по точкам i0..i1 без выбросов."""
     total = 0.0
-    for i in range(1, len(pts)):
-        if i in skip or _glitch(pts[i - 1], pts[i]):
+    for i in range(i0 + 1, i1 + 1):
+        if _glitch(pts[i - 1], pts[i]):
             continue
         total += haversine_m(pts[i - 1]["lat"], pts[i - 1]["lon"], pts[i]["lat"], pts[i]["lon"])
     return total
 
 
 def label_stops(stops: list, pts: list, orders: list) -> None:
-    """Подписи на месте: база — у старта или финиша дня; заказ — адрес заказа
-    этого дня рядом и по времени; остальное — остановка."""
+    """Подписи на месте: заказ — адрес заказа этого дня рядом и по времени;
+    база — у старта или финиша дня; иначе по длительности — остановка или
+    стоянка («прибыл куда-то»)."""
     first, last = (pts[0] if pts else None), (pts[-1] if pts else None)
     ords = []
     for o in orders or []:
@@ -132,7 +135,9 @@ def label_stops(stops: list, pts: list, orders: list) -> None:
         ords.append({"lat": olat, "lon": olon, "at": _dt(o.get("delivered_at") or o.get("timestamp")),
                      "id": str(o.get("order_id") or ""), "address": str(o.get("address") or "")[:60]})
     for s in stops:
-        s["kind"], s["label"], s["order_id"], s["address"] = "stop", "Остановка", "", ""
+        long = s["sec"] >= VISIT_MIN_S
+        s["kind"], s["label"] = ("visit", "Стоянка") if long else ("stop", "Остановка")
+        s["order_id"], s["address"] = "", ""
         best, best_d = None, None
         for o in ords:
             d = haversine_m(s["lat"], s["lon"], o["lat"], o["lon"])
@@ -147,9 +152,8 @@ def label_stops(stops: list, pts: list, orders: list) -> None:
             s["kind"], s["label"] = "order", f"Заказ {best['id']}".strip()
             s["order_id"], s["address"] = best["id"], best["address"]
             continue
-        near_base = any(p and haversine_m(s["lat"], s["lon"], p["lat"], p["lon"]) <= NEAR_BASE_M
-                        for p in (first, last))
-        if near_base:
+        if any(p and haversine_m(s["lat"], s["lon"], p["lat"], p["lon"]) <= NEAR_BASE_M
+               for p in (first, last)):
             s["kind"], s["label"] = "base", "База"
 
 
@@ -163,41 +167,100 @@ def _thin(pts: list) -> list:
     return out
 
 
-def build(raw_points, orders=None) -> dict:
-    """Всё, что нужно карточке маршрута, одним словарём."""
+def _empty():
+    return {"points": 0, "timeline": [], "stops": [], "start": None, "end": None,
+            "summary": {"dist_km": 0, "moving_min": 0, "stop_min": 0, "stops": 0, "visits": 0,
+                        "gaps": 0, "from": "", "to": ""}}
+
+
+def build(raw_points, orders=None, now=None, today: bool = True) -> dict:
+    """Всё, что нужно экрану маршрута, одним словарём.
+
+    timeline — отрезки подряд без дыр, от первой точки до последней: в пути
+    (move, с куском линии и километрами), остановка / стоянка / заказ / база
+    (с точкой и подписью), разрыв (gap, две точки для пунктира). По нему
+    рисуется полоска внизу экрана и линия на карте; stops — те же остановки
+    отдельно, для меток. end.state — что сейчас: moving / stopped / lost, а за
+    прошлый день — last."""
     pts = norm_points(raw_points)
     if not pts:
-        return {"points": 0, "segments": [], "gaps": [], "stops": [], "start": None, "end": None,
-                "summary": {"dist_km": 0, "moving_min": 0, "stop_min": 0, "stops": 0, "gaps": 0,
-                            "from": "", "to": ""}}
+        return _empty()
+    now = _dt(now) or datetime.now(timezone.utc)
     stops = find_stops(pts)
     gaps = find_gaps(pts)
     label_stops(stops, pts, orders or [])
-    dist = distance_m(pts, gaps, stops)
-    span = (pts[-1]["at"] - pts[0]["at"]).total_seconds()
+    iso = lambda d: d.astimezone(timezone.utc).isoformat()
+    n = len(pts)
+
+    # Отрезки подряд: события по положению в треке, между ними — путь.
+    marks = [("stop", s["i0"], s) for s in stops] + [("gap", g["i"] - 1, g) for g in gaps]
+    marks.sort(key=lambda m: m[1])
+    timeline, cursor, move_m, no = [], 0, 0.0, 0
+    def _move(i0, i1):
+        nonlocal move_m
+        if i1 <= i0:
+            return
+        d = _dist(pts, i0, i1)
+        move_m += d
+        seg = _thin(pts[i0:i1 + 1])
+        timeline.append({"kind": "move", "from": iso(pts[i0]["at"]), "to": iso(pts[i1]["at"]),
+                         "min": round((pts[i1]["at"] - pts[i0]["at"]).total_seconds() / 60),
+                         "dist_km": round(d / 1000, 1),
+                         "pts": [[round(p["lat"], 6), round(p["lon"], 6)] for p in seg]})
+    for kind, at_i, ev in marks:
+        if kind == "stop":
+            _move(cursor, ev["i0"])
+            no += 1
+            ev["no"] = no
+            timeline.append({"kind": ev["kind"], "no": no, "label": ev["label"],
+                             "order_id": ev["order_id"], "address": ev["address"],
+                             "lat": round(ev["lat"], 6), "lon": round(ev["lon"], 6),
+                             "from": iso(ev["from"]), "to": iso(ev["to"]),
+                             "min": round(ev["sec"] / 60), "ongoing": False})
+            cursor = ev["i1"]
+        else:
+            _move(cursor, ev["i"] - 1)
+            timeline.append({"kind": "gap", "from": iso(ev["from"]), "to": iso(ev["to"]),
+                             "min": round(ev["sec"] / 60),
+                             "a": [round(ev["a"][0], 6), round(ev["a"][1], 6)],
+                             "b": [round(ev["b"][0], 6), round(ev["b"][1], 6)]})
+            cursor = ev["i"]
+    _move(cursor, n - 1)
+
+    # Сейчас. Последняя точка — не финиш: сегодня она говорит, что человек
+    # либо едет, либо стоит здесь с такого-то часа, либо пропал из эфира.
+    last = pts[-1]
+    age = (now - last["at"]).total_seconds()
+    in_stop = bool(stops) and stops[-1]["i1"] == n - 1
+    if not today:
+        state = "last"
+    elif age > LOST_S:
+        state = "lost"
+    elif in_stop:
+        state = "stopped"
+    else:
+        state = "moving"
+    if state == "stopped" and timeline and timeline[-1].get("kind") != "move":
+        # Стоит и сейчас: длительность считаем до «сейчас», а не до последней точки.
+        timeline[-1]["ongoing"] = True
+        timeline[-1]["min"] = round((now - stops[-1]["from"]).total_seconds() / 60)
+        stops[-1]["sec"] = (now - stops[-1]["from"]).total_seconds()
+
     stop_sec = sum(s["sec"] for s in stops)
     gap_sec = sum(g["sec"] for g in gaps)
-    # Линия — кусками между разрывами; сам разрыв карта рисует пунктиром.
-    segments, cut = [], 0
-    for g in gaps:
-        segments.append(pts[cut:g["i"]])
-        cut = g["i"]
-    segments.append(pts[cut:])
-    segs = [[[round(p["lat"], 6), round(p["lon"], 6)] for p in _thin(seg)] for seg in segments if len(seg) >= 1]
-    iso = lambda d: d.astimezone(timezone.utc).isoformat()
+    moving_sec = sum(t["min"] * 60 for t in timeline if t["kind"] == "move")
     return {
-        "points": len(pts),
-        "segments": segs,
-        "gaps": [{"from": iso(g["from"]), "to": iso(g["to"]), "min": round(g["sec"] / 60),
-                  "a": [round(g["a"][0], 6), round(g["a"][1], 6)],
-                  "b": [round(g["b"][0], 6), round(g["b"][1], 6)]} for g in gaps],
-        "stops": [{"no": n + 1, "kind": s["kind"], "label": s["label"], "order_id": s["order_id"],
+        "points": n,
+        "timeline": timeline,
+        "stops": [{"no": s["no"], "kind": s["kind"], "label": s["label"], "order_id": s["order_id"],
                    "address": s["address"], "lat": round(s["lat"], 6), "lon": round(s["lon"], 6),
-                   "from": iso(s["from"]), "to": iso(s["to"]), "min": round(s["sec"] / 60)}
-                  for n, s in enumerate(stops)],
+                   "from": iso(s["from"]), "to": iso(s["to"]), "min": round(s["sec"] / 60),
+                   "ongoing": bool(state == "stopped" and s is stops[-1])} for s in stops],
         "start": {"lat": round(pts[0]["lat"], 6), "lon": round(pts[0]["lon"], 6), "at": iso(pts[0]["at"])},
-        "end": {"lat": round(pts[-1]["lat"], 6), "lon": round(pts[-1]["lon"], 6), "at": iso(pts[-1]["at"])},
-        "summary": {"dist_km": round(dist / 1000, 1), "moving_min": max(0, round((span - stop_sec - gap_sec) / 60)),
-                    "stop_min": round(stop_sec / 60), "stops": len(stops), "gaps": len(gaps),
-                    "from": iso(pts[0]["at"]), "to": iso(pts[-1]["at"])},
+        "end": {"lat": round(last["lat"], 6), "lon": round(last["lon"], 6), "at": iso(last["at"]),
+                "state": state, "age_min": round(age / 60)},
+        "summary": {"dist_km": round(move_m / 1000, 1), "moving_min": round(moving_sec / 60),
+                    "stop_min": round(stop_sec / 60), "stops": len(stops),
+                    "visits": sum(1 for s in stops if s["kind"] in ("visit", "order", "base") and s["sec"] >= VISIT_MIN_S),
+                    "gaps": len(gaps), "from": iso(pts[0]["at"]), "to": iso(last["at"])},
     }

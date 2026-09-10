@@ -1130,8 +1130,9 @@ async def handle_where_route(request):
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[where] маршрут {who} за {day}: {e}")
         pts = []
-    out = route_stops.build(pts, orders)
-    out.update({"who": who, "day": day})
+    today = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
+    out = route_stops.build(pts, orders, now=datetime.now(timezone.utc), today=(day == today))
+    out.update({"who": who, "day": day, "today": day == today})
     return web.json_response(out, headers=CORS_HEADERS)
 
 

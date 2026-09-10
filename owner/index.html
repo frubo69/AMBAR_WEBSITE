@@ -4067,13 +4067,54 @@ button.path:active{transform:scale(.995)}
 .wh-stop{position:relative;width:100%;height:100%;border-radius:50%;background:#1a1408;color:#fff;
   display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;
   font-size:11px;font-weight:800;border:2px solid #C9A96E;box-shadow:0 2px 8px rgba(0,0,0,.5)}
-.wh-stop.order{border-color:#5B8DEF}
-.wh-stop.base{border-color:#8a8a99}
 .wh-stop.on{border-width:3px;font-size:13px;box-shadow:0 0 0 4px rgba(201,169,110,.35),0 4px 14px rgba(0,0,0,.6)}
 .wh-stop i{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);white-space:nowrap;
   font-style:normal;font-size:10.5px;font-weight:700;color:#fff;background:rgba(10,10,20,.88);
   padding:2px 7px;border-radius:7px;border:1px solid rgba(255,255,255,.12)}
 .wh-rt-sum{margin-bottom:8px}
+/* Экран маршрута. Тело уезжает и приезжает при листании дня (whRouteSlide*). */
+.wh-rt-page{padding:2px 2px 8px}
+.wh-rt-body{will-change:transform}
+.wh-rt-det{padding:14px 14px 12px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.wh-rt-det-h{display:flex;align-items:center;gap:9px}
+.wh-rt-det-h b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wh-rt-det-h span{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--muted);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.wh-rt-det-h .k{flex:0 0 12px;width:12px;height:12px;border-radius:50%;background:var(--k)}
+.wh-rt-det-s{margin-top:6px;font-size:12.5px;color:var(--sub);line-height:1.4}
+.wh-rt-det-a{display:flex;gap:8px;margin-top:12px}
+.wh-rt-btn{flex:1 1 0;padding:10px 12px;border-radius:11px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);color:var(--text);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.wh-rt-btn:active{background:rgba(255,255,255,.1)}
+.wh-rt-det-a .wh-rt-btn:not(:first-child){flex:0 0 46px;font-size:18px;line-height:1}
+.wh-rt-now{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
+.wh-rt-now b{display:block;font-size:14px;font-weight:700}
+.wh-rt-now.ok b{color:#3ddc84} .wh-rt-now.dn b{color:var(--dn)}
+.wh-rt-now i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px}
+.wh-rt-hint{margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
+.wh-rt-all{display:block;width:100%;margin-top:10px;padding:11px;border-radius:12px;border:1px solid rgba(201,169,110,.4);
+  background:rgba(201,169,110,.12);color:var(--gold2);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.wh-rt-all:active{background:rgba(201,169,110,.2)}
+/* Полоска маршрута в подвале шторки — на месте разделов, пока открыт маршрут. */
+.wh-tabs.route{flex-direction:column;align-items:stretch;gap:6px}
+.wh-strip{display:flex;flex-direction:column;gap:6px}
+.wh-strip-bar{display:flex;gap:2px;height:22px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.05)}
+.wh-strip-i{min-width:5px;border:0;padding:0;margin:0;background:var(--k);opacity:.82;cursor:pointer;
+  transition:opacity .18s var(--e1),transform .18s var(--e1);-webkit-tap-highlight-color:transparent}
+.wh-strip-i.gap{background:repeating-linear-gradient(135deg,var(--k) 0 4px,transparent 4px 7px)}
+.wh-strip-i.on{opacity:1;box-shadow:inset 0 0 0 2px #fff;transform:scaleY(1.18)}
+.wh-strip-bar:has(.on) .wh-strip-i:not(.on){opacity:.35}
+.wh-strip-t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Space Grotesk',sans-serif;
+  font-size:10.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.wh-strip-l{flex:1;display:flex;justify-content:center;gap:9px;font-family:'DM Sans',sans-serif;font-size:9.5px;
+  font-weight:600;letter-spacing:.2px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.wh-strip-l i{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--k);margin-right:3px;vertical-align:-1px}
+.wh-strip-e{padding:8px 0;text-align:center;font-size:11.5px;color:var(--muted)}
+.wh-stop.dim{opacity:.35}
+.wh-stop{border-color:var(--k)}
 .wh-rt{margin:0 0 8px;border-radius:16px;overflow:hidden;
   background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));
   border:1px solid rgba(255,255,255,.1)}
@@ -4086,8 +4127,9 @@ button.path:active{transform:scale(.995)}
 .wh-rt-r .dot{flex:0 0 22px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:10.5px;
   font-weight:800;color:#fff;background:#1a1408;border:2px solid #C9A96E;box-sizing:border-box}
-.wh-rt-r.order .dot{border-color:#5B8DEF}
-.wh-rt-r.base .dot{border-color:#8a8a99}
+.wh-rt-r.order .dot{border-color:#3ddc84}
+.wh-rt-r.visit .dot{border-color:#8FB4FF}
+.wh-rt-r.base .dot{border-color:#9a9aa8}
 .wh-rt-r.start .dot{border-color:#3ddc84;background:#3ddc84}
 .wh-rt-r.end .dot{border-color:#E05555;background:#E05555}
 .wh-rt-r.gap .dot{border:2px dashed #E05555;background:none}
@@ -11091,6 +11133,8 @@ function whSegInit(){
 // Фильтр списка. Тот же смысл, что у вкладок в Find My: сузить список до
 // тех, кем сейчас занимаешься, не теряя остальных с карты.
 function whFilter(f, изЖеста){
+  // Нажали раздел, стоя в карточке, — значит хотят список: выходим из неё.
+  if(WH.view !== 'list'){ WH.sel = null; WH.view = 'list'; WH.pop = false; WH.track = false; WH.route = null; WH.off = 0; }
   _whFilter = f;
   document.querySelectorAll('#whSeg button').forEach(b =>
     b.classList.toggle('on', b.dataset.f === f));
@@ -11113,6 +11157,7 @@ async function whereOpen(){
   whSnap('half', false);
   requestAnimationFrame(() => whSegSync(false));
   WH.view = 'list'; WH.sel = null; WH.track = false; WH.fit = true; WH.off = 0; WH.route = null;
+  whStripPaint();
   document.getElementById('whList').innerHTML =
     '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -11227,6 +11272,14 @@ function whRow(r, trackOn){
 // оператор получает не подсветку строки, а его экран — с состоянием, фактами
 // и действиями, — и карта под ним работает на этот экран.
 function whBack(){
+  if(WH.view === 'route'){
+    // Из маршрута — в карточку того же человека, полоска уступает разделам.
+    WH.view = 'card'; WH.track = false; WH.route = null; WH.off = 0; WH.pan = false;
+    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+    if(WH.data){ whPaint(); _whSwap(); whSnap('card', true); }
+    whereLoad();
+    return;
+  }
   WH.sel = null; WH.view = 'list'; WH.pop = false;
   WH.track = false; WH.route = null; WH.off = 0;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -11239,6 +11292,8 @@ function whPaint(listOnly){
   const d = WH.data; if(!d) return;
   document.getElementById('whCardBack').style.display =
     WH.view === 'card' ? 'flex' : 'none';
+  if(WH.view === 'route') return whRouteScreen();
+  whStripPaint();                    // вернуть разделы, если уходили с маршрута
   if(WH.view === 'card') return whCard();
   // Вернулись к списку — вернулся и заголовок: иначе в шапке остаётся имя
   // человека, которого на экране уже нет.
@@ -11346,35 +11401,33 @@ function whMapPaint(){
   // пересоздаёт метки, и без этого выбранная дёргалась бы всю смену.
   WH.pop = false;
 
-  const rd = (WH.sel && WH.track && WH.route && WH.route.data) ? WH.route.data : null;
+  const rd = (WH.view === 'route' && WH.route && WH.route.data) ? WH.route.data : null;
   if(rd && rd.points){
-    const layers = [];
-    // Линия в два слоя: широкая полупрозрачная снизу и узкая сверху. Так она
-    // читается и на светлых кварталах, и на тёмной воде. Между разрывами —
-    // кусками; сам разрыв — красным пунктиром: ехал без сигнала.
-    (rd.segments || []).forEach(seg => {
-      if(seg.length < 2) return;
-      const pth = whSmooth(seg);
-      layers.push(L.polyline(pth, {color:'#C9A96E', weight:9, opacity:.16, lineJoin:'round', lineCap:'round'}),
-                  L.polyline(pth, {color:'#E8D5AC', weight:3.5, opacity:.95, lineJoin:'round', lineCap:'round'}));
+    const layers = [], tl = rd.timeline || [], sel = WH.route.sel;
+    const dim = i => sel != null && sel !== i;          // выбран другой отрезок — этот приглушён
+    // Линия в два слоя: широкая полупрозрачная снизу и узкая сверху, по
+    // кускам пути; разрыв — красным пунктиром; остановки — кружками с
+    // номером, выбранная крупнее и с длительностью.
+    tl.forEach((x, i) => {
+      if(x.kind === 'move' && x.pts && x.pts.length > 1){
+        const pth = whSmooth(x.pts), on = sel === i;
+        layers.push(L.polyline(pth, {color:'#C9A96E', weight: on ? 12 : 9, opacity: dim(i) ? .06 : .16, lineJoin:'round', lineCap:'round'}),
+                    L.polyline(pth, {color: on ? '#FFF1CF' : '#E8D5AC', weight: on ? 4.5 : 3.5, opacity: dim(i) ? .3 : .95, lineJoin:'round', lineCap:'round'}));
+      } else if(x.kind === 'gap'){
+        layers.push(L.polyline([x.a, x.b], {color:'#E05555', weight: sel === i ? 3.5 : 2.5, opacity: dim(i) ? .3 : .85, dashArray:'6 8', lineCap:'round'}));
+      } else if(x.lat != null){
+        const on = sel === i, sz = on ? 34 : 24, k = WH_KIND[x.kind] || WH_KIND.stop;
+        const mk = L.marker([x.lat, x.lon], {icon: L.divIcon({className:'', iconSize:[sz, sz], iconAnchor:[sz / 2, sz / 2],
+          html:`<div class="wh-stop ${x.kind}${on ? ' on' : ''}${dim(i) ? ' dim' : ''}" style="--k:${k.c}"><span>${x.no}</span>${
+            on ? `<i>${whMin(x.min)}</i>` : ''}</div>`}), zIndexOffset: on ? 1000 : 500});
+        mk.on('click', () => whSegSel(i));
+        layers.push(mk);
+      }
     });
-    (rd.gaps || []).forEach(g => layers.push(
-      L.polyline([g.a, g.b], {color:'#E05555', weight:2.5, opacity:.85, dashArray:'6 8', lineCap:'round'})));
     const dot = (p, cls) => L.marker([p.lat, p.lon], {icon: L.divIcon({className:'', iconSize:[14,14],
       iconAnchor:[7,7], html:`<div class="wh-dotp ${cls}"></div>`}), interactive:false});
     if(rd.start) layers.push(dot(rd.start, 'start'));
-    if(rd.end && rd.points > 1) layers.push(dot(rd.end, 'end'));
-    // Остановки — кружком с номером, выбранная крупнее и с длительностью.
-    // Заказ — синим ободком, база — серым, прочее — золотом, как в списке.
-    (rd.stops || []).forEach(st => {
-      const on = WH.route.sel === st.no, sz = on ? 34 : 24;
-      const mk = L.marker([st.lat, st.lon], {icon: L.divIcon({className:'', iconSize:[sz, sz],
-        iconAnchor:[sz / 2, sz / 2],
-        html:`<div class="wh-stop ${st.kind}${on ? ' on' : ''}"><span>${st.no}</span>${
-          on ? `<i>${whMin(st.min)}</i>` : ''}</div>`}), zIndexOffset: on ? 1000 : 500});
-      mk.on('click', () => whStopGo(st.no));
-      layers.push(mk);
-    });
+    if(rd.end && (rd.end.state === 'lost' || rd.end.state === 'last')) layers.push(dot(rd.end, 'end'));
     WH.line = L.layerGroup(layers).addTo(WH.map);
   }else if(WH.sel && WH.pan){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
@@ -11417,7 +11470,6 @@ function whCard(){
   const d = WH.data, r = (d.drivers || []).find(x => x.driver === WH.sel);
   if(!r){ whBack(); return; }
   const st = whState(r);
-  const track = !!WH.track;
   _setText('whTtl', r.driver);
   { const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.remove('wh-big');
     const sub = document.getElementById('whSub'); if(sub) sub.hidden = false; }
@@ -11448,15 +11500,15 @@ function whCard(){
         </span>
         ${r.panic ? '<span class="wh-card-sos">скрытый режим</span>' : ''}
       </div>
-      ${r.has || WH.track ? `<div class="wh-acts">
-        <button class="wh-act${track ? ' on' : ''}" onclick="whTrack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M7.6 16.4c2.2-2.6 3.4-5 6.6-6.8 1.2-.7 2-1.3 2.5-2" stroke-dasharray="1.2 3.4"/></svg>Маршрут</button>
-        <button class="wh-act" onclick="whFocus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>${WH.track ? 'Весь маршрут' : 'Приблизить'}</button>
+      ${r.has ? `<div class="wh-acts">
+        <button class="wh-act" onclick="whRouteOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M7.6 16.4c2.2-2.6 3.4-5 6.6-6.8 1.2-.7 2-1.3 2.5-2" stroke-dasharray="1.2 3.4"/></svg>Маршрут</button>
+        <button class="wh-act" onclick="whFocus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>Приблизить</button>
       </div>` : ''}
-      ${WH.track ? whRouteHtml() : `<div class="wh-facts">
+      <div class="wh-facts">
         ${r.senior || r.device ? '' : `<span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
         <span><b class="${r.done ? '' : 'zero'}">${r.done || '—'}</b><i>сдал</i></span>`}
         <span><b class="${r.has ? '' : 'zero'}">${когда || '—'}</b><i>точка</i></span>
-      </div>`}
+      </div>
       ${r.senior ? '' : `<button class="wh-card-go${r.panic ? ' off' : ''}"
         onclick="whPanic('${escS(r.driver)}', ${r.panic ? 'false' : 'true'})"
         >${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>`}
@@ -11494,13 +11546,6 @@ async function whPanic(name, on){
 // Приблизить — с оглядкой на шторку: центр карты не середина экрана, а
 // середина того, что из неё видно.
 function whFocus(){
-  // В режиме маршрута — весь маршрут целиком; иначе — человек крупно.
-  if(WH.track && WH.route && WH.route.data && WH.route.data.points){
-    if(WH.route.sel != null){ WH.route.sel = null; whPaint(); }
-    whRouteFit();
-    try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-    return;
-  }
   const r = (WH.data.drivers || []).find(x => x.driver === WH.sel);
   if(!r || !r.has || !WH.map) return;
   whCenter(r.lat, r.lon, 16);
@@ -11532,62 +11577,85 @@ function whCenter(lat, lon, zoom, fly, dyTarget){
   else WH.map.setView(ll, z, {animate:true});
 }
 
-// ── Маршрут за день ──────────────────────────────────────────────────────
-// Кнопка «Маршрут» включает режим: свой запрос за выбранный день (WH.off),
-// линия кусками между разрывами, остановки с подписями и временем, итог.
-// Точки и список людей при этом остаются живыми, сегодняшними.
-function whTrack(){
-  WH.track = !WH.track;
+// ── МАРШРУТ ЗА ДЕНЬ ────────────────────────────────────────────────────────
+// Отдельный экран в стопке шторки: список → карточка → маршрут, со стрелкой
+// назад в шапке. Внизу вместо разделов — полоска дня: отрезки пути, остановок,
+// стоянок, заказов, базы и разрывов подряд; нажатие на отрезок показывает его
+// одного — на карте и в карточке. День листается стрелками и календарём, и
+// содержимое уезжает и приезжает, как карточка выручки на «Обзоре».
+const WH_KIND = {
+  move:  {t: 'В пути',    c: '#C9A96E'},
+  stop:  {t: 'Остановка', c: '#E8D5AC'},
+  visit: {t: 'Стоянка',   c: '#8FB4FF'},
+  order: {t: 'Заказ',     c: '#3ddc84'},
+  base:  {t: 'База',      c: '#9a9aa8'},
+  gap:   {t: 'Без сигнала', c: '#E05555'},
+};
+
+function whRouteOpen(){
+  if(!WH.sel) return;
+  WH.view = 'route'; WH.off = 0; WH.track = true;
+  WH.route = {who: WH.sel, day: _dayIsoFor(0), loading: true, data: null, sel: null, error: false};
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  if(!WH.track){ WH.off = 0; WH.route = null; whPaint(); return; }
-  whSnap('half', true);              // и линия на карте, и список остановок
-  whRouteLoad();
+  whPaint(); _whSwap();
+  whSnap('half', true);              // и карта с линией, и экран с полоской
+  whRouteLoad(0);
 }
 
-async function whRouteLoad(){
-  if(!WH.sel || !WH.track) return;
+async function whRouteLoad(dir){
+  if(WH.view !== 'route' || !WH.sel) return;
   const who = WH.sel, day = _dayIsoFor(WH.off || 0);
-  WH.route = {who, day, loading: true, data: null, sel: null};
-  whPaint();
+  WH.route = {...(WH.route || {}), who, day, loading: true, data: null, sel: null, error: false};
+  if(dir){ whRouteSlideOut(dir); whDayBarPaint(); }    // старое уезжает, день уже новый
+  else whPaint();
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/where/route', {params: {who, day}}); }
   catch(e){
-    if(WH.route && WH.route.who === who && WH.route.day === day){
-      WH.route = {who, day, loading: false, data: null, error: true, sel: null}; whPaint();
+    if(WH.view === 'route' && WH.route && WH.route.who === who && WH.route.day === day){
+      WH.route = {who, day, loading: false, data: null, error: true, sel: null};
+      whPaint(); if(dir) whRouteSlideIn(dir);
     }
     return;
   }
-  if(!WH.track || !WH.route || WH.route.who !== who || WH.route.day !== day) return;  // ушли дальше
-  WH.route = {who, day, loading: false, data: d, sel: null};
+  if(WH.view !== 'route' || !WH.route || WH.route.who !== who || WH.route.day !== day) return;
+  WH.route = {who, day, loading: false, data: d, sel: null, error: false};
   whPaint();
+  if(dir) whRouteSlideIn(dir);
   whRouteFit();
 }
 
-// Подогнать карту под весь маршрут — один раз при загрузке, а не на каждое
-// обновление списка: иначе карту не полистать, она возвращается сама.
-function whRouteFit(){
-  const d = WH.route && WH.route.data; if(!d || !WH.map) return;
-  const pts = (d.segments || []).flat();
-  if(pts.length < 2) return;
-  const sh = document.getElementById('whSheet');
-  const hide = sh ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
-  try{ WH.map.fitBounds(L.latLngBounds(pts).pad(0.2),
-        {maxZoom: 15, paddingTopLeft: [20, 20], paddingBottomRight: [20, hide + 20]}); }catch(e){}
+// Слайд дня: содержимое уезжает в сторону листания и приезжает с другой —
+// та же механика, что у карточки выручки. Оба движения на композиторе.
+function whRouteSlideOut(dir){
+  const b = document.getElementById('whRtBody'); if(!b) return;
+  b.style.transition = 'transform .22s var(--e1), opacity .22s var(--e1)';
+  b.style.transform = `translateX(${dir > 0 ? 100 : -100}%)`;
+  b.style.opacity = '0';
+}
+function whRouteSlideIn(dir){
+  const b = document.getElementById('whRtBody'); if(!b) return;
+  b.style.transition = 'none';
+  b.style.transform = `translateX(${dir > 0 ? -100 : 100}%)`;
+  b.style.opacity = '0';
+  void b.offsetWidth;
+  b.style.transition = 'transform .28s var(--e1), opacity .28s var(--e1)';
+  b.style.transform = '';
+  b.style.opacity = '';
 }
 
-// Полоса дня маршрута: стрелки, день с датой (нажатие — календарь), возврат
-// к сегодня. Свой день у локатора (WH.off). Хранится тридцать дней.
 function whDay(delta){
+  if(WH.view !== 'route') return;
   const next = Math.max(0, Math.min(365, (WH.off || 0) + delta));
   if(next === (WH.off || 0)) return;
   WH.off = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  whRouteLoad();
+  whRouteLoad(delta > 0 ? 1 : -1);
 }
 function whDaySet(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === (WH.off || 0)) return;
-  WH.off = off; whRouteLoad();
+  const dir = off > (WH.off || 0) ? 1 : -1;
+  WH.off = off; whRouteLoad(dir);
 }
 function whMin(m){
   m = Math.max(0, Math.round(m || 0));
@@ -11602,13 +11670,17 @@ function whClock(m){
 }
 function whDayBar(){
   const {имя, дата} = dayBarLabels(WH.off || 0);
-  return `<div class="wh-day">
+  return `<div class="wh-day" id="whDayBar">
     <button class="wh-day-b" onclick="whDay(1)" aria-label="День назад"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="wh-day-t" onclick="openDate('whDay')" aria-label="Выбрать день"><b>${имя}</b><i>${дата}</i></button>
     <button class="wh-day-b" onclick="whDay(-1)" aria-label="День вперёд" ${WH.off ? '' : 'disabled'}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     <button class="dn-home wh-day-home" onclick="whDay(-(WH.off || 0))" ${WH.off ? '' : 'hidden'} aria-label="Вернуться к сегодня"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
     <span class="wh-day-s">${whRouteSpan()}</span>
   </div>`;
+}
+function whDayBarPaint(){
+  const el = document.getElementById('whDayBar'); if(!el) return;
+  el.outerHTML = whDayBar();
 }
 function whRouteSpan(){
   const r = WH.route || {}, d = r.data;
@@ -11618,15 +11690,40 @@ function whRouteSpan(){
   return s.from && s.to ? `${_hmDubai(s.from)}–${_hmDubai(s.to)}` : '';
 }
 
-// Карточка маршрута: полоса дня, три числа итога и хронология — старт,
-// остановки с подписями и длительностью, разрывы, финиш. Нажатие на
-// остановку ведёт карту к ней и подсвечивает метку; повторное — снимает.
-function whRouteHtml(){
-  const r = WH.route || {}, bar = whDayBar();
-  if(r.loading) return bar + '<div class="wh-rt-e">Считаю маршрут…</div>';
-  if(r.error)   return bar + '<div class="wh-rt-e dn">Не удалось загрузить маршрут</div>';
-  const d = r.data;
-  if(!d || !d.points) return bar + `<div class="wh-rt-e">${WH.off
+// Что сейчас с человеком — словами, по последней точке. Финиша нет:
+// последняя точка не значит, что доехал.
+function whRouteNow(d){
+  const e = d.end || {}, t = _hmDubai(e.at);
+  if(e.state === 'moving')  return {t: 'Сейчас в пути', s: `точка ${t}`, c: 'ok'};
+  if(e.state === 'stopped'){
+    const last = (d.timeline || []).slice().reverse().find(x => x.kind !== 'move' && x.kind !== 'gap') || {};
+    return {t: `Стоит здесь с ${_hmDubai(last.from || e.at)}`, s: `уже ${whMin(last.min || 0)}${last.label && last.kind !== 'stop' && last.kind !== 'visit' ? ' · ' + last.label : ''}`, c: 'ok'};
+  }
+  if(e.state === 'lost')    return {t: `Сигнал пропал в ${t}`, s: `${whMin(e.age_min)} без точек`, c: 'dn'};
+  return {t: `Последняя точка в ${t}`, s: 'день закончился', c: ''};
+}
+
+// Экран маршрута. Шапка — имя и день, тело — полоса дня, три плитки и
+// карточка выбранного отрезка (или всего дня), подвал — полоска отрезков.
+function whRouteScreen(){
+  const r = WH.route || {}, d = r.data;
+  _setText('whTtl', WH.sel || '');
+  const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.remove('wh-big');
+  const sub = document.getElementById('whSub');
+  if(sub){ sub.hidden = false; sub.textContent = `маршрут · ${dayBarLabels(WH.off || 0).имя.toLowerCase()}`; }
+  document.getElementById('whCardBack').style.display = 'flex';
+  const body = document.getElementById('whList'), scroll = body.scrollTop;
+  body.innerHTML = `<div class="wh-rt-page">${whDayBar()}<div class="wh-rt-body" id="whRtBody">${whRouteBody()}</div></div>`;
+  body.scrollTop = scroll;
+  whStripPaint();
+  whMapPaint();
+}
+
+function whRouteBody(){
+  const r = WH.route || {}, d = r.data;
+  if(r.loading) return '<div class="wh-rt-e">Считаю маршрут…</div>';
+  if(r.error)   return '<div class="wh-rt-e dn">Не удалось загрузить маршрут</div>';
+  if(!d || !d.points) return `<div class="wh-rt-e">${WH.off
     ? 'Маршрута за этот день нет' : 'Маршрута за сегодня ещё нет'}</div>`;
   const s = d.summary || {};
   const sum = `<div class="wh-facts wh-rt-sum">
@@ -11634,41 +11731,116 @@ function whRouteHtml(){
     <span><b>${whClock(s.moving_min)}</b><i>${s.moving_min >= 60 ? 'ч в пути' : 'мин в пути'}</i></span>
     <span><b>${s.stops}</b><i>${pluralize(s.stops,'остановка','остановки','остановок')}</i></span>
   </div>`;
-  const ev = [];
-  if(d.start) ev.push({kind:'start', at: d.start.at, lat: d.start.lat, lon: d.start.lon});
-  (d.stops || []).forEach(x => ev.push({...x, at: x.from}));
-  (d.gaps || []).forEach(g => ev.push({kind:'gap', at: g.from, to: g.to, min: g.min, lat: g.a[0], lon: g.a[1]}));
-  if(d.end) ev.push({kind:'end', at: d.end.at, lat: d.end.lat, lon: d.end.lon});
-  ev.sort((a, b) => String(a.at).localeCompare(String(b.at)));
-  return bar + sum + `<div class="wh-rt">${ev.map(whRouteRow).join('')}</div>`;
+  return sum + whRouteDetail(d);
 }
-function whRouteRow(x){
-  const t = _hmDubai(x.at);
-  if(x.kind === 'start' || x.kind === 'end')
-    return `<button class="wh-rt-r ${x.kind}" onclick="whRouteGo(${x.lat}, ${x.lon})">
-      <i class="dot"></i><span class="t">${t}</span>
-      <span class="b"><b>${x.kind === 'start' ? 'Старт' : 'Финиш'}</b></span></button>`;
-  if(x.kind === 'gap')
-    return `<div class="wh-rt-r gap"><i class="dot"></i><span class="t">${t}</span>
-      <span class="b"><b>Без сигнала</b><u>до ${_hmDubai(x.to)}</u></span><span class="d">${whMin(x.min)}</span></div>`;
-  const on = WH.route && WH.route.sel === x.no;
-  const sub = x.address || (x.kind === 'base' ? 'там же, где старт или финиш дня' : `до ${_hmDubai(x.to)}`);
-  return `<button class="wh-rt-r ${x.kind}${on ? ' on' : ''}" onclick="whStopGo(${x.no})">
-    <i class="dot">${x.no}</i><span class="t">${t}</span>
-    <span class="b"><b>${escS(x.label)}</b><u>${escS(sub)}</u></span>
-    <span class="d">${whMin(x.min)}</span></button>`;
+
+// Карточка отрезка: выбран — он один; не выбран — весь день и подсказка,
+// что отрезки на полоске нажимаются.
+function whRouteDetail(d){
+  const sel = WH.route.sel, tl = d.timeline || [];
+  const x = sel != null ? tl[sel] : null;
+  if(!x){
+    const now = whRouteNow(d);
+    return `<div class="wh-rt-det all">
+      <div class="wh-rt-det-h"><b>Весь день</b><span>${_hmDubai(d.summary.from)}–${_hmDubai(d.summary.to)}</span></div>
+      <div class="wh-rt-now ${now.c}"><b>${escS(now.t)}</b><i>${escS(now.s)}</i></div>
+      <div class="wh-rt-hint">Нажмите отрезок на полоске внизу — покажу его на карте</div>
+      <button class="wh-rt-all" onclick="whRouteAll()">Весь маршрут на карте</button>
+    </div>`;
+  }
+  const k = WH_KIND[x.kind] || WH_KIND.stop;
+  const when = `${_hmDubai(x.from)}–${x.ongoing ? 'сейчас' : _hmDubai(x.to)}`;
+  let head, sub;
+  if(x.kind === 'move'){ head = 'В пути'; sub = `${x.dist_km} км за ${whMin(x.min)}`; }
+  else if(x.kind === 'gap'){ head = 'Без сигнала'; sub = `${whMin(x.min)} · ехал, точек не было`; }
+  else { head = x.label; sub = `${x.ongoing ? 'уже ' : ''}${whMin(x.min)}${x.address ? ' · ' + x.address : ''}`; }
+  return `<div class="wh-rt-det" style="--k:${k.c}">
+    <div class="wh-rt-det-h"><i class="k"></i><b>${escS(head)}</b><span>${when}</span></div>
+    <div class="wh-rt-det-s">${escS(sub)}</div>
+    <div class="wh-rt-det-a">
+      <button class="wh-rt-btn" onclick="whSegSel(${sel})">Показать весь день</button>
+      ${sel > 0 ? `<button class="wh-rt-btn" onclick="whSegSel(${sel - 1})" aria-label="Предыдущий отрезок">‹</button>` : ''}
+      ${sel < tl.length - 1 ? `<button class="wh-rt-btn" onclick="whSegSel(${sel + 1})" aria-label="Следующий отрезок">›</button>` : ''}
+    </div>
+  </div>`;
 }
-function whStopGo(no){
+
+// Полоска внизу — вместо разделов «Люди · В сети · Устройства», пока открыт
+// маршрут: отрезки по длительности, цвет — вид отрезка, выбранный подсвечен.
+function whStripPaint(){
+  const foot = document.getElementById('whTabs'), seg = document.getElementById('whSeg');
+  let strip = document.getElementById('whStrip');
+  if(!foot) return;
+  // Разделы прячем через display: у .wh-seg свой display:flex, и атрибут
+  // hidden он перебивает.
+  if(WH.view !== 'route'){
+    if(seg) seg.style.display = '';
+    if(strip) strip.remove();
+    foot.classList.remove('route');
+    return;
+  }
+  if(seg) seg.style.display = 'none';
+  foot.classList.add('route');
+  if(!strip){ strip = document.createElement('div'); strip.className = 'wh-strip'; strip.id = 'whStrip'; foot.appendChild(strip); }
+  const r = WH.route || {}, d = r.data, tl = (d && d.timeline) || [];
+  if(!tl.length){
+    strip.innerHTML = `<div class="wh-strip-e">${r.loading ? 'считаю…' : 'нет маршрута'}</div>`;
+    return;
+  }
+  const total = tl.reduce((a, x) => a + Math.max(1, x.min || 0), 0);
+  strip.innerHTML = `<div class="wh-strip-bar">${tl.map((x, i) => {
+    const k = WH_KIND[x.kind] || WH_KIND.stop;
+    const w = Math.max(1, x.min || 0) / total * 100;
+    return `<button class="wh-strip-i ${x.kind}${WH.route.sel === i ? ' on' : ''}" style="flex:0 0 ${w.toFixed(2)}%;--k:${k.c}"
+      onclick="whSegSel(${i})" aria-label="${escS(k.t)} ${_hmDubai(x.from)}"></button>`; }).join('')}</div>
+  <div class="wh-strip-t"><span>${_hmDubai(tl[0].from)}</span><span class="wh-strip-l">${
+    ['move','stop','visit','order','gap'].map(k => `<i style="--k:${WH_KIND[k].c}"></i>${WH_KIND[k].t.toLowerCase()}`).join('')
+  }</span><span>${_hmDubai(tl[tl.length - 1].to)}</span></div>`;
+}
+
+function whSegSel(i){
   const d = WH.route && WH.route.data; if(!d) return;
-  const st = (d.stops || []).find(x => x.no === no); if(!st) return;
-  WH.route.sel = WH.route.sel === no ? null : no;
+  const tl = d.timeline || [];
+  WH.route.sel = (WH.route.sel === i || i == null || !tl[i]) ? null : i;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   whPaint();
-  if(WH.route.sel != null) whCenter(st.lat, st.lon, 16, true);
+  const x = WH.route.sel != null ? tl[WH.route.sel] : null;
+  if(!x){ whRouteFit(); return; }
+  if(x.kind === 'move') whRouteFitPts(x.pts);
+  else if(x.kind === 'gap') whRouteFitPts([x.a, x.b]);
+  else whCenter(x.lat, x.lon, 16, true);
 }
-function whRouteGo(lat, lon){
+
+// «Весь маршрут»: шторку — на половину, если она закрывала карту, и
+// весь маршрут — в видимую часть карты.
+function whRouteAll(){
+  if(!WH.route) return;
+  if(WH.route.sel != null){ WH.route.sel = null; whPaint(); }
+  if(_whY === 'full') whSnap('half', true);
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-  whCenter(lat, lon, 16, true);
+  whRouteFit();
+}
+
+// Подогнать карту под точки в ВИДИМУЮ часть — над тем местом, куда шторка
+// едет, а не где она сейчас.
+function whRouteFitPts(pts){
+  if(!WH.map || !pts || pts.length < 1) return;
+  const sh = document.getElementById('whSheet');
+  let hide = 0;
+  if(sh){
+    const natural = sh.getBoundingClientRect().top - _whLiveY();
+    hide = Math.max(0, innerHeight - (natural + WH_SH.y));
+  }
+  try{
+    if(pts.length === 1){ whCenter(pts[0][0], pts[0][1], 16, true); return; }
+    WH.map.fitBounds(L.latLngBounds(pts).pad(0.2),
+      {maxZoom: 15, paddingTopLeft: [24, 24], paddingBottomRight: [24, hide + 24]});
+  }catch(e){}
+}
+function whRouteFit(){
+  const d = WH.route && WH.route.data; if(!d) return;
+  const pts = (d.timeline || []).flatMap(x => x.kind === 'move' ? x.pts : (x.kind === 'gap' ? [x.a, x.b] : [[x.lat, x.lon]]));
+  whRouteFitPts(pts);
 }
 
 function whFitAll(){
@@ -11704,7 +11876,7 @@ function whLayer(){
 function whPick(name){
   const same = WH.sel === name;
   WH.sel = name; WH.view = 'card'; WH.pan = true; WH.pop = !same;
-  if(!same){ WH.track = false; WH.route = null; WH.off = 0; }
+  WH.track = false; WH.route = null; WH.off = 0;      // заново — всегда карточка, не маршрут
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(WH.data){
     whPaint();          // содержимое карточки + полёт карты

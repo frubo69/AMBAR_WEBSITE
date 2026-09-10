@@ -15,8 +15,13 @@
   /opt/ambar/venv/bin/python /opt/ambar/tools/recount_customers.py          # только показать
   /opt/ambar/venv/bin/python /opt/ambar/tools/recount_customers.py --apply  # записать
 """
-import asyncio, sys
+import asyncio, os, sys
 sys.path.insert(0, "/opt/ambar")
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+except Exception:                                        # noqa: BLE001
+    pass
 import db
 
 
@@ -42,6 +47,7 @@ async def compute() -> dict:
 
 
 async def main(apply: bool):
+    await db.connect()
     d = db._db_or_none()
     if d is None:
         print("нет базы"); return 1

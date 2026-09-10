@@ -10885,7 +10885,7 @@ function whDragInit(){
 // только палец, но и скорость: короткий резкий сдвиг доводит до следующего
 // деления, даже если пальцем прошли половину.
 const WH_SEG = {x: 0, v: 0, raf: 0, drag: null};
-const WH_FILTERS = ['all', 'live', 'route'];
+const WH_FILTERS = ['people', 'live', 'devices'];   // порядок делений панели — как в разметке #whSeg
 
 function _whSegEls(){
   return {seg: document.getElementById('whSeg'), pill: document.getElementById('whSegPill')};
@@ -10990,7 +10990,10 @@ function whFilter(f, изЖеста){
   // «На связи» читается как промах, пока список не перерисуется.
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(_whY === 'peek') whSnap('half', true);
-  whPaint();
+  // Список перестраиваем следующим кадром, а карту не трогаем вовсе: метки
+  // от фильтра не зависят. Раньше всё это шло в тот же кадр, что и первый
+  // шаг таблетки, и она дёргалась, пока пересобирались список и метки.
+  requestAnimationFrame(() => setTimeout(() => whPaint(true), 0));
 }
 
 async function whereOpen(){
@@ -11118,7 +11121,7 @@ function whBack(){
   whereLoad();
 }
 
-function whPaint(){
+function whPaint(listOnly){
   const d = WH.data; if(!d) return;
   document.getElementById('whCardBack').style.display =
     WH.view === 'card' ? 'flex' : 'none';
@@ -11186,7 +11189,7 @@ function whPaint(){
         </div>`;
       }).join('')
     : `<div class="exp-empty">${emptyTxt}</div>`);
-  whMapPaint();
+  if(!listOnly) whMapPaint();
 }
 
 function whMapPaint(){

@@ -1075,9 +1075,12 @@ async def handle_customer(request):
         "ban_reason": u.get("ban_reason", ""),
         "first_seen": str(u.get("first_seen") or ""),
         "orders_total": u.get("orders_total", 0),
-        "orders_done": u.get("orders_done", 0),
+        # Доставлено и потрачено — по самим заказам: счётчики на клиенте
+        # отставали у всех, кому доставку закрывали из приложения.
+        "orders_done": sum(1 for o in orders if o.get("status") == "delivered" and not o.get("test")),
         "orders_declined": u.get("orders_declined", 0),
-        "total_spent": u.get("total_spent", 0),
+        "total_spent": sum(int(o.get("total") or 0) for o in orders
+                           if o.get("status") == "delivered" and not o.get("test")),
         "invited_via": u.get("invited_via", ""),
         "last": [{"order_id": o.get("order_id"), "status": o.get("status"),
                   "total": o.get("total", 0), "timestamp": o.get("timestamp", ""),
@@ -1423,6 +1426,7 @@ async def _close_delivered(oid: str, order: dict, who: str, by_driver: str = "")
         fields["delivered_by_driver"] = by_driver
     await db.update_order(oid, **fields)
     order.update(status="delivered")
+    await _count_delivered(oid, order)
     await _refresh_cards(order)
     await _customer_card(oid)
     try:
@@ -1437,6 +1441,39 @@ async def _close_delivered(oid: str, order: dict, who: str, by_driver: str = "")
             await db.update_order(oid, _delivered_notif_msgs=sent)
     except Exception as e:
         log.error(f"[pos] delivered notify failed: {e}")
+
+
+async def _count_delivered(oid: str, order: dict):
+    """Доставка — в счёт клиента: +1 заказ, +сумма, а «В долг» ещё и на долг.
+
+    Раньше это делал только бот оператора, и заказы, закрытые из приложения,
+    в счёт не попадали: клиент с двумя доставленными заказами видел у себя
+    «потрачено 0», карточка не давала ему статус, долг по заказу «В долг» не
+    рос, а стена верификации считала его так и не заказавшим. Отметка на
+    заказе делает счёт ровно одним — какой бы путь ни нажали и сколько раз."""
+    try:
+        cid = int(order.get("customer_id") or 0)
+    except (TypeError, ValueError):
+        cid = 0
+    total = int(order.get("total") or 0)
+    try:
+        from api_server import _TEST_ACCOUNTS
+    except Exception:                                   # noqa: BLE001
+        _TEST_ACCOUNTS = set()
+    if not cid or cid in _TEST_ACCOUNTS or order.get("test"):
+        return
+    try:
+        if await db.claim_order_flag(oid, "stats_counted"):
+            await db._increment_user(cid, orders_done=1, total_spent=total)
+    except Exception as e:                              # noqa: BLE001
+        log.error(f"[pos] delivered counters failed for #{oid}: {e}")
+    if order.get("payment_method") == "debt" and total:
+        try:
+            if await db.claim_debt_delivery(oid):
+                await db.add_debt(cid, total, order_id=oid, note="delivered")
+                log.info(f"[debt] +{total} AED to uid={cid} for #{oid}")
+        except Exception as e:                          # noqa: BLE001
+            log.error(f"[debt] increment failed for #{oid}: {e}")
 
 
 async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
@@ -1529,7 +1566,10 @@ async def handle_undeliver(request):
     # делают, но заказ мог быть заведён и на реального клиента — тогда счётчики
     # и долг надо откатить ровно так же, как это делает бот.
     try:
-        await db._increment_user(cid, orders_done=-1, total_spent=-total)
+        # Вычитаем только то, что прибавляли: у заказа, закрытого до этой
+        # отметки, счётчики не трогаем — иначе минус без плюса.
+        if await db.unclaim_order_flag(oid, "stats_counted"):
+            await db._increment_user(cid, orders_done=-1, total_spent=-total)
     except Exception as e:
         log.error(f"[pos] undeliver counters failed for #{oid}: {e}")
     if order.get("payment_method") == "debt" and total and cid:

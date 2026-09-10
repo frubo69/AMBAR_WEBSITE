@@ -1709,7 +1709,9 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat())
             order = await db.get_order(oid)
             total = (order or {}).get("total", 0)
-            await db._increment_user(cid, orders_done=1, total_spent=total)
+            # Ровно один плюс на заказ — та же отметка, что у приложения оператора.
+            if await db.claim_order_flag(oid, "stats_counted"):
+                await db._increment_user(cid, orders_done=1, total_spent=total)
             # В ДОЛГ: goods handed over → the order amount lands on the customer's
             # debt balance. claim_* makes it exactly-once even on a double-tap.
             if (order or {}).get("payment_method") == "debt" and total:
@@ -1743,7 +1745,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order and order.get("status") == "delivered":
             total = order.get("total", 0)
-            await db._increment_user(cid, orders_done=-1, total_spent=-total)
+            if await db.unclaim_order_flag(oid, "stats_counted"):
+                await db._increment_user(cid, orders_done=-1, total_spent=-total)
             # В ДОЛГ: un-deliver rolls the amount back off the debt balance.
             if order.get("payment_method") == "debt" and total:
                 try:

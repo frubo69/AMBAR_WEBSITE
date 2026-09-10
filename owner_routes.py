@@ -893,12 +893,21 @@ def _invited_was_new(u: dict):
         return None
 
 
-def _serialize_user(u: dict, orders: list | None = None) -> dict:
-    """Convert a user doc into a JSON-safe dict for the owner dashboard."""
+def _serialize_user(u: dict, orders: list | None = None, stats: dict | None = None) -> dict:
+    """Convert a user doc into a JSON-safe dict for the owner dashboard.
+
+    stats — доставлено и потрачено по самим заказам (db.customer_delivered_stats):
+    в карточке верим им, а не счётчикам на клиенте, которые отставали у всех,
+    кому доставку закрывали из приложения. Средний чек — на доставленный
+    заказ, а не на все, включая отклонённые."""
     card = _card_for_user(u)
     total_spent = int(u.get("total_spent", 0) or 0)
     orders_total = int(u.get("orders_total", 0) or 0)
-    avg_check = total_spent // orders_total if orders_total else 0
+    orders_done = int(u.get("orders_done", 0) or 0)
+    if stats:
+        total_spent = int(stats.get("total_spent") or 0)
+        orders_done = int(stats.get("orders_done") or 0)
+    avg_check = total_spent // orders_done if orders_done else 0
     phones = u.get("phones", [])
     phone = phones[0] if phones else (u.get("phone") or "")
     # Номера теперь трёх сортов. Подтверждённый живёт на пользователе — его
@@ -938,7 +947,7 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         "debt":          round(float(u.get("debt") or 0), 2),
         "total_spent":   total_spent,
         "orders_total":  orders_total,
-        "orders_done":   int(u.get("orders_done", 0) or 0),
+        "orders_done":   orders_done,
         "orders_declined": int(u.get("orders_declined", 0) or 0),
         "avg_check":     avg_check,
         "referral_points": int(u.get("referral_points", 0) or 0),
@@ -1336,7 +1345,7 @@ async def handle_customer_detail(request):
         })
 
     return web.json_response(
-        _serialize_user(user, safe_orders),
+        _serialize_user(user, safe_orders, await db.customer_delivered_stats(tg_id)),
         headers=CORS_HEADERS,
         dumps=lambda o: __import__("json").dumps(o, default=_json_default),
     )

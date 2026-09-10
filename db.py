@@ -1774,6 +1774,42 @@ async def claim_debt_delivery(oid: str) -> bool:
     return res.modified_count == 1
 
 
+async def claim_order_flag(oid: str, flag: str) -> bool:
+    """Отметка «уже посчитано» на заказе — ровно один раз. Счётчики клиента
+    прибавляются из бота и из приложения оператора, и без такой отметки
+    двойное нажатие или два пути дали бы два плюса на один заказ."""
+    db = _db_or_none()
+    if db is None: return False
+    res = await db.orders.update_one({"order_id": oid, flag: {"$ne": True}},
+                                     {"$set": {flag: True}})
+    if res.modified_count: _orders_dirty()
+    return res.modified_count == 1
+
+
+async def unclaim_order_flag(oid: str, flag: str) -> bool:
+    """Снять отметку — при возврате заказа из доставленных."""
+    db = _db_or_none()
+    if db is None: return False
+    res = await db.orders.update_one({"order_id": oid, flag: True},
+                                     {"$set": {flag: False}})
+    if res.modified_count: _orders_dirty()
+    return res.modified_count == 1
+
+
+async def customer_delivered_stats(telegram_id: int) -> dict:
+    """Сколько доставлено и на сколько — по самим заказам, а не по счётчикам
+    на клиенте: счётчики отставали, когда доставку закрывали не через бота."""
+    db = _db_or_none()
+    if db is None: return {"orders_done": 0, "total_spent": 0}
+    cur = db.orders.find({"customer_id": {"$in": [telegram_id, str(telegram_id)]},
+                          "status": "delivered", "test": {"$ne": True}},
+                         {"_id": 0, "total": 1})
+    n = spent = 0
+    async for o in cur:
+        n += 1; spent += int(o.get("total") or 0)
+    return {"orders_done": n, "total_spent": spent}
+
+
 async def unclaim_debt_delivery(oid: str) -> bool:
     """Reverse of claim_debt_delivery — used by undo-delivered."""
     db = _db_or_none()

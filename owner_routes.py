@@ -3507,7 +3507,7 @@ async def cash_round(day: str) -> dict:
                 elif st == "pending":
                     pending += amt
                 items.append({"id": e.get("id") or "", "kind": e.get("kind") or "other",
-                              "kind_t": e.get("kind_t") or _exp._kind(e).get("t", "Доп. расход"),
+                              "kind_t": e.get("kind_t") or _exp._kind(e).get("t", "Что-то ещё"),
                               "who": d["name"], "amount": amt, "at": str(e.get("at") or ""),
                               "status": st, "note": str(e.get("comment") or "")[:80],
                               "photo": bool(e.get("photo") or e.get("thumb") or e.get("car_photo"))})

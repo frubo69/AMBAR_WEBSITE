@@ -13692,8 +13692,10 @@ async function stkPicker(тихо){
     </button>`;
   const I_AUD = '<path d="M9 11l2 2 4-4"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
   const I_MOV = '<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>';
+  // Полки «История» под обеими плитками — с одним значком часов: стрелка в
+  // круге у перемещений читалась чужой (владелец), а история — она и есть
+  // история.
   const I_HAUD = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
-  const I_HMOV = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 9l3 3-3 3"/>';
   document.getElementById('stkMid').innerHTML = `<div class="sc-page">` +
     stkValueCard(reg) + `
     <div class="stk-tiles2">
@@ -13705,7 +13707,7 @@ async function stkPicker(тихо){
       <div class="stk-col">
         ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(nMov), 'в месяц',
                'скан / куда везём')}
-        ${sub('stkMovesHist()', I_HMOV, 'История')}
+        ${sub('stkMovesHist()', I_HAUD, 'История')}
       </div>
     </div></div>`;
   requestAnimationFrame(bindDayBars);        // смахивание карточки дня
@@ -18805,7 +18807,7 @@ async function qrHome(тихо){
       <div class="ord-dists qr-in" id="qrIn">${rows}</div>
       <button class="sc-r qr-hist" onclick="qrHistory()"><span class="qr-hist-i"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-        <span>История внесений</span><em>${_SC_CHEV}</em></button>
+        <span>История внесений/удалений</span><em>${_SC_CHEV}</em></button>
     </div>
   </div>`;
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
@@ -18886,7 +18888,7 @@ function qrDistTap(){
 const _QR_KIND = {intake: 'приёмка заявки', manual: 'вручную', removed: 'удалено'};
 async function qrHistory(){
   QR_IN = null;
-  _qrHead('История внесений', 'загрузка…', () => qrHome());
+  _qrHead('История внесений/удалений', 'загрузка…', () => qrHome());
   const box = document.getElementById('accMid');
   box.innerHTML = '<div class="scan-empty">Загрузка…</div>';
   let r;
@@ -19056,10 +19058,8 @@ function qrCat(id){
 
 function qrRenderList(){
   const q = (document.getElementById('qrQ')?.value || '').trim().toLowerCase();
-  // Число рядом со строкой — про ЭТУ точку. Раньше сюда шёл общий счёт по всем
-  // точкам, и на B3 стояли числа B4: человек видел «41 Absolut» там, где не
-  // заведено ни одной бутылки.
-  const have = ((ACC_QR && ACC_QR.by_product_district) || {})[QR_DIST] || {};
+  // Числа заведённых кодов у строк нет: владелец — «это и так есть в истории
+  // внесений». Справа только бронь и красный долг из ревизии.
   // Позиции, у которых на полке лежит больше, чем заведено кодами, — красным:
   // они ждут камеры. Число справа у них — сколько ещё без кодов.
   const need = ((ACC_QR && ACC_QR.unscanned_by_product) || {})[QR_DIST] || {};
@@ -19082,8 +19082,7 @@ function qrRenderList(){
     const n = QR_NEED ? (need[p.id] || 0) : 0;
     const tag = busy ? `<span class="pk-busy">${escS(lock.name)}</span>`
               : lock ? `<span class="pk-mine">вы считаете</span>`
-              : n ? `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>`
-              : have[p.id] ? `<span class="pk-n">${fmt(have[p.id])}</span>` : '';
+              : n ? `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>` : '';
     return `<button class="pk-row ${busy ? 'off' : ''}${n ? ' need' : ''}" ${busy ? 'disabled' : ''}
         onclick="qrStart('${p.id}')">
         <span class="pk-no">${p.no || ''}</span>

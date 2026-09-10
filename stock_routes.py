@@ -1013,7 +1013,11 @@ def base_drop():
 
 
 async def _sold_after(since: dict) -> dict:
-    """{район: {позиция: продано в учётных единицах}} после его пересчёта.
+    """{район: {позиция: [(момент, продано в учётных единицах), …]}} после его
+    пересчёта, по времени.
+
+    Не суммой, а событиями: продажа списывает то, что лежало на полке в её
+    момент, и бутылке, внесённой позже, не достаётся — см. _district_base.
 
     Читаем один раз от самого старого пересчёта и уже в памяти отсекаем по
     каждому району свой момент: пересчёты у всех разные, а пять выборок вместо
@@ -1037,8 +1041,11 @@ async def _sold_after(since: dict) -> dict:
             pid, q = it.get("id"), _qty(it)
             if not pid or not q:
                 continue
-            row = out.setdefault(oid, {})
-            row[pid] = row.get(pid, 0) + q / _unit(cat.get(pid) or {})
+            out.setdefault(oid, {}).setdefault(pid, []).append(
+                (ts, q / _unit(cat.get(pid) or {})))
+    for rows in out.values():
+        for ev in rows.values():
+            ev.sort(key=lambda e: e[0])
     return out
 
 
@@ -1073,7 +1080,8 @@ async def _district_base(day: str) -> dict:
     for oid in OFFICE_IDS:
         cnt = counts[oid]
         have = {l["id"]: float(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
-        came, gone = {}, sold.get(oid) or {}
+        came, sales = {}, sold.get(oid) or {}
+        gone = {pid: sum(q for _, q in ev) for pid, ev in sales.items()}
         try:
             if since[oid]:
                 came = await db.intake_since(oid, since[oid])
@@ -1087,14 +1095,29 @@ async def _district_base(day: str) -> dict:
         # значит она лежит на полке, и склад обязан её показать — даже там,
         # где пересчёта не было. Коды, которыми лишь закрывали долг «QR не
         # внесён», сюда не идут: те бутылки в пересчёте уже есть.
+        manual = {}
         try:
-            for pid, n in (await db.qr_manual_since(oid, since[oid])).items():
-                if pid in cat:
-                    have[pid] = (have.get(pid) or 0) + n / _unit(cat.get(pid) or {})
+            manual = {pid: ats for pid, ats in (await db.qr_manual_events(oid, since[oid])).items()
+                      if pid in cat}
         except Exception as e:
             log.warning(f"[stock] внесённое руками не учтено ({oid}): {e}")
-        for pid, n in gone.items():
-            have[pid] = max(0, (have.get(pid) or 0) - n)
+        if manual:
+            log.info(f"[stock] внесённое руками {oid}: "
+                     + ", ".join(f"{pid}×{len(ats)}" for pid, ats in manual.items()))
+        # Продажи и ручной приход — по времени, а не суммами. Продажа списывает
+        # то, что лежало на полке в её момент, и не глубже нуля; бутылка,
+        # внесённая позже, ей не достаётся. Суммами было иначе: пересчёт «0»,
+        # три продажи, потом одна внесённая бутылка — 0 + 1 − 3 = 0, и владелец
+        # искал на складе бутылку, которую только что завёл. Внёс — видно,
+        # при любом раскладе; исчезнуть она может только продажей после.
+        for pid in set(sales) | set(manual):
+            ev = [(ts, -q) for ts, q in (sales.get(pid) or [])]
+            ev += [(at, 1 / _unit(cat.get(pid) or {})) for at in (manual.get(pid) or [])]
+            ev.sort(key=lambda e: e[0])
+            bal = have.get(pid) or 0
+            for _, dq in ev:
+                bal = max(0, bal + dq)
+            have[pid] = bal
         # Разбитая бутылка ушла со склада так же честно, как проданная. Без
         # этого вычитания заявка возит на полку то, чего на ней уже нет, а
         # недостача каждый раз выглядит ошибкой пересчёта.

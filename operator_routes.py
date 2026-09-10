@@ -2318,6 +2318,8 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
         log.warning(f"[where] заказы водителей не прочитаны: {e}")
         work = {}
     now = datetime.now(timezone.utc)
+    day_start = datetime(day_obj.year, day_obj.month, day_obj.day, SHIFT_START_HOUR,
+                         tzinfo=DUBAI_TZ).astimezone(timezone.utc)
     # Кто сейчас в скрытом режиме. Локатор — единственное место, где это видно
     # старшему: у водителя приложение притворяется игрой, и написать ему нельзя.
     скрыты = set()
@@ -2338,10 +2340,22 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
         at = _dt_utc(r.get("at"))
         age = int((now - at).total_seconds()) if at else None
         until = _dt_utc(r.get("until"))
+        # Сколько стоит на месте (якорь из db.driver_pos_set) и не пропал ли:
+        # при живой трансляции человек на связи, пока двигался меньше двух
+        # часов назад; точка из кармана раз в несколько минут — стоянка.
+        mv_at = _dt_utc(r.get("mv_at")) or at
+        # Стояние считаем с полудня: вчерашний якорь не делает человека
+        # «без движения 16 ч» в первую минуту новых суток.
+        if mv_at and mv_at < day_start:
+            mv_at = day_start
+        still = int((now - mv_at).total_seconds()) if mv_at else None
+        streaming = bool(until and until > now)
         out.append({
             "driver": name, "has": True,
             "lat": r.get("lat"), "lon": r.get("lon"),
             "at": r.get("at"), "age": age, "acc": r.get("acc"),
+            "still": still,
+            "lost": bool(streaming and still is not None and still >= db.GEO_LOST_SEC),
             # «На связи» — это про свежесть точки, а не про способ, которым
             # она пришла. Точка из приложения приходит без срока трансляции, и
             # раньше такой водитель показывался серым, будто молчит, хотя он

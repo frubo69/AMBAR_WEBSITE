@@ -1060,12 +1060,19 @@ async def handle_where(request):
             label, code, is_dev = labels.get(r["driver"]) or ("STAR", "STAR", False)
             r["driver"] = label
             if is_dev:
+                # Планшет и должен лежать на месте: правило «два часа без
+                # движения» — про людей.
                 r.update({"device": True, "district": "devices", "code": code, "name": "",
-                          "gcode": "", "gname": "Устройства", "orders": 0, "done": 0})
+                          "gcode": "", "gname": "Устройства", "orders": 0, "done": 0,
+                          "lost": False, "still": None})
                 devs.append(r)
             else:
+                # Старший сидит на базе часами — это работа, а не пропажа.
+                # Пропал он, только если телефон два часа не присылает точку.
                 r.update({"senior": True, "district": "senior", "code": code,
-                          "name": "", "orders": 0, "done": 0})
+                          "name": "", "orders": 0, "done": 0,
+                          "lost": bool(r.get("stream") and r.get("age") is not None
+                                       and r["age"] >= db.GEO_LOST_SEC)})
                 rows.append(r)
         data["drivers"] = rows + data["drivers"] + devs
         if want_key:

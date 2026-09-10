@@ -231,8 +231,11 @@ def _iso_at(v) -> str:
     return v.isoformat() if hasattr(v, "isoformat") else str(v or "")
 
 
-async def _geo_state(name: str) -> dict:
-    """Что сейчас с геопозицией водителя: идёт ли трансляция и до какого часа."""
+async def _geo_state(name: str, since=None) -> dict:
+    """Что сейчас с геопозицией водителя: идёт ли трансляция и до какого часа.
+
+    since — с какого момента считать стояние (открытие смены, полдень): то,
+    что человек стоял дома до смены, в счёт не идёт."""
     rows = await db.driver_pos_all([name])
     r = (rows or [{}])[0] if rows else {}
     now = datetime.now(timezone.utc)
@@ -240,13 +243,25 @@ async def _geo_state(name: str) -> dict:
     fresh = bool(at and (now - at).total_seconds() < GEO_FRESH_SEC)
     live = bool(until and until > now)
     left = int((until - now).total_seconds() // 60) if live else 0
+    # С какой минуты стоит на месте (якорь из db.driver_pos_set). Пропал —
+    # только без движения GEO_LOST_SEC подряд: точка раз в несколько минут из
+    # кармана — это стоянка, а не пропажа.
+    mv_at = _dt_of(r.get("mv_at")) or at
+    since = _dt_of(since)
+    if mv_at and since and since > mv_at:
+        mv_at = since
+    still = int((now - mv_at).total_seconds()) if mv_at else None
+    lost = bool(live and still is not None and still >= db.GEO_LOST_SEC)
     # Бессрочная трансляция приходит сроком на десятки лет. Показывать «хватит
     # ещё на 596523 ч» бессмысленно: у неё просто нет конца, так и говорим.
     endless = left > 24 * 60
     return {"ok": fresh and live, "fresh": fresh, "stream": live,
             "until": "" if endless else (_iso_at(until) if until else ""),
             "left_min": 0 if endless else left, "endless": endless,
-            "age_sec": int((now - at).total_seconds()) if at else None}
+            "age_sec": int((now - at).total_seconds()) if at else None,
+            "still_sec": still, "lost": lost,
+            # для сторожа: трансляция идёт и человек не пропал
+            "watch_ok": live and not lost}
 
 
 def _must_left(d: dict) -> list:

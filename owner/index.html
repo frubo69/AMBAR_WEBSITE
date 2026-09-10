@@ -11311,11 +11311,22 @@ const IC_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" '
 // Раньше первые два были одним зелёным огоньком, и закрытое приложение ещё
 // пять минут выглядело как живая связь. Это обманывало ровно там, где решают,
 // кому отдать заказ.
+// Живая трансляция — «на связи», пока человек двигался меньше двух часов
+// назад (r.lost считает сервер по якорю стояния): телефон в кармане присылает
+// точку раз в несколько минут, и гасить метку по возрасту точки значило
+// показывать пропавшим того, кто просто сидит на месте (владелец, 11 сен
+// 2026). Возраст точки решает только для разовой точки из приложения.
 function whState(r){
   if(!r.has) return 'none';
-  if(r.stream && r.live) return 'stream';
+  if(r.stream) return r.lost ? 'lost' : 'stream';
   if(r.live) return 'snap';
   return 'stale';
+}
+function whDur(sec){
+  const m = Math.round((sec || 0) / 60);
+  if(m < 60) return m + ' мин';
+  const h = Math.floor(m / 60), mm = m % 60;
+  return mm ? `${h} ч ${mm} мин` : `${h} ч`;
 }
 
 // Остаток трансляции словами. «Пока не выключу» телеграм отдаёт сроком в
@@ -11339,9 +11350,10 @@ function whRow(r, trackOn){
   // отвечает на второй, точка из приложения — только на первый.
   let state;
   if(st === 'none')        state = 'не транслирует';
-  else if(st === 'stream') state = `<b>на связи</b>${_whLeft(r.left)}`;
+  else if(st === 'stream') state = `<b>на связи</b>${r.still >= 300
+      ? ` <i>· на месте ${whDur(r.still)}</i>` : _whLeft(r.left)}`;
+  else if(st === 'lost')   state = 'без движения ' + whDur(r.still);
   else if(st === 'snap')   state = `<u>был здесь ${whAgo(r.age)}</u>`;
-  else if(r.stream)        state = 'трансляция идёт, точки нет ' + whAgo(r.age).replace(' назад', '');
   else                     state = 'молчит ' + whAgo(r.age).replace(' назад', '');
   return `<button class="wh-r ${cls}${WH.sel === r.driver ? ' on' : ''}"
           onclick="whPick('${escS(r.driver)}')">
@@ -11572,7 +11584,10 @@ function whCard(){
   const когда = !r.has ? '' : (r.age < 90 ? 'сейчас'
     : (r.age < 3600 ? Math.round(r.age / 60) + ' мин' : Math.floor(r.age / 3600) + ' ч'));
   let head, sub;
-  if(st === 'stream'){ head = 'на связи'; sub = `трансляция ${left || 'идёт'} · точка ${когда}`; }
+  if(st === 'stream'){ head = 'на связи'; sub = r.still >= 300
+      ? `на месте ${whDur(r.still)} · трансляция ${left || 'идёт'}`
+      : `трансляция ${left || 'идёт'} · точка ${когда}`; }
+  else if(st === 'lost'){ head = 'без движения'; sub = `${whDur(r.still)} на одном месте · трансляция ${left || 'идёт'}`; }
   else if(st === 'snap'){ head = 'был здесь'; sub = `${whAgo(r.age)} · приложение закрыто`; }
   else if(r.has){ head = 'молчит'; sub = `${whAgo(r.age).replace(' назад','')} · последняя известная точка`; }
   else { head = 'не виден'; sub = 'геопозицией не делится'; }

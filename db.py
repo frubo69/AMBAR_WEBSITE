@@ -2882,6 +2882,40 @@ TRACK_MAX = 2000              # точек на смену: восемь час�
 DAY_TRACK_MAX = 6000          # точек в маршруте дня: сутки раз в пятнадцать секунд
 DAY_TRACK_KEEP = 30           # дней хранить маршруты по дням; дальше уходят сами
 
+# Стоит или едет — по якорю: место, где человек сейчас, и с какой минуты он
+# там. Точка дальше GEO_STILL_M от якоря (и дальше точности самой точки —
+# телефон в помещении отдаёт точки с разбросом в сотни метров) — поехал, якорь
+# переезжает. Ближе — стоит, якорь на месте. «Пропавшим» человек считается
+# только без движения GEO_LOST_SEC подряд: телефон в кармане присылает точку
+# раз в несколько минут, и это не пропажа, а стоянка.
+GEO_STILL_M = 150
+GEO_LOST_SEC = 2 * 3600
+
+
+def _geo_m(lat1, lon1, lat2, lon2) -> float:
+    import math
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * 6371000.0 * math.asin(math.sqrt(a))
+
+
+def geo_moved(prev: dict | None, lat: float, lon: float, acc, day: str) -> bool:
+    """Переезжает ли якорь на эту точку. Нет якоря или другой учётный день —
+    да: стояние не тянется через ночь."""
+    if not prev or prev.get("mv_lat") is None or prev.get("mv_at") is None:
+        return True
+    if day and prev.get("day") and prev.get("day") != day:
+        return True
+    try:
+        # Разброс точки расширяет круг, но не безгранично: телеграм отдаёт
+        # точность и в полтора километра, и с таким кругом весь район — «на месте».
+        radius = max(float(GEO_STILL_M), min(float(acc or 0), 500.0))
+        return _geo_m(float(prev["mv_lat"]), float(prev["mv_lon"]), float(lat), float(lon)) > radius
+    except (TypeError, ValueError):
+        return True
+
+
 async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
                          until=None, acc=None, stop_live: bool = False) -> None:
     """Точка водителя. until — до какого времени идёт трансляция.
@@ -2897,6 +2931,13 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
     pt = {"lat": round(float(lat), 6), "lon": round(float(lon), 6), "at": at}
     doc = {"$set": {"lat": pt["lat"], "lon": pt["lon"], "at": at, "day": day},
            "$push": {"track": {"$each": [pt], "$slice": -TRACK_MAX}}}
+    try:
+        prev = await db.driver_pos.find_one({"_id": name}, {"mv_lat": 1, "mv_lon": 1,
+                                                            "mv_at": 1, "day": 1})
+    except Exception:                            # noqa: BLE001
+        prev = None
+    if geo_moved(prev, pt["lat"], pt["lon"], acc, day):
+        doc["$set"].update({"mv_lat": pt["lat"], "mv_lon": pt["lon"], "mv_at": at})
     if stop_live:
         doc["$unset"] = {"until": ""}
     elif until is not None:

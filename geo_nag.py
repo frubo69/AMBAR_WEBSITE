@@ -132,7 +132,9 @@ async def tick(now: datetime = None) -> dict:
         at = _dt(r.get("at"))
         fresh = at and (utc - at).total_seconds() < STALE_MIN * 60
 
-        if fresh and until:
+        # Трансляция идёт — напоминать не о чем, даже если точка старая:
+        # телефон в кармане присылает её раз в несколько минут.
+        if until and until > utc:
             left = (until - utc).total_seconds() / 60
             if 0 < left <= WARN_MIN:
                 ends.append(name)

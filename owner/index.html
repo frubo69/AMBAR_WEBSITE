@@ -13222,7 +13222,7 @@ async function stkPicker(тихо){
     <div class="stk-tiles2">
       <div class="stk-col">
         ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(nAud), 'в месяц',
-               'район / камера / отчёт')}
+               'район / скан / отчёт')}
         ${sub('stkAudits()', I_HAUD, 'История')}
       </div>
       <div class="stk-col">
@@ -14087,7 +14087,7 @@ function audReport(rep){
       : '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v9"/><path d="M12 18.5v.5"/></svg>'}</div>
     <div class="aud-res-t">${allOk ? 'Всё сошлось' : 'Есть расхождения'}</div>
     <div class="aud-res-s">${escS(_dayName(rep.day))} · ${fmt(t.positions || 0)} ${
-      pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · камерой ${fmt(t.scan_qty || 0)}</div>
+      pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmt(t.scan_qty || 0)}</div>
     ${allOk ? '' : `<div class="aud-res-g">
       <div class="aud-t ${t.short_qty ? 'dn' : ''}"><span class="aud-tl">Не хватает</span>
         <b class="aud-tv">${fmt(t.short_qty || 0)}</b>
@@ -15539,12 +15539,18 @@ function accDayGo(off){
   DAY_OFFSET = off;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accLoadSummaries();                     // плитки учёта — за тот же день
-  if(document.getElementById('stkBySum')){ stkByReload(); return; }
-  if(document.getElementById('stkDay')){
-    ACC_STOCK = null; daySkel('stkValCard'); stkPicker(true); return;
+  // Перечитывает себя тот раздел, который НА ЭКРАНЕ, а не тот, чей узел
+  // остался в разметке: закрытый «Склад» не стирается, и его полоса дня
+  // молча перехватывала свайп на «Расходах смены» — день листался, а
+  // списания и расходы стояли на месте. «Учёт» лежит поверх склада, поэтому
+  // при обоих открытых он первый.
+  const on = id => document.getElementById(id).classList.contains('show');
+  if(on('accOv') && document.getElementById('expSum')){
+    EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true); return;
   }
-  if(document.getElementById('expSum')){
-    EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true);
+  if(on('stkOv') && document.getElementById('stkBySum')){ stkByReload(); return; }
+  if(on('stkOv') && document.getElementById('stkDay')){
+    ACC_STOCK = null; daySkel('stkValCard'); stkPicker(true);
   }
 }
 
@@ -18212,7 +18218,7 @@ async function qrHome(тихо){
     <div class="sc">
       <button class="sc-r qr-free" onclick="qrFreeStart()">
         <span class="qr-free-i">${_QR_ICO}</span>
-        <span>Внести новый товар<i>район → позиция → камера</i></span><em>${_SC_CHEV}</em>
+        <span>Внести новый товар<i>район → позиция → скан</i></span><em>${_SC_CHEV}</em>
       </button>
     </div>
     <div class="sc grow">

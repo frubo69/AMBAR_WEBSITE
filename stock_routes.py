@@ -1832,9 +1832,9 @@ async def handle_audit_finish(request):
         fields["closed_at"] = now_iso
     a = await db.audit_set(district, day, fields)
     log.info(f"[audit] {district} {day}: завершена — не хватает {tot['short_qty']} бут "
-             f"/ {tot['short_aed']} AED, излишек {tot['over_qty']}, камерой {stats.get('total', 0)}")
+             f"/ {tot['short_aed']} AED, излишек {tot['over_qty']}, сканом {stats.get('total', 0)}")
     await backdate.notify(day, who, "ревизия",
-                          f"{OFFICE_CODES.get(district, district)} — камерой {stats.get('total', 0)}"
+                          f"{OFFICE_CODES.get(district, district)} — сканом {stats.get('total', 0)}"
                           + (f", не хватает {tot['short_aed']} AED" if tot["short_aed"] else ""))
     return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
 

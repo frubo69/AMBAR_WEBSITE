@@ -2097,20 +2097,22 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   font-size:11px;font-weight:700;color:var(--up);background:rgba(76,175,125,.14)}
 .cr-st svg{width:12px;height:12px}
 .cr-none{flex:0 0 auto;font-size:11.5px;color:var(--muted)}
-.cr-net{display:flex;align-items:baseline;gap:8px;margin-top:14px}
-.cr-net-l{flex:1;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
-.cr-net b{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;
-  letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--text)}
-.cr-net.minus b{color:var(--dn)}
-.cr-cur{font-size:12px;font-weight:600;color:var(--muted)}
-.cr-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;padding-top:12px;
-  border-top:1px solid var(--border2)}
-.cr-row3 span{display:flex;flex-direction:column;gap:3px;min-width:0}
-.cr-row3 i{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
-.cr-row3 b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
-.cr-row3 b.dn{color:var(--dn)} .cr-row3 b.gold{color:var(--gold2)}
-.cr-row3 u{text-decoration:none;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cr-row3 u.warn{color:var(--warn)}
+/* Две суммы, которые старший забирает, — крупно и слева: выручка (наличные
+   минус расход водителя) и чай, порознь, потому что и берутся порознь.
+   Остальное — строкой ниже, без акцента. Доплат водителю нет: его расход
+   просто вычитается из вала, и минус остаётся минусом. */
+.cr-main{display:flex;gap:28px;margin-top:14px}
+.cr-big{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cr-big i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.cr-big b{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;
+  letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.cr-big b.dn{color:var(--dn)} .cr-big b.gold{color:var(--gold2)}
+.cr-big u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;
+  letter-spacing:0;color:var(--muted);margin-left:5px}
+.cr-sub{margin-top:12px;padding-top:10px;border-top:1px solid var(--border2);font-size:11.5px;
+  line-height:1.5;color:var(--muted)}
+.cr-sub b{font-weight:600;color:var(--sub)}
+.cr-sub .warn{color:var(--warn)}
 .cr-fold{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:10px;
   padding:10px 2px 4px;border:0;border-top:1px solid var(--border2);background:none;cursor:pointer;
   font-family:inherit;font-size:12.5px;font-weight:600;color:var(--sub);text-align:left}
@@ -16174,10 +16176,10 @@ function crRender(){
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
     <div class="cr-tot">
-      <span><i>к сдаче всего</i><b>${fmt(d.net_total)}</b></span>
+      <span><i>выручка</i><b${d.net_total < 0 ? ' class="dn"' : ''}>${d.net_total < 0 ? '−' : ''}${fmt(Math.abs(d.net_total))}</b></span>
+      <span><i>чай</i><b class="gold">${fmt(d.tips_total)}</b></span>
       <span><i>наличные</i><b>${fmt(d.cash_total)}</b></span>
       <span><i>расход</i><b class="dn">${fmt(d.spend_total)}</b></span>
-      <span><i>чай</i><b class="gold">${fmt(d.tips_total)}</b></span>
     </div>
   </div>`;
   document.getElementById('accMid').innerHTML = head + list.map(crCard).join('');
@@ -16194,24 +16196,22 @@ function crCard(x){
   </div>`;
   const open = CR_OPEN.has(x.id);
   const n = (x.items || []).length;
-  // Главное число отвечает на один вопрос: сколько водитель кладёт на стол.
-  // Ушёл в минус — значит потратил больше, чем собрал, и это ему доплата.
-  const net = x.net, minus = net < 0;
+  // Два числа, которые старший забирает: выручка (наличные минус расход
+  // водителя) и чай — порознь, потому что и берутся порознь. Доплат
+  // водителю нет: ушёл в минус — так и пишем, с минусом.
+  const net = x.net;
   return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
       <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
       ${x.done ? `<span class="cr-st">${IC('check', 12)}собрано${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>` : ''}
     </div>
-    <div class="cr-net${minus ? ' minus' : ''}">
-      <span class="cr-net-l">${minus ? 'Доплатить водителю' : 'К сдаче'}</span>
-      <b>${fmt(Math.abs(net))}</b><span class="cr-cur">AED</span>
+    <div class="cr-main">
+      <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${net < 0 ? '−' : ''}${fmt(Math.abs(net))}<u>AED</u></b></span>
+      <span class="cr-big"><i>Чай</i><b class="gold">${fmt(x.tips)}<u>AED</u></b></span>
     </div>
-    <div class="cr-row3">
-      <span><i>наличные</i><b>${fmt(x.cash)}</b><u>${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')}</u></span>
-      <span><i>расход</i><b class="dn">${fmt(x.spend)}</b>${x.spend_pending ? `<u class="warn">+${fmt(x.spend_pending)} ждёт</u>` : '<u>за смену</u>'}</span>
-      <span><i>чай</i><b class="gold">${fmt(x.tips)}</b><u>операторам</u></span>
-    </div>
+    <div class="cr-sub">наличные <b>${fmt(x.cash)}</b> · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · расход <b>${fmt(x.spend)}</b> за смену${
+      x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}</div>
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>

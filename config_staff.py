@@ -110,6 +110,27 @@ def senior_star_by_tg(telegram_id) -> str:
     return next((n for n, t in SENIOR_STAR_IDS.items() if t == tid), "")
 
 
+# ── устройства ───────────────────────────────────────────────────────────────
+# Планшеты и прочее, чью геопозицию смотрят отдельно от людей. Метка и
+# аккаунт, с которого устройство транслирует в бот устройств:
+# AMBAR_DEVICE_IDS="iPad Star:telegram_id,…". Строки нет — устройств нет.
+DEVICE_IDS = _parse_driver_ids(_os.getenv("AMBAR_DEVICE_IDS", ""))
+
+
+def device_by_tg(telegram_id) -> str:
+    """Метка устройства по аккаунту; не устройство — пусто."""
+    try:
+        tid = int(telegram_id or 0)
+    except (TypeError, ValueError):
+        return ""
+    return next((n for n, t in DEVICE_IDS.items() if t == tid), "")
+
+
+def device_code(label: str) -> str:
+    """Короткий код на карте — первое слово метки: «iPad Star» → iPad."""
+    return ((label or "").split() or [label or ""])[0][:6]
+
+
 # ── доступы операторов ──────────────────────────────────────────────────────
 # У районного оператора своего входа в телеграм долго не было: заказы принимал
 # старший со своего устройства, и «оператор района» существовал только как

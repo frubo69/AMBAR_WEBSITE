@@ -1024,14 +1024,15 @@ async def handle_where(request):
     import geo_watch
     seniors = list(staff.SENIOR_STAR_IDS)
     # В локаторе старший подписан STAR — так его и называют; маршрут по нему
-    # просят тем же словом, а ключ точки остаётся по имени из .env. Планшет
-    # старшего — отдельная строка «iPad Star» со своим ключом: телефон при
-    # нём, планшет на точке, и одна запись на двоих сбивала след.
-    labels = {}                                  # ключ точки → (подпись, код, устройство)
+    # просят тем же словом, а ключ точки остаётся по имени из .env. Устройства
+    # (планшеты из бота устройств) — своей группой в конце списка, под своей
+    # меткой: телефон старшего и его планшет — разные точки.
+    P, D = geo_watch.SENIOR_PREFIX, geo_watch.DEVICE_PREFIX
+    labels = {}                                  # ключ точки → (подпись, код, устройство?)
     for n in seniors:
-        phone, ipad = geo_watch.senior_keys(n)
-        labels[phone] = ("STAR", "STAR", "phone")
-        labels[ipad] = (geo_watch.IPAD_LABEL, "iPad", "tablet")
+        labels[P + n] = ("STAR", "STAR", False)
+    for lb in staff.DEVICE_IDS:
+        labels[D + lb] = (lb, staff.device_code(lb), True)
     want_key = next((k for k, v in labels.items() if v[0] == want), "") if want else ""
     data = await pos.drivers_live(names, day, "" if want_key else want)
     for r in data["drivers"]:
@@ -1040,19 +1041,24 @@ async def handle_where(request):
     # он не возит. Точка лежит под своим ключом, чтобы не спутать с тёзкой.
     try:
         sen = await pos.drivers_live(list(labels), day, want_key)
-        rows = []
+        rows, devs = [], []
         for r in sen["drivers"]:
-            label, code, device = labels.get(r["driver"]) or ("STAR", "STAR", "phone")
+            label, code, is_dev = labels.get(r["driver"]) or ("STAR", "STAR", False)
             r["driver"] = label
-            r.update({"senior": True, "district": "senior", "code": code,
-                      "device": device, "name": "", "orders": 0, "done": 0})
-            rows.append(r)
-        data["drivers"] = rows + data["drivers"]
+            if is_dev:
+                r.update({"device": True, "district": "devices", "code": code, "name": "",
+                          "gcode": "", "gname": "Устройства", "orders": 0, "done": 0})
+                devs.append(r)
+            else:
+                r.update({"senior": True, "district": "senior", "code": code,
+                          "name": "", "orders": 0, "done": 0})
+                rows.append(r)
+        data["drivers"] = rows + data["drivers"] + devs
         if want_key:
             data["track"] = sen.get("track", [])
             data["track_of"] = want
     except Exception as e:                       # noqa: BLE001
-        log.warning(f"[where] старший не прочитан: {e}")
+        log.warning(f"[where] старший и устройства не прочитаны: {e}")
     return web.json_response(data, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
@@ -1113,22 +1119,16 @@ async def handle_pos(request):
     if not (-90 <= lat <= 90 and -180 <= lon <= 180):
         return web.json_response({"error": "bad_coords"}, status=400, headers=CORS_HEADERS)
     acc = body.get("acc")
-    # С какого устройства точка, говорит панель (device: phone / tablet).
-    # Планшет пишется под своим ключом — в локаторе это строка «iPad Star».
-    # Старая страница поля не шлёт — тогда смотрим, не назвался ли браузер
-    # планшетом сам.
-    device = str(body.get("device") or "").strip().lower()
-    if not device and "ipad" in (request.headers.get("User-Agent") or "").lower():
-        device = "tablet"
-    phone, ipad = geo_watch.senior_keys(name)
-    key = ipad if device == "tablet" else phone
+    # Планшет точку из панели не шлёт: устройства транслируют в бот устройств,
+    # а панель на планшете лежит на точке и только сбивала бы след телефона.
+    # Старая страница может прислать device: tablet — принимаем и не пишем.
+    if str(body.get("device") or "").strip().lower() == "tablet":
+        return web.json_response({"ok": True, "ignored": "tablet"}, headers=CORS_HEADERS)
     now = datetime.now(timezone.utc)
     day = pos._biz_date(datetime.now(pos.DUBAI_TZ)).isoformat()
-    await db.driver_pos_set(key, day, lat, lon, now,
+    await db.driver_pos_set(geo_watch.SENIOR_PREFIX + name, day, lat, lon, now,
                             acc=acc if isinstance(acc, (int, float)) else None)
-    return web.json_response({"ok": True, "at": now.isoformat(),
-                              "device": "tablet" if key == ipad else "phone"},
-                             headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "at": now.isoformat()}, headers=CORS_HEADERS)
 
 
 @require_owner

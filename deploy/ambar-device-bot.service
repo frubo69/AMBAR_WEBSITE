@@ -1,0 +1,28 @@
+# Systemd unit for the AMBAR geo bot — принимает живую трансляцию геопозиции
+# водителей и старшего (device_bot.py). Отдельный бот, чтобы трансляцию не
+# телефон старшего под одним аккаунтом не сбивали след друг другу.
+#
+# Install on VPS (после того как AMBAR_DEVICE_BOT_TOKEN и AMBAR_DEVICE_IDS добавлен в /opt/ambar/.env):
+#   sudo cp /opt/ambar/deploy/ambar-device-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ambar-device-bot
+
+[Unit]
+# Предохранитель: пять падений за минуту — юнит останавливается, и это видно.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+Description=AMBAR Device Bot (live location of tablets and other devices)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ambar
+EnvironmentFile=/opt/ambar/.env
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/device_bot.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

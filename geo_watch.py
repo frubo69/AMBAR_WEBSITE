@@ -69,27 +69,26 @@ EVENT_SENIOR = "drivers.senior_geo"
 # Точка старшего лежит там же, где точки водителей, но под своим ключом:
 # среди водителей бывает тёзка, и имя само по себе ключом быть не может.
 SENIOR_PREFIX = "op:"
-# У старшего два устройства под одним аккаунтом: телефон (трансляция в чате
-# бота) и планшет (точка из панели, пока она открыта). Раньше обе писались в
-# одну запись и сбивали след друг другу; теперь у планшета свой ключ и своя
-# строка в локаторе — «iPad Star». Телефон остаётся под именем.
-IPAD_SUFFIX = "@ipad"
-IPAD_LABEL = "iPad Star"
+# Устройства (планшеты) лежат там же, под своим ключом: в локаторе это
+# отдельная группа, и с людьми они не путаются. Транслируют они в отдельный
+# бот устройств (device_bot.py); старший и водители — в бот геопозиции.
+DEVICE_PREFIX = "dev:"
 
 
-_GEO_BOT = {"at": 0.0, "link": ""}
+_BOT_LINK: dict = {}
 
 
-async def geo_bot_link() -> str:
-    """Ссылка на бот геопозиции — туда водители и старший включают трансляцию.
-    Имя бота спрашиваем у телеграма по токену один раз и помним; токена нет
-    или телеграм не ответил — пусто, и тексты обходятся без ссылки."""
+async def _bot_link(env: str) -> str:
+    """Ссылка на бота по токену из .env. Имя спрашиваем у телеграма один раз и
+    помним; токена нет или телеграм не ответил — пусто, и тексты обходятся
+    без ссылки (повтор не раньше чем через пять минут)."""
     import time as _t
     now = _t.monotonic()
-    if _GEO_BOT["link"] or now - _GEO_BOT["at"] < 300:
-        return _GEO_BOT["link"]
-    _GEO_BOT["at"] = now
-    token = os.getenv("AMBAR_GEO_BOT_TOKEN", "")
+    c = _BOT_LINK.setdefault(env, {"at": 0.0, "link": ""})
+    if c["link"] or now - c["at"] < 300:
+        return c["link"]
+    c["at"] = now
+    token = os.getenv(env, "")
     if not token:
         return ""
     try:
@@ -99,10 +98,20 @@ async def geo_bot_link() -> str:
                 d = await r.json()
         u = ((d or {}).get("result") or {}).get("username") or ""
         if u:
-            _GEO_BOT["link"] = f"https://t.me/{u}"
+            c["link"] = f"https://t.me/{u}"
     except Exception as e:                       # noqa: BLE001
-        log.warning(f"[geo] имя бота геопозиции не узнали: {e}")
-    return _GEO_BOT["link"]
+        log.warning(f"[geo] имя бота ({env}) не узнали: {e}")
+    return c["link"]
+
+
+async def geo_bot_link() -> str:
+    """Бот геопозиции — туда водители и старший включают трансляцию."""
+    return await _bot_link("AMBAR_GEO_BOT_TOKEN")
+
+
+async def device_bot_link() -> str:
+    """Бот устройств — туда транслируют планшеты."""
+    return await _bot_link("AMBAR_DEVICE_BOT_TOKEN")
 
 
 async def geo_how() -> str:
@@ -111,10 +120,6 @@ async def geo_how() -> str:
     return ("В боте геопозиции" + (f" {link}" if link else "") + ": "
             "📎 → «Геопозиция» → «Транслировать» → «Пока не выключу». Один раз.")
 
-
-def senior_keys(name: str) -> tuple:
-    """(ключ телефона, ключ планшета) старшего в driver_pos."""
-    return SENIOR_PREFIX + name, SENIOR_PREFIX + name + IPAD_SUFFIX
 
 _STARTED = None
 
@@ -355,11 +360,9 @@ async def _seniors_tick(now: datetime, utc: datetime, day: str, out: dict) -> No
     if not _working_hours(now):
         return
     for name in list(staff.SENIOR_STAR_IDS):
-        key, ipad = senior_keys(name)
+        key = SENIOR_PREFIX + name
         g = await _geo_state(key)
-        # Виден — значит свежая точка с любого устройства: телефон в кармане
-        # молчит, а панель на планшете открыта — старший на месте.
-        fresh = g["fresh"] or (await _geo_state(ipad))["fresh"]
+        fresh = g["fresh"]
         st = await db.geo_watch_get(key)
         off_since = _dt(st.get("off_since")) if st.get("day") == day else None
         if not fresh and not off_since:

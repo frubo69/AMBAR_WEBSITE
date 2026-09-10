@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
-AMBAR — бот геопозиции.
+AMBAR — бот геопозиции (LOCATOR): люди.
 
-Делает ровно одно: принимает живую трансляцию геопозиции и кладёт точку туда,
-откуда её читают карта и локатор. Водитель — под своим именем (локатор
-оператора, сторож смены), старший — под ключом старшего (карта владельца).
-Кто есть кто, решает .env: AMBAR_DRIVER_IDS и AMBAR_SENIOR_STAR_IDS, как у
-остальных ботов. Чужие координаты не хранятся.
+Делает ровно одно: принимает живую трансляцию геопозиции водителя или старшего
+и кладёт точку туда, откуда её читают карта и локатор. Водитель — под своим
+именем (локатор оператора, сторож смены), старший — под ключом старшего
+(карта владельца). Кто есть кто, решает .env: AMBAR_DRIVER_IDS и
+AMBAR_SENIOR_STAR_IDS. Чужие координаты не хранятся.
+
+Устройства (планшеты) сюда не транслируют: у них свой бот (device_bot.py) и
+своя группа в локаторе — чтобы телефон старшего и его планшет не сбивали
+след друг другу.
 
 Зачем отдельный бот. Трансляция «пока не отключу» — это одно сообщение
 человека, которое телеграм правит; стёртое сообщение — выключенная
 трансляция. В чатах рабочих ботов сообщения стираются (скрытый режим,
 чистильщик), и трансляции там не место. Здесь ничего не стирается и в
-реестры стирания не пишется: человек один раз включает трансляцию, убирает
-чат в архив, и она работает, пока он сам её не выключит.
+реестры стирания не пишется.
 
 Токен — AMBAR_GEO_BOT_TOKEN в /opt/ambar/.env; юнит — deploy/ambar-geo-bot.service.
 """
@@ -22,9 +25,9 @@ import os
 from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import (Application, CommandHandler, MessageHandler,
-                          CallbackQueryHandler, ContextTypes, filters)
+                          ContextTypes, filters)
 
 import config_staff as staff
 import db
@@ -85,7 +88,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     who = "водитель" if kind == "driver" else "старший"
     sent = await update.message.reply_text(
         f"{name} · {who}\n\n"
-        "Здесь нужно сделать одно — включить трансляцию геопозиции:\n\n"
+        "Здесь нужно сделать одно — включить трансляцию геопозиции с телефона:\n\n"
         f"{HOW}\n\n"
         "Один раз. Дальше телефон присылает точку сам, даже когда телеграм "
         "свёрнут, а этот чат можно убрать в архив.")
@@ -108,12 +111,6 @@ async def _say(update: Update, ctx, text: str, markup=None):
     _INSTR[chat] = sent.message_id
 
 
-def _device_kb(mid: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("Телефон", callback_data=f"dev:phone:{mid}"),
-        InlineKeyboardButton("iPad", callback_data=f"dev:tablet:{mid}")]])
-
-
 async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Точка: первая из трансляции, каждая следующая (правкой того же
     сообщения) и разовая. Водитель и старший пишутся в ту же запись, что и из
@@ -125,32 +122,32 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     kind, name = _role(update.effective_user.id)
     if kind not in ("driver", "senior"):
         return                               # чужие и владельцы: не храним, не отвечаем
+    chat = update.effective_chat.id
+    # Трансляция, которую раньше пометили «iPad»: устройства теперь живут в
+    # своём боте. Точки не берём, а один раз говорим, куда её перенести.
+    if kind == "senior":
+        try:
+            st = await db.geo_stream_doc(chat, msg.message_id)
+        except Exception:                    # noqa: BLE001
+            st = {}
+        if st.get("device") == "tablet":
+            if not st.get("hinted"):
+                link = await geo_watch.device_bot_link()
+                await _say(update, ctx, "Планшет транслирует в отдельный бот устройств"
+                           + (f": {link}" if link else "") + ". Выключите трансляцию "
+                           "здесь и включите там; в этом боте — только телефон.")
+                try:
+                    await db.geo_stream_set(chat, msg.message_id, "tablet", name,
+                                            extra={"hinted": True})
+                except Exception:            # noqa: BLE001
+                    pass
+            return
     now = datetime.now(timezone.utc)
     period = getattr(loc, "live_period", None)
     until = now + timedelta(seconds=int(period)) if period else None
     # Выключили: телеграм правит то же сообщение, а срока у точки больше нет.
     stop = bool(update.edited_message and not period)
-    device = ""
-    if kind == "driver":
-        key = name
-    else:
-        # У старшего два устройства под одним аккаунтом, и по id их не
-        # отличить. Какое это — он говорит кнопкой при включении, а помним
-        # мы это по номеру сообщения трансляции: правки приходят им же.
-        # Пока не ответил — телефон.
-        device = await db.geo_stream_get(update.effective_chat.id, msg.message_id)
-        phone, ipad = geo_watch.senior_keys(name)
-        key = ipad if device == "tablet" else phone
-    started = bool(update.message and period)
-    # Первая точка трансляции приходит раньше ответа на вопрос об устройстве,
-    # и ложится в телефон. Запоминаем, каким телефон был до неё: ответит
-    # «iPad» — точку заберём, телефону вернём прежнее.
-    before = None
-    if started and kind == "senior" and not device:
-        try:
-            before = await db.driver_pos_snapshot(phone)
-        except Exception as e:               # noqa: BLE001
-            log.warning(f"снимок точки {name} не взят: {e}")
+    key = name if kind == "driver" else geo_watch.SENIOR_PREFIX + name
     try:
         await db.driver_pos_set(key, geo_watch._biz_day(), loc.latitude, loc.longitude,
                                 now, until=until, stop_live=stop,
@@ -158,15 +155,8 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:                   # noqa: BLE001
         log.warning(f"точка {name} не записана: {e}")
         return
-    if started and kind == "senior" and not device:
-        try:
-            await db.geo_stream_set(update.effective_chat.id, msg.message_id, "", name,
-                                    extra={"phone_before": before, "started": now})
-        except Exception as e:               # noqa: BLE001
-            log.warning(f"трансляция {name} не записана: {e}")
-    # Сторожу — про телефон: планшет лежит на точке, и его выключенная
-    # трансляция не значит, что старший пропал.
-    if (started or stop) and device != "tablet":
+    started = bool(update.message and period)
+    if started or stop:
         try:
             if kind == "driver":
                 await geo_watch.on_stream(name, on=started, now=now)
@@ -177,12 +167,8 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if started:
         log.info(f"трансляция включена: {name} · "
                  + ("бессрочно" if period > 86400 else f"{period // 3600} ч"))
-        if kind == "senior":
-            await _say(update, ctx, f"{name} · трансляция идёт. С какого это устройства?",
-                       _device_kb(msg.message_id))
-        else:
-            await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
-                                    "не нужно — чат можно убрать в архив.")
+        await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
+                                "не нужно — чат можно убрать в архив.")
     elif stop:
         log.info(f"трансляция выключена: {name}")
         await _say(update, ctx, f"{name} · трансляция выключена. Чтобы вас снова видели, "
@@ -191,53 +177,6 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         # Разовая точка: дошла, но погаснет через минуты. Нужна трансляция.
         await _say(update, ctx, f"{name} · точка принята, но это разовая точка, она "
                                 f"погаснет. Нужна трансляция:\n\n{HOW}")
-
-
-async def on_device(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Старший ответил, с какого устройства трансляция. Помним по номеру её
-    сообщения; с этой секунды правки идут под ключ того устройства."""
-    q = update.callback_query
-    if not q or not update.effective_user:
-        return
-    try:
-        await q.answer()
-    except Exception:                        # noqa: BLE001
-        pass
-    kind, name = _role(update.effective_user.id)
-    if kind != "senior":
-        return
-    try:
-        _, dev, mid = str(q.data or "").split(":")
-        mid = int(mid)
-    except ValueError:
-        return
-    if dev not in ("phone", "tablet"):
-        return
-    chat = update.effective_chat.id
-    doc = await db.geo_stream_doc(chat, mid)
-    if dev == "tablet" and doc.get("device") != "tablet":
-        # Всё, что эта трансляция успела записать в телефон, — планшету, а
-        # телефону — то, что было до неё. Иначе на карте две одинаковые
-        # точки, и STAR «на связи» там, где лежит планшет.
-        phone, ipad = geo_watch.senior_keys(name)
-        try:
-            cur = await db.driver_pos_snapshot(phone)
-            if cur and cur.get("lat") is not None:
-                await db.driver_pos_set(ipad, geo_watch._biz_day(), cur["lat"], cur["lon"],
-                                        cur.get("at"), until=cur.get("until"),
-                                        acc=cur.get("acc"))
-            if "phone_before" in doc:
-                await db.driver_pos_restore(phone, doc.get("phone_before"), doc.get("started"))
-        except Exception as e:               # noqa: BLE001
-            log.warning(f"точку {name} планшету не передали: {e}")
-    await db.geo_stream_set(chat, mid, dev, name)
-    label = "iPad" if dev == "tablet" else "телефон"
-    try:
-        await q.edit_message_text(f"{name} · трансляция идёт · {label}. Больше здесь "
-                                  "ничего делать не нужно — чат можно убрать в архив.")
-    except Exception as e:                   # noqa: BLE001
-        log.debug(f"ответ не правится: {e}")
-    log.info(f"устройство трансляции: {name} · {label}")
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -256,10 +195,9 @@ def main():
     app.add_handler(MessageHandler(filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE & filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
-    app.add_handler(CallbackQueryHandler(on_device, pattern=r"^dev:"))
     log.info(f"бот геопозиции запущен · водителей {len(staff.DRIVER_IDS)} · "
              f"старших {len(staff.SENIOR_STAR_IDS)}")
-    app.run_polling(allowed_updates=["message", "edited_message", "callback_query"])
+    app.run_polling(allowed_updates=["message", "edited_message"])
 
 
 if __name__ == "__main__":

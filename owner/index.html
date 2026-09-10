@@ -4033,6 +4033,8 @@ button.path:active{transform:scale(.995)}
 .wh-pin.stale{background:#7d879c;color:#0b0e18}
 /* Старший — золотой ободок: на карте его надо отличать от машин с первого взгляда. */
 .wh-pin.senior{border-color:#C9A96E;box-shadow:0 0 0 3px rgba(201,169,110,.35),0 4px 14px rgba(0,0,0,.55)}
+/* Устройство — синим: не человек, а планшет на точке. */
+.wh-pin.device{border-color:#5B8DEF;box-shadow:0 0 0 3px rgba(91,141,239,.3),0 4px 14px rgba(0,0,0,.55)}
 .wh-pin.sel{transform:scale(1.14)}
 /* Метка выбранного вырастает, а не подменяется: движение показывает связь
    между строкой, по которой нажали, и точкой на карте. */
@@ -11084,7 +11086,7 @@ function whRow(r, trackOn){
       <span class="wh-n">${escS(r.driver)}</span>
       <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
     </span>
-    ${r.senior ? '' : `<span class="wh-w">
+    ${(r.senior || r.device) ? '' : `<span class="wh-w">
       <span class="wh-w-v${r.orders ? '' : ' zero'}">${r.orders || r.done || '—'}</span>
       <span class="wh-w-l">${r.orders ? 'в пути' : (r.done ? 'сдал' : 'пусто')}</span>
     </span>`}
@@ -11143,7 +11145,9 @@ function whPaint(){
     // одиннадцать схлопывались в одну группу с чужим названием.
     const ключ = r.district || r.code || '—';
     let g = группы.find(x => x.id === ключ);
-    if(!g){ g = {id: ключ, code: r.code, name: r.name, rows: []}; группы.push(g); }
+    // Заголовок группы устройств — свой: код строки там у каждого устройства.
+    if(!g){ g = {id: ключ, code: r.gcode !== undefined ? r.gcode : r.code,
+                 name: r.gname !== undefined ? r.gname : r.name, rows: []}; группы.push(g); }
     g.rows.push(r);
   });
   document.getElementById('whList').innerHTML = (shown.length
@@ -11155,6 +11159,8 @@ function whPaint(){
             <span class="wh-grp-c">${escS(g.code || '')}</span>
             <span class="wh-grp-n">${escS(g.name || '')}</span>
             <span class="wh-grp-s">${g.id === 'senior' ? 'менеджер панели'
+              : g.id === 'devices' ? (живых ? `${живых} на связи`
+                  : `${g.rows.length} ${pluralize(g.rows.length,'устройство','устройства','устройств')}`)
               : живых ? `${живых} на связи`
               : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
               заказы ? ` · ${заказы} в пути` : ''}</span>
@@ -11197,7 +11203,7 @@ function whMapPaint(){
     const mk = L.marker([r.lat, r.lon], {icon: L.divIcon({
         className:'', iconSize:[30,30], iconAnchor:[15,30],
         html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}${
-          r.senior ? ' senior' : ''}${
+          r.senior ? ' senior' : (r.device ? ' device' : '')}${
           WH.sel === r.driver ? ' sel' : ''}${
           WH.pop && WH.sel === r.driver ? ' pop' : ''}"><span>${
           escS(r.code || '')}</span></div>`})})
@@ -11271,7 +11277,7 @@ function whCard(){
   const st = whState(r);
   const track = (d.track || []).length > 1;
   _setText('whTtl', r.driver);
-  _setText('whSub', r.senior ? (r.device === 'tablet' ? 'планшет менеджера' : 'менеджер панели')
+  _setText('whSub', r.device ? 'устройство' : r.senior ? 'менеджер панели'
                     : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));
   // Крупно — состояние, под ним одной строкой — почему. Бессрочная
   // трансляция приходит сроком на десятки лет; «ещё 596523 ч» — не ответ.
@@ -31775,23 +31781,24 @@ try{ setTimeout(callInit, 1500); }catch(e){}
     try{
       const pt = await read();
       if(!pt) return;
-      await ownerApi.ownerFetch('/api/owner/pos', {method:'POST',
-        body: {...pt, device: планшет() ? 'tablet' : 'phone'}});
+      await ownerApi.ownerFetch('/api/owner/pos', {method:'POST', body: pt});
     }catch(e){
       if(e && (e.status === 403 || e.status === 401)) stop = true;   // не старший
     }finally{ busy = false; }
   }
-  // У старшего два устройства под одним аккаунтом: телефон и планшет. Сервер
-  // по id их не различит — аккаунт один, поэтому устройство называет сама
-  // панель, той же меркой, что и в звонках: телефон — до 500 точек по узкой
-  // стороне. Планшет идёт своей строкой локатора («iPad Star»): где старший —
-  // говорит телефон, где планшет — планшет, и они не сбивают след друг другу.
+  // У старшего два устройства под одним аккаунтом: телефон и планшет. Где он —
+  // говорит телефон, он всегда при нём. Планшет транслирует в отдельный бот
+  // устройств и стоит своей строкой локатора; из панели он точку не шлёт —
+  // она только сбивала бы след телефона, а окно «разрешить геопозицию» на нём
+  // лишний вопрос. Устройство различаем по экрану, той же меркой, что и в
+  // звонках: телефон — до 500 точек по узкой стороне.
   function планшет(){
     try{ return Math.min(screen.width, screen.height) > 500; }catch(e){ return false; }
   }
   // Сперва спрашиваем сервер, старший ли это. Пока не ответил «да», к
   // телеграму за геопозицией не ходим: окно с вопросом у владельца — ошибка.
   async function arm(){
+    if(планшет()){ stop = true; return; }
     try{
       const r = await ownerApi.ownerFetch('/api/owner/pos');
       if(!r || !r.senior){ stop = true; return; }

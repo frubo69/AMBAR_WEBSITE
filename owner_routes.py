@@ -3573,6 +3573,7 @@ CHK_PLAN = [
     ("unscanned",   12.0, 21.0, False),
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
+    ("costs",       12.0, 12.0, False),   # позиции без закупочной цены — пока они есть
 ]
 # Смена — одна задача с двумя половинами. Днём спрашивается «открыты ли», под
 # утро — «закрыты ли»: это одно и то же дело в разных концах суток, и держать
@@ -3610,6 +3611,13 @@ def _chk_state(done: bool, now: datetime, since: datetime, due: datetime) -> str
     if now >= due:  return "late"
     if now >= since: return "now"
     return "soon"
+
+
+def _pl_positions(n: int) -> str:
+    n = abs(int(n)) % 100
+    if 11 <= n <= 19: return "позиций"
+    n %= 10
+    return "позиция" if n == 1 else "позиции" if 2 <= n <= 4 else "позиций"
 
 
 def _pl_bottles(n: int) -> str:
@@ -3833,6 +3841,24 @@ async def handle_checklist(request):
                        "все решения приняты" if были else "ревизий не было",
                        True, now, day, plan, go="audit")
     rows.append(row)
+
+    # Закупочные цены. Без них склад не оценить в деньгах, а удержание за бой
+    # считается по закупке. Строка есть, пока есть позиции без цены, и ведёт
+    # прямо в прайс, где показаны они одни; заполнили все — строка уходит.
+    try:
+        import stock_value, stock_routes as SR
+        cost = await stock_value.cost_map()
+        no_cost = [pid for pid in SR._catalog() if not cost.get(pid)]
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] закупочные цены не прочитаны: {e}")
+        no_cost = []
+    if no_cost:
+        n = len(no_cost)
+        row = _chk_row("costs", "Закупочные цены",
+                       f"{n} {_pl_positions(n)} без закупочной цены",
+                       False, now, day, plan, go="prices", n=n)
+        row.update({"state": "late", "due": "", "late_min": 0})
+        rows.append(row)
 
     # Порядок задан планом и не пляшет по цвету: список должен читаться как
     # один и тот же список, а не пересобираться каждый час.

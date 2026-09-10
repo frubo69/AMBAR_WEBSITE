@@ -406,11 +406,11 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    Появляется только когда действительно есть куда возвращаться. */
 /* Значком, а не словом: «Назад» занимало полкарточки, и рядом с датой уже
    ничему не оставалось места. Смысл тот же, ширина втрое меньше. */
-.dn-home{width:24px;height:24px;padding:0;margin-left:2px;margin-right:3px;border:none;border-radius:999px;
+.dn-home{width:32px;height:32px;padding:0;margin-left:2px;margin-right:3px;border:none;border-radius:999px;
   display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
   cursor:pointer;transition-property:var(--tp);transition-duration:.15s;transition-timing-function:var(--e1)}
-.dn-home svg{width:13px;height:13px;display:block}
+.dn-home svg{width:17px;height:17px;display:block}
 .dn-home:active{transform:scale(.92)}
 /* Horizontal swipes on the hero are OURS — the page must not scroll under them.
    Needs [data-detail] in the selector to outrank the generic
@@ -2137,7 +2137,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-daybar{display:block;margin:0 0 12px}
 .ck-daybar .dayslide{width:100%}
 /* Возврат к сегодня — тем же кружком, что в пилюле плашки; прячется на сегодня. */
-.dayslide .dn-home{width:26px;height:26px;margin:0 6px 0 2px;flex:0 0 auto}
+.dayslide .dn-home{width:34px;height:34px;margin:0 6px 0 2px;flex:0 0 auto}
 .dayslide .dn-home[hidden]{display:none}
 .ck-daybar .cal-btn{width:40px;align-self:stretch;flex:0 0 auto;
   margin:-3px -4px -3px 2px;border:0;border-left:1px solid var(--border2);
@@ -4620,8 +4620,8 @@ button.path:active{transform:scale(.995)}
    и появляется, только когда есть куда возвращаться. В полоске её нет: там
    она отнимала место у раскладки, а к сегодня и так ведут стрелка вперёд и
    тап по дню. */
-.exp-day .dn-home{width:24px;height:24px;flex:0 0 auto;overflow:hidden;
-  max-width:calc((1 - var(--fold,0)) * 24px);
+.exp-day .dn-home{width:30px;height:30px;flex:0 0 auto;overflow:hidden;
+  max-width:calc((1 - var(--fold,0)) * 30px);
   margin:0 calc((1 - var(--fold,0)) * 3px) 0 calc((1 - var(--fold,0)) * 1px);
   opacity:calc(1 - var(--fold,0) * 1.5)}
 .exp-day .cal-btn{width:32px;height:32px;margin:0;border:0;
@@ -8412,7 +8412,7 @@ button.pill:active{opacity:.6}
 .hero.tight .hero-unit{font-size:10.5px;margin-left:6px;letter-spacing:.8px}
 .hero.tight .dn-d{min-width:40px;height:24px}
 .hero.tight .dn-b{width:19px}
-.hero.tight .dn-home{width:21px;height:21px}
+.hero.tight .dn-home{width:28px;height:28px}
 /* Узкие телефоны (320 точек): в развёрнутом виде четвёртое число упиралось в
    край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
 @media (max-width:360px){
@@ -8428,7 +8428,7 @@ button.pill:active{opacity:.6}
   .ohero .dn-rel{display:none}
   .ohero .dn-d{min-width:40px;height:26px}
   .ohero .dn-b{width:19px}
-  .ohero .dn-home{width:21px;height:21px}
+  .ohero .dn-home{width:28px;height:28px}
   .ohero-stats{gap:6px}
   .ohero-stats .off-tot-v{font-size:15px}
   .ohero-stats .off-tot-c{padding-left:9px}
@@ -15323,7 +15323,11 @@ function dayBarPaint(el){
   const вперёд = el.querySelectorAll('.ds-arw')[1];
   if(вперёд) вперёд.disabled = off <= 0;
   // Возврат к сегодня есть, только когда есть куда возвращаться.
-  const домой = el.querySelector('.dayslide .dn-home, :scope > .dn-home');
+  // Кнопка лежит на разной глубине: в полосе чек-листа — прямо в ней, в
+  // плашке расходов — внутри блока навигации. Ищем в любом месте: раньше в
+  // плашке она рисовалась только если день уже был листнут, а перекраска её
+  // не находила — и после свайпа возвращаться к сегодня было нечем.
+  const домой = el.querySelector('.dn-home');
   if(домой) домой.hidden = off <= 0;
 }
 
@@ -15377,10 +15381,10 @@ function _dayNav(calId){
       <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
       <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
         ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
-      ${DAY_OFFSET ? `<button class="dn-home" onclick="dayBarHome(this)"
+      <button class="dn-home" onclick="dayBarHome(this)" ${DAY_OFFSET ? '' : 'hidden'}
         aria-label="Вернуться к сегодня" title="Вернуться к сегодня"><svg viewBox="0 0 24 24"
         fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
-        stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>` : ''}
+        stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
       <button class="cal-btn" onclick="openDate('${calId}')" aria-label="Выбрать день"
         ><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
@@ -15971,8 +15975,11 @@ function chkRow(r){
     : '';
   // У сделанного справа пусто: зелёная галочка слева уже ответила, а слово
   // «готово» отнимало место у названия — «Смена открыта / закрыта» резалось.
+  // Строка без срока (закупочные цены) — не «просрочено к часу», а просто
+  // не сделано.
   const справа = r.state === 'done' ? ''
-    : (r.state === 'late' ? (late ? `+${late}` : 'просрочено') : 'к ' + r.due);
+    : (r.state === 'late' ? (late ? `+${late}` : (r.due ? 'просрочено' : 'не сделано'))
+    : (r.due ? 'к ' + r.due : 'пора'));
   return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
     <span class="ck-dot">${r.state === 'done'
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -16012,7 +16019,15 @@ const CK_GO = {
   // Ревизия ждёт решения: строка ведёт прямо в её отчёт, где решение и
   // принимают. Решать нечего — просто на склад.
   audit:     () => chkAudit(),
+  // Позиции без закупочной цены: строка ведёт в прайс, и там сразу показаны
+  // только они — это и есть работа, а не весь список.
+  prices:    () => chkPrices(),
 };
+
+async function chkPrices(){
+  await ordPrices();
+  if(!OPR.only){ OPR.only = true; oprPaint(); }
+}
 
 async function chkAudit(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'audit')) || {};
@@ -26051,8 +26066,10 @@ let WOA = null;      // {kind, item, name, qty, note, photo, thumb, district}
 // живут в ней самой, а если их нет — она их запрашивает. Окно при этом
 // открывается сразу, не дожидаясь сети: ждать ответа сервера, глядя в
 // нажатую кнопку, — то же самое, что не открыться.
+// Списание своей рукой — всегда сегодняшним днём, какой бы день ни стоял в
+// полосе сверху (владелец, 10 сен 2026): бутылку бьют сейчас, а не в тот день,
+// который смотрят. Поэтому и вопроса про задний день здесь нет.
 async function woAddOpen(){
-  if(!await accAskBack('Списание')) return;
   WOA = {kind:'бой', item:'', name:'', qty:1, note:'', photo:'', thumb:'',
          district: '', q:'', districts: (STK.districts || []), cat: [], busy: true,
          // Ключ окна: повторная отправка после сбоя сети даёт ту же запись.
@@ -26099,6 +26116,8 @@ function woAddPaint(){
   const w = WOA; if(!w) return;
   const box = document.getElementById('woAddBody'); if(!box) return;
   const утеря = w.kind === 'потеря';
+  // Полоса сверху стоит на другом дне — скажем, что запись всё равно сегодняшняя.
+  const днём = DAY_OFFSET ? `<div class="wo-add-tip">Спишется сегодняшним днём, ${escS(dayBarLabels(0).дата)}</div>` : '';
   const cat = w.cat || [];
   const q = (w.q || '').toLowerCase().trim();
   const list = q ? cat.filter(r => (r.name||'').toLowerCase().includes(q)).slice(0, 8) : [];
@@ -26135,7 +26154,7 @@ function woAddPaint(){
   //
   // Утеря — другой случай: бутылки нет, сканировать нечего, и остаётся
   // единственный путь — сказать руками, что именно пропало и сколько.
-  box.innerHTML = виды + (утеря ? `
+  box.innerHTML = днём + виды + (утеря ? `
     ${w.item ? `<button class="wo-a-item" onclick="woAddSet('item','')">
         <span>${escS(w.name)}</span><b>✕</b></button>`
       : `<input class="wo-c-note" id="woAddQ" placeholder="Что пропало — начните вводить"
@@ -26184,7 +26203,7 @@ async function woAddSave(){
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff', {method:'POST', body:{
       item: w.item, qty: w.qty, kind: w.kind, district: w.district, cid: w.cid,
-      note: w.note, day: accDay(), photo: w.photo, thumb: w.thumb, as: _meName()}});
+      note: w.note, day: _dayIsoFor(0), photo: w.photo, thumb: w.thumb, as: _meName()}});
   }catch(e){
     if(go){ go.disabled = false; go.textContent = 'Списать'; }
     const why = (e && e.payload && e.payload.error) || '';
@@ -26197,8 +26216,13 @@ async function woAddSave(){
   woAddClose();
   _audHap('ok');
   _toast('Списано');
+  woToday();
+}
+
+// После записи показать её: она сегодняшняя, значит и полоса — на сегодня.
+function woToday(){
   ACC_WO = null;
-  shTab('wo');
+  if(DAY_OFFSET) accDayGo(0); else shTab('wo');
 }
 
 // ── списание сканом ─────────────────────────────────────────────────────────
@@ -26278,7 +26302,7 @@ function wosSave(code){
   qrFlash('ok', 'списана');
   wosQ().push({path:'/api/owner/stock/writeoff/scan', code, body:{
     code, kind: WOS.kind, note: WOS.note, photo: WOS.photo, thumb: WOS.thumb,
-    day: accDay(), as: _meName()}});
+    day: _dayIsoFor(0), as: _meName()}});
 }
 
 function wosDone(err, r, job){

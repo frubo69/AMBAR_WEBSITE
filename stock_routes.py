@@ -28,6 +28,7 @@ AMBAR — склад: пересчёт, перемещения, заявка и 
 Весь модуль под require_owner: доступ только владельцу и менеджерам.
 """
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
@@ -2327,6 +2328,12 @@ async def handle_shift_log(request):
         days = 14
     today = _biz_day()
     d0 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    # ?day=ГГГГ-ММ-ДД — один день: экран смен листают полосой дня, а не
+    # прокручивают две недели подряд.
+    one = (request.query.get("day") or "").strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", one):
+        d0 = today = one
+        days = 1
     # Открытия смен самими водителями — вторым запросом за тот же отрезок:
     # по ним видно, кто реально вышел, а не кого отметили.
     try:

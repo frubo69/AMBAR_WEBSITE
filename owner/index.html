@@ -10493,7 +10493,7 @@ function dpApply(){
   // Полосы дня внутри разделов — расходы и склад. Из выбранного берём начало
   // и встаём на этот день, как в чек-листе: календарь тут способ уйти дальше,
   // чем удобно листать пальцем, а не выбрать отрезок.
-  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay'){
+  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay' || dpTarget === 'shDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     const cal = document.querySelector(`.cal-btn[onclick*="'${dpTarget}'"]`);
     if(cal) cal.classList.remove('on');
@@ -15598,6 +15598,9 @@ function accDayGo(off){
   // списания и расходы стояли на месте. «Учёт» лежит поверх склада, поэтому
   // при обоих открытых он первый.
   const on = id => document.getElementById(id).classList.contains('show');
+  if(on('accOv') && document.getElementById('shDay')){
+    daySkel('accMid'); accShifts(true); return;
+  }
   if(on('accOv') && document.getElementById('expSum')){
     EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true); return;
   }
@@ -25633,38 +25636,38 @@ const CHK_V = {
    только в чужой памяти.                                                  */
 let ACC_SH = null;
 
-async function accShifts(){
+// Смены — одним днём на экране, с полосой дня сверху (владелец, 10 сен 2026:
+// «вместо того чтобы бесконечно вниз листать, добавь слайдер по дням с
+// календариком»). День общий с учётом, как у расходов и склада.
+async function accShifts(тихо){
   ACC_BACK = null;
   _setText('accTitle', 'Смены');
-  _setText('accSub', 'загрузка…');
-  document.getElementById('accFoot').innerHTML = '';
+  if(!тихо){
+    _setText('accSub', 'загрузка…');
+    document.getElementById('accFoot').innerHTML = '';
+  }
+  const day = accDay();
   try{
-    ACC_SH = await ownerApi.ownerFetch('/api/owner/stock/shifts', {params:{days:14}});
+    ACC_SH = await ownerApi.ownerFetch('/api/owner/stock/shifts', {params:{day}});
   }catch(e){
-    document.getElementById('accMid').innerHTML =
+    document.getElementById('accMid').innerHTML = accDayBar('shDay') +
       '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
     return;
   }
+  if(ACC_SH) ACC_SH.day = day;
   shLogPaint();
 }
 
 function shLogPaint(){
   const w = ACC_SH || {list: []};
-  _setText('accSub', w.list.length ? `за ${w.days} ${pluralize(w.days,'день','дня','дней')}`
-                                   : 'смены пока не отмечали');
+  const d = (w.list || [])[0];
+  _setText('accSub', d ? `открыто ${d.opened} / закрыто ${d.closed}${
+      d.revenue ? ` · ${fmt(d.revenue)} AED` : ''}` : 'смен не было');
   const mid = document.getElementById('accMid');
-  if(!w.list.length){
-    mid.innerHTML = `<div class="scan-empty">Пока пусто.<br>
-      Оператор открывает смену в своём приложении — здесь появится, кто и когда.</div>`;
-    return;
-  }
-  mid.innerHTML = w.list.map(d => `
-    <div class="shl-day">
-      <b>${_dayLbl(d.day)}</b>
-      <i>открыто ${d.opened} / закрыто ${d.closed}${
-          d.revenue ? ` / ${fmt(d.revenue)} AED` : ''}</i>
-    </div>
-    <div class="shl-list">${shLogCards(d.rows).map(shLogCard).join('')}</div>`).join('');
+  mid.innerHTML = accDayBar('shDay') + (d
+    ? `<div class="shl-list">${shLogCards(d.rows).map(shLogCard).join('')}</div>`
+    : `<div class="scan-empty">${DAY_OFFSET ? 'В этот день смены не отмечали.'
+        : 'Пока пусто.<br>Оператор открывает смену в своём приложении — здесь появится, кто и когда.'}</div>`);
 }
 
 // Открытие и закрытие — одна смена, и карточка одна: район, кто открыл и во

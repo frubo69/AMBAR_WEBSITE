@@ -3308,21 +3308,52 @@ def _chk_item(iid, title, hint, done, *, go="", n=0, manual=False, warn=False):
 
 
 async def _chk_shift(day: str):
-    """Открытые и закрытые районы за сутки."""
+    """Открытые и закрытые районы за сутки.
+
+    Открытым район считается, только когда его открыл оператор И каждый
+    водитель, отмеченный на смене, сам открыл смену в своём приложении
+    (владелец, 10 сен 2026): отметка оператора — «его ждут», открытие —
+    «он вышел». Отмеченный домашним ничего открывать не должен. Кого ещё
+    ждём — в waiting, по районам."""
     try:
         closed = await db.shifts_for_day(day)
         opens = await db.shift_opens_for_day(day)
     except Exception as e:
         log.warning(f"[chk] смены за {day}: {e}")
         closed, opens = {}, {}
+    try:
+        days = {(d.get("driver") or "").strip(): d for d in await db.get_driver_days(day)}
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] дни водителей за {day}: {e}")
+        days = {}
+    try:
+        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] перестановка не прочитана: {e}")
     total = len(OFFICE_IDS)
     n_closed = sum(1 for o in OFFICE_IDS if closed.get(o))
-    n_open = sum(1 for o in OFFICE_IDS if opens.get(o))
+    n_open, waiting = 0, {}
+    for o in OFFICE_IDS:
+        op = opens.get(o)
+        if not op:
+            continue
+        # Кого ждём: отмеченные при открытии смены и отмеченные рабочими в
+        # дне водителя из состава района. Отмеченный домашним — не ждём.
+        need = {n for n, w in (op.get("drivers") or {}).items() if w}
+        for n in staff.DISTRICT_DRIVERS.get(o) or []:
+            if (days.get(n) or {}).get("working") is True:
+                need.add(n)
+        need = {n for n in need if (days.get(n) or {}).get("working") is not False}
+        missing = sorted(n for n in need if not (days.get(n) or {}).get("shift_open_at"))
+        if missing:
+            waiting[o] = missing
+        else:
+            n_open += 1
     crew_ok = sum(1 for o in OFFICE_IDS if (opens.get(o) or {}).get("drivers"))
     last_at = max([str((closed.get(o) or {}).get("closed_at") or "")
                    for o in OFFICE_IDS] or [""])
     return {"total": total, "closed": n_closed, "open": n_open,
-            "crew": crew_ok, "closed_at": last_at}
+            "crew": crew_ok, "closed_at": last_at, "waiting": waiting}
 
 
 async def _chk_orders(day_start, day_end):
@@ -3725,12 +3756,17 @@ async def handle_checklist(request):
     # закрытия, и одно слово «Смена» на обе половины не отвечало ни на одну.
     # Одно дело в обеих половинах суток — и одно название через косую, как в
     # оглавлениях разделов. В какой половине мы сейчас, говорит подпись.
+    # Днём, пока открыты не все: кого ждём — по именам с кодом района, чтобы
+    # старший знал, кому звонить, а не только сколько.
+    ждём = [f"{n} {OFFICE_CODES.get(o, '')}".strip()
+            for o, ns in (sh.get("waiting") or {}).items() for n in ns]
     shift_row = _chk_row(
         "shift", "Смена открыта / закрыта",
         (f"закрыто {sh['closed']} из {total}" if sh["closed"] < total
          else f"все {total} районов закрылись") if closing
-        else (f"открыто {sh['open']} из {total}" if sh["open"] < total
-              else f"все {total} районов на смене"),
+        else (f"открыто {sh['open']} из {total}"
+              + (f" · не открыли: {', '.join(ждём[:4])}{'…' if len(ждём) > 4 else ''}" if ждём else "")
+              if sh["open"] < total else f"все {total} районов на смене"),
         (sh["closed"] >= total) if closing else (sh["open"] >= total),
         now, day, plan, go="shifts",
         n=(total - sh["closed"]) if closing else (total - sh["open"]))
@@ -3929,7 +3965,7 @@ async def handle_shift_state(request):
     sh = await _chk_shift(day)
     closing = now >= _chk_at(day, CHK_SHIFT_CLOSE[0], CHK_SHIFT_CLOSE[2])
     out = {"day": day, "total": sh["total"], "open": sh["open"], "closed": sh["closed"],
-           "phase": "closing" if closing else "opening"}
+           "phase": "closing" if closing else "opening", "waiting": sh.get("waiting") or {}}
     return web.json_response(out, headers=CORS_HEADERS)
 
 

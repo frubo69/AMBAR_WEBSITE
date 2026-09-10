@@ -18090,7 +18090,7 @@ let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = nul
 // замок держит сервер, экран лишь показывает его.
 let ACC_IN = null, QR_IN = null, QR_POLL = null;
 // Внесённое за этот заход: с камеры на список и обратно, пока не нажали
-// «Сохранить изменения». «Выйти» откатывает всё внесённое за заход.
+// «Сохранить и добавить на склад». «Выйти» откатывает всё внесённое за заход.
 let QR_SESS = [], QR_NEED = false;
 // 18 px в квадрате 38: отступ целый, иначе значок мылится на полпикселя вниз-вправо.
 const _QR_ICO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
@@ -18126,9 +18126,9 @@ async function qrLeave(next){
   next = next || (() => qrDistrict(true));
   if(!QR_SESS.length){ next(); return; }
   const n = QR_SESS.length;
-  const ans = await askChoice('Сохранить изменения?',
+  const ans = await askChoice('Сохранить и добавить на склад?',
     `${fmt(n)} ${pluralize(n,'бутылка внесена','бутылки внесены','бутылок внесено')} · «Выйти» уберёт их из реестра`,
-    'Сохранить изменения', 'Выйти', 'go', 'bad');
+    'Сохранить и добавить на склад', 'Выйти', 'go', 'bad');
   if(ans === 'ok'){ await qrCommit(); return; }
   if(ans === 'no'){ await qrDiscard(); return; }
 }
@@ -18430,10 +18430,10 @@ function qrPick(district){
      </div>
      <div class="pk-cats" id="qrCats"></div>
      <div id="qrList"><div class="scan-empty">Загрузка каталога…</div></div>`;
-  // Внесли хоть одну за заход — внизу золотая «Сохранить изменения»: дальше
+  // Внесли хоть одну за заход — внизу золотая «Сохранить и добавить на склад»: дальше
   // либо ещё позиции по кругу, либо она — и на первый экран.
   document.getElementById('accFoot').innerHTML = QR_SESS.length
-    ? `<div class="qb-wrap"><button class="qb" onclick="qrCommit()">Сохранить изменения</button></div>` : '';
+    ? `<div class="qb-wrap"><button class="qb" onclick="qrCommit()">Сохранить и добавить на склад</button></div>` : '';
   qrLoadCatalog();
 }
 

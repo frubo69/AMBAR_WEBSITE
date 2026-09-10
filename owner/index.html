@@ -10924,9 +10924,24 @@ function whSegSpring(to, v0, конец){
 }
 // Поставить таблетку на выбранное деление. Без движения — когда список только
 // открыли и ехать неоткуда.
-function whSegSync(smooth){
+function whSegSync(smooth, spring){
   const i = Math.max(0, WH_FILTERS.indexOf(_whFilter));
   const to = i * _whSegStep();
+  const {pill} = _whSegEls();
+  if(smooth && !spring && pill){
+    // Нажатие: движение отдаём композитору. CSS-переход не рвётся, что бы ни
+    // делал в это время скрипт — пересобирал список, ставил метки, собирал
+    // мусор; пружина на requestAnimationFrame рвалась на каждом таком кадре.
+    // Пружина остаётся жесту: там таблетку ведут пальцем и отпускают со
+    // скоростью, и это её физика.
+    cancelAnimationFrame(WH_SEG.raf); WH_SEG.raf = 0; WH_SEG.v = 0;
+    pill.style.transition = 'transform .3s cubic-bezier(.22,1,.36,1)';
+    _whSegPut(to);
+    clearTimeout(WH_SEG.tt);
+    WH_SEG.tt = setTimeout(() => { pill.style.transition = ''; }, 340);
+    return;
+  }
+  if(pill){ clearTimeout(WH_SEG.tt); pill.style.transition = ''; }
   if(smooth) whSegSpring(to, WH_SEG.v);
   else { cancelAnimationFrame(WH_SEG.raf); WH_SEG.raf = 0; WH_SEG.v = 0; _whSegPut(to); }
 }
@@ -10939,6 +10954,8 @@ function whSegInit(){
   const start = e => {
     if(WH_SEG.drag) return;
     cancelAnimationFrame(WH_SEG.raf); WH_SEG.raf = 0;
+    // Взяли пальцем — никакого CSS-перехода: таблетка идёт строго за рукой.
+    { const {pill} = _whSegEls(); if(pill){ clearTimeout(WH_SEG.tt); pill.style.transition = 'none'; } }
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     WH_SEG.drag = {x0: x, base: WH_SEG.x, moved: 0,
                    ист: [{y: x, t: performance.now()}]};
@@ -10985,7 +11002,7 @@ function whFilter(f, изЖеста){
   _whFilter = f;
   document.querySelectorAll('#whSeg button').forEach(b =>
     b.classList.toggle('on', b.dataset.f === f));
-  whSegSync(true);
+  whSegSync(true, !!изЖеста);
   // Отклик на любой переход — и по нажатию, и по жесту: без него нажатие на
   // «На связи» читается как промах, пока список не перерисуется.
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}

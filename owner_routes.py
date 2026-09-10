@@ -1090,6 +1090,52 @@ async def handle_where(request):
 
 
 @require_owner
+async def handle_where_route(request):
+    """Маршрут человека или устройства за день: линия кусками, остановки с
+    подписями и временем, разрывы, итог. ?who=<подпись из локатора>&day=
+
+    who — как в списке: имя водителя, STAR или метка устройства. Заказы для
+    подписей — только у водителя: доставленные им в этот день с координатами."""
+    import config_staff as staff
+    import geo_watch, route_stops
+    who = (request.query.get("who") or "").strip()
+    day = (request.query.get("day") or "").strip()
+    if not who:
+        return web.json_response({"error": "who"}, status=400, headers=CORS_HEADERS)
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+        day = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
+    seniors = list(staff.SENIOR_STAR_IDS)
+    if who == "STAR" and seniors:
+        key, orders = geo_watch.SENIOR_PREFIX + seniors[0], []
+    elif who in staff.DEVICE_IDS:
+        key, orders = geo_watch.DEVICE_PREFIX + who, []
+    else:
+        key = who
+        orders = []
+        try:
+            since = (datetime.strptime(day, "%Y-%m-%d").replace(hour=12, tzinfo=DUBAI_TZ)
+                     - timedelta(hours=1)).astimezone(timezone.utc)
+            for o in (await db.orders_from(since.isoformat().replace("+00:00", ""))).values():
+                if (o.get("driver") or "").strip() != who or o.get("status") != "delivered":
+                    continue
+                if not (o.get("location") or {}).get("lat"):
+                    continue
+                orders.append({"order_id": o.get("order_id"), "location": o.get("location"),
+                               "address": o.get("address", ""),
+                               "delivered_at": o.get("delivered_at") or "", "timestamp": o.get("timestamp", "")})
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[where] заказы для маршрута {who}: {e}")
+    try:
+        pts = await db.driver_track(key, day)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[where] маршрут {who} за {day}: {e}")
+        pts = []
+    out = route_stops.build(pts, orders)
+    out.update({"who": who, "day": day})
+    return web.json_response(out, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_where_panic(request):
     """Скрытый режим водителя из локатора владельца.
 
@@ -4124,6 +4170,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/where", handle_where)
     app.router.add_get(             "/api/owner/where", handle_where)
+    app.router.add_route("OPTIONS", "/api/owner/where/route", handle_where_route)
+    app.router.add_get(             "/api/owner/where/route", handle_where_route)
     app.router.add_route("OPTIONS", "/api/owner/promo",   handle_promo)
     app.router.add_get(             "/api/owner/promo",   handle_promo)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)

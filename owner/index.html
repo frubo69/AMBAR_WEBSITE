@@ -4059,6 +4059,49 @@ button.path:active{transform:scale(.995)}
 .wh-day-home[hidden]{display:none}
 .wh-day-s{margin-left:auto;padding-right:4px;font-size:10.5px;color:var(--muted);text-align:right;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* Маршрут: старт и финиш точками, остановки кружками с номером. Выбранная
+   остановка крупнее и с длительностью под ней. Цвет ободка — вид остановки:
+   заказ синий, база серая, прочее золото, как и в списке под картой. */
+.wh-dotp.start{background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.3)}
+.wh-dotp.end{background:#E05555;box-shadow:0 0 0 3px rgba(224,85,85,.3)}
+.wh-stop{position:relative;width:100%;height:100%;border-radius:50%;background:#1a1408;color:#fff;
+  display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;
+  font-size:11px;font-weight:800;border:2px solid #C9A96E;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.wh-stop.order{border-color:#5B8DEF}
+.wh-stop.base{border-color:#8a8a99}
+.wh-stop.on{border-width:3px;font-size:13px;box-shadow:0 0 0 4px rgba(201,169,110,.35),0 4px 14px rgba(0,0,0,.6)}
+.wh-stop i{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-style:normal;font-size:10.5px;font-weight:700;color:#fff;background:rgba(10,10,20,.88);
+  padding:2px 7px;border-radius:7px;border:1px solid rgba(255,255,255,.12)}
+.wh-rt-sum{margin-bottom:8px}
+.wh-rt{margin:0 0 8px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));
+  border:1px solid rgba(255,255,255,.1)}
+.wh-rt-r{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;
+  border-top:1px solid rgba(255,255,255,.06);background:none;color:var(--text);
+  font-family:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.wh-rt-r:first-child{border-top:0}
+.wh-rt-r:active{background:rgba(255,255,255,.05)}
+.wh-rt-r.on{background:rgba(201,169,110,.12)}
+.wh-rt-r .dot{flex:0 0 22px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:10.5px;
+  font-weight:800;color:#fff;background:#1a1408;border:2px solid #C9A96E;box-sizing:border-box}
+.wh-rt-r.order .dot{border-color:#5B8DEF}
+.wh-rt-r.base .dot{border-color:#8a8a99}
+.wh-rt-r.start .dot{border-color:#3ddc84;background:#3ddc84}
+.wh-rt-r.end .dot{border-color:#E05555;background:#E05555}
+.wh-rt-r.gap .dot{border:2px dashed #E05555;background:none}
+.wh-rt-r .t{flex:0 0 42px;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.wh-rt-r .b{flex:1;min-width:0}
+.wh-rt-r .b b{display:block;font-size:13.5px;font-weight:600}
+.wh-rt-r .b u{display:block;text-decoration:none;font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wh-rt-r .d{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums}
+.wh-rt-r.gap .d{color:var(--dn)}
+.wh-rt-e{padding:16px 12px;text-align:center;font-size:12.5px;color:var(--muted)}
+.wh-rt-e.dn{color:var(--dn)}
 .wh-pin.senior{border-color:#C9A96E;box-shadow:0 0 0 3px rgba(201,169,110,.35),0 4px 14px rgba(0,0,0,.55)}
 /* Устройство — синим: не человек, а планшет на точке. */
 .wh-pin.device{border-color:#5B8DEF;box-shadow:0 0 0 3px rgba(91,141,239,.3),0 4px 14px rgba(0,0,0,.55)}
@@ -11069,7 +11112,7 @@ async function whereOpen(){
   whSegInit();
   whSnap('half', false);
   requestAnimationFrame(() => whSegSync(false));
-  WH.view = 'list'; WH.sel = null; WH.track = false; WH.fit = true; WH.off = 0;
+  WH.view = 'list'; WH.sel = null; WH.track = false; WH.fit = true; WH.off = 0; WH.route = null;
   document.getElementById('whList').innerHTML =
     '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -11086,8 +11129,7 @@ function whereClose(){
 async function whereLoad(){
   let d;
   try{
-    d = await ownerApi.ownerFetch('/api/owner/where',
-      {params: (WH.sel && WH.track) ? {track: WH.sel, day: _dayIsoFor(WH.off || 0)} : {}});
+    d = await ownerApi.ownerFetch('/api/owner/where', {params: {}});
   }catch(e){
     document.getElementById('whList').innerHTML =
       '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
@@ -11186,6 +11228,7 @@ function whRow(r, trackOn){
 // и действиями, — и карта под ним работает на этот экран.
 function whBack(){
   WH.sel = null; WH.view = 'list'; WH.pop = false;
+  WH.track = false; WH.route = null; WH.off = 0;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   // Возвращаемся так же немедленно, как и уходили.
   if(WH.data){ whPaint(); _whSwap(); whSnap('half', true); }
@@ -11207,7 +11250,7 @@ function whPaint(listOnly){
   const sub = document.getElementById('whSub'); if(sub) sub.hidden = true;
   const rows = d.drivers || [];
   const live = rows.filter(r => whState(r) === 'stream').length;
-  const trackOn = (d.track || []).length > 1;
+  const trackOn = !!(WH.sel && WH.track && WH.route && WH.route.data && WH.route.data.points);
   // Счётчики на панели снизу: они же и есть фильтр, поэтому цифры живут там,
   // а не отдельной строкой над списком.
   // Три раздела: люди (водители и старший), кто в сети — любой, включая
@@ -11303,25 +11346,36 @@ function whMapPaint(){
   // пересоздаёт метки, и без этого выбранная дёргалась бы всю смену.
   WH.pop = false;
 
-  const tr = (WH.sel && WH.track) ? (d.track || []) : [];
-  if(tr.length > 1){
-    const pth = whSmooth(tr.map(p => [p.lat, p.lon]));
+  const rd = (WH.sel && WH.track && WH.route && WH.route.data) ? WH.route.data : null;
+  if(rd && rd.points){
+    const layers = [];
     // Линия в два слоя: широкая полупрозрачная снизу и узкая сверху. Так она
-    // читается и на светлых кварталах, и на тёмной воде, а не теряется.
-    WH.line = L.layerGroup([
-      L.polyline(pth, {color:'#C9A96E', weight:9, opacity:.16,
-                       lineJoin:'round', lineCap:'round'}),
-      L.polyline(pth, {color:'#E8D5AC', weight:3.5, opacity:.95,
-                       lineJoin:'round', lineCap:'round'}),
-      // Откуда и докуда: без этих двух точек линия не читается — непонятно,
-      // в какую сторону человек ехал.
-      L.marker(pth[0], {icon: L.divIcon({className:'', iconSize:[12,12],
-        iconAnchor:[6,6], html:'<div class="wh-dotp"></div>'})}),
-    ]).addTo(WH.map);
-    WH.line.getBounds = () => L.latLngBounds(pth);
-    // Потолок приближения: короткий маршрут иначе растягивается на весь экран,
-    // и вместо «где ездил» видно две улицы крупным планом.
-    WH.map.fitBounds(L.latLngBounds(pth).pad(0.25), {maxZoom: 15});
+    // читается и на светлых кварталах, и на тёмной воде. Между разрывами —
+    // кусками; сам разрыв — красным пунктиром: ехал без сигнала.
+    (rd.segments || []).forEach(seg => {
+      if(seg.length < 2) return;
+      const pth = whSmooth(seg);
+      layers.push(L.polyline(pth, {color:'#C9A96E', weight:9, opacity:.16, lineJoin:'round', lineCap:'round'}),
+                  L.polyline(pth, {color:'#E8D5AC', weight:3.5, opacity:.95, lineJoin:'round', lineCap:'round'}));
+    });
+    (rd.gaps || []).forEach(g => layers.push(
+      L.polyline([g.a, g.b], {color:'#E05555', weight:2.5, opacity:.85, dashArray:'6 8', lineCap:'round'})));
+    const dot = (p, cls) => L.marker([p.lat, p.lon], {icon: L.divIcon({className:'', iconSize:[14,14],
+      iconAnchor:[7,7], html:`<div class="wh-dotp ${cls}"></div>`}), interactive:false});
+    if(rd.start) layers.push(dot(rd.start, 'start'));
+    if(rd.end && rd.points > 1) layers.push(dot(rd.end, 'end'));
+    // Остановки — кружком с номером, выбранная крупнее и с длительностью.
+    // Заказ — синим ободком, база — серым, прочее — золотом, как в списке.
+    (rd.stops || []).forEach(st => {
+      const on = WH.route.sel === st.no, sz = on ? 34 : 24;
+      const mk = L.marker([st.lat, st.lon], {icon: L.divIcon({className:'', iconSize:[sz, sz],
+        iconAnchor:[sz / 2, sz / 2],
+        html:`<div class="wh-stop ${st.kind}${on ? ' on' : ''}"><span>${st.no}</span>${
+          on ? `<i>${whMin(st.min)}</i>` : ''}</div>`}), zIndexOffset: on ? 1000 : 500});
+      mk.on('click', () => whStopGo(st.no));
+      layers.push(mk);
+    });
+    WH.line = L.layerGroup(layers).addTo(WH.map);
   }else if(WH.sel && WH.pan){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
     if(me) whCenter(me.lat, me.lon, 15, true, whDetents().card);
@@ -11363,7 +11417,7 @@ function whCard(){
   const d = WH.data, r = (d.drivers || []).find(x => x.driver === WH.sel);
   if(!r){ whBack(); return; }
   const st = whState(r);
-  const track = (d.track || []).length > 1;
+  const track = !!WH.track;
   _setText('whTtl', r.driver);
   { const ttl = document.getElementById('whTtl'); if(ttl) ttl.classList.remove('wh-big');
     const sub = document.getElementById('whSub'); if(sub) sub.hidden = false; }
@@ -11381,7 +11435,8 @@ function whCard(){
   else if(r.has){ head = 'молчит'; sub = `${whAgo(r.age).replace(' назад','')} · последняя известная точка`; }
   else { head = 'не виден'; sub = 'геопозицией не делится'; }
 
-  document.getElementById('whList').innerHTML = `
+  const _body = document.getElementById('whList'), _scroll = _body.scrollTop;
+  _body.innerHTML = `
     <div class="wh-card ${r.panic ? 'panic' : st === 'stream' ? 'live'
         : (st === 'snap' ? 'snap' : '')}">
       <div class="wh-card-top">
@@ -11393,27 +11448,20 @@ function whCard(){
         </span>
         ${r.panic ? '<span class="wh-card-sos">скрытый режим</span>' : ''}
       </div>
-      <div class="wh-facts">
-        ${r.senior ? '' : `<span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
-        <span><b class="${r.done ? '' : 'zero'}">${r.done || '—'}</b><i>сдал</i></span>`}
-        <span><b class="${r.has ? '' : 'zero'}">${когда || '—'}</b><i>точка</i></span>
-      </div>
-      ${WH.track ? (() => { const {имя, дата} = dayBarLabels(WH.off || 0); return `
-      <div class="wh-day">
-        <button class="wh-day-b" onclick="whDay(1)" aria-label="День назад"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="wh-day-t" onclick="openDate('whDay')"><b>${имя}</b><i>${дата}</i></button>
-        <button class="wh-day-b" onclick="whDay(-1)" aria-label="День вперёд" ${WH.off ? '' : 'disabled'}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-        <button class="dn-home wh-day-home" onclick="whDay(-(WH.off || 0))" ${WH.off ? '' : 'hidden'} aria-label="Вернуться к сегодня"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
-        <span class="wh-day-s">${whTrackInfo(d)}</span>
-      </div>`; })() : ''}
       ${r.has || WH.track ? `<div class="wh-acts">
         <button class="wh-act${track ? ' on' : ''}" onclick="whTrack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M7.6 16.4c2.2-2.6 3.4-5 6.6-6.8 1.2-.7 2-1.3 2.5-2" stroke-dasharray="1.2 3.4"/></svg>Маршрут</button>
-        <button class="wh-act" onclick="whFocus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>Приблизить</button>
+        <button class="wh-act" onclick="whFocus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>${WH.track ? 'Весь маршрут' : 'Приблизить'}</button>
       </div>` : ''}
+      ${WH.track ? whRouteHtml() : `<div class="wh-facts">
+        ${r.senior || r.device ? '' : `<span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
+        <span><b class="${r.done ? '' : 'zero'}">${r.done || '—'}</b><i>сдал</i></span>`}
+        <span><b class="${r.has ? '' : 'zero'}">${когда || '—'}</b><i>точка</i></span>
+      </div>`}
       ${r.senior ? '' : `<button class="wh-card-go${r.panic ? ' off' : ''}"
         onclick="whPanic('${escS(r.driver)}', ${r.panic ? 'false' : 'true'})"
         >${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>`}
     </div>`;
+  _body.scrollTop = _scroll;
   whMapPaint();
 }
 
@@ -11446,6 +11494,13 @@ async function whPanic(name, on){
 // Приблизить — с оглядкой на шторку: центр карты не середина экрана, а
 // середина того, что из неё видно.
 function whFocus(){
+  // В режиме маршрута — весь маршрут целиком; иначе — человек крупно.
+  if(WH.track && WH.route && WH.route.data && WH.route.data.points){
+    if(WH.route.sel != null){ WH.route.sel = null; whPaint(); }
+    whRouteFit();
+    try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+    return;
+  }
   const r = (WH.data.drivers || []).find(x => x.driver === WH.sel);
   if(!r || !r.has || !WH.map) return;
   whCenter(r.lat, r.lon, 16);
@@ -11477,35 +11532,143 @@ function whCenter(lat, lon, zoom, fly, dyTarget){
   else WH.map.setView(ll, z, {animate:true});
 }
 
+// ── Маршрут за день ──────────────────────────────────────────────────────
+// Кнопка «Маршрут» включает режим: свой запрос за выбранный день (WH.off),
+// линия кусками между разрывами, остановки с подписями и временем, итог.
+// Точки и список людей при этом остаются живыми, сегодняшними.
 function whTrack(){
   WH.track = !WH.track;
-  if(!WH.track) WH.off = 0;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  whereLoad();
+  if(!WH.track){ WH.off = 0; WH.route = null; whPaint(); return; }
+  whSnap('half', true);              // и линия на карте, и список остановок
+  whRouteLoad();
 }
 
-// Маршрут — по дням: стрелки и календарь в карточке человека, как полоса
-// дня в учёте, только свой день у локатора (WH.off), точки и список при
-// этом остаются сегодняшними. Хранится тридцать дней.
+async function whRouteLoad(){
+  if(!WH.sel || !WH.track) return;
+  const who = WH.sel, day = _dayIsoFor(WH.off || 0);
+  WH.route = {who, day, loading: true, data: null, sel: null};
+  whPaint();
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/where/route', {params: {who, day}}); }
+  catch(e){
+    if(WH.route && WH.route.who === who && WH.route.day === day){
+      WH.route = {who, day, loading: false, data: null, error: true, sel: null}; whPaint();
+    }
+    return;
+  }
+  if(!WH.track || !WH.route || WH.route.who !== who || WH.route.day !== day) return;  // ушли дальше
+  WH.route = {who, day, loading: false, data: d, sel: null};
+  whPaint();
+  whRouteFit();
+}
+
+// Подогнать карту под весь маршрут — один раз при загрузке, а не на каждое
+// обновление списка: иначе карту не полистать, она возвращается сама.
+function whRouteFit(){
+  const d = WH.route && WH.route.data; if(!d || !WH.map) return;
+  const pts = (d.segments || []).flat();
+  if(pts.length < 2) return;
+  const sh = document.getElementById('whSheet');
+  const hide = sh ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
+  try{ WH.map.fitBounds(L.latLngBounds(pts).pad(0.2),
+        {maxZoom: 15, paddingTopLeft: [20, 20], paddingBottomRight: [20, hide + 20]}); }catch(e){}
+}
+
+// Полоса дня маршрута: стрелки, день с датой (нажатие — календарь), возврат
+// к сегодня. Свой день у локатора (WH.off). Хранится тридцать дней.
 function whDay(delta){
   const next = Math.max(0, Math.min(365, (WH.off || 0) + delta));
   if(next === (WH.off || 0)) return;
   WH.off = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  whereLoad();
+  whRouteLoad();
 }
 function whDaySet(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === (WH.off || 0)) return;
-  WH.off = off; whereLoad();
+  WH.off = off; whRouteLoad();
 }
-function whTrackInfo(d){
-  const tr = d.track || [];
-  if(!tr.length) return (WH.off ? 'маршрута за этот день нет' : 'маршрута за сегодня ещё нет');
-  const t = tr.map(p => p.at).filter(Boolean);
-  const hm = x => _hmDubai(x);
-  return `${tr.length} ${pluralize(tr.length,'точка','точки','точек')}`
-    + (t.length > 1 ? ` · ${hm(t[0])}–${hm(t[t.length - 1])}` : '');
+function whMin(m){
+  m = Math.max(0, Math.round(m || 0));
+  if(m < 60) return `${m} мин`;
+  return `${Math.floor(m / 60)} ч${m % 60 ? ' ' + (m % 60) + ' мин' : ''}`;
+}
+// Часы в плитке — цифрами «2:10», а не словами: слова в узкой плитке
+// переносятся, цифры стоят как у соседей.
+function whClock(m){
+  m = Math.max(0, Math.round(m || 0));
+  return m < 60 ? String(m) : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+function whDayBar(){
+  const {имя, дата} = dayBarLabels(WH.off || 0);
+  return `<div class="wh-day">
+    <button class="wh-day-b" onclick="whDay(1)" aria-label="День назад"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="wh-day-t" onclick="openDate('whDay')" aria-label="Выбрать день"><b>${имя}</b><i>${дата}</i></button>
+    <button class="wh-day-b" onclick="whDay(-1)" aria-label="День вперёд" ${WH.off ? '' : 'disabled'}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button class="dn-home wh-day-home" onclick="whDay(-(WH.off || 0))" ${WH.off ? '' : 'hidden'} aria-label="Вернуться к сегодня"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
+    <span class="wh-day-s">${whRouteSpan()}</span>
+  </div>`;
+}
+function whRouteSpan(){
+  const r = WH.route || {}, d = r.data;
+  if(r.loading) return 'считаю…';
+  if(!d || !d.points) return '';
+  const s = d.summary || {};
+  return s.from && s.to ? `${_hmDubai(s.from)}–${_hmDubai(s.to)}` : '';
+}
+
+// Карточка маршрута: полоса дня, три числа итога и хронология — старт,
+// остановки с подписями и длительностью, разрывы, финиш. Нажатие на
+// остановку ведёт карту к ней и подсвечивает метку; повторное — снимает.
+function whRouteHtml(){
+  const r = WH.route || {}, bar = whDayBar();
+  if(r.loading) return bar + '<div class="wh-rt-e">Считаю маршрут…</div>';
+  if(r.error)   return bar + '<div class="wh-rt-e dn">Не удалось загрузить маршрут</div>';
+  const d = r.data;
+  if(!d || !d.points) return bar + `<div class="wh-rt-e">${WH.off
+    ? 'Маршрута за этот день нет' : 'Маршрута за сегодня ещё нет'}</div>`;
+  const s = d.summary || {};
+  const sum = `<div class="wh-facts wh-rt-sum">
+    <span><b>${s.dist_km}</b><i>км</i></span>
+    <span><b>${whClock(s.moving_min)}</b><i>${s.moving_min >= 60 ? 'ч в пути' : 'мин в пути'}</i></span>
+    <span><b>${s.stops}</b><i>${pluralize(s.stops,'остановка','остановки','остановок')}</i></span>
+  </div>`;
+  const ev = [];
+  if(d.start) ev.push({kind:'start', at: d.start.at, lat: d.start.lat, lon: d.start.lon});
+  (d.stops || []).forEach(x => ev.push({...x, at: x.from}));
+  (d.gaps || []).forEach(g => ev.push({kind:'gap', at: g.from, to: g.to, min: g.min, lat: g.a[0], lon: g.a[1]}));
+  if(d.end) ev.push({kind:'end', at: d.end.at, lat: d.end.lat, lon: d.end.lon});
+  ev.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return bar + sum + `<div class="wh-rt">${ev.map(whRouteRow).join('')}</div>`;
+}
+function whRouteRow(x){
+  const t = _hmDubai(x.at);
+  if(x.kind === 'start' || x.kind === 'end')
+    return `<button class="wh-rt-r ${x.kind}" onclick="whRouteGo(${x.lat}, ${x.lon})">
+      <i class="dot"></i><span class="t">${t}</span>
+      <span class="b"><b>${x.kind === 'start' ? 'Старт' : 'Финиш'}</b></span></button>`;
+  if(x.kind === 'gap')
+    return `<div class="wh-rt-r gap"><i class="dot"></i><span class="t">${t}</span>
+      <span class="b"><b>Без сигнала</b><u>до ${_hmDubai(x.to)}</u></span><span class="d">${whMin(x.min)}</span></div>`;
+  const on = WH.route && WH.route.sel === x.no;
+  const sub = x.address || (x.kind === 'base' ? 'там же, где старт или финиш дня' : `до ${_hmDubai(x.to)}`);
+  return `<button class="wh-rt-r ${x.kind}${on ? ' on' : ''}" onclick="whStopGo(${x.no})">
+    <i class="dot">${x.no}</i><span class="t">${t}</span>
+    <span class="b"><b>${escS(x.label)}</b><u>${escS(sub)}</u></span>
+    <span class="d">${whMin(x.min)}</span></button>`;
+}
+function whStopGo(no){
+  const d = WH.route && WH.route.data; if(!d) return;
+  const st = (d.stops || []).find(x => x.no === no); if(!st) return;
+  WH.route.sel = WH.route.sel === no ? null : no;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  whPaint();
+  if(WH.route.sel != null) whCenter(st.lat, st.lon, 16, true);
+}
+function whRouteGo(lat, lon){
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  whCenter(lat, lon, 16, true);
 }
 
 function whFitAll(){
@@ -11541,7 +11704,7 @@ function whLayer(){
 function whPick(name){
   const same = WH.sel === name;
   WH.sel = name; WH.view = 'card'; WH.pan = true; WH.pop = !same;
-  if(!same) WH.track = false;
+  if(!same){ WH.track = false; WH.route = null; WH.off = 0; }
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(WH.data){
     whPaint();          // содержимое карточки + полёт карты

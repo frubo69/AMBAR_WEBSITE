@@ -2200,9 +2200,18 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
     # здесь, а не только в напоминании от бота: напоминание приходит ему, а
     # сделать он ничего не может, если не знает, кого подтолкнуть.
     silent = {}
+    # Смена каждого водителя — открыл ли он её и не закрыл ли уже. Оператор
+    # отмечает бригаду, но заказ увидит только тот, у кого смена открыта, и
+    # без этого поля назначение уходило в пустоту.
+    crew_shift = {}
     try:
         from driver_routes import MUST_ANSWER, _kind_of
         for d in await db.get_driver_days(day.isoformat()):
+            crew_shift[d.get("driver") or ""] = {
+                "open": bool(d.get("shift_open_at")) and not d.get("shift_close_at"),
+                "closed": bool(d.get("shift_close_at")),
+                "opened_at": str(d.get("shift_open_at") or ""),
+                "closed_at": str(d.get("shift_close_at") or "")}
             if d.get("working") is not True:
                 continue
             no = d.get("no_expense") or {}
@@ -2246,6 +2255,8 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
             "revenue": sum(int(o.get("total") or 0) for o in done),
             "silent": [n for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])
                        if silent.get(n)],
+            "crew_shift": {n: crew_shift.get(n) or {"open": False, "closed": False}
+                           for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])},
         })
     return {"day": day.isoformat(), "districts": out,
             "all_closed": bool(out) and all(x["closed"] for x in out),

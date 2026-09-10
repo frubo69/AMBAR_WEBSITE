@@ -3505,10 +3505,14 @@ function geoReady(){
 // Спрашиваем через телеграм, а не через браузер: он показывает своё окно с
 // именем приложения, а не адрес сайта, и спрашивает один раз за всё время.
 // Отказ запоминаем — второе окно ничего не изменит, кроме раздражения.
-async function geoRead(){
+async function geoRead(ask){
   const lm = await geoReady();
   if(!lm) return null;
   if(lm.isAccessRequested && !lm.isAccessGranted){ GEO.denied = true; return null; }
+  // Фоновый опрос окно с вопросом не показывает: телеграм рисует его сам, и
+  // всплывало оно на любой вкладке посреди работы. Спрашиваем только по
+  // нажатию на строку геопозиции.
+  if(!ask && !lm.isAccessGranted) return null;
   return new Promise(resolve => {
     let done = false;
     const fin = v => { if(!done){ done = true; resolve(v); } };
@@ -3526,14 +3530,14 @@ async function geoRead(){
   });
 }
 
-async function geoPush(force){
+async function geoPush(force, ask){
   // Отказали — не дёргаемся ни раз в минуту, ни на каждое действие.
   if(PANIC || GEO.busy || GEO.denied) return;
   const now = Date.now();
   if(!force && now - GEO.last < GEO_EVERY_MS) return;
   GEO.busy = true;
   try{
-    const pt = await geoRead();
+    const pt = await geoRead(!!ask);
     if(!pt){ geoState('off'); return; }
     await drvApi.drvFetch('/api/driver/pos', {method:'POST', body: pt});
     GEO.last = now;
@@ -3559,7 +3563,7 @@ async function geoFix(){
 
   if(can && !(lm.isAccessRequested && !lm.isAccessGranted)){
     GEO.denied = false;
-    await geoPush(true);
+    await geoPush(true, true);
     if(GEO.state === 'on'){ _tap('ok'); return; }
   }
   if(can && typeof lm.openSettings === 'function'
@@ -4096,11 +4100,6 @@ async function shClose(){
   const left = SH.must || [];
   if(left.length){
     toast(`Сначала ответьте про ${_shAsk(left)}`, 'err');
-    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    return;
-  }
-  if(!SH.day_closed){
-    toast('Оператор ещё не закрыл день — смену закрыть нельзя', 'err');
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     return;
   }
@@ -5973,7 +5972,7 @@ function renderShift(){
 
   // Закрыть можно, когда оператор закрыл день, расходы отвечены и ничего не
   // едет. Кнопка нажимается всегда — shClose сам скажет, что мешает.
-  const canClose = on && !!SH.day_closed && !must.length && !(SH.in_route||[]).length;
+  const canClose = on && !must.length && !(SH.in_route||[]).length;
 
   box.innerHTML = `
     <div class="shd ${on ? 'live' : ''}">
@@ -6000,9 +5999,6 @@ function renderShift(){
             must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'заполнены',
             must.length ? `<button class="shx-go" onclick="setTab('expenses')">Заполнить</button>` : '',
             true)
-        + row(!!SH.day_closed, 'Оператор закрыл смену',
-            SH.day_closed ? 'день района закрыт' : 'пока оператор не закрыл день, смену не закрыть',
-            '', true)
       : row(SH.working === true, 'Оператор отметил вас',
             SH.working === true ? 'отмечено'
               : SH.working === false ? 'сегодня выходной'

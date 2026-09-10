@@ -302,7 +302,10 @@ async def _shift_view(me: dict) -> dict:
         "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
         "in_route": route,
         "can_open": d.get("working") is True and geo["ok"] and not opened,
-        "can_close": bool(opened) and not closed and not must and not route and закрыт,
+        # Смену закрывает сам водитель, когда отдал последний заказ и ответил
+        # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
+        # висела бы до утра, а «закрыть» упиралось в чужое действие.
+        "can_close": bool(opened) and not closed and not must and not route,
     }
 
 
@@ -352,16 +355,9 @@ async def handle_shift_close(request):
     if route:
         return web.json_response({"error": "orders_in_route", "ids": route},
                                  status=409, headers=CORS_HEADERS)
-    # Смену водителя закрывают после дня района: пока оператор день не закрыл,
-    # заказы ещё могут прийти, и «закрыто» у водителя было бы враньём. Запрет
-    # держим здесь, а не только в кнопке: кнопку можно дорисовать.
-    try:
-        закрыт = bool((await db.shifts_for_day(day)).get(me.get("district") or ""))
-    except Exception as e:                                   # noqa: BLE001
-        log.warning(f"[driver] закрытие дня не прочиталось: {e}")
-        закрыт = False
-    if not закрыт:
-        return web.json_response({"error": "day_open"}, status=409, headers=CORS_HEADERS)
+    # Закрытия дня оператором не ждём (раньше ждали, и смена висела до утра):
+    # водитель отдал последний заказ и ответил по расходам — он свободен.
+    # Оператор видит закрытую смену у себя в бригаде и заказ ему не отдаст.
     await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
     log.info(f"[driver] {me['name']}: смена закрыта")
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)

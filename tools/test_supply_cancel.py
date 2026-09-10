@@ -13,7 +13,16 @@ async def supply_get(sid): return copy.deepcopy(DOCS.get(sid))
 async def supply_save(doc): DOCS[doc["_id"]] = copy.deepcopy(doc)
 async def supplies_with_open_tasks(limit=12): return [copy.deepcopy(d) for d in DOCS.values() if d["status"] == "open"]
 async def _cancel_tell(drivers, whole=True): TOLD.append((whole, list(drivers)))
+async def supply_task_cancel(sid, oid, who, now):
+    d = DOCS.get(sid); t = (d or {}).get("tasks", {}).get(oid)
+    if not d or d["status"] != "open" or not t or t.get("done_at") or t.get("cancelled_at"): return False
+    t.update(cancelled_at=now, cancelled_by=who, driver="", driver_id=0, claimed_at=None); return True
+async def supply_set(sid, fields, only_open=True):
+    d = DOCS.get(sid)
+    if not d or (only_open and d["status"] != "open"): return False
+    d.update(fields); return True
 db.supply_get, db.supply_save, db.supplies_with_open_tasks = supply_get, supply_save, supplies_with_open_tasks
+db.supply_task_cancel, db.supply_set = supply_task_cancel, supply_set
 sr._cancel_tell = _cancel_tell
 
 def task(driver="", got=0, done=None):
@@ -48,7 +57,13 @@ async def main():
     fresh()
     st, r = await cancel({"districts": ["a"], "as": "Ст"})
     eq("200, cancelled=[a], статус open", (st, r["cancelled"], r["status"]), (200, ["a"], "open"))
-    eq("задача a: cancelled_at, водителя нет", (bool(DOCS["S1"]["tasks"]["a"]["cancelled_at"]), DOCS["S1"]["tasks"]["a"].get("driver")), (True, None))
+    eq("задача a: cancelled_at, водителя нет", (bool(DOCS["S1"]["tasks"]["a"]["cancelled_at"]), DOCS["S1"]["tasks"]["a"].get("driver")), (True, ""))
+    st, r = await cancel({"districts": ["zzz"], "force": True})
+    eq("чужой район → 400, заявка цела", (st, r.get("error"), DOCS["S1"]["status"]), (400, "bad_district", "open"))
+    DOCS["S1"]["tasks"]["a"]["noscan_at"] = "n"; DOCS["S1"]["tasks"]["a"].pop("cancelled_at")
+    st, r = await cancel({"districts": ["a"], "force": True})
+    eq("принятый без сканирования не отменяется", (st, r.get("error")), (409, "nothing_to_cancel"))
+    DOCS["S1"]["tasks"]["a"].pop("noscan_at"); DOCS["S1"]["tasks"]["a"]["cancelled_at"] = "c"
     eq("водителям ничего (район был свободен)", TOLD, [(False, [])])
     print("— район с принятым: без force 409, с force — снят с водителя, ему сказали")
     st, r = await cancel({"districts": ["b"]})

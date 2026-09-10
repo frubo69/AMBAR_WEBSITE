@@ -2241,6 +2241,30 @@ async def supply_list(limit: int = 30, status: str = None) -> list:
     return rows
 
 
+async def supply_task_cancel(sid: str, district: str, who: str, now) -> bool:
+    """Отменить задачу района точечно: только если она ещё открыта и не
+    отменена. Документ целиком не переписываем — скан по соседнему району в
+    эту же секунду остаётся на месте."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.supplies.update_one(
+        {"_id": sid, "status": "open", f"tasks.{district}.done_at": None,
+         f"tasks.{district}.cancelled_at": None},
+        {"$set": {f"tasks.{district}.cancelled_at": now, f"tasks.{district}.cancelled_by": who,
+                  f"tasks.{district}.driver": "", f"tasks.{district}.driver_id": 0,
+                  f"tasks.{district}.claimed_at": None}})
+    return r.modified_count > 0
+
+
+async def supply_set(sid: str, fields: dict, only_open: bool = True) -> bool:
+    """Поставить поля поставки (статус, время закрытия) одним $set."""
+    db = _db_or_none()
+    if db is None: return False
+    q = {"_id": sid, "status": "open"} if only_open else {"_id": sid}
+    r = await db.supplies.update_one(q, {"$set": fields})
+    return r.modified_count > 0
+
+
 async def supplies_children(sids: list) -> dict:
     """Заявки, собранные из недобора указанных: {родитель: [дети]}. Дети —
     без задач целиком: нужен состав по районам, статус и база."""

@@ -20735,11 +20735,10 @@ async function accShort(sid){
                   : (_supMain(list) || list.find(x => x.kind !== 'extra'));
   ACC_BACK = cur && cur.kind === 'extra' ? (() => xOpen(cur.supply_id)) : accOrder;
   if(!cur){ shortBody(null); return; }
-  if(!SUP_D || SUP_D.supply_id !== cur.supply_id){
-    SUP_ID = cur.supply_id;
-    try{ SUP_D = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(cur.supply_id)); }
-    catch(e){ SUP_D = null; }
-  }
+  // Всегда заново: остаток зависит от заявок, созданных секунду назад.
+  SUP_ID = cur.supply_id;
+  try{ SUP_D = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(cur.supply_id)); }
+  catch(e){ SUP_D = null; }
   shortBody(SUP_D);
 }
 
@@ -21171,7 +21170,7 @@ async function supPollTick(){
   _supPollBusy = true;
   try{
     const d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(SUP_ID));
-    const sig = x => JSON.stringify((x.tasks || []).map(t => [t.district, t.erev, t.locked, t.got, t.done_at, t.driver, t.noscan_at]) .concat([x.status]));
+    const sig = x => JSON.stringify((x.tasks || []).map(t => [t.district, t.erev, t.locked, t.got, t.done_at, t.driver, t.noscan_at, t.cancelled_at]) .concat([x.status]));
     if(SUP_D && sig(d) !== sig(SUP_D)){ SUP_D = d; if(document.getElementById('supWho')) supRender(); }
   }catch(e){}
   finally{ _supPollBusy = false; }
@@ -21230,7 +21229,10 @@ async function xLoad(){
       if(XS && !Object.keys(XS.rows).length)
         (((sd || {}).shortfall || {}).rows || []).forEach(r => {
           const by = {};
-          const src = r.left_by || r.by_district || {};
+          // Остаток: по районам, если он есть; без разбивки — как в недоборе;
+          // нулевой остаток (всё уже в заявках) не подставляется вовсе.
+          if(r.left != null && !r.left) return;
+          const src = (r.left_by && Object.keys(r.left_by).length) ? r.left_by : (r.by_district || {});
           Object.entries(src).forEach(([o, n]) => { if(n > 0) by[o] = n; });
           if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
         });
@@ -21570,7 +21572,9 @@ async function xCreate(){
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     _toast('Заявка создана — водители её видят');
     if(XS && XS.did) xDraftDrop(XS.did);
-    XS = null; ACC_SUP = null;
+    // Заявка и её недобор изменились — кэш поставки тоже устарел, иначе
+    // экран недобора подставит те же бутылки второй раз.
+    XS = null; ACC_SUP = null; SUP_D = null;
     await accExtra();
   }catch(e){
     _toast('Не удалось создать');
@@ -22806,7 +22810,7 @@ async function supcGo(){
     _toast(wholeAll ? 'Заявка отменена' : `Отменено: ${n} ${pluralize(n,'район','района','районов')}`);
   }
   // Перечитываем всё, от чего зависит статус, и возвращаемся туда, откуда пришли.
-  ACC_SUP = null;
+  ACC_SUP = null; SUP_D = null;
   const back = ACC_BACK; ACC_BACK = null;
   await (back || accOrder)();
 }

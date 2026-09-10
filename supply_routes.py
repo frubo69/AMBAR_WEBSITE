@@ -1225,15 +1225,13 @@ def _cover(short: dict, children: list) -> dict:
     cov: dict = {}
     bases: dict = {}
     kids = []
+    # Ребёнок покрывает всё, что просил, — и то, что в нём потом отменили или
+    # не выдали: это уже ЕГО недобор, и следующая база собирается с его
+    # экрана. Иначе одни и те же бутылки просили бы оба экрана разом.
     for ch in children or []:
-        if (ch.get("status") or "open") == "cancelled":
-            continue
-        ctasks = ch.get("tasks") or {}
         qty = 0
         for it in ch.get("items") or []:
             for oid, n in (it.get("by_district") or {}).items():
-                if (ctasks.get(oid) or {}).get("cancelled_at"):
-                    continue
                 n = int(n or 0)
                 if n <= 0:
                     continue
@@ -1255,6 +1253,18 @@ def _cover(short: dict, children: list) -> dict:
                 covered_by[oid] = k
             if int(n or 0) - k > 0:
                 left_by[oid] = int(n or 0) - k
+        # В мастере товар могли переложить на другой район: остаток покрытия
+        # ребёнка гасит недобор любого района, а не только своего.
+        spare = sum(c.values()) - sum(covered_by.values())
+        for oid in list(left_by):
+            if spare <= 0:
+                break
+            k = min(left_by[oid], spare)
+            covered_by[oid] = covered_by.get(oid, 0) + k
+            left_by[oid] -= k
+            spare -= k
+            if not left_by[oid]:
+                del left_by[oid]
         # Без разбивки по районам считаем по сумме.
         covered = sum(covered_by.values()) if by else min(r["gap"], sum(c.values()))
         r["covered"] = covered
@@ -1790,11 +1800,17 @@ async def handle_cancel(request):
     # Отменить можно и часть заявки — районы, за которыми не едем: body
     # {districts: [...]}. Без списка — вся заявка. Принятый район отменить
     # нельзя: он уже на полке; уже отменённый — второй раз нечего.
-    want = [str(o) for o in (body.get("districts") or []) if str(o) in tasks]
-    partial = bool(want)
+    asked = [str(o) for o in (body.get("districts") or [])]
+    want = [o for o in asked if o in tasks]
+    partial = bool(asked)
+    if partial and not want:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    # Принятый район не отменяют, принятый без сканирования — тоже: товар
+    # уже на полке, ему осталось только досканироваться.
     targets = [o for o in (want if partial else list(tasks))
-               if not tasks[o].get("done_at") and not tasks[o].get("cancelled_at")]
-    if partial and not targets:
+               if not tasks[o].get("done_at") and not tasks[o].get("cancelled_at")
+               and not tasks[o].get("noscan_at")]
+    if not targets:
         return web.json_response({"error": "nothing_to_cancel"}, status=409,
                                  headers=CORS_HEADERS)
     took = sum(sum(int(v or 0) for o, v in (it.get("got") or {}).items() if o in targets)
@@ -1805,28 +1821,33 @@ async def handle_cancel(request):
     now = datetime.now(timezone.utc).isoformat()
     who = str(body.get("as") or "")[:60]
     # Задачи освобождаем: водитель не должен увидеть в списке отменённое, а
-    # если он держал её взятой — она просто исчезнет, и это правильно.
-    told = []
+    # если он держал её взятой — она просто исчезнет, и это правильно. Пишем
+    # по одному району и точечно: соседний район могут сканировать в эту же
+    # секунду, и переписывать документ целиком значило бы откатить их скан.
+    told, done_now = [], []
     for o in targets:
-        t = tasks[o]
-        if t.get("driver"):
-            told.append((t["driver"], o))
-        t.pop("driver", None)
-        t.pop("claimed_at", None)
-        t["cancelled_at"] = now
-        t["cancelled_by"] = who
+        if not await db.supply_task_cancel(sid, o, who, now):
+            continue                             # успели принять или отменить раньше
+        done_now.append(o)
+        if tasks[o].get("driver"):
+            told.append((tasks[o]["driver"], o))
+    targets = done_now
+    if not targets:
+        return web.json_response({"error": "nothing_to_cancel"}, status=409,
+                                 headers=CORS_HEADERS)
+    sup = await db.supply_get(sid) or sup
+    tasks = sup.get("tasks") or {}
     left = [o for o, t in tasks.items() if not t.get("done_at") and not t.get("cancelled_at")]
     if not left:
         # Ехать больше некуда. Если что-то принято — приём закончен, иначе
         # заявка отменена целиком: это разные записи в истории.
         if any(t.get("done_at") for t in tasks.values()):
             sup["status"] = "done"
-            sup["done_at"] = now
+            await db.supply_set(sid, {"status": "done", "done_at": now})
         else:
             sup["status"] = "cancelled"
-            sup["cancelled_at"] = now
-            sup["cancelled_by"] = who
-    await db.supply_save(sup)
+            await db.supply_set(sid, {"status": "cancelled", "cancelled_at": now,
+                                      "cancelled_by": who})
     # Задача, исчезнувшая из приложения без слова, — это повод приехать в
     # магазин и не понять, что происходит. Кто держал её взятой, узнаёт первым.
     await _cancel_tell(told, whole=not partial)

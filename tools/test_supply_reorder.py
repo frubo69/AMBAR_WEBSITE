@@ -38,7 +38,7 @@ eq("gin bases = [DEF]", g["bases"], ["DEF"])
 eq("rum left 5", rows["rum"]["left"], 5)
 eq("qty_left = 9, children = [DEF 10]", (short["qty_left"], [(k["base"], k["qty"]) for k in short["children"]]), (9, [("DEF", 10)]))
 
-print("— отменённая дочерняя заявка и отменённый район в ней не покрывают")
+print("— отменённый ребёнок и отменённый район в нём покрывают: это уже их недобор")
 short = sr._shortfall(X1)
 X3 = {"supply_id": "X3", "base": "GHI", "status": "cancelled", "at": "t3",
       "items": [{"id": "gin", "by_district": {"a": 4}}], "tasks": {"a": {}}}
@@ -46,8 +46,15 @@ X4 = {"supply_id": "X4", "base": "JKL", "status": "open", "at": "t4",
       "items": [{"id": "rum", "by_district": {"b": 5}}], "tasks": {"b": {"cancelled_at": "x"}}}
 sr._cover(short, [X3, X4])
 rows = {r["id"]: r for r in short["rows"]}
-eq("ничего не покрыто", (rows["gin"]["left"], rows["rum"]["left"], short["qty_left"]), (14, 5, 19))
-eq("детей в списке: JKL с 0 (X3 отменена — мимо)", [(k["base"], k["qty"]) for k in short["children"]], [("JKL", 0)])
+eq("gin: 4 (a) покрыто GHI, rum 5 (b) покрыто JKL", (rows["gin"]["left"], rows["rum"]["left"], short["qty_left"]), (10, 0, 10))
+eq("дети: GHI 4 (отменена), JKL 5", [(k["base"], k["qty"], k["status"]) for k in short["children"]], [("GHI", 4, "cancelled"), ("JKL", 5, "open")])
+print("— в мастере товар переложили на другой район: покрытие гасит остаток любого района")
+short = sr._shortfall(X1)
+X5 = {"supply_id": "X5", "base": "MNO", "status": "open", "at": "t5",
+      "items": [{"id": "gin", "by_district": {"c": 14}}], "tasks": {"c": {}}}
+sr._cover(short, [X5]); rows = {r["id"]: r for r in short["rows"]}
+eq("gin покрыт целиком, left 0, left_by пуст", (rows["gin"]["covered"], rows["gin"]["left"], rows["gin"]["left_by"]), (14, 0, {}))
+eq("qty_left = 5 (ром)", short["qty_left"], 5)
 
 print("— основная: отменённый район без принятого + урезанное магазином")
 M = {"_id": "S1", "kind": "main", "status": "open",

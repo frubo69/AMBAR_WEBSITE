@@ -4107,10 +4107,10 @@ button.path:active{transform:scale(.995)}
 .wh-strip-i.gap{background:repeating-linear-gradient(135deg,var(--k) 0 4px,transparent 4px 7px)}
 .wh-strip-i.on{opacity:1;box-shadow:inset 0 0 0 2px #fff;transform:scaleY(1.18)}
 .wh-strip-bar:has(.on) .wh-strip-i:not(.on){opacity:.35}
-.wh-strip-t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Space Grotesk',sans-serif;
-  font-size:10.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.wh-strip-l{flex:1;display:flex;justify-content:center;gap:9px;font-family:'DM Sans',sans-serif;font-size:9.5px;
-  font-weight:600;letter-spacing:.2px;color:var(--muted);white-space:nowrap;overflow:hidden}
+/* Легенда под полоской: часы не пишем — диапазон дня уже стоит в полосе дня. */
+.wh-strip-l{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;font-family:'DM Sans',sans-serif;
+  font-size:9.5px;font-weight:600;letter-spacing:.2px;color:var(--muted)}
+.wh-strip-l span{white-space:nowrap}
 .wh-strip-l i{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--k);margin-right:3px;vertical-align:-1px}
 .wh-strip-e{padding:8px 0;text-align:center;font-size:11.5px;color:var(--muted)}
 .wh-stop.dim{opacity:.35}
@@ -11793,9 +11793,9 @@ function whStripPaint(){
     const w = Math.max(1, x.min || 0) / total * 100;
     return `<button class="wh-strip-i ${x.kind}${WH.route.sel === i ? ' on' : ''}" style="flex:0 0 ${w.toFixed(2)}%;--k:${k.c}"
       onclick="whSegSel(${i})" aria-label="${escS(k.t)} ${_hmDubai(x.from)}"></button>`; }).join('')}</div>
-  <div class="wh-strip-t"><span>${_hmDubai(tl[0].from)}</span><span class="wh-strip-l">${
-    ['move','stop','visit','order','gap'].map(k => `<i style="--k:${WH_KIND[k].c}"></i>${WH_KIND[k].t.toLowerCase()}`).join('')
-  }</span><span>${_hmDubai(tl[tl.length - 1].to)}</span></div>`;
+  <div class="wh-strip-l">${
+    ['move','stop','visit','order','gap'].map(k => `<span><i style="--k:${WH_KIND[k].c}"></i>${WH_KIND[k].t.toLowerCase()}</span>`).join('')
+  }</div>`;
 }
 
 function whSegSel(i){

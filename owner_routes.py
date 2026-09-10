@@ -3916,23 +3916,6 @@ async def handle_shift_state(request):
     closing = now >= _chk_at(day, CHK_SHIFT_CLOSE[0], CHK_SHIFT_CLOSE[2])
     out = {"day": day, "total": sh["total"], "open": sh["open"], "closed": sh["closed"],
            "phase": "closing" if closing else "opening"}
-    # ?full=1 — ещё и по районам: кто открыл и во сколько, кто закрыл. Это
-    # полка под плиткой на «Районах»; плитке самой хватает счёта.
-    if (request.query.get("full") or "").strip():
-        try:
-            closed = await db.shifts_for_day(day)
-            opens = await db.shift_opens_for_day(day)
-        except Exception as e:                   # noqa: BLE001
-            log.warning(f"[shift] районы за {day}: {e}")
-            closed, opens = {}, {}
-        who = lambda d: (d or {}).get("by_name") or (d or {}).get("operator") or ""
-        at = lambda v: v.isoformat() if hasattr(v, "isoformat") else str(v or "")
-        out["districts"] = [{
-            "id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
-            "open_at": at((opens.get(o) or {}).get("opened_at")), "open_by": who(opens.get(o)),
-            "close_at": at((closed.get(o) or {}).get("closed_at")), "close_by": who(closed.get(o)),
-            "crew": sorted(n for n, v in ((opens.get(o) or {}).get("drivers") or {}).items() if v),
-        } for o in OFFICE_IDS]
     return web.json_response(out, headers=CORS_HEADERS)
 
 

@@ -3867,8 +3867,8 @@ async def handle_checklist(request):
         # Сдал ли водитель наличные, система знать не может: деньги переходят
         # из рук в руки. Поэтому единственная отметка, которую ставит человек,
         # — и сумма рядом, чтобы было с чем сверяться.
-        _chk_row("cash", "Деньги собраны",
-                 (f"собрано {cr['done']} из {cr['need']} · к сдаче {cr['net_total']:,}".replace(",", " ") + " AED"
+        _chk_row("cash", "Выручка получена",
+                 (f"получил {cr['done']} из {cr['need']} · выручка {cr['net_total']:,}".replace(",", " ") + " AED"
                   if cr["need"] else "наличных за смену не было"),
                  cr["all_done"] or not cr["need"],
                  now, day, plan, go="cash", n=max(0, cr["need"] - cr["done"])),

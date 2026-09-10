@@ -16632,7 +16632,7 @@ async function chkCash(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'cash')) || {};
   const было = r.state === 'done';
   if(!confirm(было ? 'Снять отметку «деньги собраны»?'
-                   : 'Наличные за смену собраны?')) return;
+                   : 'Выручка за смену получена?')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/checklist/mark',
       {method:'POST', body:{day: (CKL||{}).day, item:'cash', done: !было}});
@@ -16641,7 +16641,7 @@ async function chkCash(){
   accChecklist();
 }
 
-// ── Сбор денег по районам ──────────────────────────────────────────────────
+// ── Сбор выручки по районам (владелец: «сбор выручки, не сбор денег»; отметка — «получил») ──────────────────────────────────────────────────
 // Задача «Деньги собраны» — не одна галочка на день, а по галочке на район:
 // деньги сдают по одному, и старший заходит сюда несколько раз за смену.
 // На карточке района одно главное число — «к сдаче» (наличные − расход), под
@@ -16650,7 +16650,7 @@ async function chkCash(){
 let CR = null, CR_OPEN = new Set(), CR_BUSY = false;
 
 async function accCashRound(){
-  _setText('accTitle', 'Сбор денег');
+  _setText('accTitle', 'Сбор выручки');
   _setText('accSub', 'загрузка…');
   const day = (CKL && CKL.day) || accDay();
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
@@ -16669,10 +16669,10 @@ function crRender(){
   const list = [...d.districts].sort((a, b) => (a.empty - b.empty) || (a.done - b.done));
   const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
   const head = `<div class="ck-head cr-head${all ? ' all' : ''}">
-    <div class="ck-h-l">Сбор денег</div>
+    <div class="ck-h-l">Сбор выручки</div>
     <div class="ck-h-n">
       <span class="ck-h-v">${d.done}<u>/${d.need}</u></span>
-      <span class="ck-h-w">${all ? 'все районы собраны' : d.need ? 'районов собрано' : 'собирать нечего'}</span>
+      <span class="ck-h-w">${d.need ? 'районов получил' : 'получать нечего'}</span>
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
     <div class="cr-tot">
@@ -16691,7 +16691,7 @@ function crCard(x){
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
       <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
-      <span class="cr-none">нечего собирать</span>
+      <span class="cr-none">нечего получать</span>
     </div>
   </div>`;
   const open = CR_OPEN.has(x.id);
@@ -16704,7 +16704,7 @@ function crCard(x){
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
       <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
-      ${x.done ? `<span class="cr-st">${IC('check', 12)}собрано${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>` : ''}
+      ${x.done ? `<span class="cr-st">${IC('check', 12)}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>` : ''}
     </div>
     <div class="cr-main">
       <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${net < 0 ? '−' : ''}${fmt(Math.abs(net))}<u>AED</u></b></span>
@@ -16719,7 +16719,7 @@ function crCard(x){
         foldEnd(n, `crFold('${escS(x.id)}', 1)`)}</div>` : ''}`
       : '<div class="cr-noexp">Расходов за смену не было</div>'}
     <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
-      ${x.done ? `${IC('check', 16)}Собрано · снять отметку` : 'Собрано'}
+      ${x.done ? `${IC('check', 16)}Получил · снять отметку` : 'Получил'}
     </button>
   </div>`;
 }
@@ -16761,7 +16761,7 @@ async function crToggle(id){
   crRender();
   const all = CR.need > 0 && CR.done >= CR.need;
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(all ? 'success' : 'warning'); }catch(e){}
-  if(all && !wasAll) _toast('Деньги собраны на всех районах');
+  if(all && !wasAll) _toast('Выручка получена по всем районам');
   // Чек-лист перечитается при возврате — строка «Деньги собраны» считается
   // на сервере из этих же отметок.
   CKL = null;

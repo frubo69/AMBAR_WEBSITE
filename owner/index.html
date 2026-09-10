@@ -411,6 +411,10 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
   cursor:pointer;transition-property:var(--tp);transition-duration:.15s;transition-timing-function:var(--e1)}
 .dn-home svg{width:17px;height:17px;display:block}
+/* Атрибут hidden против display:flex не работает — в пилюле дня на плашках
+   (расходы, «По районам», склад) кнопка «к сегодня» торчала и в сегодняшнем
+   дне; у отдельной полосы это правило было, у плашек — нет. */
+.dn-home[hidden]{display:none}
 .dn-home:active{transform:scale(.92)}
 /* Horizontal swipes on the hero are OURS — the page must not scroll under them.
    Needs [data-detail] in the selector to outrank the generic
@@ -899,6 +903,19 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   font-weight:600;letter-spacing:.2px;text-transform:none;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis}
 .stk-bysum .exp-fold .aud-g{padding:2px 0 0}
+/* «Остатки всего» на складе — та же плашка: строка дня шапкой, плитки под
+   ней; строки «QR код не внесён» и «По районам» — во всю ширину карточки,
+   как в карточке .sc, поэтому боковых полей у самой карточки нет. */
+.exp-sum.stk-valsum{flex:0 0 auto;padding:12px 0 0;margin:0 0 10px}
+.stk-valsum .exp-day{margin:-3px 16px 4px}
+/* «ОСТАТКИ» и под ним «всего»: в одну строку рядом с пилюлей дня не влезает.
+   Заголовок не ужимается никогда; тесно — короче становится дата в пилюле. */
+.stk-valsum .exp-day-t{flex-direction:column;align-items:flex-start;gap:1px}
+.stk-valsum .exp-day-l{flex:1 0 auto}
+.stk-valsum .exp-day-nav{flex:0 1 auto;min-width:0}
+.stk-valsum .exp-day .ds-txt i{text-overflow:ellipsis}
+.stk-valsum .aud-g{padding:2px 13px 13px}
+.stk-valsum .sc-r:last-child{border-radius:0 0 15px 15px}
 #stkByBody{padding-top:2px}
 /* ── История ревизий: строка одной ревизии ── */
 .hst-r{display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border:0;
@@ -13608,10 +13625,10 @@ async function stkPicker(тихо){
     document.getElementById('stkMid').innerHTML =
       '<div class="stk-empty">Загрузка…</div>';
   }
-  // Полоса дня двигает только «Остатки всего»: ревизия и перемещение живут
-  // сегодняшним днём, у них своя история и свои полосы внутри. Листаем день
-  // на уже собранной странице — перечитываем одну стоимость и меняем одну
-  // карточку; плитки и полоса остаются на месте.
+  // День живёт на карточке «Остатки всего» и двигает только её: ревизия и
+  // перемещение считаются сегодняшним днём, у них своя история и свои полосы
+  // внутри. Листаем день на уже собранной странице — перечитываем одну
+  // стоимость и меняем содержимое одной карточки; плитки остаются на месте.
   const card = document.getElementById('stkValCard');
   if(тихо && card){
     const day = accDay();
@@ -13620,10 +13637,7 @@ async function stkPicker(тихо){
     if(STK.view !== 'pick' || accDay() !== day) return;
     STK.val = val;
     const now = document.getElementById('stkValCard');
-    if(now) now.outerHTML = stkValueCard(STK.reg);
-    // Полоса дня остаётся — значит день на ней пишем сами (из календаря сюда
-    // приходят без перекраски, стрелки красят её ещё раз, это не страшно).
-    dayBarPaint(document.getElementById('stkDay'));
+    if(now){ now.innerHTML = stkValInner(STK.reg); dayBarPaint(now); }
     return;
   }
   let st, reg;
@@ -13681,7 +13695,7 @@ async function stkPicker(тихо){
   const I_HAUD = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
   const I_HMOV = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 9l3 3-3 3"/>';
   document.getElementById('stkMid').innerHTML = `<div class="sc-page">` +
-    accDayBar('stkDay') + stkValueCard(reg) + `
+    stkValueCard(reg) + `
     <div class="stk-tiles2">
       <div class="stk-col">
         ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(nAud), 'в месяц',
@@ -13694,6 +13708,7 @@ async function stkPicker(тихо){
         ${sub('stkMovesHist()', I_HMOV, 'История')}
       </div>
     </div></div>`;
+  requestAnimationFrame(bindDayBars);        // смахивание карточки дня
 }
 
 // ── Ревизия: сперва район ───────────────────────────────────────────────────
@@ -13824,15 +13839,28 @@ async function stkMovesHist(){
 // оговорки выглядела бы полной, будучи посчитанной по половине склада.
 const _SC_CHEV = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
   stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>`;
+// Карточка «Остатки всего» — она же полоса дня: строка дня шапкой, под ней
+// плитки и строки. Ревизия и перемещение к дню отношения не имеют — у них
+// своя история и свои полосы внутри, — поэтому полосы над всей страницей
+// больше нет: смахивают саму карточку, как карточку выручки и плашку
+// «Остатки» на «По районам» (владелец: «отвяжи ревизию и перемещения от
+// слайдера по дням сверху»). Узел карточки при смене дня не подменяется —
+// на нём жест и полёт, — меняется только содержимое (stkValInner).
 function stkValueCard(reg){
+  return `<div class="exp-sum stk-bysum stk-valsum" id="stkValCard" data-day="общий">${
+    stkValInner(reg)}</div>`;
+}
+function stkValInner(reg){
   const v = STK.val, t = (v && v.totals) || null;
   const bottles = t ? t.bottles : ((reg && reg.totals && reg.totals.left) || 0);
   const без = (reg && reg.unscanned_total) || 0;
   // Три величины — три плитки той же анатомии, что в ревизии: подпись,
   // число, единица. Золото — на деньгах, количество белым. Цены — кнопки:
   // за ними закупочные цены по позициям.
-  return `<div class="sc" id="stkValCard">
-    <div class="sc-cap"><span>Остатки всего</span></div>
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+      <span class="exp-day-l"><span class="exp-day-t">Остатки<i>всего</i></span></span>
+      ${_dayNav('stkDay')}
+    </div>
     <div class="aud-g">
       <div class="aud-t"><span class="aud-tl">Количество</span>
         <b class="aud-tv">${fmt(bottles)}</b><span class="aud-tu">бут</span></div>
@@ -13845,8 +13873,7 @@ function stkValueCard(reg){
     </div>
     ${без ? `<button class="sc-r dn" onclick="accOpen('qr')"><span>QR код не внесён</span>
       <b>${fmt(без)}<u>${pluralize(без, 'бутылка', 'бутылки', 'бутылок')}</u></b><em>${_SC_CHEV}</em></button>` : ''}
-    <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>
-  </div>`;
+    <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>`;
 }
 
 // Прежняя полоса остатка. Оставлена для экрана района, где стоимость не
@@ -16071,7 +16098,7 @@ function accDayGo(off){
     EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true); return;
   }
   if(on('stkOv') && document.getElementById('stkBySum')){ stkByReload(); return; }
-  if(on('stkOv') && document.getElementById('stkDay')){
+  if(on('stkOv') && document.getElementById('stkValCard')){
     ACC_STOCK = null; daySkel('stkValCard'); stkPicker(true);
   }
 }

@@ -13728,7 +13728,7 @@ async function stkAuditPick(){
     // сколько раз его считали, и ждать её после районов значило бы показать
     // карточки с пустым низом.
     const [st, reg, aud] = await Promise.all([
-      ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}),
+      ownerApi.ownerFetch('/api/owner/stock/status'),
       ownerApi.ownerFetch('/api/owner/qr').catch(() => null),
       ownerApi.ownerFetch('/api/owner/stock/audits', {params:{limit: 120}}).catch(() => null)]);
     STK.status = st; STK.reg = reg; STK.districts = st.districts;
@@ -13793,7 +13793,7 @@ async function stkMovesHist(){
     return;
   }
   STK.moves = res.transfers || []; STK.moves30 = STK.moves;
-  const today = res.day || accDay();
+  const today = res.day || _dayIsoFor(0);
   const n = STK.moves.length;
   _stkHead('История перемещений', n
     ? `${n} ${pluralize(n, 'перемещение', 'перемещения', 'перемещений')} за 30 дней`
@@ -13944,8 +13944,7 @@ async function stkMovesPage(){
   _stkHead('Перемещения', 'загрузка…', false);
   document.getElementById('stkMid').innerHTML = '<div class="stk-none">Загрузка…</div>';
   let res;
-  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers',
-        {params:{day: accDay()}}); }
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers'); }
   catch(e){
     document.getElementById('stkMid').innerHTML =
       '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
@@ -13954,7 +13953,7 @@ async function stkMovesPage(){
   _stkHead('Перемещения', STK.moves.length
     ? `${STK.moves.length} ${pluralize(STK.moves.length,'строка','строки','строк')}${
         бут ? ` · ${бут} ${pluralize(бут,'бутылка','бутылки','бутылок')} сканом` : ''}`
-    : _dayName(res.day || accDay()), false);
+    : _dayName(res.day || _dayIsoFor(0)), false);
   document.getElementById('stkMid').innerHTML = STK.moves.length
     ? STK.moves.map((m, i) => `
       <div class="stk-mvr">
@@ -13972,8 +13971,7 @@ async function stkMovesPage(){
 async function stkLoadMoves(){
   const box = document.getElementById('stkMoves'); if(!box) return;
   let res;
-  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers',
-        {params:{day: accDay()}}); }
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers'); }
   catch(e){ box.innerHTML = '<div class="stk-empty" style="padding:14px">—</div>'; return; }
   STK.moves = res.transfers || [];
   // Переезды сканом сервер сводит в одну строку на позицию: тридцать
@@ -14284,7 +14282,7 @@ async function stkHistPaint(){
   let res;
   try{
     res = свой === 'moves'
-      ? await ownerApi.ownerFetch('/api/owner/stock/transfers', {params:{day: accDay()}})
+      ? await ownerApi.ownerFetch('/api/owner/stock/transfers')
       : await ownerApi.ownerFetch('/api/owner/stock/audits');
   }catch(e){
     box.innerHTML = '<div class="stkh-e" style="color:var(--dn)">Не удалось загрузить</div>';
@@ -14392,8 +14390,10 @@ async function audOpen(district, тихо){
       '<div class="stk-skel">' + '<i></i>'.repeat(7) + '</div>';
   }
   let sh;
+  // День ревизии — всегда сегодняшний (владелец: «перемещение и ревизия не
+  // относятся к дате сверху»); какой именно, говорит сервер (sh.day).
   try{ sh = await ownerApi.ownerFetch('/api/owner/stock/audit/sheet',
-        {params:{district, day: accDay()}}); }
+        {params:{district}}); }
   catch(e){ _toast('Не удалось загрузить'); return stkAuditPick(); }
   if(STK.view !== 'sheet' || STK.district !== district) return;   // пока ехало — ушли
   STK.sheet = sh;
@@ -14507,7 +14507,8 @@ function audAlienGo(){
 
 async function audStart(){
   if(!STK.sheet) return;
-  if(!await accAskBack('Ревизия')) return;
+  // Вопроса про прошедший день нет: ревизия всегда сегодняшняя, полоса дня
+  // на складе двигает только «Остатки всего».
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/start', {method:'POST',
         body:{district: STK.district, day: STK.sheet.day, as: _meName()}}); }
@@ -14554,7 +14555,7 @@ async function audFinish(){
 async function audReportGo(){
   let rep;
   try{ rep = await ownerApi.ownerFetch('/api/owner/stock/audit/report',
-        {params:{district: STK.district, day: (STK.sheet || {}).day || accDay()}}); }
+        {params:{district: STK.district, day: (STK.sheet || {}).day || ''}}); }
   catch(e){ _toast('Отчёт не найден'); return; }
   STK.repFrom = 'sheet';
   audReport(rep);
@@ -15322,7 +15323,8 @@ const MOV_V = {
 };
 
 async function stkMoveStart(){
-  if(!await accAskBack('Перемещение')) return;
+  // Перемещение всегда сегодняшним днём — к полосе дня на складе оно не
+  // относится, поэтому и вопроса про прошедший день нет.
   MOV = {to:'', rows:[], total:0, pending:null};
   if(!STK.districts) await stkLoadContext();
   stkMoveCam();

@@ -72,10 +72,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     await _remember(update.message)
+    # Ответ нарочно ни о чём: ни имени, ни района, ни слова о заказах. В
+    # скрытом режиме чат прикидывается игрой, и /start, набранный чужой рукой,
+    # не должен выдать, чей это телефон и чем он занят (владелец, 10 сен 2026).
     sent = await update.message.reply_text(
-        f"{me['name']}, здравствуйте.\n"
-        f"Ваш район: {me['district_code']} {me['district_name']}\n\n"
-        "В приложении — заказы на смену, отметка доставки и расходы.",
+        "Для начала откройте панель.",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Открыть панель", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
     await _remember(sent)

@@ -309,7 +309,11 @@ async def main():
     eq("старая строка «Гараж и ТО» без kind — тоже pool", fr._is_pool({"name": "Гараж и ТО"}), True)
     eq("образец: Хоз. нужды, Продукты, Коммуналка — группа home («Бытовые расходы»), все без даты", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "home"], [("Хоз. нужды", "pool"), ("Продукты", "pool"), ("Коммуналка", "pool")])
     eq("старые «Продукты» без kind — тоже без даты", fr._is_pool({"name": "Продукты"}), True)
-    eq("образец: Билеты, Визы, Sim, Бензин — без даты; «Реклама» — не статья, а группа", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and not w[1]["group"]], [("Билеты", "pool"), ("Визы", "pool"), ("Sim", "pool"), ("Бензин", "pool")])
+    eq("образец: Билеты, Визы, Бензин — без даты; «Sim» и «Реклама» — группы", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and not w[1]["group"]], [("Билеты", "pool"), ("Визы", "pool"), ("Бензин", "pool")])
+    eq("образец: Покупка, Пополнение — группа sim, без даты", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "sim"], [("Покупка", "pool"), ("Пополнение", "pool")])
+    BUDGET.append(dict(_id="L22", month=M, name="Пополнение", plan=300, due=0, note="", kind="pool", ord=22, group="sim", period=4, next="2026-12-01"))
+    bs = (await fr.build(M))["budget"]
+    eq("подрасход Sim без даты: график не считается, итог группы sim", (bs["sim"], next((l["kind"], l["period"], l["next_due"]) for l in bs["lines"] if l["id"] == "L22")), ({"plan": 300, "fact": 0, "left": 300, "n": 1}, ("pool", 1, "")))
     eq("образец: Посты, Интеграция бота — группа ads", [(w[1]["name"], w[1]["cur"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "ads"], [("Посты", "AED"), ("Интеграция бота", "AED")])
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Посты", plan=1000, group="ads", cur="usd", period=2, next="2026-10-15")))
     ads_id = json.loads(r.text)["id"]

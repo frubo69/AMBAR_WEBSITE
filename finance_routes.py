@@ -268,12 +268,14 @@ def template_lines() -> list[dict]:
     rows += [dict(name=n, group="auto", kind="pool" if n in POOL_NAMES else "") for n in AUTO_NAMES]
     rows += [dict(name=n, group="car") for n in CAR_NAMES]
     rows += [dict(name=n, group="home", kind="pool") for n in HOME_NAMES]
-    rows += [dict(name=n, kind="pool") for n in ("Билеты", "Визы", "Sim", "Бензин")]
+    rows += [dict(name=n, kind="pool") for n in ("Билеты", "Визы")]
+    rows += [dict(name=n, group="sim", kind="pool") for n in SIM_NAMES]
+    rows += [dict(name="Бензин", kind="pool")]
     rows += [dict(name=n, group="ads") for n in ADS_NAMES]
     return rows
 
 
-GROUPS = ("", "rent", "auto", "home", "car", "ads")
+GROUPS = ("", "rent", "auto", "home", "car", "ads", "sim")
 AUTO_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг")
 AUTO_LEGACY = ("Авто", "Аренда")  # так статьи назывались до 11 сен 2026
 # Аренда машин («Аренда» внутри «Расходов на автомобили»): у кого арендуем —
@@ -282,6 +284,8 @@ CAR_NAMES = ("Орион Рент", "Алексей Рент", "Другой Р�
 HOME_NAMES = ("Хоз. нужды", "Продукты", "Коммуналка")   # «Бытовые расходы»
 # «Реклама»: виды рекламы, каждая с графиком и суммой в AED или $ (по курсу дня)
 ADS_NAMES = ("Посты", "Интеграция бота")
+# «Sim»: два подрасхода без даты
+SIM_NAMES = ("Покупка", "Пополнение")
 # Статья без даты платежа (kind="pool"): просто бюджет на месяц, без периода
 # и календаря, правится прямо в списке; старые строки — по названию.
 POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг", "Билеты", "Визы", "Sim", "Бензин") + HOME_NAMES
@@ -376,6 +380,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
     home = dict(plan=0.0, fact=0.0, n=0)      # «Бытовые расходы»
     car = dict(plan=0.0, fact=0.0, n=0)       # аренда машин — входит и в «Расходы на автомобили»
     ads = dict(plan=0.0, fact=0.0, n=0)       # «Реклама»
+    sim = dict(plan=0.0, fact=0.0, n=0)       # «Sim»
     usd = calc._n(salary.get("usd")) or 3.67  # сумма статьи в $ считается в AED по курсу месяца
     today = _biz_day()
     for i, ln in enumerate(lines):
@@ -410,6 +415,8 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             autog["plan"] += plan_m; autog["fact"] += f
         elif group == "ads":
             ads["plan"] += plan_m; ads["fact"] += f; ads["n"] += 1
+        elif group == "sim":
+            sim["plan"] += plan_m; sim["fact"] += f; sim["n"] += 1
         rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), cur=cur, plan_aed=calc._i(plan_aed), plan_m=calc._i(plan_m),
                          fact=calc._i(f), left=calc._i(plan_m - f), due=int(ln.get("due") or 0),
                          note=ln.get("note") or "", group=group, office=office, code=code, short=short, **sch,
@@ -441,7 +448,9 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
                left=calc._i(car["plan"] - car["fact"]), n=car["n"])
     ads = dict(plan=calc._i(ads["plan"]), fact=calc._i(ads["fact"]),
                left=calc._i(ads["plan"] - ads["fact"]), n=ads["n"])
-    return dict(lines=rows, salary=salary, rent=rent, auto=autog, home=home, car=car, ads=ads, total=calc._i(total), fact=calc._i(fact_all),
+    sim = dict(plan=calc._i(sim["plan"]), fact=calc._i(sim["fact"]),
+               left=calc._i(sim["plan"] - sim["fact"]), n=sim["n"])
+    return dict(lines=rows, salary=salary, rent=rent, auto=autog, home=home, car=car, ads=ads, sim=sim, total=calc._i(total), fact=calc._i(fact_all),
                 left=calc._i(total - fact_all), off_plan=calc._i(off_plan),
                 days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
                 norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,

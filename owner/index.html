@@ -17692,7 +17692,7 @@ function fbValues(){
     V['bu.off_on'] = bu.off_plan ? 1 : 0;
     const sal = bu.salary || {};
     V['bu.salary_plan'] = sal.plan || 0; V['bu.salary_fact'] = sal.fact || 0; V['bu.salary_left'] = sal.left || 0;
-    for(const g of ['rent', 'auto', 'home', 'car', 'ads']) for(const k of ['plan', 'fact', 'left']) V[`bu.${g}_${k}`] = ((bu[g] || {})[k]) || 0;
+    for(const g of ['rent', 'auto', 'home', 'car', 'ads', 'sim']) for(const k of ['plan', 'fact', 'left']) V[`bu.${g}_${k}`] = ((bu[g] || {})[k]) || 0;
     if(FB.page && FB.page.kind === 'line'){ const l = (bu.lines || []).find(x => x.id === FB.page.id); if(l) for(const k of ['plan', 'fact', 'left']) V['ln.' + k] = l[k]; }
     const pay = fbCur(mb);
     for(const k in pay.totals) V['pay.' + k] = pay.totals[k];
@@ -18051,6 +18051,7 @@ async function accFinBud(keep){
   // норма · N в день», по нажатию раскрывается расчёт и поле.
   document.getElementById('accMid').innerHTML = `<div class="fb-page${keep ? ' back' : ''}">
   <div class="sc fb-gut">
+    ${fbCapT('Аналитика месяца')}
     ${fbCap(b.month, true)}
     <div class="aud-g">
       ${fbTile('План', 'bu.total', bu.total)}
@@ -18589,14 +18590,16 @@ function fbPersonFillRow(p, sal){
 // статьи — каждая своей карточкой и своей страницей.
 function fbBudLines(b){
   const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []};
-  const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0}, home = bu.home || {plan: 0, fact: 0, n: 0}, car = bu.car || {plan: 0, fact: 0, n: 0};
+  const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0}, home = bu.home || {plan: 0, fact: 0, n: 0}, car = bu.car || {plan: 0, fact: 0, n: 0}, sim = bu.sim || {plan: 0, fact: 0, n: 0};
   let out = fbBudGroup('Зарплаты', '', fbGroupVal(sal, 'bu.salary_plan'), "fbPageOpen('salary','')");
-  const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), homeLines = lines.filter(l => l.group === 'home'), carLines = lines.filter(l => l.group === 'car'), rest = lines.filter(l => !l.group);
+  const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), homeLines = lines.filter(l => l.group === 'home'), carLines = lines.filter(l => l.group === 'car'), simLines = lines.filter(l => l.group === 'sim'), rest = lines.filter(l => !l.group);
   if(rentLines.length) out += fbBudGroup('Аренда офисов', '', fbGroupVal(rent, 'bu.rent_plan'), "fbPageOpen('rent','')");
   if(autoLines.length || carLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
     FB.autoOpen === true, 'fbAutoToggle()', fbCarRow(car) + autoLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
   if(homeLines.length) out += fbBudGroupExpand('Бытовые расходы', '', fbGroupVal(home, 'bu.home_plan'),
     FB.homeOpen === true, 'fbHomeToggle()', homeLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
+  if(simLines.length) out += fbBudGroupExpand('Sim', '', fbGroupVal(sim, 'bu.sim_plan'),
+    FB.simOpen === true, 'fbSimToggle()', simLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
   if(!lines.length){
     out += `<div class="fb-card"><div class="fb-none">Других статей ещё нет</div><div class="fb-add">${
       bu.prev_has ? `<button class="aud-b go" onclick="fbBudFill('prev')">Из прошлого месяца</button>` : ''}
@@ -18616,6 +18619,11 @@ function fbAutoToggle(){
 }
 function fbHomeToggle(){
   FB.homeOpen = FB.homeOpen !== true;
+  fbBudRepaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbSimToggle(){
+  FB.simOpen = FB.simOpen !== true;
   fbBudRepaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -18738,6 +18746,7 @@ async function accFinRP(){
   const lines = (bu.lines || []).filter(l => l.fact && !l.group);
   const sal = bu.salary || {}, rent = bu.rent || {}, auto = bu.auto || {}, home = bu.home || {};
   if((bu.ads || {}).fact) lines.unshift({name: 'Реклама', plan: bu.ads.plan, fact: bu.ads.fact});
+  if((bu.sim || {}).fact) lines.unshift({name: 'Sim', plan: bu.sim.plan, fact: bu.sim.fact});
   if(home.fact) lines.unshift({name: 'Бытовые расходы', plan: home.plan, fact: home.fact});
   if(auto.fact) lines.unshift({name: 'Расходы на автомобили', plan: auto.plan, fact: auto.fact});
   if(rent.fact) lines.unshift({name: 'Аренда офисов', plan: rent.plan, fact: rent.fact});

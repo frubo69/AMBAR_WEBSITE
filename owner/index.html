@@ -3178,9 +3178,21 @@ button.path:active{transform:scale(.995)}
 .fb-editing .fb-e-b b{font-size:14px}
 /* Перетягивание людей: строка под пальцем — приподнятая копия, на месте —
    бледный след; соседи разъезжаются. */
-.fb-drag-grp .fb-bl[data-drag]{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;touch-action:pan-y}
-#fbList-bud.jig .fb-drag-grp .fb-bl[data-drag]{cursor:grabbing}
-.fb-bl.drag-ghost{opacity:.22;transition:opacity .15s}
+.fb-drag-grp [data-drag]{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;touch-action:pan-y}
+#fbList-bud.jig .fb-drag-grp [data-drag]{cursor:grabbing}
+.drag-ghost{opacity:.22;transition:opacity .15s}
+/* Человек в бюджете — карточка как в «Зарплатах» */
+.fb-kids .fb-pc{display:block;width:calc(100% - 20px);margin:6px 10px;padding:9px 12px;border-radius:14px;text-align:left;
+  font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fb-kids .fb-pc:active{background:var(--card2)}
+.fb-kids .fb-pc.fb-editing{cursor:default} .fb-kids .fb-pc.fb-editing:active{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%)}
+.fb-kids .fb-kcap + .fb-drag-grp .fb-pc:first-child{margin-top:2px}
+.fb-pc .shl-h{gap:12px;min-height:44px}
+.fb-pc .shl-v.fb-pv{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.fb-pc .shl-h > .fb-fill-em{margin-left:2px}
+.fb-pc .fb-pin{display:flex;align-items:center;gap:8px;padding:8px 0 0 54px}
+.fb-pc .fb-pin .fb-ok{flex:1 1 auto}
+.fb-pc .fb-edit2{padding:8px 0 2px 54px}
 .fb-drag-float{position:fixed;z-index:10000;margin:0;border-radius:13px;background:#1c1c33;transform:scale(1.03);
   box-shadow:0 12px 44px rgba(0,0,0,.55),0 0 0 1px rgba(201,169,110,.4);pointer-events:none;will-change:left,top;transition:none}
 .fb-sal[hidden]{display:none}
@@ -17943,7 +17955,7 @@ function fbDragInit(){
   if(FB_DRAG.init) return;
   const mid = document.getElementById('accMid'); if(!mid) return;
   FB_DRAG.init = true;
-  const rowOf = t => t && t.closest ? t.closest('#fbList-bud .fb-drag-grp .fb-bl[data-drag]') : null;
+  const rowOf = t => t && t.closest ? t.closest('#fbList-bud .fb-drag-grp [data-drag]') : null;
   const down = (t, x, y) => {
     const row = rowOf(t); if(!row || FB.edit) return;
     FB_DRAG.sx = x; FB_DRAG.sy = y;
@@ -17981,7 +17993,7 @@ function fbDragMove(x, y){
   f.style.left = (x - FB_DRAG.ox) + 'px'; f.style.top = (y - FB_DRAG.oy) + 'px';
   if(FB_DRAG.lock) return;
   const grp = el.parentElement;
-  const rows = [...grp.querySelectorAll('.fb-bl[data-drag]')].filter(r => r !== el);
+  const rows = [...grp.querySelectorAll('[data-drag]')].filter(r => r !== el);
   if(!rows.length) return;
   let target = null;
   for(const r of rows){ const b = r.getBoundingClientRect(); if(y >= b.top && y <= b.bottom){ target = r; break; } }
@@ -17993,7 +18005,7 @@ function fbDragMove(x, y){
   }
   if(target !== FB_DRAG.last){
     FB_DRAG.last = target;
-    const all = [...grp.querySelectorAll('.fb-bl[data-drag]')];
+    const all = [...grp.querySelectorAll('[data-drag]')];
     fbDragSwap(target, all.indexOf(el) < all.indexOf(target) ? 'after' : 'before');
   }
 }
@@ -18002,7 +18014,7 @@ function fbDragSwap(ref, mode){
   // уже стоит там, куда просят, — не двигать и не запирать
   if((mode === 'before' && ref.previousElementSibling === el) || (mode === 'after' && ref.nextElementSibling === el)) return;
   FB_DRAG.lock = true;
-  const rows = [...grp.querySelectorAll('.fb-bl[data-drag]')], old = new Map(rows.map(r => [r, r.getBoundingClientRect()]));
+  const rows = [...grp.querySelectorAll('[data-drag]')], old = new Map(rows.map(r => [r, r.getBoundingClientRect()]));
   if(mode === 'before') ref.before(el); else ref.after(el);
   rows.forEach(r => {
     if(r === el) return;
@@ -18024,7 +18036,7 @@ function fbDragEnd(){
     f.style.left = r.left + 'px'; f.style.top = r.top + 'px'; f.style.transform = 'scale(1)'; f.style.boxShadow = 'none';
     setTimeout(() => { f.remove(); el.classList.remove('drag-ghost'); }, 200);
     const grp = el.parentElement;
-    fbPayOrder([...grp.querySelectorAll('.fb-bl[data-drag]')].map(x => x.dataset.drag), grp.dataset.role);
+    fbPayOrder([...grp.querySelectorAll('[data-drag]')].map(x => x.dataset.drag), grp.dataset.role);
   }
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -18129,19 +18141,7 @@ function fbSalaryBody(b){
   for(const [role, t] of FB_SAL_GROUPS){
     const ps = (sal.people || []).filter(p => p.role === role);
     if(!ps.length) continue;
-    out += `<div class="fb-kcap">${t}</div><div class="fb-drag-grp" data-role="${role}">` + ps.map(p => {
-      const editing = FB.edit && FB.edit.kind === 'rate' && FB.edit.id === p.name;
-      const cur = editing ? (FB.editCur || p.cur) : p.cur;
-      const sym = cur === 'USD' ? '$' : 'AED';
-      // Доллары: в окошке только «2 000 $», дирхамы по нашему курсу — строкой
-      // под окошком, золотом. Ставка в день — словами под именем.
-      const eq = p.cur === 'USD' && p.rate ? `= ${fbFmt(p.rate_aed)} AED` : '';
-      const sub = [p.unit === 'day' ? 'в день' : '', p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
-      return fbFillRow({kind: 'rate', id: p.name, name: escS(p.name), sub,
-                        value: p.rate, unit: sym, eq, kid: true, attrs: `data-drag="${escS(p.name)}"`,
-                        extra: `<div class="fb-edit2">${fbSeg('cur', cur, [['AED', 'AED'], ['USD', '$']], 'fbEditCur')}<span class="fb-sp"></span>
-                          <button class="fb-lnk del" data-n="${escS(p.name)}" onclick="fbPersonHideBud(this.dataset.n)">Убрать из зарплат</button></div>`});
-    }).join('') + '</div>';
+    out += `<div class="fb-kcap">${t}</div><div class="fb-drag-grp" data-role="${role}">` + ps.map(p => fbPersonFillRow(p, sal)).join('') + '</div>';
   }
   out += `<button class="sc-r fb-plus sub" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>
     <div class="fb-add" id="fbAdd-person" hidden>
@@ -18151,6 +18151,34 @@ function fbSalaryBody(b){
       <button class="aud-b go" onclick="fbPersonAdd()">Добавить</button>
     </div>`;
   return out;
+}
+// Человек в бюджете — та же карточка, что в «Зарплатах»: квадрат с
+// инициалами, имя, подпись, справа сумма. Три состояния как у всех строк:
+// «Заполнить +», поле с «Подтвердить», окошко с карандашом. Доллары: в
+// окошке «2 000 $», дирхамы по нашему курсу — строкой под ним, золотом.
+function fbPersonFillRow(p, sal){
+  const editing = FB.edit && FB.edit.kind === 'rate' && FB.edit.id === p.name;
+  const cur = editing ? (FB.editCur || p.cur) : p.cur;
+  const sym = cur === 'USD' ? '$' : 'AED';
+  const sub = [p.unit === 'day' ? 'в день' : '', p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
+  const head = `<span class="shl-code">${escS(fbIni(p.name))}</span><span class="shl-b"><b>${escS(p.name)}</b><i>${sub}</i></span>`;
+  if(editing){
+    return `<div class="shl-card fb-pc fb-editing">
+      <div class="shl-h">${head}</div>
+      <div class="fb-pin"><b class="fb-inb"><input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFillIn" value="${p.rate ? fbFmt(p.rate) : ''}"
+          onkeydown="if(event.key==='Enter'){fbFillOk()}else if(event.key==='Escape'){fbFillCancel()}"><u>${sym}</u></b>
+        <button class="fb-ok" onclick="fbFillOk()">Подтвердить</button>
+        <em class="fb-fill-em x" onclick="fbFillCancel()" role="button" aria-label="Отмена">${IC('xmark', 13)}</em></div>
+      <div class="fb-edit2">${fbSeg('cur', cur, [['AED', 'AED'], ['USD', '$']], 'fbEditCur')}<span class="fb-sp"></span>
+        <button class="fb-lnk del" data-n="${escS(p.name)}" onclick="fbPersonHideBud(this.dataset.n)">Убрать из зарплат</button></div>
+    </div>`;
+  }
+  const empty = !(p.rate > 0);
+  return `<button class="shl-card fb-pc" data-drag="${escS(p.name)}" data-n="${escS(p.name)}" onclick="fbFillEdit('rate', this.dataset.n)">
+    <div class="shl-h">${head}
+      ${empty ? `<span class="shl-v fb-pv"><b class="fb-fill">Заполнить</b></span><em class="fb-fill-em">${_FB_PLUS}</em>`
+              : `<span class="shl-v fb-pv"><b class="fb-box">${fbFmt(p.rate)}<u>${sym}</u></b>${p.cur === 'USD' ? `<i class="fb-eq">= ${fbFmt(p.rate_aed)} AED</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em>`}
+    </div></button>`;
 }
 // Список бюджета: карточка «Зарплаты», карточка «Аренда офисов» (здания),
 // остальные статьи — каждая своей карточкой.

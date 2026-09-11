@@ -3193,7 +3193,15 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
 /* График платежа в правке статьи: барабан периода и кнопка-дата */
 .fb-sched{align-items:center;gap:12px}
-.fb-wheelw{display:flex;align-items:center;gap:8px}
+.fb-pbtn{width:42px;height:42px;border-radius:12px;border:1px solid rgba(201,169,110,.35);background:var(--gold-soft);
+  color:var(--gold2);font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.fb-pbtn.on{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;border-color:transparent}
+.fb-pbtn b{font-weight:700}
+.fb-wheelrow{justify-content:flex-start;gap:14px;padding-top:0}
+.fb-wheelrow[hidden]{display:none}
+.fb-wheelrow .fb-wheel{width:64px}
+.fb-lnk.ok{color:var(--gold2)}
 .fb-wheel{height:108px;width:52px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;position:relative;
   border-radius:12px;background:rgba(0,0,0,.35);border:1px solid var(--border2);
   mask-image:linear-gradient(180deg,transparent 0,#000 32%,#000 68%,transparent 100%);
@@ -18311,9 +18319,14 @@ function fbLineRow(l, kid){
   const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
   // в правке: барабан «раз в N мес», дата следующего платежа (календарь),
   // заметка и «Убрать»; дальше программа считает следующий платёж сама
+  // число периода — в квадратной таблетке; барабан появляется по нажатию на неё
   const extra = `<div class="fb-edit2 fb-sched">
-      <div class="fb-wheelw"><div class="fb-wheel" id="fbPeriod" onscroll="fbWheelScroll(this)">${fbWheelItems(FB.editPeriod || 1)}</div><span class="fb-wheel-l">раз в<br>мес</span></div>
+      <button class="fb-pbtn${FB.wheelOpen ? ' on' : ''}" id="fbPeriodBtn" onclick="fbWheelToggle()"><b>${FB.editPeriod || 1}</b></button><span class="fb-wheel-l">раз в<br>мес</span>
       <button class="fb-datebtn${FB.editNext ? ' on' : ''}" id="fbNextBtn" onclick="openDate('fbNext')">${IC('cal', 15)}<span>${FB.editNext ? fbDayT(FB.editNext) : 'дата платежа'}</span></button>
+    </div>
+    <div class="fb-edit2 fb-wheelrow" id="fbWheelRow"${FB.wheelOpen ? '' : ' hidden'}>
+      <div class="fb-wheel" id="fbPeriod" onscroll="fbWheelScroll(this)">${fbWheelItems(FB.editPeriod || 1)}</div>
+      <button class="fb-lnk ok" onclick="fbWheelToggle()">Готово</button>
     </div>
     <div class="fb-edit2">
       <input class="fb-txt" placeholder="Заметка" autocomplete="off" maxlength="80" id="fbFillNote" value="${escS(l.note || '')}">
@@ -18333,11 +18346,22 @@ function fbWheelScroll(el){
     const n = Math.max(1, Math.min(12, Math.round(el.scrollTop / FB_WHEEL_H) + 1));
     if(n !== FB.editPeriod){ FB.editPeriod = n; try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
     el.querySelectorAll('.fb-witem').forEach(x => x.classList.toggle('sel', +x.dataset.n === n));
+    const pb = document.querySelector('#fbPeriodBtn b'); if(pb) pb.textContent = n;
   }, 80);
 }
 function fbWheelSet(){
   const el = document.getElementById('fbPeriod'); if(!el) return;
   el.scrollTop = ((FB.editPeriod || 1) - 1) * FB_WHEEL_H;
+}
+// Барабан показывается по нажатию на таблетку и прячется по «Готово»; поле
+// суммы при этом не перерисовывается — введённое остаётся.
+function fbWheelToggle(){
+  FB.wheelOpen = !FB.wheelOpen;
+  const row = document.getElementById('fbWheelRow'), btn = document.getElementById('fbPeriodBtn');
+  if(row) row.hidden = !FB.wheelOpen;
+  if(btn) btn.classList.toggle('on', FB.wheelOpen);
+  if(FB.wheelOpen) fbWheelSet();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // Дата следующего платежа — из общего календаря (openDate → dpApply).
 function fbNextPick(ymd){
@@ -18470,6 +18494,7 @@ function fbFillEdit(kind, id){
   const ln = kind === 'line' ? ((((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === id) || {}) : {};
   FB.editPeriod = kind === 'line' ? (ln.period || 1) : 1;
   FB.editNext = kind === 'line' ? (ln.next || '') : '';
+  FB.wheelOpen = false;
   fbBudRepaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }

@@ -3121,6 +3121,28 @@ button.path:active{transform:scale(.995)}
 .fb-bl .fb-fill-em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   color:var(--gold2);background:var(--gold-soft);font-style:normal}
 .fb-bl .fb-fill-em.pen{color:var(--sub);background:rgba(255,255,255,.06);margin-left:2px}
+/* Бюджет: секция без общей обводки, статьи — отдельными карточками, группы
+   («Зарплаты», «Аренда офисов») раскрываются стрелкой. */
+.sc.fb-budsc{background:none;border:0;overflow:visible}
+.fb-budsc > .sc-cap{border-bottom:0;padding:0 6px 6px;min-height:36px}
+.fb-card{margin:0 0 8px;border-radius:15px;overflow:hidden;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.22)}
+.fb-card.group{border-color:rgba(201,169,110,.42)}
+.fb-card.add{border-style:dashed;border-color:rgba(201,169,110,.3);background:none}
+.fb-card > .fb-bl,.fb-card > .fb-e{border-top:0}
+.fb-card .fb-bl{min-height:60px;padding:10px 12px 10px 16px}
+.fb-card .fb-bl .fb-e-b b{font-size:15px}
+.fb-card .fb-e-v{font-size:16px}
+.fb-card .fb-gh{min-height:64px}
+.fb-chev{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--gold2);background:var(--gold-soft);font-style:normal;transition:transform .18s var(--e1)}
+.fb-card.group.open > .fb-gh .fb-chev{transform:rotate(90deg)}
+.fb-kids{border-top:1px solid rgba(201,169,110,.16)}
+.fb-kids[hidden]{display:none}
+.fb-kids .fb-bl.fb-kid{padding-left:26px;min-height:54px}
+.fb-kids .fb-bl.fb-kid .fb-e-b b{font-size:14px}
+.fb-kids .fb-plus.sub{min-height:44px} .fb-kids .fb-plus.sub span{font-size:12.5px;color:var(--sub)}
+.fb-card .fb-plus span{font-size:14px}
 .fb-sal[hidden]{display:none}
 .fb-sal .fb-r.fb-pr{padding-left:24px}
 .fb-sal .fb-r.fb-pr > span{white-space:normal;line-height:1.15}
@@ -17865,8 +17887,8 @@ async function accFinBud(){
     ${fbIn('Норма в день', 'norm', bu.norm_set ? bu.norm : null, m, {ph: fbFmt(bu.norm_auto), phk: 'bu.norm_auto', eu: 'по плану'})}
     ${fbIn('Базе в день', 'norm_b', bu.norm_b, m, {ph: '—', eu: 'по заказу'})}
   </div>
-  <div class="sc">
-    ${fbCapT('Статьи расходов', bu.lines.length ? `${bu.lines.length + 1}` : '')}
+  <div class="sc fb-budsc">
+    ${fbCapT('Статьи расходов')}
     <div id="fbList-bud">${fbBudLines(b)}</div>
   </div>`;
 }
@@ -17889,41 +17911,67 @@ function fbSalaryRows(b){
       <button class="aud-b go" onclick="fbPersonAdd()">Добавить</button>
     </div>`;
 }
+// Статья — строка карточки: пустая зовёт «Заполнить», заполненная показывает
+// потрачено / план и карандаш.
+function fbBudLine(l, kid){
+  const open = FB.bud === l.id;
+  const empty = !(l.plan > 0);
+  const over = l.plan > 0 && l.fact > l.plan, ok = l.plan > 0 && l.fact === l.plan;
+  const sub = [l.due ? `до ${l.due}-го` : '', l.note ? escS(l.note) : '',
+               over ? `сверх плана ${fbFmt(l.fact - l.plan)}` : ok ? 'оплачено' : l.plan > 0 ? `осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
+  return `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}${open ? ' open' : ''}" onclick="fbBudEdit('${l.id}')">
+    <span class="fb-e-b"><b>${escS(l.name)}</b><i>${sub}</i></span>
+    ${empty ? `<b class="fb-fill">Заполнить</b><em class="fb-fill-em">${_FB_PLUS}</em>`
+            : `<b class="fb-e-v${over ? ' dn' : ok ? ' ok' : ''}">${fbFmt(l.fact)}<s class="sl">/</s>${fbFmt(l.plan)}</b><em class="fb-fill-em pen">${_FB_PEN}</em>`}</button>${open ? fbBudForm(l, l.group) : ''}`;
+}
+// Шапка группы: название, что внутри, итог и стрелка — она поворачивается,
+// когда группа раскрыта.
+function fbBudGroup(t, sub, valueHtml, open, go, body){
+  return `<div class="fb-card group${open ? ' open' : ''}">
+    <button class="fb-e fb-bl fb-gh" onclick="${go}">
+      <span class="fb-e-b"><b>${t}</b><i>${sub}</i></span>${valueHtml}<em class="fb-chev">${_SC_CHEV}</em></button>
+    <div class="fb-kids"${open ? '' : ' hidden'}>${body}</div>
+  </div>`;
+}
+// Список бюджета: карточка «Зарплаты» (люди с окладами), карточка «Аренда
+// офисов» (здания), остальные статьи — каждая своей карточкой.
 function fbBudLines(b){
-  const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []};
-  const salOpen = FB.salOpen !== false;
+  const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []}, rent = bu.rent || {plan: 0, fact: 0, n: 0};
   const salSub = sal.n ? `${sal.n} ${pluralize(sal.n, 'человек', 'человека', 'человек')}${sal.set_n < sal.n ? ` · без оклада ${sal.n - sal.set_n}` : ''}` : 'людей ещё нет';
-  let out = `<button class="fb-e fb-bl${salOpen ? ' open' : ''}" onclick="fbSalToggle()">
-      <span class="fb-e-b"><b>Зарплаты</b><i>${salSub}${sal.fact ? ` · выплачено ${fbFmt(sal.fact)}` : ''}</i></span>
-      <b class="fb-e-v" data-f="bu.salary_plan">${fbFmt(sal.plan)}<u>AED</u></b></button>
-    <div class="fb-sal"${salOpen ? '' : ' hidden'}>${fbSalaryRows(b)}</div>`;
-  if(!lines.length){
-    out += `<div class="fb-none">Других статей ещё нет</div><div class="fb-add">${
-      bu.prev_has ? `<button class="aud-b go" onclick="fbBudFill('prev')">Из прошлого месяца</button>` : ''}
-      <button class="aud-b" onclick="fbBudFill('template')">По образцу</button></div>`;
+  let out = fbBudGroup('Зарплаты', salSub + (sal.fact ? ` · выплачено ${fbFmt(sal.fact)}` : ''),
+    `<b class="fb-e-v" data-f="bu.salary_plan">${fbFmt(sal.plan)}<u>AED</u></b>`, FB.salOpen !== false, 'fbSalToggle()', fbSalaryRows(b));
+  const rentLines = lines.filter(l => l.group === 'rent'), rest = lines.filter(l => l.group !== 'rent');
+  if(rentLines.length || FB.bud === 'new-rent'){
+    const rentSub = [`${rent.n} ${pluralize(rent.n, 'здание', 'здания', 'зданий')}`,
+                     rent.plan > rent.fact ? `осталось ${fbFmt(rent.left)}` : rent.plan && rent.fact === rent.plan ? 'оплачено' : ''].filter(Boolean).join(' · ');
+    const rentVal = rent.plan ? `<b class="fb-e-v${rent.fact > rent.plan ? ' dn' : rent.fact === rent.plan ? ' ok' : ''}">${fbFmt(rent.fact)}<s class="sl">/</s>${fbFmt(rent.plan)}</b>`
+                              : `<b class="fb-fill">Заполнить</b>`;
+    out += fbBudGroup('Аренда офисов', rentSub, rentVal, FB.rentOpen !== false, 'fbRentToggle()',
+      rentLines.map(l => fbBudLine(l, true)).join('')
+      + `<button class="sc-r fb-plus sub" onclick="fbBudEdit('new-rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>${FB.bud === 'new-rent' ? fbBudForm(null, 'rent') : ''}`);
   }
-  out += lines.map(l => {
-    const open = FB.bud === l.id;
-    const empty = !(l.plan > 0);
-    const over = l.plan > 0 && l.fact > l.plan, ok = l.plan > 0 && l.fact === l.plan;
-    const sub = [l.due ? `до ${l.due}-го` : '', l.note ? escS(l.note) : '',
-                 over ? `сверх плана ${fbFmt(l.fact - l.plan)}` : ok ? 'оплачено' : l.plan > 0 ? `осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
-    return `<button class="fb-e fb-bl${open ? ' open' : ''}" onclick="fbBudEdit('${l.id}')">
-      <span class="fb-e-b"><b>${escS(l.name)}</b><i>${sub}</i></span>
-      ${empty ? `<b class="fb-fill">Заполнить</b><em class="fb-fill-em">${_FB_PLUS}</em>`
-              : `<b class="fb-e-v${over ? ' dn' : ok ? ' ok' : ''}">${fbFmt(l.fact)}<s class="sl">/</s>${fbFmt(l.plan)}</b><em class="fb-fill-em pen">${_FB_PEN}</em>`}</button>${open ? fbBudForm(l) : ''}`;
-  }).join('');
-  if(bu.off_plan) out += `<div class="fb-e fb-bl"><span class="fb-e-b"><b>Вне плана</b><i>расходы без статьи</i></span><b class="fb-e-v">${fbFmt(bu.off_plan)}<u>AED</u></b></div>`;
-  out += `<button class="sc-r fb-plus" onclick="fbBudEdit('new')"><span>Добавить статью</span><em>${_FB_PLUS}</em></button>${FB.bud === 'new' ? fbBudForm(null) : ''}`;
+  if(!lines.length){
+    out += `<div class="fb-card"><div class="fb-none">Других статей ещё нет</div><div class="fb-add">${
+      bu.prev_has ? `<button class="aud-b go" onclick="fbBudFill('prev')">Из прошлого месяца</button>` : ''}
+      <button class="aud-b" onclick="fbBudFill('template')">По образцу</button></div></div>`;
+  }
+  out += rest.map(l => `<div class="fb-card${FB.bud === l.id ? ' open' : ''}">${fbBudLine(l, false)}</div>`).join('');
+  if(bu.off_plan) out += `<div class="fb-card"><div class="fb-e fb-bl"><span class="fb-e-b"><b>Вне плана</b><i>расходы без статьи</i></span><b class="fb-e-v">${fbFmt(bu.off_plan)}<u>AED</u></b></div></div>`;
+  out += `<div class="fb-card add"><button class="sc-r fb-plus" onclick="fbBudEdit('new')"><span>Добавить статью</span><em>${_FB_PLUS}</em></button>${FB.bud === 'new' ? fbBudForm(null, '') : ''}</div>`;
   return out;
+}
+function fbRentToggle(){
+  FB.rentOpen = FB.rentOpen === false;
+  fbBudRepaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // Форма статьи: у новой — название и план, у существующей — план, срок,
 // заметка; название правится там же.
-function fbBudForm(l){
+function fbBudForm(l, group){
   l = l || {id: '', name: '', plan: null, due: 0, note: ''};
-  const id = l.id || 'new';
-  return `<div class="fb-add fb-bf" id="fbBf-${id}">
-    <input class="fb-txt" placeholder="Статья" autocomplete="off" maxlength="40" id="fbBfName-${id}" value="${escS(l.name)}"
+  const id = l.id || (group === 'rent' ? 'new-rent' : 'new');
+  return `<div class="fb-add fb-bf" id="fbBf-${id}" data-group="${group || ''}">
+    <input class="fb-txt" placeholder="${group === 'rent' ? 'Здание' : 'Статья'}" autocomplete="off" maxlength="40" id="fbBfName-${id}" value="${escS(l.name)}"
       onkeydown="if(event.key==='Enter'){document.getElementById('fbBfPlan-${id}').focus()}">
     <input class="fb-num" inputmode="decimal" placeholder="План" autocomplete="off" id="fbBfPlan-${id}" value="${l.plan ? fbFmt(l.plan) : ''}"
       onkeydown="if(event.key==='Enter'){fbBudSave('${id}')}">
@@ -17938,7 +17986,7 @@ function fbBudEdit(id){
   fbBudRepaint();
   if(FB.bud){
     const l = ((fbBook(FB.month) || {}).budget || {}).lines.find(x => x.id === FB.bud);
-    const el = document.getElementById((FB.bud === 'new' || !l) ? 'fbBfName-' + FB.bud : 'fbBfPlan-' + FB.bud);
+    const el = document.getElementById((FB.bud.startsWith('new') || !l) ? 'fbBfName-' + FB.bud : 'fbBfPlan-' + FB.bud);
     if(el){ el.focus(); if(el.select) el.select(); }
   }
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -17952,9 +18000,10 @@ async function fbBudSave(id){
   const name = fbTxt('fbBfName-' + id), plan = fbAmt('fbBfPlan-' + id), due = Math.round(fbAmt('fbBfDue-' + id)) || 0;
   if(!name){ _toast('Как называется статья'); return; }
   if(due < 0 || due > 31){ _toast('Число месяца от 1 до 31'); return; }
+  const group = ((document.getElementById('fbBf-' + id) || {}).dataset || {}).group || '';
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/budget',
-      {method: 'POST', body: {month: FB.month, id: id === 'new' ? '' : id, name, plan, due, note: fbTxt('fbBfNote-' + id), as: _meName()}});
+      {method: 'POST', body: {month: FB.month, id: id.startsWith('new') ? '' : id, name, plan, due, note: fbTxt('fbBfNote-' + id), group, as: _meName()}});
     FB.bud = null;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); fbBudRepaint(); }
@@ -18027,8 +18076,9 @@ async function accFinRP(){
                    d.expenses_sum ? `расходы ${fbFmt(d.expenses_sum)}${what ? ' (' + what + ')' : ''}` : ''].filter(Boolean).join(' / ');
       return fbDayRow(d, sub, d.rp, {unit: 'в фонде', cls: d.rp < 0 ? 'dn' : ''});
     });
-  const lines = (bu.lines || []).filter(l => l.fact);
-  const sal = bu.salary || {};
+  const lines = (bu.lines || []).filter(l => l.fact && l.group !== 'rent');
+  const sal = bu.salary || {}, rent = bu.rent || {};
+  if(rent.fact) lines.unshift({name: 'Аренда офисов', plan: rent.plan, fact: rent.fact});
   if(sal.fact) lines.unshift({name: 'Зарплаты', plan: sal.plan, fact: sal.fact});
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">

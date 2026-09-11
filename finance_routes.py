@@ -261,11 +261,23 @@ def template_lines() -> list[dict]:
     """Статьи «по образцу» — те, что стоят в бюджете старшего. Зарплат здесь
     нет: зарплатный фонд складывается из людей (см. _pay_plan)."""
     from config_offices import OFFICES
-    rows = [dict(name="Аренда офис")]
-    rows += [dict(name=f"Аренда {o['name']}") for o in OFFICES]
+    # «Аренда офисов» — группа: пять зданий, каждое своей строкой
+    rows = [dict(name=f"Аренда {o['name']}", group="rent") for o in OFFICES]
     rows += [dict(name=n) for n in ("Авто", "Гараж и ТО", "Парковка", "Билеты", "Визы",
                                     "Sim", "Хоз. нужды", "Продукты", "Бензин", "Реклама")]
     return rows
+
+
+GROUPS = ("", "rent")
+
+
+def _line_group(ln: dict) -> str:
+    """Группа статьи: «rent» — здание в «Аренде офисов». Старые строки без
+    поля относим по названию, чтобы уже заполненный месяц не рассыпался."""
+    g = ln.get("group")
+    if g in GROUPS and g:
+        return g
+    return "rent" if str(ln.get("name") or "").startswith("Аренда ") else ""
 
 
 async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dict) -> dict:
@@ -293,13 +305,21 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         else:
             off_plan += calc._n(e.get("amount"))
     rows, total, fact_sum = [], 0.0, 0.0
+    rent = dict(plan=0.0, fact=0.0, n=0)
     for i, ln in enumerate(lines):
         plan = calc._n(ln.get("plan"))
         f = fact.get(ln.get("_id"), 0.0)
+        name = ln.get("name") or ""
+        group = _line_group(ln)
+        # строка «Аренда офис» старого образца: офис — это и есть пять зданий
+        if name == "Аренда офис" and not plan and not f:
+            continue
         total += plan; fact_sum += f
-        rows.append(dict(id=ln.get("_id"), name=ln.get("name") or "", plan=calc._i(plan),
+        if group == "rent":
+            rent["plan"] += plan; rent["fact"] += f; rent["n"] += 1
+        rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan),
                          fact=calc._i(f), left=calc._i(plan - f), due=int(ln.get("due") or 0),
-                         note=ln.get("note") or "", kind=ln.get("kind") or "",
+                         note=ln.get("note") or "", group=group,
                          ord=int(ln.get("ord") if ln.get("ord") is not None else i)))
     # записи без статьи и записи удалённой статьи — «вне плана», но потрачено
     known = {r["id"] for r in rows}
@@ -317,7 +337,9 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             prev_has = bool(await db.fin_budget_get(_prev_month(month)))
         except Exception:                         # noqa: BLE001
             prev_has = False
-    return dict(lines=rows, salary=salary, total=calc._i(total), fact=calc._i(fact_all),
+    rent = dict(plan=calc._i(rent["plan"]), fact=calc._i(rent["fact"]),
+                left=calc._i(rent["plan"] - rent["fact"]), n=rent["n"])
+    return dict(lines=rows, salary=salary, rent=rent, total=calc._i(total), fact=calc._i(fact_all),
                 left=calc._i(total - fact_all), off_plan=calc._i(off_plan),
                 days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
                 norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,
@@ -800,6 +822,9 @@ async def handle_budget_set(request):
         if not 0 <= due <= 31:
             return _json({"error": "bad_due"}, 400)
         lid = str(body.get("id") or "")[:24]
+        group = str(body.get("group") or "")
+        if group not in GROUPS:
+            return _json({"error": "bad_group"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
@@ -808,11 +833,13 @@ async def handle_budget_set(request):
         if not old or old.get("month") != month:
             return _json({"error": "not_found"}, 404)
         ordv = old.get("ord")
+        if "group" not in body:
+            group = _line_group(old)
     else:
         lid = secrets.token_hex(4)
         ordv = len(await db.fin_budget_get(month))
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
-           "note": str(body.get("note") or "").strip()[:80], "kind": "",
+           "note": str(body.get("note") or "").strip()[:80], "kind": "", "group": group,
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
     await _touch(month)
@@ -854,10 +881,12 @@ async def handle_budget_fill(request):
         if not prev:
             return _json({"error": "no_prev"}, 404)
         rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
-                     note=ln.get("note") or "", kind="") for ln in prev
-                if (ln.get("kind") or "") != "salary"]
+                     note=ln.get("note") or "", kind="", group=_line_group(ln)) for ln in prev
+                if (ln.get("kind") or "") != "salary"
+                and not (ln.get("name") == "Аренда офис" and not ln.get("plan"))]
     else:
-        rows = [dict(name=r["name"], plan=0, due=0, note="", kind="") for r in template_lines()]
+        rows = [dict(name=r["name"], plan=0, due=0, note="", kind="", group=r.get("group") or "")
+                for r in template_lines()]
     who = _who(body)
     for i, r in enumerate(rows):
         await db.fin_budget_set({"_id": secrets.token_hex(4), "month": month, "ord": i, "by": who, **r})

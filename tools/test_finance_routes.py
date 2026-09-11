@@ -179,7 +179,8 @@ async def main():
     eq("люди из расписания: Парвиз, Умар, Фарух, Али", [p["name"] for p in b["pay"]["people"]], ["Парвиз", "Умар", "Фарух", "Али"])
     print("— с бюджетом, приходом в фонд и зарплатами")
     BUDGET[:] = [dict(_id="L1", month=M, name="Зарплаты", plan=10000, due=0, note="", kind="salary", ord=0),
-                 dict(_id="L2", month=M, name="Аренда JVC", plan=31000, due=15, note="", kind="", ord=1)]
+                 dict(_id="L2", month=M, name="Аренда JVC", plan=31000, due=15, note="", kind="", ord=1),
+                 dict(_id="L0", month=M, name="Аренда офис", plan=0, due=0, note="", kind="", ord=2)]
     ENTRIES.append(dict(_id="in1", day="2026-09-03", book="in", amount=500, comment="с крипты", who="", by="Ст", at="t"))
     ENTRIES.append(dict(_id="a3", day="2026-09-04", book="rp", amount=300, comment="аренда", who="", line="L2", by="Ст", at="t"))
     ENTRIES.append(dict(_id="s1", day="2026-09-04", book="rp", amount=1000, comment="Зарплата", who="Али", line="L1", kind="salary", pay_month=M, by="Ст", at="t"))
@@ -201,6 +202,7 @@ async def main():
        (bu["total"], bu["salary"]["plan"], bu["days"], bu["norm_auto"], bu["norm"], bu["norm_set"]), (40422.5, 9422.5, 30, 1400, 1400, False))
     eq("строка «Зарплаты» из старого образца скрыта, люди в фонде: Макар (руками) первым, потом Парвиз, Фарух, Али; Умар скрыт",
        ([l["name"] for l in bu["lines"]], [x["name"] for x in bu["salary"]["people"]]), (["Аренда JVC"], ["Макар", "Парвиз", "Фарух", "Али"]))
+    eq("«Аренда JVC» без поля group — в группе аренды по названию; пустая «Аренда офис» скрыта; итог группы", (bu["lines"][0]["group"], bu["rent"]), ("rent", dict(plan=31000, fact=300, left=30700, n=1)))
     eq("оклады в фонде: Али 100/день → 3000, Макар 1750 $ → 6422.5, без оклада — None и 0",
        [(x["rate"], x["unit"], x["cur"], x["plan"]) for x in bu["salary"]["people"]], [(1750, "month", "USD", 6422.5), (None, "month", "AED", 0), (None, "month", "AED", 0), (100, "day", "AED", 3000)])
     eq("факт: зарплаты 1000 + 900 + аванс 2000 (по виду записи), аренда 300, вне плана 25", (bu["salary"]["fact"], [l["fact"] for l in bu["lines"]], bu["off_plan"], bu["fact"]), (3900, [300], 25, 4225))
@@ -274,7 +276,7 @@ async def main():
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="in", amount=250, comment="с крипты")))
     eq("entry in ok", (r.status, WRITES[-2][1]["book"], WRITES[-2][1]["line"]), (200, "in", ""))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Виза", plan="11000", due=20, **{"as": "Ст"})))
-    eq("budget_set новая: ord 2", (r.status, WRITES[-1][0], WRITES[-1][1]["ord"], WRITES[-1][1]["plan"]), (200, "bset", 2, 11000))
+    eq("budget_set новая: ord 3", (r.status, WRITES[-1][0], WRITES[-1][1]["ord"], WRITES[-1][1]["plan"]), (200, "bset", 3, 11000))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="nope", name="X", plan=1)))
     eq("budget_set чужой id → 404", r.status, 404)
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="L2", name="Аренда JVC", plan=32000, due=15)))
@@ -282,9 +284,15 @@ async def main():
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month=M, **{"from": "prev"})))
     eq("fill при непустом → 409", r.status, 409)
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-10", **{"from": "prev"})))
-    eq("fill октября из сентября: 2 строки (старая «Зарплаты» не копируется)", (r.status, json.loads(r.text)["n"]), (200, 2))
+    eq("fill октября из сентября: 2 строки (старые «Зарплаты» и пустая «Аренда офис» не копируются)", (r.status, json.loads(r.text)["n"]), (200, 2))
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-11", **{"from": "template"})))
-    eq("fill по образцу: без строки «Зарплаты»", any(w[0] == "bset" and w[1]["name"] == "Зарплаты" and w[1]["month"] == "2026-11" for w in WRITES), False)
+    eq("fill по образцу: без строки «Зарплаты» и без «Аренда офис», здания в группе rent",
+       (any(w[0] == "bset" and w[1]["name"] in ("Зарплаты", "Аренда офис") and w[1]["month"] == "2026-11" for w in WRITES),
+        sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ["rent"] * 5))
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Аренда склад", plan=900, group="rent")))
+    eq("новая строка в группе аренды", (r.status, WRITES[-1][1]["group"]), (200, "rent"))
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="X", plan=1, group="zzz")))
+    eq("чужая группа → 400", r.status, 400)
     r = await raw(inner2["handle_budget_del"])(_req("DELETE", dict(id="L2")))
     eq("budget_del", (r.status, WRITES[-1]), (200, ("bdel", "L2")))
     bu2 = json.loads(r.text)["book"]["budget"]

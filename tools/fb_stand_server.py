@@ -127,7 +127,9 @@ BUDGET = [dict(_id="L1", month=MONTH, name="Зарплаты", plan=80000, due=0
           dict(_id="L11", month=MONTH, name="Реклама", plan=0, due=0, note="", kind="", ord=10),
           dict(_id="L12", month=MONTH, name="Гараж и ТО", plan=10000, due=0, note="Аслам, по чекам", kind="", ord=11),
           dict(_id="L13", month=MONTH, name="Парковка", plan=1500, due=0, note="", kind="", ord=12),
-          dict(_id="L14", month=MONTH, name="Алексей Рент", plan=12000, due=0, note="", kind="", ord=13, group="car", period=3, next="2026-10-20")]
+          dict(_id="L14", month=MONTH, name="Алексей Рент", plan=12000, due=0, note="", kind="", ord=13, group="car", period=3, next="2026-10-20"),
+          dict(_id="L15", month=MONTH, name="Страховка", plan=0, due=0, note="", kind="", ord=14, group="auto"),
+          dict(_id="L16", month=MONTH, name="Пассинг", plan=2400, due=0, note="", kind="", ord=15, group="auto")]
 LINE_BY = {"аренда": "L2", "бензин": "L10", "зарплата оператору": "L1", "ремонт машины": "L12", "связь": "L8", "реклама": "", "штраф": ""}
 for e in ENTRIES:
     if e["book"] == "rp":

@@ -293,12 +293,12 @@ async def main():
        (any(w[0] == "bset" and w[1]["name"] == "Зарплаты" and w[1]["month"] == "2026-11" for w in WRITES),
         [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11"][0],
         sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ("Аренда офис", "office"), ["rent"] * 6))
-    eq("образец: Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Гараж и ТО", "Парковка"])
+    eq("образец: Гараж и ТО, Парковка, Страховка, Пассинг — группа auto", [w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"], ["Гараж и ТО", "Парковка", "Страховка", "Пассинг"])
     eq("образец: три рента — группа car", [w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "car"], ["Орион Рент", "Алексей Рент", "Другой Рент"])
     eq("старое название «Авто» без поля group — всё ещё auto", fr._line_group({"name": "Авто"}), "auto")
     eq("«Аренда» без района и без поля group — auto, не rent", fr._line_group({"name": "Аренда"}), "auto")
     eq("«Аренда JVC» без поля group — rent", fr._line_group({"name": "Аренда JVC"}), "rent")
-    eq("образец: «Гараж и ТО» и «Парковка» — без даты платежа (kind pool)", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"], [("Гараж и ТО", "pool"), ("Парковка", "pool")])
+    eq("образец: гараж, парковка, страховка, пассинг — все без даты (pool)", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"], [("Гараж и ТО", "pool"), ("Парковка", "pool"), ("Страховка", "pool"), ("Пассинг", "pool")])
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Гараж и ТО", plan=3000, group="auto", period=3, next="2026-10-05", note="по чекам", **{"as": "Ст"})))
     pool_id = json.loads(r.text)["id"]
     eq("pool по названию: вид pool, график не принимается", (r.status, WRITES[-1][1]["kind"], WRITES[-1][1]["period"], WRITES[-1][1]["next"], WRITES[-1][1]["note"]), (200, "pool", 1, "", "по чекам"))

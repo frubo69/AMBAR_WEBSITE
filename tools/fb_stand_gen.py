@@ -101,6 +101,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('kind')) fbKindPick(Q.get('kind'));
     if(Q.get('norm')){ FB.normOpen = true; }
     if(Q.get('page')){ const [k, ...r] = Q.get('page').split(':'); fbPageOpen(k, r.join(':')); await new Promise(r => setTimeout(r, 400)); }
+    if(Q.get('page') && Q.get('edit')){ const [k, ...r] = Q.get('edit').split(':'); fbFillEdit(k, r.join(':')); await new Promise(r => setTimeout(r, 200)); }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {

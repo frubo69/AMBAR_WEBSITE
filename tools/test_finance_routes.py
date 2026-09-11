@@ -201,12 +201,13 @@ async def main():
     eq("бюджет: аренда 31000 + зарплатный фонд (Али 100×30 + Макар 1750$×3.67 = 9422.5) = 40422.5, / 30 дней, норма вверх до сотни 1400",
        (bu["total"], bu["salary"]["plan"], bu["days"], bu["norm_auto"], bu["norm"], bu["norm_set"]), (40422.5, 9422.5, 30, 1400, 1400, False))
     eq("строка «Зарплаты» из старого образца скрыта, люди в фонде: Макар (руками) первым, потом Парвиз, Фарух, Али; Умар скрыт",
-       ([l["name"] for l in bu["lines"]], [x["name"] for x in bu["salary"]["people"]]), (["Аренда JVC"], ["Макар", "Парвиз", "Фарух", "Али"]))
-    eq("«Аренда JVC» без поля group — в группе аренды по названию; пустая «Аренда офис» скрыта; итог группы", (bu["lines"][0]["group"], bu["rent"]), ("rent", dict(plan=31000, fact=300, left=30700, n=1)))
+       ([l["name"] for l in bu["lines"]], [x["name"] for x in bu["salary"]["people"]]), (["Аренда JVC", "Аренда офис"], ["Макар", "Парвиз", "Фарух", "Али"]))
+    eq("«Аренда офис» — офис (по названию), JVC — билдинг", [(l["name"], l["office"]) for l in bu["lines"]], [("Аренда JVC", False), ("Аренда офис", True)])
+    eq("«Аренда JVC» без поля group — в группе аренды по названию; итог группы с офисом", (bu["lines"][0]["group"], bu["rent"]), ("rent", dict(plan=31000, fact=300, left=30700, n=2)))
     eq("водителю — район (jbr → код из config_offices), остальным пусто", [(x["name"], x["district"]) for x in bu["salary"]["people"]], [("Макар", ""), ("Парвиз", ""), ("Фарух", ""), ("Али", "jbr")])
     eq("оклады в фонде: Али 100/день → 3000, Макар 1750 $ → 6422.5, без оклада — None и 0",
        [(x["rate"], x["unit"], x["cur"], x["plan"]) for x in bu["salary"]["people"]], [(1750, "month", "USD", 6422.5), (None, "month", "AED", 0), (None, "month", "AED", 0), (100, "day", "AED", 3000)])
-    eq("факт: зарплаты 1000 + 900 + аванс 2000 (по виду записи), аренда 300, вне плана 25", (bu["salary"]["fact"], [l["fact"] for l in bu["lines"]], bu["off_plan"], bu["fact"]), (3900, [300], 25, 4225))
+    eq("факт: зарплаты 1000 + 900 + аванс 2000 (по виду записи), аренда 300, вне плана 25", (bu["salary"]["fact"], [l["fact"] for l in bu["lines"]], bu["off_plan"], bu["fact"]), (3900, [300, 0], 25, 4225))
     eq("d4: в фонд по норме 1400 (collected_src norm)", (d4["collected"], d4["collected_src"]), (1400, "norm"))
     eq("d4: прибыль дня = 180 − 777 − 1400", d4["np_plus"], -1997)
     eq("d3: приход в фонд 500 записью, ins 1", (d3["extra_rp"], len(d3["ins"])), (500, 1))
@@ -285,11 +286,12 @@ async def main():
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month=M, **{"from": "prev"})))
     eq("fill при непустом → 409", r.status, 409)
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-10", **{"from": "prev"})))
-    eq("fill октября из сентября: 2 строки (старые «Зарплаты» и пустая «Аренда офис» не копируются)", (r.status, json.loads(r.text)["n"]), (200, 2))
+    eq("fill октября из сентября: 3 строки (JVC, офис, Виза; «Зарплаты» не копируются)", (r.status, json.loads(r.text)["n"]), (200, 3))
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-11", **{"from": "template"})))
-    eq("fill по образцу: без строки «Зарплаты» и без «Аренда офис», здания в группе rent",
-       (any(w[0] == "bset" and w[1]["name"] in ("Зарплаты", "Аренда офис") and w[1]["month"] == "2026-11" for w in WRITES),
-        sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ["rent"] * 5))
+    eq("fill по образцу: без «Зарплат», офис первым с kind office, пять зданий в группе rent",
+       (any(w[0] == "bset" and w[1]["name"] == "Зарплаты" and w[1]["month"] == "2026-11" for w in WRITES),
+        [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11"][0],
+        sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ("Аренда офис", "office"), ["rent"] * 6))
     eq("образец: Авто, Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Авто", "Гараж и ТО", "Парковка"])
     BUDGET.append(dict(_id="L9", month=M, name="Парковка", plan=1500, due=0, note="", kind="", ord=9))
     ba = (await fr.build(M))["budget"]
@@ -322,7 +324,9 @@ async def main():
     eq("budget_del", (r.status, WRITES[-1]), (200, ("bdel", "L2")))
     bu2 = json.loads(r.text)["book"]["budget"]
     eq("записи удалённой статьи: вне плана 25 + 300 и в факте", (bu2["off_plan"], bu2["fact"]), (325, 4225))
-    eq("зарплаты не статья: kind в ручке не принимается, строка kind=salary не создаётся", all(w[1].get("kind") == "" for w in WRITES if w[0] == "bset"), True)
+    eq("зарплаты не статья: строка kind=salary не создаётся", all(w[1].get("kind") != "salary" for w in WRITES if w[0] == "bset"), True)
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Аренда офис 2", plan=5000, group="rent", office=True)))
+    eq("новый офис: kind office", (r.status, WRITES[-1][1]["kind"]), (200, "office"))
     eq("правка сбрасывает кэш переносов с этого месяца", INV[-1], M)
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="advance", amount=500, day="2026-09-10", **{"from": "next", "as": "Ст"})))
     eq("аванс: запись расхода (kind advance, who, строка зарплат) + удержание со следующего месяца",

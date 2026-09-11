@@ -261,8 +261,9 @@ def template_lines() -> list[dict]:
     """Статьи «по образцу» — те, что стоят в бюджете старшего. Зарплат здесь
     нет: зарплатный фонд складывается из людей (см. _pay_plan)."""
     from config_offices import OFFICES
-    # «Аренда офисов» — группа: пять зданий, каждое своей строкой
-    rows = [dict(name=f"Аренда {o['name']}", group="rent") for o in OFFICES]
+    # «Аренда офисов» — группа: офис отдельно, потом пять зданий (билдинги)
+    rows = [dict(name="Аренда офис", group="rent", kind="office")]
+    rows += [dict(name=f"Аренда {o['name']}", group="rent") for o in OFFICES]
     # «Расходы на автомобили» — группа из трёх подпунктов
     rows += [dict(name=n, group="auto") for n in AUTO_NAMES]
     rows += [dict(name=n) for n in ("Билеты", "Визы", "Sim", "Хоз. нужды", "Продукты", "Бензин", "Реклама")]
@@ -358,9 +359,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         f = fact.get(ln.get("_id"), 0.0)
         name = ln.get("name") or ""
         group = _line_group(ln)
-        # строка «Аренда офис» старого образца: офис — это и есть пять зданий
-        if name == "Аренда офис" and not plan and not f:
-            continue
+        office = group == "rent" and (ln.get("kind") == "office" or name == "Аренда офис")
         sch = _schedule(ln, month, today)
         # платёж раз в несколько месяцев входит в план только того месяца, где он
         # стоит по графику; в остальные месяцы у строки плана нет, есть «следующий»
@@ -372,7 +371,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             autog["plan"] += plan_m; autog["fact"] += f; autog["n"] += 1
         rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), plan_m=calc._i(plan_m),
                          fact=calc._i(f), left=calc._i(plan_m - f), due=int(ln.get("due") or 0),
-                         note=ln.get("note") or "", group=group, **sch,
+                         note=ln.get("note") or "", group=group, office=office, **sch,
                          ord=int(ln.get("ord") if ln.get("ord") is not None else i)))
     # записи без статьи и записи удалённой статьи — «вне плана», но потрачено
     known = {r["id"] for r in rows}
@@ -889,6 +888,7 @@ async def handle_budget_set(request):
         group = str(body.get("group") or "")
         if group not in GROUPS:
             return _json({"error": "bad_group"}, 400)
+        kind = "office" if body.get("office") and group == "rent" else ""
         period = int(_num(body.get("period")) or 1)
         if not 1 <= period <= MAX_PERIOD:
             return _json({"error": "bad_period"}, 400)
@@ -905,6 +905,8 @@ async def handle_budget_set(request):
         ordv = old.get("ord")
         if "group" not in body:
             group = _line_group(old)
+        if "office" not in body:
+            kind = "office" if old.get("kind") == "office" else ""
         if "period" not in body:
             period = int(old.get("period") or 1)
         if "next" not in body:
@@ -913,7 +915,7 @@ async def handle_budget_set(request):
         lid = secrets.token_hex(4)
         ordv = len(await db.fin_budget_get(month))
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
-           "note": str(body.get("note") or "").strip()[:80], "kind": "", "group": group,
+           "note": str(body.get("note") or "").strip()[:80], "kind": kind, "group": group,
            "period": period, "next": nxt,
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
@@ -956,12 +958,12 @@ async def handle_budget_fill(request):
         if not prev:
             return _json({"error": "no_prev"}, 404)
         rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
-                     note=ln.get("note") or "", kind="", group=_line_group(ln),
+                     note=ln.get("note") or "", kind="office" if ln.get("kind") == "office" else "",
+                     group=_line_group(ln),
                      period=int(ln.get("period") or 1), next=str(ln.get("next") or "")) for ln in prev
-                if (ln.get("kind") or "") != "salary"
-                and not (ln.get("name") == "Аренда офис" and not ln.get("plan"))]
+                if (ln.get("kind") or "") != "salary"]
     else:
-        rows = [dict(name=r["name"], plan=0, due=0, note="", kind="", group=r.get("group") or "")
+        rows = [dict(name=r["name"], plan=0, due=0, note="", kind=r.get("kind") or "", group=r.get("group") or "")
                 for r in template_lines()]
     who = _who(body)
     for i, r in enumerate(rows):

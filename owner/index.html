@@ -18080,16 +18080,22 @@ function fbSalaryPage(b){
     </div></div>
     <div class="fb-kids fb-pgkids" id="fbList-bud">${fbSalaryBody(b)}</div>`;
 }
+// Аренда: офис отдельно, потом билдинги; правка раскрывается прямо в списке,
+// без отдельной страницы у каждого здания.
 function fbRentPage(b){
-  const bu = b.budget || {}, rent = bu.rent || {}, lines = (bu.lines || []).filter(l => l.group === 'rent');
-  const newRent = FB.edit && FB.edit.kind === 'new' && FB.edit.id === 'rent';
+  const bu = b.budget || {}, rent = bu.rent || {}, all = (bu.lines || []).filter(l => l.group === 'rent');
+  const office = all.filter(l => l.office), blds = all.filter(l => !l.office);
+  const isNew = id => FB.edit && FB.edit.kind === 'new' && FB.edit.id === id;
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', 'bu.rent_plan', rent.plan)}
       ${fbTile('Потратили', 'bu.rent_fact', rent.fact)}
       ${fbTile('Осталось', 'bu.rent_left', rent.left, {mode: 'neg'})}
     </div></div>
-    <div class="sc">${fbCapT('Здания')}<div id="fbList-bud" class="fb-one">${lines.map(l => `<div class="fb-card">${fbLineListRow(l, false)}</div>`).join('')}
-      <div class="fb-card add">${newRent ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>`}</div>
+    <div class="sc">${fbCapT('Офис')}<div class="fb-one">${office.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}${
+      office.length ? '' : `<div class="fb-card add">${isNew('office') ? fbNewRow('office') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','office')"><span>Добавить офис</span><em>${_FB_PLUS}</em></button>`}</div>`}
+    </div></div>
+    <div class="sc">${fbCapT('Билдинги')}<div class="fb-one">${blds.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}
+      <div class="fb-card add">${isNew('rent') ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
 // Страница одной статьи: план (та же строка в трёх состояниях), срок и
@@ -18303,8 +18309,8 @@ function fbEditCur(field, v){
 }
 // Новая статья или здание: название и сумма в одной строке.
 function fbNewRow(group){
-  return `<div class="fb-e fb-bl fb-editing${group ? ' fb-kid' : ''}">
-    <span class="fb-e-b fb-inname"><input class="fb-txt" id="fbFillName" placeholder="${group === 'rent' ? 'Здание' : 'Статья'}" autocomplete="off" maxlength="40"
+  return `<div class="fb-e fb-bl fb-editing">
+    <span class="fb-e-b fb-inname"><input class="fb-txt" id="fbFillName" placeholder="${group === 'office' ? 'Офис' : group === 'rent' ? 'Здание' : 'Статья'}" autocomplete="off" maxlength="40"
       onkeydown="if(event.key==='Enter'){document.getElementById('fbFillIn').focus()}else if(event.key==='Escape'){fbFillCancel()}"></span>
     <b class="fb-inb"><input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFillIn"
       onkeydown="if(event.key==='Enter'){fbFillOk()}else if(event.key==='Escape'){fbFillCancel()}"><u>AED</u></b>
@@ -18538,10 +18544,11 @@ async function fbFillOk(){
   }else{
     const l = e.kind === 'line' ? (((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === e.id) : null;
     const name = e.kind === 'line' ? (l ? l.name : '') : fbTxt('fbFillName');
-    if(!name){ _toast(e.id === 'rent' ? 'Как называется здание' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
+    if(!name){ _toast(e.id === 'rent' ? 'Как называется здание' : e.id === 'office' ? 'Как называется офис' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
     url = '/api/owner/finance/book/budget';
     body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val, note: fbTxt('fbFillNote'),
-            group: e.kind === 'line' ? (l ? l.group : '') : e.id, as: _meName()};
+            group: e.kind === 'line' ? (l ? l.group : '') : (e.id === 'office' ? 'rent' : e.id), as: _meName()};
+    if(e.kind === 'new' && e.id === 'office') body.office = true;
     if(e.kind === 'line'){ body.period = FB.editPeriod || 1; body.next = FB.editNext || ''; }
   }
   try{

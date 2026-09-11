@@ -40,11 +40,9 @@ SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, ка
 MAX_AMOUNT = 10_000_000
 USD_FALLBACK = 3.67
 
-DAY_FIELDS = ('handed_fact', 'ordered_fact', 'aside', 'collected', 'extra_rp',
-              'pay_b', 'pay_b_extra')
-OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'carry_np', 'storage',
-               'safe_np_fact', 'safe_b_fact')
-MONTH_FIELDS = OPEN_FIELDS + ('norm', 'norm_b', 'usd')
+DAY_FIELDS = ('handed_fact', 'ordered_fact', 'aside', 'collected', 'extra_rp', 'pay')
+OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стопки сейфа и долг на начало
+MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
 BOOKS = ('rp', 'np', 'in')
 ENTRY_KINDS = ('', 'salary', 'advance', 'loan')
 PAY_FIELDS = ('rate', 'unit', 'cur', 'days', 'note')
@@ -109,7 +107,7 @@ async def _sales(days: list[str]) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] заказы не прочитаны: {e}")
         orders = []
-    out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, tips=0, orders=0,
+    out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, tips=0, tips_cash=0, orders=0,
                    cash_by=dict()) for d in days}
     for o in orders:
         day = bizday.order_day(o)
@@ -129,6 +127,7 @@ async def _sales(days: list[str]) -> dict:
             s["card"] += total
         else:
             s["cash"] += total
+            s["tips_cash"] += int(o.get("tip") or 0)
             oid = o.get("office_id") or ""
             s["cash_by"][oid] = s["cash_by"].get(oid, 0) + total
     return out
@@ -431,7 +430,6 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
     fact_all = fact_sum + off_plan + sal_fact
     auto = norm_auto(total, ndays)
     norm = mdoc.get("norm")
-    norm_b = mdoc.get("norm_b")
     prev_has = False
     if not lines:
         try:
@@ -455,7 +453,6 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
                 days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
                 norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,
                 norm_set=norm is not None,
-                norm_b=None if norm_b is None else calc._i(calc._n(norm_b)),
                 prev_has=prev_has, empty=not lines)
 
 
@@ -629,7 +626,7 @@ async def _opening(month: str, depth: int = 0) -> dict:
         prev = _prev_month(month)
         prev_doc = await db.fin_month_get(prev)
         cache = prev_doc.get("carry_cache")
-        if isinstance(cache, dict):
+        if isinstance(cache, dict) and "np_open" in cache:
             # закрытый месяц уже считали: его закрытие лежит в его же документе
             # и стирается любой правкой этого или более раннего месяца (_touch)
             carried = dict(cache)
@@ -646,6 +643,8 @@ async def _opening(month: str, depth: int = 0) -> dict:
                     except Exception as e:            # noqa: BLE001
                         log.warning(f"[fin] кэш переноса {prev} не записан: {e}")
     opening = {**{k: v for k, v in carried.items() if v is not None}, **explicit}
+    if opening.get("np_open") is None and (doc.get("carry_np") is not None or doc.get("storage") is not None):
+        opening["np_open"] = calc._n(doc.get("carry_np")) + calc._n(doc.get("storage"))   # старые поля
     return {"opening": opening, "explicit": explicit, "carried": carried,
             "note": doc.get("note") or "", "doc": doc}
 
@@ -682,24 +681,27 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
         en = by_day_entries.get(d) or {"rp": [], "np": [], "in": []}
-        handed = s["cash"] - sp["spend"]
+        # выручка дня — то, что старший собирает наличными: наличные заказов
+        # минус чай (он водителя) минус расходы водителей; как в обзоре
+        handed = s["cash"] - s["tips_cash"] - sp["spend"]
         fact = m.get("handed_fact")
         base = handed if fact is None else calc._n(fact)
         ordered = m["ordered_fact"] if m.get("ordered_fact") is not None else pu["ordered"]
         past = d <= today
-        # раскладка дня по умолчанию: базе — по норме или по заказу дня,
-        # в фонд — по норме бюджета; вписанное руками главнее
+        # предложение раскладки (владелец, 12 сен 2026): Барракуде — ровно
+        # половина выручки, в РП+ — норма дня из бюджета, остаток — ЧП+;
+        # старший подтверждает или правит, вписанное руками главнее
         aside, aside_src = m.get("aside"), "manual"
         if aside is None:
             aside_src = ""
             if past and base > 0:
-                aside = budget["norm_b"] if budget["norm_b"] is not None else ordered
-                aside_src = "norm" if budget["norm_b"] is not None else "order"
+                aside, aside_src = float(int(base // 2)), "half"
         collected, collected_src = m.get("collected"), "manual"
         if collected is None:
             collected_src = ""
             if past and base > 0 and budget["norm"]:
-                collected, collected_src = budget["norm"], "norm"
+                collected = float(min(calc._n(budget["norm"]), max(0.0, base - calc._n(aside))))
+                collected_src = "norm"
         extra_in = sum(calc._n(x.get("amount")) for x in en["in"])
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
@@ -707,10 +709,12 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"],
             aside=aside, collected=collected,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
-            pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
+            pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
+            ok=bool(m.get("ok")), pending=past and base > 0 and not m.get("ok"),
             expenses=en["rp"], payouts=en["np"]))
         meta[d] = dict(aside_src=aside_src, collected_src=collected_src, ins=en["in"],
-                       extra_manual=m.get("extra_rp"))
+                       extra_manual=m.get("extra_rp"), ok_by=m.get("ok_by") or "",
+                       tips_cash=s["tips_cash"])
     book = calc.compute(rows, opening["opening"])
     marks = {} if light else await _marks([d for d in days if d <= today])
     for i, d in enumerate(days):
@@ -721,6 +725,8 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                  note=m.get("note") or "", future=d > today, today=d == today,
                  aside_src=meta[d]["aside_src"], collected_src=meta[d]["collected_src"],
                  ins=meta[d]["ins"], extra_manual=meta[d]["extra_manual"],
+                 ok_by=meta[d]["ok_by"], tips_cash=meta[d]["tips_cash"],
+                 pending=bool(d <= today and r["base"] > 0 and not r["ok"]),
                  salary_sum=calc._i(sum(calc._n(e["amount"]) for e in r["expenses"]
                                         if e.get("kind") in ("salary", "advance", "loan"))))
         r["manual"] = {k: m.get(k) for k in calc.DAY_MANUAL}
@@ -731,17 +737,6 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             legacy = bool((mk.get("cash") or {}).get("done"))
             got = sum(1 for oid in need if legacy or (mk.get(f"cash:{oid}") or {}).get("done"))
             r.update(cash_need=len(need), cash_got=got)
-    b, np_ = book["b"], book["np"]
-    safe_total = b["safe_end"] + np_["should_be"]
-    fact_b, fact_np = b.get("safe_fact"), np_.get("safe_fact")
-    book["safe"] = dict(b=b["safe_end"], b_open=b["safe_open"], np=np_["should_be"],
-                        rp=book["rp"]["result"], np_days=np_["days"], payouts=np_["payouts"],
-                        carry=np_["carry"], storage=np_["storage"], total=calc._i(safe_total),
-                        fact_b=fact_b, fact_np=fact_np, diff_b=b.get("diff"), diff_np=np_.get("diff"),
-                        fact=None if fact_b is None and fact_np is None
-                        else calc._i(calc._n(fact_b) + calc._n(fact_np)),
-                        diff=None if fact_b is None and fact_np is None
-                        else calc._i(calc._n(fact_b) + calc._n(fact_np) - safe_total))
     book.update(month=month, today=today, first=days[0], last=days[-1],
                 opening=opening["opening"], opening_explicit=opening["explicit"],
                 opening_carried=opening["carried"], month_note=opening["note"],
@@ -831,6 +826,30 @@ async def handle_day_set(request):
                   "book": await build(day[:7])})
 
 
+@require_owner
+async def handle_day_ok(request):
+    """POST {day, aside, collected, as} — старший подтвердил раскладку дня:
+    суммы Барракуде и в РП+ замораживаются, день помечен подтверждённым
+    (остаток — ЧП+ — считается сам)."""
+    try:
+        body = await request.json()
+        day = _day_arg(body.get("day"))
+        aside = _num(body.get("aside")) or 0
+        collected = _num(body.get("collected")) or 0
+        if aside < 0 or collected < 0:
+            return _json({"error": "bad_number"}, 400)
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if day > _biz_day():
+        return _json({"error": "future"}, 400)
+    who = _who(body)
+    await db.fin_day_set(day, {"aside": aside, "collected": collected, "ok": True,
+                               "ok_at": datetime.now(timezone.utc), "ok_by": who, "by": who})
+    await _touch(day[:7])
+    log.info(f"[fin] {day} раскладка подтверждена: Барракуде {aside}, РП+ {collected} · {who or '—'}")
+    return _json({"ok": True, "day": day, "book": await build(day[:7])})
+
+
 async def _line_ok(month: str, lid: str) -> bool:
     if not lid:
         return True
@@ -909,7 +928,7 @@ async def handle_month_set(request):
             return _json({"error": "bad_field"}, 400)
         value = (str(body.get("value") or "").strip()[:200] if field == "note"
                  else _num(body.get("value"), 4 if field == "usd" else 2))
-        if field in ("norm", "norm_b", "usd") and value is not None and value < 0:
+        if field in ("norm", "usd") and value is not None and value < 0:
             return _json({"error": "bad_number"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
@@ -1233,7 +1252,7 @@ async def handle_pay_out(request):
 
 FIELD_T = {
     "handed_fact": "сдали по факту", "ordered_fact": "заказали по счёту",
-    "aside": "отложили Барракуде", "collected": "отложили в фонд",
+    "aside": "отложили Барракуде", "collected": "отложили в РП", "pay": "оплата Барракуде",
     "extra_rp": "приход в фонд", "pay_b": "оплата Барракуде из отложенного",
     "pay_b_extra": "оплата Барракуде сверх отложенного", "note": "заметка дня",
 }
@@ -1249,6 +1268,7 @@ def setup(app):
     routes = (
         ("/api/owner/finance/book", handle_book, "GET"),
         ("/api/owner/finance/book/day", handle_day_set, "POST"),
+        ("/api/owner/finance/book/day/ok", handle_day_ok, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_add, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_del, "DELETE"),
         ("/api/owner/finance/book/month", handle_month_set, "POST"),

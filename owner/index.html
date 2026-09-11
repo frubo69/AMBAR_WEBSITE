@@ -3237,6 +3237,21 @@ button.path:active{transform:scale(.995)}
 /* Заголовок карточки как кнопка: имя человека в списке удержаний ведёт на его страницу */
 .fb-pcap{width:100%;border:0;background:none;color:inherit;text-align:left;cursor:pointer;font-family:'Space Grotesk',sans-serif}
 .fb-pcap:active{background:rgba(201,169,110,.05)}
+/* Сейф: сумма в заголовке карточки, значок «дней ждут подтверждения»,
+   «Подтвердить» в строке дня, кнопка подтверждения в дне, отметка «подтверждено» */
+.fb-capv{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);letter-spacing:0;text-transform:none;margin-right:8px}
+.fb-capv u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
+.fb-pend{min-width:20px;height:20px;border-radius:10px;padding:0 6px;margin-right:8px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--gold);color:#1a1408;font:700 11px 'DM Sans',sans-serif;letter-spacing:0;font-style:normal}
+.fb-okbtn{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;margin-left:4px;
+  color:var(--gold2);font:700 12px 'DM Sans',sans-serif}
+.fb-okbtn .fb-fill-em{margin:0}
+.fb-okbtn:active{opacity:.7}
+.fb-sday .fb-e-b i{white-space:normal;line-height:1.25}
+.fb-okwrap{padding:10px 16px 14px}
+.fb-okday{width:100%;height:46px;border-radius:12px;font-size:14px;font-weight:700}
+.fb-okdone span{color:var(--up)}
+.fb-okdone em{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--up);background:rgba(76,175,125,.14)}
 /* Календарь одной даты: без отрезков и подвала */
 #dateOverlay.single .dp-quick,#dateOverlay.single .dp-foot{display:none}
 /* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
@@ -17431,10 +17446,11 @@ function finToggle(n, снизу){
 const FB = {month: null, months: {}, at: {}, flight: {}, seq: 0, applied: 0,
             person: null, line: '', bud: null, kind: 'fine', from: 'this'};
 const FB_TTL = 60000;   // книга месяца свежа минуту: заказы и расходы водителей идут мимо неё
-const FB_T = {handed_fact: 'Сдали по факту', ordered_fact: 'Заказали по счёту',
-              aside: 'Барракуде', collected: 'В фонд', extra_rp: 'Приход в фонд',
-              pay_b: 'Оплатили Барракуде', pay_b_extra: 'Оплатили сверх', note: 'Заметка',
-              norm: 'Норма в день', norm_b: 'Барракуде в день', usd: 'Курс доллара',
+const FB_T = {handed_fact: 'Собрал по факту', ordered_fact: 'Заказали по счёту',
+              aside: 'Барракуда', collected: 'РП+', extra_rp: 'Приход в РП',
+              pay: 'Оплатили Барракуде', note: 'Заметка',
+              norm: 'Норма в день', usd: 'Курс доллара',
+              safe_b_open: 'Барракуда на начало', rp_open: 'РП на начало', np_open: 'ЧП на начало', debt_b_open: 'Долг на начало',
               rate: 'Оклад', days: 'Дни'};
 const FB_KIND_T = {fine: 'Штраф', advance: 'Аванс', loan: 'Долг', bonus: 'Премия'};
 const _FB_L = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -17593,24 +17609,27 @@ function fbHubHtml(b, err){
   const month = FB.month || fbMonthNow();
   if(!b) return `<div class="sc fb-hub">${fbCap(month, true)}
     <div class="aud-g">${fbTile('Доход', 't.gross', null)}${fbTile('Расходы', 't.expenses', null)}${
-      fbTile('Прибыль', 'np.profit', null)}</div>
+      fbTile('Прибыль', 'np.days', null)}</div>
     <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   return `<div class="sc fb-hub">${fbCap(month, true)}
     <div class="aud-g">
       ${fbTile('Доход', 't.gross', t.gross)}
       ${fbTile('Расходы', 't.expenses', t.expenses)}
-      ${fbTile('Прибыль', 'np.profit', b.np.profit, {mode: 'neg'})}
+      ${fbTile('Прибыль', 'np.days', b.np.days, {mode: 'neg'})}
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
   </div>
   <div class="sc fb-hub">
-    ${fbCapT('Распределение')}
-    ${fbGo('Барракуда', 'b.debt_end', b.b.debt_end, "accOpen('finb')", {unit: 'долг', mode: 'debt', em: b.b.debt_end > 0 ? 'dn' : ''})}
-    ${fbGo('РП', 't.expenses', t.expenses, "accOpen('finrp')")}
+    <button class="sc-cap fb-pcap" onclick="accOpen('finsafe')"><span>Сейф</span>${
+      b.safe.pending ? `<i class="fb-pend" data-f="safe.pending">${b.safe.pending}</i>` : ''}<b class="fb-capv" data-f="safe.total">${fbFmt(b.safe.total)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>
+    ${fbGo('Барракуда', 'safe.b', b.safe.b, "accOpen('finb')", {unit: 'в сейфе'})}
+    ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg'})}
+    ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
+  </div>
+  <div class="sc fb-hub">
+    ${fbCapT('Зарплаты')}
     ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
-    ${fbGo('ЧП', 'np.profit', b.np.profit, "accOpen('finnp')", {mode: 'neg'})}
-    ${fbGo('Сейф', 'safe.total', b.safe.total, "accOpen('finsafe')", {unit: 'должно быть'})}
     ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
   </div>`;
 }
@@ -17687,12 +17706,12 @@ function fbValues(){
   if(d){ V['d.gap_on'] = d.handed_fact !== null ? 1 : 0;
          V['d.ordered_on'] = d.ordered_fact !== null ? 1 : 0; V['d.extra_on'] = d.ordered_extra ? 1 : 0;
          V['d.cash_on'] = d.cash_need ? 1 : 0; V['d.pend_on'] = d.spend_pending ? 1 : 0;
-         V['d.sal_on'] = d.salary_sum ? 1 : 0; }
+         V['d.sal_on'] = d.salary_sum ? 1 : 0; V['d.paid_on'] = d.pay ? 1 : 0; V['d.extra_pay_on'] = d.pay_b_extra ? 1 : 0; }
   const mb = fbBook(FB.month || fbMonthNow());
   if(mb){
     for(const g of ['totals', 'rp', 'np', 'b', 'safe']) for(const k in mb[g]) V[(g === 'totals' ? 't' : g) + '.' + k] = mb[g][k];
     V['econ'] = mb.econ;
-    V['b.debt_delta'] = mb.b.debt_end - mb.b.debt_open;
+    V['b.debt_delta'] = mb.b.debt_end - mb.b.debt_open; V['b.extra_pay_on'] = mb.b.pay_extra ? 1 : 0;
     const bu = mb.budget || {};
     for(const k in bu) if(typeof bu[k] === 'number' || bu[k] === null) V['bu.' + k] = bu[k];
     V['bu.off_on'] = bu.off_plan ? 1 : 0;
@@ -17743,6 +17762,7 @@ function fbPaint(){
   }
   if(mb){
     put('fbList-npm', fbPayoutsMonth(mb));
+    put('fbList-rpm', fbExpensesMonth(mb));
     put('fbList-people', fbPeopleHtml(mb));
     const p = FB.person ? (fbCur(mb).people || []).find(x => x.name === FB.person) : null;
     if(p){ put('fbList-items', fbItems(p, mb.month)); put('fbList-pays', fbPays(p)); }
@@ -17791,7 +17811,7 @@ function fbLinePick(id){
 }
 function fbAddRow(book, day){
   const rp = book === 'rp', np = book === 'np';
-  return `<button class="sc-r fb-plus" onclick="fbAddToggle('${book}')"><span>${rp ? 'Добавить расход' : np ? 'Добавить выплату' : 'Добавить приход'}</span><em>${_FB_PLUS}</em></button>
+  return `<button class="sc-r fb-plus" onclick="fbAddToggle('${book}')"><span>${rp ? 'Добавить расход' : np ? 'Забрать из ЧП' : 'Добавить приход'}</span><em>${_FB_PLUS}</em></button>
   <div class="fb-add" id="fbAdd-${book}" hidden>
     ${rp ? `<div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>` : ''}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"
@@ -17818,7 +17838,7 @@ async function fbEntryAdd(book, day){
   const comment = fbTxt('fbCmt-' + book);
   const who = book === 'np' ? fbTxt('fbWho-np') : '';
   if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
-  if(!await fbAskDay(day, book === 'rp' ? 'Расход из фонда' : book === 'in' ? 'Приход в фонд' : 'Выплата из прибыли')) return;
+  if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
   if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
   try{
@@ -17882,68 +17902,59 @@ function fbDayCardInner(d){
       ${_dayNav('finDay')}
     </div>
     <div class="aud-g">
-      ${fbTile('Сдали', 'd.base', d ? d.base : null)}
-      ${fbTile('Заказали', 'd.ordered', d ? d.ordered : null)}
-      ${fbTile('Прибыль дня', 'd.np_plus', d ? d.np_plus : null, {mode: 'neg'})}
+      ${fbTile('Выручка', 'd.base', d ? d.base : null)}
+      ${fbTile('ЧП+', 'd.np_plus', d ? d.np_plus : null, {mode: 'neg'})}
+      ${fbTile('В сейфе', 'd.stack_total', d ? d.stack_total : null, {mode: 'neg'})}
     </div>`;
 }
+// Тело дня: выручка (наличные − чай − расходы водителей), предложенная
+// раскладка — половина Барракуде, норма в РП+, остаток ЧП+ — и одна кнопка
+// «Подтвердить»; поправить можно любое из двух полей. Ниже оплата Барракуде
+// одной суммой (делится сама: из её стопки, остальное из ЧП) и стопки сейфа
+// после этого дня.
 function fbDayBodyHtml(d){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
   const day = d.day, sc = `data-day="${day}"`;
-  const asideEu = d.aside_src === 'norm' ? 'по норме' : d.aside_src === 'order' ? 'по заказу' : 'AED';
-  const colEu = d.collected_src === 'norm' ? 'по норме' : 'AED';
+  const okRow = d.future || !(d.base > 0) ? ''
+    : d.ok ? `<div class="sc-r fb-r sub fb-okdone"><span>Подтверждено${d.ok_by ? ' · ' + escS(d.ok_by) : ''}</span><em>${IC('check', 15)}</em></div>`
+           : `<div class="fb-okwrap"><button class="aud-b go fb-okday" data-d="${day}" onclick="fbDayOk(this.dataset.d)">Подтвердить</button></div>`;
   return `
   <div class="sc fb-gut">
-    ${fbCapT('Сдали')}
+    ${fbCapT('Выручка')}
     ${fbRow('Наличными за день', 'd.cash', d.cash)}
+    ${fbRow('Чай водителям', 'd.tips_cash', d.tips_cash, {sign: '−'})}
     ${fbRow('Расходы водителей', 'd.spend', d.spend, {sign: '−'})}
     ${fbRow('Ждут решения', 'd.spend_pending', d.spend_pending, {sub: true, show: 'd.pend_on', hide: !d.spend_pending})}
-    ${fbRow('Сдали по приложению', 'd.handed', d.handed, {sum: true, sign: '='})}
+    ${fbRow('Выручка по приложению', 'd.handed', d.handed, {sum: true, sign: '='})}
     <button class="sc-r fb-r sub" onclick="fbToCash()" style="cursor:pointer" data-show="d.cash_on"${d.cash_need ? '' : ' hidden'}>
       <span>Получил по районам</span><b data-frac="d.cash_got/d.cash_need">${fbFmt(d.cash_got)}<s class="sl">/</s>${fbFmt(d.cash_need)}</b><em>${_SC_CHEV}</em></button>
-    ${fbIn('Сдали по факту', 'handed_fact', d.handed_fact, sc, {ph: fbFmt(d.handed), phk: 'd.handed'})}
+    ${fbIn('Собрал по факту', 'handed_fact', d.handed_fact, sc, {ph: fbFmt(d.handed), phk: 'd.handed'})}
     ${fbRow('Разница с приложением', 'd.gap', d.gap, {sub: true, mode: 'diff', show: 'd.gap_on', hide: d.handed_fact === null})}
   </div>
   <div class="sc fb-gut">
-    ${fbCapT('Разложили')}
-    ${fbRow('Сдали', 'd.base', d.base)}
-    ${fbIn('Барракуде', 'aside', d.manual.aside, sc, {sign: '−', ph: fbFmt(d.aside), phk: 'd.aside', eu: asideEu})}
-    ${fbIn('В фонд', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: colEu})}
-    ${fbRow('Прибыль дня', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbCapT('Распределение')}
+    ${fbRow('Выручка', 'd.base', d.base)}
+    ${fbIn('Барракуда', 'aside', d.manual.aside, sc, {sign: '−', ph: fbFmt(d.aside), phk: 'd.aside', eu: d.aside_src === 'half' ? 'половина' : 'AED'})}
+    ${fbIn('РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? 'норма' : 'AED'})}
+    ${fbRow('ЧП+', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
+    ${okRow}
   </div>
-  <div class="sc">
+  <div class="sc fb-gut">
     ${fbCapT('Барракуда')}
     ${fbRow('Заказали по приложению', 'd.ordered_auto', d.ordered_auto)}
     ${fbIn('Заказали по счёту', 'ordered_fact', d.ordered_fact, sc, {ph: fbFmt(d.ordered_auto), phk: 'd.ordered_auto'})}
     ${fbRow('Другие базы', 'd.ordered_extra', d.ordered_extra, {sub: true, show: 'd.extra_on', hide: !d.ordered_extra})}
-    ${fbIn('Оплатили', 'pay_b', d.manual.pay_b, sc)}
-    ${fbIn('Оплатили сверх', 'pay_b_extra', d.manual.pay_b_extra, sc)}
+    ${fbIn('Оплатили', 'pay', d.manual.pay, sc, {ph: '0'})}
+    ${fbRow('Из стопки Барракуды', 'd.pay_b', d.pay_b, {sub: true, show: 'd.paid_on', hide: !d.pay})}
+    ${fbRow('Сверх стопки — из ЧП', 'd.pay_b_extra', d.pay_b_extra, {sub: true, show: 'd.extra_pay_on', hide: !d.pay_b_extra})}
     ${fbRow('Долг Барракуде', 'd.debt_b', d.debt_b, {sum: true, mode: 'debt'})}
-    ${fbRow('Отложено Барракуде', 'd.safe_b', d.safe_b, {sum: true})}
   </div>
   <div class="sc fb-gut">
-    ${fbCapT('Фонд')}
-    ${fbRow('В фонд', 'd.collected', d.collected, {sign: '+'})}
-    ${fbRow('Приход', 'd.extra_rp', d.extra_rp, {sign: '+'})}
-    <div id="fbList-in">${fbEntries(d.ins, 'in')}</div>
-    ${fbAddRow('in', day)}
-    ${fbRow('Расходы за день', 'd.expenses_sum', d.expenses_sum, {sign: '−'})}
-    ${fbRow('Из них зарплаты', 'd.salary_sum', d.salary_sum, {sub: true, show: 'd.sal_on', hide: !d.salary_sum})}
-    <div id="fbList-rp">${fbEntries(d.expenses, 'rp')}</div>
-    ${fbAddRow('rp', day)}
-    ${fbRow('В фонде с начала месяца', 'd.rp', d.rp, {sum: true, sign: '=', mode: 'neg'})}
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Прибыль')}
-    ${fbRow('Прибыль дня', 'd.np_plus', d.np_plus, {sign: '+', mode: 'neg'})}
-    ${fbRow('Выплаты за день', 'd.payouts_sum', d.payouts_sum, {sign: '−'})}
-    <div id="fbList-np">${fbEntries(d.payouts, 'np')}</div>
-    ${fbAddRow('np', day)}
-    ${fbRow('Накоплено с начала месяца', 'd.np_acc', d.np_acc, {sum: true, sign: '=', mode: 'neg'})}
-  </div>
-  <div class="sc">
-    ${fbCapT('Заметка')}
-    ${fbInTxt('Заметка дня', 'note', d.note, sc)}
+    ${fbCapT('В сейфе после дня')}
+    ${fbRow('Барракуда', 'd.stack_b', d.stack_b)}
+    ${fbRow('РП', 'd.stack_rp', d.stack_rp, {mode: 'neg'})}
+    ${fbRow('ЧП', 'd.stack_np', d.stack_np, {mode: 'neg'})}
+    ${fbRow('Всего', 'd.stack_total', d.stack_total, {sum: true, sign: '=', mode: 'neg'})}
   </div>`;
 }
 // Сбор выручки — тот же день, отсюда и обратно.
@@ -18006,42 +18017,64 @@ function fbOpenIn(label, field, b, o){
 // сложилась, по факту пересчёта и разница.
 async function accFinSafe(){
   const b = await fbMonthScreen('Сейф'); if(!b) return;
-  const m = `data-month="${b.month}"`, ex = b.opening_explicit || {}, s = b.safe;
+  const s = b.safe || {};
+  const days = (b.days || []).filter(d => !d.future && d.base > 0).reverse();
   document.getElementById('accMid').innerHTML = `
-  <div class="sc">
+  <div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
-      ${fbTile('Барракуде', 'safe.b', s.b)}
-      ${fbTile('Сейф', 'safe.np', s.np, {mode: 'neg'})}
-      ${fbTile('Всего', 'safe.total', s.total, {mode: 'neg'})}
+      ${fbTile('Барракуда', 'safe.b', s.b)}
+      ${fbTile('РП', 'safe.rp', s.rp, {mode: 'neg'})}
+      ${fbTile('ЧП', 'safe.np', s.np, {mode: 'neg'})}
     </div>
+    ${fbRow('Всего в сейфе', 'safe.total', s.total, {sum: true, sign: '=', mode: 'neg'})}
   </div>
+  <div class="sc">${fbCapT('Распределение по дням')}<div class="fb-one">${
+    days.length ? days.map(fbSafeDayRow).join('') : '<div class="fb-none">Выручки в этом месяце ещё нет</div>'}</div></div>
   <div class="sc fb-gut">
-    ${fbCapT('Отложено Барракуде')}
-    ${fbRow('На начало месяца', 'b.safe_open', b.b.safe_open)}
-    ${fbRow('Отложили', 'b.aside', b.b.aside, {sign: '+'})}
-    ${fbRow('Оплатили из отложенного', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
-    ${fbRow('Должно быть', 'b.safe_end', b.b.safe_end, {sum: true, sign: '='})}
-    ${fbIn('По факту', 'safe_b_fact', ex.safe_b_fact ?? null, m, {ph: '—'})}
-    ${fbRow('Разница', 'b.diff', b.b.diff, {sum: true, mode: 'diff'})}
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Сейф')}
-    ${fbOpenIn('С прошлого месяца', 'carry_np', b, {sign: '+'})}
-    ${fbIn('На хранении', 'storage', ex.storage ?? null, m, {sign: '+'})}
-    ${fbRow('Прибыль дней', 'np.days', b.np.days, {sign: '+', mode: 'neg'})}
-    ${fbRow('Выплаты из прибыли', 'np.payouts', b.np.payouts, {sign: '−'})}
-    ${fbRow('Фонд', 'rp.result', b.rp.result, {sign: '+', mode: 'neg'})}
-    ${fbRow('Должно быть', 'np.should_be', b.np.should_be, {sum: true, sign: '=', mode: 'neg'})}
-    ${fbIn('По факту', 'safe_np_fact', ex.safe_np_fact ?? null, m, {ph: '—'})}
-    ${fbRow('Разница', 'np.diff', b.np.diff, {sum: true, mode: 'diff'})}
-  </div>
-  <div class="sc">
     ${fbCapT('На начало месяца')}
-    ${fbOpenIn('Отложено Барракуде', 'safe_b_open', b)}
+    ${fbOpenIn('Барракуда', 'safe_b_open', b)}
+    ${fbOpenIn('РП', 'rp_open', b)}
+    ${fbOpenIn('ЧП', 'np_open', b)}
     ${fbOpenIn('Долг Барракуде', 'debt_b_open', b)}
-    ${fbInTxt('Заметка', 'note', b.month_note, m)}
   </div>`;
+}
+// День в сейфе: выручка и предложенная раскладка. Не подтверждён — золотая
+// «Подтвердить» прямо в строке; подтверждён — зелёное окошко и карандаш.
+// Сама строка ведёт в день, где раскладку можно поправить.
+function fbSafeDayRow(d){
+  const sub = `${fbFmt(d.base)} → Барракуда ${fbFmt(d.aside)} · РП+ ${fbFmt(d.collected)} · ЧП+ ${fbFmt(d.np_plus)}`;
+  return `<div class="fb-card"><button class="fb-e fb-bl fb-sday" onclick="fbGoDay('${d.day}')">
+    <span class="fb-e-b"><b>${escS(fbDayT(d.day))}</b><i>${sub}</i></span>${
+    d.ok ? `<b class="fb-box ok">${fbFmt(d.base)}<u>AED</u></b><em class="fb-fill-em pen">${_FB_PEN}</em>`
+         : `<span class="fb-okbtn" role="button" data-d="${d.day}" onclick="event.stopPropagation();fbDayOk(this.dataset.d)">Подтвердить<em class="fb-fill-em">${IC('check', 13)}</em></span>`}
+  </button></div>`;
+}
+// Подтвердить раскладку дня: суммы Барракуде и в РП+ замораживаются на
+// сервере; на экране дня берём то, что стоит в полях (если старший поправил).
+async function fbDayOk(day){
+  const b = fbBook(day.slice(0, 7)), d = fbDayOf(b, day); if(!d) return;
+  const val = (f, dflt) => { const el = document.querySelector(`#accMid input[data-field="${f}"]`); if(!el || el.value.trim() === '') return dflt; const v = +el.value.replace(/\s/g, '').replace(',', '.'); return Number.isNaN(v) ? dflt : v; };
+  const aside = val('aside', d.aside || 0), collected = val('collected', d.collected || 0);
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok', {method: 'POST', body: {day, aside, collected, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    if(ACC_VIEW === 'finday') fbDayReload(); else fbRepaint();
+  }catch(e){ _toast('Не удалось подтвердить'); }
+}
+// Расходы из РП за месяц одним списком (статья или «на что», кто, день).
+function fbExpensesMonth(b){
+  const rows = [];
+  (b.days || []).forEach(d => (d.expenses || []).forEach(e => rows.push({...e, day: d.day})));
+  rows.reverse();
+  if(!rows.length) return '<div class="fb-none">Расходов из РП в этом месяце не было</div>';
+  return rows.map(e => `<div class="fb-e">
+    <span class="fb-e-b"><b>${escS(e.kind_t ? e.kind_t + ' · ' + e.who : (e.line_name || e.comment || 'Расход'))}</b><i>${escS(fbDayT(e.day))}${
+      e.line_name && e.comment ? ' · ' + escS(e.comment) : ''}</i></span>
+    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
+    <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
+  </div>`).join('');
 }
 
 // ── Экран «Бюджет» ────────────────────────────────────────────────────────
@@ -18702,22 +18735,21 @@ async function fbBudFill(from){
 // ── Экран «База» ──────────────────────────────────────────────────────────
 async function accFinB(){
   const b = await fbMonthScreen('Барракуда'); if(!b) return;
-  const days = (b.days || []).filter(d => !d.future && (d.ordered || d.aside || d.pay_b || d.pay_b_extra))
+  const s = b.safe || {};
+  const days = (b.days || []).filter(d => !d.future && (d.ordered || d.aside || d.pay))
     .map(d => fbDayRow(d, [d.ordered ? `заказали ${fbFmt(d.ordered)}` : '', d.aside ? `отложили ${fbFmt(d.aside)}` : '',
-                          (d.pay_b || d.pay_b_extra) ? `оплатили ${fbFmt(d.pay_b + d.pay_b_extra)}` : ''].filter(Boolean).join(' / '),
+                          d.pay ? `оплатили ${fbFmt(d.pay)}` : ''].filter(Boolean).join(' / '),
                        d.debt_b, {unit: 'долг', cls: d.debt_b > 0 ? 'dn' : ''}));
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
-      ${fbTile('Продали', 'b.sold', b.b.sold)}
-      ${fbTile('Купили', 'b.bought', b.b.bought)}
-      ${fbTile('Купили от продаж', 'b.ratio', b.b.ratio, {unit: '%', dec: 1})}
+      ${fbTile('Заказали', 'b.bought', b.b.bought)}
+      ${fbTile('Оплатили', 'b.paid', b.b.paid)}
+      ${fbTile('Долг', 'b.debt_end', b.b.debt_end, {mode: 'debt'})}
     </div>
-    ${fbRow('Отложили Барракуде', 'b.aside', b.b.aside)}
-    ${fbRow('Оплатили из отложенного', 'b.pay_safe', b.b.pay_safe, {sub: true})}
-    ${fbRow('Оплатили сверх', 'b.pay_extra', b.b.pay_extra, {sub: true})}
-    ${fbRow('Всего оплатили', 'b.paid', b.b.paid, {sum: true, sign: '='})}
+    ${fbRow('В сейфе для Барракуды', 'safe.b', s.b, {sum: true})}
+    ${fbRow('Купили от продаж', 'b.ratio', b.b.ratio, {sub: true, unit: '%', dec: 1})}
   </div>
   <div class="sc fb-gut">
     ${fbCapT('Долг Барракуде')}
@@ -18728,12 +18760,12 @@ async function accFinB(){
     ${fbRow('За месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
   </div>
   <div class="sc fb-gut">
-    ${fbCapT('Отложено Барракуде')}
-    ${fbRow('На начало месяца', 'b.safe_open', b.b.safe_open)}
-    ${fbRow('Отложили', 'b.aside', b.b.aside, {sign: '+'})}
-    ${fbRow('Оплатили из отложенного', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
-    ${fbRow('Должно быть', 'b.safe_end', b.b.safe_end, {sum: true, sign: '='})}
-    ${fbRow('Отложено минус долг', 'b.balance', b.b.balance, {sum: true, mode: 'neg'})}
+    ${fbCapT('Стопка Барракуды')}
+    ${fbRow('На начало месяца', 'safe.open_b', s.open_b)}
+    ${fbRow('Отложили из выручки', 'b.aside', b.b.aside, {sign: '+'})}
+    ${fbRow('Оплатили из стопки', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
+    ${fbRow('В сейфе', 'safe.b', s.b, {sum: true, sign: '='})}
+    ${fbRow('Сверх стопки — из ЧП', 'b.pay_extra', b.b.pay_extra, {sub: true, show: 'b.extra_pay_on', hide: !b.b.pay_extra})}
   </div>
   ${fbDays(days)}`;
 }
@@ -18741,13 +18773,12 @@ async function accFinB(){
 // ── Экран «Расходы» (фонд) ────────────────────────────────────────────────
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
-  const bu = b.budget;
+  const bu = b.budget, s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
   const days = (b.days || []).filter(d => !d.future && (d.collected || d.extra_rp || d.expenses_sum))
     .map(d => {
-      const what = (d.expenses || []).map(e => `${escS(e.kind_t ? e.kind_t + ' ' + e.who : (e.line_name || e.comment || 'расход'))} ${fbFmt(e.amount)}`).join(', ');
-      const sub = [d.collected ? `в фонд ${fbFmt(d.collected)}` : '', d.extra_rp ? `приход ${fbFmt(d.extra_rp)}` : '',
-                   d.expenses_sum ? `расходы ${fbFmt(d.expenses_sum)}${what ? ' (' + what + ')' : ''}` : ''].filter(Boolean).join(' / ');
-      return fbDayRow(d, sub, d.rp, {unit: 'в фонде', cls: d.rp < 0 ? 'dn' : ''});
+      const sub = [d.collected ? `РП+ ${fbFmt(d.collected)}` : '', d.extra_rp ? `приход ${fbFmt(d.extra_rp)}` : '',
+                   d.expenses_sum ? `РП− ${fbFmt(d.expenses_sum)}` : ''].filter(Boolean).join(' / ');
+      return fbDayRow(d, sub, d.stack_rp, {unit: 'в сейфе', cls: d.stack_rp < 0 ? 'dn' : ''});
     });
   const lines = (bu.lines || []).filter(l => l.fact && !l.group);
   const sal = bu.salary || {}, rent = bu.rent || {}, auto = bu.auto || {}, home = bu.home || {};
@@ -18761,15 +18792,15 @@ async function accFinRP(){
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
-      ${fbTile('В фонд', 'rp.rp_in', b.rp.rp_in)}
-      ${fbTile('Расходы', 'rp.expenses', b.rp.expenses)}
-      ${fbTile('В фонде', 'rp.result', b.rp.result, {mode: 'neg'})}
+      ${fbTile('РП+', 'safe.rp_in', s.rp_in)}
+      ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
+      ${fbTile('В сейфе', 'safe.rp', s.rp, {mode: 'neg'})}
     </div>
-    ${fbRow('Отложили в фонд', 'rp.collected', b.rp.collected, {sign: '+'})}
+    ${fbRow('На начало месяца', 'safe.open_rp', s.open_rp)}
+    ${fbRow('Отложили из выручки', 'rp.collected', b.rp.collected, {sign: '+'})}
     ${fbRow('Приход', 'rp.extra', b.rp.extra, {sign: '+'})}
-    ${fbRow('Всего в фонд', 'rp.rp_in', b.rp.rp_in, {sum: true, sign: '='})}
     ${fbRow('Расходы', 'rp.expenses', b.rp.expenses, {sign: '−'})}
-    ${fbRow('В фонде', 'rp.result', b.rp.result, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbRow('В сейфе', 'safe.rp', s.rp, {sum: true, sign: '=', mode: 'neg'})}
   </div>
   <div class="sc">
     ${fbCapT('По статьям')}
@@ -18777,6 +18808,12 @@ async function accFinRP(){
         <b class="fb-e-v${l.plan && l.fact > l.plan ? ' dn' : ''}">${fbFmt(l.fact)}<u>AED</u></b></div>`).join('')
       + (bu.off_plan ? `<div class="fb-e"><span class="fb-e-b"><b>Вне плана</b><i>без статьи</i></span><b class="fb-e-v">${fbFmt(bu.off_plan)}<u>AED</u></b></div>` : '')
       : '<div class="fb-none">Расходов в этом месяце ещё нет</div>'}
+  </div>
+  <div class="sc">
+    ${fbCapT('Расходы')}
+    <div id="fbList-rpm">${fbExpensesMonth(b)}</div>
+    ${fbAddRow('rp', today)}
+    ${fbAddRow('in', today)}
   </div>
   ${fbDays(days)}`;
 }
@@ -19044,26 +19081,26 @@ async function fbPayOut(name){
 // ── Экран «Прибыль» ───────────────────────────────────────────────────────
 async function accFinNP(){
   const b = await fbMonthScreen('ЧП'); if(!b) return;
+  const s = b.safe || {};
   const days = (b.days || []).filter(d => !d.future && (d.base || d.np_plus))
-    .map(d => fbDayRow(d, [`сдали ${fbFmt(d.base)}`, `Барракуде ${fbFmt(d.aside)}`, `в фонд ${fbFmt(d.collected)}`].join(' / '),
-                       d.np_plus, {unit: 'прибыль дня', cls: d.np_plus < 0 ? 'dn' : ''}));
+    .map(d => fbDayRow(d, [`выручка ${fbFmt(d.base)}`, `Барракуда ${fbFmt(d.aside)}`, `РП+ ${fbFmt(d.collected)}`].join(' / '),
+                       d.np_plus, {unit: 'ЧП+', cls: d.np_plus < 0 ? 'dn' : ''}));
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
-      ${fbTile('Из кассы', 'np.days', b.np.days, {mode: 'neg'})}
-      ${fbTile('Фонд', 'np.rp_result', b.np.rp_result, {mode: 'neg'})}
-      ${fbTile('Прибыль', 'np.profit', b.np.profit, {mode: 'neg'})}
+      ${fbTile('ЧП+', 'safe.np_in', s.np_in, {mode: 'neg'})}
+      ${fbTile('ЧП−', 'safe.np_out', s.np_out)}
+      ${fbTile('В сейфе', 'safe.np', s.np, {mode: 'neg'})}
     </div>
-    ${fbRow('Из кассы за месяц', 'np.days', b.np.days, {sign: '+', mode: 'neg'})}
-    ${fbRow('Результат фонда', 'np.rp_result', b.np.rp_result, {sign: '+', mode: 'neg'})}
-    ${fbRow('Прибыль месяца', 'np.profit', b.np.profit, {sum: true, sign: '=', mode: 'neg'})}
-    ${fbRow('Итого / 2', 'np.half', b.np.half, {sub: true, mode: 'neg'})}
-    ${fbRow('Выплаты из прибыли', 'np.payouts', b.np.payouts, {sign: '−'})}
-    ${fbRow('В остатке', 'np.left', b.np.left, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbRow('На начало месяца', 'safe.open_np', s.open_np)}
+    ${fbRow('Из выручки за месяц', 'np.days', b.np.days, {sign: '+', mode: 'neg'})}
+    ${fbRow('Забрали', 'np.payouts', b.np.payouts, {sign: '−'})}
+    ${fbRow('Сверх стопки Барракуде', 'b.pay_extra', b.b.pay_extra, {sign: '−', show: 'b.extra_pay_on', hide: !b.b.pay_extra})}
+    ${fbRow('В сейфе', 'safe.np', s.np, {sum: true, sign: '=', mode: 'neg'})}
   </div>
   <div class="sc">
-    ${fbCapT('Выплаты из прибыли')}
+    ${fbCapT('Забрали из ЧП')}
     <div id="fbList-npm">${fbPayoutsMonth(b)}</div>
     ${fbAddRow('np', b.today <= b.last ? b.today : b.last)}
   </div>

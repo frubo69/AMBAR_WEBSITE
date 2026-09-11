@@ -57,11 +57,11 @@ for r in ROWS:
         SUPPLIES.append(dict(supply_id="X5", day=day, kind="extra", base="Спиннейс", status="done",
                              items=[dict(id="p5", qty=2, asked=2)], buys={"p5": {"price": 410, "qty": 2}}))
     m = {}
-    if n < today_n:                   # сегодня ещё не разложено
+    if n < today_n - 2:               # давние дни: раскладка подтверждена старшим
         m.update(aside=r["aside"], collected=r["collected"],
-                 handed_fact=r["aside"] + r["collected"] + r["np_plus"])
-    if r["pay_b"]: m["pay_b"] = r["pay_b"]
-    if r["pay_b_extra"]: m["pay_b_extra"] = r["pay_b_extra"]
+                 handed_fact=r["aside"] + r["collected"] + r["np_plus"], ok=True, ok_by="Старший")
+    # два последних прошедших дня и сегодня — только предложение, ждут подтверждения
+    if r["pay_b"] or r["pay_b_extra"]: m["pay"] = r["pay_b"] + r["pay_b_extra"]   # оплата одной суммой
     if r["extra_rp"]: m["extra_rp"] = r["extra_rp"]
     if n == 3: m["note"] = "пересчитали вдвоём"
     if m:

@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-DAY_MANUAL = ('handed_fact', 'aside', 'collected', 'extra_rp', 'pay_b', 'pay_b_extra')
+DAY_MANUAL = ('handed_fact', 'aside', 'collected', 'extra_rp', 'pay', 'pay_b', 'pay_b_extra')
 MONTH_MANUAL = ('safe_b_open', 'debt_b_open', 'carry_np', 'storage',
                 'safe_np_fact', 'safe_b_fact')
 
@@ -50,6 +50,9 @@ def compute(days: list[dict], opening: dict) -> dict:
          aside          отложили в сейф Б
          collected      собрал в фонд РП
          extra_rp       доп. приход в фонд РП (не из выручки)
+         pay            оплатили Баракуде всего за день: сначала из стопки
+                        Баракуды, остальное — из ЧП (делится само); если задано,
+                        pay_b / pay_b_extra ниже не читаются
          pay_b          оплатили Баракуде из сейфа Б
          pay_b_extra    добавили оплату Баракуде из ЧП / РП
          expenses       [{amount, comment}] — расходы предприятия из фонда
@@ -58,17 +61,22 @@ def compute(days: list[dict], opening: dict) -> dict:
          safe_b_open, debt_b_open   — сейф Б и долг Б на начало месяца
          carry_np                   — остаток (перенос) прошлого месяца по ЧП
          storage                    — на хранении
+         rp_open, np_open           — стопки РП и ЧП в сейфе на начало месяца
+                                      (три стопки сейфа: Баракуда, РП, ЧП)
          safe_np_fact, safe_b_fact  — пересчитанные сейфы (None — не считали)
     """
     safe_b = _n(opening.get('safe_b_open'))
     debt_b = _n(opening.get('debt_b_open'))
     rp = 0.0          # фонд РП, накопительно с начала месяца
     np_acc = 0.0      # чистая прибыль, накопительно
+    # три стопки сейфа: Баракуда (safe_b), РП+ − РП−, ЧП+ − ЧП−; с переносом
+    rp_st = _n(opening.get('rp_open'))
+    np_st = _n(opening.get('np_open'))
     out = []
     t = dict(gross=0.0, cash=0.0, spend=0.0, handed=0.0, ordered=0.0,
              ordered_extra=0.0, aside=0.0, collected=0.0, extra_rp=0.0,
              pay_b=0.0, pay_b_extra=0.0, expenses=0.0, np_plus=0.0,
-             payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0)
+             payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0, pending=0)
     for d in days:
         cash = _n(d.get('cash'))
         spend = _n(d.get('spend'))
@@ -81,6 +89,11 @@ def compute(days: list[dict], opening: dict) -> dict:
         extra_rp = _n(d.get('extra_rp'))
         pay_b = _n(d.get('pay_b'))
         pay_b_extra = _n(d.get('pay_b_extra'))
+        if d.get('pay') is not None:
+            # одна сумма оплаты: из стопки Баракуды, сколько в ней есть, остальное из ЧП
+            pay_total = _n(d.get('pay'))
+            pay_b = min(pay_total, max(0.0, safe_b + aside))
+            pay_b_extra = pay_total - pay_b
         ordered = _n(d.get('ordered'))
         ordered_extra = _n(d.get('ordered_extra'))
         exp_sum = sum(_n(e.get('amount')) for e in (d.get('expenses') or []))
@@ -91,8 +104,12 @@ def compute(days: list[dict], opening: dict) -> dict:
         debt_b = debt_b + ordered - pay_b - pay_b_extra
         rp = rp + collected + extra_rp - exp_sum
         np_acc = np_acc + np_plus - pay_sum
+        rp_st = rp_st + collected + extra_rp - exp_sum
+        np_st = np_st + np_plus - pay_sum - pay_b_extra
         touched = any(d.get(k) is not None for k in DAY_MANUAL) \
             or bool(d.get('expenses')) or bool(d.get('payouts'))
+        if d.get('pending'):
+            t['pending'] += 1
         out.append(dict(
             day=d['day'], gross=_i(_n(d.get('gross'))), cash=_i(cash),
             card=_i(_n(d.get('card'))), crypto=_i(_n(d.get('crypto'))),
@@ -105,6 +122,8 @@ def compute(days: list[dict], opening: dict) -> dict:
             payouts=d.get('payouts') or [], payouts_sum=_i(pay_sum),
             np_plus=_i(np_plus), safe_b=_i(safe_b), debt_b=_i(debt_b),
             rp=_i(rp), np_acc=_i(np_acc), touched=touched,
+            pay=_i(pay_b + pay_b_extra), ok=bool(d.get('ok')),
+            stack_b=_i(safe_b), stack_rp=_i(rp_st), stack_np=_i(np_st), stack_total=_i(safe_b + rp_st + np_st),
             manual={k: d.get(k) for k in DAY_MANUAL},
         ))
         t['gross'] += _n(d.get('gross')); t['cash'] += cash; t['spend'] += spend
@@ -143,6 +162,13 @@ def compute(days: list[dict], opening: dict) -> dict:
     econ = t['gross'] - t['ordered'] - t['expenses'] - t['spend']
 
     totals = {k: _i(v) for k, v in t.items()}
+    safe = dict(open_b=_i(_n(opening.get('safe_b_open'))), open_rp=_i(_n(opening.get('rp_open'))),
+                open_np=_i(_n(opening.get('np_open'))),
+                b=_i(safe_b), rp=_i(rp_st), np=_i(np_st), total=_i(safe_b + rp_st + np_st),
+                b_in=_i(t['aside']), b_out=_i(t['pay_b']),
+                rp_in=_i(t['collected'] + t['extra_rp']), rp_out=_i(t['expenses']),
+                np_in=_i(t['np_plus']), np_out=_i(t['payouts'] + t['pay_b_extra']),
+                pending=int(t['pending']))
     return dict(
         days=out,
         totals=totals,
@@ -163,6 +189,7 @@ def compute(days: list[dict], opening: dict) -> dict:
                safe_fact=None if safe_b_fact is None else _i(_n(safe_b_fact)),
                diff=None if safe_b_diff is None else _i(safe_b_diff)),
         econ=_i(econ),
+        safe=safe,
     )
 
 
@@ -173,8 +200,10 @@ def carry_from(prev: dict | None) -> dict:
         return {}
     np_ = prev.get('np') or {}
     b = prev.get('b') or {}
+    safe = prev.get('safe') or {}
     return dict(
         carry_np=np_['safe_fact'] if np_.get('safe_fact') is not None else np_.get('should_be'),
         safe_b_open=b['safe_fact'] if b.get('safe_fact') is not None else b.get('safe_end'),
         debt_b_open=b.get('debt_end'),
+        rp_open=safe.get('rp'), np_open=safe.get('np'),
     )

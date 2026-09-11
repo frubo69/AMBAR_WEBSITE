@@ -18487,9 +18487,9 @@ function fbBudGroupExpand(t, sub, valueHtml, open, go, body){
 // Статья без даты платежа («Гараж и ТО»): просто бюджет на месяц, правится
 // прямо в списке — та же строка в трёх состояниях, без страницы, периода и
 // календаря. Как учитывать по ней факт — владелец объяснит позже.
-function fbPoolRow(l){
+function fbPoolRow(l, kid){
   const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
-  return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid: true,
+  return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid: kid !== false,
                     cls: over ? 'dn' : ok ? 'ok' : ''});
 }
 // «Аренда» внутри «Расходов на автомобили»: сумма рентов в месяц, стрелка —
@@ -18588,7 +18588,7 @@ function fbBudLines(b){
       bu.prev_has ? `<button class="aud-b go" onclick="fbBudFill('prev')">Из прошлого месяца</button>` : ''}
       <button class="aud-b" onclick="fbBudFill('template')">По образцу</button></div></div>`;
   }
-  out += rest.map(l => `<div class="fb-card">${fbLineListRow(l, false)}</div>`).join('');
+  out += rest.map(l => `<div class="fb-card">${l.kind === 'pool' ? fbPoolRow(l, false) : fbLineListRow(l, false)}</div>`).join('');
   if(bu.off_plan) out += `<div class="fb-card"><div class="fb-e fb-bl"><span class="fb-e-b"><b>Вне плана</b><i>расходы без статьи</i></span><b class="fb-e-v">${fbFmt(bu.off_plan)}<u>AED</u></b></div></div>`;
   const newLine = FB.edit && FB.edit.kind === 'new' && FB.edit.id === '';
   out += `<div class="fb-card add">${newLine ? fbNewRow('') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','')"><span>Добавить статью</span><em>${_FB_PLUS}</em></button>`}</div>`;

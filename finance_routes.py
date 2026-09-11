@@ -268,7 +268,7 @@ def template_lines() -> list[dict]:
     rows += [dict(name=n, group="auto", kind="pool" if n in POOL_NAMES else "") for n in AUTO_NAMES]
     rows += [dict(name=n, group="car") for n in CAR_NAMES]
     rows += [dict(name=n, group="home", kind="pool") for n in HOME_NAMES]
-    rows += [dict(name=n) for n in ("Билеты", "Визы", "Sim", "Бензин", "Реклама")]
+    rows += [dict(name=n, kind="pool" if n in POOL_NAMES else "") for n in ("Билеты", "Визы", "Sim", "Бензин", "Реклама")]
     return rows
 
 
@@ -281,7 +281,7 @@ CAR_NAMES = ("Орион Рент", "Алексей Рент", "Другой Р�
 HOME_NAMES = ("Хоз. нужды", "Продукты", "Коммуналка")   # «Бытовые расходы»
 # Статья без даты платежа (kind="pool"): просто бюджет на месяц, без периода
 # и календаря, правится прямо в списке; старые строки — по названию.
-POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг") + HOME_NAMES
+POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг", "Билеты", "Визы", "Sim", "Бензин") + HOME_NAMES
 MAX_PERIOD = 24
 
 
@@ -956,7 +956,7 @@ async def handle_budget_set(request):
     else:
         lid = secrets.token_hex(4)
         ordv = len(await db.fin_budget_get(month))
-    if kind != "pool" and group == "auto" and name in POOL_NAMES:
+    if kind != "office" and name in POOL_NAMES:
         kind = "pool"
     if kind == "pool":
         period, nxt = 1, ""                       # без даты платежа: только бюджет на месяц

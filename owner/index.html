@@ -18055,7 +18055,7 @@ async function accFinBud(keep){
     ${fbCap(b.month, true)}
     <div class="aud-g">
       ${fbTile('План', 'bu.total', bu.total)}
-      ${fbTile('Потратили', 'bu.fact', bu.fact)}
+      ${fbTile('Фактический расход', 'bu.fact', bu.fact)}
       ${fbTile('Осталось', 'bu.left', bu.left, {mode: 'neg'})}
     </div>
     <button class="sc-r fb-normh${FB.normOpen ? ' open' : ''}" id="fbNormH" onclick="fbNormToggle()">
@@ -18132,7 +18132,7 @@ function fbRentPage(b){
   const isNew = id => FB.edit && FB.edit.kind === 'new' && FB.edit.id === id;
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', 'bu.rent_plan', rent.plan)}
-      ${fbTile('Потратили', 'bu.rent_fact', rent.fact)}
+      ${fbTile('Фактический расход', 'bu.rent_fact', rent.fact)}
       ${fbTile('Осталось', 'bu.rent_left', rent.left, {mode: 'neg'})}
     </div></div>
     <div class="sc">${fbCapT('Офис')}<div class="fb-one">${office.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}</div>`).join('')}${
@@ -18149,7 +18149,7 @@ function fbCarPage(b){
   const isNew = FB.edit && FB.edit.kind === 'new' && FB.edit.id === 'car';
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', 'bu.car_plan', car.plan)}
-      ${fbTile('Потратили', 'bu.car_fact', car.fact)}
+      ${fbTile('Фактический расход', 'bu.car_fact', car.fact)}
       ${fbTile('Осталось', 'bu.car_left', car.left, {mode: 'neg'})}
     </div></div>
     <div class="sc">${fbCapT('Рент')}<div class="fb-one">${all.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}
@@ -18163,7 +18163,7 @@ function fbAdsPage(b){
   const isNew = FB.edit && FB.edit.kind === 'new' && FB.edit.id === 'ads';
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', 'bu.ads_plan', ads.plan)}
-      ${fbTile('Потратили', 'bu.ads_fact', ads.fact)}
+      ${fbTile('Фактический расход', 'bu.ads_fact', ads.fact)}
       ${fbTile('Осталось', 'bu.ads_left', ads.left, {mode: 'neg'})}
     </div></div>
     <div class="sc">${fbCapT('Виды рекламы')}<div class="fb-one">${all.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}
@@ -18178,7 +18178,7 @@ function fbLinePage(b, l){
   rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', 'ln.plan', l.plan)}
-      ${fbTile('Потратили', 'ln.fact', l.fact)}
+      ${fbTile('Фактический расход', 'ln.fact', l.fact)}
       ${fbTile('Осталось', 'ln.left', l.left, {mode: 'neg'})}
     </div></div>
     <div class="sc">${fbCapT('План')}<div id="fbList-bud" class="fb-one"><div class="fb-card">${fbLineRow(l, false)}</div></div></div>

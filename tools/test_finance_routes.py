@@ -197,9 +197,13 @@ async def main():
     d3 = next(r for r in b["days"] if r["day"] == "2026-09-03")
     d4 = next(r for r in b["days"] if r["day"] == "2026-09-04")
     bu = b["budget"]
-    eq("бюджет: план 41000, / 30 дней, норма вверх до сотни 1400", (bu["total"], bu["days"], bu["norm_auto"], bu["norm"], bu["norm_set"]), (41000, 30, 1400, 1400, False))
-    eq("факт по строкам: зарплаты 1000 + 900 + аванс 2000, аренда 300, вне плана 25", ([l["fact"] for l in bu["lines"]], bu["off_plan"], bu["fact"]), ([3900, 300], 25, 4225))
-    eq("подсказка «по окладам» = начислено", bu["salary_hint"], b["pay"]["totals"]["accrued"])
+    eq("бюджет: аренда 31000 + зарплатный фонд (Али 100×30 + Макар 1750$×3.67 = 9422.5) = 40422.5, / 30 дней, норма вверх до сотни 1400",
+       (bu["total"], bu["salary"]["plan"], bu["days"], bu["norm_auto"], bu["norm"], bu["norm_set"]), (40422.5, 9422.5, 30, 1400, 1400, False))
+    eq("строка «Зарплаты» из старого образца скрыта, люди в фонде: Макар (руками) первым, потом Парвиз, Фарух, Али; Умар скрыт",
+       ([l["name"] for l in bu["lines"]], [x["name"] for x in bu["salary"]["people"]]), (["Аренда JVC"], ["Макар", "Парвиз", "Фарух", "Али"]))
+    eq("оклады в фонде: Али 100/день → 3000, Макар 1750 $ → 6422.5, без оклада — None и 0",
+       [(x["rate"], x["unit"], x["cur"], x["plan"]) for x in bu["salary"]["people"]], [(1750, "month", "USD", 6422.5), (None, "month", "AED", 0), (None, "month", "AED", 0), (100, "day", "AED", 3000)])
+    eq("факт: зарплаты 1000 + 900 + аванс 2000 (по виду записи), аренда 300, вне плана 25", (bu["salary"]["fact"], [l["fact"] for l in bu["lines"]], bu["off_plan"], bu["fact"]), (3900, [300], 25, 4225))
     eq("d4: в фонд по норме 1400 (collected_src norm)", (d4["collected"], d4["collected_src"]), (1400, "norm"))
     eq("d4: прибыль дня = 180 − 777 − 1400", d4["np_plus"], -1997)
     eq("d3: приход в фонд 500 записью, ins 1", (d3["extra_rp"], len(d3["ins"])), (500, 1))
@@ -278,18 +282,19 @@ async def main():
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month=M, **{"from": "prev"})))
     eq("fill при непустом → 409", r.status, 409)
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-10", **{"from": "prev"})))
-    eq("fill октября из сентября: 3 строки", (r.status, json.loads(r.text)["n"]), (200, 3))
+    eq("fill октября из сентября: 2 строки (старая «Зарплаты» не копируется)", (r.status, json.loads(r.text)["n"]), (200, 2))
     r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-11", **{"from": "template"})))
-    eq("fill по образцу: есть «Зарплаты» kind salary", any(w[0] == "bset" and w[1]["kind"] == "salary" and w[1]["month"] == "2026-11" for w in WRITES), True)
+    eq("fill по образцу: без строки «Зарплаты»", any(w[0] == "bset" and w[1]["name"] == "Зарплаты" and w[1]["month"] == "2026-11" for w in WRITES), False)
     r = await raw(inner2["handle_budget_del"])(_req("DELETE", dict(id="L2")))
     eq("budget_del", (r.status, WRITES[-1]), (200, ("bdel", "L2")))
     bu2 = json.loads(r.text)["book"]["budget"]
     eq("записи удалённой статьи: вне плана 25 + 300 и в факте", (bu2["off_plan"], bu2["fact"]), (325, 4225))
+    eq("зарплаты не статья: kind в ручке не принимается, строка kind=salary не создаётся", all(w[1].get("kind") == "" for w in WRITES if w[0] == "bset"), True)
     eq("правка сбрасывает кэш переносов с этого месяца", INV[-1], M)
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="advance", amount=500, day="2026-09-10", **{"from": "next", "as": "Ст"})))
     eq("аванс: запись расхода (kind advance, who, строка зарплат) + удержание со следующего месяца",
        (r.status, WRITES[-3][0], WRITES[-3][1]["kind"], WRITES[-3][1]["who"], WRITES[-3][1]["line"], WRITES[-2][0], WRITES[-2][1]["from"], WRITES[-2][1]["entry"] == WRITES[-3][1]["_id"]),
-       (200, "entry", "advance", "Али", "L1", "item", "2026-10", True))
+       (200, "entry", "advance", "Али", "", "item", "2026-10", True))
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="fine", amount=300, per_month=100)))
     eq("штраф: без записи расхода, с этого месяца", (r.status, WRITES[-1][0], WRITES[-1][1]["from"], WRITES[-1][1]["entry"]), (200, "item", "2026-09", ""))
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="bad", amount=1)))
@@ -297,7 +302,7 @@ async def main():
     r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id="i2", month=M)))
     eq("убрать аванс: удержание и запись расхода", (r.status, WRITES[-2], WRITES[-1]), (200, ("idel", "i2"), ("del", "adv1")))
     r = await raw(inner2["handle_pay_out"])(_req("POST", dict(name="Макар", amount=4000, day="2026-09-10", month="2026-08")))
-    eq("выплата: запись kind salary на строку зарплат, за август, ответ за август", (r.status, WRITES[-2][1]["kind"], WRITES[-2][1]["who"], WRITES[-2][1]["line"], WRITES[-2][1]["comment"], WRITES[-2][1]["pay_month"], json.loads(r.text)["book"]["month"]), (200, "salary", "Макар", "L1", "Зарплата", "2026-08", "2026-08"))
+    eq("выплата: запись kind salary без статьи, за август, ответ за август", (r.status, WRITES[-2][1]["kind"], WRITES[-2][1]["who"], WRITES[-2][1]["line"], WRITES[-2][1]["comment"], WRITES[-2][1]["pay_month"], json.loads(r.text)["book"]["month"]), (200, "salary", "Макар", "", "Зарплата", "2026-08", "2026-08"))
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="fine", amount=50, month="2026-08", **{"from": "next"})))
     eq("штраф из экрана августа «со следующего» → с сентября", WRITES[-1][1]["from"], "2026-09")
     r = await raw(inner2["handle_pay_month_set"])(_req("POST", dict(month=M, name="Али", field="rate", value="120")))

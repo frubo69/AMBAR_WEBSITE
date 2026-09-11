@@ -22,6 +22,7 @@ from finance_calc import _n, _i
 KINDS = {'fine': 'Штраф', 'advance': 'Аванс', 'loan': 'Долг', 'bonus': 'Премия'}
 CASH_KINDS = ('advance', 'loan')            # деньги выданы на руки — расход фонда
 MINUS_KINDS = ('fine', 'advance', 'loan')   # снимаются с зарплаты
+PAY_KINDS = ('salary', 'advance', 'loan')  # записи фонда, которые считаются зарплатами
 ROLES = ('senior', 'operator', 'driver', 'other')
 ROLE_T = {'senior': 'Старшие', 'operator': 'Операторы', 'driver': 'Водители', 'other': 'Другие'}
 UNITS = ('month', 'day')

@@ -258,25 +258,34 @@ def norm_auto(total: float, ndays: int) -> int:
 
 
 def template_lines() -> list[dict]:
-    """Статьи «по образцу» — те, что стоят в бюджете старшего."""
+    """Статьи «по образцу» — те, что стоят в бюджете старшего. Зарплат здесь
+    нет: зарплатный фонд складывается из людей (см. _pay_plan)."""
     from config_offices import OFFICES
-    rows = [dict(name="Зарплаты", kind="salary"), dict(name="Аренда офис")]
+    rows = [dict(name="Аренда офис")]
     rows += [dict(name=f"Аренда {o['name']}") for o in OFFICES]
     rows += [dict(name=n) for n in ("Авто", "Гараж и ТО", "Парковка", "Билеты", "Визы",
                                     "Sim", "Хоз. нужды", "Продукты", "Бензин", "Реклама")]
     return rows
 
 
-async def _budget(month: str, entries: list, mdoc: dict, ndays: int) -> dict:
+async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dict) -> dict:
+    """Статьи месяца с планом и фактом плюс зарплатный фонд (salary — из
+    _pay_plan: люди и их оклады). Выплаты, авансы и долги людям идут в факт
+    зарплат по виду записи, а не по статье."""
     try:
         lines = await db.fin_budget_get(month)
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] бюджет не прочитан: {e}")
         lines = []
+    lines = [ln for ln in lines if (ln.get("kind") or "") != "salary"]   # старые строки «Зарплаты»
     fact: dict = {}
     off_plan = 0.0
+    sal_fact = 0.0
     for e in entries:
         if e.get("book", "rp") != "rp":
+            continue
+        if e.get("kind") in pay.PAY_KINDS:
+            sal_fact += calc._n(e.get("amount"))
             continue
         lid = e.get("line") or ""
         if lid:
@@ -296,7 +305,9 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int) -> dict:
     known = {r["id"] for r in rows}
     stray = sum(v for k, v in fact.items() if k not in known)   # строка удалена, записи остались
     off_plan += stray
-    fact_all = fact_sum + off_plan
+    salary = dict(salary, fact=calc._i(sal_fact), left=calc._i(calc._n(salary.get("plan")) - sal_fact))
+    total += calc._n(salary.get("plan"))
+    fact_all = fact_sum + off_plan + sal_fact
     auto = norm_auto(total, ndays)
     norm = mdoc.get("norm")
     norm_b = mdoc.get("norm_b")
@@ -306,7 +317,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int) -> dict:
             prev_has = bool(await db.fin_budget_get(_prev_month(month)))
         except Exception:                         # noqa: BLE001
             prev_has = False
-    return dict(lines=rows, total=calc._i(total), fact=calc._i(fact_all),
+    return dict(lines=rows, salary=salary, total=calc._i(total), fact=calc._i(fact_all),
                 left=calc._i(total - fact_all), off_plan=calc._i(off_plan),
                 days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
                 norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,
@@ -335,6 +346,7 @@ def _people(docs: list) -> list[dict]:
     """Кто получает зарплату: люди из расписания плюс вписанные руками."""
     import config_staff as staff
     from config_offices import OFFICE_IDS
+    docs = sorted(docs, key=lambda d: str(d.get("created") or d.get("at") or ""))
     by_name = {str(d.get("_id")): d for d in docs}
     out, seen = [], set()
 
@@ -347,6 +359,11 @@ def _people(docs: list) -> list[dict]:
             return
         out.append(dict(name=name, role=d.get("role") or role, manual=bool(d.get("manual")),
                         pnote=d.get("note") or "", **kw))
+    # Сначала те, кого вписали руками (руководство, старший), в порядке
+    # добавления; потом расписание: старшие операторы, операторы, водители.
+    for d in docs:
+        if d.get("manual"):
+            add(str(d.get("_id")), d.get("role") or "other", districts=[])
     try:
         for s in staff.SENIOR_OPERATORS:
             add(s.get("name"), "senior", districts=list(OFFICE_IDS))
@@ -360,6 +377,36 @@ def _people(docs: list) -> list[dict]:
     for d in docs:
         add(str(d.get("_id")), d.get("role") or "other", districts=[])
     return out
+
+
+async def _pay_plan(month: str, ndays: int, usd: float) -> dict:
+    """Зарплатный фонд месяца — из людей и их окладов: оклад в месяц как есть,
+    ставка в день × дни месяца, доллары по курсу. Это и есть статья «Зарплаты»
+    бюджета: не число, вписанное отдельно, а список людей."""
+    try:
+        docs = await db.fin_people_get()
+        mdocs = await db.fin_pay_months_upto(month)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] оклады не прочитаны: {e}")
+        docs, mdocs = [], []
+    by_name: dict = {}
+    for d in mdocs:
+        by_name.setdefault(str(d.get("name")), []).append(d)
+    people, total = [], 0.0
+    for p in _people(docs):
+        eff = pay.effective({**p, "_month": month}, by_name.get(p["name"]) or [])
+        rate = calc._n(eff.get("rate"))
+        unit = eff.get("unit") if eff.get("unit") in pay.UNITS else "month"
+        cur = eff.get("cur") if eff.get("cur") in pay.CURS else "AED"
+        rate_aed = rate * (usd if cur == "USD" else 1.0)
+        plan = rate_aed if unit == "month" else rate_aed * ndays
+        total += plan
+        people.append(dict(name=p["name"], role=p["role"], role_t=pay.ROLE_T.get(p["role"], ""),
+                           manual=bool(p.get("manual")),
+                           rate=None if eff.get("rate") is None else calc._i(rate),
+                           unit=unit, cur=cur, rate_aed=calc._i(rate_aed), plan=calc._i(plan)))
+    return dict(plan=calc._i(total), people=people, n=len(people),
+                set_n=sum(1 for x in people if x["rate"] is not None))
 
 
 def _days_auto(people: list, work: dict, shifts: list) -> dict:
@@ -429,10 +476,6 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     return res
 
 
-def _salary_line(lines: list) -> str:
-    return next((ln["id"] for ln in lines if ln.get("kind") == "salary"), "")
-
-
 # ── Месяц целиком ────────────────────────────────────────────────────────────
 async def _opening(month: str, depth: int = 0) -> dict:
     """Переносы месяца: что вписано руками — главнее; остальное берём из
@@ -485,7 +528,8 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         await _opening(month, depth))
     work = spend.pop("_work", {})
     mdoc = opening["doc"]
-    budget = await _budget(month, entries, mdoc, len(days))
+    fx = await _usd(mdoc)
+    budget = await _budget(month, entries, mdoc, len(days), await _pay_plan(month, len(days), fx["usd"]))
     line_names = {ln["id"]: ln["name"] for ln in budget["lines"]}
     by_day_entries: dict = {}
     for e in entries:
@@ -561,10 +605,8 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                 opening_carried=opening["carried"], month_note=opening["note"],
                 prev_month=_prev_month(month), budget=budget)
     if not light:
-        fx = await _usd(mdoc)
         book["pay"] = await _payroll(month, days, today, entries, work, fx["usd"])
         book["pay"].update(fx)
-        book["budget"]["salary_hint"] = book["pay"]["totals"]["accrued"]
     return book
 
 
@@ -757,9 +799,6 @@ async def handle_budget_set(request):
         due = int(_num(body.get("due")) or 0)
         if not 0 <= due <= 31:
             return _json({"error": "bad_due"}, 400)
-        kind = str(body.get("kind") or "")
-        if kind not in ("", "salary"):
-            return _json({"error": "bad_kind"}, 400)
         lid = str(body.get("id") or "")[:24]
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
@@ -773,7 +812,7 @@ async def handle_budget_set(request):
         lid = secrets.token_hex(4)
         ordv = len(await db.fin_budget_get(month))
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
-           "note": str(body.get("note") or "").strip()[:80], "kind": kind,
+           "note": str(body.get("note") or "").strip()[:80], "kind": "",
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
     await _touch(month)
@@ -815,10 +854,10 @@ async def handle_budget_fill(request):
         if not prev:
             return _json({"error": "no_prev"}, 404)
         rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
-                     note=ln.get("note") or "", kind=ln.get("kind") or "") for ln in prev]
+                     note=ln.get("note") or "", kind="") for ln in prev
+                if (ln.get("kind") or "") != "salary"]
     else:
-        rows = [dict(name=r["name"], plan=0, due=0, note="", kind=r.get("kind") or "")
-                for r in template_lines()]
+        rows = [dict(name=r["name"], plan=0, due=0, note="", kind="") for r in template_lines()]
     who = _who(body)
     for i, r in enumerate(rows):
         await db.fin_budget_set({"_id": secrets.token_hex(4), "month": month, "ord": i, "by": who, **r})
@@ -925,11 +964,10 @@ async def handle_pay_item_add(request):
     iid = secrets.token_hex(5)
     entry_id = ""
     if kind in pay.CASH_KINDS:
-        lines = (await _budget(day[:7], [], {}, 1))["lines"]
         entry_id = secrets.token_hex(6)
         await db.fin_entry_add({"_id": entry_id, "day": day, "book": "rp", "amount": amount,
                                 "comment": note or pay.KINDS[kind], "who": name,
-                                "line": _salary_line(lines), "kind": kind, "item": iid,
+                                "line": "", "kind": kind, "item": iid,
                                 "by": who, "at": datetime.now(timezone.utc)})
     await db.fin_pay_item_add({"_id": iid, "name": name, "kind": kind, "amount": amount,
                                "per_month": per_month, "from": start, "day": day, "note": note,
@@ -978,10 +1016,9 @@ async def handle_pay_out(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
-    lines = (await _budget(day[:7], [], {}, 1))["lines"]
     doc = {"_id": secrets.token_hex(6), "day": day, "book": "rp", "amount": amount,
            "comment": str(body.get("note") or "").strip()[:120] or "Зарплата",
-           "who": name, "line": _salary_line(lines), "kind": "salary", "pay_month": month,
+           "who": name, "line": "", "kind": "salary", "pay_month": month,
            "by": who, "at": datetime.now(timezone.utc)}
     await db.fin_entry_add(doc)
     await _touch(min(month, day[:7]))

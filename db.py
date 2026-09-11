@@ -4799,7 +4799,8 @@ async def fin_people_get() -> list:
 async def fin_person_set(name: str, fields: dict, unset: list | None = None) -> None:
     d = _db_or_none()
     if d is None: return
-    upd: dict = {"$set": {**fields, "at": datetime.now(timezone.utc)}}
+    now = datetime.now(timezone.utc)
+    upd: dict = {"$set": {**fields, "at": now}, "$setOnInsert": {"created": now}}
     if unset:
         upd["$unset"] = {k: "" for k in unset}
     await d.fin_people.update_one({"_id": name}, upd, upsert=True)

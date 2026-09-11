@@ -18449,7 +18449,7 @@ function fbNextPick(ymd){
 function fbBudGroup(t, sub, valueHtml, go){
   return `<div class="fb-card group">
     <button class="fb-e fb-bl fb-gh" onclick="${go}">
-      <span class="fb-e-b"><b>${t}</b><i>${sub}</i></span>${valueHtml}<em class="fb-chev r">${_SC_CHEV}</em></button>
+      <span class="fb-e-b"><b>${t}</b>${sub ? `<i>${sub}</i>` : ''}</span>${valueHtml}<em class="fb-chev r">${_SC_CHEV}</em></button>
   </div>`;
 }
 // Карточка-раскрывашка: стрелка поворачивается, подпункты внутри, каждый
@@ -18457,7 +18457,7 @@ function fbBudGroup(t, sub, valueHtml, go){
 function fbBudGroupExpand(t, sub, valueHtml, open, go, body){
   return `<div class="fb-card group${open ? ' open' : ''}">
     <button class="fb-e fb-bl fb-gh" onclick="${go}">
-      <span class="fb-e-b"><b>${t}</b><i>${sub}</i></span>${valueHtml}<em class="fb-chev">${_SC_CHEV}</em></button>
+      <span class="fb-e-b"><b>${t}</b>${sub ? `<i>${sub}</i>` : ''}</span>${valueHtml}<em class="fb-chev">${_SC_CHEV}</em></button>
     <div class="fb-kids"${open ? '' : ' hidden'}>${body}</div>
   </div>`;
 }
@@ -18469,12 +18469,11 @@ function fbLineListRow(l, kid){
     <span class="fb-e-b"><b>${escS(l.name)}</b><i>${fbLineSub(l)}</i></span>
     ${empty ? `<b class="fb-fill">Заполнить</b>` : `<b class="fb-box${over ? ' dn' : ok ? ' ok' : ''}">${fbFmt(l.plan)}<u>AED</u></b>`}<em class="fb-chev r">${_SC_CHEV}</em></button>`;
 }
-function fbGroupVal(g){
-  return g.plan ? `<b class="fb-e-v${g.fact > g.plan ? ' dn' : g.fact === g.plan ? ' ok' : ''}">${fbFmt(g.fact)}<s class="sl">/</s>${fbFmt(g.plan)}</b>`
+// У группы в списке — только сумма в месяц (сумма месячных долей всех её
+// статей): это то, что надо вкладывать в бюджет; без «потратили / осталось».
+function fbGroupVal(g, key){
+  return g.plan ? `<b class="fb-e-v"${key ? ` data-f="${key}"` : ''}>${fbFmt(g.plan)}<u>в месяц</u></b>`
                 : `<b class="fb-fill">Заполнить</b>`;
-}
-function fbGroupSub(g){
-  return g.plan > g.fact ? `осталось ${fbFmt(g.left)}` : g.plan && g.fact === g.plan ? 'оплачено' : '';
 }
 // Зарплаты — люди по группам, как в «Зарплатах»: старшие (руководство),
 // старший оператор, операторы, водители (эти — по районам). Каждая группа —
@@ -18540,12 +18539,10 @@ function fbPersonFillRow(p, sal){
 function fbBudLines(b){
   const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []};
   const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0};
-  const salSub = sal.fact ? `выплачено ${fbFmt(sal.fact)}` : '';
-  let out = fbBudGroup('Зарплаты', salSub,
-    `<b class="fb-e-v" data-f="bu.salary_plan">${fbFmt(sal.plan)}<u>AED</u></b>`, "fbPageOpen('salary','')");
+  let out = fbBudGroup('Зарплаты', '', fbGroupVal(sal, 'bu.salary_plan'), "fbPageOpen('salary','')");
   const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), rest = lines.filter(l => !l.group);
-  if(rentLines.length) out += fbBudGroup('Аренда офисов', fbGroupSub(rent), fbGroupVal(rent), "fbPageOpen('rent','')");
-  if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', fbGroupSub(auto), fbGroupVal(auto),
+  if(rentLines.length) out += fbBudGroup('Аренда офисов', '', fbGroupVal(rent, 'bu.rent_plan'), "fbPageOpen('rent','')");
+  if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
     FB.autoOpen === true, 'fbAutoToggle()', autoLines.map(l => fbLineListRow(l, true)).join(''));
   if(!lines.length){
     out += `<div class="fb-card"><div class="fb-none">Других статей ещё нет</div><div class="fb-add">${

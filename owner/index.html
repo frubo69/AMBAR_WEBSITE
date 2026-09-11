@@ -3220,6 +3220,8 @@ button.path:active{transform:scale(.995)}
   border:1px solid var(--border2);background:rgba(255,255,255,.04);color:var(--sub);font:600 12.5px 'DM Sans',sans-serif;cursor:pointer}
 .fb-datebtn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
 .fb-datebtn svg{flex:0 0 auto}
+/* Календарь одной даты: без отрезков и подвала */
+#dateOverlay.single .dp-quick,#dateOverlay.single .dp-foot{display:none}
 /* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
 .fb-one .fb-card{margin:0;border:0;border-radius:0;background:transparent;border-top:1px solid rgba(201,169,110,.14)}
 .fb-one .fb-card:first-child{border-top:0}
@@ -10746,17 +10748,26 @@ const MONTHS_GEN = ['января','февраля','марта','апреля',
                     'августа','сентября','октября','ноября','декабря'];
 const MONTHS_RU_SHORT = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 
+// Одна дата (платёж статьи бюджета): без быстрых отрезков и подвала, будущее
+// открыто, листать можно в обе стороны, нажатие на день сразу выбирает.
+let dpSingle = false;
 function openDate(targetId){
   dpTarget = targetId;
+  dpSingle = targetId === 'fbNext';
+  dateOv.classList.toggle('single', dpSingle);
   const today = new Date();
   dpView = new Date(today.getFullYear(), today.getMonth(), 1);
   dpFrom = null;
   dpTo = null;
+  if(dpSingle && FB.editNext){
+    const d = new Date(FB.editNext + 'T00:00:00');
+    if(!isNaN(d)){ dpFrom = d; dpTo = d; dpView = new Date(d.getFullYear(), d.getMonth(), 1); }
+  }
   renderDp();
   dateOv.classList.add('show');
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){}
 }
-function closeDate(){ dateOv.classList.remove('show'); }
+function closeDate(){ dateOv.classList.remove('show'); dateOv.classList.remove('single'); dpSingle = false; }
 dateOv.addEventListener('click',e=>{ if(e.target===dateOv) closeDate(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && dateOv.classList.contains('show')) closeDate(); });
 
@@ -10795,7 +10806,7 @@ function renderDp(){
     el.textContent = c.d.getDate();
     // Будущее выбирать нечем: заказов там ещё нет, а выбранный «завтрашний»
     // период показывал бы пустоту и выглядел поломкой.
-    const future = c.d > today;
+    const future = !dpSingle && c.d > today;
     if(future) el.classList.add('future');
     if(sameDay(c.d, today)) el.classList.add('today');
     if(dpFrom && sameDay(c.d, dpFrom)) el.classList.add('range-start');
@@ -10809,8 +10820,8 @@ function renderDp(){
   // Листать вперёд дальше текущего месяца незачем — там пусто.
   const nav = document.querySelector('.dp-month-hdr .dp-nav:last-child');
   if(nav){
-    const ahead = (y > today.getFullYear()) ||
-                  (y === today.getFullYear() && m >= today.getMonth());
+    const ahead = !dpSingle && ((y > today.getFullYear()) ||
+                  (y === today.getFullYear() && m >= today.getMonth()));
     nav.classList.toggle('dim', ahead);
     nav.disabled = ahead;
   }
@@ -10818,6 +10829,13 @@ function renderDp(){
 }
 
 function pickDp(d){
+  if(dpSingle){
+    dpFrom = d; dpTo = d;
+    fbNextPick(_ymd(d));
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+    closeDate();
+    return;
+  }
   if(!dpFrom || (dpFrom && dpTo)){
     dpFrom = d; dpTo = null;
   } else {
@@ -10832,6 +10850,7 @@ function pickDp(d){
 function updateDpLbl(){
   const lbl = document.getElementById('dpRangeLbl');
   const apply = document.getElementById('dpApplyBtn');
+  if(dpSingle){ if(lbl) lbl.innerHTML = `<span class="hint">Дата платежа</span>`; return; }
   const days = dpFrom && dpTo ? Math.round((dpTo - dpFrom) / 86400000) + 1 : 0;
   if(apply){
     // Нечего применять — кнопка не должна выглядеть рабочей.

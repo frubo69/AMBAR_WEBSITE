@@ -31,6 +31,20 @@ parts = [
     fn("dayBarArrow"), fn("dayBarHome"), fn("_heroFlip"), fn("askDialog"), fn("closePinPop"),
     fn("pluralize"),
 ]
+# календарь одной даты (платёж статьи): разметка и функции — настоящие
+_d0 = src.index('<div class="cmd-overlay" id="dateOverlay">')
+_d1 = src.index('id="dpApplyBtn"', _d0)
+_d1 = src.index("\n", _d1); _d1 = src.index("\n", _d1 + 1); _d1 = src.index("\n", _d1 + 1); _d1 = src.index("\n", _d1 + 1)
+date_html = src[_d0:_d1]
+def line(prefix):
+    """Одна строка исходника, начинающаяся с prefix (объявление или функция в одну строку)."""
+    m = re.search(r"^" + re.escape(prefix) + r".*$", src, re.M)
+    assert m, prefix
+    return m.group(0) + "\n"
+parts += [line("let dpTarget ="), line("let dpView ="), line("let dpFrom ="), line("let dpTo ="), line("const MONTHS_RU_SHORT ="),
+          line("let dpSingle ="), line("const _ymd ="), "const dateOv = document.getElementById('dateOverlay');",
+          fn("openDate"), line("function closeDate()"), fn("dpStep"), line("function sameDay("), line("function strDate("),
+          fn("renderDp"), fn("pickDp"), fn("updateDpLbl"), line("function dpReset()")]
 overlay = src[src.index('<div class="stk-ov" id="accOv">'):]
 overlay = overlay[:overlay.index('<div class="stk-foot" id="accFoot"></div>') + len('<div class="stk-foot" id="accFoot"></div>')] + "\n</div>"
 
@@ -47,7 +61,6 @@ async function askYes(t){ log('ASK ' + t.split('\n')[0]); return true; }
 function accAskBack(){ return true; }
 function _meName(){ return 'Стенд'; }
 function _navSave(){}
-function openDate(id){ log('openDate ' + id); }
 function accLoadSummaries(){}
 window.ownerApi = {ownerFetch: async (path, opts = {}) => {
   const {method = 'GET', params, body} = opts;
@@ -103,6 +116,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('page')){ const [k, ...r] = Q.get('page').split(':'); fbPageOpen(k, r.join(':')); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('page') && Q.get('edit')){ const [k, ...r] = Q.get('edit').split(':'); fbFillEdit(k, r.join(':')); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('wheel')){ fbPillOpen(); await new Promise(r => setTimeout(r, 400)); }
+    if(Q.get('cal')){ openDate('fbNext'); await new Promise(r => setTimeout(r, 300)); }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {
@@ -145,6 +159,7 @@ body{{padding:0;background:#0a0a14}}
 <div id="phone">
 <div class="page active" id="pg-finance"><div id="finBook"></div></div>
 {overlay}
+{date_html}
 </div>
 <div id="err"></div>
 <script>

@@ -17606,9 +17606,9 @@ function fbHubHtml(b, err){
     ${fbGo('Барракуда', 'b.debt_end', b.b.debt_end, "accOpen('finb')", {unit: 'долг', mode: 'debt', em: b.b.debt_end > 0 ? 'dn' : ''})}
     ${fbGo('РП', 't.expenses', t.expenses, "accOpen('finrp')")}
     ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
+    ${fbGo('ЧП', 'np.profit', b.np.profit, "accOpen('finnp')", {mode: 'neg'})}
     ${fbGo('Сейф', 'safe.total', b.safe.total, "accOpen('finsafe')", {unit: 'должно быть'})}
     ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
-    ${fbGo('ЧП', 'np.profit', b.np.profit, "accOpen('finnp')", {mode: 'neg'})}
   </div>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками

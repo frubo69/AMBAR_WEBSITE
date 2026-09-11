@@ -330,6 +330,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
     """Статьи месяца с планом и фактом плюс зарплатный фонд (salary — из
     _pay_plan: люди и их оклады). Выплаты, авансы и долги людям идут в факт
     зарплат по виду записи, а не по статье."""
+    from config_offices import OFFICES, OFFICE_CODES
     try:
         lines = await db.fin_budget_get(month)
     except Exception as e:                        # noqa: BLE001
@@ -360,6 +361,12 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         name = ln.get("name") or ""
         group = _line_group(ln)
         office = group == "rent" and (ln.get("kind") == "office" or name == "Аренда офис")
+        # здание в аренде: код района в золотой таблетке и короткое имя — «B1 JVC»
+        code, short = "", name
+        if group == "rent":
+            short = "Офис" if office else (name[7:] if name.startswith("Аренда ") else name)
+            oid = next((o["id"] for o in OFFICES if o["name"] == short), "")
+            code = OFFICE_CODES.get(oid, "")
         sch = _schedule(ln, month, today)
         # платёж раз в несколько месяцев входит в план только того месяца, где он
         # стоит по графику; в остальные месяцы у строки плана нет, есть «следующий»
@@ -371,7 +378,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             autog["plan"] += plan_m; autog["fact"] += f; autog["n"] += 1
         rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), plan_m=calc._i(plan_m),
                          fact=calc._i(f), left=calc._i(plan_m - f), due=int(ln.get("due") or 0),
-                         note=ln.get("note") or "", group=group, office=office, **sch,
+                         note=ln.get("note") or "", group=group, office=office, code=code, short=short, **sch,
                          ord=int(ln.get("ord") if ln.get("ord") is not None else i)))
     # записи без статьи и записи удалённой статьи — «вне плана», но потрачено
     known = {r["id"] for r in rows}

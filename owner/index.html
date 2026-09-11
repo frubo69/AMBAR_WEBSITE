@@ -3220,6 +3220,10 @@ button.path:active{transform:scale(.995)}
   border:1px solid var(--border2);background:rgba(255,255,255,.04);color:var(--sub);font:600 12.5px 'DM Sans',sans-serif;cursor:pointer}
 .fb-datebtn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
 .fb-datebtn svg{flex:0 0 auto}
+/* Код района у здания — золотая таблетка, как в «Кто на каком районе» */
+.fb-bcode{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:24px;padding:0 6px;
+  border-radius:8px;margin-right:9px;vertical-align:-6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
+  font-style:normal;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 /* Календарь одной даты: без отрезков и подвала */
 #dateOverlay.single .dp-quick,#dateOverlay.single .dp-foot{display:none}
 /* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
@@ -18110,10 +18114,10 @@ function fbRentPage(b){
       ${fbTile('Потратили', 'bu.rent_fact', rent.fact)}
       ${fbTile('Осталось', 'bu.rent_left', rent.left, {mode: 'neg'})}
     </div></div>
-    <div class="sc">${fbCapT('Офис')}<div class="fb-one">${office.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}${
+    <div class="sc">${fbCapT('Офис')}<div class="fb-one">${office.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}</div>`).join('')}${
       office.length ? '' : `<div class="fb-card add">${isNew('office') ? fbNewRow('office') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','office')"><span>Добавить офис</span><em>${_FB_PLUS}</em></button>`}</div>`}
     </div></div>
-    <div class="sc">${fbCapT('Билдинги')}<div class="fb-one">${blds.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}
+    <div class="sc">${fbCapT('Билдинги')}<div class="fb-one">${blds.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}</div>`).join('')}
       <div class="fb-card add">${isNew('rent') ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
@@ -18345,7 +18349,7 @@ function fbLineSub(l){
           l.note ? escS(l.note) : '',
           over ? `сверх плана ${fbFmt(l.fact - pm)}` : ok ? 'оплачено' : pm > 0 ? `потратили ${fbFmt(l.fact)} · осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
 }
-function fbLineRow(l, kid){
+function fbLineRow(l, kid, nameHtml){
   const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
   // в правке: барабан «раз в N мес», дата следующего платежа (календарь),
   // заметка и «Убрать»; дальше программа считает следующий платёж сама
@@ -18358,8 +18362,14 @@ function fbLineRow(l, kid){
     <div class="fb-edit2">
       <input class="fb-txt" placeholder="Заметка" autocomplete="off" maxlength="80" id="fbFillNote" value="${escS(l.note || '')}">
       <button class="fb-lnk del" onclick="fbBudDel('${l.id}')">Убрать</button></div>`;
-  return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid,
+  return fbFillRow({kind: 'line', id: l.id, name: nameHtml || escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid,
                     cls: over ? 'dn' : ok ? 'ok' : '', extra});
+}
+// Здание в аренде: код района золотой таблеткой, как везде — «B1 JVC»; офис
+// — просто «Офис».
+function fbBldName(l){
+  if(l.office) return 'Офис';
+  return (l.code ? `<i class="fb-bcode">${escS(l.code)}</i>` : '') + escS(l.short || l.name);
 }
 // Барабан периода живёт внутри таблетки: закрытая показывает одно число,
 // нажатие плавно растягивает её в барабан (три числа, выбранное по центру),

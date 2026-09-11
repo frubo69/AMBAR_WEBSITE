@@ -272,7 +272,8 @@ def template_lines() -> list[dict]:
 
 
 GROUPS = ("", "rent", "auto", "home")
-AUTO_NAMES = ("Авто", "Гараж и ТО", "Парковка")
+AUTO_NAMES = ("Аренда", "Гараж и ТО", "Парковка")
+AUTO_LEGACY = ("Авто",)  # так статья называлась до 11 сен 2026
 HOME_NAMES = ("Хоз. нужды", "Продукты")
 MAX_PERIOD = 24
 
@@ -323,9 +324,11 @@ def _line_group(ln: dict) -> str:
     if g in GROUPS and g:
         return g
     name = str(ln.get("name") or "")
+    if name in AUTO_NAMES or name in AUTO_LEGACY:
+        return "auto"          # просто «Аренда» — машины, а не «Аренда B1»
     if name.startswith("Аренда "):
         return "rent"
-    return "auto" if name in AUTO_NAMES else "home" if name in HOME_NAMES else ""
+    return "home" if name in HOME_NAMES else ""
 
 
 async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dict) -> dict:

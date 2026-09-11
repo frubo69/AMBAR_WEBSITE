@@ -293,7 +293,10 @@ async def main():
        (any(w[0] == "bset" and w[1]["name"] == "Зарплаты" and w[1]["month"] == "2026-11" for w in WRITES),
         [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11"][0],
         sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ("Аренда офис", "office"), ["rent"] * 6))
-    eq("образец: Авто, Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Авто", "Гараж и ТО", "Парковка"])
+    eq("образец: Аренда, Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Аренда", "Гараж и ТО", "Парковка"])
+    eq("старое название «Авто» без поля group — всё ещё auto", fr._line_group({"name": "Авто"}), "auto")
+    eq("«Аренда» без района и без поля group — auto, не rent", fr._line_group({"name": "Аренда"}), "auto")
+    eq("«Аренда JVC» без поля group — rent", fr._line_group({"name": "Аренда JVC"}), "rent")
     eq("образец: Хоз. нужды, Продукты — группа home («Бытовые расходы»)", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "home"), ["Продукты", "Хоз. нужды"])
     BUDGET.append(dict(_id="L30", month=M, name="Продукты", plan=6000, due=0, note="", kind="", ord=30))
     bh = (await fr.build(M))["budget"]

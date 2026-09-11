@@ -18582,7 +18582,7 @@ function fbBudLines(b){
   if(autoLines.length || carLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
     FB.autoOpen === true, 'fbAutoToggle()', fbCarRow(car) + autoLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
   if(homeLines.length) out += fbBudGroupExpand('Бытовые расходы', '', fbGroupVal(home, 'bu.home_plan'),
-    FB.homeOpen === true, 'fbHomeToggle()', homeLines.map(l => fbLineListRow(l, true)).join(''));
+    FB.homeOpen === true, 'fbHomeToggle()', homeLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
   if(!lines.length){
     out += `<div class="fb-card"><div class="fb-none">Других статей ещё нет</div><div class="fb-add">${
       bu.prev_has ? `<button class="aud-b go" onclick="fbBudFill('prev')">Из прошлого месяца</button>` : ''}

@@ -267,7 +267,7 @@ def template_lines() -> list[dict]:
     # «Расходы на автомобили» и «Бытовые расходы» — группы из подпунктов
     rows += [dict(name=n, group="auto", kind="pool" if n in POOL_NAMES else "") for n in AUTO_NAMES]
     rows += [dict(name=n, group="car") for n in CAR_NAMES]
-    rows += [dict(name=n, group="home") for n in HOME_NAMES]
+    rows += [dict(name=n, group="home", kind="pool") for n in HOME_NAMES]
     rows += [dict(name=n) for n in ("Билеты", "Визы", "Sim", "Бензин", "Реклама")]
     return rows
 
@@ -278,10 +278,10 @@ AUTO_LEGACY = ("Авто", "Аренда")  # так статьи называл
 # Аренда машин («Аренда» внутри «Расходов на автомобили»): у кого арендуем —
 # строки группы car, каждая с периодом и датой платежа, как здания.
 CAR_NAMES = ("Орион Рент", "Алексей Рент", "Другой Рент")
+HOME_NAMES = ("Хоз. нужды", "Продукты", "Коммуналка")   # «Бытовые расходы»
 # Статья без даты платежа (kind="pool"): просто бюджет на месяц, без периода
 # и календаря, правится прямо в списке; старые строки — по названию.
-POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг")
-HOME_NAMES = ("Хоз. нужды", "Продукты")
+POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг") + HOME_NAMES
 MAX_PERIOD = 24
 
 

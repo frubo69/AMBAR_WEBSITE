@@ -307,7 +307,8 @@ async def main():
     pl = next(x for x in json.loads(r.text)["book"]["budget"]["lines"] if x["id"] == pool_id)
     eq("pool в книге: kind pool, период 1, без следующего платежа, в группе auto", (pl["kind"], pl["period"], pl["next_due"], pl["group"], pl["plan_m"]), ("pool", 1, "", "auto", 4000))
     eq("старая строка «Гараж и ТО» без kind — тоже pool", fr._is_pool({"name": "Гараж и ТО"}), True)
-    eq("образец: Хоз. нужды, Продукты — группа home («Бытовые расходы»)", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "home"), ["Продукты", "Хоз. нужды"])
+    eq("образец: Хоз. нужды, Продукты, Коммуналка — группа home («Бытовые расходы»), все без даты", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "home"], [("Хоз. нужды", "pool"), ("Продукты", "pool"), ("Коммуналка", "pool")])
+    eq("старые «Продукты» без kind — тоже без даты", fr._is_pool({"name": "Продукты"}), True)
     BUDGET.append(dict(_id="L30", month=M, name="Продукты", plan=6000, due=0, note="", kind="", ord=30))
     bh = (await fr.build(M))["budget"]
     eq("старая строка «Продукты» без group — в бытовых; итог группы", (next(l["group"] for l in bh["lines"] if l["name"] == "Продукты"), bh["home"]), ("home", dict(plan=6000, fact=0, left=6000, n=1)))

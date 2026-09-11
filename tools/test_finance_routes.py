@@ -290,6 +290,10 @@ async def main():
     eq("fill по образцу: без строки «Зарплаты» и без «Аренда офис», здания в группе rent",
        (any(w[0] == "bset" and w[1]["name"] in ("Зарплаты", "Аренда офис") and w[1]["month"] == "2026-11" for w in WRITES),
         sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ["rent"] * 5))
+    eq("образец: Авто, Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Авто", "Гараж и ТО", "Парковка"])
+    BUDGET.append(dict(_id="L9", month=M, name="Парковка", plan=1500, due=0, note="", kind="", ord=9))
+    ba = (await fr.build(M))["budget"]
+    eq("старая строка «Парковка» без поля group — в авто; итог группы", (next(l["group"] for l in ba["lines"] if l["name"] == "Парковка"), ba["auto"]), ("auto", dict(plan=1500, fact=0, left=1500, n=1)))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Аренда склад", plan=900, group="rent")))
     eq("новая строка в группе аренды", (r.status, WRITES[-1][1]["group"]), (200, "rent"))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="X", plan=1, group="zzz")))

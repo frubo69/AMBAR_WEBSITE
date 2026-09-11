@@ -98,6 +98,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(v !== 'hub') await accOpen(v);
     if(Q.get('add')){ fbAddToggle(Q.get('add')); }
     if(Q.get('kind')) fbKindPick(Q.get('kind'));
+    if(Q.get('page')){ const [k, ...r] = Q.get('page').split(':'); fbPageOpen(k, r.join(':')); await new Promise(r => setTimeout(r, 400)); }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {

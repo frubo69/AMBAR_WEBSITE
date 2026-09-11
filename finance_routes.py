@@ -263,21 +263,27 @@ def template_lines() -> list[dict]:
     from config_offices import OFFICES
     # «Аренда офисов» — группа: пять зданий, каждое своей строкой
     rows = [dict(name=f"Аренда {o['name']}", group="rent") for o in OFFICES]
-    rows += [dict(name=n) for n in ("Авто", "Гараж и ТО", "Парковка", "Билеты", "Визы",
-                                    "Sim", "Хоз. нужды", "Продукты", "Бензин", "Реклама")]
+    # «Расходы на автомобили» — группа из трёх подпунктов
+    rows += [dict(name=n, group="auto") for n in AUTO_NAMES]
+    rows += [dict(name=n) for n in ("Билеты", "Визы", "Sim", "Хоз. нужды", "Продукты", "Бензин", "Реклама")]
     return rows
 
 
-GROUPS = ("", "rent")
+GROUPS = ("", "rent", "auto")
+AUTO_NAMES = ("Авто", "Гараж и ТО", "Парковка")
 
 
 def _line_group(ln: dict) -> str:
-    """Группа статьи: «rent» — здание в «Аренде офисов». Старые строки без
-    поля относим по названию, чтобы уже заполненный месяц не рассыпался."""
+    """Группа статьи: «rent» — здание в «Аренде офисов», «auto» — подпункт
+    «Расходов на автомобили». Старые строки без поля относим по названию,
+    чтобы уже заполненный месяц не рассыпался."""
     g = ln.get("group")
     if g in GROUPS and g:
         return g
-    return "rent" if str(ln.get("name") or "").startswith("Аренда ") else ""
+    name = str(ln.get("name") or "")
+    if name.startswith("Аренда "):
+        return "rent"
+    return "auto" if name in AUTO_NAMES else ""
 
 
 async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dict) -> dict:
@@ -306,6 +312,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             off_plan += calc._n(e.get("amount"))
     rows, total, fact_sum = [], 0.0, 0.0
     rent = dict(plan=0.0, fact=0.0, n=0)
+    autog = dict(plan=0.0, fact=0.0, n=0)     # «Расходы на автомобили»; auto ниже — норма
     for i, ln in enumerate(lines):
         plan = calc._n(ln.get("plan"))
         f = fact.get(ln.get("_id"), 0.0)
@@ -317,6 +324,8 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         total += plan; fact_sum += f
         if group == "rent":
             rent["plan"] += plan; rent["fact"] += f; rent["n"] += 1
+        elif group == "auto":
+            autog["plan"] += plan; autog["fact"] += f; autog["n"] += 1
         rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan),
                          fact=calc._i(f), left=calc._i(plan - f), due=int(ln.get("due") or 0),
                          note=ln.get("note") or "", group=group,
@@ -339,7 +348,9 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             prev_has = False
     rent = dict(plan=calc._i(rent["plan"]), fact=calc._i(rent["fact"]),
                 left=calc._i(rent["plan"] - rent["fact"]), n=rent["n"])
-    return dict(lines=rows, salary=salary, rent=rent, total=calc._i(total), fact=calc._i(fact_all),
+    autog = dict(plan=calc._i(autog["plan"]), fact=calc._i(autog["fact"]),
+                 left=calc._i(autog["plan"] - autog["fact"]), n=autog["n"])
+    return dict(lines=rows, salary=salary, rent=rent, auto=autog, total=calc._i(total), fact=calc._i(fact_all),
                 left=calc._i(total - fact_all), off_plan=calc._i(off_plan),
                 days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
                 norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,

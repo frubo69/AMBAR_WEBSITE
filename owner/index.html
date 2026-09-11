@@ -3234,6 +3234,9 @@ button.path:active{transform:scale(.995)}
 /* Дата следующего платежа: цвет по срочности */
 .fb-e-b i .fb-due{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.2px}
 .fb-due.ok{color:var(--up)} .fb-due.warn{color:var(--warn)} .fb-due.dn{color:var(--dn)}
+/* Заголовок карточки как кнопка: имя человека в списке удержаний ведёт на его страницу */
+.fb-pcap{width:100%;border:0;background:none;color:inherit;text-align:left;cursor:pointer;font-family:'Space Grotesk',sans-serif}
+.fb-pcap:active{background:rgba(201,169,110,.05)}
 /* Календарь одной даты: без отрезков и подвала */
 #dateOverlay.single .dp-quick,#dateOverlay.single .dp-foot{display:none}
 /* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
@@ -17429,9 +17432,9 @@ const FB = {month: null, months: {}, at: {}, flight: {}, seq: 0, applied: 0,
             person: null, line: '', bud: null, kind: 'fine', from: 'this'};
 const FB_TTL = 60000;   // книга месяца свежа минуту: заказы и расходы водителей идут мимо неё
 const FB_T = {handed_fact: 'Сдали по факту', ordered_fact: 'Заказали по счёту',
-              aside: 'Базе', collected: 'В фонд', extra_rp: 'Приход в фонд',
-              pay_b: 'Оплатили базе', pay_b_extra: 'Оплатили сверх', note: 'Заметка',
-              norm: 'Норма в день', norm_b: 'Базе в день', usd: 'Курс доллара',
+              aside: 'Барракуде', collected: 'В фонд', extra_rp: 'Приход в фонд',
+              pay_b: 'Оплатили Барракуде', pay_b_extra: 'Оплатили сверх', note: 'Заметка',
+              norm: 'Норма в день', norm_b: 'Барракуде в день', usd: 'Курс доллара',
               rate: 'Оклад', days: 'Дни'};
 const FB_KIND_T = {fine: 'Штраф', advance: 'Аванс', loan: 'Долг', bonus: 'Премия'};
 const _FB_L = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -17592,20 +17595,20 @@ function fbHubHtml(b, err){
     <div class="aud-g">${fbTile('Доход', 't.gross', null)}${fbTile('Расходы', 't.expenses', null)}${
       fbTile('Прибыль', 'np.profit', null)}</div>
     <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>`;
-  const t = b.totals, today = (b.days || []).find(d => d.today) || null, bu = b.budget || {}, pay = fbCur(b);
+  const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   return `<div class="sc fb-hub">${fbCap(month, true)}
     <div class="aud-g">
       ${fbTile('Доход', 't.gross', t.gross)}
       ${fbTile('Расходы', 't.expenses', t.expenses)}
       ${fbTile('Прибыль', 'np.profit', b.np.profit, {mode: 'neg'})}
     </div>
-    ${month === fbMonthNow() ? fbGo('Касса дня', 'd0.base', today ? today.base : 0, 'fbOpenToday()', {unit: 'сдали'}) : ''}
-    ${fbGo('Сейф', 'safe.total', b.safe.total, "accOpen('finsafe')", {unit: 'должно быть'})}
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
-    ${fbGo('Расходы', 't.expenses', t.expenses, "accOpen('finrp')")}
-    ${fbGo('База', 'b.debt_end', b.b.debt_end, "accOpen('finb')", {unit: 'долг', mode: 'debt', em: b.b.debt_end > 0 ? 'dn' : ''})}
-    ${fbGo('Зарплаты', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
-    ${fbGo('Прибыль', 'np.profit', b.np.profit, "accOpen('finnp')", {mode: 'neg'})}
+    ${fbGo('Барракуда', 'b.debt_end', b.b.debt_end, "accOpen('finb')", {unit: 'долг', mode: 'debt', em: b.b.debt_end > 0 ? 'dn' : ''})}
+    ${fbGo('РП', 't.expenses', t.expenses, "accOpen('finrp')")}
+    ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
+    ${fbGo('Сейф', 'safe.total', b.safe.total, "accOpen('finsafe')", {unit: 'должно быть'})}
+    ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
+    ${fbGo('ЧП', 'np.profit', b.np.profit, "accOpen('finnp')", {mode: 'neg'})}
   </div>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
@@ -17627,7 +17630,7 @@ async function fbMonthStep(d){
 // Перерисовать всё, что смотрит на месяц: карточку на странице и открытый
 // месячный экран. Экран дня месяц не листает — у него свой день.
 const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => accFinNP(), finsafe: () => accFinSafe(),
-                  finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson()};
+                  finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson(), finitems: () => accFinItems()};
 function fbRepaint(){
   const box = document.getElementById('finBook');
   if(box) box.innerHTML = fbHubHtml(fbBook(FB.month));
@@ -17901,19 +17904,19 @@ function fbDayBodyHtml(d){
   <div class="sc fb-gut">
     ${fbCapT('Разложили')}
     ${fbRow('Сдали', 'd.base', d.base)}
-    ${fbIn('Базе', 'aside', d.manual.aside, sc, {sign: '−', ph: fbFmt(d.aside), phk: 'd.aside', eu: asideEu})}
+    ${fbIn('Барракуде', 'aside', d.manual.aside, sc, {sign: '−', ph: fbFmt(d.aside), phk: 'd.aside', eu: asideEu})}
     ${fbIn('В фонд', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: colEu})}
     ${fbRow('Прибыль дня', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
   </div>
   <div class="sc">
-    ${fbCapT('База')}
+    ${fbCapT('Барракуда')}
     ${fbRow('Заказали по приложению', 'd.ordered_auto', d.ordered_auto)}
     ${fbIn('Заказали по счёту', 'ordered_fact', d.ordered_fact, sc, {ph: fbFmt(d.ordered_auto), phk: 'd.ordered_auto'})}
     ${fbRow('Другие базы', 'd.ordered_extra', d.ordered_extra, {sub: true, show: 'd.extra_on', hide: !d.ordered_extra})}
     ${fbIn('Оплатили', 'pay_b', d.manual.pay_b, sc)}
     ${fbIn('Оплатили сверх', 'pay_b_extra', d.manual.pay_b_extra, sc)}
-    ${fbRow('Долг базе', 'd.debt_b', d.debt_b, {sum: true, mode: 'debt'})}
-    ${fbRow('Отложено базе', 'd.safe_b', d.safe_b, {sum: true})}
+    ${fbRow('Долг Барракуде', 'd.debt_b', d.debt_b, {sum: true, mode: 'debt'})}
+    ${fbRow('Отложено Барракуде', 'd.safe_b', d.safe_b, {sum: true})}
   </div>
   <div class="sc fb-gut">
     ${fbCapT('Фонд')}
@@ -18005,13 +18008,13 @@ async function accFinSafe(){
   <div class="sc">
     ${fbCap(b.month, true)}
     <div class="aud-g">
-      ${fbTile('Базе', 'safe.b', s.b)}
+      ${fbTile('Барракуде', 'safe.b', s.b)}
       ${fbTile('Сейф', 'safe.np', s.np, {mode: 'neg'})}
       ${fbTile('Всего', 'safe.total', s.total, {mode: 'neg'})}
     </div>
   </div>
   <div class="sc fb-gut">
-    ${fbCapT('Отложено базе')}
+    ${fbCapT('Отложено Барракуде')}
     ${fbRow('На начало месяца', 'b.safe_open', b.b.safe_open)}
     ${fbRow('Отложили', 'b.aside', b.b.aside, {sign: '+'})}
     ${fbRow('Оплатили из отложенного', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
@@ -18032,8 +18035,8 @@ async function accFinSafe(){
   </div>
   <div class="sc">
     ${fbCapT('На начало месяца')}
-    ${fbOpenIn('Отложено базе', 'safe_b_open', b)}
-    ${fbOpenIn('Долг базе', 'debt_b_open', b)}
+    ${fbOpenIn('Отложено Барракуде', 'safe_b_open', b)}
+    ${fbOpenIn('Долг Барракуде', 'debt_b_open', b)}
     ${fbInTxt('Заметка', 'note', b.month_note, m)}
   </div>`;
 }
@@ -18695,7 +18698,7 @@ async function fbBudFill(from){
 
 // ── Экран «База» ──────────────────────────────────────────────────────────
 async function accFinB(){
-  const b = await fbMonthScreen('База'); if(!b) return;
+  const b = await fbMonthScreen('Барракуда'); if(!b) return;
   const days = (b.days || []).filter(d => !d.future && (d.ordered || d.aside || d.pay_b || d.pay_b_extra))
     .map(d => fbDayRow(d, [d.ordered ? `заказали ${fbFmt(d.ordered)}` : '', d.aside ? `отложили ${fbFmt(d.aside)}` : '',
                           (d.pay_b || d.pay_b_extra) ? `оплатили ${fbFmt(d.pay_b + d.pay_b_extra)}` : ''].filter(Boolean).join(' / '),
@@ -18708,21 +18711,21 @@ async function accFinB(){
       ${fbTile('Купили', 'b.bought', b.b.bought)}
       ${fbTile('Купили от продаж', 'b.ratio', b.b.ratio, {unit: '%', dec: 1})}
     </div>
-    ${fbRow('Отложили базе', 'b.aside', b.b.aside)}
+    ${fbRow('Отложили Барракуде', 'b.aside', b.b.aside)}
     ${fbRow('Оплатили из отложенного', 'b.pay_safe', b.b.pay_safe, {sub: true})}
     ${fbRow('Оплатили сверх', 'b.pay_extra', b.b.pay_extra, {sub: true})}
     ${fbRow('Всего оплатили', 'b.paid', b.b.paid, {sum: true, sign: '='})}
   </div>
   <div class="sc fb-gut">
-    ${fbCapT('Долг базе')}
+    ${fbCapT('Долг Барракуде')}
     ${fbRow('На начало месяца', 'b.debt_open', b.b.debt_open)}
     ${fbRow('Заказали', 'b.bought', b.b.bought, {sign: '+'})}
     ${fbRow('Оплатили', 'b.paid', b.b.paid, {sign: '−'})}
-    ${fbRow('Долг базе', 'b.debt_end', b.b.debt_end, {sum: true, sign: '=', mode: 'debt'})}
+    ${fbRow('Долг Барракуде', 'b.debt_end', b.b.debt_end, {sum: true, sign: '=', mode: 'debt'})}
     ${fbRow('За месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
   </div>
   <div class="sc fb-gut">
-    ${fbCapT('Отложено базе')}
+    ${fbCapT('Отложено Барракуде')}
     ${fbRow('На начало месяца', 'b.safe_open', b.b.safe_open)}
     ${fbRow('Отложили', 'b.aside', b.b.aside, {sign: '+'})}
     ${fbRow('Оплатили из отложенного', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
@@ -18734,7 +18737,7 @@ async function accFinB(){
 
 // ── Экран «Расходы» (фонд) ────────────────────────────────────────────────
 async function accFinRP(){
-  const b = await fbMonthScreen('Расходы'); if(!b) return;
+  const b = await fbMonthScreen('РП'); if(!b) return;
   const bu = b.budget;
   const days = (b.days || []).filter(d => !d.future && (d.collected || d.extra_rp || d.expenses_sum))
     .map(d => {
@@ -18777,7 +18780,7 @@ async function accFinRP(){
 
 // ── Экран «Зарплаты» ──────────────────────────────────────────────────────
 async function accFinPay(){
-  const b = await fbMonthScreen('Зарплаты'); if(!b) return;
+  const b = await fbMonthScreen('Зарплатная ведомость'); if(!b) return;
   const pay = fbCur(b), m = `data-month="${b.month}"`;
   document.getElementById('accMid').innerHTML = `
   <div class="sc">
@@ -18839,10 +18842,10 @@ async function fbPersonAdd(){
     else fbBudRepaint();
   }catch(e){ _toast('Не удалось добавить'); }
 }
-function fbPersonOpen(name){
-  FB.person = name;
+function fbPersonOpen(name, from){
+  FB.person = name; FB.personFrom = from || 'finpay';
   accOpen('finperson');
-  ACC_BACK = () => accOpen('finpay');
+  ACC_BACK = () => accOpen(FB.personFrom);
 }
 async function fbPersonHide(name){
   if(!await askDialog('Убрать из зарплат?', `${name} пропадёт из списка. Записи о выплатах останутся в книге.`,
@@ -18860,7 +18863,7 @@ async function accFinPerson(){
   const b = await fbMonthScreen(FB.person || 'Зарплата'); if(!b) return;
   const p = (fbCur(b).people || []).find(x => x.name === FB.person);
   if(!p){ document.getElementById('accMid').innerHTML = '<div class="exp-empty">В этом месяце его нет в списке</div>'; return; }
-  ACC_BACK = () => accOpen('finpay');
+  ACC_BACK = () => accOpen(FB.personFrom || 'finpay');
   const sc = `data-month="${b.month}" data-name="${escS(p.name)}"`;
   const sym = p.cur === 'USD' ? '$' : 'AED';
   document.getElementById('accMid').innerHTML = `
@@ -18924,6 +18927,10 @@ async function fbPaySeg(field, value){
 function fbItems(p, month){
   const rows = (p.items || []).filter(it => it.before > 0 || it.start >= month);
   if(!rows.length) return '<div class="fb-none">Штрафов, авансов и премий нет</div>';
+  return fbItemRows(rows, month, true);
+}
+// Строки удержаний: на странице человека с крестиком, в общем списке — без.
+function fbItemRows(rows, month, del){
   return rows.map(it => {
     const later = it.start > month;
     const sub = [`${fbFmt(it.amount)} всего`, it.per_month ? `по ${fbFmt(it.per_month)} в месяц` : '',
@@ -18931,9 +18938,33 @@ function fbItems(p, month){
     return `<div class="fb-e">
       <span class="fb-e-b"><b>${it.t}${it.note ? ' · ' + escS(it.note) : ''}</b><i>${sub}</i></span>
       <b class="fb-e-v${it.kind === 'bonus' ? ' ok' : later ? ' dim' : ''}">${it.kind === 'bonus' ? '+' : '−'}${fbFmt(later ? it.amount : it.due)}<u>AED</u></b>
-      <button class="fb-e-x" onclick="fbItemDel('${it.id}')" aria-label="Убрать">${IC('xmark', 15)}</button>
+      ${del ? `<button class="fb-e-x" onclick="fbItemDel('${it.id}')" aria-label="Убрать">${IC('xmark', 15)}</button>` : ''}
     </div>`;
   }).join('');
+}
+// ── Экран «Штрафы/авансы/долги» ──────────────────────────────────────────
+// Лист из тетради: у кого что удерживается в этом месяце. Три числа сверху —
+// сколько снимается штрафами, авансами и долгами; ниже по людям их записи,
+// имя ведёт на страницу человека (там же записывают и убирают).
+async function accFinItems(){
+  const b = await fbMonthScreen('Штрафы/авансы/долги'); if(!b) return;
+  const pay = fbCur(b), month = b.month, sums = {fine: 0, advance: 0, loan: 0};
+  const people = (pay.people || []).map(p => ({p, items: (p.items || []).filter(it => it.kind !== 'bonus' && (it.before > 0 || it.start >= month))}))
+    .filter(x => x.items.length);
+  people.forEach(x => x.items.forEach(it => { sums[it.kind] = (sums[it.kind] || 0) + (it.due || 0); }));
+  document.getElementById('accMid').innerHTML = `
+  <div class="sc">
+    ${fbCap(month, true)}
+    <div class="aud-g">
+      ${fbTile('Штрафы', 'it.fine', sums.fine)}
+      ${fbTile('Авансы', 'it.advance', sums.advance)}
+      ${fbTile('Долги', 'it.loan', sums.loan)}
+    </div>
+  </div>
+  ${people.length ? people.map(x => `<div class="sc">
+    <button class="sc-cap fb-pcap" data-n="${escS(x.p.name)}" onclick="fbPersonOpen(this.dataset.n, 'finitems')"><span>${escS(x.p.name)}</span><em class="fb-chev r">${_SC_CHEV}</em></button>
+    ${fbItemRows(x.items, month, false)}
+  </div>`).join('') : '<div class="sc"><div class="fb-none">Штрафов, авансов и долгов нет</div></div>'}`;
 }
 function fbItemForm(name){
   return `<button class="sc-r fb-plus" onclick="fbAddToggle('item')"><span>Штраф, аванс или премия</span><em>${_FB_PLUS}</em></button>
@@ -19009,9 +19040,9 @@ async function fbPayOut(name){
 
 // ── Экран «Прибыль» ───────────────────────────────────────────────────────
 async function accFinNP(){
-  const b = await fbMonthScreen('Прибыль'); if(!b) return;
+  const b = await fbMonthScreen('ЧП'); if(!b) return;
   const days = (b.days || []).filter(d => !d.future && (d.base || d.np_plus))
-    .map(d => fbDayRow(d, [`сдали ${fbFmt(d.base)}`, `базе ${fbFmt(d.aside)}`, `в фонд ${fbFmt(d.collected)}`].join(' / '),
+    .map(d => fbDayRow(d, [`сдали ${fbFmt(d.base)}`, `Барракуде ${fbFmt(d.aside)}`, `в фонд ${fbFmt(d.collected)}`].join(' / '),
                        d.np_plus, {unit: 'прибыль дня', cls: d.np_plus < 0 ? 'dn' : ''}));
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
@@ -19036,11 +19067,11 @@ async function accFinNP(){
   <div class="sc fb-gut">
     ${fbCapT('По расчёту')}
     ${fbRow('Продали', 't.gross', b.totals.gross)}
-    ${fbRow('Купили у базы', 't.ordered', b.totals.ordered, {sign: '−'})}
+    ${fbRow('Купили у Барракуды', 't.ordered', b.totals.ordered, {sign: '−'})}
     ${fbRow('Расходы', 't.expenses', b.totals.expenses, {sign: '−'})}
     ${fbRow('Расходы водителей', 't.spend', b.totals.spend, {sign: '−'})}
     ${fbRow('Прибыль по расчёту', 'econ', b.econ, {sum: true, sign: '=', mode: 'neg'})}
-    ${fbRow('Долг базе за месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
+    ${fbRow('Долг Барракуде за месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
   </div>
   ${fbDays(days)}`;
 }
@@ -19215,6 +19246,7 @@ function accOpen(id){
   if(id === 'finbud')   accFinBud();
   if(id === 'finpay')   accFinPay();
   if(id === 'finperson') accFinPerson();
+  if(id === 'finitems') accFinItems();
   if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
 

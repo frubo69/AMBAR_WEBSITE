@@ -84,6 +84,7 @@ function accOpen(id){
   if(id === 'finbud') return accFinBud();
   if(id === 'finpay') return accFinPay();
   if(id === 'finperson') return accFinPerson();
+  if(id === 'finitems') return accFinItems();
   if(id === 'cashround'){ _setText('accTitle', 'Сбор выручки'); document.getElementById('accMid').innerHTML = '<div class="exp-empty">(экран сбора выручки)</div>'; }
 }
 function accBack(){

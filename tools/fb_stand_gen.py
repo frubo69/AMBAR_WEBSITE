@@ -91,6 +91,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('off')) DAY_OFFSET = +Q.get('off');
     if(Q.get('month')) FB.month = Q.get('month');
     if(Q.get('person')) FB.person = Q.get('person');
+    if(Q.get('norm')) FB.normOpen = true;
     if(Q.get('bud')) FB.bud = Q.get('bud');
     if(Q.get('edit')){ const [k, ...rest] = Q.get('edit').split(':'); FB.edit = {kind: k, id: rest.join(':')}; }
     await fbHub();
@@ -98,6 +99,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(v !== 'hub') await accOpen(v);
     if(Q.get('add')){ fbAddToggle(Q.get('add')); }
     if(Q.get('kind')) fbKindPick(Q.get('kind'));
+    if(Q.get('norm')){ FB.normOpen = true; }
     if(Q.get('page')){ const [k, ...r] = Q.get('page').split(':'); fbPageOpen(k, r.join(':')); await new Promise(r => setTimeout(r, 400)); }
     await new Promise(r => setTimeout(r, 60));
     const M = [];

@@ -3191,6 +3191,15 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-pc{display:block;width:100%;margin:0;padding:9px 12px;border:0;border-radius:0;background:transparent;text-align:left;
   font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
+/* Норма — строка-раскрывашка внизу карточки месяца */
+.fb-normh{border-top:1px solid rgba(201,169,110,.14);min-height:54px}
+.fb-normh .fb-normt{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-normh > b{margin-right:4px}
+.fb-normh.open .fb-chev{transform:rotate(90deg)}
+.fb-norm{border-top:1px solid rgba(201,169,110,.14);background:rgba(201,169,110,.03)}
+.fb-norm[hidden]{display:none}
+.fb-norm .fb-r:first-child{border-top:0}
 /* Страница статьи выезжает справа, назад — с лёгким сдвигом слева */
 @keyframes fbPageIn{from{transform:translateX(56px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fbPageBack{from{transform:translateX(-24px);opacity:.4}to{transform:none;opacity:1}}
@@ -17954,28 +17963,37 @@ async function accFinBud(keep){
   if(FB.page){ fbPageRender('back'); return; }
   ACC_BACK = null;
   const m = `data-month="${b.month}"`, bu = b.budget;
+  // Норма приклеена к низу карточки месяца: свёрнутая строка «РП+ ежедневная
+  // норма · N в день», по нажатию раскрывается расчёт и поле.
   document.getElementById('accMid').innerHTML = `<div class="fb-page${keep ? ' back' : ''}">
-  <div class="sc">
+  <div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
       ${fbTile('План', 'bu.total', bu.total)}
       ${fbTile('Потратили', 'bu.fact', bu.fact)}
       ${fbTile('Осталось', 'bu.left', bu.left, {mode: 'neg'})}
     </div>
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Норма')}
-    ${fbRow('План месяца', 'bu.total', bu.total)}
-    ${fbRow('Дней в месяце', 'bu.days', bu.days, {sign: '/', unit: 'дн'})}
-    ${fbRow('Выходит в день', 'bu.per_day', bu.per_day, {sum: true, sign: '='})}
-    ${fbIn('Норма в день', 'norm', bu.norm_set ? bu.norm : null, m, {ph: fbFmt(bu.norm_auto), phk: 'bu.norm_auto', eu: 'по плану'})}
-    ${fbIn('Базе в день', 'norm_b', bu.norm_b, m, {ph: '—', eu: 'по заказу'})}
+    <button class="sc-r fb-normh${FB.normOpen ? ' open' : ''}" id="fbNormH" onclick="fbNormToggle()">
+      <span class="fb-normt">РП+ ежедневная норма</span>${fbB('bu.norm', bu.norm, {unit: 'в день'})}<em class="fb-chev">${_SC_CHEV}</em></button>
+    <div class="fb-norm" id="fbNorm"${FB.normOpen ? '' : ' hidden'}>
+      ${fbRow('План месяца', 'bu.total', bu.total)}
+      ${fbRow('Дней в месяце', 'bu.days', bu.days, {sign: '/', unit: 'дн'})}
+      ${fbRow('Выходит в день', 'bu.per_day', bu.per_day, {sum: true, sign: '='})}
+      ${fbIn('Норма в день', 'norm', bu.norm_set ? bu.norm : null, m, {ph: fbFmt(bu.norm_auto), phk: 'bu.norm_auto', eu: 'по плану'})}
+    </div>
   </div>
   <div class="sc fb-budsc">
     ${fbCapT('Статьи расходов')}
     <div id="fbList-bud">${fbBudLines(b)}</div>
   </div></div>`;
   fbDragInit();
+}
+function fbNormToggle(){
+  FB.normOpen = !FB.normOpen;
+  const h = document.getElementById('fbNormH'), n = document.getElementById('fbNorm');
+  if(h) h.classList.toggle('open', FB.normOpen);
+  if(n) n.hidden = !FB.normOpen;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // ── Страницы статей ───────────────────────────────────────────────────────
 // «Зарплаты», «Аренда офисов» и каждая статья открываются своей страницей —

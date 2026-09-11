@@ -3191,6 +3191,12 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-pc{display:block;width:100%;margin:0;padding:9px 12px;border:0;border-radius:0;background:transparent;text-align:left;
   font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
+/* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
+.fb-one .fb-card{margin:0;border:0;border-radius:0;background:transparent;border-top:1px solid rgba(201,169,110,.14)}
+.fb-one .fb-card:first-child{border-top:0}
+.fb-one .fb-card.group{border-color:rgba(201,169,110,.14)}
+.fb-one .fb-card.add{border-style:solid;background:transparent}
+.fb-one .fb-card .fb-kids{background:rgba(201,169,110,.04)}
 /* Норма — строка-раскрывашка внизу карточки месяца */
 .fb-normh{border-top:1px solid rgba(201,169,110,.14)}
 .fb-normh .fb-normt{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;
@@ -17986,9 +17992,9 @@ async function accFinBud(keep){
       ${fbIn('Норма в день', 'norm', bu.norm_set ? bu.norm : null, m, {ph: fbFmt(bu.norm_auto), phk: 'bu.norm_auto', eu: 'по плану'})}
     </div>
   </div>
-  <div class="sc fb-budsc">
+  <div class="sc">
     ${fbCapT('Статьи расходов')}
-    <div id="fbList-bud">${fbBudLines(b)}</div>
+    <div id="fbList-bud" class="fb-one">${fbBudLines(b)}</div>
   </div></div>`;
   fbDragInit();
 }
@@ -18051,7 +18057,7 @@ function fbRentPage(b){
       ${fbTile('Потратили', 'bu.rent_fact', rent.fact)}
       ${fbTile('Осталось', 'bu.rent_left', rent.left, {mode: 'neg'})}
     </div></div>
-    <div class="sc fb-budsc"><div id="fbList-bud">${lines.map(l => `<div class="fb-card">${fbLineListRow(l, false)}</div>`).join('')}
+    <div class="sc">${fbCapT('Здания', String(lines.length))}<div id="fbList-bud" class="fb-one">${lines.map(l => `<div class="fb-card">${fbLineListRow(l, false)}</div>`).join('')}
       <div class="fb-card add">${newRent ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
@@ -18066,7 +18072,7 @@ function fbLinePage(b, l){
       ${fbTile('Потратили', 'ln.fact', l.fact)}
       ${fbTile('Осталось', 'ln.left', l.left, {mode: 'neg'})}
     </div></div>
-    <div class="sc fb-budsc">${fbCapT('План')}<div id="fbList-bud"><div class="fb-card">${fbLineRow(l, false)}</div></div></div>
+    <div class="sc">${fbCapT('План')}<div id="fbList-bud" class="fb-one"><div class="fb-card">${fbLineRow(l, false)}</div></div></div>
     <div class="sc">${fbCapT('Расходы', rows.length ? String(rows.length) : '')}
       <div id="fbList-line">${fbLineEntries(rows)}</div>
       <button class="sc-r fb-plus" onclick="fbAddToggle('ln')"><span>Добавить расход</span><em>${_FB_PLUS}</em></button>

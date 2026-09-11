@@ -3200,6 +3200,10 @@ button.path:active{transform:scale(.995)}
 .fb-norm{border-top:1px solid rgba(201,169,110,.14);background:rgba(201,169,110,.03)}
 .fb-norm[hidden]{display:none}
 .fb-norm .fb-r:first-child{border-top:0}
+.fb-eqn > span{display:flex;align-items:baseline;gap:6px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--sub)}
+.fb-eqn > span b{font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.fb-eqn > span u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:-2px}
+.fb-eqn > span s.sl{color:var(--dim);margin:0 2px}
 /* Страница статьи выезжает справа, назад — с лёгким сдвигом слева */
 @keyframes fbPageIn{from{transform:translateX(56px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fbPageBack{from{transform:translateX(-24px);opacity:.4}to{transform:none;opacity:1}}
@@ -17976,9 +17980,7 @@ async function accFinBud(keep){
     <button class="sc-r fb-normh${FB.normOpen ? ' open' : ''}" id="fbNormH" onclick="fbNormToggle()">
       <span class="fb-normt">РП+ ежедневная норма</span>${fbB('bu.norm', bu.norm, {unit: 'в день'})}<em class="fb-chev">${_SC_CHEV}</em></button>
     <div class="fb-norm" id="fbNorm"${FB.normOpen ? '' : ' hidden'}>
-      ${fbRow('План месяца', 'bu.total', bu.total)}
-      ${fbRow('Дней в месяце', 'bu.days', bu.days, {sign: '/', unit: 'дн'})}
-      ${fbRow('Выходит в день', 'bu.per_day', bu.per_day, {sum: true, sign: '='})}
+      <div class="sc-r fb-r fb-eqn"><span><b data-f="bu.total">${fbFmt(bu.total)}</b><s class="sl">/</s><b data-f="bu.days">${fbFmt(bu.days)}</b><u>дн</u><s class="sl">=</s></span>${fbB('bu.per_day', bu.per_day)}</div>
       ${fbIn('Норма в день', 'norm', bu.norm_set ? bu.norm : null, m, {ph: fbFmt(bu.norm_auto), phk: 'bu.norm_auto', eu: 'по плану'})}
     </div>
   </div>

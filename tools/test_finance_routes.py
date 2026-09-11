@@ -327,6 +327,14 @@ async def main():
     eq("скрыть без роли: роль и заметка не затираются", ("role" in WRITES[-1][2], "note" in WRITES[-1][2]), (False, False))
     r = await raw(inner2["handle_pay_person"])(_req("POST", dict(name="Али", month="2026-13")))
     eq("плохой месяц → 400, не 500", r.status, 400)
+    PEOPLE[:] = [dict(_id="Макар", role="senior", manual=True, ord=1), dict(_id="Парвиз", role="senior", ord=0)]
+    b2 = await fr.build(M)
+    eq("порядок руками: Парвиз (ord 0) перед Макаром (ord 1), без ord — следом как были",
+       [x["name"] for x in b2["budget"]["salary"]["people"]], ["Парвиз", "Макар", "Умар", "Фарух", "Али"])
+    r = await raw(getattr(fr, "handle_pay_order"))(_req("POST", dict(names=["Умар", "Парвиз"], month=M, **{"as": "Ст"})))
+    eq("порядок записан: ord 0 Умар, ord 1 Парвиз", (r.status, [(w[1], w[2]["ord"]) for w in WRITES[-2:]]), (200, [("Умар", 0), ("Парвиз", 1)]))
+    r = await raw(getattr(fr, "handle_pay_order"))(_req("POST", dict(names=[])))
+    eq("пустой порядок → 400", r.status, 400)
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month=M, field="norm", value=8000)))
     eq("норма в день", WRITES[-1], ("month", M, {"norm": 8000, "by": ""}, None))
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month=M, field="norm_b", value=-5)))

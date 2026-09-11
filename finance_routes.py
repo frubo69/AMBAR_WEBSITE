@@ -398,6 +398,10 @@ def _people(docs: list) -> list[dict]:
         log.warning(f"[fin] расписание не прочитано: {e}")
     for d in docs:
         add(str(d.get("_id")), d.get("role") or "other", districts=[])
+    # порядок руками (перетягиванием): у кого ord есть — по нему, остальные
+    # остаются в прежнем порядке после них
+    ords = {str(d.get("_id")): d.get("ord") for d in docs if d.get("ord") is not None}
+    out.sort(key=lambda p: (p["name"] not in ords, ords.get(p["name"], 0)))
     return out
 
 
@@ -929,6 +933,26 @@ async def handle_pay_person(request):
 
 
 @require_owner
+async def handle_pay_order(request):
+    """POST {names: [...], month, as} — порядок людей в зарплатах: как
+    перетянули, так и лежат (ord по номеру в списке)."""
+    try:
+        body = await request.json()
+        names = [str(n or "").strip()[:40] for n in (body.get("names") or [])]
+        names = [n for n in names if n]
+        if not names or len(names) > 200:
+            return _json({"error": "bad_names"}, 400)
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    for i, n in enumerate(names):
+        await db.fin_person_set(n, {"ord": i, "by": who})
+    log.info(f"[fin] зарплаты: порядок {', '.join(names)} · {who or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
 async def handle_pay_month_set(request):
     """POST {month, name, field, value, as} — ставка (rate / unit / cur) с этого
     месяца и дальше, дни и заметка — только за месяц."""
@@ -1082,6 +1106,7 @@ def setup(app):
         ("/api/owner/finance/book/budget/fill", handle_budget_fill, "POST"),
         ("/api/owner/finance/book/pay/person", handle_pay_person, "POST"),
         ("/api/owner/finance/book/pay/month", handle_pay_month_set, "POST"),
+        ("/api/owner/finance/book/pay/order", handle_pay_order, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_add, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_del, "DELETE"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),

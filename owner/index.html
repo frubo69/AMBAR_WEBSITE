@@ -3171,6 +3171,13 @@ button.path:active{transform:scale(.995)}
 .fb-lnk.del{color:var(--dn)}
 .fb-inname{flex:1 1 auto;min-width:0} .fb-inname .fb-txt{width:100%;height:36px}
 .fb-editing .fb-e-b b{font-size:14px}
+/* Перетягивание людей: строка под пальцем — приподнятая копия, на месте —
+   бледный след; соседи разъезжаются. */
+.fb-drag-grp .fb-bl[data-drag]{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;touch-action:pan-y}
+#fbList-bud.jig .fb-drag-grp .fb-bl[data-drag]{cursor:grabbing}
+.fb-bl.drag-ghost{opacity:.22;transition:opacity .15s}
+.fb-drag-float{position:fixed;z-index:10000;margin:0;border-radius:13px;background:#1c1c33;transform:scale(1.03);
+  box-shadow:0 12px 44px rgba(0,0,0,.55),0 0 0 1px rgba(201,169,110,.4);pointer-events:none;will-change:left,top;transition:none}
 .fb-sal[hidden]{display:none}
 .fb-kids .fb-r.fb-pr,.fb-sal .fb-r.fb-pr{padding-left:26px;min-height:56px}
 .fb-kids .fb-r.fb-pr > span,.fb-sal .fb-r.fb-pr > span{white-space:normal;line-height:1.15;font-size:14px}
@@ -17919,6 +17926,134 @@ async function accFinBud(){
     ${fbCapT('Статьи расходов')}
     <div id="fbList-bud">${fbBudLines(b)}</div>
   </div>`;
+  fbDragInit();
+}
+// ── Порядок людей: зажал строку, потянул, отпустил ────────────────────────
+// Тот же приём, что у фишек фильтра клиентов (initChipReorder): удержание
+// 420 мс → строка приподнимается и едет за пальцем внутри своей группы,
+// соседи расступаются; отпустил — порядок уходит на сервер. Слушаем
+// #accMid один раз: список перерисовывается, а обёртка живёт всегда.
+const FB_DRAG = {hold: null, sx: 0, sy: 0, el: null, float: null, ox: 0, oy: 0, lock: false, last: null, done: 0, init: false};
+function fbDragInit(){
+  if(FB_DRAG.init) return;
+  const mid = document.getElementById('accMid'); if(!mid) return;
+  FB_DRAG.init = true;
+  const rowOf = t => t && t.closest ? t.closest('#fbList-bud .fb-drag-grp .fb-bl[data-drag]') : null;
+  const down = (t, x, y) => {
+    const row = rowOf(t); if(!row || FB.edit) return;
+    FB_DRAG.sx = x; FB_DRAG.sy = y;
+    clearTimeout(FB_DRAG.hold);
+    FB_DRAG.hold = setTimeout(() => { FB_DRAG.hold = null; fbDragStart(row, x, y); }, 420);
+  };
+  const move = (x, y, e) => {
+    if(FB_DRAG.hold && Math.hypot(x - FB_DRAG.sx, y - FB_DRAG.sy) > 8){ clearTimeout(FB_DRAG.hold); FB_DRAG.hold = null; }
+    if(FB_DRAG.float){ if(e && e.cancelable) e.preventDefault(); fbDragMove(x, y); }
+  };
+  const up = () => { clearTimeout(FB_DRAG.hold); FB_DRAG.hold = null; if(FB_DRAG.float) fbDragEnd(); };
+  mid.addEventListener('pointerdown', e => { if(e.pointerType === 'mouse') down(e.target, e.clientX, e.clientY); });
+  mid.addEventListener('pointermove', e => { if(e.pointerType === 'mouse') move(e.clientX, e.clientY); });
+  document.addEventListener('pointerup', e => { if(e.pointerType === 'mouse') up(); });
+  mid.addEventListener('touchstart', e => { const t = e.touches[0]; if(t) down(e.target, t.clientX, t.clientY); }, {passive: true});
+  mid.addEventListener('touchmove', e => { const t = e.touches[0]; if(t) move(t.clientX, t.clientY, e); }, {passive: false});
+  document.addEventListener('touchend', up); document.addEventListener('touchcancel', up);
+  // нажатие, которым закончили перетягивание, — не открывать правку
+  mid.addEventListener('click', e => { if(FB_DRAG.float || Date.now() - FB_DRAG.done < 400){ e.stopPropagation(); e.preventDefault(); } }, true);
+  document.addEventListener('visibilitychange', () => { if(document.hidden) fbDragKill(); });
+}
+function fbDragStart(row, x, y){
+  const r = row.getBoundingClientRect();
+  FB_DRAG.el = row; FB_DRAG.ox = x - r.left; FB_DRAG.oy = y - r.top;
+  const f = row.cloneNode(true);
+  f.classList.add('fb-drag-float'); f.removeAttribute('onclick');
+  f.style.left = r.left + 'px'; f.style.top = r.top + 'px'; f.style.width = r.width + 'px'; f.style.height = r.height + 'px';
+  document.body.appendChild(f); FB_DRAG.float = f;
+  row.classList.add('drag-ghost');
+  const list = document.getElementById('fbList-bud'); if(list) list.classList.add('jig');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+}
+function fbDragMove(x, y){
+  const f = FB_DRAG.float, el = FB_DRAG.el; if(!f || !el) return;
+  f.style.left = (x - FB_DRAG.ox) + 'px'; f.style.top = (y - FB_DRAG.oy) + 'px';
+  if(FB_DRAG.lock) return;
+  const grp = el.parentElement;
+  const rows = [...grp.querySelectorAll('.fb-bl[data-drag]')].filter(r => r !== el);
+  if(!rows.length) return;
+  let target = null;
+  for(const r of rows){ const b = r.getBoundingClientRect(); if(y >= b.top && y <= b.bottom){ target = r; break; } }
+  if(!target){
+    const fb = rows[0].getBoundingClientRect(), lb = rows[rows.length - 1].getBoundingClientRect();
+    if(y < fb.top && FB_DRAG.last !== '_first'){ FB_DRAG.last = '_first'; fbDragSwap(rows[0], 'before'); }
+    else if(y > lb.bottom && FB_DRAG.last !== '_last'){ FB_DRAG.last = '_last'; fbDragSwap(rows[rows.length - 1], 'after'); }
+    return;
+  }
+  if(target !== FB_DRAG.last){
+    FB_DRAG.last = target;
+    const all = [...grp.querySelectorAll('.fb-bl[data-drag]')];
+    fbDragSwap(target, all.indexOf(el) < all.indexOf(target) ? 'after' : 'before');
+  }
+}
+function fbDragSwap(ref, mode){
+  const el = FB_DRAG.el, grp = el.parentElement;
+  // уже стоит там, куда просят, — не двигать и не запирать
+  if((mode === 'before' && ref.previousElementSibling === el) || (mode === 'after' && ref.nextElementSibling === el)) return;
+  FB_DRAG.lock = true;
+  const rows = [...grp.querySelectorAll('.fb-bl[data-drag]')], old = new Map(rows.map(r => [r, r.getBoundingClientRect()]));
+  if(mode === 'before') ref.before(el); else ref.after(el);
+  rows.forEach(r => {
+    if(r === el) return;
+    const o = old.get(r), n = r.getBoundingClientRect(), dy = o.top - n.top;
+    if(Math.abs(dy) < 1) return;
+    r.style.transition = 'none'; r.style.transform = `translateY(${dy}px)`; void r.offsetHeight;
+    r.style.transition = 'transform .25s cubic-bezier(.34,1.56,.64,1)'; r.style.transform = '';
+  });
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  setTimeout(() => { FB_DRAG.lock = false; FB_DRAG.last = null; }, 260);
+}
+function fbDragEnd(){
+  const f = FB_DRAG.float, el = FB_DRAG.el;
+  FB_DRAG.float = null; FB_DRAG.el = null; FB_DRAG.last = null; FB_DRAG.lock = false; FB_DRAG.done = Date.now();
+  const list = document.getElementById('fbList-bud'); if(list) list.classList.remove('jig');
+  if(f && el){
+    const r = el.getBoundingClientRect();
+    f.style.transition = 'all .18s cubic-bezier(.34,1.56,.64,1)';
+    f.style.left = r.left + 'px'; f.style.top = r.top + 'px'; f.style.transform = 'scale(1)'; f.style.boxShadow = 'none';
+    setTimeout(() => { f.remove(); el.classList.remove('drag-ghost'); }, 200);
+    const grp = el.parentElement;
+    fbPayOrder([...grp.querySelectorAll('.fb-bl[data-drag]')].map(x => x.dataset.drag), grp.dataset.role);
+  }
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbDragKill(){
+  if(FB_DRAG.float){ FB_DRAG.float.remove(); FB_DRAG.float = null; }
+  if(FB_DRAG.el){ FB_DRAG.el.classList.remove('drag-ghost'); FB_DRAG.el = null; }
+  clearTimeout(FB_DRAG.hold); FB_DRAG.hold = null;
+  const list = document.getElementById('fbList-bud'); if(list) list.classList.remove('jig');
+}
+// Порядок на сервер: весь список людей, где перетянутая группа — в новом
+// порядке, остальные как были; ord у каждого — номер в этом списке.
+async function fbPayOrder(names, role){
+  const people = (((fbBook(FB.month) || {}).budget || {}).salary || {}).people || [];
+  const all = []; let put = false;
+  for(const p of people){
+    if(p.role === role){ if(!put){ all.push(...names); put = true; } }
+    else all.push(p.name);
+  }
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/order', {method: 'POST', body: {names: all, month: FB.month, as: _meName()}});
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbBudRepaint();
+  }catch(e){ _toast('Порядок не сохранился'); fbBudRepaint(); }
+}
+async function fbPersonHideBud(name){
+  if(!await askDialog('Убрать из зарплат?', `${name} пропадёт из списка. Записи о выплатах останутся в книге.`,
+                      'Убрать', 'Вернуться назад', 'bad')) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/person',
+      {method: 'POST', body: {name, hidden: true, month: FB.month, as: _meName()}});
+    FB.edit = null;
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbBudRepaint();
+  }catch(e){ _toast('Не удалось убрать'); }
 }
 function fbBudRepaint(){ const box = document.getElementById('fbList-bud'); if(box) box.innerHTML = fbBudLines(fbBook(FB.month)); fbFillFocus(); }
 // Строка с суммой в трёх состояниях — так везде в бюджете: пусто — «Заполнить»
@@ -17935,7 +18070,7 @@ function fbFillRow(o){
       <em class="fb-fill-em x" onclick="fbFillCancel()" role="button" aria-label="Отмена">${IC('xmark', 13)}</em></div>${o.extra || ''}`;
   }
   const empty = !(o.value > 0);
-  return `<button class="fb-e fb-bl${o.kid ? ' fb-kid' : ''}" onclick="fbFillEdit('${o.kind}','${escS(o.id)}')">${head}${
+  return `<button class="fb-e fb-bl${o.kid ? ' fb-kid' : ''}"${o.attrs ? ' ' + o.attrs : ''} onclick="fbFillEdit('${o.kind}','${escS(o.id)}')">${head}${
     empty ? `<b class="fb-fill">Заполнить</b><em class="fb-fill-em">${_FB_PLUS}</em>`
           : `<b class="fb-box${o.cls ? ' ' + o.cls : ''}">${fbFmt(o.value)}<u>${escS(o.unit || 'AED')}</u></b><em class="fb-fill-em pen">${_FB_PEN}</em>`}</button>`;
 }
@@ -17981,11 +18116,12 @@ function fbSalaryBody(b){
   for(const [role, t] of FB_SAL_GROUPS){
     const ps = (sal.people || []).filter(p => p.role === role);
     if(!ps.length) continue;
-    out += `<div class="fb-kcap">${t}</div>` + ps.map(p => {
+    out += `<div class="fb-kcap">${t}</div><div class="fb-drag-grp" data-role="${role}">` + ps.map(p => {
       const sym = p.cur === 'USD' ? '$' : 'AED', per = p.unit === 'day' ? 'дн' : 'м';
       return fbFillRow({kind: 'rate', id: p.name, name: escS(p.name), sub: p.cur === 'USD' && p.rate ? `${fbFmt(p.rate_aed)} AED по курсу` : '',
-                        value: p.rate, unit: `${sym}/${per}`, kid: true});
-    }).join('');
+                        value: p.rate, unit: `${sym}/${per}`, kid: true, attrs: `data-drag="${escS(p.name)}"`,
+                        extra: `<div class="fb-edit2"><button class="fb-lnk del" data-n="${escS(p.name)}" onclick="fbPersonHideBud(this.dataset.n)">Убрать из зарплат</button></div>`});
+    }).join('') + '</div>';
   }
   out += `<button class="sc-r fb-plus sub" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>
     <div class="fb-add" id="fbAdd-person" hidden>

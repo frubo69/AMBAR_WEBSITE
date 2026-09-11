@@ -17602,6 +17602,9 @@ function fbHubHtml(b, err){
       ${fbTile('Расходы', 't.expenses', t.expenses)}
       ${fbTile('Прибыль', 'np.profit', b.np.profit, {mode: 'neg'})}
     </div>
+  </div>
+  <div class="sc fb-hub">
+    ${fbCapT('Распределение')}
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
     ${fbGo('Барракуда', 'b.debt_end', b.b.debt_end, "accOpen('finb')", {unit: 'долг', mode: 'debt', em: b.b.debt_end > 0 ? 'dn' : ''})}
     ${fbGo('РП', 't.expenses', t.expenses, "accOpen('finrp')")}

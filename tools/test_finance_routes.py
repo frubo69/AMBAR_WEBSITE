@@ -294,6 +294,10 @@ async def main():
         [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11"][0],
         sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ("Аренда офис", "office"), ["rent"] * 6))
     eq("образец: Авто, Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Авто", "Гараж и ТО", "Парковка"])
+    eq("образец: Хоз. нужды, Продукты — группа home («Бытовые расходы»)", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "home"), ["Продукты", "Хоз. нужды"])
+    BUDGET.append(dict(_id="L30", month=M, name="Продукты", plan=6000, due=0, note="", kind="", ord=30))
+    bh = (await fr.build(M))["budget"]
+    eq("старая строка «Продукты» без group — в бытовых; итог группы", (next(l["group"] for l in bh["lines"] if l["name"] == "Продукты"), bh["home"]), ("home", dict(plan=6000, fact=0, left=6000, n=1)))
     BUDGET.append(dict(_id="L9", month=M, name="Парковка", plan=1500, due=0, note="", kind="", ord=9))
     ba = (await fr.build(M))["budget"]
     eq("старая строка «Парковка» без поля group — в авто; итог группы", (next(l["group"] for l in ba["lines"] if l["name"] == "Парковка"), ba["auto"]), ("auto", dict(plan=1500, fact=0, left=1500, n=1)))

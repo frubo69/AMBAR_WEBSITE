@@ -17684,7 +17684,7 @@ function fbValues(){
     V['bu.off_on'] = bu.off_plan ? 1 : 0;
     const sal = bu.salary || {};
     V['bu.salary_plan'] = sal.plan || 0; V['bu.salary_fact'] = sal.fact || 0; V['bu.salary_left'] = sal.left || 0;
-    for(const g of ['rent', 'auto']) for(const k of ['plan', 'fact', 'left']) V[`bu.${g}_${k}`] = ((bu[g] || {})[k]) || 0;
+    for(const g of ['rent', 'auto', 'home']) for(const k of ['plan', 'fact', 'left']) V[`bu.${g}_${k}`] = ((bu[g] || {})[k]) || 0;
     if(FB.page && FB.page.kind === 'line'){ const l = (bu.lines || []).find(x => x.id === FB.page.id); if(l) for(const k of ['plan', 'fact', 'left']) V['ln.' + k] = l[k]; }
     const pay = fbCur(mb);
     for(const k in pay.totals) V['pay.' + k] = pay.totals[k];
@@ -18538,12 +18538,14 @@ function fbPersonFillRow(p, sal){
 // статьи — каждая своей карточкой и своей страницей.
 function fbBudLines(b){
   const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []};
-  const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0};
+  const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0}, home = bu.home || {plan: 0, fact: 0, n: 0};
   let out = fbBudGroup('Зарплаты', '', fbGroupVal(sal, 'bu.salary_plan'), "fbPageOpen('salary','')");
-  const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), rest = lines.filter(l => !l.group);
+  const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), homeLines = lines.filter(l => l.group === 'home'), rest = lines.filter(l => !l.group);
   if(rentLines.length) out += fbBudGroup('Аренда офисов', '', fbGroupVal(rent, 'bu.rent_plan'), "fbPageOpen('rent','')");
   if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
     FB.autoOpen === true, 'fbAutoToggle()', autoLines.map(l => fbLineListRow(l, true)).join(''));
+  if(homeLines.length) out += fbBudGroupExpand('Бытовые расходы', '', fbGroupVal(home, 'bu.home_plan'),
+    FB.homeOpen === true, 'fbHomeToggle()', homeLines.map(l => fbLineListRow(l, true)).join(''));
   if(!lines.length){
     out += `<div class="fb-card"><div class="fb-none">Других статей ещё нет</div><div class="fb-add">${
       bu.prev_has ? `<button class="aud-b go" onclick="fbBudFill('prev')">Из прошлого месяца</button>` : ''}
@@ -18557,6 +18559,11 @@ function fbBudLines(b){
 }
 function fbAutoToggle(){
   FB.autoOpen = FB.autoOpen !== true;
+  fbBudRepaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbHomeToggle(){
+  FB.homeOpen = FB.homeOpen !== true;
   fbBudRepaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -18675,7 +18682,8 @@ async function accFinRP(){
       return fbDayRow(d, sub, d.rp, {unit: 'в фонде', cls: d.rp < 0 ? 'dn' : ''});
     });
   const lines = (bu.lines || []).filter(l => l.fact && !l.group);
-  const sal = bu.salary || {}, rent = bu.rent || {}, auto = bu.auto || {};
+  const sal = bu.salary || {}, rent = bu.rent || {}, auto = bu.auto || {}, home = bu.home || {};
+  if(home.fact) lines.unshift({name: 'Бытовые расходы', plan: home.plan, fact: home.fact});
   if(auto.fact) lines.unshift({name: 'Расходы на автомобили', plan: auto.plan, fact: auto.fact});
   if(rent.fact) lines.unshift({name: 'Аренда офисов', plan: rent.plan, fact: rent.fact});
   if(sal.fact) lines.unshift({name: 'Зарплаты', plan: sal.plan, fact: sal.fact});

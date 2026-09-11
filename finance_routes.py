@@ -265,7 +265,7 @@ def template_lines() -> list[dict]:
     rows = [dict(name="Аренда офис", group="rent", kind="office")]
     rows += [dict(name=f"Аренда {o['name']}", group="rent") for o in OFFICES]
     # «Расходы на автомобили» и «Бытовые расходы» — группы из подпунктов
-    rows += [dict(name=n, group="auto") for n in AUTO_NAMES]
+    rows += [dict(name=n, group="auto", kind="pool" if n in POOL_NAMES else "") for n in AUTO_NAMES]
     rows += [dict(name=n, group="home") for n in HOME_NAMES]
     rows += [dict(name=n) for n in ("Билеты", "Визы", "Sim", "Бензин", "Реклама")]
     return rows
@@ -274,6 +274,9 @@ def template_lines() -> list[dict]:
 GROUPS = ("", "rent", "auto", "home")
 AUTO_NAMES = ("Аренда", "Гараж и ТО", "Парковка")
 AUTO_LEGACY = ("Авто",)  # так статья называлась до 11 сен 2026
+# Статья без даты платежа (kind="pool"): просто бюджет на месяц, без периода
+# и календаря, правится прямо в списке; старые строки — по названию.
+POOL_NAMES = ("Гараж и ТО",)
 HOME_NAMES = ("Хоз. нужды", "Продукты")
 MAX_PERIOD = 24
 
@@ -314,6 +317,10 @@ def _schedule(ln: dict, month: str, today: str) -> dict:
     while due < today:
         due = _add_months(due, period)
     return dict(period=period, next=nxt, next_due=due, due_in=due_in)
+
+
+def _is_pool(ln: dict) -> bool:
+    return ln.get("kind") == "pool" or (ln.get("name") or "") in POOL_NAMES
 
 
 def _line_group(ln: dict) -> str:
@@ -373,7 +380,8 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             short = "Офис" if office else (name[7:] if name.startswith("Аренда ") else name)
             oid = next((o["id"] for o in OFFICES if o["name"] == short), "")
             code = OFFICE_CODES.get(oid, "")
-        sch = _schedule(ln, month, today)
+        pool = _is_pool(ln)
+        sch = dict(period=1, next="", next_due="", due_in=True) if pool else _schedule(ln, month, today)
         # платёж раз в N месяцев делится поровну на каждый месяц: доля входит в
         # план месяца и в норму дня, и к дате платежа сумма уже отложена
         # (владелец: «не узнавать сюрпризом»); следующий платёж — рядом
@@ -388,6 +396,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), plan_m=calc._i(plan_m),
                          fact=calc._i(f), left=calc._i(plan_m - f), due=int(ln.get("due") or 0),
                          note=ln.get("note") or "", group=group, office=office, code=code, short=short, **sch,
+                         kind="pool" if pool else "office" if office else "",
                          ord=int(ln.get("ord") if ln.get("ord") is not None else i)))
     # записи без статьи и записи удалённой статьи — «вне плана», но потрачено
     known = {r["id"] for r in rows}
@@ -907,6 +916,7 @@ async def handle_budget_set(request):
         if group not in GROUPS:
             return _json({"error": "bad_group"}, 400)
         kind = "office" if body.get("office") and group == "rent" else ""
+        note = None if body.get("note") is None else str(body.get("note")).strip()[:80]
         period = int(_num(body.get("period")) or 1)
         if not 1 <= period <= MAX_PERIOD:
             return _json({"error": "bad_period"}, 400)
@@ -929,11 +939,19 @@ async def handle_budget_set(request):
             period = int(old.get("period") or 1)
         if "next" not in body:
             nxt = str(old.get("next") or "")
+        if note is None:
+            note = str(old.get("note") or "")
+        if _is_pool(old):
+            kind = "pool"
     else:
         lid = secrets.token_hex(4)
         ordv = len(await db.fin_budget_get(month))
+    if kind != "pool" and group == "auto" and name in POOL_NAMES:
+        kind = "pool"
+    if kind == "pool":
+        period, nxt = 1, ""                       # без даты платежа: только бюджет на месяц
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
-           "note": str(body.get("note") or "").strip()[:80], "kind": kind, "group": group,
+           "note": note or "", "kind": kind, "group": group,
            "period": period, "next": nxt,
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
@@ -976,7 +994,7 @@ async def handle_budget_fill(request):
         if not prev:
             return _json({"error": "no_prev"}, 404)
         rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
-                     note=ln.get("note") or "", kind="office" if ln.get("kind") == "office" else "",
+                     note=ln.get("note") or "", kind="pool" if _is_pool(ln) else "office" if ln.get("kind") == "office" else "",
                      group=_line_group(ln),
                      period=int(ln.get("period") or 1), next=str(ln.get("next") or "")) for ln in prev
                 if (ln.get("kind") or "") != "salary"]

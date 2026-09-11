@@ -18469,6 +18469,14 @@ function fbBudGroupExpand(t, sub, valueHtml, open, go, body){
     <div class="fb-kids"${open ? '' : ' hidden'}>${body}</div>
   </div>`;
 }
+// Статья без даты платежа («Гараж и ТО»): просто бюджет на месяц, правится
+// прямо в списке — та же строка в трёх состояниях, без страницы, периода и
+// календаря. Как учитывать по ней факт — владелец объяснит позже.
+function fbPoolRow(l){
+  const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
+  return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid: true,
+                    cls: over ? 'dn' : ok ? 'ok' : ''});
+}
 // Строка статьи в списке: состояние плана и стрелка — открывает страницу.
 function fbLineListRow(l, kid){
   const empty = !(l.plan > 0), pm = l.plan_m || 0, per = l.period > 1;
@@ -18551,7 +18559,7 @@ function fbBudLines(b){
   const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), homeLines = lines.filter(l => l.group === 'home'), rest = lines.filter(l => !l.group);
   if(rentLines.length) out += fbBudGroup('Аренда офисов', '', fbGroupVal(rent, 'bu.rent_plan'), "fbPageOpen('rent','')");
   if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
-    FB.autoOpen === true, 'fbAutoToggle()', autoLines.map(l => fbLineListRow(l, true)).join(''));
+    FB.autoOpen === true, 'fbAutoToggle()', autoLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
   if(homeLines.length) out += fbBudGroupExpand('Бытовые расходы', '', fbGroupVal(home, 'bu.home_plan'),
     FB.homeOpen === true, 'fbHomeToggle()', homeLines.map(l => fbLineListRow(l, true)).join(''));
   if(!lines.length){
@@ -18608,8 +18616,9 @@ async function fbFillOk(){
     const name = e.kind === 'line' ? (l ? l.name : '') : fbTxt('fbFillName');
     if(!name){ _toast(e.id === 'rent' ? 'Как называется здание' : e.id === 'office' ? 'Как называется офис' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
     url = '/api/owner/finance/book/budget';
-    body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val, note: fbTxt('fbFillNote'),
+    body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val,
             group: e.kind === 'line' ? (l ? l.group : '') : (e.id === 'office' ? 'rent' : e.id), as: _meName()};
+    if(document.getElementById('fbFillNote')) body.note = fbTxt('fbFillNote');   // без поля заметки — прежняя остаётся
     if(e.kind === 'new' && e.id === 'office') body.office = true;
     if(e.kind === 'line'){ body.period = FB.editPeriod || 1; body.next = FB.editNext || ''; }
   }

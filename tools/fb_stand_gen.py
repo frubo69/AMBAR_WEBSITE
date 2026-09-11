@@ -92,6 +92,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('month')) FB.month = Q.get('month');
     if(Q.get('person')) FB.person = Q.get('person');
     if(Q.get('bud')) FB.bud = Q.get('bud');
+    if(Q.get('edit')){ const [k, ...rest] = Q.get('edit').split(':'); FB.edit = {kind: k, id: rest.join(':')}; }
     await fbHub();
     const v = Q.get('view') || 'hub';
     if(v !== 'hub') await accOpen(v);

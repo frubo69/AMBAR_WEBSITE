@@ -23,8 +23,8 @@ KINDS = {'fine': 'Штраф', 'advance': 'Аванс', 'loan': 'Долг', 'bon
 CASH_KINDS = ('advance', 'loan')            # деньги выданы на руки — расход фонда
 MINUS_KINDS = ('fine', 'advance', 'loan')   # снимаются с зарплаты
 PAY_KINDS = ('salary', 'advance', 'loan')  # записи фонда, которые считаются зарплатами
-ROLES = ('senior', 'operator', 'driver', 'other')
-ROLE_T = {'senior': 'Старшие', 'operator': 'Операторы', 'driver': 'Водители', 'other': 'Другие'}
+ROLES = ('other', 'senior', 'operator', 'driver')      # руководство первым, как в тетради
+ROLE_T = {'other': 'Старшие', 'senior': 'Старший оператор', 'operator': 'Операторы', 'driver': 'Водители'}
 UNITS = ('month', 'day')
 CURS = ('AED', 'USD')
 

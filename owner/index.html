@@ -3221,7 +3221,7 @@ button.path:active{transform:scale(.995)}
 .fb-datebtn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
 .fb-datebtn svg{flex:0 0 auto}
 /* Код района у здания — золотая таблетка, как в «Кто на каком районе» */
-.fb-bcode{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:24px;padding:0 6px;
+.fb-e-b b .fb-bcode,.fb-bcode{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:24px;padding:0 6px;
   border-radius:8px;margin-right:9px;vertical-align:-6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
   font-style:normal;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 /* Календарь одной даты: без отрезков и подвала */
@@ -18369,7 +18369,7 @@ function fbLineRow(l, kid, nameHtml){
 // — просто «Офис».
 function fbBldName(l){
   if(l.office) return 'Офис';
-  return (l.code ? `<i class="fb-bcode">${escS(l.code)}</i>` : '') + escS(l.short || l.name);
+  return (l.code ? `<span class="fb-bcode">${escS(l.code)}</span>` : '') + escS(l.short || l.name);
 }
 // Барабан периода живёт внутри таблетки: закрытая показывает одно число,
 // нажатие плавно растягивает её в барабан (три числа, выбранное по центру),

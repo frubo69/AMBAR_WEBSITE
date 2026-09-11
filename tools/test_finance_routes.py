@@ -40,7 +40,7 @@ SUPPLIES = [
          items=[dict(id="gin", qty=3, asked=3)], buys={"gin": {"price": 55, "qty": 3}}),  # 165
     dict(supply_id="S2", day="2026-09-04", status="open", cancelled_at="x", items=[dict(id="gin", qty=100)]),
 ]
-FIN_DAYS = {"2026-09-03": dict(_id="2026-09-03", aside=100, collected=80, pay_b=60, note="тест"),
+FIN_DAYS = {"2026-09-03": dict(_id="2026-09-03", aside=100, collected=80, pay_b=60, note="тест", ok=True, ok_by="Ст"),
             "2026-09-04": dict(_id="2026-09-04", handed_fact=180, ordered_fact=777, extra_rp=10, pay_b_extra=5)}
 ENTRIES = [dict(_id="a1", day="2026-09-03", book="rp", amount=25, comment="бензин", who="", by="Ст", at="t"),
            dict(_id="a2", day="2026-09-04", book="np", amount=7, comment="", who="владелец", by="Ст", at="t")]
@@ -151,7 +151,7 @@ async def main():
     eq("handed_fact", d4["handed_fact"], 180); eq("gap = 160 − 180", d4["gap"], -20)
     eq("ЧП+ = 180 − 90 (половина Барракуде) − 0 (нормы нет)", (d4["aside"], d4["collected"], d4["np_plus"]), (90, 0, 90))
     eq("aside_src half / collected_src пусто; день ждёт подтверждения", (d4["aside_src"], d4["collected_src"], d4["ok"], d4["pending"]), ("half", "", False, True))
-    eq("d3: вписанное руками главнее (manual)", (d3["aside_src"], d3["collected_src"]), ("manual", "manual"))
+    eq("d3: вписанное руками главнее (manual), подтверждён → в деньгах; d4 — только предложение", (d3["aside_src"], d3["collected_src"], d3["ok"], d3["counted"], d4["counted"]), ("manual", "manual", True, True, False))
     eq("ordered_fact", d4["ordered"], 777); eq("ordered_auto (отменённая мимо)", d4["ordered_auto"], 0)
     eq("payouts_sum", d4["payouts_sum"], 7)
     eq("cash_need (marina + jbr дома, без отметок)", (d4["cash_need"], d4["cash_got"]), (2, 0))
@@ -161,17 +161,17 @@ async def main():
     eq("safe_b d3 = 34500 + 100 − 60", d3["safe_b"], 34540)
     eq("debt_b d3 = 110198 + 640 − 60", d3["debt_b"], 110778)
     eq("debt_b d4 = 110778 + 777 − 5", d4["debt_b"], 111550)
-    eq("rp d4 = 80 + 10 − 25", d4["rp"], 65)
-    eq("np_acc d4 = 20 + 90 − 7", d4["np_acc"], 103)
+    eq("rp d4 = 80 (d3 подтверждён) + 10 − 25; РП+ дня 4 не считается", d4["rp"], 65)
+    eq("np_acc d4 = 20 + 0 (д4 не подтверждён) − 7", d4["np_acc"], 13)
     eq("future flag on 11 sep", next(r for r in b["days"] if r["day"] == "2026-09-11")["future"], True)
     eq("today flag", next(r for r in b["days"] if r["day"] == "2026-09-10")["today"], True)
     print("— итоги месяца")
-    eq("np.days = 20 + 90", b["np"]["days"], 110)
-    eq("сейф три стопки: Барракуда 34540 + 90, РП 80 + 10 − 25, ЧП 41030 + 110 − 7 − 5 (сверх Барракуде из ЧП)",
-       (b["safe"]["b"], b["safe"]["rp"], b["safe"]["np"], b["safe"]["total"]), (34630, 65, 41128, 75823))
-    eq("сейф: потоки и ждущие подтверждения дни (3 сен вписан руками, но не подтверждён; 4 сен)",
-       (b["safe"]["b_in"], b["safe"]["b_out"], b["safe"]["rp_in"], b["safe"]["rp_out"], b["safe"]["np_in"], b["safe"]["np_out"], b["safe"]["pending"]), (190, 60, 90, 25, 110, 12, 2))
-    eq("стопки на день 4: после оплаты сверх 5 из ЧП", (d4["stack_b"], d4["stack_rp"], d4["stack_np"], d4["stack_total"]), (34630, 65, 41128, 75823))
+    eq("np.days = 20 (только подтверждённые дни)", b["np"]["days"], 20)
+    eq("сейф три стопки (д4 не подтверждён — не в деньгах): Барракуда 34540, РП 80 + 10 − 25, ЧП 41030 + 20 − 7 − 5 (сверх Барракуде из ЧП)",
+       (b["safe"]["b"], b["safe"]["rp"], b["safe"]["np"], b["safe"]["total"]), (34540, 65, 41038, 75643))
+    eq("сейф: потоки и ждущие подтверждения дни (только 4 сен)",
+       (b["safe"]["b_in"], b["safe"]["b_out"], b["safe"]["rp_in"], b["safe"]["rp_out"], b["safe"]["np_in"], b["safe"]["np_out"], b["safe"]["pending"]), (100, 60, 90, 25, 20, 12, 1))
+    eq("стопки на день 4: после оплаты сверх 5 из ЧП", (d4["stack_b"], d4["stack_rp"], d4["stack_np"], d4["stack_total"]), (34540, 65, 41038, 75643))
     eq("b.ratio = 1417 / (1270/100)", b["b"]["ratio"], round(1417 / 12.7, 1))
     eq("b.paid", b["b"]["paid"], 65)
     eq("econ = 1270 − 1417 − 25 − 140 (приход не доход)", b["econ"], -312)
@@ -215,7 +215,7 @@ async def main():
     eq("d4: ЧП+ = 180 − 90 − 90 = 0", d4["np_plus"], 0)
     eq("d3: приход в фонд 500 записью, ins 1", (d3["extra_rp"], len(d3["ins"])), (500, 1))
     eq("d3: фонд = 80 + 500 − 25", d3["rp"], 555)
-    eq("d4: фонд = 555 + 90 + 10 − (300 + 1000 + 2000)", d4["rp"], -2645)
+    eq("d4: фонд = 555 + 0 (не подтверждён) + 10 − (300 + 1000 + 2000)", d4["rp"], -2735)
     d5 = next(r for r in b["days"] if r["day"] == "2026-09-05")
     eq("d5: зарплата за август — расход сентябрьского фонда", (d5["expenses_sum"], d5["salary_sum"]), (900, 900))
     eq("d4: зарплаты в расходах дня 3000", d4["salary_sum"], 3000)
@@ -281,7 +281,7 @@ async def main():
     eq("оплата Барракуде одной суммой пишется полем pay", (r.status, WRITES[-2]), (200, ("day", "2026-09-04", {"pay": 40000, "by": "Ст"}, None)))
     FIN_DAYS["2026-09-04"]["pay"] = 40000
     bp = await fr.build(M); d4p = next(x for x in bp["days"] if x["day"] == "2026-09-04")
-    eq("оплата делится сама: из стопки Барракуды 34540 + 90 = 34630, остальное 5370 из ЧП", (d4p["pay"], d4p["pay_b"], d4p["pay_b_extra"], d4p["stack_b"]), (40000, 34630, 5370, 0))
+    eq("оплата делится сама: из стопки Барракуды 34540, остальное 5460 из ЧП", (d4p["pay"], d4p["pay_b"], d4p["pay_b_extra"], d4p["stack_b"]), (40000, 34540, 5460, 0))
     del FIN_DAYS["2026-09-04"]["pay"]
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month="2026-13", field="storage", value=1)))
     eq("bad month → 400", r.status, 400)

@@ -57,6 +57,9 @@ def compute(days: list[dict], opening: dict) -> dict:
          pay_b_extra    добавили оплату Баракуде из ЧП / РП
          expenses       [{amount, comment}] — расходы предприятия из фонда
          payouts        [{amount, who, comment}] — выплаты из чистой прибыли
+         pending        раскладка дня ещё не подтверждена старшим: aside /
+                        collected / прибыль дня показываются как предложение,
+                        но в стопки, итоги и остатки не входят
        opening — переносы и факты месяца:
          safe_b_open, debt_b_open   — сейф Б и долг Б на начало месяца
          carry_np                   — остаток (перенос) прошлого месяца по ЧП
@@ -89,23 +92,27 @@ def compute(days: list[dict], opening: dict) -> dict:
         extra_rp = _n(d.get('extra_rp'))
         pay_b = _n(d.get('pay_b'))
         pay_b_extra = _n(d.get('pay_b_extra'))
-        if d.get('pay') is not None:
-            # одна сумма оплаты: из стопки Баракуды, сколько в ней есть, остальное из ЧП
-            pay_total = _n(d.get('pay'))
-            pay_b = min(pay_total, max(0.0, safe_b + aside))
-            pay_b_extra = pay_total - pay_b
         ordered = _n(d.get('ordered'))
         ordered_extra = _n(d.get('ordered_extra'))
         exp_sum = sum(_n(e.get('amount')) for e in (d.get('expenses') or []))
         pay_sum = sum(_n(e.get('amount')) for e in (d.get('payouts') or []))
         np_plus = base - aside - collected
+        pending = bool(d.get('pending'))
+        # неподтверждённый день — только предложение: в деньгах его ещё нет
+        aside_c, collected_c, np_c = (0.0, 0.0, 0.0) if pending else (aside, collected, np_plus)
+        if d.get('pay') is not None:
+            # одна сумма оплаты: из стопки Баракуды, сколько в ней есть (с учётом
+            # подтверждённой раскладки этого дня), остальное из ЧП
+            pay_total = _n(d.get('pay'))
+            pay_b = min(pay_total, max(0.0, safe_b + aside_c))
+            pay_b_extra = pay_total - pay_b
         # книга «Баракуда»: сейф и долг — бегущие остатки
-        safe_b = safe_b + aside - pay_b
+        safe_b = safe_b + aside_c - pay_b
         debt_b = debt_b + ordered - pay_b - pay_b_extra
-        rp = rp + collected + extra_rp - exp_sum
-        np_acc = np_acc + np_plus - pay_sum
-        rp_st = rp_st + collected + extra_rp - exp_sum
-        np_st = np_st + np_plus - pay_sum - pay_b_extra
+        rp = rp + collected_c + extra_rp - exp_sum
+        np_acc = np_acc + np_c - pay_sum
+        rp_st = rp_st + collected_c + extra_rp - exp_sum
+        np_st = np_st + np_c - pay_sum - pay_b_extra
         touched = any(d.get(k) is not None for k in DAY_MANUAL) \
             or bool(d.get('expenses')) or bool(d.get('payouts'))
         if d.get('pending'):
@@ -122,7 +129,7 @@ def compute(days: list[dict], opening: dict) -> dict:
             payouts=d.get('payouts') or [], payouts_sum=_i(pay_sum),
             np_plus=_i(np_plus), safe_b=_i(safe_b), debt_b=_i(debt_b),
             rp=_i(rp), np_acc=_i(np_acc), touched=touched,
-            pay=_i(pay_b + pay_b_extra), ok=bool(d.get('ok')),
+            pay=_i(pay_b + pay_b_extra), ok=bool(d.get('ok')), counted=not pending,
             stack_b=_i(safe_b), stack_rp=_i(rp_st), stack_np=_i(np_st), stack_total=_i(safe_b + rp_st + np_st),
             manual={k: d.get(k) for k in DAY_MANUAL},
         ))
@@ -130,10 +137,10 @@ def compute(days: list[dict], opening: dict) -> dict:
         t['card'] += _n(d.get('card')); t['crypto'] += _n(d.get('crypto'))
         t['tips'] += _n(d.get('tips'))
         t['handed'] += handed; t['base'] += base; t['gap'] += gap; t['ordered'] += ordered
-        t['ordered_extra'] += ordered_extra; t['aside'] += aside
-        t['collected'] += collected; t['extra_rp'] += extra_rp
+        t['ordered_extra'] += ordered_extra; t['aside'] += aside_c
+        t['collected'] += collected_c; t['extra_rp'] += extra_rp
         t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra
-        t['expenses'] += exp_sum; t['np_plus'] += np_plus; t['payouts'] += pay_sum
+        t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
 
     # «РП + и −»
     rp_in = t['collected'] + t['extra_rp']          # всего собрал за месяц

@@ -3224,6 +3224,9 @@ button.path:active{transform:scale(.995)}
 .fb-e-b b .fb-bcode,.fb-bcode{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:24px;padding:0 6px;
   border-radius:8px;margin-right:9px;vertical-align:-6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
   font-style:normal;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Дата следующего платежа: цвет по срочности */
+.fb-e-b i .fb-due{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.2px}
+.fb-due.ok{color:var(--up)} .fb-due.warn{color:var(--warn)} .fb-due.dn{color:var(--dn)}
 /* Календарь одной даты: без отрезков и подвала */
 #dateOverlay.single .dp-quick,#dateOverlay.single .dp-foot{display:none}
 /* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
@@ -18342,16 +18345,22 @@ function fbNewRow(group){
 }
 // Подпись статьи: график (раз в N мес · следующий платёж) и деньги месяца.
 // Платёж, который в этом месяце не стоит, ни «осталось», ни «сверх» не даёт.
+// Статья с датой платежа: в подписи только «Следующий платёж: 3.11.2026» —
+// зелёным, за неделю жёлтым, за день и в день красным. Остальное — доля в
+// месяц, оплачено — здесь не нужно, оно в плане и в расходах.
+function fbDueHtml(ymd){
+  const d = new Date(ymd + 'T00:00:00'), today = new Date(); today.setHours(0, 0, 0, 0);
+  if(isNaN(d)) return '';
+  const days = Math.round((d - today) / 86400000);
+  const cls = days <= 1 ? 'dn' : days <= 7 ? 'warn' : 'ok';
+  return `Следующий платёж: <b class="fb-due ${cls}">${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}</b>`;
+}
 function fbLineSub(l){
+  if(l.next_due) return fbDueHtml(l.next_due);
   const pm = l.plan_m || 0;
-  if(l.period > 1){
-    // раз в N месяцев: доля в месяц копится к дате платежа; сам платёж —
-    // «оплачено», без «сверх плана» в месяц, когда его провели
-    return [`раз в ${l.period} мес`, `в месяц ${fbFmt(pm)}`, l.next_due ? `следующий ${fbDayT(l.next_due)}` : '',
-            l.note ? escS(l.note) : '', l.fact ? `оплачено ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
-  }
+  if(l.period > 1) return [`раз в ${l.period} мес`, `в месяц ${fbFmt(pm)}`, l.note ? escS(l.note) : ''].filter(Boolean).join(' · ');
   const over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
-  return [l.next_due ? `следующий ${fbDayT(l.next_due)}` : '', l.note ? escS(l.note) : '',
+  return [l.note ? escS(l.note) : '',
           over ? `сверх плана ${fbFmt(l.fact - pm)}` : ok ? 'оплачено' : pm > 0 ? `потратили ${fbFmt(l.fact)} · осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
 }
 function fbLineRow(l, kid, nameHtml){

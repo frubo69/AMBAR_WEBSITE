@@ -432,7 +432,7 @@ async def _pay_plan(month: str, ndays: int, usd: float) -> dict:
                            rate=None if eff.get("rate") is None else calc._i(rate),
                            unit=unit, cur=cur, rate_aed=calc._i(rate_aed), plan=calc._i(plan)))
     return dict(plan=calc._i(total), people=people, n=len(people),
-                set_n=sum(1 for x in people if x["rate"] is not None))
+                set_n=sum(1 for x in people if x["rate"] is not None), usd=usd)
 
 
 def _days_auto(people: list, work: dict, shifts: list) -> dict:
@@ -981,11 +981,17 @@ async def handle_pay_month_set(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
+    fields: dict = {"by": who}
+    # валюта оклада приходит вместе со ставкой — одной записью, чтобы книга
+    # не пересчитывалась дважды и не показывала доллары по дирхамовой ставке
+    cur = body.get("cur")
+    if field == "rate" and cur in pay.CURS:
+        fields["cur"] = cur
     if value is None or value == "":
-        await db.fin_pay_month_set(month, name, {"by": who}, unset=[field])
+        await db.fin_pay_month_set(month, name, fields, unset=[field])
     else:
-        await db.fin_pay_month_set(month, name, {field: value, "by": who})
-    log.info(f"[fin] зарплаты {month} {name}: {field} → {value!r} · {who or '—'}")
+        await db.fin_pay_month_set(month, name, {**fields, field: value})
+    log.info(f"[fin] зарплаты {month} {name}: {field} → {value!r}{' ' + cur if fields.get('cur') else ''} · {who or '—'}")
     return _json({"ok": True, "book": await build(month)})
 
 

@@ -18387,11 +18387,8 @@ function fbDueHtml(ymd){
 }
 function fbLineSub(l){
   if(l.next_due) return fbDueHtml(l.next_due);
-  const pm = l.plan_m || 0;
-  if(l.period > 1) return [`раз в ${l.period} мес`, `в месяц ${fbFmt(pm)}`, l.note ? escS(l.note) : ''].filter(Boolean).join(' · ');
-  const over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
-  return [l.note ? escS(l.note) : '',
-          over ? `сверх плана ${fbFmt(l.fact - pm)}` : ok ? 'оплачено' : pm > 0 ? `потратили ${fbFmt(l.fact)} · осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
+  if(l.period > 1) return [`раз в ${l.period} мес`, `в месяц ${fbFmt(l.plan_m || 0)}`, l.note ? escS(l.note) : ''].filter(Boolean).join(' · ');
+  return l.note ? escS(l.note) : '';   // «потратили · осталось» владелец просил не писать
 }
 function fbLineRow(l, kid, nameHtml){
   const pm = l.plan_m || 0, per = l.period > 1, over = !per && pm > 0 && l.fact > pm, ok = !per && pm > 0 && l.fact === pm;

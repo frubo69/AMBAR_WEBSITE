@@ -47,6 +47,7 @@ from config_offices import OFFICE_NAMES, OFFICE_CODES   # офис ≡ райо�
 # work out whose orders, tips and delivery times these are.
 from config_staff import DISTRICT_STAFF
 import config_staff as _staff_mod
+import bizday as _bizday        # день заказа = смена, в которой его приняли
 
 
 def _districts() -> list:
@@ -801,6 +802,9 @@ async def handle_create(request):
         # Задним числом — сразу доставлен: заказ уже состоялся.
         "status": "delivered" if back_dt else "approved",
         "confirmed_at": now,
+        # День заказа: задним числом — тот день; иначе текущие сутки, а если
+        # смену района за них уже закрыли — следующие (bizday.py).
+        "day": back or await db.order_day_now(office_id),
         "operator_id": uid,
         "source": "manual",
         "created_by": uid,
@@ -900,12 +904,7 @@ async def handle_list(request):
     for o in all_orders.values():
         if o.get("source") != "manual":
             continue
-        try:
-            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
-                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-        except (ValueError, TypeError):
-            continue
-        if _biz_date(ts) != today:
+        if _biz_date_of(o) != today:
             continue
         out.append(_summary(o))
     out.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
@@ -994,16 +993,14 @@ async def handle_queue(request):
         oid_dist = o.get("office_id") or ""
         if oid_dist not in scope and not (oid_dist == "" and len(scope) == len(districts)):
             continue
-        try:
-            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
-                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-        except (ValueError, TypeError):
+        od = _biz_date_of(o)
+        if od is None:
             continue
         # Новые показываем любого возраста: заказ, висящий с ночи, тем более
         # требует ответа. В работе — всегда текущие. Закрытые — за выбранный день.
-        if lane == "work" and _biz_date(ts) != today:
+        if lane == "work" and od != today:
             continue
-        if lane == "done" and _biz_date(ts) != day:
+        if lane == "done" and od != day:
             continue
         row = _summary(o)
         if lane == "new":
@@ -1073,6 +1070,9 @@ async def handle_accept(request):
     got = await db.claim_order(oid, {
         "status": "approved", "eta": eta, "deliver_by": deliver_by,
         "confirmed_at": now.isoformat(), "updated_at": now.isoformat(),
+        # Заказ относится к смене, в которой его приняли: пришёл утром, принят
+        # после открытия — это уже сегодняшняя смена, а не вчерашняя.
+        "day": await db.order_day_now(order.get("office_id") or ""),
         # Устройство одно на всех, поэтому в заказе живут оба: чей аккаунт
         # принял и кто за ним сидел. Без имени вся статистика троих схлопнется
         # в «Планшет операторов».
@@ -2240,10 +2240,7 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
     # Именно из-за него окно закрытия смены висело — и на открытии, и на каждом
     # нажатии «Закрыть». Незакрытые заказы orders_from отдаёт любого возраста,
     # так что заказ, висящий со вчера, из подсчёта не выпадет.
-    since = (datetime(day.year, day.month, day.day, SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-             - timedelta(hours=1))
-    orders = list((await db.orders_from(
-        since.astimezone(timezone.utc).isoformat().replace("+00:00", ""))).values())
+    orders = list((await db.orders_from(_bizday.since_utc(day.isoformat()))).values())
     # Кто из водителей не ответил по обязательным расходам. Оператору это видно
     # здесь, а не только в напоминании от бота: напоминание приходит ему, а
     # сделать он ничего не может, если не знает, кого подтолкнуть.
@@ -2312,11 +2309,9 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
 
 
 def _biz_date_of(o: dict):
-    try:
-        return _biz_date(datetime.fromisoformat(o.get("timestamp", "")).replace(
-            tzinfo=timezone.utc).astimezone(DUBAI_TZ))
-    except (ValueError, TypeError):
-        return None
+    """День заказа как date — смена, в которой его приняли (bizday.order_day)."""
+    d = _bizday.order_day(o)
+    return datetime.strptime(d, "%Y-%m-%d").date() if d else None
 
 
 # ── где водители ───────────────────────────────────────────────────────────
@@ -2334,10 +2329,7 @@ async def _orders_by_driver(day) -> dict:
     Список водителей без этого отвечает только на «где он», а спрашивают
     обычно «кому отдать следующий» — и тут решает не расстояние само по себе,
     а расстояние вместе с тем, сколько у человека уже на руках."""
-    since = (datetime(day.year, day.month, day.day, SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-             - timedelta(hours=1))
-    orders = (await db.orders_from(
-        since.astimezone(timezone.utc).isoformat().replace("+00:00", ""))).values()
+    orders = (await db.orders_from(_bizday.since_utc(day.isoformat()))).values()
     out = {}
     for o in orders:
         name = (o.get("driver") or "").strip()
@@ -2345,6 +2337,8 @@ async def _orders_by_driver(day) -> dict:
             continue
         st = (o.get("status") or "").strip()
         if st not in ("approved", "delivered"):
+            continue
+        if st == "delivered" and _biz_date_of(o) != day:
             continue
         r = out.setdefault(name, {"live": 0, "done": 0})
         if st == "approved":

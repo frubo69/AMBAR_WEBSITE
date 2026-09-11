@@ -2084,6 +2084,23 @@ async def zayavka_last_full() -> dict:
 #
 # Поэтому статус меняем условием: сработало — заказ твой, вернулось ничего —
 # его взяли раньше, и это не ошибка, а нормальный ответ, который надо показать.
+async def order_day_now(district: str) -> str:
+    """Каким днём подписать заказ, который берут в работу сейчас: учётные
+    сутки, а если смену этого района за них уже закрыли — следующий день
+    (bizday.py). Иначе утренний заказ падал бы в закрытую и посчитанную смену."""
+    from bizday import biz_day, next_day
+    day = biz_day()
+    db = _db_or_none()
+    if db is None or not district:
+        return day
+    try:
+        if await db.shift_days.find_one({"_id": f"{day}:{district}"}, {"_id": 1}):
+            return next_day(day)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[orders] день заказа: смены не прочитаны ({e})")
+    return day
+
+
 async def claim_order(oid: str, fields: dict) -> dict | None:
     db = _db_or_none()
     if db is None: return None

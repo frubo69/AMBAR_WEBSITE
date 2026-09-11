@@ -51,6 +51,8 @@ REVENUE_STATUSES = ("delivered",)
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES   # офисы ≡ районы
 import config_offices as _offices
 import config_staff as staff                                        # кто на каком районе
+import bizday as _bizday                                            # день заказа = смена, где его приняли
+_order_day = _bizday.order_day
 
 VALID_PERIODS = ("today", "yesterday", "week", "month", "year")
 
@@ -212,29 +214,40 @@ def _open_at(all_orders: dict, end_dt: datetime, statuses, office_id=None) -> li
     return out
 
 
+def _order_day_dt(o: dict):
+    """Начало учётных суток заказа (Дубай) — смены, в которой его приняли
+    (bizday.order_day). Окна у экранов идут по границам суток, поэтому
+    принадлежность окну решает день заказа, а не минута его создания."""
+    d = _order_day(o)
+    return _bizday.day_start(d) if d else None
+
+
 def _orders_in_window(all_orders: dict, start_dt: datetime, end_dt: datetime):
-    """Yield (dubai_dt, order) pairs for delivered orders inside the window."""
+    """Yield (dubai_dt, order) pairs for delivered orders inside the window.
+    dt — момент создания (для порядка), окно — по дню заказа."""
     out = []
     for o in all_orders.values():
         if o.get("status") not in REVENUE_STATUSES:
             continue
         dt = _parse_ts(o.get("timestamp"))
-        if dt is None:
+        ds = _order_day_dt(o)
+        if dt is None or ds is None:
             continue
-        if start_dt <= dt < end_dt:
+        if start_dt <= ds < end_dt:
             out.append((dt, o))
     return out
 
 
 def _all_orders_in_window(all_orders: dict, start_dt: datetime, end_dt: datetime):
     """Like _orders_in_window but doesn't filter by status — every order
-    placed during the window, regardless of outcome."""
+    whose day falls into the window, regardless of outcome."""
     out = []
     for o in all_orders.values():
         dt = _parse_ts(o.get("timestamp"))
-        if dt is None:
+        ds = _order_day_dt(o)
+        if dt is None or ds is None:
             continue
-        if start_dt <= dt < end_dt:
+        if start_dt <= ds < end_dt:
             out.append((dt, o))
     return out
 
@@ -312,7 +325,7 @@ def _last_7_days(all_orders: dict, ref_day_start: datetime = None) -> list:
     orders = _orders_in_window(all_orders, start, end)
     buckets = [0] * 7
     for dt, o in orders:
-        idx = (_biz_date(dt) - start.date()).days
+        idx = (_order_day_dt(o).date() - start.date()).days
         if 0 <= idx < 7:
             buckets[idx] += int(o.get("total", 0) or 0)
     return buckets
@@ -632,9 +645,7 @@ async def handle_finance(request):
     week_start = week_end - timedelta(days=7)
     orders_7d = [0] * 7
     for _, o in _all_orders_in_window(all_orders, week_start, week_end):
-        dt = _parse_ts(o.get("timestamp"))
-        if dt is None: continue
-        idx = (_biz_date(dt) - week_start.date()).days
+        idx = (_order_day_dt(o).date() - week_start.date()).days
         if 0 <= idx < 7:
             orders_7d[idx] += 1
 
@@ -1123,10 +1134,10 @@ async def handle_where_route(request):
         key = who
         orders = []
         try:
-            since = (datetime.strptime(day, "%Y-%m-%d").replace(hour=12, tzinfo=DUBAI_TZ)
-                     - timedelta(hours=1)).astimezone(timezone.utc)
-            for o in (await db.orders_from(since.isoformat().replace("+00:00", ""))).values():
+            for o in (await db.orders_from(_bizday.since_utc(day))).values():
                 if (o.get("driver") or "").strip() != who or o.get("status") != "delivered":
+                    continue
+                if _order_day(o) != day:
                     continue
                 if not (o.get("location") or {}).get("lat"):
                     continue
@@ -2532,18 +2543,18 @@ async def _sales_by_day(days: int = 7) -> dict:
     start = today - timedelta(days=days - 1)
     end   = today + timedelta(days=1)
     orders = await db.get_orders_in_range(
-        start.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+        (start - _bizday.PAD).astimezone(timezone.utc).isoformat().replace("+00:00", ""),
         end.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
-        limit=None, fields=["status", "items", "timestamp"],
+        limit=None, fields=["status", "items", "timestamp", "confirmed_at", "day"],
     )
     out = {}
     for o in orders:
         if o.get("status") not in REVENUE_STATUSES:
             continue
-        dt = _parse_ts(o.get("timestamp"))
-        if dt is None:
+        ds = _order_day_dt(o)
+        if ds is None:
             continue
-        idx = (_biz_date(dt) - start.date()).days
+        idx = (ds.date() - start.date()).days
         if not (0 <= idx < days):
             continue
         for it in (o.get("items") or []):
@@ -3427,21 +3438,15 @@ async def _chk_shift(day: str):
 
 async def _chk_orders(day_start, day_end):
     """Заказы суток: сколько ещё в пути и сколько просьб водителей без ответа."""
+    day = day_start.strftime("%Y-%m-%d")
     try:
-        since = (day_start - timedelta(hours=1)).astimezone(timezone.utc)
-        orders = list((await db.orders_from(
-            since.isoformat().replace("+00:00", ""))).values())
+        orders = list((await db.orders_from(_bizday.since_utc(day))).values())
     except Exception as e:
         log.warning(f"[chk] заказы за сутки: {e}")
         return {"route": 0, "req": 0}
     route = req = 0
     for o in orders:
-        try:
-            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
-                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-        except (ValueError, TypeError):
-            continue
-        if not (day_start <= ts < day_end):
+        if _order_day(o) != day:
             continue
         if o.get("status") == "approved":
             route += 1
@@ -3461,12 +3466,8 @@ async def cash_round(day: str) -> dict:
     чек-листе выполнена, когда собраны все районы, где было что собирать."""
     import expense_routes as _exp
     import config_staff as _staff
-    day_start = _chk_at(day, 12.0)
-    day_end = day_start + timedelta(days=1)
     try:
-        since = (day_start - timedelta(hours=1)).astimezone(timezone.utc)
-        orders = list((await db.orders_from(
-            since.isoformat().replace("+00:00", ""))).values())
+        orders = list((await db.orders_from(_bizday.since_utc(day))).values())
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[cash] заказы за день: {e}")
         orders = []
@@ -3474,12 +3475,7 @@ async def cash_round(day: str) -> dict:
     for o in orders:
         if o.get("status") != "delivered":
             continue
-        try:
-            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
-                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-        except (ValueError, TypeError):
-            continue
-        if not (day_start <= ts < day_end):
+        if _order_day(o) != day:
             continue
         oid = o.get("office_id") or ""
         if oid in by_o:
@@ -3562,10 +3558,9 @@ async def _chk_cash(day_start, day_end):
     Считаем по доставленным заказам, где платили не онлайн и не в долг: только
     эти деньги кто-то физически везёт и должен сдать. Сдал или нет — система
     знать не может, это отмечает человек."""
+    day = day_start.strftime("%Y-%m-%d")
     try:
-        since = (day_start - timedelta(hours=1)).astimezone(timezone.utc)
-        orders = list((await db.orders_from(
-            since.isoformat().replace("+00:00", ""))).values())
+        orders = list((await db.orders_from(_bizday.since_utc(day))).values())
     except Exception as e:
         log.warning(f"[chk] наличные за сутки: {e}")
         return 0
@@ -3573,12 +3568,7 @@ async def _chk_cash(day_start, day_end):
     for o in orders:
         if o.get("status") != "delivered":
             continue
-        try:
-            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
-                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-        except (ValueError, TypeError):
-            continue
-        if not (day_start <= ts < day_end):
+        if _order_day(o) != day:
             continue
         if o.get("payment_method") == "debt" or _is_prepaid_order(o):
             continue

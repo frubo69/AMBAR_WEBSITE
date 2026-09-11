@@ -41,6 +41,7 @@ from urllib.parse import parse_qsl
 from aiohttp import web
 
 import db
+import bizday                 # день заказа = смена, в которой его приняли
 import photos
 import config_staff as staff
 from owner_auth import CORS_HEADERS
@@ -1125,10 +1126,12 @@ async def handle_orders(request):
     чтобы было видно, что уже закрыто, и не звонить туда второй раз."""
     me = request["driver"]
     day = _biz_day()
-    start = datetime.strptime(day, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-    f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
-    orders = await db.get_orders_in_range(f(start), f(start + timedelta(days=1)))
-    mine = [o for o in orders if (o.get("driver") or "").strip() == me["name"]]
+    # Окно с запасом назад: заказ, созданный до полудня и принятый после
+    # открытия смены, относится к этой смене (bizday.order_day).
+    since, until = bizday.window_utc(day, day)
+    orders = await db.get_orders_in_range(since, until)
+    mine = [o for o in orders if (o.get("driver") or "").strip() == me["name"]
+            and (o.get("status") != "delivered" or bizday.order_day(o) == day)]
     active = [_order_view(o) for o in mine if o.get("status") == "approved"]
     done = [_order_view(o) for o in mine if o.get("status") == "delivered"]
     # Кому из этих клиентов мы должны. Долг возник, когда у водителя не нашлось
@@ -1165,16 +1168,16 @@ async def handle_history(request):
     except ValueError:
         days = 14
     today = _biz_day()
-    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)
-             ).replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-    end = datetime.strptime(today, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-    f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
+    first = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    last = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    since, until = bizday.window_utc(first, last)
     # История берётся за месяц и больше. С предельными пятьюстами заказами по
     # всем районам ранние дни просто исчезали бы из его истории — а водитель
     # смотрит её как раз затем, чтобы сверить свои деньги за период.
-    orders = await db.get_orders_in_range(f(start), f(end), limit=None)
+    orders = await db.get_orders_in_range(since, until, limit=None)
     mine = [o for o in orders
-            if (o.get("driver") or "").strip() == me["name"] and o.get("status") == "delivered"]
+            if (o.get("driver") or "").strip() == me["name"] and o.get("status") == "delivered"
+            and bizday.in_days(o, first, last)]
 
     # По дням: за какой день сколько увёз — так видно и объём, и выходные.
     #
@@ -1196,12 +1199,7 @@ async def handle_history(request):
 
     by_day = {}
     for o in mine:
-        dt = o.get("confirmed_at") or o.get("timestamp") or ""
-        try:
-            d = datetime.fromisoformat(str(dt)).replace(tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-            key = _biz_day(d)
-        except (ValueError, TypeError):
-            key = ""
+        key = bizday.order_day(o) or ""
         g = by_day.setdefault(key, {"day": key, "count": 0, "aed": 0, "cash": 0,
                                     "online": 0, "mins": [], "orders": []})
         total = int(o.get("total", 0) or 0)

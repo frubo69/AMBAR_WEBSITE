@@ -100,9 +100,10 @@ def _is_prepaid(o: dict) -> bool:
 async def _sales(days: list[str]) -> dict:
     """По дням: продали всего и по способам оплаты, чаевые, заказы, наличные
     по районам (для отметок сбора)."""
-    first, last = days[0], days[-1]
-    since = _utc_iso(_day_start(first))
-    until = _utc_iso(_day_start(last) + timedelta(days=1))
+    import bizday
+    # Окно по timestamp с запасом назад: день заказа — смена, в которой его
+    # приняли, и созданный до полудня заказ может принадлежать этому дню.
+    since, until = bizday.window_utc(days[0], days[-1])
     try:
         orders = await db.orders_between(since, until)
     except Exception as e:                        # noqa: BLE001
@@ -111,12 +112,7 @@ async def _sales(days: list[str]) -> dict:
     out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, tips=0, orders=0,
                    cash_by=dict()) for d in days}
     for o in orders:
-        try:
-            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
-                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
-        except (ValueError, TypeError):
-            continue
-        day = _biz_day(ts)
+        day = bizday.order_day(o)
         s = out.get(day)
         if s is None:
             continue

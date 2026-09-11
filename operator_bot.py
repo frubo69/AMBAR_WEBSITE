@@ -1630,10 +1630,13 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"🟢 <b>ТЕСТ</b> — #{oid} Принят, ETA {eta} мин (до {deliver_by_str})",
                 parse_mode="HTML", reply_markup=_kb)
         else:
+            _cur = await db.get_order(oid) or {}
             await db.update_order(oid, status="approved", eta=eta,
                                   operator_id=op, updated_at=datetime.now(timezone.utc).isoformat(),
                                   confirmed_at=datetime.now(timezone.utc).isoformat(),
-                                  deliver_by=deliver_by_str)
+                                  deliver_by=deliver_by_str,
+                                  # день заказа — смена, в которой его приняли (bizday.py)
+                                  day=await db.order_day_now(_cur.get("office_id") or ""))
             await update_customer_card(oid)
             order = await db.get_order(oid)
             if order:

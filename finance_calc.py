@@ -136,10 +136,11 @@ def compute(days: list[dict], opening: dict) -> dict:
     paid = t['pay_b'] + t['pay_b_extra']
     safe_b_fact = opening.get('safe_b_fact')
     safe_b_diff = None if safe_b_fact is None else _n(safe_b_fact) - safe_b
-    # Прибыль по расчёту, не по кассе: продали − купили у Баракуды − расходы
-    # фонда − расходы водителей + доп. приход. Закупки на других базах сюда не
-    # входят: их оплату старший записывает расходом из фонда.
-    econ = t['gross'] - t['ordered'] - t['expenses'] - t['spend'] + t['extra_rp']
+    # Прибыль по расчёту, не по кассе: продали − купили у базы − расходы фонда
+    # − расходы водителей. Приход в фонд сюда не входит: перевод с крипты уже
+    # сидит в «продали», а возвращённый депозит — не доход. Закупки на других
+    # базах тоже мимо: их оплату старший записывает расходом из фонда.
+    econ = t['gross'] - t['ordered'] - t['expenses'] - t['spend']
 
     totals = {k: _i(v) for k, v in t.items()}
     return dict(

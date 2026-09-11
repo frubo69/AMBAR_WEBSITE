@@ -67,6 +67,10 @@ function accOpen(id){
   if(id === 'finb') return accFinB();
   if(id === 'finrp') return accFinRP();
   if(id === 'finnp') return accFinNP();
+  if(id === 'finsafe') return accFinSafe();
+  if(id === 'finbud') return accFinBud();
+  if(id === 'finpay') return accFinPay();
+  if(id === 'finperson') return accFinPerson();
   if(id === 'cashround'){ _setText('accTitle', 'Сбор выручки'); document.getElementById('accMid').innerHTML = '<div class="exp-empty">(экран сбора выручки)</div>'; }
 }
 function accBack(){
@@ -86,10 +90,13 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
   try{
     if(Q.get('off')) DAY_OFFSET = +Q.get('off');
     if(Q.get('month')) FB.month = Q.get('month');
+    if(Q.get('person')) FB.person = Q.get('person');
+    if(Q.get('bud')) FB.bud = Q.get('bud');
     await fbHub();
     const v = Q.get('view') || 'hub';
     if(v !== 'hub') await accOpen(v);
     if(Q.get('add')){ fbAddToggle(Q.get('add')); }
+    if(Q.get('kind')) fbKindPick(Q.get('kind'));
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {

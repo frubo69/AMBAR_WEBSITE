@@ -60,7 +60,16 @@ async def fin_months_list(): return sorted(MONTHS)
 async def checklist_get(d): return CHECK.get(d, {})
 async def cost_map(): return COST
 async def fin_day_set(day, fields, unset=None): WRITES.append(("day", day, fields, unset))
-async def fin_month_set(m, fields, unset=None): WRITES.append(("month", m, fields, unset))
+async def fin_month_set(m, fields, unset=None):
+    if "carry_cache" in fields: MONTHS.setdefault(m, {"_id": m})["carry_cache"] = fields["carry_cache"]; CACHE_W.append(m); return
+    WRITES.append(("month", m, fields, unset)); MONTHS.setdefault(m, {"_id": m}).update(fields)
+    for k in (unset or []): MONTHS[m].pop(k, None)
+CACHE_W, INV = [], []
+async def fin_entries_where(q): return [e for e in ENTRIES if all(e.get(k) == v for k, v in q.items())]
+async def fin_carry_invalidate(m):
+    INV.append(m)
+    for k, d in MONTHS.items():
+        if k >= m: d.pop("carry_cache", None)
 async def fin_entry_add(doc): WRITES.append(("entry", doc))
 async def fin_entry_get(eid): return ENTRIES[0] if eid == "a1" else None
 async def fin_entry_del(eid): WRITES.append(("del", eid)); return True
@@ -70,13 +79,47 @@ for n, f in dict(orders_between=orders_between, get_driver_days_range=get_driver
                  fin_entries_get=fin_entries_get, fin_month_get=fin_month_get,
                  fin_months_list=fin_months_list, checklist_get=checklist_get,
                  fin_day_set=fin_day_set, fin_month_set=fin_month_set, fin_entry_add=fin_entry_add,
-                 fin_entry_get=fin_entry_get, fin_entry_del=fin_entry_del).items():
+                 fin_entry_get=fin_entry_get, fin_entry_del=fin_entry_del, fin_entries_where=fin_entries_where,
+                 fin_carry_invalidate=fin_carry_invalidate).items():
     setattr(db, n, f)
 stock_value.cost_map = cost_map
 stock_routes._catalog = lambda: CATALOG
 config_staff.MEAL_WORKING, config_staff.MEAL_OFF = 80, 40
 config_staff.drivers = lambda: [dict(name="Али", district="jbr")]
 fr.backdate.notify = notify
+# ── бюджет и зарплаты: заполняются во второй фазе ──
+BUDGET, PEOPLE, PAYM, ITEMS, SHIFTS = [], [], [], [], []
+async def fin_budget_get(m): return [dict(l) for l in BUDGET if l["month"] == m]
+async def fin_budget_line_get(lid): return next((dict(l) for l in BUDGET if l["_id"] == lid), None)
+async def fin_budget_set(doc):
+    WRITES.append(("bset", doc)); BUDGET[:] = [l for l in BUDGET if l["_id"] != doc["_id"]]; BUDGET.append(dict(doc))
+async def fin_budget_del(lid): WRITES.append(("bdel", lid)); BUDGET[:] = [l for l in BUDGET if l["_id"] != lid]; return True
+async def fin_people_get(): return [dict(p) for p in PEOPLE]
+async def fin_person_set(name, fields, unset=None): WRITES.append(("person", name, fields))
+async def fin_pay_months_upto(m): return [dict(d) for d in PAYM if d["month"] <= m]
+async def fin_pay_month_set(m, name, fields, unset=None): WRITES.append(("paym", m, name, fields, unset))
+async def fin_pay_items_get(): return [dict(i) for i in ITEMS]
+async def fin_pay_item_add(doc): WRITES.append(("item", doc)); ITEMS.append(dict(doc))
+async def fin_pay_item_get(iid): return next((dict(i) for i in ITEMS if i["_id"] == iid), None)
+async def fin_pay_item_del(iid): WRITES.append(("idel", iid)); ITEMS[:] = [i for i in ITEMS if i["_id"] != iid]; return True
+async def shift_days_worked(a, b): return [x for x in SHIFTS if a <= x[0] <= b]
+for n, f in dict(fin_budget_get=fin_budget_get, fin_budget_line_get=fin_budget_line_get, fin_budget_set=fin_budget_set,
+                 fin_budget_del=fin_budget_del, fin_people_get=fin_people_get, fin_person_set=fin_person_set,
+                 fin_pay_months_upto=fin_pay_months_upto, fin_pay_month_set=fin_pay_month_set,
+                 fin_pay_items_get=fin_pay_items_get, fin_pay_item_add=fin_pay_item_add, fin_pay_item_get=fin_pay_item_get,
+                 fin_pay_item_del=fin_pay_item_del, shift_days_worked=shift_days_worked).items():
+    setattr(db, n, f)
+import types
+_rates = types.ModuleType("rates")
+async def _get_rates(force=False): return {"rates": [{"code": "USD", "aed": 3.6725, "cash_aed": 3.67}]}
+_rates.get_rates = _get_rates
+sys.modules["rates"] = _rates
+config_staff.SENIOR_OPERATORS = [{"id": "parviz", "name": "Парвиз", "telegram_id": 1}]
+config_staff.operators = lambda: [dict(name="Парвиз", senior=True, districts=["jbr", "marina"]),
+                                  dict(name="Умар", senior=False, districts=["jbr"]),
+                                  dict(name="Фарух", senior=False, districts=["marina"])]
+config_staff.driver_names = lambda: ["Али"]
+config_staff.operator_names = lambda: ["Умар", "Фарух", "Парвиз"]
 fr._biz_day = lambda ref=None: "2026-09-10" if ref is None else ref.strftime("%Y-%m-%d") if ref.hour >= 12 else (ref.replace(day=ref.day) - __import__("datetime").timedelta(days=1)).strftime("%Y-%m-%d")
 
 fails = []
@@ -106,7 +149,9 @@ async def main():
     eq("cash (долг и перевод мимо)", d4["cash"], 200); eq("card", d4["card"], 100); eq("debt", d4["debt"], 150)
     eq("spend = 40 (дома)", d4["spend"], 40); eq("handed app", d4["handed"], 160)
     eq("handed_fact", d4["handed_fact"], 180); eq("gap = 160 − 180", d4["gap"], -20)
-    eq("np_plus = 180 − 0 − 0", d4["np_plus"], 180)
+    eq("np_plus = 180 − 777 (базе по заказу дня) − 0 (нормы нет)", d4["np_plus"], -597)
+    eq("aside_src order / collected_src пусто", (d4["aside_src"], d4["collected_src"]), ("order", ""))
+    eq("d3: вписанное руками главнее (manual)", (d3["aside_src"], d3["collected_src"]), ("manual", "manual"))
     eq("ordered_fact", d4["ordered"], 777); eq("ordered_auto (отменённая мимо)", d4["ordered_auto"], 0)
     eq("payouts_sum", d4["payouts_sum"], 7)
     eq("cash_need (marina + jbr дома, без отметок)", (d4["cash_need"], d4["cash_got"]), (2, 0))
@@ -117,16 +162,69 @@ async def main():
     eq("debt_b d3 = 110198 + 640 − 60", d3["debt_b"], 110778)
     eq("debt_b d4 = 110778 + 777 − 5", d4["debt_b"], 111550)
     eq("rp d4 = 80 + 10 − 25", d4["rp"], 65)
-    eq("np_acc d4 = 40 + 180 − 7", d4["np_acc"], 213)
+    eq("np_acc d4 = 40 − 597 − 7", d4["np_acc"], -564)
     eq("future flag on 11 sep", next(r for r in b["days"] if r["day"] == "2026-09-11")["future"], True)
     eq("today flag", next(r for r in b["days"] if r["day"] == "2026-09-10")["today"], True)
     print("— итоги месяца")
-    eq("np.profit = 220 + 65", b["np"]["profit"], 285)
-    eq("np.should_be = 278 + 1000 + 45325", b["np"]["should_be"], 46603)
-    eq("np.diff = 2000 − 46603", b["np"]["diff"], -44603)
+    eq("np.profit = (40 − 597) + 65", b["np"]["profit"], -492)
+    eq("np.should_be = −492 − 7 + 1000 + 45325", b["np"]["should_be"], 45826)
+    eq("np.diff = 2000 − 45826", b["np"]["diff"], -43826)
+    eq("safe: база 28817, сейф 45826, всего", (b["safe"]["b"], b["safe"]["np"], b["safe"]["total"]), (28817, 45826, 74643))
     eq("b.ratio = 1417 / (1270/100)", b["b"]["ratio"], round(1417 / 12.7, 1))
     eq("b.paid", b["b"]["paid"], 65)
-    eq("econ = 1270 − 1417 − 25 − 140 + 10", b["econ"], -302)
+    eq("econ = 1270 − 1417 − 25 − 140 (приход не доход)", b["econ"], -312)
+    print("— без бюджета: нормы нет, курс доллара с биржи, зарплаты пустые")
+    eq("budget пустой, norm 0, prev_has False", (b["budget"]["empty"], b["budget"]["norm"], b["budget"]["prev_has"]), (True, 0, False))
+    eq("usd с биржи (наличный курс)", (b["pay"]["usd"], b["pay"]["usd_set"]), (3.67, False))
+    eq("люди из расписания: Парвиз, Умар, Фарух, Али", [p["name"] for p in b["pay"]["people"]], ["Парвиз", "Умар", "Фарух", "Али"])
+    print("— с бюджетом, приходом в фонд и зарплатами")
+    BUDGET[:] = [dict(_id="L1", month=M, name="Зарплаты", plan=10000, due=0, note="", kind="salary", ord=0),
+                 dict(_id="L2", month=M, name="Аренда JVC", plan=31000, due=15, note="", kind="", ord=1)]
+    ENTRIES.append(dict(_id="in1", day="2026-09-03", book="in", amount=500, comment="с крипты", who="", by="Ст", at="t"))
+    ENTRIES.append(dict(_id="a3", day="2026-09-04", book="rp", amount=300, comment="аренда", who="", line="L2", by="Ст", at="t"))
+    ENTRIES.append(dict(_id="s1", day="2026-09-04", book="rp", amount=1000, comment="Зарплата", who="Али", line="L1", kind="salary", pay_month=M, by="Ст", at="t"))
+    # зарплата за август, выданная в сентябре — в сентябрьский фонд, но в августовскую ведомость
+    ENTRIES.append(dict(_id="s0", day="2026-09-05", book="rp", amount=900, comment="Зарплата", who="Али", line="L1", kind="salary", pay_month="2026-08", by="Ст", at="t"))
+    ENTRIES.append(dict(_id="adv1", day="2026-09-04", book="rp", amount=2000, comment="Аванс", who="Макар", line="L1", kind="advance", item="i2", by="Ст", at="t"))
+    PEOPLE[:] = [dict(_id="Макар", role="senior", manual=True), dict(_id="Умар", role="operator", hidden=True)]
+    PAYM[:] = [dict(_id="2026-08|Али", month="2026-08", name="Али", rate=100, unit="day", cur="AED"),
+               dict(_id="2026-09|Макар", month=M, name="Макар", rate=1750, unit="month", cur="USD"),
+               dict(_id="2026-09|Али", month=M, name="Али", days=20)]
+    ITEMS[:] = [dict(_id="i1", name="Али", kind="fine", amount=4040, per_month=1000, **{"from": "2026-08"}, day="2026-08-20", note="кр. свет"),
+                dict(_id="i2", name="Макар", kind="advance", amount=2000, per_month=0, **{"from": M}, day="2026-09-04", note="", entry="adv1")]
+    SHIFTS[:] = [("2026-09-03", "jbr"), ("2026-09-04", "jbr")]
+    b = await fr.build(M)
+    d3 = next(r for r in b["days"] if r["day"] == "2026-09-03")
+    d4 = next(r for r in b["days"] if r["day"] == "2026-09-04")
+    bu = b["budget"]
+    eq("бюджет: план 41000, / 30 дней, норма вверх до сотни 1400", (bu["total"], bu["days"], bu["norm_auto"], bu["norm"], bu["norm_set"]), (41000, 30, 1400, 1400, False))
+    eq("факт по строкам: зарплаты 1000 + 900 + аванс 2000, аренда 300, вне плана 25", ([l["fact"] for l in bu["lines"]], bu["off_plan"], bu["fact"]), ([3900, 300], 25, 4225))
+    eq("подсказка «по окладам» = начислено", bu["salary_hint"], b["pay"]["totals"]["accrued"])
+    eq("d4: в фонд по норме 1400 (collected_src norm)", (d4["collected"], d4["collected_src"]), (1400, "norm"))
+    eq("d4: прибыль дня = 180 − 777 − 1400", d4["np_plus"], -1997)
+    eq("d3: приход в фонд 500 записью, ins 1", (d3["extra_rp"], len(d3["ins"])), (500, 1))
+    eq("d3: фонд = 80 + 500 − 25", d3["rp"], 555)
+    eq("d4: фонд = 555 + 1400 + 10 − (300 + 1000 + 2000)", d4["rp"], -1335)
+    d5 = next(r for r in b["days"] if r["day"] == "2026-09-05")
+    eq("d5: зарплата за август — расход сентябрьского фонда", (d5["expenses_sum"], d5["salary_sum"]), (900, 900))
+    eq("d4: зарплаты в расходах дня 3000", d4["salary_sum"], 3000)
+    eq("запись несёт строку бюджета", next(e for e in d4["expenses"] if e["id"] == "a3")["line_name"], "Аренда JVC")
+    P = {p["name"]: p for p in b["pay"]["people"]}
+    eq("Умар скрыт, Макар (руками) есть", ("Умар" in P, P["Макар"]["manual"]), (False, True))
+    a = P["Али"]
+    eq("Али: ставка 100/день с августа, дней 20 (вписано), начислено 2000", (a["rate"], a["unit"], a["rate_month"], a["days"], a["days_set"], a["accrued"]), (100, "day", "2026-08", 20, True, 2000))
+    eq("Али: дней по приложению 1 (working)", a["days_auto"], 1)
+    eq("Али: штраф 4040 по 1000: август снял 1000, сентябрь 1000, останется 2040", (a["minus"], a["items"][0]["before"], a["items"][0]["due"], a["items"][0]["after"]), (1000, 3040, 1000, 2040))
+    eq("Али: к выплате 1000, выплачено 1000 (за август — не сюда), остаток 0, долг 2040", (a["to_pay"], a["paid"], a["left"], a["debt"]), (1000, 1000, 0, 2040))
+    b8 = await fr.build("2026-08")
+    a8 = {p["name"]: p for p in b8["pay"]["people"]}["Али"]
+    eq("август Али: выплачено 900 сентябрьской записью, штраф 1000", (a8["paid"], a8["minus"]), (900, 1000))
+    eq("кэш переноса августа записан один раз и читается", (CACHE_W.count("2026-08"), isinstance(MONTHS["2026-08"].get("carry_cache"), dict)), (1, True))
+    m_ = P["Макар"]
+    eq("Макар: 1750 $ × 3.67 = 6422.5, аванс 2000 в этом месяце", (m_["rate_aed"], m_["accrued"], m_["minus"], m_["to_pay"], m_["left"]), (6422.5, 6422.5, 2000, 4422.5, 4422.5))
+    eq("Макар: дней = дни смен (старший)", m_["days_auto"], 2)
+    eq("Фарух: дней = смены его района (marina) 0", P["Фарух"]["days_auto"], 0)
+    eq("итог к выплате", b["pay"]["totals"]["to_pay"], 5422.5)
     print("— ручки: проверка тела и запись")
     async def call(h, method, body):
         req = make_mocked_request(method, "/x", headers={"Authorization": "tma x"})
@@ -162,6 +260,64 @@ async def main():
     eq("month_set", WRITES[-1], ("month", "2026-09", {"safe_np_fact": 2500, "by": ""}, None))
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month="2026-13", field="storage", value=1)))
     eq("bad month → 400", r.status, 400)
+    inner2 = {n: getattr(fr, n) for n in ("handle_budget_set", "handle_budget_del", "handle_budget_fill",
+                                            "handle_pay_item_add", "handle_pay_item_del", "handle_pay_out",
+                                            "handle_pay_month_set", "handle_pay_person")}
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=50, line="zzz")))
+    eq("entry: чужая строка бюджета → 400", r.status, 400)
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=50, kind="salary")))
+    eq("entry: зарплата без имени → 400", r.status, 400)
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="in", amount=250, comment="с крипты")))
+    eq("entry in ok", (r.status, WRITES[-2][1]["book"], WRITES[-2][1]["line"]), (200, "in", ""))
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Виза", plan="11000", due=20, **{"as": "Ст"})))
+    eq("budget_set новая: ord 2", (r.status, WRITES[-1][0], WRITES[-1][1]["ord"], WRITES[-1][1]["plan"]), (200, "bset", 2, 11000))
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="nope", name="X", plan=1)))
+    eq("budget_set чужой id → 404", r.status, 404)
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="L2", name="Аренда JVC", plan=32000, due=15)))
+    eq("budget_set правка: ord прежний 1", (r.status, WRITES[-1][1]["ord"], WRITES[-1][1]["plan"]), (200, 1, 32000))
+    r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month=M, **{"from": "prev"})))
+    eq("fill при непустом → 409", r.status, 409)
+    r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-10", **{"from": "prev"})))
+    eq("fill октября из сентября: 3 строки", (r.status, json.loads(r.text)["n"]), (200, 3))
+    r = await raw(inner2["handle_budget_fill"])(_req("POST", dict(month="2026-11", **{"from": "template"})))
+    eq("fill по образцу: есть «Зарплаты» kind salary", any(w[0] == "bset" and w[1]["kind"] == "salary" and w[1]["month"] == "2026-11" for w in WRITES), True)
+    r = await raw(inner2["handle_budget_del"])(_req("DELETE", dict(id="L2")))
+    eq("budget_del", (r.status, WRITES[-1]), (200, ("bdel", "L2")))
+    bu2 = json.loads(r.text)["book"]["budget"]
+    eq("записи удалённой статьи: вне плана 25 + 300 и в факте", (bu2["off_plan"], bu2["fact"]), (325, 4225))
+    eq("правка сбрасывает кэш переносов с этого месяца", INV[-1], M)
+    r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="advance", amount=500, day="2026-09-10", **{"from": "next", "as": "Ст"})))
+    eq("аванс: запись расхода (kind advance, who, строка зарплат) + удержание со следующего месяца",
+       (r.status, WRITES[-3][0], WRITES[-3][1]["kind"], WRITES[-3][1]["who"], WRITES[-3][1]["line"], WRITES[-2][0], WRITES[-2][1]["from"], WRITES[-2][1]["entry"] == WRITES[-3][1]["_id"]),
+       (200, "entry", "advance", "Али", "L1", "item", "2026-10", True))
+    r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="fine", amount=300, per_month=100)))
+    eq("штраф: без записи расхода, с этого месяца", (r.status, WRITES[-1][0], WRITES[-1][1]["from"], WRITES[-1][1]["entry"]), (200, "item", "2026-09", ""))
+    r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="bad", amount=1)))
+    eq("плохой вид → 400", r.status, 400)
+    r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id="i2", month=M)))
+    eq("убрать аванс: удержание и запись расхода", (r.status, WRITES[-2], WRITES[-1]), (200, ("idel", "i2"), ("del", "adv1")))
+    r = await raw(inner2["handle_pay_out"])(_req("POST", dict(name="Макар", amount=4000, day="2026-09-10", month="2026-08")))
+    eq("выплата: запись kind salary на строку зарплат, за август, ответ за август", (r.status, WRITES[-2][1]["kind"], WRITES[-2][1]["who"], WRITES[-2][1]["line"], WRITES[-2][1]["comment"], WRITES[-2][1]["pay_month"], json.loads(r.text)["book"]["month"]), (200, "salary", "Макар", "L1", "Зарплата", "2026-08", "2026-08"))
+    r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="fine", amount=50, month="2026-08", **{"from": "next"})))
+    eq("штраф из экрана августа «со следующего» → с сентября", WRITES[-1][1]["from"], "2026-09")
+    r = await raw(inner2["handle_pay_month_set"])(_req("POST", dict(month=M, name="Али", field="rate", value="120")))
+    eq("ставка месяца", WRITES[-1], ("paym", M, "Али", {"rate": 120, "by": ""}, None))
+    r = await raw(inner2["handle_pay_month_set"])(_req("POST", dict(month=M, name="Али", field="unit", value="week")))
+    eq("плохая единица → 400", r.status, 400)
+    r = await raw(inner2["handle_pay_month_set"])(_req("POST", dict(month=M, name="Али", field="days", value="")))
+    eq("снять дни → unset", WRITES[-1], ("paym", M, "Али", {"by": ""}, ["days"]))
+    r = await raw(inner2["handle_pay_person"])(_req("POST", dict(name="Слон", role="senior", month=M)))
+    eq("новый человек руками: manual True", (r.status, WRITES[-1][0], WRITES[-1][2]["manual"]), (200, "person", True))
+    r = await raw(inner2["handle_pay_person"])(_req("POST", dict(name="Али", role="driver", hidden=True, month=M)))
+    eq("скрыть водителя из расписания: manual False", (WRITES[-1][2]["hidden"], WRITES[-1][2]["manual"]), (True, False))
+    r = await raw(inner2["handle_pay_person"])(_req("POST", dict(name="Али", hidden=True, month=M)))
+    eq("скрыть без роли: роль и заметка не затираются", ("role" in WRITES[-1][2], "note" in WRITES[-1][2]), (False, False))
+    r = await raw(inner2["handle_pay_person"])(_req("POST", dict(name="Али", month="2026-13")))
+    eq("плохой месяц → 400, не 500", r.status, 400)
+    r = await raw(inner["handle_month_set"])(_req("POST", dict(month=M, field="norm", value=8000)))
+    eq("норма в день", WRITES[-1], ("month", M, {"norm": 8000, "by": ""}, None))
+    r = await raw(inner["handle_month_set"])(_req("POST", dict(month=M, field="norm_b", value=-5)))
+    eq("норма базе отрицательная → 400", r.status, 400)
     print()
     print("FAILED:", fails) if fails else print("ALL OK — сервер собирает книгу верно")
     sys.exit(1 if fails else 0)

@@ -1,24 +1,27 @@
-"""Книга учёта денег — раздел «Финансы» владельца.
+"""Финансы владельца — учёт денег по книге старшего, одним ответом на месяц.
 
-Источник — месячный отчёт старшего (Excel из четырёх листов). Что приложение
-знает само, считается здесь на лету и руками не вводится:
+Что приложение знает само и считает на лету (руками не вводится):
   сдали      — наличные доставленных заказов за учётные сутки минус расходы
-               водителей (питание и согласованные разовые) — та же цифра, что
-               в «Сборе выручки»;
-  заказали   — поставки этого дня в закупочных ценах (stock_value.cost_map);
-  продали    — вся выручка дня, по способам оплаты.
-Что старший решает сам, лежит в fin_days / fin_entries / fin_months (db.py):
-отложили в сейф Б, собрал в фонд, оплаты Баракуде, доп. приход, расходы из
-фонда, выплаты из прибыли, переносы и пересчёты сейфов.
-
-Математика книги — finance_calc.compute(); здесь только сбор входных чисел и
-запись ручных. Один запрос отдаёт весь месяц: экран рисует день, четыре книги
-и итог из одного ответа, без второго похода на сервер.
+               водителей (питание и согласованные разовые);
+  заказали   — поставки дня в закупочных ценах (stock_value.cost_map);
+  продали    — вся выручка дня по способам оплаты;
+  дни        — сколько дней человек работал (отметки смен и питания).
+Что решает старший (fin_* в db.py):
+  день       — сколько отложить базе и в фонд (по умолчанию: базе — по заказу
+               дня или по норме, в фонд — по норме бюджета), оплаты базе,
+               сдали по факту, заметка;
+  записи     — расходы из фонда (со строкой бюджета), приход в фонд,
+               выплаты из прибыли, зарплаты и авансы;
+  бюджет     — статьи месяца с планом; норма в день = план / дни месяца;
+  зарплаты   — ставка, дни, штрафы, авансы, премии — finance_pay.py;
+  месяц      — переносы, хранение, пересчёт сейфов, курс доллара.
+Математика дня и месяца — finance_calc.compute(), зарплат — finance_pay.
 """
 from __future__ import annotations
 
 import calendar
 import logging
+import math
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -27,6 +30,7 @@ from aiohttp import web
 import db
 import backdate
 import finance_calc as calc
+import finance_pay as pay
 from owner_auth import require_owner, CORS_HEADERS
 
 log = logging.getLogger(__name__)
@@ -34,12 +38,16 @@ log = logging.getLogger(__name__)
 DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, как во всей системе
 MAX_AMOUNT = 10_000_000
+USD_FALLBACK = 3.67
 
 DAY_FIELDS = ('handed_fact', 'ordered_fact', 'aside', 'collected', 'extra_rp',
               'pay_b', 'pay_b_extra')
-MONTH_FIELDS = ('safe_b_open', 'debt_b_open', 'carry_np', 'storage',
-                'safe_np_fact', 'safe_b_fact')
-BOOKS = ('rp', 'np')
+OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'carry_np', 'storage',
+               'safe_np_fact', 'safe_b_fact')
+MONTH_FIELDS = OPEN_FIELDS + ('norm', 'norm_b', 'usd')
+BOOKS = ('rp', 'np', 'in')
+ENTRY_KINDS = ('', 'salary', 'advance', 'loan')
+PAY_FIELDS = ('rate', 'unit', 'cur', 'days', 'note')
 
 
 def _biz_day(ref: datetime = None) -> str:
@@ -67,7 +75,7 @@ def _prev_month(month: str) -> str:
     return f"{y - 1:04d}-12" if m == 1 else f"{y:04d}-{m - 1:02d}"
 
 
-def _num(v):
+def _num(v, dec: int = 2):
     """Число из тела запроса; None и пустая строка — «снять значение»."""
     if v is None or v == "":
         return None
@@ -77,7 +85,7 @@ def _num(v):
         raise ValueError("bad_number")
     if f != f or abs(f) > MAX_AMOUNT:
         raise ValueError("bad_number")
-    r = round(f, 2)
+    r = round(f, dec)
     return int(r) if r == int(r) else r
 
 
@@ -133,7 +141,8 @@ async def _sales(days: list[str]) -> dict:
 async def _spend(days: list[str]) -> dict:
     """Расходы водителей по дням: питание по отметке смены плюс согласованные
     разовые (со знаком — «нам вернули» уменьшает расход). Ждущие решения —
-    отдельно, в расход не идут."""
+    отдельно, в расход не идут. Заодно — рабочие дни каждого водителя (для
+    зарплат): ключ 'work' в out['_work']."""
     import expense_routes as _exp
     import config_staff as _staff
     try:
@@ -148,11 +157,14 @@ async def _spend(days: list[str]) -> dict:
     except Exception:                             # noqa: BLE001
         pass
     out = {d: dict(spend=0, pending=0, spend_by=dict()) for d in days}
+    work: dict = {}
     for r in rows:
         s = out.get(r.get("day") or "")
         if s is None:
             continue
         w = r.get("working")
+        if w is True and r.get("driver"):
+            work[r["driver"]] = work.get(r["driver"], 0) + 1
         meal = _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
         amt = meal
         for e in (r.get("extras") or []):
@@ -164,14 +176,15 @@ async def _spend(days: list[str]) -> dict:
         s["spend"] += amt
         oid = home.get(r.get("driver")) or ""
         s["spend_by"][oid] = s["spend_by"].get(oid, 0) + amt
+    out["_work"] = work
     return out
 
 
 async def _purchases(days: list[str]) -> dict:
-    """Поставки по дням в закупочных ценах. Основная — «заказали у Баракуды»,
-    с других баз — отдельно. Цена за бутылку = цена учётной единицы / бутылок
-    в ней (пиво идёт ящиками). Позиция без цены в сумму не попадает — рядом
-    доля бутылок, у которых цена известна."""
+    """Поставки по дням в закупочных ценах. Основная — «заказали у базы», с
+    других баз — отдельно. Цена за бутылку = цена учётной единицы / бутылок в
+    ней (пиво идёт ящиками). Позиция без цены в сумму не попадает — рядом доля
+    бутылок, у которых цена известна."""
     import stock_routes
     import stock_value
     try:
@@ -240,25 +253,230 @@ async def _marks(days: list[str]) -> dict:
     return out
 
 
+# ── Бюджет месяца ────────────────────────────────────────────────────────────
+def norm_auto(total: float, ndays: int) -> int:
+    """План месяца / дни месяца, вверх до сотни: 205 000 / 31 → 6 700."""
+    if not total or not ndays:
+        return 0
+    return int(math.ceil(total / ndays / 100.0 - 1e-9) * 100)
+
+
+def template_lines() -> list[dict]:
+    """Статьи «по образцу» — те, что стоят в бюджете старшего."""
+    from config_offices import OFFICES
+    rows = [dict(name="Зарплаты", kind="salary"), dict(name="Аренда офис")]
+    rows += [dict(name=f"Аренда {o['name']}") for o in OFFICES]
+    rows += [dict(name=n) for n in ("Авто", "Гараж и ТО", "Парковка", "Билеты", "Визы",
+                                    "Sim", "Хоз. нужды", "Продукты", "Бензин", "Реклама")]
+    return rows
+
+
+async def _budget(month: str, entries: list, mdoc: dict, ndays: int) -> dict:
+    try:
+        lines = await db.fin_budget_get(month)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] бюджет не прочитан: {e}")
+        lines = []
+    fact: dict = {}
+    off_plan = 0.0
+    for e in entries:
+        if e.get("book", "rp") != "rp":
+            continue
+        lid = e.get("line") or ""
+        if lid:
+            fact[lid] = fact.get(lid, 0.0) + calc._n(e.get("amount"))
+        else:
+            off_plan += calc._n(e.get("amount"))
+    rows, total, fact_sum = [], 0.0, 0.0
+    for i, ln in enumerate(lines):
+        plan = calc._n(ln.get("plan"))
+        f = fact.get(ln.get("_id"), 0.0)
+        total += plan; fact_sum += f
+        rows.append(dict(id=ln.get("_id"), name=ln.get("name") or "", plan=calc._i(plan),
+                         fact=calc._i(f), left=calc._i(plan - f), due=int(ln.get("due") or 0),
+                         note=ln.get("note") or "", kind=ln.get("kind") or "",
+                         ord=int(ln.get("ord") if ln.get("ord") is not None else i)))
+    # записи без статьи и записи удалённой статьи — «вне плана», но потрачено
+    known = {r["id"] for r in rows}
+    stray = sum(v for k, v in fact.items() if k not in known)   # строка удалена, записи остались
+    off_plan += stray
+    fact_all = fact_sum + off_plan
+    auto = norm_auto(total, ndays)
+    norm = mdoc.get("norm")
+    norm_b = mdoc.get("norm_b")
+    prev_has = False
+    if not lines:
+        try:
+            prev_has = bool(await db.fin_budget_get(_prev_month(month)))
+        except Exception:                         # noqa: BLE001
+            prev_has = False
+    return dict(lines=rows, total=calc._i(total), fact=calc._i(fact_all),
+                left=calc._i(total - fact_all), off_plan=calc._i(off_plan),
+                days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
+                norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,
+                norm_set=norm is not None,
+                norm_b=None if norm_b is None else calc._i(calc._n(norm_b)),
+                prev_has=prev_has, empty=not lines)
+
+
+# ── Зарплаты ─────────────────────────────────────────────────────────────────
+async def _usd(mdoc: dict) -> dict:
+    if mdoc.get("usd"):
+        return dict(usd=float(mdoc["usd"]), usd_auto=None, usd_set=True)
+    auto = None
+    try:
+        import rates
+        r = await rates.get_rates()
+        row = next((x for x in (r.get("rates") or []) if x.get("code") == "USD"), None)
+        if row:
+            auto = float(row.get("cash_aed") or row.get("aed") or 0) or None
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] курс доллара не прочитан: {e}")
+    return dict(usd=auto or USD_FALLBACK, usd_auto=auto, usd_set=False)
+
+
+def _people(docs: list) -> list[dict]:
+    """Кто получает зарплату: люди из расписания плюс вписанные руками."""
+    import config_staff as staff
+    from config_offices import OFFICE_IDS
+    by_name = {str(d.get("_id")): d for d in docs}
+    out, seen = [], set()
+
+    def add(name, role, **kw):
+        if not name or name in seen:
+            return
+        seen.add(name)
+        d = by_name.get(name) or {}
+        if d.get("hidden"):
+            return
+        out.append(dict(name=name, role=d.get("role") or role, manual=bool(d.get("manual")),
+                        pnote=d.get("note") or "", **kw))
+    try:
+        for s in staff.SENIOR_OPERATORS:
+            add(s.get("name"), "senior", districts=list(OFFICE_IDS))
+        for o in staff.operators():
+            if not o.get("senior"):
+                add(o.get("name"), "operator", districts=list(o.get("districts") or []))
+        for d in staff.drivers():
+            add(d.get("name"), "driver", districts=[d.get("district") or ""])
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] расписание не прочитано: {e}")
+    for d in docs:
+        add(str(d.get("_id")), d.get("role") or "other", districts=[])
+    return out
+
+
+def _days_auto(people: list, work: dict, shifts: list) -> dict:
+    """Дней по приложению: водитель — отметки «работал», оператор — дни, когда
+    открывалась смена его района, старший — дни, когда работал хоть один район."""
+    by_d: dict = {}
+    all_days: set = set()
+    for day, district in shifts:
+        by_d.setdefault(district, set()).add(day)
+        all_days.add(day)
+    out = {}
+    for p in people:
+        if p["role"] == "driver":
+            out[p["name"]] = work.get(p["name"], 0)
+        elif p["role"] == "operator":
+            ds: set = set()
+            for d in p.get("districts") or []:
+                ds |= by_d.get(d, set())
+            out[p["name"]] = len(ds)
+        elif p["role"] == "senior":
+            out[p["name"]] = len(all_days)
+        else:
+            out[p["name"]] = 0
+    return out
+
+
+async def _payroll(month: str, days: list[str], today: str, entries: list,
+                   work: dict, usd: float) -> dict:
+    try:
+        docs = await db.fin_people_get()
+        mdocs = await db.fin_pay_months_upto(month)
+        items = await db.fin_pay_items_get()
+        shifts = await db.shift_days_worked(days[0], min(days[-1], today))
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] зарплаты не прочитаны: {e}")
+        docs, mdocs, items, shifts = [], [], [], []
+    people = _people(docs)
+    by_name: dict = {}
+    for d in mdocs:
+        by_name.setdefault(str(d.get("name")), []).append(d)
+    # выплата относится к месяцу, за который платят (pay_month), а не к дню,
+    # когда деньги вышли из фонда: зарплату за август платят в сентябре
+    try:
+        paid_rows = await db.fin_entries_where({"kind": "salary", "pay_month": month})
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] выплаты не прочитаны: {e}")
+        paid_rows = []
+    seen_ids = {str(e.get("_id")) for e in paid_rows}
+    paid_rows += [e for e in entries if e.get("kind") == "salary" and not e.get("pay_month")
+                  and str(e.get("_id")) not in seen_ids]
+    payouts: dict = {}
+    for e in paid_rows:
+        if e.get("who"):
+            payouts.setdefault(e["who"], []).append(_entry_view(e, {}))
+    # люди, которых нет в расписании, но у кого есть выплаты или удержания —
+    # тоже в списке, чтобы деньги не пропали из виду
+    known = {p["name"] for p in people}
+    hidden = {str(d.get("_id")) for d in docs if d.get("hidden")}
+    for name in list(payouts) + [it.get("name") for it in items]:
+        if name and name not in known and name not in hidden:
+            known.add(name)
+            people.append(dict(name=name, role="other", manual=True, pnote="", districts=[]))
+    res = pay.payroll(people, month, by_name, _days_auto(people, work, shifts), items, payouts, usd)
+    for r in res["people"]:
+        p = next((x for x in people if x["name"] == r["name"]), {})
+        r["pnote"] = p.get("pnote", "")
+    return res
+
+
+def _salary_line(lines: list) -> str:
+    return next((ln["id"] for ln in lines if ln.get("kind") == "salary"), "")
+
+
 # ── Месяц целиком ────────────────────────────────────────────────────────────
 async def _opening(month: str, depth: int = 0) -> dict:
     """Переносы месяца: что вписано руками — главнее; остальное берём из
     закрытия прошлого месяца, если он вообще вёлся."""
     doc = await db.fin_month_get(month)
-    explicit = {k: doc.get(k) for k in MONTH_FIELDS if doc.get(k) is not None}
+    explicit = {k: doc.get(k) for k in OPEN_FIELDS if doc.get(k) is not None}
     carried: dict = {}
     if depth < 6:
         prev = _prev_month(month)
         prev_doc = await db.fin_month_get(prev)
-        days = _month_days(prev)
-        touched = bool(prev_doc) or bool(await db.fin_days_get(days[0], days[-1])) \
-            or bool(await db.fin_entries_get(days[0], days[-1]))
-        if touched:
-            book = await build(prev, depth + 1, light=True)
-            carried = calc.carry_from(book)
+        cache = prev_doc.get("carry_cache")
+        if isinstance(cache, dict):
+            # закрытый месяц уже считали: его закрытие лежит в его же документе
+            # и стирается любой правкой этого или более раннего месяца (_touch)
+            carried = dict(cache)
+        else:
+            days = _month_days(prev)
+            touched = bool(prev_doc) or bool(await db.fin_days_get(days[0], days[-1])) \
+                or bool(await db.fin_entries_get(days[0], days[-1]))
+            if touched:
+                book = await build(prev, depth + 1, light=True)
+                carried = calc.carry_from(book)
+                if prev < _biz_day()[:7]:
+                    try:
+                        await db.fin_month_set(prev, {"carry_cache": carried})
+                    except Exception as e:            # noqa: BLE001
+                        log.warning(f"[fin] кэш переноса {prev} не записан: {e}")
     opening = {**{k: v for k, v in carried.items() if v is not None}, **explicit}
     return {"opening": opening, "explicit": explicit, "carried": carried,
-            "note": doc.get("note") or ""}
+            "note": doc.get("note") or "", "doc": doc}
+
+
+def _entry_view(e: dict, line_names: dict) -> dict:
+    lid = e.get("line") or ""
+    return {"id": e.get("_id"), "amount": e.get("amount"), "comment": e.get("comment") or "",
+            "who": e.get("who") or "", "line": lid, "line_name": line_names.get(lid, ""),
+            "kind": e.get("kind") or "", "kind_t": {"salary": "Зарплата", "advance": "Аванс",
+                                                    "loan": "Долг"}.get(e.get("kind") or "", ""),
+            "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
+            "day": e.get("day") or "", "pay_month": e.get("pay_month") or ""}
 
 
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
@@ -269,38 +487,61 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         await db.fin_days_get(days[0], days[-1]),
         await db.fin_entries_get(days[0], days[-1]),
         await _opening(month, depth))
+    work = spend.pop("_work", {})
+    mdoc = opening["doc"]
+    budget = await _budget(month, entries, mdoc, len(days))
+    line_names = {ln["id"]: ln["name"] for ln in budget["lines"]}
     by_day_entries: dict = {}
     for e in entries:
-        by_day_entries.setdefault(e.get("day"), {"rp": [], "np": []})
-        row = {"id": e.get("_id"), "amount": e.get("amount"), "comment": e.get("comment") or "",
-               "who": e.get("who") or "", "by": e.get("by") or "",
-               "at": str(e.get("at") or "")}
-        by_day_entries[e.get("day")][e.get("book") if e.get("book") in BOOKS else "rp"].append(row)
-    rows = []
+        bk = e.get("book") if e.get("book") in BOOKS else "rp"
+        by_day_entries.setdefault(e.get("day"), {"rp": [], "np": [], "in": []})[bk].append(
+            _entry_view(e, line_names))
+    rows, meta = [], {}
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
-        en = by_day_entries.get(d) or {"rp": [], "np": []}
+        en = by_day_entries.get(d) or {"rp": [], "np": [], "in": []}
         handed = s["cash"] - sp["spend"]
-        ordered_auto = pu["ordered"]
+        fact = m.get("handed_fact")
+        base = handed if fact is None else calc._n(fact)
+        ordered = m["ordered_fact"] if m.get("ordered_fact") is not None else pu["ordered"]
+        past = d <= today
+        # раскладка дня по умолчанию: базе — по норме или по заказу дня,
+        # в фонд — по норме бюджета; вписанное руками главнее
+        aside, aside_src = m.get("aside"), "manual"
+        if aside is None:
+            aside_src = ""
+            if past and base > 0:
+                aside = budget["norm_b"] if budget["norm_b"] is not None else ordered
+                aside_src = "norm" if budget["norm_b"] is not None else "order"
+        collected, collected_src = m.get("collected"), "manual"
+        if collected is None:
+            collected_src = ""
+            if past and base > 0 and budget["norm"]:
+                collected, collected_src = budget["norm"], "norm"
+        extra_in = sum(calc._n(x.get("amount")) for x in en["in"])
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
             debt=s["debt"], tips=s["tips"], spend=sp["spend"], handed=handed,
-            handed_fact=m.get("handed_fact"),
-            ordered=m["ordered_fact"] if m.get("ordered_fact") is not None else ordered_auto,
-            ordered_extra=pu["ordered_extra"],
-            aside=m.get("aside"), collected=m.get("collected"), extra_rp=m.get("extra_rp"),
+            handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"],
+            aside=aside, collected=collected,
+            extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
             expenses=en["rp"], payouts=en["np"]))
+        meta[d] = dict(aside_src=aside_src, collected_src=collected_src, ins=en["in"],
+                       extra_manual=m.get("extra_rp"))
     book = calc.compute(rows, opening["opening"])
-    # Сверх математики — то, что нужно экрану: откуда взялось «заказали»,
-    # ждущие расходы, отметки сбора, будущее.
     marks = {} if light else await _marks([d for d in days if d <= today])
     for i, d in enumerate(days):
         r, s, sp, pu, m = book["days"][i], sales[d], spend[d], purch[d], manual.get(d) or {}
         r.update(orders=s["orders"], debt=s["debt"], spend_pending=sp["pending"],
                  ordered_auto=pu["ordered"], ordered_fact=m.get("ordered_fact"),
                  ordered_cover=pu["cover"], supplies=pu["supplies"],
-                 note=m.get("note") or "", future=d > today, today=d == today)
+                 note=m.get("note") or "", future=d > today, today=d == today,
+                 aside_src=meta[d]["aside_src"], collected_src=meta[d]["collected_src"],
+                 ins=meta[d]["ins"], extra_manual=meta[d]["extra_manual"],
+                 salary_sum=calc._i(sum(calc._n(e["amount"]) for e in r["expenses"]
+                                        if e.get("kind") in ("salary", "advance", "loan"))))
+        r["manual"] = {k: m.get(k) for k in calc.DAY_MANUAL}
         if not light:
             mk = marks.get(d) or {}
             need = set(s["cash_by"]) | set(k for k, v in sp["spend_by"].items() if v)
@@ -308,14 +549,38 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             legacy = bool((mk.get("cash") or {}).get("done"))
             got = sum(1 for oid in need if legacy or (mk.get(f"cash:{oid}") or {}).get("done"))
             r.update(cash_need=len(need), cash_got=got)
+    b, np_ = book["b"], book["np"]
+    safe_total = b["safe_end"] + np_["should_be"]
+    fact_b, fact_np = b.get("safe_fact"), np_.get("safe_fact")
+    book["safe"] = dict(b=b["safe_end"], b_open=b["safe_open"], np=np_["should_be"],
+                        rp=book["rp"]["result"], np_days=np_["days"], payouts=np_["payouts"],
+                        carry=np_["carry"], storage=np_["storage"], total=calc._i(safe_total),
+                        fact_b=fact_b, fact_np=fact_np, diff_b=b.get("diff"), diff_np=np_.get("diff"),
+                        fact=None if fact_b is None and fact_np is None
+                        else calc._i(calc._n(fact_b) + calc._n(fact_np)),
+                        diff=None if fact_b is None and fact_np is None
+                        else calc._i(calc._n(fact_b) + calc._n(fact_np) - safe_total))
     book.update(month=month, today=today, first=days[0], last=days[-1],
                 opening=opening["opening"], opening_explicit=opening["explicit"],
                 opening_carried=opening["carried"], month_note=opening["note"],
-                prev_month=_prev_month(month))
+                prev_month=_prev_month(month), budget=budget)
+    if not light:
+        fx = await _usd(mdoc)
+        book["pay"] = await _payroll(month, days, today, entries, work, fx["usd"])
+        book["pay"].update(fx)
+        book["budget"]["salary_hint"] = book["pay"]["totals"]["accrued"]
     return book
 
 
 # ── Ручки ────────────────────────────────────────────────────────────────────
+async def _touch(month: str) -> None:
+    """Любая запись в месяц меняет его закрытие и переносы всех следующих."""
+    try:
+        await db.fin_carry_invalidate(month)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] кэш переносов не сброшен: {e}")
+
+
 def _json(data, status=200):
     import json
     return web.json_response(data, status=status, headers=CORS_HEADERS,
@@ -337,6 +602,10 @@ def _day_arg(s: str) -> str:
     return s
 
 
+def _who(body: dict) -> str:
+    return str(body.get("as") or "").strip()[:40]
+
+
 @require_owner
 async def handle_book(request):
     """GET /api/owner/finance/book?month=YYYY-MM — весь месяц одним ответом."""
@@ -355,7 +624,8 @@ async def handle_book(request):
 @require_owner
 async def handle_day_set(request):
     """POST {day, field, value, as} — одно ручное поле дня. value пустое —
-    снять. Прошедший день уходит владельцам в бот (backdate)."""
+    снять (вернуть значение по умолчанию). Прошедший день уходит владельцам в
+    бот (backdate)."""
     try:
         body = await request.json()
         day = _day_arg(body.get("day"))
@@ -368,22 +638,31 @@ async def handle_day_set(request):
             value = _num(body.get("value"))
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
-    who = str(body.get("as") or "").strip()[:40]
+    who = _who(body)
     if value is None or value == "":
         await db.fin_day_set(day, {"by": who}, unset=[field])
     else:
         await db.fin_day_set(day, {field: value, "by": who})
+    await _touch(day[:7])
     log.info(f"[fin] {day} {field} → {value!r} · {who or '—'}")
-    await backdate.notify(day, who, "книга учёта: " + FIELD_T.get(field, field),
-                          "" if value in (None, "") else f"{value} AED")
+    await backdate.notify(day, who, "финансы: " + FIELD_T.get(field, field),
+                          "" if value in (None, "") else (value if field == "note" else f"{value} AED"))
     return _json({"ok": True, "day": day, "field": field, "value": value,
                   "book": await build(day[:7])})
 
 
+async def _line_ok(month: str, lid: str) -> bool:
+    if not lid:
+        return True
+    ln = await db.fin_budget_line_get(lid)
+    return bool(ln) and ln.get("month") == month
+
+
 @require_owner
 async def handle_entry_add(request):
-    """POST {day, book: rp|np, amount, comment, who, as} — строка расхода из
-    фонда (rp) или выплаты из прибыли (np)."""
+    """POST {day, book: rp|np|in, amount, comment, who, line, kind, as} —
+    строка расхода из фонда (rp, со строкой бюджета), выплаты из прибыли (np)
+    или прихода в фонд (in)."""
     try:
         body = await request.json()
         day = _day_arg(body.get("day"))
@@ -393,24 +672,32 @@ async def handle_entry_add(request):
         amount = _num(body.get("amount"))
         if amount is None or amount <= 0:
             return _json({"error": "bad_amount"}, 400)
+        kind = str(body.get("kind") or "")
+        if kind not in ENTRY_KINDS or (kind and book != "rp"):
+            return _json({"error": "bad_kind"}, 400)
+        line = str(body.get("line") or "")[:24] if book == "rp" else ""
+        if not await _line_ok(day[:7], line):
+            return _json({"error": "bad_line"}, 400)
+        who = str(body.get("who") or "").strip()[:60]
+        if kind and not who:
+            return _json({"error": "who_required"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
-    who = str(body.get("as") or "").strip()[:40]
+    by = _who(body)
     doc = {"_id": secrets.token_hex(6), "day": day, "book": book, "amount": amount,
            "comment": str(body.get("comment") or "").strip()[:120],
-           "who": str(body.get("who") or "").strip()[:60],
-           "by": who, "at": datetime.now(timezone.utc)}
+           "who": who, "line": line, "kind": kind, "by": by, "at": datetime.now(timezone.utc)}
     await db.fin_entry_add(doc)
-    log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» · {who or '—'}")
-    await backdate.notify(day, who, "книга учёта: " + ("расход из фонда" if book == "rp"
-                                                        else "выплата из прибыли"),
-                          f"{amount} AED {doc['comment']}".strip())
+    await _touch(day[:7])
+    log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}")
+    await backdate.notify(day, by, "финансы: " + BOOK_T.get(book, book),
+                          f"{amount} AED {who} {doc['comment']}".strip())
     return _json({"ok": True, "id": doc["_id"], "book": await build(day[:7])})
 
 
 @require_owner
 async def handle_entry_del(request):
-    """DELETE {id, as} — убрать строку."""
+    """DELETE {id, as} — убрать строку; аванс тянет за собой своё удержание."""
     try:
         body = await request.json()
         eid = str(body.get("id") or "")
@@ -420,16 +707,20 @@ async def handle_entry_del(request):
     if not old:
         return _json({"error": "not_found"}, 404)
     await db.fin_entry_del(eid)
-    who = str(body.get("as") or "").strip()[:40]
+    if old.get("item"):
+        await db.fin_pay_item_del(str(old["item"]))
+    await _touch(str(old.get("day") or "")[:7] or _biz_day()[:7])
+    who = _who(body)
     log.info(f"[fin] {old.get('day')} {old.get('book')} −{old.get('amount')} убрано · {who or '—'}")
-    await backdate.notify(str(old.get("day") or ""), who, "книга учёта: строка убрана",
+    await backdate.notify(str(old.get("day") or ""), who, "финансы: строка убрана",
                           f"{old.get('amount')} AED {old.get('comment') or ''}".strip())
     return _json({"ok": True, "book": await build(str(old.get("day") or "")[:7])})
 
 
 @require_owner
 async def handle_month_set(request):
-    """POST {month, field, value, as} — перенос, хранение или пересчёт сейфа."""
+    """POST {month, field, value, as} — перенос, хранение, пересчёт сейфа,
+    норма в день (в фонд / базе), курс доллара, заметка."""
     try:
         body = await request.json()
         month = _month_arg(body.get("month"))
@@ -437,25 +728,279 @@ async def handle_month_set(request):
         if field not in MONTH_FIELDS and field != "note":
             return _json({"error": "bad_field"}, 400)
         value = (str(body.get("value") or "").strip()[:200] if field == "note"
-                 else _num(body.get("value")))
+                 else _num(body.get("value"), 4 if field == "usd" else 2))
+        if field in ("norm", "norm_b", "usd") and value is not None and value < 0:
+            return _json({"error": "bad_number"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
-    who = str(body.get("as") or "").strip()[:40]
+    who = _who(body)
     if value is None or value == "":
         await db.fin_month_set(month, {"by": who}, unset=[field])
     else:
         await db.fin_month_set(month, {field: value, "by": who})
+    await _touch(month)
     log.info(f"[fin] {month} {field} → {value!r} · {who or '—'}")
     return _json({"ok": True, "month": month, "field": field, "value": value,
                   "book": await build(month)})
 
 
+# ── Бюджет ──────────────────────────────────────────────────────────────────
+@require_owner
+async def handle_budget_set(request):
+    """POST {month, id?, name, plan, due, note, kind, as} — статья бюджета:
+    новая или правка."""
+    try:
+        body = await request.json()
+        month = _month_arg(body.get("month"))
+        name = str(body.get("name") or "").strip()[:40]
+        if not name:
+            return _json({"error": "name_required"}, 400)
+        plan = _num(body.get("plan")) or 0
+        if plan < 0:
+            return _json({"error": "bad_number"}, 400)
+        due = int(_num(body.get("due")) or 0)
+        if not 0 <= due <= 31:
+            return _json({"error": "bad_due"}, 400)
+        kind = str(body.get("kind") or "")
+        if kind not in ("", "salary"):
+            return _json({"error": "bad_kind"}, 400)
+        lid = str(body.get("id") or "")[:24]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    if lid:
+        old = await db.fin_budget_line_get(lid)
+        if not old or old.get("month") != month:
+            return _json({"error": "not_found"}, 404)
+        ordv = old.get("ord")
+    else:
+        lid = secrets.token_hex(4)
+        ordv = len(await db.fin_budget_get(month))
+    doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
+           "note": str(body.get("note") or "").strip()[:80], "kind": kind,
+           "ord": ordv if ordv is not None else 0, "by": who}
+    await db.fin_budget_set(doc)
+    await _touch(month)
+    log.info(f"[fin] бюджет {month}: {name} {plan} · {who or '—'}")
+    return _json({"ok": True, "id": lid, "book": await build(month)})
+
+
+@require_owner
+async def handle_budget_del(request):
+    """DELETE {id, as} — убрать статью; записи с ней остаются «вне плана»."""
+    try:
+        body = await request.json()
+        lid = str(body.get("id") or "")
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    old = await db.fin_budget_line_get(lid)
+    if not old:
+        return _json({"error": "not_found"}, 404)
+    await db.fin_budget_del(lid)
+    await _touch(str(old.get("month")))
+    log.info(f"[fin] бюджет {old.get('month')}: убрана «{old.get('name')}» · {_who(body) or '—'}")
+    return _json({"ok": True, "book": await build(str(old.get("month")))})
+
+
+@require_owner
+async def handle_budget_fill(request):
+    """POST {month, from: prev|template, as} — заполнить пустой бюджет: из
+    прошлого месяца (с планами) или по образцу (без сумм)."""
+    try:
+        body = await request.json()
+        month = _month_arg(body.get("month"))
+        src = str(body.get("from") or "prev")
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if await db.fin_budget_get(month):
+        return _json({"error": "not_empty"}, 409)
+    if src == "prev":
+        prev = await db.fin_budget_get(_prev_month(month))
+        if not prev:
+            return _json({"error": "no_prev"}, 404)
+        rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
+                     note=ln.get("note") or "", kind=ln.get("kind") or "") for ln in prev]
+    else:
+        rows = [dict(name=r["name"], plan=0, due=0, note="", kind=r.get("kind") or "")
+                for r in template_lines()]
+    who = _who(body)
+    for i, r in enumerate(rows):
+        await db.fin_budget_set({"_id": secrets.token_hex(4), "month": month, "ord": i, "by": who, **r})
+    await _touch(month)
+    log.info(f"[fin] бюджет {month} заполнен ({src}, {len(rows)}) · {who or '—'}")
+    return _json({"ok": True, "n": len(rows), "book": await build(month)})
+
+
+# ── Зарплаты ─────────────────────────────────────────────────────────────────
+@require_owner
+async def handle_pay_person(request):
+    """POST {name, role, note, hidden, as} — человек в зарплатах: новый (не из
+    расписания), роль, заметка, скрыть."""
+    try:
+        body = await request.json()
+        name = str(body.get("name") or "").strip()[:40]
+        if not name:
+            return _json({"error": "name_required"}, 400)
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+        fields = {"by": _who(body)}
+        if "role" in body:
+            role = str(body.get("role") or "other")
+            if role not in pay.ROLES:
+                return _json({"error": "bad_role"}, 400)
+            fields["role"] = role
+        if "note" in body:
+            fields["note"] = str(body.get("note") or "").strip()[:80]
+        if "hidden" in body:
+            fields["hidden"] = bool(body.get("hidden"))
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    import config_staff as staff
+    known = set(staff.driver_names()) | set(staff.operator_names())
+    fields["manual"] = name not in known
+    if "hidden" not in fields:
+        fields["hidden"] = False                  # добавили заново — снова в списке
+    await db.fin_person_set(name, fields)
+    log.info(f"[fin] зарплаты: {name} {fields.get('role', '')}{' скрыт' if fields['hidden'] else ''} · {_who(body) or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
+async def handle_pay_month_set(request):
+    """POST {month, name, field, value, as} — ставка (rate / unit / cur) с этого
+    месяца и дальше, дни и заметка — только за месяц."""
+    try:
+        body = await request.json()
+        month = _month_arg(body.get("month"))
+        name = str(body.get("name") or "").strip()[:40]
+        field = str(body.get("field") or "")
+        if not name or field not in PAY_FIELDS:
+            return _json({"error": "bad_field"}, 400)
+        raw = body.get("value")
+        if field in ("rate", "days"):
+            value = _num(raw)
+            if value is not None and value < 0:
+                return _json({"error": "bad_number"}, 400)
+        elif field == "unit":
+            value = str(raw or "") or None
+            if value is not None and value not in pay.UNITS:
+                return _json({"error": "bad_unit"}, 400)
+        elif field == "cur":
+            value = str(raw or "") or None
+            if value is not None and value not in pay.CURS:
+                return _json({"error": "bad_cur"}, 400)
+        else:
+            value = str(raw or "").strip()[:80]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    if value is None or value == "":
+        await db.fin_pay_month_set(month, name, {"by": who}, unset=[field])
+    else:
+        await db.fin_pay_month_set(month, name, {field: value, "by": who})
+    log.info(f"[fin] зарплаты {month} {name}: {field} → {value!r} · {who or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
+async def handle_pay_item_add(request):
+    """POST {name, kind, amount, per_month, from: this|next|YYYY-MM, day, note, as}
+    — штраф, аванс, долг или премия. Аванс и долг — деньги выданы из фонда:
+    запись расхода в тот же день."""
+    try:
+        body = await request.json()
+        name = str(body.get("name") or "").strip()[:40]
+        kind = str(body.get("kind") or "")
+        if not name or kind not in pay.KINDS:
+            return _json({"error": "bad_kind"}, 400)
+        amount = _num(body.get("amount"))
+        if amount is None or amount <= 0:
+            return _json({"error": "bad_amount"}, 400)
+        per_month = _num(body.get("per_month")) or 0
+        if per_month < 0:
+            return _json({"error": "bad_number"}, 400)
+        day = _day_arg(body.get("day") or _biz_day())
+        month = _month_arg(body.get("month")) if body.get("month") else day[:7]
+        frm = str(body.get("from") or "this")
+        start = month if frm == "this" else pay.next_month(month) if frm == "next" else _month_arg(frm)
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    note = str(body.get("note") or "").strip()[:80]
+    iid = secrets.token_hex(5)
+    entry_id = ""
+    if kind in pay.CASH_KINDS:
+        lines = (await _budget(day[:7], [], {}, 1))["lines"]
+        entry_id = secrets.token_hex(6)
+        await db.fin_entry_add({"_id": entry_id, "day": day, "book": "rp", "amount": amount,
+                                "comment": note or pay.KINDS[kind], "who": name,
+                                "line": _salary_line(lines), "kind": kind, "item": iid,
+                                "by": who, "at": datetime.now(timezone.utc)})
+    await db.fin_pay_item_add({"_id": iid, "name": name, "kind": kind, "amount": amount,
+                               "per_month": per_month, "from": start, "day": day, "note": note,
+                               "entry": entry_id, "by": who, "at": datetime.now(timezone.utc)})
+    await _touch(min(month, day[:7]))
+    log.info(f"[fin] зарплаты: {name} {pay.KINDS[kind]} {amount} с {start}"
+             f"{f' по {per_month}/мес' if per_month else ''} · {who or '—'}")
+    if kind in pay.CASH_KINDS:
+        await backdate.notify(day, who, f"финансы: {pay.KINDS[kind].lower()} {name}", f"{amount} AED")
+    return _json({"ok": True, "id": iid, "book": await build(month)})
+
+
+@require_owner
+async def handle_pay_item_del(request):
+    """DELETE {id, month, as} — убрать удержание; выданные деньги уходят из
+    расходов вместе с ним."""
+    try:
+        body = await request.json()
+        iid = str(body.get("id") or "")
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    old = await db.fin_pay_item_get(iid)
+    if not old:
+        return _json({"error": "not_found"}, 404)
+    await db.fin_pay_item_del(iid)
+    if old.get("entry"):
+        await db.fin_entry_del(str(old["entry"]))
+    await _touch(min(month, str(old.get("day") or month)[:7]))
+    log.info(f"[fin] зарплаты: {old.get('name')} {old.get('kind')} {old.get('amount')} убрано · {_who(body) or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
+async def handle_pay_out(request):
+    """POST {name, amount, day, month, note, as} — выплата зарплаты из фонда:
+    деньги выходят днём day, зарплата — за месяц month (по умолчанию месяц дня)."""
+    try:
+        body = await request.json()
+        name = str(body.get("name") or "").strip()[:40]
+        amount = _num(body.get("amount"))
+        if not name or amount is None or amount <= 0:
+            return _json({"error": "bad_amount"}, 400)
+        day = _day_arg(body.get("day") or _biz_day())
+        month = _month_arg(body.get("month")) if body.get("month") else day[:7]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    lines = (await _budget(day[:7], [], {}, 1))["lines"]
+    doc = {"_id": secrets.token_hex(6), "day": day, "book": "rp", "amount": amount,
+           "comment": str(body.get("note") or "").strip()[:120] or "Зарплата",
+           "who": name, "line": _salary_line(lines), "kind": "salary", "pay_month": month,
+           "by": who, "at": datetime.now(timezone.utc)}
+    await db.fin_entry_add(doc)
+    await _touch(min(month, day[:7]))
+    log.info(f"[fin] зарплата {name} {amount} за {month} ({day}) · {who or '—'}")
+    await backdate.notify(day, who, f"финансы: зарплата {name}", f"{amount} AED")
+    return _json({"ok": True, "id": doc["_id"], "book": await build(month)})
+
+
 FIELD_T = {
     "handed_fact": "сдали по факту", "ordered_fact": "заказали по счёту",
-    "aside": "отложили в сейф Б", "collected": "собрал в фонд",
-    "extra_rp": "доп. приход в фонд", "pay_b": "оплата Баракуде из сейфа Б",
-    "pay_b_extra": "оплата Баракуде из ЧП / РП", "note": "заметка дня",
+    "aside": "отложили базе", "collected": "отложили в фонд",
+    "extra_rp": "приход в фонд", "pay_b": "оплата базе из отложенного",
+    "pay_b_extra": "оплата базе сверх отложенного", "note": "заметка дня",
 }
+BOOK_T = {"rp": "расход из фонда", "np": "выплата из прибыли", "in": "приход в фонд"}
 
 
 async def _opt(request):
@@ -470,6 +1015,14 @@ def setup(app):
         ("/api/owner/finance/book/entry", handle_entry_add, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_del, "DELETE"),
         ("/api/owner/finance/book/month", handle_month_set, "POST"),
+        ("/api/owner/finance/book/budget", handle_budget_set, "POST"),
+        ("/api/owner/finance/book/budget", handle_budget_del, "DELETE"),
+        ("/api/owner/finance/book/budget/fill", handle_budget_fill, "POST"),
+        ("/api/owner/finance/book/pay/person", handle_pay_person, "POST"),
+        ("/api/owner/finance/book/pay/month", handle_pay_month_set, "POST"),
+        ("/api/owner/finance/book/pay/item", handle_pay_item_add, "POST"),
+        ("/api/owner/finance/book/pay/item", handle_pay_item_del, "DELETE"),
+        ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),
     )
     seen = set()
     for path, handler, method in routes:

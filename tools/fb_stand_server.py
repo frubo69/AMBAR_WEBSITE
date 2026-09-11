@@ -47,6 +47,7 @@ for r in ROWS:
     if n % 4 == 0:
         ORDERS.append(dict(order_id=f"t{n}", timestamp=ts, status="delivered", total=250, tip=0,
                            payment_method="transfer", office_id="marina"))
+    if n % 2: DRIVER_DAYS.append(dict(day=day, driver="Худоба", working=True, extras=[]))
     DRIVER_DAYS.append(dict(day=day, driver="Али", working=True,
                             extras=[dict(id=f"e{n}", amount=220, kind="fuel", status="approved")]))
     if r["ordered"]:
@@ -111,6 +112,83 @@ stock_routes._catalog = lambda: CATALOG
 config_staff.MEAL_WORKING, config_staff.MEAL_OFF = 80, 40
 config_staff.drivers = lambda: [dict(name="Али", district="jbr")]
 backdate.notify = notify
+
+# ── бюджет, люди, зарплаты ──
+BUDGET = [dict(_id="L1", month=MONTH, name="Зарплаты", plan=80000, due=0, note="", kind="salary", ord=0),
+          dict(_id="L2", month=MONTH, name="Аренда офис", plan=26000, due=3, note="менеджеру, на 3 мес", kind="", ord=1),
+          dict(_id="L3", month=MONTH, name="Аренда JVC", plan=31250, due=15, note="", kind="", ord=2),
+          dict(_id="L4", month=MONTH, name="Аренда Бизнес Бей", plan=37500, due=5, note="", kind="", ord=3),
+          dict(_id="L5", month=MONTH, name="Авто", plan=32000, due=0, note="два рента", kind="", ord=4),
+          dict(_id="L6", month=MONTH, name="Билеты", plan=5600, due=0, note="", kind="", ord=5),
+          dict(_id="L7", month=MONTH, name="Визы", plan=11000, due=0, note="5 чел", kind="", ord=6),
+          dict(_id="L8", month=MONTH, name="Sim", plan=3500, due=0, note="", kind="", ord=7),
+          dict(_id="L9", month=MONTH, name="Продукты", plan=6000, due=0, note="", kind="", ord=8),
+          dict(_id="L10", month=MONTH, name="Бензин", plan=3000, due=0, note="", kind="", ord=9)]
+LINE_BY = {"аренда": "L2", "бензин": "L10", "зарплата оператору": "L1", "ремонт машины": "L5", "связь": "L8", "реклама": "", "штраф": ""}
+for e in ENTRIES:
+    if e["book"] == "rp":
+        e["line"] = LINE_BY.get(e["comment"], "")
+        if e["comment"] == "зарплата оператору":
+            e["kind"] = "salary"; e["who"] = "Умар"; e["comment"] = "Зарплата"; e["pay_month"] = MONTH
+ENTRIES.append(dict(_id="in1", day=f"{MONTH}-02", book="in", amount=250, comment="перевод с крипты", who="", by="Старший", at="t"))
+if today_n >= 8:
+    ENTRIES.append(dict(_id="in2", day=f"{MONTH}-08", book="in", amount=340, comment="вернули депозит", who="", by="Старший", at="t"))
+PEOPLE = [dict(_id="Макар", role="senior", manual=True, note="старший"), dict(_id="Слон", role="senior", manual=True)]
+PAYM = [dict(_id=f"{PREV}|Макар", month=PREV, name="Макар", rate=1750, unit="month", cur="USD"),
+        dict(_id=f"{PREV}|Слон", month=PREV, name="Слон", rate=1750, unit="month", cur="USD"),
+        dict(_id=f"{PREV}|Али", month=PREV, name="Али", rate=110, unit="day", cur="AED"),
+        dict(_id=f"{PREV}|Умар", month=PREV, name="Умар", rate=3000, unit="month", cur="AED"),
+        dict(_id=f"{MONTH}|Умар", month=MONTH, name="Умар", days=22, note="")]
+ITEMS = [dict(_id="i1", name="Али", kind="fine", amount=4040, per_month=1000, **{"from": PREV}, day=f"{PREV}-20", note="кр. свет", entry=""),
+         dict(_id="i2", name="Макар", kind="advance", amount=2000, per_month=0, **{"from": MONTH}, day=f"{MONTH}-04", note="", entry="adv1"),
+         dict(_id="i3", name="Умар", kind="bonus", amount=100, per_month=0, **{"from": MONTH}, day=f"{MONTH}-06", note="премия", entry=""),
+         dict(_id="i4", name="Слон", kind="advance", amount=6450, per_month=0, **{"from": fr.pay.next_month(MONTH)}, day=f"{MONTH}-05", note="за следующий месяц", entry="adv2")]
+ENTRIES.append(dict(_id="adv1", day=f"{MONTH}-04", book="rp", amount=2000, comment="Аванс", who="Макар", line="L1", kind="advance", item="i2", by="Старший", at="t"))
+ENTRIES.append(dict(_id="adv2", day=f"{MONTH}-05", book="rp", amount=6450, comment="за следующий месяц", who="Слон", line="L1", kind="advance", item="i4", by="Старший", at="t"))
+SHIFTS = [(f"{MONTH}-{n:02d}", d) for n in range(1, today_n + 1) for d in ("jvc", "bbay", "tecom")]
+async def fin_budget_get(m): return [dict(l) for l in BUDGET if l["month"] == m]
+async def fin_budget_line_get(lid): return next((dict(l) for l in BUDGET if l["_id"] == lid), None)
+async def fin_budget_set(doc): BUDGET[:] = [l for l in BUDGET if l["_id"] != doc["_id"]]; BUDGET.append(dict(doc))
+async def fin_budget_del(lid): BUDGET[:] = [l for l in BUDGET if l["_id"] != lid]; return True
+async def fin_people_get(): return [dict(p) for p in PEOPLE]
+async def fin_person_set(name, fields, unset=None):
+    d = next((p for p in PEOPLE if p["_id"] == name), None)
+    if d is None: d = {"_id": name}; PEOPLE.append(d)
+    d.update(fields)
+async def fin_pay_months_upto(m): return sorted([dict(d) for d in PAYM if d["month"] <= m], key=lambda d: d["month"])
+async def fin_pay_month_set(m, name, fields, unset=None):
+    d = next((x for x in PAYM if x["_id"] == f"{m}|{name}"), None)
+    if d is None: d = {"_id": f"{m}|{name}", "month": m, "name": name}; PAYM.append(d)
+    d.update(fields)
+    for k in (unset or []): d.pop(k, None)
+async def fin_pay_items_get(): return [dict(i) for i in ITEMS]
+async def fin_pay_item_add(doc): ITEMS.append(dict(doc))
+async def fin_pay_item_get(iid): return next((dict(i) for i in ITEMS if i["_id"] == iid), None)
+async def fin_pay_item_del(iid): ITEMS[:] = [i for i in ITEMS if i["_id"] != iid]; return True
+async def shift_days_worked(a, b): return [x for x in SHIFTS if a <= x[0] <= b]
+async def fin_entries_where(q): return [dict(e) for e in ENTRIES if all(e.get(k) == v for k, v in q.items())]
+async def fin_carry_invalidate(m):
+    for k, d in MONTHS.items():
+        if k >= m: d.pop('carry_cache', None)
+for n_, f in dict(fin_budget_get=fin_budget_get, fin_budget_line_get=fin_budget_line_get, fin_budget_set=fin_budget_set,
+                  fin_budget_del=fin_budget_del, fin_people_get=fin_people_get, fin_person_set=fin_person_set,
+                  fin_pay_months_upto=fin_pay_months_upto, fin_pay_month_set=fin_pay_month_set,
+                  fin_pay_items_get=fin_pay_items_get, fin_pay_item_add=fin_pay_item_add, fin_pay_item_get=fin_pay_item_get,
+                  fin_pay_item_del=fin_pay_item_del, shift_days_worked=shift_days_worked,
+                  fin_entries_where=fin_entries_where, fin_carry_invalidate=fin_carry_invalidate).items():
+    setattr(db, n_, f)
+import types
+_rates = types.ModuleType("rates")
+async def _get_rates(force=False): return {"rates": [{"code": "USD", "aed": 3.6725, "cash_aed": 3.67}]}
+_rates.get_rates = _get_rates
+sys.modules["rates"] = _rates
+config_staff.SENIOR_OPERATORS = [{"id": "parviz", "name": "Парвиз", "telegram_id": 1}]
+config_staff.operators = lambda: [dict(name="Парвиз", senior=True, districts=["jvc", "bbay", "tecom"]),
+                                  dict(name="Умар", senior=False, districts=["jvc", "tecom"]),
+                                  dict(name="Фарух", senior=False, districts=["bbay"])]
+config_staff.drivers = lambda: [dict(name="Али", district="jbr"), dict(name="Худоба", district="jvc")]
+config_staff.driver_names = lambda: ["Али", "Худоба"]
+config_staff.operator_names = lambda: ["Умар", "Фарух", "Парвиз"]
 
 async def static(request):
     path = request.match_info.get("path") or "stand.html"

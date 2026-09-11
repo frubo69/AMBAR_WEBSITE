@@ -4651,7 +4651,8 @@ async def cost_override_set(product_id: str, price, by_name: str = "") -> bool:
 # пишется, а считается на лету в finance_routes.
 #   fin_days    {_id: день, handed_fact, ordered_fact, aside, collected,
 #                extra_rp, pay_b, pay_b_extra, note, by, at}
-#   fin_entries {_id, day, book: 'rp' | 'np', amount, comment, who, by, at}
+#   fin_entries {_id, day, book: 'rp' | 'np' | 'in', amount, comment, who, line,
+#                kind: '' | 'salary' | 'advance' | 'loan', item, by, at}
 #   fin_months  {_id: 'YYYY-MM', safe_b_open, debt_b_open, carry_np, storage,
 #                safe_np_fact, safe_b_fact, note, by, at}
 async def fin_days_get(day_from: str, day_to: str) -> dict:
@@ -4711,6 +4712,14 @@ async def fin_month_set(month: str, fields: dict, unset: list | None = None) -> 
     await d.fin_months.update_one({"_id": month}, upd, upsert=True)
 
 
+async def fin_carry_invalidate(month: str) -> None:
+    """Правка месяца меняет его закрытие — кэш переносов этого и всех более
+    поздних месяцев больше не верен."""
+    d = _db_or_none()
+    if d is None: return
+    await d.fin_months.update_many({"_id": {"$gte": month}}, {"$unset": {"carry_cache": ""}})
+
+
 async def fin_months_list() -> list:
     """Месяцы, в которых книга хоть раз тронута: по дням, записям или итогам."""
     d = _db_or_none()
@@ -4723,6 +4732,124 @@ async def fin_months_list() -> list:
     async for r in d.fin_months.find({}, {"_id": 1}):
         out.add(str(r["_id"])[:7])
     return sorted(m for m in out if len(m) == 7)
+
+
+# ── Финансы: бюджет, люди, зарплаты ─────────────────────────────────────────
+#   fin_budget_lines {_id, month, name, plan, due, note, kind: '' | 'salary', ord, by, at}
+#   fin_people       {_id: имя, role, note, hidden, manual, by, at}
+#   fin_pay_months   {_id: 'YYYY-MM|имя', month, name, rate, unit, cur, days, note, by, at}
+#   fin_pay_items    {_id, name, kind: fine|advance|loan|bonus, amount, per_month,
+#                     from: 'YYYY-MM', day, note, entry, by, at}
+async def fin_budget_get(month: str) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.fin_budget_lines.find({"month": month}).sort([("ord", 1), ("at", 1)])
+    return await cur.to_list(length=200)
+
+
+async def fin_budget_set(doc: dict) -> None:
+    d = _db_or_none()
+    if d is None: return
+    doc = {**doc, "at": datetime.now(timezone.utc)}
+    await d.fin_budget_lines.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
+
+
+async def fin_budget_line_get(lid: str) -> dict | None:
+    d = _db_or_none()
+    if d is None: return None
+    return await d.fin_budget_lines.find_one({"_id": lid})
+
+
+async def fin_budget_del(lid: str) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.fin_budget_lines.delete_one({"_id": lid})
+    return bool(r.deleted_count)
+
+
+async def fin_budget_months() -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return sorted(await d.fin_budget_lines.distinct("month"))
+
+
+async def fin_people_get() -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.fin_people.find({}).to_list(length=500)
+
+
+async def fin_person_set(name: str, fields: dict, unset: list | None = None) -> None:
+    d = _db_or_none()
+    if d is None: return
+    upd: dict = {"$set": {**fields, "at": datetime.now(timezone.utc)}}
+    if unset:
+        upd["$unset"] = {k: "" for k in unset}
+    await d.fin_people.update_one({"_id": name}, upd, upsert=True)
+
+
+async def fin_pay_months_upto(month: str) -> list:
+    """Все записи по людям до этого месяца включительно: ставка действует с
+    того месяца, в котором её вписали, и дальше, пока не впишут новую."""
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.fin_pay_months.find({"month": {"$lte": month}}).sort("month", 1)
+    return await cur.to_list(length=5000)
+
+
+async def fin_pay_month_set(month: str, name: str, fields: dict, unset: list | None = None) -> None:
+    d = _db_or_none()
+    if d is None: return
+    upd: dict = {"$set": {**fields, "month": month, "name": name, "at": datetime.now(timezone.utc)}}
+    if unset:
+        upd["$unset"] = {k: "" for k in unset}
+    await d.fin_pay_months.update_one({"_id": f"{month}|{name}"}, upd, upsert=True)
+
+
+async def fin_pay_items_get() -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.fin_pay_items.find({}).sort("at", 1).to_list(length=5000)
+
+
+async def fin_pay_item_add(doc: dict) -> None:
+    d = _db_or_none()
+    if d is None: return
+    await d.fin_pay_items.insert_one(doc)
+
+
+async def fin_pay_item_get(iid: str) -> dict | None:
+    d = _db_or_none()
+    if d is None: return None
+    return await d.fin_pay_items.find_one({"_id": iid})
+
+
+async def fin_pay_item_del(iid: str) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.fin_pay_items.delete_one({"_id": iid})
+    return bool(r.deleted_count)
+
+
+async def fin_entries_where(q: dict) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.fin_entries.find(q).sort("at", 1).to_list(length=2000)
+
+
+async def shift_days_worked(day_from: str, day_to: str) -> list:
+    """Пары (день, район), когда смена района открывалась или закрывалась —
+    для подсчёта дней операторов."""
+    d = _db_or_none()
+    if d is None: return []
+    out: set = set()
+    for coll in (d.shift_opens, d.shift_days):
+        cur = coll.find({"day": {"$gte": day_from, "$lte": day_to}, "district": {"$ne": "*"}},
+                        {"_id": 0, "day": 1, "district": 1})
+        async for r in cur:
+            if r.get("district"):
+                out.add((r["day"], r["district"]))
+    return sorted(out)
 
 
 async def orders_between(since_iso: str, until_iso: str) -> list:

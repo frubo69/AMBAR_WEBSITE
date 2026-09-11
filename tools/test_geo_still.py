@@ -149,14 +149,14 @@ async def watch():
     DAYS["Али"]["shift_close_at"] = "y"
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
     eq("замка нет, метка снята", (out.get("locked"), "off_since" in (WATCH.get("Али") or {})), ([], False))
-    print("— выключил трансляцию и не включил — замок с новым текстом")
+    print("— выключил трансляцию и не включил — замка нет, пропажа снимается тихо")
     SENT.clear(); WATCH.clear(); DAYS["Али"] = {"working": True, "shift_open_at": "x"}
     POS["Али"] = pos(30, 30, until="")
     await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
     DAYS["Али"]["shift_close_at"] = "y"
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("заперт", out.get("locked"), ["Али"])
-    eq("текст замка: «Трансляция выключена с …»", any("Трансляция выключена с" in t for _, t in SENT), True)
+    eq("не заперт, метка снята", (out.get("locked"), "off_since" in (WATCH.get("Али") or {})), ([], False))
+    eq("в текстах нет «закроется»", any("закро" in t for _, t in SENT), False)
     print("— «Стоял N» и «Без движения с» — от якоря, не от минуты обнаружения")
     SENT.clear(); WATCH.clear(); DAYS["Али"] = {"working": True, "shift_open_at": "x"}
     NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc)

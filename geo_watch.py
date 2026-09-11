@@ -5,8 +5,9 @@
 Водитель на смене обязан быть виден: оператор отдаёт заказ тому, кто ближе,
 и невидимая машина для него не существует. Напоминание самому водителю уже
 есть (geo_nag), но напоминание — это просьба, а здесь нужно правило. Правило
-такое: пропала геопозиция — старший узнаёт сразу; не вернулась до конца
-смены — вход в приложение закрыт, пока старший его не откроет.
+такое: пропала геопозиция — старший узнаёт сразу. Замка нет: раньше
+невернувшаяся геопозиция запирала вход до утра, владелец это снял
+(11 сен 2026) — сообщение есть, наказания нет.
 
 Что считаем пропажей
 --------------------
@@ -175,8 +176,8 @@ def _n(name: str) -> str:
 
 
 def text_stream_off(name: str, opened: bool) -> str:
-    tail = ("Если до конца смены не включит — вход в приложение закроется."
-            if opened else "Смена у него не открыта.")
+    tail = "Оператор его не видит." if opened else "Смена у него не открыта."
+
     return f"📍 *{_n(name)}*: выключил трансляцию геопозиции\n{tail}"
 
 
@@ -193,11 +194,9 @@ def _since_still(geo: dict, now: datetime = None) -> datetime:
 def text_off(name: str, why: str, geo: dict, now: datetime = None) -> str:
     if why == "stream":
         return (f"📍 *{_n(name)}*: трансляция геопозиции выключена\n"
-                "Оператор больше не видит, где он. Если до конца смены не "
-                "включит — вход в приложение закроется.")
+                "Оператор больше не видит, где он.")
     return (f"📍 *{_n(name)}*: два часа без движения\n"
-            f"На одном месте с {_hhmm(_since_still(geo, now))}. Если до конца смены "
-            "не поедет — вход в приложение закроется.")
+            f"На одном месте с {_hhmm(_since_still(geo, now))}.")
 
 
 def text_back(name: str, gone_sec: float, why: str = "") -> str:
@@ -536,25 +535,16 @@ async def tick(now: datetime = None) -> dict:
                 out["back"].append(name)
             continue
 
-        # Смена кончилась. Пропажа, которая так и длится, — замок. Стояние
-        # замка не даёт: закрыл смену и стоит — значит, приехал; не закрыл
-        # и стоит до утра — уснул дома, а не спрятался.
+        # Смена кончилась. Замка больше нет (владелец, 11 сен 2026: «не надо
+        # ничего закрывать»): пропажа просто снимается, вернулась — короткая
+        # строка владельцам.
         if not off_since:
             continue
         why = st.get("off_why") or ""
-        if why == "still":
-            await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
-            continue
-        if g["watch_ok"]:
-            await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
+        await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
+        if g["watch_ok"] and why != "still":
             await _owners(text_back(name, (utc - off_since).total_seconds(), why), EVENT_ON)
             out["back"].append(name)
-            continue
-        key = await db.geo_lock_set(name, utc, why)
-        await _owners(text_lock(name, off_since, why), EVENT_LOCK, unlock_keyboard(key))
-        await _driver(name, text_lock_driver(off_since, why))
-        log.warning(f"[geo-watch] {name}: вход закрыт — геопозиции нет с {_hhmm(off_since)}")
-        out["locked"].append(name)
 
     if out["off"] or out["back"] or out["locked"]:
         log.info(f"[geo-watch] {day}: пропала у {out['off']}, вернулась у {out['back']}, "

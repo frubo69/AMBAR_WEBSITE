@@ -3191,6 +3191,10 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-pc{display:block;width:100%;margin:0;padding:9px 12px;border:0;border-radius:0;background:transparent;text-align:left;
   font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
+.fb-kids .fb-dh{padding:8px 12px;gap:9px}
+.fb-kids .fb-dh .crew-code{width:30px;height:30px;font-size:11.5px}
+.fb-kids .fb-dh .crw-c-n{flex:1;font-size:12.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.fb-kids .fb-drag-grp + .fb-dh{border-top:1px solid rgba(201,169,110,.14)}
 .fb-kids .fb-pc:active{background:var(--card2)}
 .fb-kids .fb-pc.fb-editing{cursor:default;background:rgba(201,169,110,.05)} .fb-kids .fb-pc.fb-editing:active{background:rgba(201,169,110,.05)}
 .fb-pc .shl-h{gap:12px;min-height:44px}
@@ -18047,7 +18051,7 @@ function fbDragEnd(){
     f.style.left = r.left + 'px'; f.style.top = r.top + 'px'; f.style.transform = 'scale(1)'; f.style.boxShadow = 'none';
     setTimeout(() => { f.remove(); el.classList.remove('drag-ghost'); }, 200);
     const grp = el.parentElement;
-    fbPayOrder([...grp.querySelectorAll('[data-drag]')].map(x => x.dataset.drag), grp.dataset.role);
+    fbPayOrder([...grp.querySelectorAll('[data-drag]')].map(x => x.dataset.drag), grp.dataset.role, grp.dataset.district || '');
   }
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -18057,13 +18061,15 @@ function fbDragKill(){
   clearTimeout(FB_DRAG.hold); FB_DRAG.hold = null;
   const list = document.getElementById('fbList-bud'); if(list) list.classList.remove('jig');
 }
-// Порядок на сервер: весь список людей, где перетянутая группа — в новом
-// порядке, остальные как были; ord у каждого — номер в этом списке.
-async function fbPayOrder(names, role){
+// Порядок на сервер: весь список людей, где перетянутая группа (роль, у
+// водителей — район) — в новом порядке, остальные как были; ord у каждого
+// — номер в этом списке.
+async function fbPayOrder(names, role, district){
   const people = (((fbBook(FB.month) || {}).budget || {}).salary || {}).people || [];
+  const same = p => p.role === role && (role !== 'driver' || (p.district || '') === (district || ''));
   const all = []; let put = false;
   for(const p of people){
-    if(p.role === role){ if(!put){ all.push(...names); put = true; } }
+    if(same(p)){ if(!put){ all.push(...names); put = true; } }
     else all.push(p.name);
   }
   try{
@@ -18152,9 +18158,19 @@ function fbSalaryBody(b){
   for(const [role, t] of FB_SAL_GROUPS){
     const ps = (sal.people || []).filter(p => p.role === role);
     if(!ps.length) continue;
-    // группа — карточка с заголовком и счётчиком, как в «Зарплатах»
-    out += `<div class="fb-sgrp"><div class="sc-cap"><span>${t}</span><i>${ps.length}</i></div>
-      <div class="fb-drag-grp" data-role="${role}">${ps.map(p => fbPersonFillRow(p, sal)).join('')}</div></div>`;
+    // группа — карточка с заголовком и счётчиком, как в «Зарплатах»;
+    // водители внутри — по районам, шапка района как в «Кто на каком районе»
+    let body;
+    if(role === 'driver'){
+      const byD = [];
+      ps.forEach(p => { let g = byD.find(x => x.id === (p.district || '')); if(!g){ g = {id: p.district || '', code: p.district_code || '', name: p.district_name || 'Без района', rows: []}; byD.push(g); } g.rows.push(p); });
+      body = byD.map(g => `<div class="crw-c-h fb-dh"><span class="crew-code">${escS(g.code || '—')}</span><span class="crw-c-n">${escS(g.name)}</span>
+          <span class="crw-c-x">${g.rows.length} ${pluralize(g.rows.length, 'водитель', 'водителя', 'водителей')}</span></div>
+        <div class="fb-drag-grp" data-role="${role}" data-district="${escS(g.id)}">${g.rows.map(p => fbPersonFillRow(p, sal)).join('')}</div>`).join('');
+    }else{
+      body = `<div class="fb-drag-grp" data-role="${role}">${ps.map(p => fbPersonFillRow(p, sal)).join('')}</div>`;
+    }
+    out += `<div class="fb-sgrp"><div class="sc-cap"><span>${t}</span><i>${ps.length}</i></div>${body}</div>`;
   }
   out += `<button class="sc-r fb-plus sub" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>
     <div class="fb-add" id="fbAdd-person" hidden>

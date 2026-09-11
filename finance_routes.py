@@ -415,6 +415,7 @@ async def _pay_plan(month: str, ndays: int, usd: float) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] оклады не прочитаны: {e}")
         docs, mdocs = [], []
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
     by_name: dict = {}
     for d in mdocs:
         by_name.setdefault(str(d.get("name")), []).append(d)
@@ -427,8 +428,12 @@ async def _pay_plan(month: str, ndays: int, usd: float) -> dict:
         rate_aed = rate * (usd if cur == "USD" else 1.0)
         plan = rate_aed if unit == "month" else rate_aed * ndays
         total += plan
+        # водителю — его район: в бюджете водители лежат по районам, как везде
+        dist = (p.get("districts") or [""])[0] if p["role"] == "driver" else ""
         people.append(dict(name=p["name"], role=p["role"], role_t=pay.ROLE_T.get(p["role"], ""),
                            manual=bool(p.get("manual")),
+                           district=dist, district_code=OFFICE_CODES.get(dist, ""),
+                           district_name=OFFICE_NAMES.get(dist, ""),
                            rate=None if eff.get("rate") is None else calc._i(rate),
                            unit=unit, cur=cur, rate_aed=calc._i(rate_aed), plan=calc._i(plan)))
     return dict(plan=calc._i(total), people=people, n=len(people),

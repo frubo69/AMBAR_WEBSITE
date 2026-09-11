@@ -3181,12 +3181,18 @@ button.path:active{transform:scale(.995)}
 .fb-drag-grp [data-drag]{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;touch-action:pan-y}
 #fbList-bud.jig .fb-drag-grp [data-drag]{cursor:grabbing}
 .drag-ghost{opacity:.22;transition:opacity .15s}
-/* Человек в бюджете — карточка как в «Зарплатах» */
-.fb-kids .fb-pc{display:block;width:calc(100% - 20px);margin:6px 10px;padding:9px 12px;border-radius:14px;text-align:left;
+/* Люди в бюджете — группа карточкой с заголовком и счётчиком, строки внутри
+   разделены линиями, как в «Зарплатах» */
+.fb-kids .fb-sgrp{margin:8px 10px;border-radius:14px;overflow:hidden;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.28)}
+.fb-kids .fb-sgrp + .fb-plus.sub{border-top:0}
+.fb-kids .fb-sgrp .sc-cap{min-height:40px;padding:0 14px;font-size:12.5px;letter-spacing:.7px;border-bottom:1px solid rgba(201,169,110,.14)}
+.fb-kids .fb-sgrp .sc-cap i{font-size:11px;color:var(--muted)}
+.fb-kids .fb-pc{display:block;width:100%;margin:0;padding:9px 12px;border:0;border-radius:0;background:transparent;text-align:left;
   font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
 .fb-kids .fb-pc:active{background:var(--card2)}
-.fb-kids .fb-pc.fb-editing{cursor:default} .fb-kids .fb-pc.fb-editing:active{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%)}
-.fb-kids .fb-kcap + .fb-drag-grp .fb-pc:first-child{margin-top:2px}
+.fb-kids .fb-pc.fb-editing{cursor:default;background:rgba(201,169,110,.05)} .fb-kids .fb-pc.fb-editing:active{background:rgba(201,169,110,.05)}
 .fb-pc .shl-h{gap:12px;min-height:44px}
 .fb-pc .shl-v.fb-pv{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
 /* правило .shl-v b из «Зарплат» (display:block) не должно ломать окошко */
@@ -18146,7 +18152,9 @@ function fbSalaryBody(b){
   for(const [role, t] of FB_SAL_GROUPS){
     const ps = (sal.people || []).filter(p => p.role === role);
     if(!ps.length) continue;
-    out += `<div class="fb-kcap">${t}</div><div class="fb-drag-grp" data-role="${role}">` + ps.map(p => fbPersonFillRow(p, sal)).join('') + '</div>';
+    // группа — карточка с заголовком и счётчиком, как в «Зарплатах»
+    out += `<div class="fb-sgrp"><div class="sc-cap"><span>${t}</span><i>${ps.length}</i></div>
+      <div class="fb-drag-grp" data-role="${role}">${ps.map(p => fbPersonFillRow(p, sal)).join('')}</div></div>`;
   }
   out += `<button class="sc-r fb-plus sub" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>
     <div class="fb-add" id="fbAdd-person" hidden>

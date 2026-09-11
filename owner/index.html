@@ -3191,6 +3191,22 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-pc{display:block;width:100%;margin:0;padding:9px 12px;border:0;border-radius:0;background:transparent;text-align:left;
   font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
+/* График платежа в правке статьи: барабан периода и кнопка-дата */
+.fb-sched{align-items:center;gap:12px}
+.fb-wheelw{display:flex;align-items:center;gap:8px}
+.fb-wheel{height:108px;width:52px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;position:relative;
+  border-radius:12px;background:rgba(0,0,0,.35);border:1px solid var(--border2);
+  mask-image:linear-gradient(180deg,transparent 0,#000 32%,#000 68%,transparent 100%);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 32%,#000 68%,transparent 100%)}
+.fb-wheel::-webkit-scrollbar{display:none}
+.fb-wheel .fb-wpad{height:36px}
+.fb-wheel .fb-witem{height:36px;line-height:36px;font-size:19px;text-align:center;letter-spacing:0;scroll-snap-align:center}
+.fb-wheel .fb-witem.sel{font-size:22px}
+.fb-wheel-l{font-size:11px;font-weight:600;color:var(--muted);line-height:1.15}
+.fb-datebtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border-radius:10px;
+  border:1px solid var(--border2);background:rgba(255,255,255,.04);color:var(--sub);font:600 12.5px 'DM Sans',sans-serif;cursor:pointer}
+.fb-datebtn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+.fb-datebtn svg{flex:0 0 auto}
 /* Одна карточка на все статьи: «карточки» внутри — строки с разделителями */
 .fb-one .fb-card{margin:0;border:0;border-radius:0;background:transparent;border-top:1px solid rgba(201,169,110,.14)}
 .fb-one .fb-card:first-child{border-top:0}
@@ -10840,6 +10856,8 @@ function _clearRangeChip(){
 function dpApply(){
   if(!dpFrom) return;
   if(!dpTo) dpTo = dpFrom;
+  // дата платежа статьи бюджета: одна дата, без диапазона
+  if(dpTarget === 'fbNext'){ fbNextPick(_ymd(dpFrom)); closeDate(); return; }
   const chip = document.getElementById('rangeChip-'+dpTarget);
   if(chip){
     chip.style.display = 'flex';
@@ -18280,19 +18298,52 @@ function fbNewRow(group){
     <button class="fb-ok" onclick="fbFillOk()">Подтвердить</button>
     <em class="fb-fill-em x" onclick="fbFillCancel()" role="button" aria-label="Отмена">${IC('xmark', 13)}</em></div>`;
 }
+// Подпись статьи: график (раз в N мес · следующий платёж) и деньги месяца.
+// Платёж, который в этом месяце не стоит, ни «осталось», ни «сверх» не даёт.
 function fbLineSub(l){
-  const over = l.plan > 0 && l.fact > l.plan, ok = l.plan > 0 && l.fact === l.plan;
-  return [l.due ? `до ${l.due}-го` : '', l.note ? escS(l.note) : '',
-          over ? `сверх плана ${fbFmt(l.fact - l.plan)}` : ok ? 'оплачено' : l.plan > 0 ? `потратили ${fbFmt(l.fact)} · осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
+  const pm = l.plan_m || 0;
+  const over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
+  return [l.period > 1 ? `раз в ${l.period} мес` : '', l.next_due ? `следующий ${fbDayT(l.next_due)}` : '',
+          l.note ? escS(l.note) : '',
+          over ? `сверх плана ${fbFmt(l.fact - pm)}` : ok ? 'оплачено' : pm > 0 ? `потратили ${fbFmt(l.fact)} · осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
 }
 function fbLineRow(l, kid){
-  const over = l.plan > 0 && l.fact > l.plan, ok = l.plan > 0 && l.fact === l.plan;
-  const extra = `<div class="fb-edit2">
-      <input class="fb-num" inputmode="numeric" placeholder="До числа" autocomplete="off" id="fbFillDue" value="${l.due || ''}">
+  const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
+  // в правке: барабан «раз в N мес», дата следующего платежа (календарь),
+  // заметка и «Убрать»; дальше программа считает следующий платёж сама
+  const extra = `<div class="fb-edit2 fb-sched">
+      <div class="fb-wheelw"><div class="fb-wheel" id="fbPeriod" onscroll="fbWheelScroll(this)">${fbWheelItems(FB.editPeriod || 1)}</div><span class="fb-wheel-l">раз в<br>мес</span></div>
+      <button class="fb-datebtn${FB.editNext ? ' on' : ''}" id="fbNextBtn" onclick="openDate('fbNext')">${IC('cal', 15)}<span>${FB.editNext ? fbDayT(FB.editNext) : 'дата платежа'}</span></button>
+    </div>
+    <div class="fb-edit2">
       <input class="fb-txt" placeholder="Заметка" autocomplete="off" maxlength="80" id="fbFillNote" value="${escS(l.note || '')}">
       <button class="fb-lnk del" onclick="fbBudDel('${l.id}')">Убрать</button></div>`;
   return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid,
                     cls: over ? 'dn' : ok ? 'ok' : '', extra});
+}
+// Барабан периода: 1…12 месяцев, крутится пальцем, выбранное — по центру.
+const FB_WHEEL_H = 36;
+function fbWheelItems(sel){
+  return `<div class="tp-pad fb-wpad"></div>${Array.from({length: 12}, (_, i) => i + 1).map(n =>
+    `<div class="tp-item fb-witem${n === sel ? ' sel' : ''}" data-n="${n}">${n}</div>`).join('')}<div class="tp-pad fb-wpad"></div>`;
+}
+function fbWheelScroll(el){
+  clearTimeout(FB.wheelT);
+  FB.wheelT = setTimeout(() => {
+    const n = Math.max(1, Math.min(12, Math.round(el.scrollTop / FB_WHEEL_H) + 1));
+    if(n !== FB.editPeriod){ FB.editPeriod = n; try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
+    el.querySelectorAll('.fb-witem').forEach(x => x.classList.toggle('sel', +x.dataset.n === n));
+  }, 80);
+}
+function fbWheelSet(){
+  const el = document.getElementById('fbPeriod'); if(!el) return;
+  el.scrollTop = ((FB.editPeriod || 1) - 1) * FB_WHEEL_H;
+}
+// Дата следующего платежа — из общего календаря (openDate → dpApply).
+function fbNextPick(ymd){
+  FB.editNext = ymd;
+  const b = document.getElementById('fbNextBtn');
+  if(b){ b.classList.toggle('on', !!ymd); b.querySelector('span').textContent = ymd ? fbDayT(ymd) : 'дата платежа'; }
 }
 // Карточка-ссылка группы: название, что внутри, итог и стрелка вправо —
 // открывает страницу.
@@ -18416,11 +18467,15 @@ function fbAutoToggle(){
 function fbFillEdit(kind, id){
   FB.edit = {kind, id};
   FB.editCur = kind === 'rate' ? (((((fbBook(FB.month) || {}).budget || {}).salary || {}).people || []).find(p => p.name === id) || {}).cur || 'AED' : null;
+  const ln = kind === 'line' ? ((((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === id) || {}) : {};
+  FB.editPeriod = kind === 'line' ? (ln.period || 1) : 1;
+  FB.editNext = kind === 'line' ? (ln.next || '') : '';
   fbBudRepaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 function fbFillFocus(){
   if(!FB.edit) return;
+  fbWheelSet();
   const el = document.getElementById(FB.edit.kind === 'new' ? 'fbFillName' : 'fbFillIn');
   if(el){ el.focus(); if(el.select && el.value) el.select(); }
 }
@@ -18440,11 +18495,10 @@ async function fbFillOk(){
     const l = e.kind === 'line' ? (((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === e.id) : null;
     const name = e.kind === 'line' ? (l ? l.name : '') : fbTxt('fbFillName');
     if(!name){ _toast(e.id === 'rent' ? 'Как называется здание' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
-    const due = Math.round(fbAmt('fbFillDue')) || 0;
-    if(due < 0 || due > 31){ _toast('Число месяца от 1 до 31'); return; }
     url = '/api/owner/finance/book/budget';
-    body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val, due, note: fbTxt('fbFillNote'),
+    body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val, note: fbTxt('fbFillNote'),
             group: e.kind === 'line' ? (l ? l.group : '') : e.id, as: _meName()};
+    if(e.kind === 'line'){ body.period = FB.editPeriod || 1; body.next = FB.editNext || ''; }
   }
   try{
     const res = await ownerApi.ownerFetch(url, {method: 'POST', body});

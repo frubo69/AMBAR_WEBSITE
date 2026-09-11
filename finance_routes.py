@@ -271,6 +271,45 @@ def template_lines() -> list[dict]:
 
 GROUPS = ("", "rent", "auto")
 AUTO_NAMES = ("Авто", "Гараж и ТО", "Парковка")
+MAX_PERIOD = 24
+
+
+def _add_months(day: str, n: int) -> str:
+    """Та же дата через n месяцев; 31-го → последнее число короткого месяца."""
+    d = datetime.strptime(day, "%Y-%m-%d")
+    y, m = d.year + (d.month - 1 + n) // 12, (d.month - 1 + n) % 12 + 1
+    return f"{y:04d}-{m:02d}-{min(d.day, calendar.monthrange(y, m)[1]):02d}"
+
+
+def _schedule(ln: dict, month: str, today: str) -> dict:
+    """Платёж раз в period месяцев от даты next: когда следующий (первая дата
+    не раньше сегодня) и попадает ли платёж в этот месяц. Без даты — как
+    ежемесячный: план каждый месяц, следующего платежа нет."""
+    try:
+        period = max(1, min(MAX_PERIOD, int(ln.get("period") or 1)))
+    except (TypeError, ValueError):
+        period = 1
+    nxt = str(ln.get("next") or "")
+    try:
+        datetime.strptime(nxt, "%Y-%m-%d")
+    except ValueError:
+        nxt = ""
+    if not nxt:
+        return dict(period=period, next="", next_due="", due_in=period == 1)
+    first, last = month + "-01", _month_days(month)[-1]
+    # платёж в этом месяце — любая дата ряда next ± k·period
+    due_in = False
+    for k in range(-40, 41):
+        d = _add_months(nxt, k * period)
+        if first <= d <= last:
+            due_in = True
+            break
+        if d > last and k >= 0:
+            break
+    due = nxt
+    while due < today:
+        due = _add_months(due, period)
+    return dict(period=period, next=nxt, next_due=due, due_in=due_in)
 
 
 def _line_group(ln: dict) -> str:
@@ -313,6 +352,7 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
     rows, total, fact_sum = [], 0.0, 0.0
     rent = dict(plan=0.0, fact=0.0, n=0)
     autog = dict(plan=0.0, fact=0.0, n=0)     # «Расходы на автомобили»; auto ниже — норма
+    today = _biz_day()
     for i, ln in enumerate(lines):
         plan = calc._n(ln.get("plan"))
         f = fact.get(ln.get("_id"), 0.0)
@@ -321,14 +361,18 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         # строка «Аренда офис» старого образца: офис — это и есть пять зданий
         if name == "Аренда офис" and not plan and not f:
             continue
-        total += plan; fact_sum += f
+        sch = _schedule(ln, month, today)
+        # платёж раз в несколько месяцев входит в план только того месяца, где он
+        # стоит по графику; в остальные месяцы у строки плана нет, есть «следующий»
+        plan_m = plan if sch["due_in"] else 0.0
+        total += plan_m; fact_sum += f
         if group == "rent":
-            rent["plan"] += plan; rent["fact"] += f; rent["n"] += 1
+            rent["plan"] += plan_m; rent["fact"] += f; rent["n"] += 1
         elif group == "auto":
-            autog["plan"] += plan; autog["fact"] += f; autog["n"] += 1
-        rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan),
-                         fact=calc._i(f), left=calc._i(plan - f), due=int(ln.get("due") or 0),
-                         note=ln.get("note") or "", group=group,
+            autog["plan"] += plan_m; autog["fact"] += f; autog["n"] += 1
+        rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), plan_m=calc._i(plan_m),
+                         fact=calc._i(f), left=calc._i(plan_m - f), due=int(ln.get("due") or 0),
+                         note=ln.get("note") or "", group=group, **sch,
                          ord=int(ln.get("ord") if ln.get("ord") is not None else i)))
     # записи без статьи и записи удалённой статьи — «вне плана», но потрачено
     known = {r["id"] for r in rows}
@@ -845,6 +889,12 @@ async def handle_budget_set(request):
         group = str(body.get("group") or "")
         if group not in GROUPS:
             return _json({"error": "bad_group"}, 400)
+        period = int(_num(body.get("period")) or 1)
+        if not 1 <= period <= MAX_PERIOD:
+            return _json({"error": "bad_period"}, 400)
+        nxt = str(body.get("next") or "").strip()
+        if nxt:
+            nxt = _day_arg(nxt)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
@@ -855,11 +905,16 @@ async def handle_budget_set(request):
         ordv = old.get("ord")
         if "group" not in body:
             group = _line_group(old)
+        if "period" not in body:
+            period = int(old.get("period") or 1)
+        if "next" not in body:
+            nxt = str(old.get("next") or "")
     else:
         lid = secrets.token_hex(4)
         ordv = len(await db.fin_budget_get(month))
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
            "note": str(body.get("note") or "").strip()[:80], "kind": "", "group": group,
+           "period": period, "next": nxt,
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
     await _touch(month)
@@ -901,7 +956,8 @@ async def handle_budget_fill(request):
         if not prev:
             return _json({"error": "no_prev"}, 404)
         rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
-                     note=ln.get("note") or "", kind="", group=_line_group(ln)) for ln in prev
+                     note=ln.get("note") or "", kind="", group=_line_group(ln),
+                     period=int(ln.get("period") or 1), next=str(ln.get("next") or "")) for ln in prev
                 if (ln.get("kind") or "") != "salary"
                 and not (ln.get("name") == "Аренда офис" and not ln.get("plan"))]
     else:

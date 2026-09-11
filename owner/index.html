@@ -3151,9 +3151,11 @@ button.path:active{transform:scale(.995)}
 .fb-box{flex:0 0 auto;display:inline-flex;align-items:center;height:36px;padding:0 11px;border-radius:10px;
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);font-family:'Space Grotesk',sans-serif;
   font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;margin-right:2px}
-.fb-box u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:5px}
+.fb-box u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:var(--gold2);margin-left:5px}
+.fb-boxcol{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-right:2px}
+.fb-boxcol .fb-box{margin-right:0}
+.fb-eq{font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums;padding-right:2px}
 .fb-box.ok{color:var(--up)} .fb-box.dn{color:var(--dn)}
-.fb-box .fb-box-eq{font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);margin-left:6px}
 .fb-edit2 .fb-sp{flex:1 1 auto}
 .fb-edit2 .fb-seg{margin-right:0}
 .fb-bl.fb-editing{cursor:default;gap:8px;padding-right:10px;flex-wrap:wrap}
@@ -18075,13 +18077,13 @@ function fbFillRow(o){
   const empty = !(o.value > 0);
   return `<button class="fb-e fb-bl${o.kid ? ' fb-kid' : ''}"${o.attrs ? ' ' + o.attrs : ''} onclick="fbFillEdit('${o.kind}','${escS(o.id)}')">${head}${
     empty ? `<b class="fb-fill">Заполнить</b><em class="fb-fill-em">${_FB_PLUS}</em>`
-          : `<b class="fb-box${o.cls ? ' ' + o.cls : ''}">${fbFmt(o.value)}<u>${escS(o.unit || 'AED')}</u>${o.eq || ''}</b><em class="fb-fill-em pen">${_FB_PEN}</em>`}</button>`;
+          : `<span class="fb-boxcol"><b class="fb-box${o.cls ? ' ' + o.cls : ''}">${fbFmt(o.value)}<u>${escS(o.unit || 'AED')}</u></b>${o.eq ? `<i class="fb-eq">${o.eq}</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em>`}</button>`;
 }
 // Валюта оклада в правке: меняет подпись у поля, уходит на сервер вместе со
 // ставкой по «Подтвердить».
 function fbEditCur(field, v){
   FB.editCur = v;
-  const u = document.querySelector('#fbFillIn + u'); if(u) u.textContent = u.textContent.replace(/^(\$|AED)/, v === 'USD' ? '$' : 'AED');
+  const u = document.querySelector('#fbFillIn + u'); if(u) u.textContent = v === 'USD' ? '$' : 'AED';
   document.querySelectorAll('#fbList-bud .fb-editing ~ .fb-edit2 .fb-seg button, #fbList-bud .fb-edit2 .fb-seg button').forEach(b => b.classList.toggle('on', b.textContent === (v === 'USD' ? '$' : 'AED')));
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -18130,11 +18132,13 @@ function fbSalaryBody(b){
     out += `<div class="fb-kcap">${t}</div><div class="fb-drag-grp" data-role="${role}">` + ps.map(p => {
       const editing = FB.edit && FB.edit.kind === 'rate' && FB.edit.id === p.name;
       const cur = editing ? (FB.editCur || p.cur) : p.cur;
-      const sym = cur === 'USD' ? '$' : 'AED', per = p.unit === 'day' ? 'дн' : 'м';
-      // доллары показываем вместе с дирхамами по нашему курсу: 1 000 $ (3 670 AED)
-      const eq = p.cur === 'USD' && p.rate ? `<i class="fb-box-eq">(${fbFmt(p.rate_aed)} AED)</i>` : '';
-      return fbFillRow({kind: 'rate', id: p.name, name: escS(p.name), sub: p.cur === 'USD' && p.rate ? `по курсу ${fbFmtN(sal.usd, 1)}` : '',
-                        value: p.rate, unit: `${sym}/${per}`, eq, kid: true, attrs: `data-drag="${escS(p.name)}"`,
+      const sym = cur === 'USD' ? '$' : 'AED';
+      // Доллары: в окошке только «2 000 $», дирхамы по нашему курсу — строкой
+      // под окошком, золотом. Ставка в день — словами под именем.
+      const eq = p.cur === 'USD' && p.rate ? `= ${fbFmt(p.rate_aed)} AED` : '';
+      const sub = [p.unit === 'day' ? 'в день' : '', p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
+      return fbFillRow({kind: 'rate', id: p.name, name: escS(p.name), sub,
+                        value: p.rate, unit: sym, eq, kid: true, attrs: `data-drag="${escS(p.name)}"`,
                         extra: `<div class="fb-edit2">${fbSeg('cur', cur, [['AED', 'AED'], ['USD', '$']], 'fbEditCur')}<span class="fb-sp"></span>
                           <button class="fb-lnk del" data-n="${escS(p.name)}" onclick="fbPersonHideBud(this.dataset.n)">Убрать из зарплат</button></div>`});
     }).join('') + '</div>';

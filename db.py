@@ -4876,9 +4876,11 @@ async def orders_between(since_iso: str, until_iso: str) -> list:
     if d is None: return []
     cur = d.orders.find(
         {"timestamp": {"$gte": since_iso, "$lt": until_iso}, "status": "delivered"},
-        {"_id": 0, "order_id": 1, "timestamp": 1, "total": 1, "tip": 1,
-         "payment_method": 1, "paid": 1, "prepaid": 1, "crypto_paid": 1,
-         "office_id": 1, "status": 1})
+        # confirmed_at и day обязательны: по ним bizday.order_day относит заказ
+        # к смене; без них утренний заказ снова уезжал бы во вчера
+        {"_id": 0, "order_id": 1, "timestamp": 1, "confirmed_at": 1, "day": 1,
+         "total": 1, "tip": 1, "payment_method": 1, "paid": 1, "prepaid": 1,
+         "crypto_paid": 1, "office_id": 1, "status": 1})
     return await cur.to_list(length=50000)
 
 

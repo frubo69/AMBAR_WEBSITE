@@ -69,6 +69,12 @@ eq("в окне 11 сен: утренний заказ и дневной", sorte
 pairs = ow._orders_in_window(allo, start - timedelta(days=1), start)
 eq("в окне 10 сен: только вечерний", [o["order_id"] for _, o in pairs], ["x2"])
 eq("столбики 7 дней: заказ в последнем столбике", ow._last_7_days(allo, start)[6], 620)
+print("— проекции запросов не выбрасывают confirmed_at и day")
+import inspect, re
+src = inspect.getsource(db.orders_between)
+eq("orders_between отдаёт confirmed_at и day", ('"confirmed_at": 1' in src, '"day": 1' in src), (True, True))
+src = inspect.getsource(db.orders_from)
+eq("orders_from — проекция исключающая (поля дня на месте)", '"item_lines": 0' in src and '"confirmed_at": 0' not in src, True)
 print()
 print("FAILED:", fails) if fails else print("ALL OK — день заказа считается по смене")
 sys.exit(1 if fails else 0)

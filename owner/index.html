@@ -3193,15 +3193,20 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-pc + .fb-pc{border-top:1px solid rgba(201,169,110,.14)}
 /* График платежа в правке статьи: барабан периода и кнопка-дата */
 .fb-sched{align-items:center;gap:12px}
-.fb-pbtn{width:42px;height:42px;border-radius:12px;border:1px solid rgba(201,169,110,.35);background:var(--gold-soft);
-  color:var(--gold2);font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
-.fb-pbtn.on{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;border-color:transparent}
-.fb-pbtn b{font-weight:700}
-.fb-wheelrow{justify-content:flex-start;gap:14px;padding-top:0}
-.fb-wheelrow[hidden]{display:none}
-.fb-wheelrow .fb-wheel{width:64px}
-.fb-lnk.ok{color:var(--gold2)}
+.fb-pill{flex:0 0 auto;width:44px;height:40px;border-radius:12px;overflow:hidden;position:relative;cursor:pointer;
+  border:1px solid rgba(201,169,110,.35);background:var(--gold-soft);
+  transition:height .22s var(--e1),width .22s var(--e1),background .2s var(--e1),border-color .2s;-webkit-tap-highlight-color:transparent}
+.fb-pill.open{height:120px;width:64px;background:rgba(0,0,0,.35);border-color:rgba(201,169,110,.5)}
+.fb-pill-w{height:100%;overflow:hidden;scroll-snap-type:y mandatory;scrollbar-width:none;pointer-events:none}
+.fb-pill-w::-webkit-scrollbar{display:none}
+.fb-pill.open .fb-pill-w{overflow-y:scroll;pointer-events:auto;
+  mask-image:linear-gradient(180deg,transparent 0,#000 30%,#000 70%,transparent 100%);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 30%,#000 70%,transparent 100%)}
+.fb-pill .fb-wpad{height:40px}
+.fb-pill .fb-witem{height:40px;line-height:40px;text-align:center;scroll-snap-align:center;font-family:'Space Grotesk',sans-serif;
+  font-size:18px;font-weight:700;color:var(--gold2);transition:color .15s,font-size .15s}
+.fb-pill.open .fb-witem{color:var(--sub);font-size:19px}
+.fb-pill.open .fb-witem.sel{color:var(--gold2);font-size:22px}
 .fb-wheel{height:108px;width:52px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;position:relative;
   border-radius:12px;background:rgba(0,0,0,.35);border:1px solid var(--border2);
   mask-image:linear-gradient(180deg,transparent 0,#000 32%,#000 68%,transparent 100%);
@@ -18320,13 +18325,10 @@ function fbLineRow(l, kid){
   // в правке: барабан «раз в N мес», дата следующего платежа (календарь),
   // заметка и «Убрать»; дальше программа считает следующий платёж сама
   // число периода — в квадратной таблетке; барабан появляется по нажатию на неё
+  // таблетка периода сама раскрывается в барабан на своём месте (fbPillTap)
   const extra = `<div class="fb-edit2 fb-sched">
-      <button class="fb-pbtn${FB.wheelOpen ? ' on' : ''}" id="fbPeriodBtn" onclick="fbWheelToggle()"><b>${FB.editPeriod || 1}</b></button><span class="fb-wheel-l">раз в<br>мес</span>
+      <div class="fb-pill" id="fbPill" onclick="fbPillTap(event)"><div class="fb-pill-w" id="fbPeriod" onscroll="fbWheelScroll(this)">${fbWheelItems(FB.editPeriod || 1)}</div></div><span class="fb-wheel-l">раз в<br>мес</span>
       <button class="fb-datebtn${FB.editNext ? ' on' : ''}" id="fbNextBtn" onclick="openDate('fbNext')">${IC('cal', 15)}<span>${FB.editNext ? fbDayT(FB.editNext) : 'дата платежа'}</span></button>
-    </div>
-    <div class="fb-edit2 fb-wheelrow" id="fbWheelRow"${FB.wheelOpen ? '' : ' hidden'}>
-      <div class="fb-wheel" id="fbPeriod" onscroll="fbWheelScroll(this)">${fbWheelItems(FB.editPeriod || 1)}</div>
-      <button class="fb-lnk ok" onclick="fbWheelToggle()">Готово</button>
     </div>
     <div class="fb-edit2">
       <input class="fb-txt" placeholder="Заметка" autocomplete="off" maxlength="80" id="fbFillNote" value="${escS(l.note || '')}">
@@ -18334,35 +18336,52 @@ function fbLineRow(l, kid){
   return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid,
                     cls: over ? 'dn' : ok ? 'ok' : '', extra});
 }
-// Барабан периода: 1…12 месяцев, крутится пальцем, выбранное — по центру.
-const FB_WHEEL_H = 36;
+// Барабан периода живёт внутри таблетки: закрытая показывает одно число,
+// нажатие плавно растягивает её в барабан (три числа, выбранное по центру),
+// каждая пролистанная цифра отзывается отдачей, нажатие вне — закрывает.
+const FB_WHEEL_H = 40;
 function fbWheelItems(sel){
-  return `<div class="tp-pad fb-wpad"></div>${Array.from({length: 12}, (_, i) => i + 1).map(n =>
-    `<div class="tp-item fb-witem${n === sel ? ' sel' : ''}" data-n="${n}">${n}</div>`).join('')}<div class="tp-pad fb-wpad"></div>`;
+  return `<div class="fb-wpad"></div>${Array.from({length: 12}, (_, i) => i + 1).map(n =>
+    `<div class="fb-witem${n === sel ? ' sel' : ''}" data-n="${n}">${n}</div>`).join('')}<div class="fb-wpad"></div>`;
 }
 function fbWheelScroll(el){
-  clearTimeout(FB.wheelT);
-  FB.wheelT = setTimeout(() => {
-    const n = Math.max(1, Math.min(12, Math.round(el.scrollTop / FB_WHEEL_H) + 1));
-    if(n !== FB.editPeriod){ FB.editPeriod = n; try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
-    el.querySelectorAll('.fb-witem').forEach(x => x.classList.toggle('sel', +x.dataset.n === n));
-    const pb = document.querySelector('#fbPeriodBtn b'); if(pb) pb.textContent = n;
-  }, 80);
-}
-function fbWheelSet(){
-  const el = document.getElementById('fbPeriod'); if(!el) return;
-  el.scrollTop = ((FB.editPeriod || 1) - 1) * FB_WHEEL_H;
-}
-// Барабан показывается по нажатию на таблетку и прячется по «Готово»; поле
-// суммы при этом не перерисовывается — введённое остаётся.
-function fbWheelToggle(){
-  FB.wheelOpen = !FB.wheelOpen;
-  const row = document.getElementById('fbWheelRow'), btn = document.getElementById('fbPeriodBtn');
-  if(row) row.hidden = !FB.wheelOpen;
-  if(btn) btn.classList.toggle('on', FB.wheelOpen);
-  if(FB.wheelOpen) fbWheelSet();
+  if(!FB.wheelOpen) return;
+  const n = Math.max(1, Math.min(12, Math.round(el.scrollTop / FB_WHEEL_H) + 1));
+  if(n === FB.wheelLast) return;
+  FB.wheelLast = n; FB.editPeriod = n;
+  el.querySelectorAll('.fb-witem').forEach(x => x.classList.toggle('sel', +x.dataset.n === n));
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
+// Положение ленты: в барабане выбранное число по центру, в таблетке — оно
+// же в единственном окошке (лента сдвинута на отступ).
+function fbWheelSet(){
+  const el = document.getElementById('fbPeriod'); if(!el) return;
+  const n = FB.editPeriod || 1;
+  el.scrollTop = FB.wheelOpen ? (n - 1) * FB_WHEEL_H : FB_WHEEL_H + (n - 1) * FB_WHEEL_H;
+}
+function fbPillTap(e){
+  e.stopPropagation();
+  if(FB.wheelOpen) fbPillClose(); else fbPillOpen();
+}
+function fbPillOpen(){
+  const pill = document.getElementById('fbPill'), w = document.getElementById('fbPeriod'); if(!pill || !w) return;
+  FB.wheelOpen = true; FB.wheelLast = FB.editPeriod || 1;
+  pill.classList.add('open');
+  w.scrollTop = ((FB.editPeriod || 1) - 1) * FB_WHEEL_H;
+  document.addEventListener('pointerdown', fbPillOutside, true);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbPillClose(){
+  const pill = document.getElementById('fbPill'), w = document.getElementById('fbPeriod');
+  FB.wheelOpen = false;
+  document.removeEventListener('pointerdown', fbPillOutside, true);
+  if(!pill || !w) return;
+  pill.classList.remove('open');
+  w.scrollTop = FB_WHEEL_H + ((FB.editPeriod || 1) - 1) * FB_WHEEL_H;
+  setTimeout(fbWheelSet, 240);           // после того, как таблетка сжалась
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbPillOutside(e){ if(!(e.target && e.target.closest && e.target.closest('#fbPill'))) fbPillClose(); }
 // Дата следующего платежа — из общего календаря (openDate → dpApply).
 function fbNextPick(ymd){
   FB.editNext = ymd;
@@ -18494,7 +18513,7 @@ function fbFillEdit(kind, id){
   const ln = kind === 'line' ? ((((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === id) || {}) : {};
   FB.editPeriod = kind === 'line' ? (ln.period || 1) : 1;
   FB.editNext = kind === 'line' ? (ln.next || '') : '';
-  FB.wheelOpen = false;
+  FB.wheelOpen = false; document.removeEventListener('pointerdown', fbPillOutside, true);
   fbBudRepaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }

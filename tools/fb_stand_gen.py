@@ -105,6 +105,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('month')) FB.month = Q.get('month');
     if(Q.get('person')) FB.person = Q.get('person');
     if(Q.get('norm')) FB.normOpen = true;
+    if(Q.get('open')){ for(const g of Q.get('open').split(',')){ if(g === 'auto') FB.autoOpen = true; if(g === 'home') FB.homeOpen = true; } }
     if(Q.get('bud')) FB.bud = Q.get('bud');
     if(Q.get('edit')){ const [k, ...rest] = Q.get('edit').split(':'); FB.edit = {kind: k, id: rest.join(':')}; }
     await fbHub();

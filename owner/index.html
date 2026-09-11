@@ -3222,8 +3222,15 @@ button.path:active{transform:scale(.995)}
 .fb-datebtn svg{flex:0 0 auto}
 /* Код района у здания — золотая таблетка, как в «Кто на каком районе» */
 .fb-e-b b .fb-bcode,.fb-bcode{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:24px;padding:0 6px;
-  border-radius:8px;margin-right:9px;vertical-align:-6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
+  border-radius:8px;margin:0;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
   font-style:normal;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* таблетка и имя — на одной оси, а не по базовой линии текста */
+.fb-e-b b:has(> .fb-bcode){display:flex;align-items:center;gap:10px;line-height:24px}
+/* воздух в строках бюджета: выше строки, отступ подписи, дата платежа своей строкой */
+.fb-one .fb-card .fb-bl{padding:14px 12px 14px 16px;min-height:64px}
+.fb-one .fb-card .fb-e-b i{margin-top:5px;line-height:1.45}
+.fb-one .fb-card .fb-bl.fb-kid{min-height:60px}
+.fb-e-b i .fb-due{display:block;margin-top:3px}
 /* Дата следующего платежа: цвет по срочности */
 .fb-e-b i .fb-due{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.2px}
 .fb-due.ok{color:var(--up)} .fb-due.warn{color:var(--warn)} .fb-due.dn{color:var(--dn)}

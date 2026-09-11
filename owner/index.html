@@ -18057,7 +18057,7 @@ function fbRentPage(b){
       ${fbTile('Потратили', 'bu.rent_fact', rent.fact)}
       ${fbTile('Осталось', 'bu.rent_left', rent.left, {mode: 'neg'})}
     </div></div>
-    <div class="sc">${fbCapT('Здания', String(lines.length))}<div id="fbList-bud" class="fb-one">${lines.map(l => `<div class="fb-card">${fbLineListRow(l, false)}</div>`).join('')}
+    <div class="sc">${fbCapT('Здания')}<div id="fbList-bud" class="fb-one">${lines.map(l => `<div class="fb-card">${fbLineListRow(l, false)}</div>`).join('')}
       <div class="fb-card add">${newRent ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
@@ -18073,7 +18073,7 @@ function fbLinePage(b, l){
       ${fbTile('Осталось', 'ln.left', l.left, {mode: 'neg'})}
     </div></div>
     <div class="sc">${fbCapT('План')}<div id="fbList-bud" class="fb-one"><div class="fb-card">${fbLineRow(l, false)}</div></div></div>
-    <div class="sc">${fbCapT('Расходы', rows.length ? String(rows.length) : '')}
+    <div class="sc">${fbCapT('Расходы')}
       <div id="fbList-line">${fbLineEntries(rows)}</div>
       <button class="sc-r fb-plus" onclick="fbAddToggle('ln')"><span>Добавить расход</span><em>${_FB_PLUS}</em></button>
       <div class="fb-add" id="fbAdd-ln" hidden>
@@ -18323,9 +18323,8 @@ function fbGroupVal(g){
   return g.plan ? `<b class="fb-e-v${g.fact > g.plan ? ' dn' : g.fact === g.plan ? ' ok' : ''}">${fbFmt(g.fact)}<s class="sl">/</s>${fbFmt(g.plan)}</b>`
                 : `<b class="fb-fill">Заполнить</b>`;
 }
-function fbGroupSub(g, one, few, many){
-  return [`${g.n} ${pluralize(g.n, one, few, many)}`,
-          g.plan > g.fact ? `осталось ${fbFmt(g.left)}` : g.plan && g.fact === g.plan ? 'оплачено' : ''].filter(Boolean).join(' · ');
+function fbGroupSub(g){
+  return g.plan > g.fact ? `осталось ${fbFmt(g.left)}` : g.plan && g.fact === g.plan ? 'оплачено' : '';
 }
 // Зарплаты — люди по группам, как в «Зарплатах»: старшие (руководство),
 // старший оператор, операторы, водители (эти — по районам). Каждая группа —
@@ -18341,13 +18340,12 @@ function fbSalaryBody(b){
     if(role === 'driver'){
       const byD = [];
       ps.forEach(p => { let g = byD.find(x => x.id === (p.district || '')); if(!g){ g = {id: p.district || '', code: p.district_code || '', name: p.district_name || 'Без района', rows: []}; byD.push(g); } g.rows.push(p); });
-      body = byD.map(g => `<div class="crw-c-h fb-dh"><span class="crew-code">${escS(g.code || '—')}</span><span class="crw-c-n">${escS(g.name)}</span>
-          <span class="crw-c-x">${g.rows.length} ${pluralize(g.rows.length, 'водитель', 'водителя', 'водителей')}</span></div>
+      body = byD.map(g => `<div class="crw-c-h fb-dh"><span class="crew-code">${escS(g.code || '—')}</span><span class="crw-c-n">${escS(g.name)}</span></div>
         <div class="fb-drag-grp" data-role="${role}" data-district="${escS(g.id)}">${g.rows.map(p => fbPersonFillRow(p, sal)).join('')}</div>`).join('');
     }else{
       body = `<div class="fb-drag-grp" data-role="${role}">${ps.map(p => fbPersonFillRow(p, sal)).join('')}</div>`;
     }
-    out += `<div class="fb-sgrp"><div class="sc-cap"><span>${t}</span><i>${ps.length}</i></div>${body}</div>`;
+    out += `<div class="fb-sgrp"><div class="sc-cap"><span>${t}</span></div>${body}</div>`;
   }
   out += `<button class="sc-r fb-plus sub" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>
     <div class="fb-add" id="fbAdd-person" hidden>
@@ -18392,12 +18390,12 @@ function fbPersonFillRow(p, sal){
 function fbBudLines(b){
   const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []};
   const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0};
-  const salSub = sal.n ? `${sal.n} ${pluralize(sal.n, 'человек', 'человека', 'человек')}${sal.set_n < sal.n ? ` · без оклада ${sal.n - sal.set_n}` : ''}` : 'людей ещё нет';
-  let out = fbBudGroup('Зарплаты', salSub + (sal.fact ? ` · выплачено ${fbFmt(sal.fact)}` : ''),
+  const salSub = sal.fact ? `выплачено ${fbFmt(sal.fact)}` : '';
+  let out = fbBudGroup('Зарплаты', salSub,
     `<b class="fb-e-v" data-f="bu.salary_plan">${fbFmt(sal.plan)}<u>AED</u></b>`, "fbPageOpen('salary','')");
   const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), rest = lines.filter(l => !l.group);
-  if(rentLines.length) out += fbBudGroup('Аренда офисов', fbGroupSub(rent, 'здание', 'здания', 'зданий'), fbGroupVal(rent), "fbPageOpen('rent','')");
-  if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', fbGroupSub(auto, 'статья', 'статьи', 'статей'), fbGroupVal(auto),
+  if(rentLines.length) out += fbBudGroup('Аренда офисов', fbGroupSub(rent), fbGroupVal(rent), "fbPageOpen('rent','')");
+  if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', fbGroupSub(auto), fbGroupVal(auto),
     FB.autoOpen === true, 'fbAutoToggle()', autoLines.map(l => fbLineListRow(l, true)).join(''));
   if(!lines.length){
     out += `<div class="fb-card"><div class="fb-none">Других статей ещё нет</div><div class="fb-add">${

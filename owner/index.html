@@ -18344,13 +18344,18 @@ function fbNewRow(group){
 // Платёж, который в этом месяце не стоит, ни «осталось», ни «сверх» не даёт.
 function fbLineSub(l){
   const pm = l.plan_m || 0;
+  if(l.period > 1){
+    // раз в N месяцев: доля в месяц копится к дате платежа; сам платёж —
+    // «оплачено», без «сверх плана» в месяц, когда его провели
+    return [`раз в ${l.period} мес`, `в месяц ${fbFmt(pm)}`, l.next_due ? `следующий ${fbDayT(l.next_due)}` : '',
+            l.note ? escS(l.note) : '', l.fact ? `оплачено ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
+  }
   const over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
-  return [l.period > 1 ? `раз в ${l.period} мес` : '', l.next_due ? `следующий ${fbDayT(l.next_due)}` : '',
-          l.note ? escS(l.note) : '',
+  return [l.next_due ? `следующий ${fbDayT(l.next_due)}` : '', l.note ? escS(l.note) : '',
           over ? `сверх плана ${fbFmt(l.fact - pm)}` : ok ? 'оплачено' : pm > 0 ? `потратили ${fbFmt(l.fact)} · осталось ${fbFmt(l.left)}` : l.fact ? `потратили ${fbFmt(l.fact)}` : ''].filter(Boolean).join(' · ');
 }
 function fbLineRow(l, kid, nameHtml){
-  const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
+  const pm = l.plan_m || 0, per = l.period > 1, over = !per && pm > 0 && l.fact > pm, ok = !per && pm > 0 && l.fact === pm;
   // в правке: барабан «раз в N мес», дата следующего платежа (календарь),
   // заметка и «Убрать»; дальше программа считает следующий платёж сама
   // число периода — в квадратной таблетке; барабан появляется по нажатию на неё
@@ -18442,8 +18447,8 @@ function fbBudGroupExpand(t, sub, valueHtml, open, go, body){
 }
 // Строка статьи в списке: состояние плана и стрелка — открывает страницу.
 function fbLineListRow(l, kid){
-  const empty = !(l.plan > 0);
-  const over = l.plan > 0 && l.fact > l.plan, ok = l.plan > 0 && l.fact === l.plan;
+  const empty = !(l.plan > 0), pm = l.plan_m || 0, per = l.period > 1;
+  const over = !per && pm > 0 && l.fact > pm, ok = !per && pm > 0 && l.fact === pm;
   return `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" data-l="${l.id}" onclick="fbPageOpen('line', this.dataset.l)">
     <span class="fb-e-b"><b>${escS(l.name)}</b><i>${fbLineSub(l)}</i></span>
     ${empty ? `<b class="fb-fill">Заполнить</b>` : `<b class="fb-box${over ? ' dn' : ok ? ' ok' : ''}">${fbFmt(l.plan)}<u>AED</u></b>`}<em class="fb-chev r">${_SC_CHEV}</em></button>`;

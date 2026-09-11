@@ -313,8 +313,8 @@ async def main():
     BUDGET.append(dict(_id="L20", month=M, name="Аренда Силикон", plan=15500, due=0, note="", kind="", ord=20, group="rent", period=3, next="2026-10-01"))
     bq = (await fr.build(M))["budget"]
     lq = next(l for l in bq["lines"] if l["id"] == "L20")
-    eq("квартальная аренда в сентябре: план 15500, в план месяца 0, следующий 1 окт", (lq["plan"], lq["plan_m"], lq["next_due"], lq["due_in"]), (15500, 0, "2026-10-01", False))
-    eq("итог аренды без неё (32000 JVC + 900 склад)", bq["rent"]["plan"], 32900)
+    eq("квартальная аренда в сентябре: платёж 15500, в план месяца треть 5166.67, следующий 1 окт", (lq["plan"], lq["plan_m"], lq["next_due"], lq["due_in"]), (15500, 5166.67, "2026-10-01", False))
+    eq("итог аренды: 32000 JVC + 900 склад + треть 5166.67", bq["rent"]["plan"], 38066.67)
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="L20", name="Аренда Силикон", plan=15500, period=6, next="2026-12-15")))
     eq("правка графика: period 6, next 15 дек", (r.status, WRITES[-1][1]["period"], WRITES[-1][1]["next"]), (200, 6, "2026-12-15"))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="L20", name="Аренда Силикон", plan=16000)))

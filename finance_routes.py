@@ -368,9 +368,10 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             oid = next((o["id"] for o in OFFICES if o["name"] == short), "")
             code = OFFICE_CODES.get(oid, "")
         sch = _schedule(ln, month, today)
-        # платёж раз в несколько месяцев входит в план только того месяца, где он
-        # стоит по графику; в остальные месяцы у строки плана нет, есть «следующий»
-        plan_m = plan if sch["due_in"] else 0.0
+        # платёж раз в N месяцев делится поровну на каждый месяц: доля входит в
+        # план месяца и в норму дня, и к дате платежа сумма уже отложена
+        # (владелец: «не узнавать сюрпризом»); следующий платёж — рядом
+        plan_m = plan / sch["period"]
         total += plan_m; fact_sum += f
         if group == "rent":
             rent["plan"] += plan_m; rent["fact"] += f; rent["n"] += 1

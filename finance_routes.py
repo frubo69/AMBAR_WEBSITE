@@ -268,17 +268,20 @@ def template_lines() -> list[dict]:
     rows += [dict(name=n, group="auto", kind="pool" if n in POOL_NAMES else "") for n in AUTO_NAMES]
     rows += [dict(name=n, group="car") for n in CAR_NAMES]
     rows += [dict(name=n, group="home", kind="pool") for n in HOME_NAMES]
-    rows += [dict(name=n, kind="pool" if n in POOL_NAMES else "") for n in ("Билеты", "Визы", "Sim", "Бензин", "Реклама")]
+    rows += [dict(name=n, kind="pool") for n in ("Билеты", "Визы", "Sim", "Бензин")]
+    rows += [dict(name=n, group="ads") for n in ADS_NAMES]
     return rows
 
 
-GROUPS = ("", "rent", "auto", "home", "car")
+GROUPS = ("", "rent", "auto", "home", "car", "ads")
 AUTO_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг")
 AUTO_LEGACY = ("Авто", "Аренда")  # так статьи назывались до 11 сен 2026
 # Аренда машин («Аренда» внутри «Расходов на автомобили»): у кого арендуем —
 # строки группы car, каждая с периодом и датой платежа, как здания.
 CAR_NAMES = ("Орион Рент", "Алексей Рент", "Другой Рент")
 HOME_NAMES = ("Хоз. нужды", "Продукты", "Коммуналка")   # «Бытовые расходы»
+# «Реклама»: виды рекламы, каждая с графиком и суммой в AED или $ (по курсу дня)
+ADS_NAMES = ("Посты", "Интеграция бота")
 # Статья без даты платежа (kind="pool"): просто бюджет на месяц, без периода
 # и календаря, правится прямо в списке; старые строки — по названию.
 POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг", "Билеты", "Визы", "Sim", "Бензин") + HOME_NAMES
@@ -372,6 +375,8 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
     autog = dict(plan=0.0, fact=0.0, n=0)     # «Расходы на автомобили»; auto ниже — норма
     home = dict(plan=0.0, fact=0.0, n=0)      # «Бытовые расходы»
     car = dict(plan=0.0, fact=0.0, n=0)       # аренда машин — входит и в «Расходы на автомобили»
+    ads = dict(plan=0.0, fact=0.0, n=0)       # «Реклама»
+    usd = calc._n(salary.get("usd")) or 3.67  # сумма статьи в $ считается в AED по курсу месяца
     today = _biz_day()
     for i, ln in enumerate(lines):
         plan = calc._n(ln.get("plan"))
@@ -387,10 +392,12 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
             code = OFFICE_CODES.get(oid, "")
         pool = _is_pool(ln)
         sch = dict(period=1, next="", next_due="", due_in=True) if pool else _schedule(ln, month, today)
+        cur = "USD" if ln.get("cur") == "USD" else "AED"
+        plan_aed = plan * usd if cur == "USD" else plan
         # платёж раз в N месяцев делится поровну на каждый месяц: доля входит в
         # план месяца и в норму дня, и к дате платежа сумма уже отложена
         # (владелец: «не узнавать сюрпризом»); следующий платёж — рядом
-        plan_m = plan / sch["period"]
+        plan_m = plan_aed / sch["period"]
         total += plan_m; fact_sum += f
         if group == "rent":
             rent["plan"] += plan_m; rent["fact"] += f; rent["n"] += 1
@@ -401,7 +408,9 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         elif group == "car":
             car["plan"] += plan_m; car["fact"] += f; car["n"] += 1
             autog["plan"] += plan_m; autog["fact"] += f
-        rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), plan_m=calc._i(plan_m),
+        elif group == "ads":
+            ads["plan"] += plan_m; ads["fact"] += f; ads["n"] += 1
+        rows.append(dict(id=ln.get("_id"), name=name, plan=calc._i(plan), cur=cur, plan_aed=calc._i(plan_aed), plan_m=calc._i(plan_m),
                          fact=calc._i(f), left=calc._i(plan_m - f), due=int(ln.get("due") or 0),
                          note=ln.get("note") or "", group=group, office=office, code=code, short=short, **sch,
                          kind="pool" if pool else "office" if office else "",
@@ -430,7 +439,9 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
                 left=calc._i(home["plan"] - home["fact"]), n=home["n"])
     car = dict(plan=calc._i(car["plan"]), fact=calc._i(car["fact"]),
                left=calc._i(car["plan"] - car["fact"]), n=car["n"])
-    return dict(lines=rows, salary=salary, rent=rent, auto=autog, home=home, car=car, total=calc._i(total), fact=calc._i(fact_all),
+    ads = dict(plan=calc._i(ads["plan"]), fact=calc._i(ads["fact"]),
+               left=calc._i(ads["plan"] - ads["fact"]), n=ads["n"])
+    return dict(lines=rows, salary=salary, rent=rent, auto=autog, home=home, car=car, ads=ads, total=calc._i(total), fact=calc._i(fact_all),
                 left=calc._i(total - fact_all), off_plan=calc._i(off_plan),
                 days=ndays, per_day=calc._i(total / ndays) if ndays and total else 0,
                 norm_auto=auto, norm=calc._i(calc._n(norm)) if norm is not None else auto,
@@ -927,6 +938,9 @@ async def handle_budget_set(request):
             return _json({"error": "bad_group"}, 400)
         kind = "office" if body.get("office") and group == "rent" else ""
         note = None if body.get("note") is None else str(body.get("note")).strip()[:80]
+        cur = str(body.get("cur") or "").upper()
+        if cur not in ("", "AED", "USD"):
+            return _json({"error": "bad_cur"}, 400)
         period = int(_num(body.get("period")) or 1)
         if not 1 <= period <= MAX_PERIOD:
             return _json({"error": "bad_period"}, 400)
@@ -951,6 +965,8 @@ async def handle_budget_set(request):
             nxt = str(old.get("next") or "")
         if note is None:
             note = str(old.get("note") or "")
+        if "cur" not in body:
+            cur = "USD" if old.get("cur") == "USD" else "AED"
         if _is_pool(old):
             kind = "pool"
     else:
@@ -961,7 +977,7 @@ async def handle_budget_set(request):
     if kind == "pool":
         period, nxt = 1, ""                       # без даты платежа: только бюджет на месяц
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
-           "note": note or "", "kind": kind, "group": group,
+           "note": note or "", "kind": kind, "group": group, "cur": cur or "AED",
            "period": period, "next": nxt,
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
@@ -1005,11 +1021,11 @@ async def handle_budget_fill(request):
             return _json({"error": "no_prev"}, 404)
         rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
                      note=ln.get("note") or "", kind="pool" if _is_pool(ln) else "office" if ln.get("kind") == "office" else "",
-                     group=_line_group(ln),
+                     group=_line_group(ln), cur="USD" if ln.get("cur") == "USD" else "AED",
                      period=int(ln.get("period") or 1), next=str(ln.get("next") or "")) for ln in prev
                 if (ln.get("kind") or "") != "salary"]
     else:
-        rows = [dict(name=r["name"], plan=0, due=0, note="", kind=r.get("kind") or "", group=r.get("group") or "")
+        rows = [dict(name=r["name"], plan=0, due=0, note="", kind=r.get("kind") or "", group=r.get("group") or "", cur="AED")
                 for r in template_lines()]
     who = _who(body)
     for i, r in enumerate(rows):

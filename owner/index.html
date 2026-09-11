@@ -3144,10 +3144,10 @@ button.path:active{transform:scale(.995)}
 .fb-kids .fb-plus.sub{min-height:44px} .fb-kids .fb-plus.sub span{font-size:12.5px;color:var(--sub)}
 .fb-card .fb-plus span{font-size:14px}
 .fb-sal[hidden]{display:none}
-.fb-sal .fb-r.fb-pr{padding-left:24px}
-.fb-sal .fb-r.fb-pr > span{white-space:normal;line-height:1.15}
-.fb-sal .fb-r.fb-pr > span i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);margin-top:2px}
-.fb-sal .fb-r.fb-pr > span i:empty{display:none}
+.fb-kids .fb-r.fb-pr,.fb-sal .fb-r.fb-pr{padding-left:26px;min-height:56px}
+.fb-kids .fb-r.fb-pr > span,.fb-sal .fb-r.fb-pr > span{white-space:normal;line-height:1.15;font-size:14px}
+.fb-kids .fb-r.fb-pr > span i,.fb-sal .fb-r.fb-pr > span i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);margin-top:3px}
+.fb-kids .fb-r.fb-pr > span i:empty,.fb-sal .fb-r.fb-pr > span i:empty{display:none}
 .fb-sal .fb-plus.sub{min-height:44px} .fb-sal .fb-plus.sub span{font-size:12.5px;color:var(--sub)}
 /* Плитки книги: отрицательное — красным, сходится — зелёным. */
 .fb-hub .aud-g{padding:12px 13px 8px}
@@ -17898,9 +17898,10 @@ function fbBudRepaint(){ const box = document.getElementById('fbList-bud'); if(b
 // операторы, операторы, водители.
 function fbSalaryRows(b){
   const sal = (b.budget || {}).salary || {people: []};
+  const ROLE1 = {senior: 'старший оператор', operator: 'оператор', driver: 'водитель', other: ''};
   const rows = (sal.people || []).map(p => {
     const sym = p.cur === 'USD' ? '$' : 'AED', per = p.unit === 'day' ? 'дн' : 'м';
-    return fbIn(`${escS(p.name)}<i>${p.manual ? (p.role !== 'other' ? p.role_t.toLowerCase() : '') : p.role_t.toLowerCase()}</i>`, 'rate', p.rate,
+    return fbIn(`${escS(p.name)}<i>${ROLE1[p.role] || ''}</i>`, 'rate', p.rate,
                 `data-month="${b.month}" data-name="${escS(p.name)}"`, {unit: `${sym}/${per}`, eu: 'не задан', ph: '0', cls: 'fb-pr'});
   }).join('');
   return rows + `<button class="sc-r fb-plus sub" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>

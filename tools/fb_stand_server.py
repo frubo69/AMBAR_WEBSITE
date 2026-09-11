@@ -118,7 +118,7 @@ BUDGET = [dict(_id="L1", month=MONTH, name="Зарплаты", plan=80000, due=0
           dict(_id="L2", month=MONTH, name="Аренда офис", plan=26000, due=3, note="менеджеру, на 3 мес", kind="", ord=1),
           dict(_id="L3", month=MONTH, name="Аренда JVC", plan=31250, due=15, note="", kind="", ord=2),
           dict(_id="L4", month=MONTH, name="Аренда Бизнес Бей", plan=37500, due=5, note="", kind="", ord=3),
-          dict(_id="L5", month=MONTH, name="Аренда", plan=32000, due=0, note="два рента", kind="", ord=4),
+          dict(_id="L5", month=MONTH, name="Орион Рент", plan=20000, due=0, note="два рента", kind="", ord=4, group="car"),
           dict(_id="L6", month=MONTH, name="Билеты", plan=5600, due=0, note="", kind="", ord=5),
           dict(_id="L7", month=MONTH, name="Визы", plan=11000, due=0, note="5 чел", kind="", ord=6),
           dict(_id="L8", month=MONTH, name="Sim", plan=3500, due=0, note="", kind="", ord=7),
@@ -126,8 +126,9 @@ BUDGET = [dict(_id="L1", month=MONTH, name="Зарплаты", plan=80000, due=0
           dict(_id="L10", month=MONTH, name="Бензин", plan=3000, due=0, note="", kind="", ord=9),
           dict(_id="L11", month=MONTH, name="Реклама", plan=0, due=0, note="", kind="", ord=10),
           dict(_id="L12", month=MONTH, name="Гараж и ТО", plan=10000, due=0, note="Аслам, по чекам", kind="", ord=11),
-          dict(_id="L13", month=MONTH, name="Парковка", plan=1500, due=0, note="", kind="", ord=12)]
-LINE_BY = {"аренда": "L2", "бензин": "L10", "зарплата оператору": "L1", "ремонт машины": "L5", "связь": "L8", "реклама": "", "штраф": ""}
+          dict(_id="L13", month=MONTH, name="Парковка", plan=1500, due=0, note="", kind="", ord=12),
+          dict(_id="L14", month=MONTH, name="Алексей Рент", plan=12000, due=0, note="", kind="", ord=13, group="car", period=3, next="2026-10-20")]
+LINE_BY = {"аренда": "L2", "бензин": "L10", "зарплата оператору": "L1", "ремонт машины": "L12", "связь": "L8", "реклама": "", "штраф": ""}
 for e in ENTRIES:
     if e["book"] == "rp":
         e["line"] = LINE_BY.get(e["comment"], "")

@@ -18098,6 +18098,7 @@ function fbPageInfo(b){
   if(!pg) return null;
   if(pg.kind === 'salary') return {title: 'Зарплаты', html: fbSalaryPage(b)};
   if(pg.kind === 'rent') return {title: 'Аренда офисов', html: fbRentPage(b)};
+  if(pg.kind === 'car') return {title: 'Аренда машин', html: fbCarPage(b)};
   const l = (bu.lines || []).find(x => x.id === pg.id);
   return l ? {title: l.name, html: fbLinePage(b, l)} : null;
 }
@@ -18137,6 +18138,20 @@ function fbRentPage(b){
     </div></div>
     <div class="sc">${fbCapT('Билдинги')}<div class="fb-one">${blds.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}</div>`).join('')}
       <div class="fb-card add">${isNew('rent') ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить здание</span><em>${_FB_PLUS}</em></button>`}</div>
+    </div></div>`;
+}
+// Аренда машин — как здания: у кого арендуем, каждая строка с периодом и
+// датой платежа, правится на месте; «Добавить рент» — новая строка.
+function fbCarPage(b){
+  const bu = b.budget || {}, car = bu.car || {}, all = (bu.lines || []).filter(l => l.group === 'car');
+  const isNew = FB.edit && FB.edit.kind === 'new' && FB.edit.id === 'car';
+  return `<div class="sc"><div class="aud-g">
+      ${fbTile('План', 'bu.car_plan', car.plan)}
+      ${fbTile('Потратили', 'bu.car_fact', car.fact)}
+      ${fbTile('Осталось', 'bu.car_left', car.left, {mode: 'neg'})}
+    </div></div>
+    <div class="sc">${fbCapT('Рент')}<div class="fb-one">${all.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}
+      <div class="fb-card add">${isNew ? fbNewRow('car') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','car')"><span>Добавить рент</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
 // Страница одной статьи: план (та же строка в трёх состояниях), срок и
@@ -18351,7 +18366,7 @@ function fbEditCur(field, v){
 // Новая статья или здание: название и сумма в одной строке.
 function fbNewRow(group){
   return `<div class="fb-e fb-bl fb-editing">
-    <span class="fb-e-b fb-inname"><input class="fb-txt" id="fbFillName" placeholder="${group === 'office' ? 'Офис' : group === 'rent' ? 'Здание' : 'Статья'}" autocomplete="off" maxlength="40"
+    <span class="fb-e-b fb-inname"><input class="fb-txt" id="fbFillName" placeholder="${group === 'office' ? 'Офис' : group === 'rent' ? 'Здание' : group === 'car' ? 'Рент' : 'Статья'}" autocomplete="off" maxlength="40"
       onkeydown="if(event.key==='Enter'){document.getElementById('fbFillIn').focus()}else if(event.key==='Escape'){fbFillCancel()}"></span>
     <b class="fb-inb"><input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFillIn"
       onkeydown="if(event.key==='Enter'){fbFillOk()}else if(event.key==='Escape'){fbFillCancel()}"><u>AED</u></b>
@@ -18477,6 +18492,12 @@ function fbPoolRow(l){
   return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid: true,
                     cls: over ? 'dn' : ok ? 'ok' : ''});
 }
+// «Аренда» внутри «Расходов на автомобили»: сумма рентов в месяц, стрелка —
+// на страницу аренды машин.
+function fbCarRow(car){
+  return `<button class="fb-e fb-bl fb-kid" onclick="fbPageOpen('car','')"><span class="fb-e-b"><b>Аренда</b></span>${
+    fbGroupVal(car, 'bu.car_plan')}<em class="fb-chev r">${_SC_CHEV}</em></button>`;
+}
 // Строка статьи в списке: состояние плана и стрелка — открывает страницу.
 function fbLineListRow(l, kid){
   const empty = !(l.plan > 0), pm = l.plan_m || 0, per = l.period > 1;
@@ -18554,12 +18575,12 @@ function fbPersonFillRow(p, sal){
 // статьи — каждая своей карточкой и своей страницей.
 function fbBudLines(b){
   const bu = b.budget, lines = bu.lines || [], sal = bu.salary || {plan: 0, fact: 0, people: []};
-  const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0}, home = bu.home || {plan: 0, fact: 0, n: 0};
+  const rent = bu.rent || {plan: 0, fact: 0, n: 0}, auto = bu.auto || {plan: 0, fact: 0, n: 0}, home = bu.home || {plan: 0, fact: 0, n: 0}, car = bu.car || {plan: 0, fact: 0, n: 0};
   let out = fbBudGroup('Зарплаты', '', fbGroupVal(sal, 'bu.salary_plan'), "fbPageOpen('salary','')");
-  const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), homeLines = lines.filter(l => l.group === 'home'), rest = lines.filter(l => !l.group);
+  const rentLines = lines.filter(l => l.group === 'rent'), autoLines = lines.filter(l => l.group === 'auto'), homeLines = lines.filter(l => l.group === 'home'), carLines = lines.filter(l => l.group === 'car'), rest = lines.filter(l => !l.group);
   if(rentLines.length) out += fbBudGroup('Аренда офисов', '', fbGroupVal(rent, 'bu.rent_plan'), "fbPageOpen('rent','')");
-  if(autoLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
-    FB.autoOpen === true, 'fbAutoToggle()', autoLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
+  if(autoLines.length || carLines.length) out += fbBudGroupExpand('Расходы на автомобили', '', fbGroupVal(auto, 'bu.auto_plan'),
+    FB.autoOpen === true, 'fbAutoToggle()', fbCarRow(car) + autoLines.map(l => l.kind === 'pool' ? fbPoolRow(l) : fbLineListRow(l, true)).join(''));
   if(homeLines.length) out += fbBudGroupExpand('Бытовые расходы', '', fbGroupVal(home, 'bu.home_plan'),
     FB.homeOpen === true, 'fbHomeToggle()', homeLines.map(l => fbLineListRow(l, true)).join(''));
   if(!lines.length){
@@ -18614,7 +18635,7 @@ async function fbFillOk(){
   }else{
     const l = e.kind === 'line' ? (((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === e.id) : null;
     const name = e.kind === 'line' ? (l ? l.name : '') : fbTxt('fbFillName');
-    if(!name){ _toast(e.id === 'rent' ? 'Как называется здание' : e.id === 'office' ? 'Как называется офис' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
+    if(!name){ _toast(e.id === 'rent' ? 'Как называется здание' : e.id === 'office' ? 'Как называется офис' : e.id === 'car' ? 'Как называется рент' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
     url = '/api/owner/finance/book/budget';
     body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val,
             group: e.kind === 'line' ? (l ? l.group : '') : (e.id === 'office' ? 'rent' : e.id), as: _meName()};

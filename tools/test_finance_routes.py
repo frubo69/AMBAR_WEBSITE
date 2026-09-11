@@ -293,11 +293,12 @@ async def main():
        (any(w[0] == "bset" and w[1]["name"] == "Зарплаты" and w[1]["month"] == "2026-11" for w in WRITES),
         [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11"][0],
         sorted(w[1]["group"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["name"].startswith("Аренда "))), (False, ("Аренда офис", "office"), ["rent"] * 6))
-    eq("образец: Аренда, Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Аренда", "Гараж и ТО", "Парковка"])
+    eq("образец: Гараж и ТО, Парковка — группа auto", sorted(w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"), ["Гараж и ТО", "Парковка"])
+    eq("образец: три рента — группа car", [w[1]["name"] for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "car"], ["Орион Рент", "Алексей Рент", "Другой Рент"])
     eq("старое название «Авто» без поля group — всё ещё auto", fr._line_group({"name": "Авто"}), "auto")
     eq("«Аренда» без района и без поля group — auto, не rent", fr._line_group({"name": "Аренда"}), "auto")
     eq("«Аренда JVC» без поля group — rent", fr._line_group({"name": "Аренда JVC"}), "rent")
-    eq("образец: «Гараж и ТО» и «Парковка» — без даты платежа (kind pool), «Аренда» — с графиком", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"], [("Аренда", ""), ("Гараж и ТО", "pool"), ("Парковка", "pool")])
+    eq("образец: «Гараж и ТО» и «Парковка» — без даты платежа (kind pool)", [(w[1]["name"], w[1]["kind"]) for w in WRITES if w[0] == "bset" and w[1]["month"] == "2026-11" and w[1]["group"] == "auto"], [("Гараж и ТО", "pool"), ("Парковка", "pool")])
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Гараж и ТО", plan=3000, group="auto", period=3, next="2026-10-05", note="по чекам", **{"as": "Ст"})))
     pool_id = json.loads(r.text)["id"]
     eq("pool по названию: вид pool, график не принимается", (r.status, WRITES[-1][1]["kind"], WRITES[-1][1]["period"], WRITES[-1][1]["next"], WRITES[-1][1]["note"]), (200, "pool", 1, "", "по чекам"))
@@ -313,6 +314,12 @@ async def main():
     BUDGET.append(dict(_id="L9", month=M, name="Парковка", plan=1500, due=0, note="", kind="", ord=9))
     ba = (await fr.build(M))["budget"]
     eq("старая строка «Парковка» без поля group — в авто; итог группы (с «Гаражом» 4000)", (next(l["group"] for l in ba["lines"] if l["name"] == "Парковка"), ba["auto"]), ("auto", dict(plan=5500, fact=0, left=5500, n=2)))
+    BUDGET.append(dict(_id="L21", month=M, name="Орион Рент", plan=6000, due=0, note="", kind="", ord=21, group="car", period=3, next="2026-10-20"))
+    bc = (await fr.build(M))["budget"]
+    eq("рент машин: треть в car и в итог «Расходов на автомобили», в списке с графиком", (bc["car"], bc["auto"]["plan"], next((l["group"], l["kind"], l["next_due"]) for l in bc["lines"] if l["id"] == "L21")),
+       ({"plan": 2000, "fact": 0, "left": 2000, "n": 1}, 7500, ("car", "", "2026-10-20")))
+    r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Другой Рент", plan=900, group="car")))
+    eq("новый рент — группа car", (r.status, WRITES[-1][1]["group"], WRITES[-1][1]["kind"]), (200, "car", ""))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Аренда склад", plan=900, group="rent")))
     eq("новая строка в группе аренды", (r.status, WRITES[-1][1]["group"]), (200, "rent"))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="X", plan=1, group="zzz")))

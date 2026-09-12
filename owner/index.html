@@ -3272,6 +3272,9 @@ button.path:active{transform:scale(.995)}
 .fb-rcpi{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
   color:var(--gold2);background:var(--gold-soft);font-style:normal;cursor:pointer;margin-right:2px}
 .fb-add .fb-rcp{flex:1 1 100%;margin-top:0}
+.fb-add .fb-pick{flex:1 1 100%;margin:-4px -16px 4px;border-top:1px solid rgba(255,255,255,.05)}
+.fb-pick .fb-card .fb-bl{min-height:52px}
+.fb-pick .fb-card .fb-bl .fb-e-b b{font-size:14.5px}
 .fb-add .fb-rcp.need{border-color:var(--dn);color:var(--dn)}
 .fb-an-sum{display:flex;gap:10px;padding:12px 16px 4px}
 .fb-an-sum > div{flex:1;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
@@ -17484,7 +17487,7 @@ function finToggle(n, снизу){
 // /api/owner/finance/book на весь месяц. После каждой записи сервер
 // возвращает книгу заново, и числа меняются на месте.
 const FB = {month: null, months: {}, at: {}, flight: {}, seq: 0, applied: 0,
-            person: null, line: '', bud: null, kind: 'fine', from: 'this'};
+            person: null, line: '', lineSet: false, pick: {open: null, all: false}, bud: null, kind: 'fine', from: 'this'};
 const FB_TTL = 60000;   // книга месяца свежа минуту: заказы и расходы водителей идут мимо неё
 const FB_T = {handed_fact: 'Собрал по факту', ordered_fact: 'Заказали по счёту',
               aside: 'Барракуда', collected: 'РП+', extra_rp: 'Приход в РП',
@@ -17804,7 +17807,7 @@ function fbPaint(){
     put('fbList-rp', fbEntries(d.expenses, 'rp'));
     put('fbList-np', fbEntries(d.payouts, 'np'));
     put('fbList-in', fbEntries(d.ins, 'in'));
-    put('fbLine-rp', fbLineChips(fbBook(day.slice(0, 7))));
+    fbPickPaint();
   }
   if(mb){
     put('fbList-npm', fbPayoutsMonth(mb));
@@ -17885,6 +17888,7 @@ async function fbEntryAdd(book, day){
   const comment = fbTxt('fbCmt-' + book);
   const who = book === 'np' ? fbTxt('fbWho-np') : '';
   if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
+  if(book === 'rp' && !FB.lineSet){ _toast('Выберите статью'); return; }
   if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
@@ -17894,7 +17898,7 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-    if(book === 'rp'){ FB.shot = null; fbShotMark(); }
+    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; }
     const f = document.getElementById('fbAdd-' + book); if(f) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
@@ -18859,7 +18863,7 @@ function fbBToSupply(day){
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
-  FB.shot = null;
+  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false};
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
@@ -18884,7 +18888,7 @@ async function accFinRP(){
 function fbRpAddRow(day){
   return `<button class="sc-r fb-plus" onclick="fbAddToggle('rp')"><span>Добавить расход</span><em>${_FB_PLUS}</em></button>
   <div class="fb-add" id="fbAdd-rp" hidden>
-    <div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>
+    ${fbLinePicker(fbBook(day.slice(0, 7)))}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
       onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
     <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
@@ -18893,6 +18897,48 @@ function fbRpAddRow(day){
     <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
   </div>`;
 }
+// Выбор статьи для расхода — теми же строками, что в бюджете: группы
+// раскрываются на месте, статья отмечается галкой; выбранная сворачивается
+// в одну строку с карандашом (владелец: «у нас тут не диджейская установка»).
+function fbLinePicker(b){
+  const bu = (b && b.budget) || {}, lines = bu.lines || [];
+  const byG = g => lines.filter(l => l.group === g);
+  const nm = l => l.group === 'rent' ? fbBldName(l) : escS(l.name);
+  const mark = on => on ? `<em class="fb-fill-em">${IC('check', 13)}</em>` : '';
+  const leaf = (l, kid) => `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" data-l="${l.id}" onclick="fbPickLine(this.dataset.l)"><span class="fb-e-b"><b>${nm(l)}</b></span>${mark(FB.lineSet && FB.line === l.id)}</button>`;
+  const card = html => `<div class="fb-card">${html}</div>`;
+  if(FB.lineSet && !FB.pick.all){
+    const l = lines.find(x => x.id === FB.line);
+    const g = l ? (FB_AN_G[l.group] || '') : '';
+    return `<div class="fb-one fb-pick" id="fbLine-rp"><div class="fb-card"><button class="fb-e fb-bl" onclick="fbPickReopen()">
+      <span class="fb-e-b"><b>${l ? nm(l) : 'Вне плана'}</b>${g ? `<i>${g}</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em></button></div></div>`;
+  }
+  const grp = (key, title, kids) => kids ? `<div class="fb-card group${FB.pick.open === key ? ' open' : ''}">
+      <button class="fb-e fb-bl fb-gh" data-k="${key}" onclick="fbPickGroup(this.dataset.k)"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>
+      <div class="fb-kids"${FB.pick.open === key ? '' : ' hidden'}>${kids}</div></div>` : '';
+  const rent = byG('rent'), cars = byG('car');
+  let out = grp('rent', 'Аренда офисов', rent.filter(l => l.office).concat(rent.filter(l => !l.office)).map(l => leaf(l, true)).join(''));
+  out += grp('auto', 'Расходы на автомобили', (cars.length ? `<div class="fb-kcap">Аренда машин</div>` : '') + cars.map(l => leaf(l, true)).join('') + byG('auto').map(l => leaf(l, true)).join(''));
+  out += grp('home', 'Бытовые расходы', byG('home').map(l => leaf(l, true)).join(''));
+  out += grp('sim', 'Sim', byG('sim').map(l => leaf(l, true)).join(''));
+  out += lines.filter(l => !l.group).map(l => card(leaf(l, false))).join('');
+  out += grp('ads', 'Реклама', byG('ads').map(l => leaf(l, true)).join(''));
+  out += card(`<button class="fb-e fb-bl" onclick="fbPickLine('')"><span class="fb-e-b"><b>Вне плана</b></span>${mark(FB.lineSet && FB.line === '')}</button>`);
+  return `<div class="fb-one fb-pick" id="fbLine-rp">${out}</div>`;
+}
+function fbPickPaint(){ const el = document.getElementById('fbLine-rp'); if(el) el.outerHTML = fbLinePicker(fbBook(FB.month)); }
+function fbPickGroup(k){
+  FB.pick.open = FB.pick.open === k ? null : k;
+  fbPickPaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbPickLine(id){
+  FB.line = id; FB.lineSet = true; FB.pick.all = false;
+  fbPickPaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const a = document.getElementById('fbAmt-rp'); if(a && !a.value) a.focus();
+}
+function fbPickReopen(){ FB.pick.all = true; fbPickPaint(); }
 // Снимок чека: тот же путь, что у расходов водителей — кадр 1280px и
 // миниатюра; лежит в FB.shot до записи, кнопка показывает, что чек снят.
 function fbShot(inp){

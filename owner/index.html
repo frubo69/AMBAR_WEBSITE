@@ -18320,7 +18320,9 @@ function fbLinePage(b, l){
 }
 function fbLineEntries(rows){
   if(!rows.length) return '<div class="fb-none">Расходов по этой статье в этом месяце нет</div>';
+  // значок чека — тот же, что в списке месяца: нажал и смотришь снимок
   return rows.map(e => `<div class="fb-e">
+    ${e.photo ? `<em class="fb-rcpi" role="button" data-id="${escS(e.id)}" data-n="${escS(e.comment || '')}" onclick="fbShotOpen(this.dataset.id, this.dataset.n)">${IC('note', 15)}</em>` : ''}
     <span class="fb-e-b"><b>${escS(e.comment || 'Расход')}</b><i>${escS(fbDayT(e.day))}${e.who ? ' · ' + escS(e.who) : ''}</i></span>
     <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
@@ -19077,7 +19079,7 @@ function fbLinePayHtml(b, l){
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
         <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
           onkeydown="if(event.key==='Enter'){this.blur()}">
-        <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
+        <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
       </div></div>
     ${rows.length ? `<div class="sc">${fbCapT('Расходы')}<div id="fbList-line">${fbLineEntries(rows)}</div></div>` : ''}`;
@@ -19151,8 +19153,8 @@ function fbShot(inp){
 }
 function fbShotMark(){
   const st = document.getElementById('fbRcp'); if(!st) return;
-  if(FB.shot){ st.classList.add('set'); st.innerHTML = `<img src="${FB.shot.thumb}" alt=""><span class="xe-rcp-t">Чек снят<i>нажмите, чтобы переснять</i></span>`; }
-  else { st.classList.remove('set'); st.innerHTML = `${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span>`; }
+  if(FB.shot){ st.classList.add('set'); st.innerHTML = `<img src="${FB.shot.thumb}" alt=""><span class="xe-rcp-t">Чек добавлен<i>нажать, чтобы заменить</i></span>`; }
+  else { st.classList.remove('set'); st.innerHTML = `${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span>`; }
 }
 // Чек к записи — во весь экран, как у расходов водителей.
 const _fbImg = {};
@@ -32971,7 +32973,9 @@ function renderHours(h){
 <input type="file" id="expCam" accept="image/*" capture="environment"
   onchange="expShot(this)"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
-<input type="file" id="fbCam" accept="image/*" capture="environment"
+<!-- Чек у старшего берётся и камерой, и из галереи: снимок могли прислать в
+     переписке (у водителя наоборот — только камера, чтобы не подсунули старое) -->
+<input type="file" id="fbCam" accept="image/*"
   onchange="fbShot(this)"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
 <input type="file" id="woCam" accept="image/*" capture="environment"

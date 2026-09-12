@@ -25,7 +25,7 @@ parts = [
     "let DAY_OFFSET = 0; let _flipTimer; let ACC_BACK = null; let ACC_VIEW = null; const SHIFT_START_HOUR = 12;",
     const("MONTHS_RU"), const("MONTHS_GEN"), const("ACC_WDF"), const("IC_P", r"\n\};\n"),
     const("_SC_CHEV", r"`;\n"),
-    fn("IC"), fn("escS"), fn("_setText"), fn("_bizToday"), fn("_dayIsoFor"), fn("accDay"),
+    fn("IC"), fn("escS"), fn("_setText"), fn("_woFull"), fn("_bizToday"), fn("_dayIsoFor"), fn("accDay"),
     fn("accIsBack"), fn("accDayWord"), fn("dayBarOff"), fn("dayBarLabels"), fn("dayBarPaint"),
     fn("_dayNavFor"), fn("_dayNav"), fn("bindDayBars"), fn("daySwipe"), fn("dayBarStep"),
     fn("dayBarArrow"), fn("dayBarHome"), fn("_heroFlip"), fn("askDialog"), fn("closePinPop"),
@@ -73,6 +73,11 @@ window.ownerApi = {ownerFetch: async (path, opts = {}) => {
                                      body: body ? JSON.stringify(body) : undefined});
   if(!r.ok) throw new Error('api ' + r.status);
   return r.json();
+},
+ownerBlob: async (path) => {                    // чек: как в аппе — байты и blob-адрес
+  const r = await fetch(path);
+  if(!r.ok) throw new Error('api ' + r.status);
+  return URL.createObjectURL(await r.blob());
 }};
 function accOpen(id){
   document.getElementById('accOv').classList.add('show');

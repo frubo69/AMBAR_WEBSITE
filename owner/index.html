@@ -17929,7 +17929,8 @@ async function fbEntryAdd(book, day){
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
-    if(FB.lpage){ FB.line = FB.lpage; FB.lineSet = true; fbLinePayPaint(); }   // страница статьи
+    if(FB.lpage){ FB.line = FB.lpage; FB.lineSet = true; }      // статья страницы не теряется
+    fbPagePaint();
   }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек' : 'Не удалось записать'); }
 }
 async function fbEntryDel(id){
@@ -17941,7 +17942,13 @@ async function fbEntryDel(id){
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
     if(FB.page) fbBudRepaint();
-  }catch(e){ _toast('Не удалось убрать'); }
+    fbPagePaint();
+  }catch(e){
+    _toast('Не удалось убрать');
+    // записи уже нет (убрали раньше или с другого телефона) — подтянуть месяц,
+    // чтобы экран показывал книгу, а не прошлое
+    try{ await fbLoad(FB.month, true); fbPaint(); fbPagePaint(); }catch(e2){}
+  }
 }
 
 // ── Экран «Касса дня» ─────────────────────────────────────────────────────
@@ -19015,7 +19022,7 @@ async function fbPayOpen(id){
       {method: 'POST', body: {day, book: 'rp', amount: sum, comment: '', who: '', line: id, as: _meName()}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
-    fbRentPayPaint();
+    fbPagePaint();
   }catch(e){ _toast('Не удалось записать'); }
 }
 // Нажал случайно — вернуть как было: запись уходит, факт и остаток отматываются
@@ -19026,7 +19033,7 @@ async function fbPayUndo(eid){
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry', {method: 'DELETE', body: {id: eid, as: _meName()}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
-    fbRentPayPaint();
+    fbPagePaint();
   }catch(e){ _toast('Не удалось отменить'); }
 }
 // Статья без срока платежа (гараж, парковка, страховка) — своя страница:
@@ -19041,6 +19048,13 @@ function fbLinePay(id){
   mid.scrollTop = 0;
   ACC_BACK = accFinRP;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+// Открытая страница расхода — статья или аренда: перерисовать после записи,
+// удаления и отмены, иначе на экране остаётся то, чего в книге уже нет
+// (владелец нажал «убрать» дважды и получил «не удалось»)
+function fbPagePaint(){
+  if(FB.lpage) fbLinePayPaint();
+  else if(FB.rentGrp) fbRentPayPaint();
 }
 function fbLinePayPaint(){
   const b = fbBook(FB.month), body = document.getElementById('fbPayBody');

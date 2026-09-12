@@ -3071,9 +3071,9 @@ button.path:active{transform:scale(.995)}
 /* Форма новой записи — под строкой «Добавить», пока не записали. */
 .fb-add{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
-.fb-add .fb-num{flex:0 0 96px;width:96px}
+.fb-add .fb-num{flex:0 0 96px;width:96px;text-align:center}   /* сумма по центру окошка */
 .fb-add .fb-txt{flex:1 1 120px}
-.fb-add .aud-b{flex:0 0 auto;height:36px;padding:0 16px;border-radius:10px;font-size:12.5px}
+.fb-add .aud-b{flex:0 0 auto;height:36px;padding:0 16px;border-radius:10px;font-size:12.5px;margin-left:auto}
 .fb-add[hidden]{display:none}
 /* Раскрытая всегда (РП): своей полосы нет — отбивку даёт строка выбора статьи */
 .fb-add.fb-open{padding-top:0;border-top:0}
@@ -19077,7 +19077,7 @@ function fbLinePayHtml(b, l){
       <div class="fb-add fb-lnf">
         <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
-        <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
+        <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-rp"
           onkeydown="if(event.key==='Enter'){this.blur()}">
         <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>

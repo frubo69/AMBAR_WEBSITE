@@ -529,6 +529,8 @@ async def notify_driver(order: dict, kind: str = "new"):
            f"💰 <b>{order.get('total',0)} AED</b>")
     if order.get("payment_method") == "debt":
         txt += "\n☑️ В ДОЛГ — наличные не брать"
+    if order.get("payment_method") == "free":
+        txt += "\n🎁 БЕЗ ОПЛАТЫ — денег не брать"
     if order.get("comment"):
         txt += f"\n\n💬 {_h.escape(order['comment'])}"
 
@@ -1127,8 +1129,10 @@ async def handle_customer(request):
         # отставали у всех, кому доставку закрывали из приложения.
         "orders_done": sum(1 for o in orders if o.get("status") == "delivered" and not o.get("test")),
         "orders_declined": u.get("orders_declined", 0),
+        # заказы «без оплаты» в потраченное не идут — денег по ним не было
         "total_spent": sum(int(o.get("total") or 0) for o in orders
-                           if o.get("status") == "delivered" and not o.get("test")),
+                           if o.get("status") == "delivered" and not o.get("test")
+                           and o.get("payment_method") != "free"),
         "invited_via": u.get("invited_via", ""),
         "last": [{"order_id": o.get("order_id"), "status": o.get("status"),
                   "total": o.get("total", 0), "timestamp": o.get("timestamp", ""),
@@ -1510,9 +1514,11 @@ async def _count_delivered(oid: str, order: dict):
         _TEST_ACCOUNTS = set()
     if not cid or cid in _TEST_ACCOUNTS or order.get("test"):
         return
+    # «Без оплаты» — клиент ничего не потратил: заказ в счётчике есть, денег нет
+    spent = 0 if order.get("payment_method") == "free" else total
     try:
         if await db.claim_order_flag(oid, "stats_counted"):
-            await db._increment_user(cid, orders_done=1, total_spent=total)
+            await db._increment_user(cid, orders_done=1, total_spent=spent)
     except Exception as e:                              # noqa: BLE001
         log.error(f"[pos] delivered counters failed for #{oid}: {e}")
     if order.get("payment_method") == "debt" and total:
@@ -1617,7 +1623,8 @@ async def handle_undeliver(request):
         # Вычитаем только то, что прибавляли: у заказа, закрытого до этой
         # отметки, счётчики не трогаем — иначе минус без плюса.
         if await db.unclaim_order_flag(oid, "stats_counted"):
-            await db._increment_user(cid, orders_done=-1, total_spent=-total)
+            await db._increment_user(cid, orders_done=-1,
+                                     total_spent=-(0 if order.get("payment_method") == "free" else total))
     except Exception as e:
         log.error(f"[pos] undeliver counters failed for #{oid}: {e}")
     if order.get("payment_method") == "debt" and total and cid:

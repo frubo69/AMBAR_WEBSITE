@@ -396,6 +396,19 @@ async def main():
     eq("новая строка в группе аренды", (r.status, WRITES[-1][1]["group"]), (200, "rent"))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="X", plan=1, group="zzz")))
     eq("чужая группа → 400", r.status, 400)
+    # «Без оплаты»: заказ уехал, денег нет — ни в выручку дня, ни в наличные
+    _ob = db.orders_between
+    async def _ob_free(a1, b1):
+        return [dict(order_id="f1", timestamp="2026-09-03T16:00:00", status="delivered",
+                     total=500, tip=0, payment_method="free", office_id="jbr"),
+                dict(order_id="f2", timestamp="2026-09-03T16:30:00", status="delivered",
+                     total=300, tip=0, office_id="jbr")]
+    db.orders_between = _ob_free
+    sf = (await fr._sales(["2026-09-03"]))["2026-09-03"]
+    db.orders_between = _ob
+    eq("без оплаты: мимо выручки и наличных, считается отдельно",
+       (sf["gross"], sf["cash"], sf["free"], sf["orders"]), (300, 300, 500, 1))
+
     print("— график платежей: раз в N месяцев от даты, следующий считается сам")
     eq("_add_months: 31 янв + 1 = 28 фев, + 3 = 30 апр", (fr._add_months("2026-01-31", 1), fr._add_months("2026-01-31", 3)), ("2026-02-28", "2026-04-30"))
     q = dict(period=3, next="2026-10-01")

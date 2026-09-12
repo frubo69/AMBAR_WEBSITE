@@ -30,7 +30,8 @@ async def compute() -> dict:
     d = db._db_or_none()
     out = {}
     cur = d.orders.find({"status": "delivered", "test": {"$ne": True}},
-                        {"_id": 0, "order_id": 1, "customer_id": 1, "total": 1})
+                        {"_id": 0, "order_id": 1, "customer_id": 1, "total": 1,
+                         "payment_method": 1})
     async for o in cur:
         try:
             cid = int(o.get("customer_id") or 0)
@@ -40,7 +41,9 @@ async def compute() -> dict:
             continue
         r = out.setdefault(cid, {"orders_done": 0, "total_spent": 0, "oids": []})
         r["orders_done"] += 1
-        r["total_spent"] += int(o.get("total") or 0)
+        # «без оплаты» — заказ был, денег не было
+        if o.get("payment_method") != "free":
+            r["total_spent"] += int(o.get("total") or 0)
         if o.get("order_id"):
             r["oids"].append(o["order_id"])
     return out

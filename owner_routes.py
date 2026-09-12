@@ -596,6 +596,14 @@ async def handle_finance(request):
     curr_all    = _all_orders_in_window(all_orders, start, end)    # any status
     prev_all    = _all_orders_in_window(all_orders, prev_start, prev_end)
 
+    # «Без оплаты» — заказ уехал, денег за него нет: в выручку он не входит
+    # ни одной строкой, иначе касса показывала бы то, чего в ней не будет.
+    def _free(o):
+        return o.get("payment_method") == "free"
+    free_delivered = [o for _, o in curr_orders if _free(o)]
+    free_aed = sum(int(o.get("total", 0) or 0) for o in free_delivered)
+    curr_orders = [(k, o) for k, o in curr_orders if not _free(o)]
+    prev_orders = [(k, o) for k, o in prev_orders if not _free(o)]
     rev_curr = _sum_field(curr_orders, "total")
     rev_prev = _sum_field(prev_orders, "total")
     pct = _delta_pct(rev_curr, rev_prev)
@@ -826,6 +834,9 @@ async def handle_finance(request):
             # долг сидел в наличных, кассу показывало больше, чем в ней лежит.
             "debt":   {"aed": debt_aed, "count": len(debt_delivered)},
             "transfer": {"aed": transfer_aed, "count": len(transfer_delivered)},
+            # Заказы без оплаты показываем отдельной строкой: они есть, но денег
+            # по ним нет и в выручке их тоже нет.
+            "free": {"aed": free_aed, "count": len(free_delivered)},
             "cash":   {"aed": rev_curr - crypto_aed - debt_aed - transfer_aed,
                        "count": delivered_count - len(crypto_delivered)
                                 - len(debt_delivered) - len(transfer_delivered)},
@@ -972,6 +983,7 @@ def _serialize_user(u: dict, orders: list | None = None, stats: dict | None = No
         "is_banned":     bool(u.get("is_banned")),
         # Debt programme (В ДОЛГ): whitelist flag + current balance in AED
         "debt_allowed":  bool(u.get("debt_allowed")),
+        "free_allowed":  bool(u.get("free_allowed")),
         "debt":          round(float(u.get("debt") or 0), 2),
         "total_spent":   total_spent,
         "orders_total":  orders_total,
@@ -2419,6 +2431,7 @@ async def handle_customer_debt(request):
       {"debt": 250}          — set the balance to an absolute value (after a cash
                                repayment, correction, etc.). Logged to debt_history.
       {"debt_allowed": true} — enable/disable the В ДОЛГ payment option.
+      {"free_allowed": true} — enable/disable «Без оплаты» (заказ без денег).
     Returns the updated customer row."""
     raw = request.match_info["telegram_id"]
     try:
@@ -2442,6 +2455,12 @@ async def handle_customer_debt(request):
         await db.set_debt_allowed(tg_id, allowed, by=owner_id)
         changed["debt_allowed"] = allowed
         log.info(f"[debt] owner {owner_id} set debt_allowed={allowed} for {tg_id}")
+
+    if "free_allowed" in body:
+        allowed = bool(body.get("free_allowed"))
+        await db.set_free_allowed(tg_id, allowed, by=owner_id)
+        changed["free_allowed"] = allowed
+        log.info(f"[free] owner {owner_id} set free_allowed={allowed} for {tg_id}")
 
     if "debt" in body:
         try:

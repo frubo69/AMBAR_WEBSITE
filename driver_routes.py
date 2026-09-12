@@ -498,7 +498,7 @@ async def handle_settle(request):
     o = await db.get_order(oid)
     if not o or (o.get("driver") or "").strip() != me["name"]:
         return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
-    if _is_prepaid(o) or o.get("payment_method") in ("debt", "transfer"):
+    if _is_prepaid(o) or o.get("payment_method") in ("debt", "transfer", "free"):
         # Там, где деньги не идут через руки водителя, и расчёта быть не может.
         return web.json_response({"error": "not_cash"}, status=400, headers=CORS_HEADERS)
     try:
@@ -575,7 +575,7 @@ async def handle_debt_settle(request):
 
 def _needs_settle(o: dict) -> bool:
     """Брал ли водитель наличные по этому заказу."""
-    return not (_is_prepaid(o) or o.get("payment_method") in ("debt", "crypto", "transfer"))
+    return not (_is_prepaid(o) or o.get("payment_method") in ("debt", "crypto", "transfer", "free"))
 
 
 # ── Списания ────────────────────────────────────────────────────────────────
@@ -1205,7 +1205,7 @@ async def handle_history(request):
         total = int(o.get("total", 0) or 0)
         g["count"] += 1
         g["aed"] += total
-        if _is_prepaid(o) or o.get("payment_method") in ("debt", "transfer"):
+        if _is_prepaid(o) or o.get("payment_method") in ("debt", "transfer", "free"):
             g["online"] += total
         else:
             g["cash"] += total

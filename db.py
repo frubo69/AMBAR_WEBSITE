@@ -1669,6 +1669,7 @@ async def list_confirmed_unpromoted_crypto_invoices(limit: int = 50) -> list:
 # ── Debt (В ДОЛГ) ─────────────────────────────────────────────────────────────
 # Selected customers may take orders on credit. Fields on the user doc:
 #   debt_allowed  — gates the В ДОЛГ payment option (whitelist, admin-managed)
+#   free_allowed  — gates «Без оплаты»: заказ уезжает без денег (не в выручку)
 #   debt          — current balance in AED (grows on delivery, admin edits down)
 #   debt_history  — audit log: order deliveries and manual admin edits
 
@@ -1685,6 +1686,34 @@ def _round_aed(v) -> float:
 async def is_debt_allowed(telegram_id: int) -> bool:
     u = await get_user(int(telegram_id))
     return bool(u and u.get("debt_allowed") and not u.get("is_banned"))
+
+
+async def is_free_allowed(telegram_id: int) -> bool:
+    """Разрешена ли этому клиенту оплата «Без оплаты» — заказ, за который денег
+    не берут вовсе (свои, подарок, замена). Белый список, как и «В долг»."""
+    u = await get_user(int(telegram_id))
+    return bool(u and u.get("free_allowed") and not u.get("is_banned"))
+
+
+async def set_free_allowed(telegram_id: int, allowed: bool, by: int = 0):
+    """Включить/выключить способ «Без оплаты» у клиента."""
+    db = _db_or_none()
+    if db is None: return
+    now = datetime.now(timezone.utc)
+    await db.users.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": {"free_allowed": bool(allowed),
+                  "free_allowed_changed_at": now.isoformat(),
+                  "free_allowed_changed_by": int(by) if by else 0},
+         "$setOnInsert": {
+             "telegram_id": int(telegram_id), "debt": 0.0,
+             "is_banned": False, "first_seen": now,
+             "orders_total": 0, "orders_done": 0, "orders_declined": 0,
+             "total_spent": 0, "support_tickets": 0,
+             "notes": "", "verified": False, "verify_requested": False,
+         }},
+        upsert=True,
+    )
 
 
 async def get_debt(telegram_id: int) -> float:

@@ -3983,13 +3983,15 @@ function orderCard(o, i){
           ? ['no', `Оператор отклонил: ${(KIND[req.kind] || 'просьбу').toLowerCase()}`]
           : (DONE[req.kind] || ['ok','Оператор принял']));
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
-  const cash = !paid && !debt && o.payment_method !== 'transfer';
+  const nopay = o.payment_method === 'free';          // «без оплаты» — денег нет вовсе
+  const cash = !paid && !debt && !nopay && o.payment_method !== 'transfer';
   const lines = (o.items || []);
   const n = lines.length;
   const PAY = paid ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
+            : (nopay ? {ico: ICO.warn, t: 'Без оплаты',     s: 'денег не брать'}
             : (debt ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
             : (o.payment_method === 'transfer' ? {ico: ICO.ok, t: 'Переводом', s: 'денег не брать'}
-                    : {ico: ICO.cash, t: 'Наличными',       s: ''}));
+                    : {ico: ICO.cash, t: 'Наличными',       s: ''})));
   const now = o.order_id === OPEN_OID || i === 0;
   const fx = o.pay_fx || null;
   const items = lines.map(it => `<div class="oc-it">
@@ -4026,7 +4028,7 @@ function orderCard(o, i){
         <button class="oc-act" onclick="openEdit('${esc(o.order_id)}')">${svg(ICO.edit, 13)}Изменить</button></div>
       ${items}
     </div>
-    <div class="oc-sec pay ${paid ? 'paid' : (debt ? 'debt' : '')}">
+    <div class="oc-sec pay ${paid ? 'paid' : (debt || nopay ? 'debt' : '')}">
       <div class="oc-l">Оплата${cash ? `<button class="oc-act" onclick="fxOpen('${esc(o.order_id)}')">${
           fx ? esc(fx.code) + ' · сменить' : 'Валютой'}</button>` : ''}</div>
       <div class="oc-pay">
@@ -4073,9 +4075,11 @@ function histCard(o){
   // а не ошибка, и писать «адрес не указан» тут незачем.
   const addr = esc(o.address) || (o.customer_name ? esc(o.customer_name) : 'Телефонный заказ');
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
+  const nopay = o.payment_method === 'free';
   const PAY = paid ? {ico: ICO.ok,   t: 'Оплачено онлайн'}
+            : (nopay ? {ico: ICO.warn, t: 'Без оплаты'}
             : (debt ? {ico: ICO.warn, t: 'В долг'}
-                    : {ico: ICO.cash, t: 'Наличными'});
+                    : {ico: ICO.cash, t: 'Наличными'}));
   return `<div class="ord hist">
     <div class="ord-row ord-row-hd">
       <span class="ord-seq ok">${svg(ICO.ok, 13)}</span>
@@ -4097,7 +4101,7 @@ function histCard(o){
       <div class="ord-items">${items}</div>
     </div>` : ''}
 
-    <div class="ord-row ord-row-pay ${paid ? 'paid' : (debt ? 'debt' : '')}">
+    <div class="ord-row ord-row-pay ${paid ? 'paid' : (debt || nopay ? 'debt' : '')}">
       <div class="ord-l">Оплата</div>
       <div class="ord-l ord-l-r">Итого</div>
       <div class="ord-method">${svg(PAY.ico, 16)}${PAY.t}</div>
@@ -5211,7 +5215,8 @@ function geoBar(){
 function ordHead(active){
   if(!active.length) return '';
   const free = o => !!o.prepaid || o.payment_method === 'crypto'
-                 || o.payment_method === 'debt' || o.payment_method === 'transfer';
+                 || o.payment_method === 'debt' || o.payment_method === 'transfer'
+                 || o.payment_method === 'free';
   const cash = active.filter(o => !free(o)).reduce((a, o) => a + (o.total || 0), 0);
   const paid = active.filter(free).reduce((a, o) => a + (o.total || 0), 0);
   const units = active.reduce((a, o) =>
@@ -6577,6 +6582,7 @@ function _isLate(hm){
 function incShow(o){
   INC = o;
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
+  const nopay = o.payment_method === 'free';
   const n = (o.items||[]).length;
   document.getElementById('incDist').textContent = o.district || '';
   document.getElementById('incTime').innerHTML = timeStrip(o);
@@ -6586,15 +6592,17 @@ function incShow(o){
   // Деньги: сколько и чем. Оплаченный и долговой заказ обязаны читаться сразу —
   // взять наличные там, где не надо, дороже любой ошибки в интерфейсе.
   const payRow = document.querySelector('.inc-row-pay');
-  payRow.className = 'inc-row inc-row-pay' + (paid ? ' paid' : (debt ? ' debt' : ''));
+  payRow.className = 'inc-row inc-row-pay' + (paid ? ' paid' : (debt || nopay ? ' debt' : ''));
   document.getElementById('incPayL').textContent = 'Итого';
   document.getElementById('incTotal').textContent = fmt(o.total);
   const PAY = paid
     ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
+    : (nopay
+      ? {ico: ICO.warn, t: 'Без оплаты',      s: 'денег не брать'}
     : (debt
       ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
       // У наличных уточнять нечего: «Наличными» — это и есть всё сообщение.
-      : {ico: ICO.cash, t: 'Наличными',       s: ''});
+      : {ico: ICO.cash, t: 'Наличными',       s: ''}));
   document.getElementById('incPay').innerHTML = svg(PAY.ico, 17) + PAY.t;
   const ps = document.getElementById('incPayS');
   ps.textContent = PAY.s; ps.hidden = !PAY.s;
@@ -6806,7 +6814,8 @@ let ASK = null;
 // денег не брал, приучится нажимать не глядя.
 function askDeliver(oid){
   const o = _ordById(oid);
-  const cash = o && !o.prepaid && o.payment_method !== 'debt' && o.payment_method !== 'crypto';
+  const cash = o && !o.prepaid && o.payment_method !== 'debt' && o.payment_method !== 'crypto'
+            && o.payment_method !== 'free';
   const st = (o && o.settle) || null;
   ASK = {t:'Отметить доставку?',
          s:'Оператор увидит отметку и закроет заказ. Деньги и выручка считаются '

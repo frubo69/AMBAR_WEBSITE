@@ -108,7 +108,7 @@ async def _sales(days: list[str]) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] заказы не прочитаны: {e}")
         orders = []
-    out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, tips=0, tips_cash=0, orders=0,
+    out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, free=0, tips=0, tips_cash=0, orders=0,
                    cash_by=dict()) for d in days}
     for o in orders:
         day = bizday.order_day(o)
@@ -117,6 +117,11 @@ async def _sales(days: list[str]) -> dict:
             continue
         total = int(o.get("total") or 0)
         m = str(o.get("payment_method") or "").lower()
+        # «Без оплаты» — товар уехал, денег нет: в выручку дня такой заказ не
+        # входит вовсе, считаем его отдельно (владелец, 12 сен 2026)
+        if m == "free":
+            s["free"] += total
+            continue
         s["gross"] += total
         s["orders"] += 1
         s["tips"] += int(o.get("tip") or 0)

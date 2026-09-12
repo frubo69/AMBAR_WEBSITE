@@ -26731,6 +26731,20 @@ async function ownerToggleDebtAllowed(tgId){
   }
 }
 
+// «Без оплаты»: тот же белый список, что и «В долг», и та же ручка
+async function ownerToggleFreeAllowed(tgId){
+  if(!window.ownerApi) return;
+  const c = (_customersCache||[]).find(u=>String(u.telegram_id)===String(tgId));
+  const target = !(c && c.free_allowed);
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/customers/'+tgId+'/debt',
+                                        {method:'POST', body:{free_allowed:target}});
+    _applyDebtResponse(tgId, r);
+  }catch(e){
+    alert('Ошибка: '+(e.message||'unknown'));
+  }
+}
+
 async function ownerSaveDebt(tgId){
   if(!window.ownerApi) return;
   const inp = document.getElementById('dtDebtInput');
@@ -31859,6 +31873,15 @@ const DETAIL = {
           <label class="tg" style="width:44px;height:26px;flex:0 0 auto">
             <input type="checkbox" id="dtDebtAllow" ${c.debt_allowed?'checked':''}
               onchange="ownerToggleDebtAllowed(${c.telegram_id})"><i></i></label>
+        </div>
+        <div class="ofd-p">
+          <div class="ofd-p-b">
+            <div class="ofd-p-n">Разрешить «Без оплаты»</div>
+            <div class="ofd-p-s">${c.free_allowed ? 'клиент может заказать бесплатно — такой заказ не идёт в выручку' : 'сейчас недоступна этому клиенту'}</div>
+          </div>
+          <label class="tg" style="width:44px;height:26px;flex:0 0 auto">
+            <input type="checkbox" id="dtFreeAllow" ${c.free_allowed?'checked':''}
+              onchange="ownerToggleFreeAllowed(${c.telegram_id})"><i></i></label>
         </div>
         <div class="ofd-p">
           <div class="ofd-p-b">

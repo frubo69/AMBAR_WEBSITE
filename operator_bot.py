@@ -508,6 +508,10 @@ async def order_card(o, full=True):
         lines.append("<blockquote>📒 <b>ОПЛАТА: В ДОЛГ</b> — наличные НЕ брать,\n"
                      "сумма заказа записывается в долг клиента</blockquote>")
         lines.append("")
+    elif o.get("payment_method") == "free":
+        lines.append("<blockquote>🎁 <b>БЕЗ ОПЛАТЫ</b> — денег за этот заказ\n"
+                     "принимать НЕ надо, в выручку он не идёт</blockquote>")
+        lines.append("")
     lines.append(f"🆕 <b>НОВЫЙ ЗАКАЗ #{o['order_id']}</b>")
     lines.append("")
     if full:
@@ -986,7 +990,12 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         tod   = [o for o in all_orders.values() if o.get("timestamp","").startswith(today)]
         deliv = [o for o in tod if o.get("status")=="delivered"]
-        rev   = sum(o.get("total",0) for o in deliv)
+        # «Без оплаты» — заказ уехал бесплатно: в выручку не идёт, но показываем
+        # отдельной строкой, чтобы цифры сходились с числом доставок
+        free_rev = sum(o.get("total",0) for o in deliv
+                       if o.get("payment_method")=="free")
+        rev   = sum(o.get("total",0) for o in deliv
+                    if o.get("payment_method")!="free")
         # Crypto was paid on-chain at placement — that money is already on the wallet,
         # the courier must NOT have collected cash for it.
         crypto_rev = sum(o.get("total",0) for o in deliv
@@ -1005,7 +1014,8 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"💰 *Выручка: {int(rev)} AED*\n"
             f"  💎 Крипта (уже на кошельке): *{int(crypto_rev)} AED*\n"
             f"  📒 В долг: *{int(debt_rev)} AED*\n"
-            f"  💵 Наличные: *{int(rev-crypto_rev-debt_rev)} AED*",
+            f"  💵 Наличные: *{int(rev-crypto_rev-debt_rev)} AED*"
+            + (f"\n  🎁 Без оплаты (мимо выручки): *{int(free_rev)} AED*" if free_rev else ""),
             parse_mode="Markdown", reply_markup=_dismiss)
 
     elif "Помощь" in text:

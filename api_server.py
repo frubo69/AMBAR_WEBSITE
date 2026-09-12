@@ -554,6 +554,20 @@ async def handle_create_order(request: web.Request) -> web.Response:
             return web.json_response({"error": "debt_not_allowed"},
                                      status=403, headers=CORS_HEADERS)
 
+    # «Без оплаты»: заказ уезжает бесплатно (свои, подарок, замена). Тоже белый
+    # список и тоже перепроверяем на сервере — в выручку такой заказ не идёт,
+    # так что открывать его всем нельзя.
+    free = False
+    if data.get("payment_method") == "free":
+        try:
+            free = await db.is_free_allowed(uid)
+        except Exception as e:                     # noqa: BLE001
+            log.warning(f"[free] allow check failed for uid={uid}: {e}")
+        if not free:
+            log.warning(f"[order] rejected «без оплаты» order {oid} from non-whitelisted uid={uid}")
+            return web.json_response({"error": "free_not_allowed"},
+                                     status=403, headers=CORS_HEADERS)
+
     # Сигареты — только в паре с алкоголем (правило и его причина в tobacco.py).
     # Приложение это уже проверило, но корзина живёт на телефоне: решает сервер.
     # Проверка падает — заказ пропускаем: потерять живой заказ из-за сбоя в
@@ -752,6 +766,10 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             order_doc["crypto_test"]    = True   # demo order — not a real payment
     elif debt:
         order_doc["payment_method"] = "debt"
+    elif free:
+        # Денег по этому заказу не будет: оператору — «оплату не принимать»,
+        # в выручку дня он не входит, товар со склада уходит доставкой.
+        order_doc["payment_method"] = "free"
     elif src.get("payment_method") == "transfer":
         # Перевод — деньги приходят на счёт, а не курьеру. Проверить их на месте
         # заказа нечем, поэтому статус тут только один: способ расчёта записан,
@@ -1791,6 +1809,9 @@ async def handle_me(request: web.Request) -> web.Response:
         # В ДОЛГ (pay-later) programme: display gate + current balance. The order
         # endpoint re-checks the whitelist server-side, so this is cosmetic.
         "debt_allowed": bool(user_doc.get("debt_allowed")) if user_doc else False,
+        # «Без оплаты» — такой же белый список: способ виден только тем, кому
+        # владелец его включил (сервер всё равно перепроверяет).
+        "free_allowed": bool(user_doc.get("free_allowed")) if user_doc else False,
         "debt": round(float(user_doc.get("debt") or 0), 2) if user_doc else 0,
     }, headers=CORS_HEADERS)
 

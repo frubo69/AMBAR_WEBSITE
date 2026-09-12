@@ -18908,19 +18908,27 @@ function fbRpAddRow(day){
 // Выбор статьи для расхода — теми же строками, что в бюджете: группы
 // раскрываются на месте, статья отмечается галкой; выбранная сворачивается
 // в одну строку с карандашом (владелец: «у нас тут не диджейская установка»).
+// Верхние строки все со стрелкой — и те, что раскрываются, и те, что сразу
+// статья: список читается одной колонкой, без «этой со стрелкой, а той без».
+// Расход всегда ложится на статью — строки «Вне плана» в выборе нет.
 function fbLinePicker(b){
   const bu = (b && b.budget) || {}, lines = bu.lines || [];
   const byG = g => lines.filter(l => l.group === g);
   const nm = l => l.group === 'rent' ? fbBldName(l) : escS(l.name);
   const mark = on => on ? `<em class="fb-fill-em">${IC('check', 13)}</em>` : '';
-  const leaf = (l, kid) => `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" data-l="${l.id}" onclick="fbPickLine(this.dataset.l)"><span class="fb-e-b"><b>${nm(l)}</b></span>${mark(FB.lineSet && FB.line === l.id)}</button>`;
+  const leaf = (l, kid) => `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" data-l="${l.id}" onclick="fbPickLine(this.dataset.l)"><span class="fb-e-b"><b>${nm(l)}</b></span>${
+    FB.lineSet && FB.line === l.id ? mark(true) : (kid ? '' : `<em class="fb-chev">${_SC_CHEV}</em>`)}</button>`;
   const card = html => `<div class="fb-card">${html}</div>`;
-  if(FB.lineSet && !FB.pick.all){
-    const l = lines.find(x => x.id === FB.line);
-    const g = l ? (FB_AN_G[l.group] || '') : '';
+  const sel = FB.lineSet ? lines.find(x => x.id === FB.line) : null;
+  if(sel && !FB.pick.all){
+    const g = FB_AN_G[sel.group] || '';
     return `<div class="fb-one fb-pick" id="fbLine-rp"><div class="fb-card"><button class="fb-e fb-bl" onclick="fbPickReopen()">
-      <span class="fb-e-b"><b>${l ? nm(l) : 'Вне плана'}</b>${g ? `<i>${g}</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em></button></div></div>`;
+      <span class="fb-e-b"><b>${nm(sel)}</b>${g ? `<i>${g}</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em></button></div></div>`;
   }
+  // Статей нет (бюджет месяца не заполнен) — расходу не на что лечь: строка
+  // ведёт в бюджет, а не оставляет форму без выбора
+  if(!lines.length) return `<div class="fb-one fb-pick" id="fbLine-rp"><div class="fb-card"><button class="fb-e fb-bl" onclick="accOpen('finbud')">
+    <span class="fb-e-b"><b>Бюджет не заполнен</b><i>расход ложится на статью</i></span><em class="fb-chev">${_SC_CHEV}</em></button></div></div>`;
   const grp = (key, title, kids) => kids ? `<div class="fb-card group${FB.pick.open === key ? ' open' : ''}">
       <button class="fb-e fb-bl fb-gh" data-k="${key}" onclick="fbPickGroup(this.dataset.k)"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>
       <div class="fb-kids"${FB.pick.open === key ? '' : ' hidden'}>${kids}</div></div>` : '';
@@ -18931,7 +18939,6 @@ function fbLinePicker(b){
   out += grp('sim', 'Sim', byG('sim').map(l => leaf(l, true)).join(''));
   out += lines.filter(l => !l.group).map(l => card(leaf(l, false))).join('');
   out += grp('ads', 'Реклама', byG('ads').map(l => leaf(l, true)).join(''));
-  out += card(`<button class="fb-e fb-bl" onclick="fbPickLine('')"><span class="fb-e-b"><b>Вне плана</b></span>${mark(FB.lineSet && FB.line === '')}</button>`);
   return `<div class="fb-one fb-pick" id="fbLine-rp">${out}</div>`;
 }
 function fbPickPaint(){ const el = document.getElementById('fbLine-rp'); if(el) el.outerHTML = fbLinePicker(fbBook(FB.month)); }

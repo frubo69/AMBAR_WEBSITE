@@ -3106,6 +3106,7 @@ button.path:active{transform:scale(.995)}
 .rcp-body img.zoom{cursor:grab}
 .rcp-body img.none{visibility:hidden}
 .rcp-hint{padding:9px 16px;font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--border2)}
+.fb-chev.open{transform:rotate(90deg)}   /* фильтр истории раскрыт */
 .fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
   font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
 .fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
@@ -17754,6 +17755,9 @@ function fbRepaint(){
   const box = document.getElementById('finBook');
   if(box) box.innerHTML = fbHubHtml(fbBook(FB.month));
   if(!document.getElementById('accOv').classList.contains('show')) return;
+  // открыта страница расхода (статья, аренда, зарплаты, история) — месяц
+  // листается прямо на ней, экран под ней трогать незачем
+  if(FB.hist || FB.lpage || FB.rentGrp || FB.salPage){ fbPagePaint(); return; }
   if(FB_VIEWS[ACC_VIEW]) FB_VIEWS[ACC_VIEW]();
 }
 
@@ -17859,9 +17863,6 @@ function fbPaint(){
   }
   if(mb){
     put('fbList-npm', fbPayoutsMonth(mb));
-    const rpm = fbExpensesMonth(mb);
-    put('fbList-rpm', rpm);
-    const rpc = document.getElementById('fbRpmCard'); if(rpc) rpc.hidden = !rpm;
     put('fbList-an', fbAnalysis(mb));
     put('fbList-people', fbPeopleHtml(mb));
     const p = FB.person ? (fbCur(mb).people || []).find(x => x.name === FB.person) : null;
@@ -18177,19 +18178,99 @@ async function fbDayOk(day){
     if(ACC_VIEW === 'finday' || ACC_VIEW === 'finb') fbDayReload(); else fbRepaint();
   }catch(e){ _toast('Не удалось подтвердить'); }
 }
-// Расходы из РП за месяц одним списком (статья или «на что», кто, день).
-// Пусто — ничего не пишем: ниже и так раскрыта форма нового расхода.
-function fbExpensesMonth(b){
+// ── История расходов ──────────────────────────────────────────────────────
+// Всё, что ушло из РП, одной страницей: по дням, с фильтром по статье.
+// Открывается справа — с экрана РП (все) и со страницы статьи (только она).
+function fbHistOpen(line, from){
+  const b = fbBook(FB.month); if(!b) return;
+  FB.shot = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false;
+  FB.hist = {line: line || '', open: false, from: from || (line ? {kind: 'line', id: line} : null)};
+  _setText('accTitle', 'История'); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbHistHtml(b)}</div>`;
+  mid.scrollTop = 0;
+  const back = FB.hist.from;
+  ACC_BACK = back && back.kind === 'line' ? () => fbLinePay(back.id) : accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbHistPaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  if(b && body) body.innerHTML = fbHistHtml(b);
+}
+// Записи месяца, уже отфильтрованные: newest first, с днём у каждой
+function fbHistRows(b){
+  const f = (FB.hist || {}).line || '';
   const rows = [];
   (b.days || []).forEach(d => (d.expenses || []).forEach(e => rows.push({...e, day: d.day})));
-  rows.reverse();
-  if(!rows.length) return '';
-  return rows.map(e => `<div class="fb-e">
-    <span class="fb-e-b"><b>${escS(e.kind_t ? e.kind_t + ' · ' + e.who : (e.line_name || e.comment || 'Расход'))}</b><i>${escS(fbDayT(e.day))}${
-      e.line_name && e.comment ? ' · ' + escS(e.comment) : ''}</i></span>
+  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
+  return rows.filter(e => f === '' ? true
+    : f === 'salary' ? !!e.kind
+    : f === 'none' ? !e.line && !e.kind
+    : e.line === f);
+}
+// Чем фильтруем: все, зарплаты, любая статья месяца, записи без статьи
+function fbHistOpts(b){
+  const lines = ((b.budget || {}).lines || []);
+  const opts = [{id: '', t: 'Все расходы'}, {id: 'salary', t: 'Зарплаты'}];
+  lines.forEach(l => opts.push({id: l.id, t: l.group === 'rent' ? fbBldName(l) : escS(l.name),
+                                g: FB_AN_G[l.group] || ''}));
+  opts.push({id: 'none', t: 'Без статьи'});
+  return opts;
+}
+function fbHistTitle(b){
+  const f = (FB.hist || {}).line || '';
+  const o = fbHistOpts(b).find(x => x.id === f);
+  return o ? o.t : 'Все расходы';
+}
+function fbHistHtml(b){
+  const st = FB.hist || {line: '', open: false};
+  const rows = fbHistRows(b);
+  const sum = rows.reduce((a, e) => a + (e.amount || 0), 0);
+  // фильтр раскрывается на месте — теми же строками, что и выбор статьи
+  const opts = fbHistOpts(b).map(o => `<div class="fb-card"><button class="fb-e fb-bl" data-f="${escS(o.id)}" onclick="fbHistPick(this.dataset.f)">
+      <span class="fb-e-b"><b>${o.t}</b>${o.g ? `<i>${o.g}</i>` : ''}</span>${
+      o.id === st.line ? `<em class="fb-fill-em">${IC('check', 13)}</em>` : ''}</button></div>`).join('');
+  // по дням: у каждого дня своя карточка с суммой в шапке
+  const byDay = [];
+  rows.forEach(e => {
+    const d = byDay.length && byDay[byDay.length - 1].day === e.day ? byDay[byDay.length - 1] : null;
+    if(d) d.rows.push(e); else byDay.push({day: e.day, rows: [e]});
+  });
+  const days = byDay.map(d => `<div class="sc">${fbCapT(fbDayT(d.day), fbFmt(d.rows.reduce((a, e) => a + (e.amount || 0), 0)) + ' AED')}
+    <div>${d.rows.map(fbHistRow).join('')}</div></div>`).join('');
+  return `<div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Всего', 'hist.sum', sum)}
+      ${fbTile('Записей', 'hist.n', rows.length, {unit: pluralize(rows.length, 'запись', 'записи', 'записей')})}
+      ${fbTile('Дней', 'hist.days', byDay.length, {unit: pluralize(byDay.length, 'день', 'дня', 'дней')})}
+    </div>
+  </div>
+  <div class="sc">
+    <button class="fb-e fb-bl" onclick="fbHistToggle()"><span class="fb-e-b"><b>Статья</b><i>${fbHistTitle(b)}</i></span><em class="fb-chev${st.open ? ' open' : ''}">${_SC_CHEV}</em></button>
+    <div class="fb-one fb-pick"${st.open ? '' : ' hidden'}>${opts}</div>
+  </div>
+  ${days || '<div class="sc"><div class="fb-none">Таких расходов в этом месяце не было</div></div>'}`;
+}
+function fbHistRow(e){
+  const t = e.kind_t ? `${e.kind_t} · ${escS(e.who)}` : (e.line_name ? escS(e.line_name) : escS(e.comment || 'Расход'));
+  const sub = [e.line_name && e.comment ? escS(e.comment) : '', e.kind_t && e.comment ? escS(e.comment) : '',
+               e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
+  return `<div class="fb-e">
+    <span class="fb-e-b"><b>${t}</b>${sub ? `<i>${sub}</i>` : ''}</span>
     <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
-  </div>${fbRcpBtn(e)}`).join('');
+  </div>${fbRcpBtn(e)}`;
+}
+function fbHistToggle(){
+  FB.hist.open = !FB.hist.open;
+  fbHistPaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbHistPick(f){
+  FB.hist.line = f; FB.hist.open = false;
+  fbHistPaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 // ── Экран «Бюджет» ────────────────────────────────────────────────────────
@@ -18951,7 +19032,7 @@ async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null}; FB.lpage = null; FB.rentGrp = null; FB.salPage = false;
-  const rows = fbExpensesMonth(b);           // пусто — карточку списка не показываем совсем
+  FB.hist = null;
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
@@ -18965,9 +19046,8 @@ async function accFinRP(){
     ${fbCapT('РП−')}
     ${fbRpAddRow(today)}
   </div>
-  <div class="sc" id="fbRpmCard"${rows ? '' : ' hidden'}>
-    ${fbCapT('Расходы')}
-    <div id="fbList-rpm">${rows}</div>
+  <div class="sc"><button class="fb-e fb-bl" onclick="fbHistOpen('')">
+    <span class="fb-e-b"><b>История</b><i>все расходы по дням, с фильтром</i></span><em class="fb-chev">${_SC_CHEV}</em></button>
   </div>`;
 }
 // «Новый расход» — только список статей: каждая уводит на свою страницу, где
@@ -19147,7 +19227,10 @@ function fbLinePay(id){
 // удаления и отмены, иначе на экране остаётся то, чего в книге уже нет
 // (владелец нажал «убрать» дважды и получил «не удалось»)
 function fbPagePaint(){
-  if(FB.lpage) fbLinePayPaint();
+  const b = fbBook(FB.month);
+  if(b) _setText('accSub', fbMonthT(b.month));
+  if(FB.hist) fbHistPaint();
+  else if(FB.lpage) fbLinePayPaint();
   else if(FB.rentGrp) fbRentPayPaint();
   else if(FB.salPage) fbSalPayPaint();
 }
@@ -19175,7 +19258,9 @@ function fbLinePayHtml(b, l){
         <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
       </div></div>
-    ${rows.length ? `<div class="sc">${fbCapT('Расходы')}<div id="fbList-line">${fbLineEntries(rows)}</div></div>` : ''}`;
+    ${rows.length ? `<div class="sc"><button class="fb-e fb-bl" data-l="${l.id}" onclick="fbHistOpen(this.dataset.l)">
+      <span class="fb-e-b"><b>История</b><i>${rows.length} ${pluralize(rows.length, 'запись', 'записи', 'записей')} за месяц · ${fbFmt(rows.reduce((a2, e) => a2 + (e.amount || 0), 0))} AED</i></span>
+      <em class="fb-chev">${_SC_CHEV}</em></button></div>` : ''}`;
 }
 // Выбор статьи для расхода — теми же строками, что в бюджете: группы
 // раскрываются на месте, статья отмечается галкой; выбранная сворачивается

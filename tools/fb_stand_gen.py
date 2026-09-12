@@ -142,6 +142,8 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('kid')){          // строка внутри раскрытой группы выбора статьи
       const k = [...document.querySelectorAll('#fbLine-rp .fb-kid')].find(e => e.innerText.trim() === Q.get('kid'));
       if(k) k.click(); await new Promise(r => setTimeout(r, 400)); }
+    if(Q.get('hist')){         // страница истории: hist=1 — все, hist=<фильтр>
+      fbHistOpen(Q.get('hist') === '1' ? '' : Q.get('hist')); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('rcp')){          // открыть окно чека у первой записи со снимком
       const b2 = document.querySelector('.fb-rcpb'); if(b2) b2.click(); await new Promise(r => setTimeout(r, 900)); }
     if(Q.get('pay')){ const r0 = [...document.querySelectorAll('#fbPayBody .fb-pay')].find(e => e.innerText.includes(Q.get('pay')));

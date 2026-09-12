@@ -173,7 +173,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     // «Штрафы/авансы/долги»: itemwho=<имя> (пусто — «Другой человек») открывает страницу человека,
     // itemamt=сумма [itemkind=fine|advance|loan, itemname=имя, itemcmt=за что] — заполнить и нажать «Записать»
     if(Q.get('itemwho') !== null){
-      const pill = [...document.querySelectorAll('#accMid .crw-p, #accMid .crw-op, #accMid .fb-bl')]
+      const pill = [...document.querySelectorAll('#accMid .crw-p, #accMid .crw-op, #accMid .fb-star, #accMid .fb-bl')]
         .find(e => Q.get('itemwho') ? e.dataset.n === Q.get('itemwho') : e.classList.contains('fb-bl'));
       if(pill) pill.click(); else log('SCENARIO no pill ' + Q.get('itemwho'));
       await new Promise(r => setTimeout(r, 400));

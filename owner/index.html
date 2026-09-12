@@ -3161,6 +3161,11 @@ button.path:active{transform:scale(.995)}
   font-style:normal;font-size:11px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2));font-variant-numeric:tabular-nums}
 .fb-who-s u{text-decoration:none;font-size:9px;font-weight:700;opacity:.75}
+/* «Штрафы/авансы/долги»: старший в STAR — отдельная карточка-кнопка над районами */
+.crw-c.fb-star{display:block;width:100%;padding:0;font-family:inherit;text-align:left;color:inherit;cursor:pointer}
+.crw-c.fb-star .crw-c-h{border-bottom:0}
+.crw-c.fb-star.fb-spent{border-color:rgba(201,169,110,.6)}
+.crw-c.fb-star:active{border-color:var(--gold2)}
 .fb-fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
 .fb-fchip{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
@@ -19887,6 +19892,13 @@ function fbItemsHtml(b){
   const pill = (n, ic) => `<button class="crw-p${on(n)}" data-n="${escS(n)}" onclick="fbItemPerson(this.dataset.n)">
       <span class="crw-p-a">${IC(ic, 15)}</span><span class="crw-p-n">${escS(n)}</span>${tag(n)}</button>`;
   const seen = new Set();
+  // старший в STAR — отдельной карточкой над районами
+  const stars = (CREW.stars || []).map(n => {
+    seen.add(n);
+    return `<button class="crw-c fb-star${on(n)}" data-n="${escS(n)}" onclick="fbItemPerson(this.dataset.n)">
+      <span class="crw-c-h"><span class="crew-code">${IC('star', 15)}</span><span class="crw-c-n">${escS(n)}</span>${tag(n)}<em class="fb-chev">${_SC_CHEV}</em></span>
+    </button>`;
+  }).join('');
   const cards = (CREW.districts || []).map(d => {
     if(d.operator) seen.add(d.operator);
     (d.drivers || []).forEach(n => seen.add(n));
@@ -19900,13 +19912,14 @@ function fbItemsHtml(b){
       <div class="crw-c-b">${(d.drivers || []).length ? d.drivers.map(n => pill(n, 'car')).join('') : '<span class="crw-none">никого нет</span>'}</div>
     </div>`;
   }).join('');
-  // в зарплатах есть и те, кто не стоит на районе: старшие, вписанные руками
-  const rest = (pay.people || []).filter(p => !seen.has(p.name));
+  // в зарплатах есть и те, кто не стоит на районе. Вписанные руками без роли
+  // (руководство) здесь не нужны — видны, только если на них уже что-то записано
+  const rest = (pay.people || []).filter(p => !seen.has(p.name) && (p.role !== 'other' || has(p.name)));
   const restCard = rest.length ? `<div class="crw-c">
       <div class="crw-c-h"><span class="crw-c-n wrap">Без района</span></div>
       <div class="crw-c-b">${rest.map(p => pill(p.name, p.role === 'driver' ? 'car' : p.role === 'other' ? 'user' : 'headset')).join('')}</div>
     </div>` : '';
-  return tiles + cards + restCard + `<div class="sc"><button class="fb-e fb-bl" onclick="fbItemPerson('')">
+  return tiles + stars + cards + restCard + `<div class="sc"><button class="fb-e fb-bl" onclick="fbItemPerson('')">
       <span class="fb-e-b"><b>Другой человек</b><i>вписать имя вручную</i></span><em class="fb-chev">${_SC_CHEV}</em></button></div>`;
 }
 // Страница человека для удержаний: сверху — что записать, ниже — что на нём

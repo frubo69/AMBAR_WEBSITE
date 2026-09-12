@@ -1637,6 +1637,9 @@ async def handle_staff(request):
                       for d in OFFICE_IDS],
         "operators": staff.operator_names(),
         "seniors": [x["name"] for x in staff.SENIOR_OPERATORS],
+        # старший в STAR (менеджер, не оператор из расписания) — только имена,
+        # «Штрафы/авансы/долги» ставят его отдельной карточкой наверх
+        "stars": list(staff.SENIOR_STAR_IDS),
         # Водители тоже переставляются: список тем же видом, что и районы, —
         # у кого где стоит и от чего отступили.
         "drivers": [{"name": n,

@@ -147,7 +147,9 @@ for e in ENTRIES:
 ENTRIES.append(dict(_id="in1", day=f"{MONTH}-02", book="in", amount=250, comment="перевод с крипты", who="", by="Старший", at="t"))
 if today_n >= 8:
     ENTRIES.append(dict(_id="in2", day=f"{MONTH}-08", book="in", amount=340, comment="вернули депозит", who="", by="Старший", at="t"))
-PEOPLE = [dict(_id="Макар", role="senior", manual=True, note="старший"), dict(_id="Слон", role="senior", manual=True)]
+PEOPLE = [dict(_id="Макар", role="senior", manual=True, note="старший"), dict(_id="Слон", role="senior", manual=True),
+          # вписанные руками без роли: старший из STAR (карточка наверху) и руководство (на «Штрафах» не видно)
+          dict(_id="Старший", role="other", manual=True), dict(_id="АМ", role="other", manual=True)]
 PAYM = [dict(_id=f"{PREV}|Макар", month=PREV, name="Макар", rate=1750, unit="month", cur="USD"),
         dict(_id=f"{PREV}|Слон", month=PREV, name="Слон", rate=1750, unit="month", cur="USD"),
         dict(_id=f"{PREV}|Али", month=PREV, name="Али", rate=110, unit="day", cur="AED"),
@@ -218,7 +220,7 @@ async def staff(request):
         dict(id="bbay", code="B2", name="Бизнес Бей", operator="Джанабиль", base="Джанабиль", moved=False,
              drivers=["Парвиз", "Авазбек", "Бахадыр"]),
         dict(id="tecom", code="B5", name="Тиком", operator="Умар", base="Умар", moved=False, drivers=["Файзуло", "Алишер"]),
-    ], "drivers": []})
+    ], "drivers": [], "stars": ["Старший"]})
 
 app = web.Application()
 fr.setup(app)

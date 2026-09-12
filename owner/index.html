@@ -3107,6 +3107,8 @@ button.path:active{transform:scale(.995)}
 .rcp-body img.none{visibility:hidden}
 .rcp-hint{padding:9px 16px;font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--border2)}
 .fb-chev.open{transform:rotate(90deg)}   /* фильтр истории раскрыт */
+/* Список фильтра листается внутри себя, а не раздвигает страницу */
+.fb-histf{max-height:46dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
   font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
 .fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
@@ -18200,27 +18202,40 @@ function fbHistPaint(){
 // Записи месяца, уже отфильтрованные: newest first, с днём у каждой
 function fbHistRows(b){
   const f = (FB.hist || {}).line || '';
+  const byId = {};
+  ((b.budget || {}).lines || []).forEach(l => { byId[l.id] = l; });
+  const grp = e => ((byId[e.line] || {}).group || '');
   const rows = [];
   (b.days || []).forEach(d => (d.expenses || []).forEach(e => rows.push({...e, day: d.day})));
   rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
   return rows.filter(e => f === '' ? true
     : f === 'salary' ? !!e.kind
-    : f === 'none' ? !e.line && !e.kind
+    : f === 'none' ? (!e.line && !e.kind)
+    : f.startsWith('l:') ? e.line === f.slice(2)
+    : f === 'g:auto' ? ['car', 'auto'].includes(grp(e))
+    : f.startsWith('g:') ? grp(e) === f.slice(2)
     : e.line === f);
 }
-// Чем фильтруем: все, зарплаты, любая статья месяца, записи без статьи
+// Чем фильтруем: группами, а не каждым билдингом (владелец: «не нужно сразу
+// раскрывать по билдингам»). Отдельными строками — только статьи без группы.
+const FB_HIST_G = [['rent', 'Аренда офисов'], ['auto', 'Расходы на автомобили'],
+                   ['home', 'Бытовые расходы'], ['sim', 'Sim'], ['ads', 'Реклама']];
 function fbHistOpts(b){
   const lines = ((b.budget || {}).lines || []);
+  const has = g => lines.some(l => (g === 'auto' ? ['car', 'auto'] : [g]).includes(l.group));
   const opts = [{id: '', t: 'Все расходы'}, {id: 'salary', t: 'Зарплаты'}];
-  lines.forEach(l => opts.push({id: l.id, t: l.group === 'rent' ? fbBldName(l) : escS(l.name),
-                                g: FB_AN_G[l.group] || ''}));
+  FB_HIST_G.forEach(([g, t]) => { if(has(g)) opts.push({id: 'g:' + g, t}); });
+  lines.filter(l => !l.group).forEach(l => opts.push({id: 'l:' + l.id, t: escS(l.name)}));
   opts.push({id: 'none', t: 'Без статьи'});
   return opts;
 }
 function fbHistTitle(b){
   const f = (FB.hist || {}).line || '';
   const o = fbHistOpts(b).find(x => x.id === f);
-  return o ? o.t : 'Все расходы';
+  if(o) return o.t;
+  // открыли со страницы статьи — фильтр по ней самой, её и называем
+  const l = ((b.budget || {}).lines || []).find(x => 'l:' + x.id === f || x.id === f);
+  return l ? (l.group === 'rent' ? fbBldName(l) : escS(l.name)) : 'Все расходы';
 }
 function fbHistHtml(b){
   const st = FB.hist || {line: '', open: false};
@@ -18247,8 +18262,8 @@ function fbHistHtml(b){
     </div>
   </div>
   <div class="sc">
-    <button class="fb-e fb-bl" onclick="fbHistToggle()"><span class="fb-e-b"><b>Статья</b><i>${fbHistTitle(b)}</i></span><em class="fb-chev${st.open ? ' open' : ''}">${_SC_CHEV}</em></button>
-    <div class="fb-one fb-pick"${st.open ? '' : ' hidden'}>${opts}</div>
+    <button class="fb-e fb-bl" onclick="fbHistToggle()"><span class="fb-e-b"><b>Фильтр</b><i>${fbHistTitle(b)}</i></span><em class="fb-chev${st.open ? ' open' : ''}">${_SC_CHEV}</em></button>
+    <div class="fb-one fb-pick fb-histf"${st.open ? '' : ' hidden'}>${opts}</div>
   </div>
   ${days || '<div class="sc"><div class="fb-none">Таких расходов в этом месяце не было</div></div>'}`;
 }

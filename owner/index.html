@@ -3077,8 +3077,6 @@ button.path:active{transform:scale(.995)}
 .fb-add[hidden]{display:none}
 /* Раскрытая всегда (РП): своей полосы нет — отбивку даёт строка выбора статьи */
 .fb-add.fb-open{padding-top:0;border-top:0}
-.fb-addf{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px}
-.fb-addf[hidden]{display:none}
 .fb-add.fb-nof{padding-bottom:0}          /* статья не выбрана — карточка кончается списком */
 /* Оплата аренды: сумма сверху, под ней жёлтая «Оплатил» */
 .fb-pay{align-items:flex-start;padding-top:14px;padding-bottom:14px}
@@ -17927,7 +17925,7 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; fbPickPaint(); }
+    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; fbPickPaint(); }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
@@ -18922,7 +18920,7 @@ function fbBToSupply(day){
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
-  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; FB.lpage = null; FB.rentGrp = null;
+  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null}; FB.lpage = null; FB.rentGrp = null;
   const rows = fbExpensesMonth(b);           // пусто — карточку списка не показываем совсем
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
@@ -18942,27 +18940,10 @@ async function accFinRP(){
     <div id="fbList-rpm">${rows}</div>
   </div>`;
 }
-// Форма фактического расхода: статья, сумма, на что и чек — без чека не
-// записывается (владелец: «все обязательно с чеками»). Сам экран раскрыт
-// всегда, а поля появляются под выбранной статьёй: пока статья не выбрана,
-// сумма и чек ни к чему не относятся (владелец: «это к чему внизу?»).
+// «Новый расход» — только список статей: каждая уводит на свою страницу, где
+// расход и записывают (владелец: «уводи на отдельные страницы»).
 function fbRpAddRow(day){
-  return `<div class="fb-add fb-open${fbLineChosen() ? '' : ' fb-nof'}" id="fbAdd-rp">
-    ${fbLinePicker(fbBook(day.slice(0, 7)))}
-    <div class="fb-addf" id="fbAddF"${fbLineChosen() ? '' : ' hidden'}>
-      <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
-        onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
-      <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
-        onkeydown="if(event.key==='Enter'){this.blur()}">
-      <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
-      <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
-    </div>
-  </div>`;
-}
-// Статья выбрана — значит список свёрнут в одну строку и поля под ней к месту
-function fbLineChosen(){
-  if(!FB.lineSet || FB.pick.all) return false;
-  return (((fbBook(FB.month) || {}).budget || {}).lines || []).some(l => l.id === FB.line);
+  return `<div class="fb-add fb-open fb-nof" id="fbAdd-rp">${fbLinePicker(fbBook(day.slice(0, 7)))}</div>`;
 }
 // ── «Аренда офисов»: страница оплаты ──────────────────────────────────────
 // Та же страница, что в бюджете (план/факт/осталось, «Офис» и «Билдинги» со
@@ -19097,16 +19078,9 @@ function fbLinePicker(b){
   const bu = (b && b.budget) || {}, lines = bu.lines || [];
   const byG = g => lines.filter(l => l.group === g);
   const nm = l => l.group === 'rent' ? fbBldName(l) : escS(l.name);
-  const mark = on => on ? `<em class="fb-fill-em">${IC('check', 13)}</em>` : '';
-  const leaf = (l, kid) => `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" data-l="${l.id}" onclick="fbPickLine(this.dataset.l)"><span class="fb-e-b"><b>${nm(l)}</b></span>${
-    FB.lineSet && FB.line === l.id ? mark(true) : (kid ? '' : `<em class="fb-chev">${_SC_CHEV}</em>`)}</button>`;
   const card = html => `<div class="fb-card">${html}</div>`;
-  const sel = FB.lineSet ? lines.find(x => x.id === FB.line) : null;
-  if(sel && !FB.pick.all){
-    const g = FB_AN_G[sel.group] || '';
-    return `<div class="fb-one fb-pick" id="fbLine-rp"><div class="fb-card"><button class="fb-e fb-bl" onclick="fbPickReopen()">
-      <span class="fb-e-b"><b>${nm(sel)}</b>${g ? `<i>${g}</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em></button></div></div>`;
-  }
+  const row = (title, go, kid) => `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" onclick="${go}"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`;
+  const leaf = (l, kid) => row(nm(l), `fbLinePay('${l.id}')`, kid);
   // Статей нет (бюджет месяца не заполнен) — расходу не на что лечь: строка
   // ведёт в бюджет, а не оставляет форму без выбора
   if(!lines.length) return `<div class="fb-one fb-pick" id="fbLine-rp"><div class="fb-card"><button class="fb-e fb-bl" onclick="accOpen('finbud')">
@@ -19117,37 +19091,27 @@ function fbLinePicker(b){
   const rent = byG('rent'), cars = byG('car');
   // аренда — не группа со списком, а своя страница: там у каждого здания сумма,
   // срок платежа и «Оплатил»
-  let out = rent.length ? card(`<button class="fb-e fb-bl" onclick="fbRentPay()"><span class="fb-e-b"><b>Аренда офисов</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`) : '';
+  let out = rent.length ? card(row('Аренда офисов', "fbRentPay('rent')")) : '';
   // автомобили: аренда — одной строкой на свою страницу (не десяток рентов),
   // гараж, парковка и страховка — каждый своей страницей
-  const sub = (title, go) => `<div class="fb-card"><button class="fb-e fb-bl fb-kid" onclick="${go}"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button></div>`;
+  const kidCard = html => `<div class="fb-card">${html}</div>`;
   out += grp('auto', 'Расходы на автомобили',
-    (cars.length ? sub('Аренда', "fbRentPay('car')") : '') +
-    byG('auto').map(l => sub(nm(l), `fbLinePay('${l.id}')`)).join(''));
-  out += grp('home', 'Бытовые расходы', byG('home').map(l => leaf(l, true)).join(''));
-  out += grp('sim', 'Sim', byG('sim').map(l => leaf(l, true)).join(''));
+    (cars.length ? kidCard(row('Аренда', "fbRentPay('car')", true)) : '') +
+    byG('auto').map(l => kidCard(leaf(l, true))).join(''));
+  out += grp('home', 'Бытовые расходы', byG('home').map(l => kidCard(leaf(l, true))).join(''));
+  out += grp('sim', 'Sim', byG('sim').map(l => kidCard(leaf(l, true))).join(''));
   out += lines.filter(l => !l.group).map(l => card(leaf(l, false))).join('');
-  out += grp('ads', 'Реклама', byG('ads').map(l => leaf(l, true)).join(''));
+  out += grp('ads', 'Реклама', byG('ads').map(l => kidCard(leaf(l, true))).join(''));
   return `<div class="fb-one fb-pick" id="fbLine-rp">${out}</div>`;
 }
 function fbPickPaint(){
   const el = document.getElementById('fbLine-rp'); if(el) el.outerHTML = fbLinePicker(fbBook(FB.month));
-  const on = fbLineChosen();
-  const f = document.getElementById('fbAddF'); if(f) f.hidden = !on;
-  const w = document.getElementById('fbAdd-rp'); if(w) w.classList.toggle('fb-nof', !on);
 }
 function fbPickGroup(k){
   FB.pick.open = FB.pick.open === k ? null : k;
   fbPickPaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
-function fbPickLine(id){
-  FB.line = id; FB.lineSet = true; FB.pick.all = false;
-  fbPickPaint();
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  const a = document.getElementById('fbAmt-rp'); if(a && !a.value) a.focus();
-}
-function fbPickReopen(){ FB.pick.all = true; fbPickPaint(); }
 // Снимок чека: тот же путь, что у расходов водителей — кадр 1280px и
 // миниатюра; лежит в FB.shot до записи, кнопка показывает, что чек снят.
 function fbShot(inp){

@@ -3146,6 +3146,9 @@ button.path:active{transform:scale(.995)}
   color:var(--muted);margin-left:4px}
 .fb-e-v.none{color:var(--muted)}
 .fb-add .fb-who{flex:1 1 100%}
+.fb-route{flex:1 1 100%;min-width:0;max-width:100%;display:flex;align-items:center;gap:8px}
+.fb-route .fb-txt{flex:1 1 0;min-width:0;width:0}   /* иначе поле тянется до своей «природной» ширины и вылезает */
+.fb-route-ar{flex:0 0 auto;display:flex;color:var(--gold2);transform:rotate(90deg)}
 /* «Кому оформляем»: на кого уже тратили в этом месяце — золотая таблетка и
    плашка с суммой, чтобы не искать глазами мелкую цифру */
 .crw-c-k{font-style:normal;font-size:13.5px;font-weight:600;color:var(--sub);white-space:nowrap}
@@ -18002,6 +18005,9 @@ async function fbEntryAdd(book, day){
   const comment = fbTxt('fbCmt-' + book);
   const who = book === 'np' ? fbTxt('fbWho-np') : book === 'rp' ? fbTxt('fbWho-rp') : '';
   if(book === 'rp' && document.getElementById('fbWho-rp') && !who){ _toast('Кому оформляли'); document.getElementById('fbWho-rp').focus(); return; }
+  const route_from = book === 'rp' ? fbTxt('fbFrom-rp') : '', route_to = book === 'rp' ? fbTxt('fbTo-rp') : '';
+  if(document.getElementById('fbFrom-rp') && (!route_from || !route_to)){
+    _toast('Откуда и куда летит'); document.getElementById(route_from ? 'fbTo-rp' : 'fbFrom-rp').focus(); return; }
   if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
   if(book === 'rp' && !FB.lineSet){ _toast('Выберите статью'); return; }
   if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
@@ -18011,8 +18017,9 @@ async function fbEntryAdd(book, day){
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
+                              ...(route_from || route_to ? {route_from, route_to} : {}),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
-    ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -18365,6 +18372,7 @@ function fbHistHtml(b){
 function fbHistRow(e){
   const t = e.kind_t ? `${e.kind_t} · ${escS(e.who)}` : (e.line_name ? escS(e.line_name) : escS(e.comment || 'Расход'));
   const sub = [!e.kind && e.who ? 'кому ' + escS(e.who) : '',
+               e.route_from || e.route_to ? `${escS(e.route_from || '?')} → ${escS(e.route_to || '?')}` : '',
                e.line_name && e.comment ? escS(e.comment) : '', e.kind_t && e.comment ? escS(e.comment) : '',
                e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
   return `<div class="fb-e">
@@ -19433,6 +19441,11 @@ function fbLinePay(id, who){
 // формой — те же карточки районов, что в «Кто на каком районе»: нажал на
 // оператора или водителя — расход пишется на него.
 const FB_WHO = ['билеты', 'визы'];
+// Билет — ещё и маршрут: откуда и куда летит. Города подсказываются, но
+// вписать можно любой.
+const FB_CITIES = ['Дубай', 'Шарджа', 'Абу-Даби', 'Ташкент', 'Самарканд', 'Фергана', 'Наманган', 'Андижан',
+                   'Бухара', 'Душанбе', 'Худжанд', 'Бишкек', 'Ош', 'Алматы', 'Москва', 'Стамбул'];
+function fbIsTicket(l){ return !!l && String(l.name || '').trim().toLowerCase() === 'билеты'; }
 function fbNeedsWho(l){ return !!l && FB_WHO.includes(String(l.name || '').trim().toLowerCase()); }
 async function fbWhoPage(id){
   const b = fbBook(FB.month); if(!b) return;
@@ -19504,6 +19517,12 @@ function fbLinePayHtml(b, l){
     <div class="sc">${fbCapT('РП−')}
       <div class="fb-add fb-lnf">
         ${FB.lwho !== null && FB.lwho !== undefined ? `<input class="fb-txt fb-who" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-rp" value="${escS(FB.lwho)}">` : ''}
+        ${fbIsTicket(l) ? `<div class="fb-route">
+          <input class="fb-txt" placeholder="Откуда" autocomplete="off" maxlength="40" id="fbFrom-rp" list="fbCities">
+          <span class="fb-route-ar">${IC('export', 14)}</span>
+          <input class="fb-txt" placeholder="Куда" autocomplete="off" maxlength="40" id="fbTo-rp" list="fbCities">
+          <datalist id="fbCities">${FB_CITIES.map(c => `<option value="${c}">`).join('')}</datalist>
+        </div>` : ''}
         <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
         <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-rp"

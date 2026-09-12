@@ -318,6 +318,13 @@ async def main():
     BUDGET.append(dict(_id="carX", month="2026-09", name="Орион Рент", group="car", plan=20000, ord=11))
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=20000, line="carX")))
     eq("аренда машин без чека → записана", (r.status, WRITES[-2][1]["line"]), (200, "carX"))
+    # билет: откуда и куда — ложатся в запись и отдаются обратно
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=900, who="Азиз",
+                                                              route_from="Дубай", route_to="Ташкент", photo=jpeg)))
+    eq("билет: маршрут в записи", (r.status, WRITES[-2][1].get("route_from"), WRITES[-2][1].get("route_to"), WRITES[-2][1]["who"]),
+       (200, "Дубай", "Ташкент", "Азиз"))
+    eq("билет: маршрут в выдаче", {k: fr._entry_view(dict(_id="x", route_from="Дубай", route_to="Ташкент"), {})[k]
+                                   for k in ("route_from", "route_to")}, {"route_from": "Дубай", "route_to": "Ташкент"})
     BUDGET.append(dict(_id="adsX", month="2026-09", name="Посты", group="ads", plan=3670, ord=12))
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=3670, line="adsX")))
     eq("реклама без чека → записана (платят кнопкой)", (r.status, WRITES[-2][1]["line"]), (200, "adsX"))

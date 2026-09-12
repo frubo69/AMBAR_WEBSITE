@@ -674,7 +674,8 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             "kind": e.get("kind") or "", "kind_t": {"salary": "Зарплата", "advance": "Аванс",
                                                     "loan": "Долг"}.get(e.get("kind") or "", ""),
             "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
-            "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo"))}
+            "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo")),
+            "route_from": e.get("route_from") or "", "route_to": e.get("route_to") or ""}
 
 
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
@@ -898,6 +899,9 @@ async def handle_entry_add(request):
         if not ok:
             return _json({"error": "bad_line"}, 400)
         who = str(body.get("who") or "").strip()[:60]
+        # билет: откуда и куда летит — для учёта, кому что покупали
+        route_from = str(body.get("route_from") or "").strip()[:40] if book == "rp" else ""
+        route_to = str(body.get("route_to") or "").strip()[:40] if book == "rp" else ""
         if kind and not who:
             return _json({"error": "who_required"}, 400)
         import photos
@@ -920,6 +924,8 @@ async def handle_entry_add(request):
            "comment": str(body.get("comment") or "").strip()[:120],
            "who": who, "line": line, "kind": kind, "by": by, "at": datetime.now(timezone.utc),
            "photo": bool(photo)}
+    if route_from or route_to:
+        doc["route_from"], doc["route_to"] = route_from, route_to
     if photo:
         await db.expense_photo_set("fin:" + doc["_id"], photo, thumb)
     await db.fin_entry_add(doc)

@@ -3118,9 +3118,11 @@ button.path:active{transform:scale(.995)}
 /* РП+ — просто кнопка: полоса золотистого тона, видно, что на неё жмут */
 .fb-rpbtn{display:flex;align-items:center;gap:10px;width:100%;min-height:66px;flex:0 0 auto;
   padding:10px 12px 10px 16px;border-radius:16px;text-align:left;cursor:pointer;
-  background:rgba(201,169,110,.09);          /* тот же тон, что у шапки РП− */
+  /* ровно тот же цвет, что шапка РП−: под ней лежит верх карточки (#161629),
+     поэтому одну золотую подсветку кладём на такую же подложку */
+  background:linear-gradient(rgba(201,169,110,.09),rgba(201,169,110,.09)),#161629;
   border:1px solid rgba(201,169,110,.28);font-family:inherit;color:var(--text)}
-.fb-rpbtn:active{transform:scale(.995);background:rgba(201,169,110,.14)}
+.fb-rpbtn:active{transform:scale(.995);background:linear-gradient(rgba(201,169,110,.15),rgba(201,169,110,.15)),#161629}
 /* Плитки разделов тянутся по высоте карточки: на большом экране крупнее, на
    маленьком ужимаются — но все помещаются без прокрутки */
 .fb-half .fb-hbody{overflow-y:auto}

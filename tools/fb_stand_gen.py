@@ -156,6 +156,8 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
       document.head.appendChild(st);
       await new Promise(r => setTimeout(r, 150));
     }
+    if(Q.get('rppage')){ fbRpInPage(); await new Promise(r => setTimeout(r, 400));
+      if(Q.get('addin')) { fbAddToggle('in'); await new Promise(r => setTimeout(r, 200)); } }
     if(Q.get('rpin')){ FB.rpIn = true; accFinRP(); await new Promise(r => setTimeout(r, 500)); }   // раскрыть РП+
     if(Q.get('histf')){ FB.hist.open = true; fbHistPaint(); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('rcp')){          // открыть окно чека у первой записи со снимком

@@ -17962,7 +17962,7 @@ function fbLinePick(id){
 }
 function fbAddRow(book, day){
   const rp = book === 'rp', np = book === 'np';
-  return `<button class="sc-r fb-plus" onclick="fbAddToggle('${book}')"><span>${rp ? 'Добавить расход' : np ? 'Забрать из ЧП' : 'Добавить приход'}</span><em>${_FB_PLUS}</em></button>
+  return `<button class="sc-r fb-plus" onclick="fbAddToggle('${book}')"><span>${rp ? 'Добавить расход' : np ? 'Забрать из ЧП' : 'Доп. РП+'}</span><em>${_FB_PLUS}</em></button>
   <div class="fb-add" id="fbAdd-${book}" hidden>
     ${rp ? `<div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>` : ''}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"
@@ -19238,6 +19238,7 @@ function fbRpInHtml(b){
       ${fbTile('В среднем', 'rpin.avg', n ? Math.round((s.rp_in || 0) / n) : 0, {unit: 'в день'})}
     </div>
   </div>
+  <div class="sc">${fbAddRow('in', b.today <= b.last ? b.today : b.last)}</div>
   <div class="sc">${fbCapT('По дням')}<div class="fb-one">${fbRpInRows(b)}</div></div>`;
 }
 // ── «Аренда офисов»: страница оплаты ──────────────────────────────────────
@@ -19418,6 +19419,8 @@ function fbPagePaint(){
   else if(FB.lpage) fbLinePayPaint();
   else if(FB.rentGrp) fbRentPayPaint();
   else if(FB.salPage) fbSalPayPaint();
+  else if(FB.sec) fbSecPaint();
+  else if(FB.rpPage) fbRpInPaint();
 }
 function fbLinePayPaint(){
   const b = fbBook(FB.month), body = document.getElementById('fbPayBody');

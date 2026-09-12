@@ -129,6 +129,9 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
               l0.next_due = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); } }
     if(Q.get('pick')){ const b = [...document.querySelectorAll('#fbLine-rp .fb-e')].find(e => e.innerText.trim() === Q.get('pick'));
                        if(b) b.click(); await new Promise(r => setTimeout(r, 300)); }
+    if(Q.get('kid')){          // строка внутри раскрытой группы выбора статьи
+      const k = [...document.querySelectorAll('#fbLine-rp .fb-kid')].find(e => e.innerText.trim() === Q.get('kid'));
+      if(k) k.click(); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('pay')){ const r0 = [...document.querySelectorAll('#fbPayBody .fb-pay')].find(e => e.innerText.includes(Q.get('pay')));
                       const b = r0 && r0.querySelector('.fb-paybtn'); if(b) b.click(); await new Promise(r => setTimeout(r, 250));
                       // ?ask=1 — остановиться на окне «вы уверены?», иначе подтвердить и дождаться записи

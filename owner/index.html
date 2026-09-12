@@ -3084,6 +3084,7 @@ button.path:active{transform:scale(.995)}
 .fb-pay{align-items:flex-start;padding-top:14px;padding-bottom:14px}
 .fb-boxcol.fb-paycol{gap:20px}   /* цена высоко, кнопка отдельно; два класса — иначе .fb-boxcol{gap:3px} ниже перебьёт */
 .fb-paybtn{flex:0 0 auto;height:32px;padding:0 14px;border-radius:10px;font-size:12.5px}
+.fb-lnf{border-top:0;padding-top:12px}   /* форма под шапкой карточки — своей полосы не надо */
 .fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
   font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
 .fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
@@ -17919,6 +17920,7 @@ async function fbEntryAdd(book, day){
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
+    if(FB.lpage){ FB.line = FB.lpage; FB.lineSet = true; fbLinePayPaint(); }   // страница статьи
   }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек' : 'Не удалось записать'); }
 }
 async function fbEntryDel(id){
@@ -18887,7 +18889,7 @@ function fbBToSupply(day){
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
-  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false};
+  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; FB.lpage = null; FB.rentGrp = null;
   const rows = fbExpensesMonth(b);           // пусто — карточку списка не показываем совсем
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
@@ -18933,10 +18935,11 @@ function fbLineChosen(){
 // Та же страница, что в бюджете (план/факт/осталось, «Офис» и «Билдинги» со
 // сроком платежа), только сумма сверху, а под ней жёлтая «Оплатил». Нажал —
 // под строкой сумма, чек и «Записать»: расход из РП ложится на это здание.
-function fbRentPay(){
+function fbRentPay(grp){
   const b = fbBook(FB.month); if(!b) return;
-  FB.shot = null; FB.line = ''; FB.lineSet = false;
-  _setText('accTitle', 'Аренда офисов'); _setText('accSub', fbMonthT(b.month));
+  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null;
+  FB.rentGrp = grp === 'car' ? 'car' : 'rent';
+  _setText('accTitle', FB.rentGrp === 'car' ? 'Аренда машин' : 'Аренда офисов'); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRentPayHtml(b)}</div>`;
   mid.scrollTop = 0;
@@ -18948,17 +18951,17 @@ function fbRentPayPaint(){
   if(b && body) body.innerHTML = fbRentPayHtml(b);
 }
 function fbRentPayHtml(b){
-  const bu = b.budget || {}, rent = bu.rent || {}, all = (bu.lines || []).filter(l => l.group === 'rent');
-  const office = all.filter(l => l.office), blds = all.filter(l => !l.office);
+  const car = FB.rentGrp === 'car', k = car ? 'car' : 'rent';
+  const bu = b.budget || {}, tot = (car ? bu.car : bu.rent) || {}, all = (bu.lines || []).filter(l => l.group === k);
   const sect = (cap, list) => list.length ? `<div class="sc">${fbCapT(cap)}<div class="fb-one">${
     list.map(l => `<div class="fb-card">${fbPayRow(l)}</div>`).join('')}</div></div>` : '';
   return `<div class="sc"><div class="aud-g">
-      ${fbTile('План', 'bu.rent_plan', rent.plan)}
-      ${fbTile('Фактический расход', 'bu.rent_fact', rent.fact)}
-      ${fbTile('Осталось', 'bu.rent_left', rent.left, {mode: 'neg'})}
+      ${fbTile('План', `bu.${k}_plan`, tot.plan)}
+      ${fbTile('Фактический расход', `bu.${k}_fact`, tot.fact)}
+      ${fbTile('Осталось', `bu.${k}_left`, tot.left, {mode: 'neg'})}
     </div></div>
-    ${sect('Офис', office)}
-    ${sect('Билдинги', blds)}`;
+    ${car ? sect('Рент', all)
+          : sect('Офис', all.filter(l => l.office)) + sect('Билдинги', all.filter(l => !l.office))}`;
 }
 // Строка здания: сумма плана сверху, под ней «Оплатил». Оплаченное — сумма
 // зелёным и «Отменить»: нажал случайно — вернул как было.
@@ -19012,6 +19015,45 @@ async function fbPayUndo(eid){
     fbRentPayPaint();
   }catch(e){ _toast('Не удалось отменить'); }
 }
+// Статья без срока платежа (гараж, парковка, страховка) — своя страница:
+// план и факт сверху, форма расхода и всё, что записано за месяц.
+function fbLinePay(id){
+  const b = fbBook(FB.month); if(!b) return;
+  const l = ((b.budget || {}).lines || []).find(x => x.id === id); if(!l) return;
+  FB.shot = null; FB.line = id; FB.lineSet = true; FB.lpage = id; FB.rentGrp = null;
+  _setText('accTitle', l.name); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbLinePayHtml(b, l)}</div>`;
+  mid.scrollTop = 0;
+  ACC_BACK = accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbLinePayPaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  const l = b && ((b.budget || {}).lines || []).find(x => x.id === FB.lpage);
+  if(l && body) body.innerHTML = fbLinePayHtml(b, l);
+}
+function fbLinePayHtml(b, l){
+  const rows = [];
+  (b.days || []).forEach(d => (d.expenses || []).forEach(e => { if(e.line === l.id) rows.push({...e, day: d.day}); }));
+  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
+  const day = FB.month === fbMonthNow() ? b.today : b.last;
+  return `<div class="sc"><div class="aud-g">
+      ${fbTile('План', 'ln.plan', l.plan)}
+      ${fbTile('Фактический расход', 'ln.fact', l.fact)}
+      ${fbTile('Осталось', 'ln.left', l.left, {mode: 'neg'})}
+    </div></div>
+    <div class="sc">${fbCapT('Новый расход')}
+      <div class="fb-add fb-lnf">
+        <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
+          onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
+        <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
+          onkeydown="if(event.key==='Enter'){this.blur()}">
+        <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
+        <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
+      </div></div>
+    ${rows.length ? `<div class="sc">${fbCapT('Расходы')}<div id="fbList-line">${fbLineEntries(rows)}</div></div>` : ''}`;
+}
 // Выбор статьи для расхода — теми же строками, что в бюджете: группы
 // раскрываются на месте, статья отмечается галкой; выбранная сворачивается
 // в одну строку с карандашом (владелец: «у нас тут не диджейская установка»).
@@ -19043,7 +19085,12 @@ function fbLinePicker(b){
   // аренда — не группа со списком, а своя страница: там у каждого здания сумма,
   // срок платежа и «Оплатил»
   let out = rent.length ? card(`<button class="fb-e fb-bl" onclick="fbRentPay()"><span class="fb-e-b"><b>Аренда офисов</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`) : '';
-  out += grp('auto', 'Расходы на автомобили', (cars.length ? `<div class="fb-kcap">Аренда машин</div>` : '') + cars.map(l => leaf(l, true)).join('') + byG('auto').map(l => leaf(l, true)).join(''));
+  // автомобили: аренда — одной строкой на свою страницу (не десяток рентов),
+  // гараж, парковка и страховка — каждый своей страницей
+  const sub = (title, go) => `<div class="fb-card"><button class="fb-e fb-bl fb-kid" onclick="${go}"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button></div>`;
+  out += grp('auto', 'Расходы на автомобили',
+    (cars.length ? sub('Аренда', "fbRentPay('car')") : '') +
+    byG('auto').map(l => sub(nm(l), `fbLinePay('${l.id}')`)).join(''));
   out += grp('home', 'Бытовые расходы', byG('home').map(l => leaf(l, true)).join(''));
   out += grp('sim', 'Sim', byG('sim').map(l => leaf(l, true)).join(''));
   out += lines.filter(l => !l.group).map(l => card(leaf(l, false))).join('');

@@ -1,7 +1,7 @@
 """Снимки и проверки стенда: python3 shot.py view[?params] ... → view.png + строки ERROR/MEASURE/OVERLAP/TOAST."""
 import subprocess, sys, re, os, html
 CH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-BASE = "http://127.0.0.1:8773/stand.html"
+BASE = "http://127.0.0.1:%s/stand.html" % os.environ.get("FB_PORT", "8773")
 for spec in sys.argv[1:]:
     view, _, extra = spec.partition("?")
     url = f"{BASE}?view={view}" + (("&" + extra) if extra else "")

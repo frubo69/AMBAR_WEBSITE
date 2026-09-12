@@ -3075,6 +3075,9 @@ button.path:active{transform:scale(.995)}
 .fb-add .fb-txt{flex:1 1 120px}
 .fb-add .aud-b{flex:0 0 auto;height:36px;padding:0 16px;border-radius:10px;font-size:12.5px}
 .fb-add[hidden]{display:none}
+/* Раскрытая всегда (РП): своей полосы нет — отбивку даёт строка выбора статьи */
+.fb-add.fb-open{padding-top:0;border-top:0}
+.fb-add.fb-open .fb-pick{margin-top:0;border-top:0}
 .sc-r.fb-plus em{color:var(--gold2)}
 /* Карточка дня — та же плашка, что «Остатки всего» на складе: строка дня
    шапкой, под ней плитки, ниже строки во всю ширину. */
@@ -17811,7 +17814,9 @@ function fbPaint(){
   }
   if(mb){
     put('fbList-npm', fbPayoutsMonth(mb));
-    put('fbList-rpm', fbExpensesMonth(mb));
+    const rpm = fbExpensesMonth(mb);
+    put('fbList-rpm', rpm);
+    const rpc = document.getElementById('fbRpmCard'); if(rpc) rpc.hidden = !rpm;
     put('fbList-an', fbAnalysis(mb));
     put('fbList-people', fbPeopleHtml(mb));
     const p = FB.person ? (fbCur(mb).people || []).find(x => x.name === FB.person) : null;
@@ -17898,8 +17903,8 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; }
-    const f = document.getElementById('fbAdd-' + book); if(f) f.hidden = true;
+    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; fbPickPaint(); }
+    const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
   }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек' : 'Не удалось записать'); }
@@ -18120,11 +18125,12 @@ async function fbDayOk(day){
   }catch(e){ _toast('Не удалось подтвердить'); }
 }
 // Расходы из РП за месяц одним списком (статья или «на что», кто, день).
+// Пусто — ничего не пишем: ниже и так раскрыта форма нового расхода.
 function fbExpensesMonth(b){
   const rows = [];
   (b.days || []).forEach(d => (d.expenses || []).forEach(e => rows.push({...e, day: d.day})));
   rows.reverse();
-  if(!rows.length) return '<div class="fb-none">Расходов из РП в этом месяце не было</div>';
+  if(!rows.length) return '';
   return rows.map(e => `<div class="fb-e">
     ${e.photo ? `<em class="fb-rcpi" role="button" data-id="${escS(e.id)}" data-n="${escS(e.line_name || e.comment || '')}" onclick="fbShotOpen(this.dataset.id, this.dataset.n)">${IC('note', 15)}</em>` : ''}
     <span class="fb-e-b"><b>${escS(e.kind_t ? e.kind_t + ' · ' + e.who : (e.line_name || e.comment || 'Расход'))}</b><i>${escS(fbDayT(e.day))}${
@@ -18864,6 +18870,7 @@ async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false};
+  const rows = fbExpensesMonth(b);           // пусто — карточку списка не показываем совсем
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
@@ -18874,9 +18881,12 @@ async function accFinRP(){
     </div>
   </div>
   <div class="sc">
-    ${fbCapT('Расходы')}
-    <div id="fbList-rpm">${fbExpensesMonth(b)}</div>
+    ${fbCapT('Новый расход')}
     ${fbRpAddRow(today)}
+  </div>
+  <div class="sc" id="fbRpmCard"${rows ? '' : ' hidden'}>
+    ${fbCapT('Расходы')}
+    <div id="fbList-rpm">${rows}</div>
   </div>
   <div class="sc">
     ${fbCapT('Анализ')}
@@ -18884,10 +18894,10 @@ async function accFinRP(){
   </div>`;
 }
 // Форма фактического расхода: статья, сумма, на что и чек — без чека не
-// записывается (владелец: «все обязательно с чеками»).
+// записывается (владелец: «все обязательно с чеками»). Раскрыта всегда: на
+// этом экране расход и записывают, прятать его за «Добавить» незачем.
 function fbRpAddRow(day){
-  return `<button class="sc-r fb-plus" onclick="fbAddToggle('rp')"><span>Добавить расход</span><em>${_FB_PLUS}</em></button>
-  <div class="fb-add" id="fbAdd-rp" hidden>
+  return `<div class="fb-add fb-open" id="fbAdd-rp">
     ${fbLinePicker(fbBook(day.slice(0, 7)))}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
       onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">

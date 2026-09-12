@@ -18358,7 +18358,7 @@ async function accFinBud(keep){
     </div>
   </div>
   <div class="sc">
-    ${fbCapT('Статьи расходов')}
+    ${fbCapT('Расходы по разделам')}
     <div id="fbList-bud" class="fb-one">${fbBudLines(b)}</div>
   </div></div>`;
   fbDragInit();
@@ -18922,7 +18922,7 @@ function fbBudLines(b){
   out += fbBudGroup('Реклама', '', fbGroupVal(bu.ads || {plan: 0}, 'bu.ads_plan'), "fbPageOpen('ads','')");
   if(bu.off_plan) out += `<div class="fb-card"><div class="fb-e fb-bl"><span class="fb-e-b"><b>Вне плана</b><i>расходы без статьи</i></span><b class="fb-e-v">${fbFmt(bu.off_plan)}<u>AED</u></b></div></div>`;
   const newLine = FB.edit && FB.edit.kind === 'new' && FB.edit.id === '';
-  out += `<div class="fb-card add">${newLine ? fbNewRow('') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','')"><span>Добавить статью</span><em>${_FB_PLUS}</em></button>`}</div>`;
+  out += `<div class="fb-card add">${newLine ? fbNewRow('') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','')"><span>Добавить раздел</span><em>${_FB_PLUS}</em></button>`}</div>`;
   return out;
 }
 function fbAutoToggle(){
@@ -18977,7 +18977,7 @@ async function fbFillOk(){
   }else{
     const l = e.kind === 'line' ? (((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === e.id) : null;
     const name = e.kind === 'line' ? (l ? l.name : '') : fbTxt('fbFillName');
-    if(!name){ _toast(e.id === 'rent' ? 'Как называется билдинг' : e.id === 'office' ? 'Как называется офис' : e.id === 'car' ? 'Как называется рент' : e.id === 'ads' ? 'Что за реклама' : 'Как называется статья'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
+    if(!name){ _toast(e.id === 'rent' ? 'Как называется билдинг' : e.id === 'office' ? 'Как называется офис' : e.id === 'car' ? 'Как называется рент' : e.id === 'ads' ? 'Что за реклама' : 'Как называется раздел'); const n = document.getElementById('fbFillName'); if(n) n.focus(); return; }
     url = '/api/owner/finance/book/budget';
     body = {month: FB.month, id: e.kind === 'line' ? e.id : '', name, plan: val,
             group: e.kind === 'line' ? (l ? l.group : '') : (e.id === 'office' ? 'rent' : e.id), as: _meName()};

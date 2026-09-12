@@ -3111,6 +3111,8 @@ button.path:active{transform:scale(.995)}
 .fb-fwrap{max-height:0;opacity:0;overflow:hidden;
   transition:max-height .28s var(--e1),opacity .18s var(--e1)}
 .fb-fwrap.open{max-height:46dvh;opacity:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.fb-fwrap.rpin.open{max-height:300px}   /* дни РП+ — окно строго на 300 px, листается внутри */
+.fb-e-v.none{color:var(--muted)}
 .fb-fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
 .fb-fchip{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
@@ -18199,6 +18201,32 @@ async function fbDayOk(day){
     if(ACC_VIEW === 'finday' || ACC_VIEW === 'finb') fbDayReload(); else fbRepaint();
   }catch(e){ _toast('Не удалось подтвердить'); }
 }
+// ── РП+: сколько откладывали по дням ──────────────────────────────────────
+// Карточка над расходами: раскрывается на месте, размер окна строго задан —
+// все дни месяца листаются внутри него (владелец: «листать внутри карточки»).
+function fbRpInRows(b){
+  const rows = (b.days || []).filter(d => !d.future && ((d.collected || 0) + (d.extra_rp || 0)) > 0).reverse();
+  if(!rows.length) return '<div class="fb-none">В этом месяце в РП ещё не откладывали</div>';
+  return rows.map(d => {
+    // в фонд легло только подтверждённое: неподтверждённая раскладка дня — это
+    // ещё предложение, и в «В сейфе» она не входит (как и в calc)
+    const col = d.ok ? (d.collected || 0) : 0, sum = col + (d.extra_rp || 0);
+    const parts = [];
+    if(!d.ok && d.collected) parts.push(`ждёт подтверждения: ${fbFmt(d.collected)}`);
+    if(d.extra_rp) parts.push(`приход ${fbFmt(d.extra_rp)}`);
+    const sub = parts.join(' · ');
+    return `<div class="fb-e"><span class="fb-e-b"><b>${escS(fbDayT(d.day))}</b>${sub ? `<i>${sub}</i>` : ''}</span>
+      <b class="fb-e-v${sum ? '' : ' none'}">${fbFmt(sum)}<u>AED</u></b></div>`;
+  }).join('');
+}
+function fbRpInToggle(){
+  FB.rpIn = !FB.rpIn;
+  const w = document.getElementById('fbRpInBox'), c = document.getElementById('fbRpInChev');
+  if(w) w.classList.toggle('open', FB.rpIn);
+  if(c) c.classList.toggle('open', FB.rpIn);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 // ── История расходов ──────────────────────────────────────────────────────
 // Всё, что ушло из РП, одной страницей: по дням, с фильтром по статье.
 // Открывается справа — с экрана РП (все) и со страницы статьи (только она).
@@ -19095,6 +19123,12 @@ async function accFinRP(){
       ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
       ${fbTile('В сейфе', 'safe.rp', s.rp, {mode: 'neg'})}
     </div>
+  </div>
+  <div class="sc">
+    <button class="fb-e fb-bl" onclick="fbRpInToggle()">
+      <span class="fb-e-b"><b>РП+</b><i>сколько откладывали по дням</i></span>
+      <b class="fb-e-v">${fbFmt(s.rp_in)}<u>AED</u></b><em class="fb-chev${FB.rpIn ? ' open' : ''}" id="fbRpInChev">${_SC_CHEV}</em></button>
+    <div class="fb-fwrap rpin${FB.rpIn ? ' open' : ''}" id="fbRpInBox"><div class="fb-one">${fbRpInRows(b)}</div></div>
   </div>
   <div class="sc">
     ${fbCapT('РП−')}

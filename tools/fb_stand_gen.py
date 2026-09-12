@@ -146,6 +146,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
       fbHistOpen(Q.get('hist') === '1' ? '' : Q.get('hist')); await new Promise(r => setTimeout(r, 400)); }
     // раскрыть фильтр: состоянием и перерисовкой, иначе в снимке он останется
     // закрытым (анимация без кадров не идёт)
+    if(Q.get('rpin')){ FB.rpIn = true; accFinRP(); await new Promise(r => setTimeout(r, 500)); }   // раскрыть РП+
     if(Q.get('histf')){ FB.hist.open = true; fbHistPaint(); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('rcp')){          // открыть окно чека у первой записи со снимком
       const b2 = document.querySelector('.fb-rcpb'); if(b2) b2.click(); await new Promise(r => setTimeout(r, 900)); }

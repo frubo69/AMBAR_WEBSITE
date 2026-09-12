@@ -589,7 +589,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
     except Exception as e:
         log.error(f"[tobacco] проверка не выполнена: {e}")
 
-    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt)
+    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt, free=free)
     return web.json_response(
         {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"]},
         headers=CORS_HEADERS,
@@ -615,7 +615,8 @@ def _is_vetted(user_doc: dict | None) -> bool:
 
 async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                                    prepaid: dict | None = None,
-                                   debt: bool = False) -> dict:
+                                   debt: bool = False,
+                                   free: bool = False) -> dict:
     """Persist an accepted order and run the full notification fan-out: customer
     card, first-order verification gate, operator + owner notifications, and
     referral points. Shared by the live POST /api/order path and the crypto
@@ -717,7 +718,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         # orders they've started (closes the place-a-second-order bypass).
         _user_verified = _is_vetted(user_doc)
         # Reset verification for test accounts so each order triggers full flow
-        if uid in _TEST_ALWAYS_FIRST:
+        if uid in _TEST_ACCOUNTS:
             await db.set_user_field(uid, verified=False, verify_requested=False)
             _user_verified = False
         if is_first_order and user_doc and user_doc.get("referred_by"):

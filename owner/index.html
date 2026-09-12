@@ -17615,10 +17615,12 @@ function fbInFmt(v, dec){ return v === null || v === undefined ? '' : (dec || !N
 function fbTile(t, key, v, o){
   o = o || {};
   const cls = fbCls(v, o.mode);
-  return `<div class="aud-t${cls ? ' ' + cls : ''}" data-fr="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}>
-    <span class="aud-tl">${t}</span>
+  // o.go — плитка ведёт на страницу: та же плашка кнопкой, с уголком-шевроном
+  const at = `class="aud-t${o.go ? ' tap' : ''}${cls ? ' ' + cls : ''}" data-fr="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}`;
+  const in_ = `<span class="aud-tl">${t}</span>
     <b class="aud-tv" data-f="${key}"${o.dec ? ' data-dec="1"' : ''}>${fbFmtN(v, o.dec)}</b>
-    <span class="aud-tu">${o.unit || 'AED'}</span></div>`;
+    <span class="aud-tu">${o.unit || 'AED'}</span>`;
+  return o.go ? `<button ${at} onclick="${o.go}">${in_}</button>` : `<div ${at}>${in_}</div>`;
 }
 function fbCap(month, arrows){
   const fut = month >= fbMonthNow();
@@ -17660,9 +17662,9 @@ function fbHubHtml(b, err){
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   return `<div class="sc fb-hub">${fbCap(month, true)}
     <div class="aud-g">
-      ${fbTile('Доход', 't.gross', t.gross)}
-      ${fbTile('Расходы', 't.expenses', t.expenses)}
-      ${fbTile('Прибыль', 'np.days', b.np.days, {mode: 'neg'})}
+      ${fbTile('Доход', 't.gross', t.gross, {go: 'fbAnOpen()'})}
+      ${fbTile('Расходы', 't.expenses', t.expenses, {go: 'fbAnOpen()'})}
+      ${fbTile('Прибыль', 'np.days', b.np.days, {mode: 'neg', go: 'fbAnOpen()'})}
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
   </div>
@@ -18887,10 +18889,6 @@ async function accFinRP(){
   <div class="sc" id="fbRpmCard"${rows ? '' : ' hidden'}>
     ${fbCapT('Расходы')}
     <div id="fbList-rpm">${rows}</div>
-  </div>
-  <div class="sc">
-    ${fbCapT('Анализ')}
-    <div id="fbList-an">${fbAnalysis(b)}</div>
   </div>`;
 }
 // Форма фактического расхода: статья, сумма, на что и чек — без чека не
@@ -18989,6 +18987,31 @@ async function fbShotOpen(id, name){
   try{ _fbImg[id] = await ownerApi.ownerBlob('/api/owner/finance/book/photo/' + encodeURIComponent(id)); }
   catch(e){ ov.classList.remove('show'); _toast('Чека не нашлось'); return; }
   if(ov.classList.contains('show')) ov.innerHTML = кадр(_fbImg[id]);
+}
+// Анализ плана и факта — своей страницей поверх главной: наезжает справа с
+// карточки месяца (все три плитки — «Доход», «Расходы», «Прибыль» — ведут
+// сюда), стрелка в шапке уводит обратно.
+async function fbAnOpen(){
+  const month = FB.month || fbMonthNow();
+  const ov = document.getElementById('finAnOv'), mid = document.getElementById('finAnMid');
+  ov.classList.add('show');
+  void ov.offsetWidth;                 // стартовое положение должно попасть в стиль,
+  ov.classList.add('in');              // иначе браузер прыгнет сразу в конец без выезда
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  _setText('finAnSub', fbMonthT(month));
+  let b = fbBook(month);
+  if(!b){
+    mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+    try{ b = await fbLoad(month); }
+    catch(e){ mid.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+    if(!ov.classList.contains('show')) return;        // успели уйти назад
+  }
+  mid.innerHTML = `<div class="sc"><div id="fbList-an">${fbAnalysis(b)}</div></div>`;   // название — в шапке страницы
+}
+function fbAnClose(){
+  const ov = document.getElementById('finAnOv');
+  ov.classList.remove('in');
+  setTimeout(() => { ov.classList.remove('show'); document.getElementById('finAnMid').innerHTML = ''; }, 260);
 }
 // Анализ бюджета: по каждой статье — сколько потратили против плана к
 // сегодняшнему дню (план месяца × прошедшая доля месяца). Перерасход —
@@ -32834,6 +32857,20 @@ function renderHours(h){
        оказывалась посреди него. -->
   <div class="stk-foot" id="accFoot"></div>
 </div>
+
+<!-- Анализ плана и факта: страница поверх главной, с плиток месяца. -->
+<div class="pg-ov" id="finAnOv">
+  <div class="stk-top">
+    <div class="stk-top-r">
+      <button class="stk-x" onclick="fbAnClose()" aria-label="Назад"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="stk-ttl">
+        <div class="stk-ttl-t">Анализ</div>
+        <div class="stk-ttl-s" id="finAnSub">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="stk-mid" id="finAnMid"></div>
+</div><!-- /finAnOv -->
 
 <!-- Карточка бутылки: по нажатию на плашку в ленте сканера. Одна на все три
      экрана — данные кладёт тот, кто её вызвал. -->

@@ -47,6 +47,9 @@ parts += [line("let dpTarget ="), line("let dpView ="), line("let dpFrom ="), li
           fn("renderDp"), fn("pickDp"), fn("updateDpLbl"), line("function dpReset()")]
 overlay = src[src.index('<div class="stk-ov" id="accOv">'):]
 overlay = overlay[:overlay.index('<div class="stk-foot" id="accFoot"></div>') + len('<div class="stk-foot" id="accFoot"></div>')] + "\n</div>"
+# страница «Анализ» — поверх главной, наезжает справа
+_a0 = src.index('<div class="pg-ov" id="finAnOv">')
+an_html = src[_a0:src.index('<!-- /finAnOv -->', _a0) + len('<!-- /finAnOv -->')]
 
 stubs = r"""
 // ── заглушки панели ──
@@ -119,6 +122,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('page') && Q.get('edit')){ const [k, ...r] = Q.get('edit').split(':'); fbFillEdit(k, r.join(':')); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('wheel')){ fbPillOpen(); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('cal')){ openDate('fbNext'); await new Promise(r => setTimeout(r, 300)); }
+    if(Q.get('an')){ await fbAnOpen(); await new Promise(r => setTimeout(r, 400)); }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {
@@ -156,11 +160,13 @@ body{{padding:0;background:#0a0a14}}
 #phone .stk-ov{{position:relative;inset:auto;height:auto;min-height:0}}
 #phone .stk-ov.show{{animation:none}}
 #phone .stk-mid{{overflow:visible;flex:none}}
+#phone .pg-ov{{position:relative;inset:auto;box-shadow:none;height:auto}}
 #err{{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;max-width:390px;margin:0 auto}}
 </style></head><body>
 <div id="phone">
 <div class="page active" id="pg-finance"><div id="finBook"></div></div>
 {overlay}
+{an_html}
 {date_html}
 </div>
 <div id="err"></div>

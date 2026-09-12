@@ -163,6 +163,8 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
       if(l0){ await fbWhoPage(l0.id); await new Promise(r => setTimeout(r, 500));
               if(Q.get('whoname')){ fbLinePay(l0.id, Q.get('whoname')); await new Promise(r => setTimeout(r, 400)); } } }
     if(Q.get('rpin')){ FB.rpIn = true; accFinRP(); await new Promise(r => setTimeout(r, 500)); }   // раскрыть РП+
+    if(Q.get('sal')){ fbSalPay(); await new Promise(r => setTimeout(r, 400));                   // страница «Зарплаты» из РП−
+      if(Q.get('salback')){ accBack(); await new Promise(r => setTimeout(r, 500)); } }
     if(Q.get('histf')){ FB.hist.open = true; fbHistPaint(); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('rcp')){          // открыть окно чека у первой записи со снимком
       const b2 = document.querySelector('.fb-rcpb'); if(b2) b2.click(); await new Promise(r => setTimeout(r, 900)); }

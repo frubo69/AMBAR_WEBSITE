@@ -3161,6 +3161,14 @@ button.path:active{transform:scale(.995)}
   font-style:normal;font-size:11px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2));font-variant-numeric:tabular-nums}
 .fb-who-s u{text-decoration:none;font-size:9px;font-weight:700;opacity:.75}
+/* «Зарплаты»: сколько сотрудников — золотая таблетка справа в шапке */
+.fb-staffn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px 0 10px;border-radius:999px;
+  white-space:nowrap;color:var(--gold2);border:1px solid rgba(201,169,110,.45);
+  background:linear-gradient(135deg,rgba(201,169,110,.22),rgba(201,169,110,.07));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.fb-staffn svg{flex:0 0 auto}
+.fb-staffn b{font-size:15px;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.fb-staffn i{font-style:normal;font-size:11.5px;font-weight:600;color:var(--sub)}
 /* «Штрафы/авансы/долги»: старший в STAR — отдельная карточка-кнопка над районами */
 .crw-c.fb-star{display:block;width:100%;padding:0;font-family:inherit;text-align:left;color:inherit;cursor:pointer}
 .crw-c.fb-star .crw-c-h{border-bottom:0}
@@ -18459,6 +18467,7 @@ function fbPageOpen(kind, id){
 function fbPageBack(){
   FB.edit = null;
   FB.page = FB.page ? FB.page.from : null;
+  fbActSet('');
   accFinBud(true);
 }
 function fbPageInfo(b){
@@ -18477,6 +18486,10 @@ function fbPageRender(anim){
   if(!info){ fbPageBack(); return; }
   ACC_BACK = fbPageBack;
   _setText('accTitle', info.title); _setText('accSub', fbMonthT(b.month));
+  if(FB.page.kind === 'salary'){
+    const sal = (b.budget || {}).salary || {}, roles = new Set(FB_SAL_GROUPS.map(g => g[0]));
+    fbActSet(fbStaffPill((sal.people || []).filter(p => roles.has(p.role)).length));
+  } else fbActSet('');
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page${anim ? ' ' + anim : ''}" id="fbPageBody">${info.html}</div>`;
   if(anim === 'in') mid.scrollTop = 0;
@@ -19282,15 +19295,25 @@ function fbSalPay(){
   const b = fbBook(FB.month); if(!b) return;
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null; FB.rentGrp = null; FB.salPage = true;
   _setText('accTitle', 'Зарплаты'); _setText('accSub', fbMonthT(b.month));
+  fbActSet(fbStaffPill(fbSalPayCount(b)));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbSalPayHtml(b)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = accFinRP;
+  ACC_BACK = () => { fbActSet(''); accFinRP(); };
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbSalPayPaint(){
   const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
-  if(b && body) body.innerHTML = fbSalPayHtml(b);
+  if(b && body){ body.innerHTML = fbSalPayHtml(b); fbActSet(fbStaffPill(fbSalPayCount(b))); }
+}
+// Справа в шапке «Зарплат» — сколько людей в списке этого экрана
+function fbActSet(html){ const a = document.getElementById('accAct'); if(a) a.innerHTML = html; }
+function fbStaffPill(n){
+  return `<span class="fb-staffn">${IC('users', 15)}<b>${n}</b><i>${pluralize(n, 'сотрудник', 'сотрудника', 'сотрудников')}</i></span>`;
+}
+function fbSalPayCount(b){
+  const pay = fbCur(b), roles = new Set((pay.roles || []).map(r => r.id));
+  return (pay.people || []).filter(p => roles.has(p.role)).length;
 }
 function fbSalPayHtml(b){
   const pay = fbCur(b);

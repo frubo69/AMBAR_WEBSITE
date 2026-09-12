@@ -3107,8 +3107,20 @@ button.path:active{transform:scale(.995)}
 .rcp-body img.none{visibility:hidden}
 .rcp-hint{padding:9px 16px;font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--border2)}
 .fb-chev.open{transform:rotate(90deg)}   /* фильтр истории раскрыт */
-/* Список фильтра листается внутри себя, а не раздвигает страницу */
-.fb-histf{max-height:46dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+/* Окно фильтра: раскрывается плавно, внутри листается, не раздвигая страницу */
+.fb-fwrap{max-height:0;opacity:0;overflow:hidden;
+  transition:max-height .28s var(--e1),opacity .18s var(--e1)}
+.fb-fwrap.open{max-height:46dvh;opacity:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.fb-fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 14px;
+  border-top:1px solid rgba(255,255,255,.05)}
+.fb-fchip{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
+  min-height:84px;padding:12px 6px;border-radius:14px;border:1px solid var(--border2);background:var(--card2);
+  color:var(--sub);font-family:inherit;font-size:11px;font-weight:600;line-height:1.25;text-align:center;cursor:pointer}
+.fb-fchip em{flex:0 0 auto;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.05);color:var(--sub);font-style:normal}
+.fb-fchip.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft);color:var(--gold2)}
+.fb-fchip.on em{background:rgba(201,169,110,.18);color:var(--gold2)}
+.fb-fchip:active{transform:scale(.97)}
 .fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
   font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
 .fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
@@ -18186,7 +18198,8 @@ async function fbDayOk(day){
 function fbHistOpen(line, from){
   const b = fbBook(FB.month); if(!b) return;
   FB.shot = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false;
-  FB.hist = {line: line || '', open: false, from: from || (line ? {kind: 'line', id: line} : null)};
+  FB.hist = {sel: line ? ['l:' + line] : [], open: false,
+             from: from || (line ? {kind: 'line', id: line} : null)};
   _setText('accTitle', 'История'); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbHistHtml(b)}</div>`;
@@ -18201,50 +18214,63 @@ function fbHistPaint(){
 }
 // Записи месяца, уже отфильтрованные: newest first, с днём у каждой
 function fbHistRows(b){
-  const f = (FB.hist || {}).line || '';
+  const sel = ((FB.hist || {}).sel || []);
   const byId = {};
   ((b.budget || {}).lines || []).forEach(l => { byId[l.id] = l; });
   const grp = e => ((byId[e.line] || {}).group || '');
-  const rows = [];
-  (b.days || []).forEach(d => (d.expenses || []).forEach(e => rows.push({...e, day: d.day})));
-  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
-  return rows.filter(e => f === '' ? true
+  const hit = (e, f) => f === '' ? true
     : f === 'salary' ? !!e.kind
     : f === 'none' ? (!e.line && !e.kind)
     : f.startsWith('l:') ? e.line === f.slice(2)
     : f === 'g:auto' ? ['car', 'auto'].includes(grp(e))
     : f.startsWith('g:') ? grp(e) === f.slice(2)
-    : e.line === f);
+    : e.line === f;
+  const rows = [];
+  (b.days || []).forEach(d => (d.expenses || []).forEach(e => rows.push({...e, day: d.day})));
+  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
+  // ничего не выбрано — всё; выбрано несколько — подходит любой из них
+  return sel.length ? rows.filter(e => sel.some(f => hit(e, f))) : rows;
 }
 // Чем фильтруем: группами, а не каждым билдингом (владелец: «не нужно сразу
 // раскрывать по билдингам»). Отдельными строками — только статьи без группы.
-const FB_HIST_G = [['rent', 'Аренда офисов'], ['auto', 'Расходы на автомобили'],
-                   ['home', 'Бытовые расходы'], ['sim', 'Sim'], ['ads', 'Реклама']];
+const FB_HIST_G = [['rent', 'Аренда офисов', 'key'], ['auto', 'Расходы на автомобили', 'car'],
+                   ['home', 'Бытовые расходы', 'box'], ['sim', 'Sim', 'mobile'], ['ads', 'Реклама', 'trend']];
+// Значок статьи без группы — по названию: билеты, визы, бензин и прочее
+const FB_HIST_I = {'билеты': 'export', 'визы': 'user', 'бензин': 'bolt', 'зарплаты': 'users'};
+function fbHistIco(name){ return FB_HIST_I[String(name || '').toLowerCase()] || 'dot'; }
 function fbHistOpts(b){
   const lines = ((b.budget || {}).lines || []);
   const has = g => lines.some(l => (g === 'auto' ? ['car', 'auto'] : [g]).includes(l.group));
-  const opts = [{id: '', t: 'Все расходы'}, {id: 'salary', t: 'Зарплаты'}];
-  FB_HIST_G.forEach(([g, t]) => { if(has(g)) opts.push({id: 'g:' + g, t}); });
-  lines.filter(l => !l.group).forEach(l => opts.push({id: 'l:' + l.id, t: escS(l.name)}));
-  opts.push({id: 'none', t: 'Без статьи'});
+  const opts = [{id: '', t: 'Все расходы', i: 'inbox'}, {id: 'salary', t: 'Зарплаты', i: 'users'}];
+  FB_HIST_G.forEach(([g, t, i]) => { if(has(g)) opts.push({id: 'g:' + g, t, i}); });
+  lines.filter(l => !l.group).forEach(l => opts.push({id: 'l:' + l.id, t: escS(l.name), i: fbHistIco(l.name)}));
+  opts.push({id: 'none', t: 'Без статьи', i: 'warn'});
   return opts;
 }
+// Что написано под словом «Фильтр»: ничего не выбрано — «Все расходы»,
+// выбрано несколько — через точку, чтобы было видно, что их несколько
 function fbHistTitle(b){
-  const f = (FB.hist || {}).line || '';
-  const o = fbHistOpts(b).find(x => x.id === f);
-  if(o) return o.t;
-  // открыли со страницы статьи — фильтр по ней самой, её и называем
-  const l = ((b.budget || {}).lines || []).find(x => 'l:' + x.id === f || x.id === f);
-  return l ? (l.group === 'rent' ? fbBldName(l) : escS(l.name)) : 'Все расходы';
+  const sel = ((FB.hist || {}).sel || []);
+  if(!sel.length) return 'Все расходы';
+  const opts = fbHistOpts(b), lines = ((b.budget || {}).lines || []);
+  const name = f => {
+    const o = opts.find(x => x.id === f); if(o) return o.t;
+    const l = lines.find(x => 'l:' + x.id === f || x.id === f);
+    return l ? (l.group === 'rent' ? fbBldName(l) : escS(l.name)) : f;
+  };
+  return sel.map(name).join(' · ');
 }
 function fbHistHtml(b){
   const st = FB.hist || {line: '', open: false};
   const rows = fbHistRows(b);
   const sum = rows.reduce((a, e) => a + (e.amount || 0), 0);
   // фильтр раскрывается на месте — теми же строками, что и выбор статьи
-  const opts = fbHistOpts(b).map(o => `<div class="fb-card"><button class="fb-e fb-bl" data-f="${escS(o.id)}" onclick="fbHistPick(this.dataset.f)">
-      <span class="fb-e-b"><b>${o.t}</b>${o.g ? `<i>${o.g}</i>` : ''}</span>${
-      o.id === st.line ? `<em class="fb-fill-em">${IC('check', 13)}</em>` : ''}</button></div>`).join('');
+  const sel = st.sel || [];
+  const opts = fbHistOpts(b).map(o => {
+    const on = o.id === '' ? !sel.length : sel.includes(o.id);
+    return `<button class="fb-fchip${on ? ' on' : ''}" data-f="${escS(o.id)}" onclick="fbHistPick(this.dataset.f)">
+      <em>${IC(o.i, 16)}</em><span>${o.t}</span></button>`;
+  }).join('');
   // по дням: у каждого дня своя карточка с суммой в шапке
   const byDay = [];
   rows.forEach(e => {
@@ -18263,7 +18289,7 @@ function fbHistHtml(b){
   </div>
   <div class="sc">
     <button class="fb-e fb-bl" onclick="fbHistToggle()"><span class="fb-e-b"><b>Фильтр</b><i>${fbHistTitle(b)}</i></span><em class="fb-chev${st.open ? ' open' : ''}">${_SC_CHEV}</em></button>
-    <div class="fb-one fb-pick fb-histf"${st.open ? '' : ' hidden'}>${opts}</div>
+    <div class="fb-fwrap${st.open ? ' open' : ''}" id="fbHistF"><div class="fb-fgrid">${opts}</div></div>
   </div>
   ${days || '<div class="sc"><div class="fb-none">Таких расходов в этом месяце не было</div></div>'}`;
 }
@@ -18277,13 +18303,19 @@ function fbHistRow(e){
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
   </div>${fbRcpBtn(e)}`;
 }
+// Раскрываем классом, а не перерисовкой: иначе окошко появляется рывком
 function fbHistToggle(){
   FB.hist.open = !FB.hist.open;
-  fbHistPaint();
+  const w = document.getElementById('fbHistF');
+  const c = document.querySelector('#fbPayBody .fb-e.fb-bl .fb-chev');
+  if(w) w.classList.toggle('open', FB.hist.open);
+  if(c) c.classList.toggle('open', FB.hist.open);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
+// Выбрать можно несколько: «Все расходы» снимает выбор, остальные копятся
 function fbHistPick(f){
-  FB.hist.line = f; FB.hist.open = false;
+  const sel = FB.hist.sel || [];
+  FB.hist.sel = f === '' ? [] : (sel.includes(f) ? sel.filter(x => x !== f) : sel.concat(f));
   fbHistPaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }

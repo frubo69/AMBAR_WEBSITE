@@ -3252,6 +3252,27 @@ button.path:active{transform:scale(.995)}
   font-variant-numeric:tabular-nums;cursor:pointer;margin-right:2px;line-height:1}
 .fb-prop-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
 .fb-okwrap{padding:10px 16px 14px}
+/* РП: чек у строки расхода, кнопка чека в форме, анализ плана и факта */
+.fb-rcpi{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  color:var(--gold2);background:var(--gold-soft);font-style:normal;cursor:pointer;margin-right:2px}
+.fb-add .fb-rcp{flex:1 1 100%;margin-top:0}
+.fb-add .fb-rcp.need{border-color:var(--dn);color:var(--dn)}
+.fb-an-sum{display:flex;gap:10px;padding:12px 16px 4px}
+.fb-an-sum > div{flex:1;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
+.fb-an-sum b{display:block;font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.fb-an-sum b.dn{color:var(--dn)} .fb-an-sum b.warn{color:var(--warn)}
+.fb-an-sum i{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px}
+.fb-an{padding:11px 16px 12px;border-top:1px solid rgba(255,255,255,.05)}
+.fb-an-h{display:flex;align-items:baseline;gap:10px}
+.fb-an-h b{flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-an-h b i{font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-left:6px}
+.fb-an-h span{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.fb-an-h span u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);margin-left:5px}
+.fb-an-bar{position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.07);margin:8px 0 6px}
+.fb-an-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--gold)}
+.fb-an-bar i.dn{background:var(--dn)} .fb-an-bar i.ok{background:var(--up)} .fb-an-bar i.warn{background:var(--warn)}
+.fb-an-bar s{position:absolute;top:-3px;width:2px;height:12px;margin-left:-1px;border-radius:1px;background:var(--text);opacity:.5}
+.fb-an-s{font-size:11px;color:var(--muted)} .fb-an-s.dn{color:var(--dn)} .fb-an-s.warn{color:var(--warn)} .fb-an-s.ok{color:var(--up)}
 .fb-okday{width:100%;height:46px;border-radius:12px;font-size:14px;font-weight:700}
 .fb-okdone span{color:var(--up)}
 .fb-okdone em{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--up);background:rgba(76,175,125,.14)}
@@ -17770,6 +17791,7 @@ function fbPaint(){
   if(mb){
     put('fbList-npm', fbPayoutsMonth(mb));
     put('fbList-rpm', fbExpensesMonth(mb));
+    put('fbList-an', fbAnalysis(mb));
     put('fbList-people', fbPeopleHtml(mb));
     const p = FB.person ? (fbCur(mb).people || []).find(x => x.name === FB.person) : null;
     if(p){ put('fbList-items', fbItems(p, mb.month)); put('fbList-pays', fbPays(p)); }
@@ -17845,17 +17867,20 @@ async function fbEntryAdd(book, day){
   const comment = fbTxt('fbCmt-' + book);
   const who = book === 'np' ? fbTxt('fbWho-np') : '';
   if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
+  if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
   if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
-      {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName()}});
+      {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
+                              ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    if(book === 'rp'){ FB.shot = null; fbShotMark(); }
     const f = document.getElementById('fbAdd-' + book); if(f) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
-  }catch(e){ _toast('Не удалось записать'); }
+  }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек' : 'Не удалось записать'); }
 }
 async function fbEntryDel(id){
   if(!await askDialog('Убрать запись?', 'Сумма уйдёт из книги. Вернуть можно будет только новой записью.',
@@ -18079,6 +18104,7 @@ function fbExpensesMonth(b){
   rows.reverse();
   if(!rows.length) return '<div class="fb-none">Расходов из РП в этом месяце не было</div>';
   return rows.map(e => `<div class="fb-e">
+    ${e.photo ? `<em class="fb-rcpi" role="button" data-id="${escS(e.id)}" data-n="${escS(e.line_name || e.comment || '')}" onclick="fbShotOpen(this.dataset.id, this.dataset.n)">${IC('note', 15)}</em>` : ''}
     <span class="fb-e-b"><b>${escS(e.kind_t ? e.kind_t + ' · ' + e.who : (e.line_name || e.comment || 'Расход'))}</b><i>${escS(fbDayT(e.day))}${
       e.line_name && e.comment ? ' · ' + escS(e.comment) : ''}</i></span>
     <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
@@ -18232,14 +18258,6 @@ function fbLinePage(b, l){
     <div class="sc">${fbCapT('План')}<div id="fbList-bud" class="fb-one"><div class="fb-card">${fbLineRow(l, false)}</div></div></div>
     <div class="sc">${fbCapT('Расходы')}
       <div id="fbList-line">${fbLineEntries(rows)}</div>
-      <button class="sc-r fb-plus" onclick="fbAddToggle('ln')"><span>Добавить расход</span><em>${_FB_PLUS}</em></button>
-      <div class="fb-add" id="fbAdd-ln" hidden>
-        <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-ln"
-          onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-ln').focus()}">
-        <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-ln" data-l="${l.id}"
-          onkeydown="if(event.key==='Enter'){fbLineEntryAdd(this.dataset.l)}">
-        <button class="aud-b go" data-l="${l.id}" onclick="fbLineEntryAdd(this.dataset.l)">Записать</button>
-      </div>
     </div>`;
 }
 function fbLineEntries(rows){
@@ -18822,21 +18840,8 @@ function fbBToSupply(day){
 // ── Экран «Расходы» (фонд) ────────────────────────────────────────────────
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
-  const bu = b.budget, s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
-  const days = (b.days || []).filter(d => !d.future && (d.collected || d.extra_rp || d.expenses_sum))
-    .map(d => {
-      const sub = [d.collected ? `РП+ ${fbFmt(d.collected)}` : '', d.extra_rp ? `приход ${fbFmt(d.extra_rp)}` : '',
-                   d.expenses_sum ? `РП− ${fbFmt(d.expenses_sum)}` : ''].filter(Boolean).join(' / ');
-      return fbDayRow(d, sub, d.stack_rp, {unit: 'в сейфе', cls: d.stack_rp < 0 ? 'dn' : ''});
-    });
-  const lines = (bu.lines || []).filter(l => l.fact && !l.group);
-  const sal = bu.salary || {}, rent = bu.rent || {}, auto = bu.auto || {}, home = bu.home || {};
-  if((bu.ads || {}).fact) lines.unshift({name: 'Реклама', plan: bu.ads.plan, fact: bu.ads.fact});
-  if((bu.sim || {}).fact) lines.unshift({name: 'Sim', plan: bu.sim.plan, fact: bu.sim.fact});
-  if(home.fact) lines.unshift({name: 'Бытовые расходы', plan: home.plan, fact: home.fact});
-  if(auto.fact) lines.unshift({name: 'Расходы на автомобили', plan: auto.plan, fact: auto.fact});
-  if(rent.fact) lines.unshift({name: 'Аренда офисов', plan: rent.plan, fact: rent.fact});
-  if(sal.fact) lines.unshift({name: 'Зарплаты', plan: sal.plan, fact: sal.fact});
+  const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
+  FB.shot = null;
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
@@ -18845,26 +18850,106 @@ async function accFinRP(){
       ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
       ${fbTile('В сейфе', 'safe.rp', s.rp, {mode: 'neg'})}
     </div>
-    ${fbRow('На начало месяца', 'safe.open_rp', s.open_rp)}
-    ${fbRow('Отложили из выручки', 'rp.collected', b.rp.collected, {sign: '+'})}
-    ${fbRow('Приход', 'rp.extra', b.rp.extra, {sign: '+'})}
-    ${fbRow('Расходы', 'rp.expenses', b.rp.expenses, {sign: '−'})}
-    ${fbRow('В сейфе', 'safe.rp', s.rp, {sum: true, sign: '=', mode: 'neg'})}
-  </div>
-  <div class="sc">
-    ${fbCapT('По статьям')}
-    ${lines.length || bu.off_plan ? lines.map(l => `<div class="fb-e"><span class="fb-e-b"><b>${escS(l.name)}</b><i>план ${fbFmt(l.plan)}</i></span>
-        <b class="fb-e-v${l.plan && l.fact > l.plan ? ' dn' : ''}">${fbFmt(l.fact)}<u>AED</u></b></div>`).join('')
-      + (bu.off_plan ? `<div class="fb-e"><span class="fb-e-b"><b>Вне плана</b><i>без статьи</i></span><b class="fb-e-v">${fbFmt(bu.off_plan)}<u>AED</u></b></div>` : '')
-      : '<div class="fb-none">Расходов в этом месяце ещё нет</div>'}
   </div>
   <div class="sc">
     ${fbCapT('Расходы')}
     <div id="fbList-rpm">${fbExpensesMonth(b)}</div>
-    ${fbAddRow('rp', today)}
-    ${fbAddRow('in', today)}
+    ${fbRpAddRow(today)}
   </div>
-  ${fbDays(days)}`;
+  <div class="sc">
+    ${fbCapT('Анализ')}
+    <div id="fbList-an">${fbAnalysis(b)}</div>
+  </div>`;
+}
+// Форма фактического расхода: статья, сумма, на что и чек — без чека не
+// записывается (владелец: «все обязательно с чеками»).
+function fbRpAddRow(day){
+  return `<button class="sc-r fb-plus" onclick="fbAddToggle('rp')"><span>Добавить расход</span><em>${_FB_PLUS}</em></button>
+  <div class="fb-add" id="fbAdd-rp" hidden>
+    <div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>
+    <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
+      onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
+    <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
+      onkeydown="if(event.key==='Enter'){this.blur()}">
+    <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
+    <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
+  </div>`;
+}
+// Снимок чека: тот же путь, что у расходов водителей — кадр 1280px и
+// миниатюра; лежит в FB.shot до записи, кнопка показывает, что чек снят.
+function fbShot(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f) return;
+  const img = new Image(), fr = new FileReader();
+  fr.onload = () => { img.src = fr.result; };
+  img.onload = () => {
+    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const t = document.createElement('canvas');
+    const tk = Math.min(1, 96 / Math.max(img.width, img.height));
+    t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
+    t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
+    FB.shot = {photo: c.toDataURL('image/jpeg', 0.72), thumb: t.toDataURL('image/jpeg', 0.5)};
+    fbShotMark();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  img.onerror = () => _toast('Не смогли прочитать снимок');
+  fr.readAsDataURL(f);
+}
+function fbShotMark(){
+  const st = document.getElementById('fbRcp'); if(!st) return;
+  if(FB.shot){ st.classList.add('set'); st.innerHTML = `<img src="${FB.shot.thumb}" alt=""><span class="xe-rcp-t">Чек снят<i>нажмите, чтобы переснять</i></span>`; }
+  else { st.classList.remove('set'); st.innerHTML = `${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span>`; }
+}
+// Чек к записи — во весь экран, как у расходов водителей.
+const _fbImg = {};
+async function fbShotOpen(id, name){
+  const ov = _woFull();
+  const кадр = url => `<img src="${url}" alt="Чек"><span>${escS(name || '')}</span>`;
+  ov.innerHTML = кадр(_fbImg[id] || '');
+  ov.classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(_fbImg[id]) return;
+  try{ _fbImg[id] = await ownerApi.ownerBlob('/api/owner/finance/book/photo/' + encodeURIComponent(id)); }
+  catch(e){ ov.classList.remove('show'); _toast('Чека не нашлось'); return; }
+  if(ov.classList.contains('show')) ov.innerHTML = кадр(_fbImg[id]);
+}
+// Анализ бюджета: по каждой статье — сколько потратили против плана к
+// сегодняшнему дню (план месяца × прошедшая доля месяца). Перерасход —
+// красным, почти не тратим — жёлтым (можно сократить), в норме — зелёным.
+// Статьи с датой платежа считаются по факту оплаты, без доли по дням.
+const FB_AN_G = {rent: 'Аренда офисов', auto: 'Автомобили', car: 'Аренда машин', home: 'Бытовые', ads: 'Реклама', sim: 'Sim'};
+function fbAnalysis(b){
+  const bu = b.budget || {}, nd = bu.days || 30, now = fbMonthNow(), month = b.month;
+  const passed = month < now ? nd : month > now ? 0 : +String(b.today || '').slice(8, 10) || 0;
+  const k = nd ? passed / nd : 0, over_month = month < now;
+  const rows = [];
+  const sal = bu.salary || {};
+  if(sal.plan) rows.push({name: 'Зарплаты', grp: '', dated: true, plan: sal.plan, fact: sal.fact || 0});
+  // по дням размазываются только статьи без даты (kind pool); аренда, ренты,
+  // реклама и зарплаты — платежи: сравниваем с планом месяца целиком
+  (bu.lines || []).forEach(l => { if(l.plan_m > 0 || l.fact) rows.push({name: l.group === 'rent' ? (l.short || l.name) : l.name, grp: FB_AN_G[l.group] || '', dated: l.kind !== 'pool', plan: l.plan_m || 0, fact: l.fact || 0}); });
+  if(!rows.length) return '<div class="fb-none">Бюджет ещё не заполнен</div>';
+  let over = 0, free = 0;
+  rows.forEach(r => {
+    r.planT = r.dated ? r.plan : r.plan * k;
+    r.dev = r.fact - r.planT;
+    if(r.fact > r.planT * 1.1 && r.dev > 50){ r.st = 'dn'; r.txt = `перерасход ${fbFmt(r.dev)}`; over += r.dev; }
+    else if(r.dated){ r.st = r.fact >= r.plan ? 'ok' : ''; r.txt = r.fact >= r.plan ? 'оплачено' : r.fact ? `ещё ${fbFmt(r.plan - r.fact)}` : 'не оплачено'; }
+    else if(passed >= 7 && r.fact < r.planT * 0.5){ r.st = 'warn'; r.txt = over_month ? `не потратили ${fbFmt(-r.dev)} — можно сократить` : `почти не тратим · свободно ${fbFmt(-r.dev)}`; free += -r.dev; }
+    else { r.st = 'ok'; r.txt = over_month ? `в плане · остаток ${fbFmt(Math.max(0, -r.dev))}` : `к сегодня по плану ${fbFmt(r.planT)}`; if(r.dev < 0) free += -r.dev; }
+    r.w = r.plan ? Math.min(100, Math.round(r.fact / r.plan * 100)) : (r.fact ? 100 : 0);
+    r.m = r.plan && !r.dated ? Math.min(100, Math.round(r.planT / r.plan * 100)) : -1;
+  });
+  rows.sort((a, c) => (c.st === 'dn') - (a.st === 'dn') || (c.st === 'warn') - (a.st === 'warn') || Math.abs(c.dev) - Math.abs(a.dev));
+  const head = `<div class="fb-an-sum"><div><b class="dn">${fbFmt(over)}</b><i>перерасход</i></div><div><b class="warn">${fbFmt(free)}</b><i>${over_month ? 'не потрачено' : 'свободно к сегодня'}</i></div></div>`;
+  return head + rows.map(r => `<div class="fb-an">
+    <div class="fb-an-h"><b>${escS(r.name)}${r.grp ? `<i>${r.grp}</i>` : ''}</b><span>${fbFmt(r.fact)}<u>из ${fbFmt(r.plan)}</u></span></div>
+    <div class="fb-an-bar"><i class="${r.st}" style="width:${r.w}%"></i>${r.m >= 0 ? `<s style="left:${r.m}%"></s>` : ''}</div>
+    <div class="fb-an-s ${r.st}">${r.txt}</div>
+  </div>`).join('');
 }
 
 // ── Экран «Зарплаты» ──────────────────────────────────────────────────────
@@ -32609,6 +32694,9 @@ function renderHours(h){
 </div>
 <input type="file" id="expCam" accept="image/*" capture="environment"
   onchange="expShot(this)"
+  style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+<input type="file" id="fbCam" accept="image/*" capture="environment"
+  onchange="fbShot(this)"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
 <input type="file" id="woCam" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"

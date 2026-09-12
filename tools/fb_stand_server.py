@@ -95,6 +95,11 @@ async def fin_day_set(day, fields, unset=None):
 async def fin_month_set(m, fields, unset=None):
     d = MONTHS.setdefault(m, {"_id": m}); d.update(fields)
     for k in (unset or []): d.pop(k, None)
+PHOTOS = {}
+async def expense_photo_set(item_id, photo, thumb=""): PHOTOS[item_id] = photo
+async def expense_photo_del(item_id): PHOTOS.pop(item_id, None)
+async def expense_photo(item_id): return PHOTOS.get(item_id, b"")
+db.expense_photo_set, db.expense_photo_del, db.expense_photo = expense_photo_set, expense_photo_del, expense_photo
 async def fin_entry_add(doc): ENTRIES.append(doc)
 async def fin_entry_get(eid): return next((e for e in ENTRIES if e["_id"] == eid), None)
 async def fin_entry_del(eid):

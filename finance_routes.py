@@ -656,7 +656,7 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             "kind": e.get("kind") or "", "kind_t": {"salary": "Зарплата", "advance": "Аванс",
                                                     "loan": "Долг"}.get(e.get("kind") or "", ""),
             "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
-            "day": e.get("day") or "", "pay_month": e.get("pay_month") or ""}
+            "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo"))}
 
 
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
@@ -880,18 +880,41 @@ async def handle_entry_add(request):
         who = str(body.get("who") or "").strip()[:60]
         if kind and not who:
             return _json({"error": "who_required"}, 400)
+        import photos
+        photo, bad = photos.decode(body.get("photo"))
+        if bad:
+            return _json({"error": bad}, 400)
+        thumb = photos.thumb(body.get("thumb")) if photo else ""
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
+    # фактический расход из РП — только с чеком (владелец: «все обязательно с
+    # чеками»); зарплатные записи и выплаты из ЧП идут без снимка
+    if book == "rp" and not kind and not photo:
+        return _json({"error": "no_photo"}, 400)
     by = _who(body)
     doc = {"_id": secrets.token_hex(6), "day": day, "book": book, "amount": amount,
            "comment": str(body.get("comment") or "").strip()[:120],
-           "who": who, "line": line, "kind": kind, "by": by, "at": datetime.now(timezone.utc)}
+           "who": who, "line": line, "kind": kind, "by": by, "at": datetime.now(timezone.utc),
+           "photo": bool(photo)}
+    if photo:
+        await db.expense_photo_set("fin:" + doc["_id"], photo, thumb)
     await db.fin_entry_add(doc)
     await _touch(day[:7])
     log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}")
     await backdate.notify(day, by, "финансы: " + BOOK_T.get(book, book),
                           f"{amount} AED {who} {doc['comment']}".strip())
     return _json({"ok": True, "id": doc["_id"], "book": await build(day[:7])})
+
+
+@require_owner
+async def handle_entry_photo(request):
+    """GET /api/owner/finance/book/photo/{id} — чек к расходу из РП."""
+    eid = (request.match_info.get("id") or "").strip()
+    img = await db.expense_photo("fin:" + eid) if eid else b""
+    if not img:
+        return _json({"error": "no_photo"}, 404)
+    return web.Response(body=img, content_type="image/jpeg",
+                        headers={**CORS_HEADERS, "Cache-Control": "private, max-age=86400"})
 
 
 @require_owner
@@ -906,6 +929,8 @@ async def handle_entry_del(request):
     if not old:
         return _json({"error": "not_found"}, 404)
     await db.fin_entry_del(eid)
+    if old.get("photo"):
+        await db.expense_photo_del("fin:" + eid)
     if old.get("item"):
         await db.fin_pay_item_del(str(old["item"]))
     await _touch(str(old.get("day") or "")[:7] or _biz_day()[:7])
@@ -1269,6 +1294,7 @@ def setup(app):
         ("/api/owner/finance/book", handle_book, "GET"),
         ("/api/owner/finance/book/day", handle_day_set, "POST"),
         ("/api/owner/finance/book/day/ok", handle_day_ok, "POST"),
+        ("/api/owner/finance/book/photo/{id}", handle_entry_photo, "GET"),
         ("/api/owner/finance/book/entry", handle_entry_add, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_del, "DELETE"),
         ("/api/owner/finance/book/month", handle_month_set, "POST"),

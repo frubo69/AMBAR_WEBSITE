@@ -74,13 +74,18 @@ async def fin_entry_add(doc): WRITES.append(("entry", doc))
 async def fin_entry_get(eid): return ENTRIES[0] if eid == "a1" else None
 async def fin_entry_del(eid): WRITES.append(("del", eid)); return True
 async def notify(*a, **k): WRITES.append(("notify", a))
+PHOTOS = {}
+async def expense_photo_set(item_id, photo, thumb=""): PHOTOS[item_id] = photo; WRITES.append(("photo", item_id, len(photo), len(thumb)))
+async def expense_photo_del(item_id): PHOTOS.pop(item_id, None); WRITES.append(("photo_del", item_id))
+async def expense_photo(item_id): return PHOTOS.get(item_id, b"")
 for n, f in dict(orders_between=orders_between, get_driver_days_range=get_driver_days_range,
                  supplies_between=supplies_between, fin_days_get=fin_days_get,
                  fin_entries_get=fin_entries_get, fin_month_get=fin_month_get,
                  fin_months_list=fin_months_list, checklist_get=checklist_get,
                  fin_day_set=fin_day_set, fin_month_set=fin_month_set, fin_entry_add=fin_entry_add,
                  fin_entry_get=fin_entry_get, fin_entry_del=fin_entry_del, fin_entries_where=fin_entries_where,
-                 fin_carry_invalidate=fin_carry_invalidate).items():
+                 fin_carry_invalidate=fin_carry_invalidate, expense_photo_set=expense_photo_set,
+                 expense_photo_del=expense_photo_del, expense_photo=expense_photo).items():
     setattr(db, n, f)
 stock_value.cost_map = cost_map
 stock_routes._catalog = lambda: CATALOG
@@ -293,7 +298,24 @@ async def main():
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=50, kind="salary")))
     eq("entry: зарплата без имени → 400", r.status, 400)
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="in", amount=250, comment="с крипты")))
-    eq("entry in ok", (r.status, WRITES[-2][1]["book"], WRITES[-2][1]["line"]), (200, "in", ""))
+    eq("entry in ok (приход — без чека)", (r.status, WRITES[-2][1]["book"], WRITES[-2][1]["line"]), (200, "in", ""))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=70, comment="симка")))
+    eq("расход из РП без чека → 400 no_photo", (r.status, json.loads(r.text)["error"]), (400, "no_photo"))
+    import base64
+    jpeg = "data:image/jpeg;base64," + base64.b64encode(b"\xff\xd8" + b"\x00" * 2500).decode()
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=70, comment="симка", photo=jpeg, thumb="data:image/jpeg;base64,AAAA")))
+    ph_id = json.loads(r.text)["id"]
+    eq("расход с чеком: снимок лёг под fin:<id>, запись помечена photo", (r.status, WRITES[-3][0], WRITES[-3][1], WRITES[-3][2], WRITES[-2][1]["photo"]), (200, "photo", "fin:" + ph_id, 2502, True))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=70, comment="x", photo="data:image/jpeg;base64,AAAA")))
+    eq("битый снимок → 400 bad_photo", (r.status, json.loads(r.text)["error"]), (400, "bad_photo"))
+    ENTRIES.append(dict(_id="ph1", day="2026-09-10", book="rp", amount=70, comment="симка", who="", by="Ст", at="t", photo=True))
+    PHOTOS["fin:ph1"] = b"\xff\xd8" + b"\x00" * 10
+    async def fin_entry_get2(eid): return next((e for e in ENTRIES if e["_id"] == eid), None)
+    db.fin_entry_get = fin_entry_get2
+    r = await raw(inner["handle_entry_del"])(_req("DELETE", dict(id="ph1")))
+    eq("удаление записи уносит чек", (r.status, "fin:ph1" in PHOTOS, WRITES[-2][0]), (200, False, "photo_del"))
+    db.fin_entry_get = fin_entry_get
+    ENTRIES[:] = [e for e in ENTRIES if e["_id"] != "ph1"]
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, name="Виза", plan="11000", due=20, **{"as": "Ст"})))
     eq("budget_set новая: ord 3", (r.status, WRITES[-1][0], WRITES[-1][1]["ord"], WRITES[-1][1]["plan"]), (200, "bset", 3, 11000))
     r = await raw(inner2["handle_budget_set"])(_req("POST", dict(month=M, id="nope", name="X", plan=1)))

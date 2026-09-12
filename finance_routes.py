@@ -850,11 +850,12 @@ async def handle_day_ok(request):
     return _json({"ok": True, "day": day, "book": await build(day[:7])})
 
 
-async def _line_ok(month: str, lid: str) -> bool:
+async def _line_get(month: str, lid: str):
+    """Статья расхода: (документ, годится ли). Пустой id — расход вне плана."""
     if not lid:
-        return True
+        return None, True
     ln = await db.fin_budget_line_get(lid)
-    return bool(ln) and ln.get("month") == month
+    return ln, bool(ln) and ln.get("month") == month
 
 
 @require_owner
@@ -875,7 +876,8 @@ async def handle_entry_add(request):
         if kind not in ENTRY_KINDS or (kind and book != "rp"):
             return _json({"error": "bad_kind"}, 400)
         line = str(body.get("line") or "")[:24] if book == "rp" else ""
-        if not await _line_ok(day[:7], line):
+        ln, ok = await _line_get(day[:7], line)
+        if not ok:
             return _json({"error": "bad_line"}, 400)
         who = str(body.get("who") or "").strip()[:60]
         if kind and not who:
@@ -888,8 +890,11 @@ async def handle_entry_add(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     # фактический расход из РП — только с чеком (владелец: «все обязательно с
-    # чеками»); зарплатные записи и выплаты из ЧП идут без снимка
-    if book == "rp" and not kind and not photo:
+    # чеками»); зарплатные записи и выплаты из ЧП идут без снимка. Аренда —
+    # исключение: её платят кнопкой «Оплатил» суммой из плана, чека к ней нет
+    # (владелец, 12 сен: «нажал кнопку — оплатил, расход засчитан»)
+    rent = bool(ln) and _line_group(ln) == "rent"
+    if book == "rp" and not kind and not photo and not rent:
         return _json({"error": "no_photo"}, 400)
     by = _who(body)
     doc = {"_id": secrets.token_hex(6), "day": day, "book": book, "amount": amount,

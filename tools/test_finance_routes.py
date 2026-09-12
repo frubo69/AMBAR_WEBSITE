@@ -308,6 +308,15 @@ async def main():
     eq("расход с чеком: снимок лёг под fin:<id>, запись помечена photo", (r.status, WRITES[-3][0], WRITES[-3][1], WRITES[-3][2], WRITES[-2][1]["photo"]), (200, "photo", "fin:" + ph_id, 2502, True))
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=70, comment="x", photo="data:image/jpeg;base64,AAAA")))
     eq("битый снимок → 400 bad_photo", (r.status, json.loads(r.text)["error"]), (400, "bad_photo"))
+    # аренда платится кнопкой «Оплатил» — суммой из плана, чека к ней нет
+    BUDGET.append(dict(_id="rentX", month="2026-09", name="Аренда B9", group="rent", plan=9000, ord=9))
+    BUDGET.append(dict(_id="simX", month="2026-09", name="Пополнение", group="sim", plan=500, ord=10))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=9000, line="rentX")))
+    eq("аренда без чека → записана", (r.status, WRITES[-2][1]["line"], WRITES[-2][1]["photo"]), (200, "rentX", False))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=500, line="simX")))
+    eq("не аренда без чека → 400 no_photo", (r.status, json.loads(r.text)["error"]), (400, "no_photo"))
+    ENTRIES[:] = [e for e in ENTRIES if e.get("line") != "rentX"]
+    BUDGET[:] = [l for l in BUDGET if l["_id"] not in ("rentX", "simX")]
     ENTRIES.append(dict(_id="ph1", day="2026-09-10", book="rp", amount=70, comment="симка", who="", by="Ст", at="t", photo=True))
     PHOTOS["fin:ph1"] = b"\xff\xd8" + b"\x00" * 10
     async def fin_entry_get2(eid): return next((e for e in ENTRIES if e["_id"] == eid), None)

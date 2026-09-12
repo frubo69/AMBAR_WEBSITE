@@ -3084,7 +3084,9 @@ button.path:active{transform:scale(.995)}
 .fb-pay{align-items:flex-start;padding-top:14px;padding-bottom:14px}
 .fb-boxcol.fb-paycol{gap:20px}   /* цена высоко, кнопка отдельно; два класса — иначе .fb-boxcol{gap:3px} ниже перебьёт */
 .fb-paybtn{flex:0 0 auto;height:32px;padding:0 14px;border-radius:10px;font-size:12.5px}
-.fb-payf{padding-top:0;border-top:0}
+.fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
+  font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
+.fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
 .fb-add.fb-open .fb-pick{margin-top:0;border-top:0}
 .sc-r.fb-plus em{color:var(--gold2)}
 /* Карточка дня — та же плашка, что «Остатки всего» на складе: строка дня
@@ -17917,7 +17919,6 @@ async function fbEntryAdd(book, day){
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
-    if(FB.pay){ FB.pay = null; fbRentPayPaint(); }        // страница оплаты аренды
   }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек' : 'Не удалось записать'); }
 }
 async function fbEntryDel(id){
@@ -18886,7 +18887,7 @@ function fbBToSupply(day){
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
-  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false}; FB.pay = null;
+  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null, all: false};
   const rows = fbExpensesMonth(b);           // пусто — карточку списка не показываем совсем
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
@@ -18934,7 +18935,7 @@ function fbLineChosen(){
 // под строкой сумма, чек и «Записать»: расход из РП ложится на это здание.
 function fbRentPay(){
   const b = fbBook(FB.month); if(!b) return;
-  FB.pay = null; FB.shot = null; FB.line = ''; FB.lineSet = false;
+  FB.shot = null; FB.line = ''; FB.lineSet = false;
   _setText('accTitle', 'Аренда офисов'); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRentPayHtml(b)}</div>`;
@@ -18949,9 +18950,8 @@ function fbRentPayPaint(){
 function fbRentPayHtml(b){
   const bu = b.budget || {}, rent = bu.rent || {}, all = (bu.lines || []).filter(l => l.group === 'rent');
   const office = all.filter(l => l.office), blds = all.filter(l => !l.office);
-  const day = b.today <= b.last ? b.today : b.last;
   const sect = (cap, list) => list.length ? `<div class="sc">${fbCapT(cap)}<div class="fb-one">${
-    list.map(l => `<div class="fb-card">${fbPayRow(l, day)}</div>`).join('')}</div></div>` : '';
+    list.map(l => `<div class="fb-card">${fbPayRow(l)}</div>`).join('')}</div></div>` : '';
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', 'bu.rent_plan', rent.plan)}
       ${fbTile('Фактический расход', 'bu.rent_fact', rent.fact)}
@@ -18960,22 +18960,22 @@ function fbRentPayHtml(b){
     ${sect('Офис', office)}
     ${sect('Билдинги', blds)}`;
 }
-function fbPayRow(l, day){
-  const sum = l.plan || 0;
-  const head = `<span class="fb-e-b"><b>${fbBldName(l)}</b><i>${fbLineSub(l)}</i></span>`;
-  if(FB.pay !== l.id) return `<div class="fb-e fb-bl fb-pay">${head}
-    <span class="fb-boxcol fb-paycol">${sum ? `<b class="fb-box">${fbFmt(sum)}<u>AED</u></b>` : ''}
-      <button class="aud-b go fb-paybtn" data-l="${l.id}" onclick="fbPayOpen(this.dataset.l)">Оплатил</button></span></div>`;
-  return `<div class="fb-e fb-bl fb-pay open">${head}
-      <em class="fb-fill-em x" onclick="fbPayCancel()" role="button" aria-label="Отмена">${IC('xmark', 13)}</em></div>
-    <div class="fb-add fb-open fb-payf">
-      <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp" value="${sum ? fbFmt(sum) : ''}"
-        onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
-      <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
-        onkeydown="if(event.key==='Enter'){this.blur()}">
-      <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
-      <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
-    </div>`;
+// Строка здания: сумма плана сверху, под ней «Оплатил». Оплаченное — сумма
+// зелёным и «Отменить»: нажал случайно — вернул как было.
+function fbPayRow(l){
+  const e = fbPaidOf(l.id), sum = e ? e.amount : (l.plan || 0);
+  const sub = e ? `Оплачено <b class="fb-due ok">${escS(fbDayT(e.day))}</b>` : fbLineSub(l);
+  return `<div class="fb-e fb-bl fb-pay"><span class="fb-e-b"><b>${fbBldName(l)}</b><i>${sub}</i></span>
+    <span class="fb-boxcol fb-paycol">${sum ? `<b class="fb-box${e ? ' ok' : ''}">${fbFmt(sum)}<u>AED</u></b>` : ''}
+      ${e ? `<button class="fb-paybtn undo" data-e="${escS(e.id)}" onclick="fbPayUndo(this.dataset.e)">Отменить</button>`
+          : `<button class="aud-b go fb-paybtn" data-l="${l.id}" onclick="fbPayOpen(this.dataset.l)">Оплатил</button>`}</span></div>`;
+}
+// Оплата статьи в этом месяце — последняя запись расхода по ней
+function fbPaidOf(id){
+  const b = fbBook(FB.month); if(!b || !id) return null;
+  let found = null;
+  (b.days || []).forEach(d => (d.expenses || []).forEach(e => { if(e.line === id) found = {...e, day: d.day}; }));
+  return found;
 }
 // Платят раньше срока — переспрашиваем. Молча пропускаем только платёж в
 // последние дни: «день в день» и накануне вопрос ни к чему.
@@ -18984,18 +18984,33 @@ function fbLeftT(n){
   return `${n} ${pluralize(n, 'день', 'дня', 'дней')}`;
 }
 async function fbPayOpen(id){
-  const l = (((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === id);
-  const left = l && l.next_due ? fbDueDays(l.next_due) : null;
+  const b = fbBook(FB.month); if(!b) return;
+  const l = ((b.budget || {}).lines || []).find(x => x.id === id); if(!l) return;
+  const left = l.next_due ? fbDueDays(l.next_due) : null;
   if(left !== null && left >= 3 &&
      !await askDialog('Вы уверены?', `До платежа осталось ${fbLeftT(left)}`, 'Оплатил', 'Вернуться назад')) return;
-  FB.pay = id; FB.line = id; FB.lineSet = true; FB.shot = null;
-  fbRentPayPaint();
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  const a = document.getElementById('fbAmt-rp'); if(a){ a.focus(); a.select(); }
+  const sum = l.plan || 0;
+  if(!(sum > 0)){ _toast('Сумма аренды не заполнена'); return; }
+  const day = b.today <= b.last ? b.today : b.last;
+  if(!await fbAskDay(day, 'Оплата аренды')) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
+      {method: 'POST', body: {day, book: 'rp', amount: sum, comment: '', who: '', line: id, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbRentPayPaint();
+  }catch(e){ _toast('Не удалось записать'); }
 }
-function fbPayCancel(){
-  FB.pay = null; FB.line = ''; FB.lineSet = false; FB.shot = null;
-  fbRentPayPaint();
+// Нажал случайно — вернуть как было: запись уходит, факт и остаток отматываются
+async function fbPayUndo(eid){
+  if(!await askDialog('Отменить оплату?', 'Расход уйдёт из фактического, строка вернётся к «Оплатил».',
+                      'Отменить оплату', 'Вернуться назад', 'bad')) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry', {method: 'DELETE', body: {id: eid, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbRentPayPaint();
+  }catch(e){ _toast('Не удалось отменить'); }
 }
 // Выбор статьи для расхода — теми же строками, что в бюджете: группы
 // раскрываются на месте, статья отмечается галкой; выбранная сворачивается

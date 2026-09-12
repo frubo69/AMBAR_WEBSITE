@@ -6940,6 +6940,18 @@ function placeOrder(){
   }).then(r=>r.json()).then(res=>{
     if(res.ok){
       console.log('Order sent via API:', res.order_id);
+      // Номер заказа выдаёт сервер, наш был временным. Переписываем его в
+      // своей записи — иначе в истории полторы минуты висят ДВА заказа: наш
+      // и серверный (sync держит свежие «pending», которых не знает API).
+      if(res.order_id && res.order_id !== oid){
+        const _o = orders.find(x => x.order_id === oid);
+        if(_o){
+          _o.order_id = res.order_id;
+          localStorage.setItem('ambar_orders', JSON.stringify(orders.slice(0,50)));
+          if(typeof renderOrders === 'function') renderOrders();
+          if(typeof checkActiveOrder === 'function') checkActiveOrder();
+        }
+      }
       if(res.needs_verification){
         localStorage.removeItem('ambar_verified');
         localStorage.removeItem('ambar_verify_requested');

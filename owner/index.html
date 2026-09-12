@@ -3248,6 +3248,9 @@ button.path:active{transform:scale(.995)}
 .fb-okbtn .fb-fill-em{margin:0}
 .fb-okbtn:active{opacity:.7}
 .fb-sday .fb-e-b i{white-space:normal;line-height:1.25}
+.fb-prop-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums;cursor:pointer;margin-right:2px;line-height:1}
+.fb-prop-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
 .fb-okwrap{padding:10px 16px 14px}
 .fb-okday{width:100%;height:46px;border-radius:12px;font-size:14px;font-weight:700}
 .fb-okdone span{color:var(--up)}
@@ -17623,7 +17626,7 @@ function fbHubHtml(b, err){
   <div class="sc fb-hub">
     <button class="sc-cap fb-pcap" onclick="accOpen('finsafe')"><span>Сейф</span>${
       b.safe.pending ? `<i class="fb-pend" data-f="safe.pending">${b.safe.pending}</i>` : ''}<b class="fb-capv" data-f="safe.total">${fbFmt(b.safe.total)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>
-    ${fbGo('Барракуда', 'safe.b', b.safe.b, "accOpen('finb')", {unit: 'в сейфе'})}
+    ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе'})}
     ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg'})}
     ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
   </div>
@@ -17638,6 +17641,10 @@ function fbHubHtml(b, err){
 function fbOpenToday(){
   if(DAY_OFFSET) accDayGo(0);
   accOpen('finday');
+}
+function fbOpenB(){
+  if(DAY_OFFSET) accDayGo(0);
+  accOpen('finb');
 }
 async function fbMonthStep(d){
   const m = fbMonthAdd(FB.month || fbMonthNow(), d);
@@ -17886,15 +17893,17 @@ async function fbDayReload(){
       return;
     }
   }
-  else if(fbStale(month)) fbLoad(month).then(() => { if(accDay() === day && ACC_VIEW === 'finday') fbPaint(); }).catch(() => {});
+  else if(fbStale(month)) fbLoad(month).then(() => { if(accDay() === day && (ACC_VIEW === 'finday' || ACC_VIEW === 'finb')) fbPaint(); }).catch(() => {});
   if(accDay() !== day) return;              // листнули дальше, пока грузилось
   const card = document.getElementById('finDayCard'), body = document.getElementById('finDayBody');
   if(!card || !body) return;
   FB.line = '';                             // статья расхода выбирается заново на каждом дне
   const d = fbDayOf(fbBook(month), day);
-  card.innerHTML = fbDayCardInner(d);
+  const isB = ACC_VIEW === 'finb';
+  card.innerHTML = isB ? fbBCardInner(d) : fbDayCardInner(d);
   dayBarPaint(card);
-  body.innerHTML = fbDayBodyHtml(d);
+  body.innerHTML = isB ? fbBBodyHtml(d) : fbDayBodyHtml(d);
+  if(isB) fbFillFocus();
 }
 function fbDayCardInner(d){
   return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
@@ -18060,7 +18069,7 @@ async function fbDayOk(day){
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok', {method: 'POST', body: {day, aside, collected, as: _meName()}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
-    if(ACC_VIEW === 'finday') fbDayReload(); else fbRepaint();
+    if(ACC_VIEW === 'finday' || ACC_VIEW === 'finb') fbDayReload(); else fbRepaint();
   }catch(e){ _toast('Не удалось подтвердить'); }
 }
 // Расходы из РП за месяц одним списком (статья или «на что», кто, день).
@@ -18383,6 +18392,7 @@ async function fbPersonHideBud(name){
 }
 // Перерисовать список бюджета или тело открытой страницы — прокрутка на месте.
 function fbBudRepaint(){
+  if(ACC_VIEW === 'finb'){ fbDayReload(); return; }
   if(FB.page){
     const b = fbBook(FB.month), info = b ? fbPageInfo(b) : null;
     if(!info){ fbPageBack(); return; }
@@ -18692,7 +18702,11 @@ async function fbFillOk(){
   const val = fbAmt('fbFillIn');
   if(Number.isNaN(val) || val < 0){ _toast('Нужно число'); return; }
   let url, body;
-  if(e.kind === 'rate'){
+  if(e.kind === 'baside' || e.kind === 'bpay'){
+    const day = e.id, d = fbDayOf(fbBook(day.slice(0, 7)), day) || {};
+    if(e.kind === 'baside'){ url = '/api/owner/finance/book/day/ok'; body = {day, aside: val, collected: d.collected || 0, as: _meName()}; }
+    else { url = '/api/owner/finance/book/day'; body = {day, field: 'pay', value: val, as: _meName()}; }
+  }else if(e.kind === 'rate'){
     url = '/api/owner/finance/book/pay/month';
     body = {month: FB.month, name: e.id, field: 'rate', value: val > 0 ? val : null, cur: FB.editCur || 'AED', as: _meName()};
   }else{
@@ -18734,40 +18748,75 @@ async function fbBudFill(from){
 
 // ── Экран «База» ──────────────────────────────────────────────────────────
 async function accFinB(){
-  const b = await fbMonthScreen('Барракуда'); if(!b) return;
-  const s = b.safe || {};
-  const days = (b.days || []).filter(d => !d.future && (d.ordered || d.aside || d.pay))
-    .map(d => fbDayRow(d, [d.ordered ? `заказали ${fbFmt(d.ordered)}` : '', d.aside ? `отложили ${fbFmt(d.aside)}` : '',
-                          d.pay ? `оплатили ${fbFmt(d.pay)}` : ''].filter(Boolean).join(' / '),
-                       d.debt_b, {unit: 'долг', cls: d.debt_b > 0 ? 'dn' : ''}));
-  document.getElementById('accMid').innerHTML = `
-  <div class="sc fb-gut">
-    ${fbCap(b.month, true)}
-    <div class="aud-g">
-      ${fbTile('Заказали', 'b.bought', b.b.bought)}
-      ${fbTile('Оплатили', 'b.paid', b.b.paid)}
-      ${fbTile('Долг', 'b.debt_end', b.b.debt_end, {mode: 'debt'})}
+  _setText('accTitle', 'Барракуда');
+  _setText('accSub', accDayWord());
+  FB.edit = null;
+  document.getElementById('accMid').innerHTML =
+    `<div class="exp-sum stk-bysum fb-daysum" id="finDayCard" data-day="общий">${fbBCardInner(null)}</div>
+     <div id="finDayBody"><div class="exp-empty">Загрузка…</div></div>`;
+  requestAnimationFrame(bindDayBars);
+  await fbDayReload();
+}
+function fbBCardInner(d){
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+      <span class="exp-day-l"><span class="exp-day-t">Барракуда</span></span>
+      ${_dayNav('finDay')}
     </div>
-    ${fbRow('В сейфе для Барракуды', 'safe.b', s.b, {sum: true})}
-    ${fbRow('Купили от продаж', 'b.ratio', b.b.ratio, {sub: true, unit: '%', dec: 1})}
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Долг Барракуде')}
-    ${fbRow('На начало месяца', 'b.debt_open', b.b.debt_open)}
-    ${fbRow('Заказали', 'b.bought', b.b.bought, {sign: '+'})}
-    ${fbRow('Оплатили', 'b.paid', b.b.paid, {sign: '−'})}
-    ${fbRow('Долг Барракуде', 'b.debt_end', b.b.debt_end, {sum: true, sign: '=', mode: 'debt'})}
-    ${fbRow('За месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Стопка Барракуды')}
-    ${fbRow('На начало месяца', 'safe.open_b', s.open_b)}
-    ${fbRow('Отложили из выручки', 'b.aside', b.b.aside, {sign: '+'})}
-    ${fbRow('Оплатили из стопки', 'b.pay_safe', b.b.pay_safe, {sign: '−'})}
-    ${fbRow('В сейфе', 'safe.b', s.b, {sum: true, sign: '='})}
-    ${fbRow('Сверх стопки — из ЧП', 'b.pay_extra', b.b.pay_extra, {sub: true, show: 'b.extra_pay_on', hide: !b.b.pay_extra})}
-  </div>
-  ${fbDays(days)}`;
+    <div class="aud-g">
+      ${fbTile('Заказали', 'd.ordered', d ? d.ordered : null)}
+      ${fbTile('Оплатили', 'd.pay', d ? d.pay : null)}
+      ${fbTile('Долг', 'd.debt_b', d ? d.debt_b : null, {mode: 'debt'})}
+    </div>`;
+}
+// Одно окно на день: сколько выделили Барракуде из выручки (предложена
+// половина), заявка дня (стрелка ведёт в неё) и сколько оплатили по факту
+// (предложена сумма заявки). Каждую сумму можно подтвердить как есть или
+// вписать свою; после подтверждения — карандаш, всё обратимо. Оплатили
+// больше заявки — долг сам стал меньше.
+function fbBBodyHtml(d){
+  if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
+  const day = d.day, paid = d.manual.pay !== null && d.manual.pay !== undefined;
+  const sup = (d.supplies || []).find(x => x.kind === 'main');
+  return `<div class="sc"><div class="fb-one">
+    <div class="fb-card">${fbBRow('baside', day, 'Выделили', d.aside, d.ok, d.ok ? '' : d.aside_src === 'half' ? `половина от ${fbFmt(d.base)}` : '')}</div>
+    <div class="fb-card"><button class="fb-e fb-bl" onclick="fbBToSupply('${day}')"><span class="fb-e-b"><b>Заявка</b><i>${sup ? 'по приложению' : 'заявки нет'}</i></span>
+      <b class="fb-e-v" data-f="d.ordered">${fbFmt(d.ordered)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button></div>
+    <div class="fb-card">${fbBRow('bpay', day, 'Оплатили', paid ? d.pay : d.ordered, paid, paid ? '' : d.ordered ? 'по заявке' : '')}</div>
+  </div></div>`;
+}
+// Строка суммы в трёх состояниях: предложение (золотая сумма — нажать и
+// вписать свою — и «Подтвердить»), подтверждено (серое окошко и карандаш),
+// правка (поле и «Подтвердить»).
+function fbBRow(kind, day, name, value, ok, sub){
+  const editing = FB.edit && FB.edit.kind === kind && FB.edit.id === day;
+  const head = `<span class="fb-e-b"><b>${name}</b>${sub ? `<i>${sub}</i>` : ''}</span>`;
+  if(editing) return `<div class="fb-e fb-bl fb-editing">${head}
+      <b class="fb-inb"><input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFillIn" value="${value ? fbFmt(value) : ''}"
+        onkeydown="if(event.key==='Enter'){fbFillOk()}else if(event.key==='Escape'){fbFillCancel()}"><u>AED</u></b>
+      <button class="fb-ok" onclick="fbFillOk()">Подтвердить</button>
+      <em class="fb-fill-em x" onclick="fbFillCancel()" role="button" aria-label="Отмена">${IC('xmark', 13)}</em></div>`;
+  if(ok) return `<button class="fb-e fb-bl" onclick="fbFillEdit('${kind}','${day}')">${head}<b class="fb-box">${fbFmt(value)}<u>AED</u></b><em class="fb-fill-em pen">${_FB_PEN}</em></button>`;
+  // предлагать нечего (нет выручки / нет заявки) — только вписать своё
+  if(!(value > 0)) return `<button class="fb-e fb-bl" onclick="fbFillEdit('${kind}','${day}')">${head}<b class="fb-fill">Вписать</b><em class="fb-fill-em">${_FB_PLUS}</em></button>`;
+  return `<div class="fb-e fb-bl fb-prop">${head}<b class="fb-prop-v" role="button" onclick="fbFillEdit('${kind}','${day}')">${fbFmt(value)}<u>AED</u></b>
+    <span class="fb-okbtn" role="button" onclick="fbBOk('${kind}','${day}')">Подтвердить<em class="fb-fill-em">${IC('check', 13)}</em></span></div>`;
+}
+// Подтвердить предложенное как есть: выделенное — это подтверждение
+// раскладки дня, оплата — сумма заявки полем pay.
+async function fbBOk(kind, day){
+  const d = fbDayOf(fbBook(day.slice(0, 7)), day); if(!d) return;
+  if(kind === 'baside'){ fbDayOk(day); return; }
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day', {method: 'POST', body: {day, field: 'pay', value: d.ordered || 0, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbDayReload();
+  }catch(e){ _toast('Не удалось сохранить'); }
+}
+// В заявку — и обратно сюда же.
+function fbBToSupply(day){
+  accOpen('supply');
+  ACC_BACK = () => accOpen('finb');
 }
 
 // ── Экран «Расходы» (фонд) ────────────────────────────────────────────────

@@ -146,6 +146,16 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
       fbHistOpen(Q.get('hist') === '1' ? '' : Q.get('hist')); await new Promise(r => setTimeout(r, 400)); }
     // раскрыть фильтр: состоянием и перерисовкой, иначе в снимке он останется
     // закрытым (анимация без кадров не идёт)
+    // ?fit=1 — телефон настоящей высоты (844), раздел на весь экран: так
+    // проверяются экраны, которые «должны занимать страницу ровно»
+    if(Q.get('fit')){
+      const st = document.createElement('style');
+      st.textContent = '#phone{height:' + (Q.get('fit') === '1' ? 844 : +Q.get('fit')) + 'px!important;overflow:hidden}'
+        + '#phone .page{display:none}#phone .stk-ov{position:absolute!important;inset:0!important;height:100%!important;display:flex}'
+        + '#phone .stk-mid{flex:1 1 auto!important;overflow-y:auto!important}';
+      document.head.appendChild(st);
+      await new Promise(r => setTimeout(r, 150));
+    }
     if(Q.get('rpin')){ FB.rpIn = true; accFinRP(); await new Promise(r => setTimeout(r, 500)); }   // раскрыть РП+
     if(Q.get('histf')){ FB.hist.open = true; fbHistPaint(); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('rcp')){          // открыть окно чека у первой записи со снимком

@@ -3077,7 +3077,6 @@ button.path:active{transform:scale(.995)}
 .fb-add[hidden]{display:none}
 /* Раскрытая всегда (РП): своей полосы нет — отбивку даёт строка выбора статьи */
 .fb-add.fb-open{padding-top:0;border-top:0}
-.fb-add.fb-nof{padding-bottom:0}          /* статья не выбрана — карточка кончается списком */
 /* Оплата аренды: сумма сверху, под ней жёлтая «Оплатил» */
 .fb-pay{align-items:flex-start;padding-top:14px;padding-bottom:14px}
 .fb-boxcol.fb-paycol{gap:20px}   /* цена высоко, кнопка отдельно; два класса — иначе .fb-boxcol{gap:3px} ниже перебьёт */
@@ -3111,7 +3110,26 @@ button.path:active{transform:scale(.995)}
 .fb-fwrap{max-height:0;opacity:0;overflow:hidden;
   transition:max-height .28s var(--e1),opacity .18s var(--e1)}
 .fb-fwrap.open{max-height:46dvh;opacity:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.fb-fwrap.rpin.open{max-height:300px}   /* дни РП+ — окно строго на 300 px, листается внутри */
+/* Экран РП: месяц сверху, под ним две карточки одного размера на весь остаток
+   экрана — листается внутри каждой, страница не прокручивается. */
+.fb-rppage{display:flex;flex-direction:column;gap:10px;height:100%;min-height:0}
+.fb-rppage > .sc{margin:0;flex:0 0 auto}
+.fb-rppage > .fb-half{flex:1 1 0;min-height:120px;display:flex;flex-direction:column;overflow:hidden}
+.fb-half .fb-hbody{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+/* Шапка карточки — отдельная полоса, а не первая строка списка */
+.fb-hcap{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:10px 12px 10px 16px;
+  background:rgba(201,169,110,.09);border:0;border-bottom:1px solid rgba(201,169,110,.22);
+  font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
+.fb-hcap:active{background:rgba(201,169,110,.14)}
+.fb-hcap-t{flex:1;min-width:0}
+.fb-hcap-t b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;color:var(--gold2)}
+.fb-hcap-t i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-hcap-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+.fb-hcap-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:4px}
 .fb-e-v.none{color:var(--muted)}
 .fb-fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
@@ -3126,7 +3144,6 @@ button.path:active{transform:scale(.995)}
 .fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
   font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
 .fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
-.fb-add.fb-open .fb-pick{margin-top:0;border-top:0}
 .sc-r.fb-plus em{color:var(--gold2)}
 /* Карточка дня — та же плашка, что «Остатки всего» на складе: строка дня
    шапкой, под ней плитки, ниже строки во всю ширину. */
@@ -3322,9 +3339,6 @@ button.path:active{transform:scale(.995)}
 .fb-rcpi{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
   color:var(--gold2);background:var(--gold-soft);font-style:normal;cursor:pointer;margin-right:2px}
 .fb-add .fb-rcp{flex:1 1 100%;margin-top:0}
-.fb-add .fb-pick{flex:1 1 100%;margin:-4px -16px 4px;border-top:1px solid rgba(255,255,255,.05)}
-.fb-pick .fb-card .fb-bl{min-height:52px}
-.fb-pick .fb-card .fb-bl .fb-e-b b{font-size:14.5px}
 .fb-add .fb-rcp.need{border-color:var(--dn);color:var(--dn)}
 .fb-an-sum{display:flex;gap:10px;padding:12px 16px 4px}
 .fb-an-sum > div{flex:1;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
@@ -17882,7 +17896,6 @@ function fbPaint(){
     put('fbList-rp', fbEntries(d.expenses, 'rp'));
     put('fbList-np', fbEntries(d.payouts, 'np'));
     put('fbList-in', fbEntries(d.ins, 'in'));
-    fbPickPaint();
   }
   if(mb){
     put('fbList-npm', fbPayoutsMonth(mb));
@@ -17972,7 +17985,7 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; fbPickPaint(); }
+    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
@@ -18218,13 +18231,6 @@ function fbRpInRows(b){
     return `<div class="fb-e"><span class="fb-e-b"><b>${escS(fbDayT(d.day))}</b>${sub ? `<i>${sub}</i>` : ''}</span>
       <b class="fb-e-v${sum ? '' : ' none'}">${fbFmt(sum)}<u>AED</u></b></div>`;
   }).join('');
-}
-function fbRpInToggle(){
-  FB.rpIn = !FB.rpIn;
-  const w = document.getElementById('fbRpInBox'), c = document.getElementById('fbRpInChev');
-  if(w) w.classList.toggle('open', FB.rpIn);
-  if(c) c.classList.toggle('open', FB.rpIn);
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 // ── История расходов ──────────────────────────────────────────────────────
@@ -19112,36 +19118,116 @@ function fbBToSupply(day){
 // ── Экран «Расходы» (фонд) ────────────────────────────────────────────────
 async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
-  const s = b.safe || {}, today = b.today <= b.last ? b.today : b.last;
-  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.pick = {open: null}; FB.lpage = null; FB.rentGrp = null; FB.salPage = false;
-  FB.hist = null;
+  const s = b.safe || {};
+  FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null; FB.rentGrp = null;
+  FB.salPage = false; FB.hist = null; FB.sec = null; FB.rpPage = false;
+  // Две карточки одного размера делят остаток экрана: листается ВНУТРИ каждой,
+  // страница не прокручивается (владелец: «занимали всю страницу ровно»).
   document.getElementById('accMid').innerHTML = `
-  <div class="sc fb-gut">
-    ${fbCap(b.month, true)}
-    <div class="aud-g">
-      ${fbTile('РП+', 'safe.rp_in', s.rp_in)}
-      ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
-      ${fbTile('В сейфе', 'safe.rp', s.rp, {mode: 'neg'})}
+  <div class="fb-rppage">
+    <div class="sc fb-gut">
+      ${fbCap(b.month, true)}
+      <div class="aud-g">
+        ${fbTile('РП+', 'safe.rp_in', s.rp_in)}
+        ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
+        ${fbTile('В сейфе', 'safe.rp', s.rp, {mode: 'neg'})}
+      </div>
     </div>
-  </div>
-  <div class="sc">
-    <button class="fb-e fb-bl" onclick="fbRpInToggle()">
-      <span class="fb-e-b"><b>РП+</b><i>сколько откладывали по дням</i></span>
-      <b class="fb-e-v">${fbFmt(s.rp_in)}<u>AED</u></b><em class="fb-chev${FB.rpIn ? ' open' : ''}" id="fbRpInChev">${_SC_CHEV}</em></button>
-    <div class="fb-fwrap rpin${FB.rpIn ? ' open' : ''}" id="fbRpInBox"><div class="fb-one">${fbRpInRows(b)}</div></div>
-  </div>
-  <div class="sc">
-    ${fbCapT('РП−')}
-    ${fbRpAddRow(today)}
-  </div>
-  <div class="sc"><button class="fb-e fb-bl" onclick="fbHistOpen('')">
-    <span class="fb-e-b"><b>История</b><i>все расходы по дням, с фильтром</i></span><em class="fb-chev">${_SC_CHEV}</em></button>
+    <div class="sc fb-half">
+      <button class="fb-hcap" onclick="fbRpInPage()">
+        <span class="fb-hcap-t"><b>РП+</b><i>сколько откладывали по дням</i></span>
+        <b class="fb-hcap-v">${fbFmt(s.rp_in)}<u>AED</u></b><em class="fb-chev">${_SC_CHEV}</em></button>
+      <div class="fb-hbody"><div class="fb-one">${fbRpInRows(b)}</div></div>
+    </div>
+    <div class="sc fb-half">
+      <button class="fb-hcap" onclick="fbHistOpen('')">
+        <span class="fb-hcap-t"><b>РП−</b><i>на что тратим · история</i></span>
+        <b class="fb-hcap-v">${fbFmt(s.rp_out)}<u>AED</u></b><em class="fb-chev">${_SC_CHEV}</em></button>
+      <div class="fb-hbody"><div class="fb-fgrid">${fbRpSecTiles(b)}</div></div>
+    </div>
   </div>`;
 }
-// «Новый расход» — только список статей: каждая уводит на свою страницу, где
-// расход и записывают (владелец: «уводи на отдельные страницы»).
-function fbRpAddRow(day){
-  return `<div class="fb-add fb-open fb-nof" id="fbAdd-rp">${fbLinePicker(fbBook(day.slice(0, 7)))}</div>`;
+// Разделы расхода плитками: значок и подпись, нажал — своя страница
+function fbRpSections(b){
+  const bu = b.budget || {}, lines = bu.lines || [];
+  const has = g => lines.some(l => (g === 'auto' ? ['car', 'auto'] : [g]).includes(l.group));
+  const out = [];
+  if((fbCur(b).people || []).length) out.push({t: 'Зарплаты', i: 'money', go: 'fbSalPay()'});
+  if(has('rent')) out.push({t: 'Аренда офисов', i: 'building', go: "fbRentPay('rent')"});
+  if(has('auto')) out.push({t: 'Расходы на автомобили', i: 'car', go: "fbSecPage('auto')"});
+  if(has('home')) out.push({t: 'Бытовые расходы', i: 'home', go: "fbSecPage('home')"});
+  if(has('sim')) out.push({t: 'Sim', i: 'simcard', go: "fbSecPage('sim')"});
+  lines.filter(l => !l.group).forEach(l =>
+    out.push({t: escS(l.name), i: fbHistIco(l.name), go: `fbLinePay('${l.id}')`}));
+  if(has('ads')) out.push({t: 'Реклама', i: 'megaphone', go: "fbRentPay('ads')"});
+  return out;
+}
+function fbRpSecTiles(b){
+  const secs = fbRpSections(b);
+  if(!secs.length) return `<button class="fb-fchip" onclick="accOpen('finbud')"><em>${IC('warn', 16)}</em><span>Бюджет не заполнен</span></button>`;
+  return secs.map(x => `<button class="fb-fchip" onclick="${x.go}"><em>${IC(x.i, 16)}</em><span>${x.t}</span></button>`).join('');
+}
+// Страница раздела: те же плитки, только его детьми (авто, бытовые, sim)
+const FB_SEC_T = {auto: 'Расходы на автомобили', home: 'Бытовые расходы', sim: 'Sim'};
+function fbSecPage(g){
+  const b = fbBook(FB.month); if(!b || !FB_SEC_T[g]) return;
+  FB.sec = g; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null; FB.rpPage = false;
+  _setText('accTitle', FB_SEC_T[g]); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbSecHtml(b)}</div>`;
+  mid.scrollTop = 0;
+  ACC_BACK = accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbSecPaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  if(b && body) body.innerHTML = fbSecHtml(b);
+}
+function fbSecHtml(b){
+  const g = FB.sec, bu = b.budget || {}, lines = bu.lines || [];
+  const tot = bu[g] || {};
+  const tiles = [];
+  if(g === 'auto'){
+    if(lines.some(l => l.group === 'car')) tiles.push({t: 'Аренда', i: 'car', go: "fbRentPay('car')"});
+    lines.filter(l => l.group === 'auto').forEach(l => tiles.push({t: escS(l.name), i: fbHistIco(l.name), go: `fbLinePay('${l.id}')`}));
+  }else{
+    lines.filter(l => l.group === g).forEach(l => tiles.push({t: escS(l.name), i: fbHistIco(l.name), go: `fbLinePay('${l.id}')`}));
+  }
+  return `<div class="sc"><div class="aud-g">
+      ${fbTile('План', `bu.${g}_plan`, tot.plan)}
+      ${fbTile('Фактический расход', `bu.${g}_fact`, tot.fact)}
+      ${fbTile('Осталось', `bu.${g}_left`, tot.left, {mode: 'neg'})}
+    </div></div>
+    <div class="sc"><div class="fb-fgrid">${
+      tiles.map(x => `<button class="fb-fchip" onclick="${x.go}"><em>${IC(x.i, 16)}</em><span>${x.t}</span></button>`).join('')}</div></div>`;
+}
+// Страница РП+: те же дни, но во всю высоту и с итогами
+function fbRpInPage(){
+  const b = fbBook(FB.month); if(!b) return;
+  FB.rpPage = true; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
+  _setText('accTitle', 'РП+'); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRpInHtml(b)}</div>`;
+  mid.scrollTop = 0;
+  ACC_BACK = accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbRpInPaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  if(b && body) body.innerHTML = fbRpInHtml(b);
+}
+function fbRpInHtml(b){
+  const s = b.safe || {};
+  const n = (b.days || []).filter(d => !d.future && ((d.ok ? (d.collected || 0) : 0) + (d.extra_rp || 0)) > 0).length;
+  return `<div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Отложено', 'safe.rp_in', s.rp_in)}
+      ${fbTile('Дней', 'rpin.n', n, {unit: pluralize(n, 'день', 'дня', 'дней')})}
+      ${fbTile('В среднем', 'rpin.avg', n ? Math.round((s.rp_in || 0) / n) : 0, {unit: 'в день'})}
+    </div>
+  </div>
+  <div class="sc">${fbCapT('По дням')}<div class="fb-one">${fbRpInRows(b)}</div></div>`;
 }
 // ── «Аренда офисов»: страница оплаты ──────────────────────────────────────
 // Та же страница, что в бюджете (план/факт/осталось, «Офис» и «Билдинги» со
@@ -19349,52 +19435,6 @@ function fbLinePayHtml(b, l){
     ${rows.length ? `<div class="sc"><button class="fb-e fb-bl" data-l="${l.id}" onclick="fbHistOpen(this.dataset.l)">
       <span class="fb-e-b"><b>История</b><i>${rows.length} ${pluralize(rows.length, 'запись', 'записи', 'записей')} за месяц · ${fbFmt(rows.reduce((a2, e) => a2 + (e.amount || 0), 0))} AED</i></span>
       <em class="fb-chev">${_SC_CHEV}</em></button></div>` : ''}`;
-}
-// Выбор статьи для расхода — теми же строками, что в бюджете: группы
-// раскрываются на месте, статья отмечается галкой; выбранная сворачивается
-// в одну строку с карандашом (владелец: «у нас тут не диджейская установка»).
-// Верхние строки все со стрелкой — и те, что раскрываются, и те, что сразу
-// статья: список читается одной колонкой, без «этой со стрелкой, а той без».
-// Расход всегда ложится на статью — строки «Вне плана» в выборе нет.
-function fbLinePicker(b){
-  const bu = (b && b.budget) || {}, lines = bu.lines || [];
-  const byG = g => lines.filter(l => l.group === g);
-  const nm = l => l.group === 'rent' ? fbBldName(l) : escS(l.name);
-  const card = html => `<div class="fb-card">${html}</div>`;
-  const row = (title, go, kid) => `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" onclick="${go}"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`;
-  const leaf = (l, kid) => row(nm(l), `fbLinePay('${l.id}')`, kid);
-  // Статей нет (бюджет месяца не заполнен) — расходу не на что лечь: строка
-  // ведёт в бюджет, а не оставляет форму без выбора
-  if(!lines.length) return `<div class="fb-one fb-pick" id="fbLine-rp"><div class="fb-card"><button class="fb-e fb-bl" onclick="accOpen('finbud')">
-    <span class="fb-e-b"><b>Бюджет не заполнен</b><i>расход ложится на статью</i></span><em class="fb-chev">${_SC_CHEV}</em></button></div></div>`;
-  const grp = (key, title, kids) => kids ? `<div class="fb-card group${FB.pick.open === key ? ' open' : ''}">
-      <button class="fb-e fb-bl fb-gh" data-k="${key}" onclick="fbPickGroup(this.dataset.k)"><span class="fb-e-b"><b>${title}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>
-      <div class="fb-kids"${FB.pick.open === key ? '' : ' hidden'}>${kids}</div></div>` : '';
-  const rent = byG('rent'), cars = byG('car');
-  // аренда — не группа со списком, а своя страница: там у каждого здания сумма,
-  // срок платежа и «Оплатил»
-  const people = (fbCur(b).people || []).length;
-  let out = people ? card(row('Зарплаты', 'fbSalPay()')) : '';
-  out += rent.length ? card(row('Аренда офисов', "fbRentPay('rent')")) : '';
-  // автомобили: аренда — одной строкой на свою страницу (не десяток рентов),
-  // гараж, парковка и страховка — каждый своей страницей
-  const kidCard = html => `<div class="fb-card">${html}</div>`;
-  out += grp('auto', 'Расходы на автомобили',
-    (cars.length ? kidCard(row('Аренда', "fbRentPay('car')", true)) : '') +
-    byG('auto').map(l => kidCard(leaf(l, true))).join(''));
-  out += grp('home', 'Бытовые расходы', byG('home').map(l => kidCard(leaf(l, true))).join(''));
-  out += grp('sim', 'Sim', byG('sim').map(l => kidCard(leaf(l, true))).join(''));
-  out += lines.filter(l => !l.group).map(l => card(leaf(l, false))).join('');
-  out += byG('ads').length ? card(row('Реклама', "fbRentPay('ads')")) : '';
-  return `<div class="fb-one fb-pick" id="fbLine-rp">${out}</div>`;
-}
-function fbPickPaint(){
-  const el = document.getElementById('fbLine-rp'); if(el) el.outerHTML = fbLinePicker(fbBook(FB.month));
-}
-function fbPickGroup(k){
-  FB.pick.open = FB.pick.open === k ? null : k;
-  fbPickPaint();
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // Снимок чека: тот же путь, что у расходов водителей — кадр 1280px и
 // миниатюра; лежит в FB.shot до записи, кнопка показывает, что чек снят.

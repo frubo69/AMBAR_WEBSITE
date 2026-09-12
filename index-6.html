@@ -2173,15 +2173,14 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
       </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:8px">
-      <button id="supp-call-btn" data-copied="Copied" onclick="(()=>{function doFeedback(){if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');const s=el('supp-call-sub');const prev=s.textContent;s.textContent=el('supp-call-btn').dataset.copied;setTimeout(()=>{s.textContent=prev;},2000);}try{navigator.clipboard.writeText(SUPPORT_PHONE).then(doFeedback).catch(()=>{const ta=document.createElement('textarea');ta.value=SUPPORT_PHONE;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);doFeedback();});}catch(e){const ta=document.createElement('textarea');ta.value=SUPPORT_PHONE;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);doFeedback();}})()"
-        style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s;box-sizing:border-box"
-        onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
-        <div style="width:42px;height:42px;border-radius:12px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6 6l.94-1.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 15z"/></svg>
+      <button id="supp-call-btn" class="supp-soon" onclick="supportCallSoon()"
+        style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;text-align:left;transition:.15s;box-sizing:border-box;opacity:.55">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6 6l.94-1.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 15z"/></svg>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text)" id="supp-call-lbl">Call</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-call-sub">+971 50 884 8308</div>
+          <div style="font-size:15px;font-weight:600;color:var(--sub)" id="supp-call-lbl">Call</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-call-sub">Soon</div>
         </div>
       </button>
       <button id="supp-msg-btn" onclick="closeSupportOptions();setTimeout(()=>{openSupportChat('general');},250)"
@@ -8728,22 +8727,28 @@ function showConfirm(title,opts={}){
   });
 }
 
-// ── SUPPORT PHONE — change this number ───────────────────────────────────────
-const SUPPORT_PHONE='+971508848308';
-const SUPPORT_PHONE_DISPLAY='+971 50 884 8308';
+// ── ПОДДЕРЖКА ────────────────────────────────────────────────────────────────
+// Номера в приложении нет: звонок ещё не сделан, кнопка приглушена и говорит
+// «скоро». Появится звонок — номер придёт с сервера, а не будет лежать в коде.
 
 function openSupportOptions(hideMsg){
   const ru=lang==='ru';
   set('supp-opt-title',ru?'ПОДДЕРЖКА':'SUPPORT');
   set('supp-call-lbl',ru?'Позвонить':'Call');
-  set('supp-call-sub',SUPPORT_PHONE_DISPLAY);
-  el('supp-call-btn').dataset.copied=ru?'Скопировано':'Copied';
+  // Звонок пока не работает: номер не показываем, кнопка приглушена
+  set('supp-call-sub',ru?'Скоро':'Soon');
   set('supp-msg-lbl',ru?'Написать сообщение':'Send message');
   set('supp-msg-sub',ru?'Чат в приложении':'In-app chat');
   el('supp-msg-btn').style.display=hideMsg?'none':'flex';
   _openSheet('support-options-ov');
 }
 function closeSupportOptions(){_closeSheet('support-options-ov');}
+// Пока звонок не сделан — говорим об этом прямо, а не молчим по нажатию
+function supportCallSoon(){
+  haptic.light();
+  showToast(lang==='ru'?'Ведётся разработка — звонок скоро будет доступен'
+                       :'Under development — calls will be available soon','info');
+}
 
 function quickReorder(){
   const last=orders.filter(o=>o.items?.length).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))[0];

@@ -18979,11 +18979,12 @@ function fbRpAddRow(day){
 // Та же страница, что в бюджете (план/факт/осталось, «Офис» и «Билдинги» со
 // сроком платежа), только сумма сверху, а под ней жёлтая «Оплатил». Нажал —
 // под строкой сумма, чек и «Записать»: расход из РП ложится на это здание.
+const FB_PAY_T = {rent: 'Аренда офисов', car: 'Аренда машин', ads: 'Реклама'};
 function fbRentPay(grp){
   const b = fbBook(FB.month); if(!b) return;
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null;
-  FB.rentGrp = grp === 'car' ? 'car' : 'rent';
-  _setText('accTitle', FB.rentGrp === 'car' ? 'Аренда машин' : 'Аренда офисов'); _setText('accSub', fbMonthT(b.month));
+  FB.rentGrp = FB_PAY_T[grp] ? grp : 'rent';
+  _setText('accTitle', FB_PAY_T[FB.rentGrp]); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRentPayHtml(b)}</div>`;
   mid.scrollTop = 0;
@@ -18995,8 +18996,8 @@ function fbRentPayPaint(){
   if(b && body) body.innerHTML = fbRentPayHtml(b);
 }
 function fbRentPayHtml(b){
-  const car = FB.rentGrp === 'car', k = car ? 'car' : 'rent';
-  const bu = b.budget || {}, tot = (car ? bu.car : bu.rent) || {}, all = (bu.lines || []).filter(l => l.group === k);
+  const k = FB.rentGrp || 'rent';
+  const bu = b.budget || {}, tot = bu[k] || {}, all = (bu.lines || []).filter(l => l.group === k);
   const sect = (cap, list) => list.length ? `<div class="sc">${fbCapT(cap)}<div class="fb-one">${
     list.map(l => `<div class="fb-card">${fbPayRow(l)}</div>`).join('')}</div></div>` : '';
   return `<div class="sc"><div class="aud-g">
@@ -19004,14 +19005,16 @@ function fbRentPayHtml(b){
       ${fbTile('Фактический расход', `bu.${k}_fact`, tot.fact)}
       ${fbTile('Осталось', `bu.${k}_left`, tot.left, {mode: 'neg'})}
     </div></div>
-    ${car ? sect('Рент', all)
-          : sect('Офис', all.filter(l => l.office)) + sect('Билдинги', all.filter(l => !l.office))}`;
+    ${k === 'rent' ? sect('Офис', all.filter(l => l.office)) + sect('Билдинги', all.filter(l => !l.office))
+                   : sect(k === 'car' ? 'Рент' : 'Виды рекламы', all)}`;
 }
 // Строка здания: сумма плана сверху, под ней «Оплатил». Оплаченное — сумма
 // зелёным и «Отменить»: нажал случайно — вернул как было.
 function fbPayRow(l){
-  const e = fbPaidOf(l.id), sum = e ? e.amount : (l.plan || 0);
-  const sub = e ? `Оплачено <b class="fb-due ok">${escS(fbDayT(e.day))}</b>` : fbLineSub(l);
+  const e = fbPaidOf(l.id), sum = e ? e.amount : fbPaySum(l);
+  const usd = !e && l.cur === 'USD' && l.plan > 0 ? `${fbFmt(l.plan)} $` : '';
+  const sub = e ? `Оплачено <b class="fb-due ok">${escS(fbDayT(e.day))}</b>`
+                : [fbLineSub(l), usd].filter(Boolean).join(' · ');
   return `<div class="fb-e fb-bl fb-pay"><span class="fb-e-b"><b>${fbBldName(l)}</b><i>${sub}</i></span>
     <span class="fb-boxcol fb-paycol">${sum ? `<b class="fb-box${e ? ' ok' : ''}">${fbFmt(sum)}<u>AED</u></b>` : ''}
       ${e ? `<button class="fb-paybtn undo" data-e="${escS(e.id)}" onclick="fbPayUndo(this.dataset.e)">Отменить</button>`
@@ -19030,14 +19033,16 @@ function fbLeftT(n){
   if(n >= 14){ const w = Math.round(n / 7); return `${w} ${pluralize(w, 'неделя', 'недели', 'недель')}`; }
   return `${n} ${pluralize(n, 'день', 'дня', 'дней')}`;
 }
+// Платим в дирхамах: у рекламы план бывает в долларах, в книгу идёт по курсу
+function fbPaySum(l){ return (l.cur === 'USD' ? l.plan_aed : l.plan) || 0; }
 async function fbPayOpen(id){
   const b = fbBook(FB.month); if(!b) return;
   const l = ((b.budget || {}).lines || []).find(x => x.id === id); if(!l) return;
   const left = l.next_due ? fbDueDays(l.next_due) : null;
   if(left !== null && left >= 3 &&
      !await askDialog('Вы уверены?', `До платежа осталось ${fbLeftT(left)}`, 'Оплатил', 'Вернуться назад')) return;
-  const sum = l.plan || 0;
-  if(!(sum > 0)){ _toast('Сумма аренды не заполнена'); return; }
+  const sum = fbPaySum(l);
+  if(!(sum > 0)){ _toast('Сумма не заполнена'); return; }
   const day = b.today <= b.last ? b.today : b.last;
   if(!await fbAskDay(day, 'Оплата аренды')) return;
   try{
@@ -19138,7 +19143,7 @@ function fbLinePicker(b){
   out += grp('home', 'Бытовые расходы', byG('home').map(l => kidCard(leaf(l, true))).join(''));
   out += grp('sim', 'Sim', byG('sim').map(l => kidCard(leaf(l, true))).join(''));
   out += lines.filter(l => !l.group).map(l => card(leaf(l, false))).join('');
-  out += grp('ads', 'Реклама', byG('ads').map(l => kidCard(leaf(l, true))).join(''));
+  out += byG('ads').length ? card(row('Реклама', "fbRentPay('ads')")) : '';
   return `<div class="fb-one fb-pick" id="fbLine-rp">${out}</div>`;
 }
 function fbPickPaint(){

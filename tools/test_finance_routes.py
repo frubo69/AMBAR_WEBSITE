@@ -318,8 +318,11 @@ async def main():
     BUDGET.append(dict(_id="carX", month="2026-09", name="Орион Рент", group="car", plan=20000, ord=11))
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=20000, line="carX")))
     eq("аренда машин без чека → записана", (r.status, WRITES[-2][1]["line"]), (200, "carX"))
-    ENTRIES[:] = [e for e in ENTRIES if e.get("line") not in ("rentX", "carX")]
-    BUDGET[:] = [l for l in BUDGET if l["_id"] not in ("rentX", "simX", "carX")]
+    BUDGET.append(dict(_id="adsX", month="2026-09", name="Посты", group="ads", plan=3670, ord=12))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=3670, line="adsX")))
+    eq("реклама без чека → записана (платят кнопкой)", (r.status, WRITES[-2][1]["line"]), (200, "adsX"))
+    ENTRIES[:] = [e for e in ENTRIES if e.get("line") not in ("rentX", "carX", "adsX")]
+    BUDGET[:] = [l for l in BUDGET if l["_id"] not in ("rentX", "simX", "carX", "adsX")]
     ENTRIES.append(dict(_id="ph1", day="2026-09-10", book="rp", amount=70, comment="симка", who="", by="Ст", at="t", photo=True))
     PHOTOS["fin:ph1"] = b"\xff\xd8" + b"\x00" * 10
     async def fin_entry_get2(eid): return next((e for e in ENTRIES if e["_id"] == eid), None)

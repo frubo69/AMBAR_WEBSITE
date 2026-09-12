@@ -29,7 +29,7 @@ parts = [
     fn("accIsBack"), fn("accDayWord"), fn("dayBarOff"), fn("dayBarLabels"), fn("dayBarPaint"),
     fn("_dayNavFor"), fn("_dayNav"), fn("bindDayBars"), fn("daySwipe"), fn("dayBarStep"),
     fn("dayBarArrow"), fn("dayBarHome"), fn("_heroFlip"), fn("askDialog"), fn("closePinPop"),
-    fn("pluralize"),
+    fn("pluralize"), "let CREW = null;", fn("crewLoad"),
 ]
 # календарь одной даты (платёж статьи): разметка и функции — настоящие
 _d0 = src.index('<div class="cmd-overlay" id="dateOverlay">')
@@ -158,6 +158,9 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     }
     if(Q.get('rppage')){ fbRpInPage(); await new Promise(r => setTimeout(r, 400));
       if(Q.get('addin')) { fbAddToggle('in'); await new Promise(r => setTimeout(r, 200)); } }
+    if(Q.get('who')){          // страница «кому» у статьи по названию (who=Билеты)
+      const l0 = ((fbBook(FB.month).budget || {}).lines || []).find(l => l.name === Q.get('who'));
+      if(l0){ await fbWhoPage(l0.id); await new Promise(r => setTimeout(r, 500)); } }
     if(Q.get('rpin')){ FB.rpIn = true; accFinRP(); await new Promise(r => setTimeout(r, 500)); }   // раскрыть РП+
     if(Q.get('histf')){ FB.hist.open = true; fbHistPaint(); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('rcp')){          // открыть окно чека у первой записи со снимком

@@ -3145,6 +3145,8 @@ button.path:active{transform:scale(.995)}
 .fb-hcap-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
   color:var(--muted);margin-left:4px}
 .fb-e-v.none{color:var(--muted)}
+.fb-add .fb-who{flex:1 1 100%}
+.fb-who-s{font-style:normal;font-size:11px;font-weight:700;color:var(--gold2);margin-left:6px}
 .fb-fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
 .fb-fchip{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
@@ -17987,7 +17989,8 @@ async function fbEntryAdd(book, day){
   const amount = fbAmt('fbAmt-' + book);
   if(!(amount > 0)){ _toast('Нужна сумма'); const a = document.getElementById('fbAmt-' + book); if(a) a.focus(); return; }
   const comment = fbTxt('fbCmt-' + book);
-  const who = book === 'np' ? fbTxt('fbWho-np') : '';
+  const who = book === 'np' ? fbTxt('fbWho-np') : book === 'rp' ? fbTxt('fbWho-rp') : '';
+  if(book === 'rp' && document.getElementById('fbWho-rp') && !who){ _toast('Кому оформляли'); document.getElementById('fbWho-rp').focus(); return; }
   if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
   if(book === 'rp' && !FB.lineSet){ _toast('Выберите статью'); return; }
   if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
@@ -18350,7 +18353,8 @@ function fbHistHtml(b){
 }
 function fbHistRow(e){
   const t = e.kind_t ? `${e.kind_t} · ${escS(e.who)}` : (e.line_name ? escS(e.line_name) : escS(e.comment || 'Расход'));
-  const sub = [e.line_name && e.comment ? escS(e.comment) : '', e.kind_t && e.comment ? escS(e.comment) : '',
+  const sub = [!e.kind && e.who ? 'кому ' + escS(e.who) : '',
+               e.line_name && e.comment ? escS(e.comment) : '', e.kind_t && e.comment ? escS(e.comment) : '',
                e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
   return `<div class="fb-e">
     <span class="fb-e-b"><b>${t}</b>${sub ? `<i>${sub}</i>` : ''}</span>
@@ -19169,7 +19173,7 @@ function fbRpSections(b){
   if(has('home')) out.push({t: 'Бытовые расходы', i: 'home', go: "fbSecPage('home')"});
   if(has('sim')) out.push({t: 'Sim', i: 'simcard', go: "fbSecPage('sim')"});
   lines.filter(l => !l.group).forEach(l =>
-    out.push({t: escS(l.name), i: fbHistIco(l.name), go: `fbLinePay('${l.id}')`}));
+    out.push({t: escS(l.name), i: fbHistIco(l.name), go: fbNeedsWho(l) ? `fbWhoPage('${l.id}')` : `fbLinePay('${l.id}')`}));
   if(has('ads')) out.push({t: 'Реклама', i: 'megaphone', go: "fbRentPay('ads')"});
   return out;
 }
@@ -19398,16 +19402,62 @@ async function fbPayUndo(eid){
 }
 // Статья без срока платежа (гараж, парковка, страховка) — своя страница:
 // план и факт сверху, форма расхода и всё, что записано за месяц.
-function fbLinePay(id){
+function fbLinePay(id, who){
   const b = fbBook(FB.month); if(!b) return;
   const l = ((b.budget || {}).lines || []).find(x => x.id === id); if(!l) return;
   FB.shot = null; FB.line = id; FB.lineSet = true; FB.lpage = id; FB.rentGrp = null; FB.salPage = false;
-  _setText('accTitle', l.name); _setText('accSub', fbMonthT(b.month));
+  FB.who = null; FB.sec = null; FB.rpPage = false; FB.hist = null;
+  // билеты и визы — на человека: имя пришло со страницы «кому», его и пишем
+  FB.lwho = fbNeedsWho(l) ? (who || '') : null;
+  _setText('accTitle', l.name);
+  _setText('accSub', FB.lwho ? 'кому: ' + FB.lwho : fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbLinePayHtml(b, l)}</div>`;
   mid.scrollTop = 0;
+  ACC_BACK = fbNeedsWho(l) ? () => fbWhoPage(id) : accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+// ── Билеты и визы: сначала — кому ────────────────────────────────────────
+// Их оформляют на людей, и потом надо знать, кому что покупали. Поэтому перед
+// формой — те же карточки районов, что в «Кто на каком районе»: нажал на
+// оператора или водителя — расход пишется на него.
+const FB_WHO = ['билеты', 'визы'];
+function fbNeedsWho(l){ return !!l && FB_WHO.includes(String(l.name || '').trim().toLowerCase()); }
+async function fbWhoPage(id){
+  const b = fbBook(FB.month); if(!b) return;
+  const l = ((b.budget || {}).lines || []).find(x => x.id === id); if(!l) return;
+  FB.who = {id}; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.sec = null; FB.rpPage = false; FB.hist = null;
+  _setText('accTitle', l.name); _setText('accSub', 'кому оформляем');
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody"><div class="exp-empty">Загрузка…</div></div>`;
+  mid.scrollTop = 0;
   ACC_BACK = accFinRP;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(!CREW) await crewLoad();
+  if(FB.who && FB.who.id === id) fbWhoPaint();
+}
+function fbWhoPaint(){
+  const body = document.getElementById('fbPayBody'); if(!body) return;
+  if(!CREW){ body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить людей</div>'; return; }
+  const b = fbBook(FB.month), id = (FB.who || {}).id;
+  // сколько уже на человека за месяц — рядом с именем, чтобы видеть сразу
+  const spent = {};
+  ((b && b.days) || []).forEach(d => (d.expenses || []).forEach(e => {
+    if(e.line === id && e.who) spent[e.who] = (spent[e.who] || 0) + (e.amount || 0); }));
+  const tag = n => spent[n] ? `<i class="fb-who-s">${fbFmt(spent[n])}</i>` : '';
+  const cards = (CREW.districts || []).map(d => `<div class="crw-c">
+      <div class="crw-c-h">
+        <span class="crew-code">${escS(d.code)}</span>
+        <span class="crw-c-n">${escS(d.name)}</span>
+        ${d.operator ? `<button class="crw-op" data-n="${escS(d.operator)}" onclick="fbLinePay('${id}', this.dataset.n)">
+          <span class="crw-op-n">${IC('headset', 15)}${escS(d.operator)}${tag(d.operator)}</span></button>` : ''}
+      </div>
+      <div class="crw-c-b">${(d.drivers || []).length ? d.drivers.map(n => `<button class="crw-p" data-n="${escS(n)}" onclick="fbLinePay('${id}', this.dataset.n)">
+          <span class="crw-p-a">${IC('car', 15)}</span><span class="crw-p-n">${escS(n)}</span>${tag(n)}</button>`).join('')
+        : '<span class="crw-none">никого нет</span>'}</div>
+    </div>`).join('');
+  body.innerHTML = cards + `<div class="sc"><button class="fb-e fb-bl" onclick="fbLinePay('${id}', '')">
+      <span class="fb-e-b"><b>Другой человек</b><i>вписать имя вручную</i></span><em class="fb-chev">${_SC_CHEV}</em></button></div>`;
 }
 // Открытая страница расхода — статья или аренда: перерисовать после записи,
 // удаления и отмены, иначе на экране остаётся то, чего в книге уже нет
@@ -19421,6 +19471,7 @@ function fbPagePaint(){
   else if(FB.salPage) fbSalPayPaint();
   else if(FB.sec) fbSecPaint();
   else if(FB.rpPage) fbRpInPaint();
+  else if(FB.who) fbWhoPaint();
 }
 function fbLinePayPaint(){
   const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
@@ -19439,6 +19490,7 @@ function fbLinePayHtml(b, l){
     </div></div>
     <div class="sc">${fbCapT('РП−')}
       <div class="fb-add fb-lnf">
+        ${FB.lwho !== null && FB.lwho !== undefined ? `<input class="fb-txt fb-who" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-rp" value="${escS(FB.lwho)}">` : ''}
         <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
         <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-rp"

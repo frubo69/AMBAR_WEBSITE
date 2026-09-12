@@ -211,8 +211,18 @@ async def static(request):
         return web.Response(status=404, text="no " + path)
     return web.FileResponse(full, headers={"Cache-Control": "no-cache"})
 
+# «Кто на каком районе» — для страницы «кому» у билетов и виз
+async def staff(request):
+    return web.json_response({"districts": [
+        dict(id="jvc", code="B1", name="JVC", operator="Умар", base="Умар", moved=False, drivers=["Худоба", "Фарух"]),
+        dict(id="bbay", code="B2", name="Бизнес Бей", operator="Джанабиль", base="Джанабиль", moved=False,
+             drivers=["Парвиз", "Авазбек", "Бахадыр"]),
+        dict(id="tecom", code="B5", name="Тиком", operator="Умар", base="Умар", moved=False, drivers=["Файзуло", "Алишер"]),
+    ], "drivers": []})
+
 app = web.Application()
 fr.setup(app)
+app.router.add_get("/api/owner/staff", staff)
 app.router.add_get("/", static)
 app.router.add_get("/{path:.+}", static)
 print(f"stand: http://127.0.0.1:{PORT}/stand.html  today={TODAY}")

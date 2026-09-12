@@ -3146,7 +3146,14 @@ button.path:active{transform:scale(.995)}
   color:var(--muted);margin-left:4px}
 .fb-e-v.none{color:var(--muted)}
 .fb-add .fb-who{flex:1 1 100%}
-.fb-who-s{font-style:normal;font-size:11px;font-weight:700;color:var(--gold2);margin-left:6px}
+/* «Кому оформляем»: на кого уже тратили в этом месяце — золотая таблетка и
+   плашка с суммой, чтобы не искать глазами мелкую цифру */
+.crw-p.fb-spent,.crw-op.fb-spent{background:var(--gold-soft);border-color:rgba(201,169,110,.6);color:var(--gold2)}
+.crw-p.fb-spent .crw-p-a{background:rgba(201,169,110,.2);color:var(--gold2)}
+.fb-who-s{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:2px 7px 2px 5px;border-radius:999px;
+  font-style:normal;font-size:11px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));font-variant-numeric:tabular-nums}
+.fb-who-s u{text-decoration:none;font-size:9px;font-weight:700;opacity:.75}
 .fb-fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
 .fb-fchip{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
@@ -19444,15 +19451,17 @@ function fbWhoPaint(){
   const spent = {};
   ((b && b.days) || []).forEach(d => (d.expenses || []).forEach(e => {
     if(e.line === id && e.who) spent[e.who] = (spent[e.who] || 0) + (e.amount || 0); }));
-  const tag = n => spent[n] ? `<i class="fb-who-s">${fbFmt(spent[n])}</i>` : '';
+  // на кого уже тратили — таблетка золотая, сумма отдельной плашкой с «AED»
+  const tag = n => spent[n] ? `<i class="fb-who-s">${IC('money', 13)}${fbFmt(spent[n])}<u>AED</u></i>` : '';
+  const on = n => spent[n] ? ' fb-spent' : '';
   const cards = (CREW.districts || []).map(d => `<div class="crw-c">
       <div class="crw-c-h">
         <span class="crew-code">${escS(d.code)}</span>
         <span class="crw-c-n">${escS(d.name)}</span>
-        ${d.operator ? `<button class="crw-op" data-n="${escS(d.operator)}" onclick="fbLinePay('${id}', this.dataset.n)">
+        ${d.operator ? `<button class="crw-op${on(d.operator)}" data-n="${escS(d.operator)}" onclick="fbLinePay('${id}', this.dataset.n)">
           <span class="crw-op-n">${IC('headset', 15)}${escS(d.operator)}${tag(d.operator)}</span></button>` : ''}
       </div>
-      <div class="crw-c-b">${(d.drivers || []).length ? d.drivers.map(n => `<button class="crw-p" data-n="${escS(n)}" onclick="fbLinePay('${id}', this.dataset.n)">
+      <div class="crw-c-b">${(d.drivers || []).length ? d.drivers.map(n => `<button class="crw-p${on(n)}" data-n="${escS(n)}" onclick="fbLinePay('${id}', this.dataset.n)">
           <span class="crw-p-a">${IC('car', 15)}</span><span class="crw-p-n">${escS(n)}</span>${tag(n)}</button>`).join('')
         : '<span class="crw-none">никого нет</span>'}</div>
     </div>`).join('');

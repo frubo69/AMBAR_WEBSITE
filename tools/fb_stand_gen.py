@@ -1,4 +1,4 @@
-"""Стенд книги учёта из настоящего owner/index.html: оба <style> целиком, блок
+"""Стенд книги учёта из настоящего owner/index.html: все <style> целиком (фишки .chip живут не в первых двух), блок
 книги (от «Финансы: книга учёта денег» до «Прайс: закупка и продажа») и
 нужные ему функции панели — вырезаются регуляркой; остальное — заглушки.
 Запуск: python3 tools/fb_stand_gen.py <dir>  → <dir>/stand.html"""
@@ -170,6 +170,30 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
                       const b = r0 && r0.querySelector('.fb-paybtn'); if(b) b.click(); await new Promise(r => setTimeout(r, 250));
                       // ?ask=1 — остановиться на окне «вы уверены?», иначе подтвердить и дождаться записи
                       if(!Q.get('ask') && document.getElementById('askOk')){ document.getElementById('askOk').click(); await new Promise(r => setTimeout(r, 1200)); } }
+    // «Штрафы/авансы/долги»: itemwho=<имя> (пусто — «Другой человек») открывает страницу человека,
+    // itemamt=сумма [itemkind=fine|advance|loan, itemname=имя, itemcmt=за что] — заполнить и нажать «Записать»
+    if(Q.get('itemwho') !== null){
+      const pill = [...document.querySelectorAll('#accMid .crw-p, #accMid .crw-op, #accMid .fb-bl')]
+        .find(e => Q.get('itemwho') ? e.dataset.n === Q.get('itemwho') : e.classList.contains('fb-bl'));
+      if(pill) pill.click(); else log('SCENARIO no pill ' + Q.get('itemwho'));
+      await new Promise(r => setTimeout(r, 400));
+      if(Q.get('itemkind')) fbKindPick(Q.get('itemkind'));
+      if(Q.get('itemname')) document.getElementById('fbName-item').value = Q.get('itemname');
+      if(Q.get('itemamt')){
+        document.getElementById('fbAmt-item').value = Q.get('itemamt');
+        if(Q.get('itemper')) document.getElementById('fbPer-item').value = Q.get('itemper');
+        if(Q.get('itemcmt')) document.getElementById('fbCmt-item').value = Q.get('itemcmt');
+        document.querySelector('#fbItemBody .aud-b.go').click(); await new Promise(r => setTimeout(r, 300));
+        if(document.getElementById('askOk')){ document.getElementById('askOk').click(); }
+        await new Promise(r => setTimeout(r, 1500));
+      }
+      if(Q.get('itemdel')){      // крестик у первой записи на странице человека + «Убрать»
+        const x = document.querySelector('#fbItemBody .fb-e-x'); if(x) x.click(); else log('SCENARIO no x');
+        await new Promise(r => setTimeout(r, 300));
+        if(document.getElementById('askOk')) document.getElementById('askOk').click();
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {
@@ -196,8 +220,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
 html = f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>стенд · книга учёта</title>
-<style>{styles[0]}</style>
-<style>{styles[1]}</style>
+{''.join('<style>' + st + '</style>' for st in styles)}
 <style>
 /* стенд: экран телефона шириной из ?w=, оверлей раскрыт на всю высоту */
 html,body{{height:auto;min-height:0;overflow:visible}}

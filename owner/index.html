@@ -18500,10 +18500,16 @@ function fbNewRow(group){
 // Статья с датой платежа: в подписи только «Следующий платёж: 3.11.2026» —
 // зелёным, за неделю жёлтым, за день и в день красным. Остальное — доля в
 // месяц, оплачено — здесь не нужно, оно в плане и в расходах.
+// Дней до платежа: по этому числу красится дата и спрашивается «вы уверены?»
+function fbDueDays(ymd){
+  const d = new Date(ymd + 'T00:00:00'); if(isNaN(d)) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
 function fbDueHtml(ymd){
-  const d = new Date(ymd + 'T00:00:00'), today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(ymd + 'T00:00:00');
   if(isNaN(d)) return '';
-  const days = Math.round((d - today) / 86400000);
+  const days = fbDueDays(ymd);
   const cls = days <= 1 ? 'dn' : days <= 7 ? 'warn' : 'ok';
   return `Следующий платёж: <b class="fb-due ${cls}">${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}</b>`;
 }
@@ -18971,7 +18977,17 @@ function fbPayRow(l, day){
       <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
     </div>`;
 }
-function fbPayOpen(id){
+// Платят раньше срока — переспрашиваем. Молча пропускаем только платёж в
+// последние дни: «день в день» и накануне вопрос ни к чему.
+function fbLeftT(n){
+  if(n >= 14){ const w = Math.round(n / 7); return `${w} ${pluralize(w, 'неделя', 'недели', 'недель')}`; }
+  return `${n} ${pluralize(n, 'день', 'дня', 'дней')}`;
+}
+async function fbPayOpen(id){
+  const l = (((fbBook(FB.month) || {}).budget || {}).lines || []).find(x => x.id === id);
+  const left = l && l.next_due ? fbDueDays(l.next_due) : null;
+  if(left !== null && left >= 3 &&
+     !await askDialog('Вы уверены?', `До платежа осталось ${fbLeftT(left)}`, 'Оплатил', 'Вернуться назад')) return;
   FB.pay = id; FB.line = id; FB.lineSet = true; FB.shot = null;
   fbRentPayPaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}

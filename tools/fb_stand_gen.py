@@ -123,6 +123,10 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('wheel')){ fbPillOpen(); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('cal')){ openDate('fbNext'); await new Promise(r => setTimeout(r, 300)); }
     if(Q.get('an')){ await fbAnOpen(); await new Promise(r => setTimeout(r, 400)); }
+    if(Q.get('due')){          // срок платежа у первого билдинга — через N дней от сегодня
+      const l0 = ((fbBook(FB.month).budget || {}).lines || []).find(l => l.group === 'rent' && !l.office);
+      if(l0){ const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + (+Q.get('due')));
+              l0.next_due = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); } }
     if(Q.get('pick')){ const b = [...document.querySelectorAll('#fbLine-rp .fb-e')].find(e => e.innerText.trim() === Q.get('pick'));
                        if(b) b.click(); await new Promise(r => setTimeout(r, 300)); }
     if(Q.get('pay')){ const r0 = [...document.querySelectorAll('#fbPayBody .fb-pay')].find(e => e.innerText.includes(Q.get('pay')));

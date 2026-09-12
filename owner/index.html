@@ -3077,6 +3077,9 @@ button.path:active{transform:scale(.995)}
 .fb-add[hidden]{display:none}
 /* Раскрытая всегда (РП): своей полосы нет — отбивку даёт строка выбора статьи */
 .fb-add.fb-open{padding-top:0;border-top:0}
+.fb-addf{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px}
+.fb-addf[hidden]{display:none}
+.fb-add.fb-nof{padding-bottom:0}          /* статья не выбрана — карточка кончается списком */
 .fb-add.fb-open .fb-pick{margin-top:0;border-top:0}
 .sc-r.fb-plus em{color:var(--gold2)}
 /* Карточка дня — та же плашка, что «Остатки всего» на складе: строка дня
@@ -18892,18 +18895,26 @@ async function accFinRP(){
   </div>`;
 }
 // Форма фактического расхода: статья, сумма, на что и чек — без чека не
-// записывается (владелец: «все обязательно с чеками»). Раскрыта всегда: на
-// этом экране расход и записывают, прятать его за «Добавить» незачем.
+// записывается (владелец: «все обязательно с чеками»). Сам экран раскрыт
+// всегда, а поля появляются под выбранной статьёй: пока статья не выбрана,
+// сумма и чек ни к чему не относятся (владелец: «это к чему внизу?»).
 function fbRpAddRow(day){
-  return `<div class="fb-add fb-open" id="fbAdd-rp">
+  return `<div class="fb-add fb-open${fbLineChosen() ? '' : ' fb-nof'}" id="fbAdd-rp">
     ${fbLinePicker(fbBook(day.slice(0, 7)))}
-    <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
-      onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
-    <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
-      onkeydown="if(event.key==='Enter'){this.blur()}">
-    <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
-    <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
+    <div class="fb-addf" id="fbAddF"${fbLineChosen() ? '' : ' hidden'}>
+      <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
+        onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
+      <input class="fb-txt" placeholder="На что" autocomplete="off" maxlength="120" id="fbCmt-rp"
+        onkeydown="if(event.key==='Enter'){this.blur()}">
+      <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Снять чек<i>без чека расход не запишется</i></span></button>
+      <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
+    </div>
   </div>`;
+}
+// Статья выбрана — значит список свёрнут в одну строку и поля под ней к месту
+function fbLineChosen(){
+  if(!FB.lineSet || FB.pick.all) return false;
+  return (((fbBook(FB.month) || {}).budget || {}).lines || []).some(l => l.id === FB.line);
 }
 // Выбор статьи для расхода — теми же строками, что в бюджете: группы
 // раскрываются на месте, статья отмечается галкой; выбранная сворачивается
@@ -18941,7 +18952,12 @@ function fbLinePicker(b){
   out += grp('ads', 'Реклама', byG('ads').map(l => leaf(l, true)).join(''));
   return `<div class="fb-one fb-pick" id="fbLine-rp">${out}</div>`;
 }
-function fbPickPaint(){ const el = document.getElementById('fbLine-rp'); if(el) el.outerHTML = fbLinePicker(fbBook(FB.month)); }
+function fbPickPaint(){
+  const el = document.getElementById('fbLine-rp'); if(el) el.outerHTML = fbLinePicker(fbBook(FB.month));
+  const on = fbLineChosen();
+  const f = document.getElementById('fbAddF'); if(f) f.hidden = !on;
+  const w = document.getElementById('fbAdd-rp'); if(w) w.classList.toggle('fb-nof', !on);
+}
 function fbPickGroup(k){
   FB.pick.open = FB.pick.open === k ? null : k;
   fbPickPaint();

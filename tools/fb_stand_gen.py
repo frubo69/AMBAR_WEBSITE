@@ -123,6 +123,8 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('wheel')){ fbPillOpen(); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('cal')){ openDate('fbNext'); await new Promise(r => setTimeout(r, 300)); }
     if(Q.get('an')){ await fbAnOpen(); await new Promise(r => setTimeout(r, 400)); }
+    if(Q.get('pick')){ const b = [...document.querySelectorAll('#fbLine-rp .fb-e')].find(e => e.innerText.trim() === Q.get('pick'));
+                       if(b) b.click(); await new Promise(r => setTimeout(r, 200)); }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {

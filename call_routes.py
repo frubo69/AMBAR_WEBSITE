@@ -76,10 +76,18 @@ STUN_URL = os.getenv("AMBAR_STUN_URL", "stun:stun.l.google.com:19302").strip()
 # Верхний уровень — AMBAR STAR. Кто именно звонит, водитель и оператор должны
 # видеть словом, а не догадываться по номеру: «Старший» и «AMBAR» — разные
 # люди с разным весом просьбы. Имена берём отсюда, id — из настроек сервера.
-STAR_NAMES = {
-    8927037895: "Старший",
-    7865205960: "AMBAR",
-}
+def _star_names() -> dict:
+    """«id:имя» через запятую из .env (AMBAR_STAR_NAMES) — в репозитории ни
+    номеров, ни имён."""
+    out = {}
+    for pair in os.getenv("AMBAR_STAR_NAMES", "").split(","):
+        i, _, n = pair.partition(":")
+        if i.strip().isdigit() and n.strip():
+            out[int(i.strip())] = n.strip()
+    return out
+
+
+STAR_NAMES = _star_names()
 
 # Имена тех, кто вошёл, но в списке выше не назван: телеграм сообщает их сам
 # при входе. Держим, чтобы собеседник видел человека, а не номер.
@@ -1072,4 +1080,5 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/call/ice", handle_ice)
     app.router.add_get("/api/call/ice", handle_ice)
     log.info("[call] сигналинг подключён"
-             + (f", TURN {TURN_HOST}" if TURN_HOST else ", только STUN"))
+             + (f", TURN {TURN_HOST}" if TURN_HOST else ", только STUN")
+             + f", имён верхнего уровня: {len(STAR_NAMES)}")

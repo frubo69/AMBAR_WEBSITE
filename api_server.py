@@ -24,7 +24,7 @@ from config import (
     CRYPTO_REAL_MODE, CRYPTO_USDT_PER_AED, CRYPTO_REQUIRED_CONF,
     CRYPTO_TTL_MIN, CRYPTO_AMOUNT_STEP, TRON_RECEIVE_ADDRESS,
     CRYPTO_WATCH_INTERVAL_SEC, CRYPTO_WATCH_DRYRUN, CRYPTO_FEE_PCT, CRYPTO_TEST_USDT,
-    CRYPTO_AED_PER_USDT,
+    CRYPTO_AED_PER_USDT, FOUNDER_ID, PREMIUM_IDS, WORLDWIDE_IDS, TEST_ACCOUNT_IDS,
 )
 from tron import get_incoming_usdt
 
@@ -41,7 +41,7 @@ PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 HOST               = os.getenv("WEBAPP_HOST", "127.0.0.1")
 STATIC_DIR         = Path(__file__).parent
 UPLOAD_DIR         = STATIC_DIR / "uploads" / "support"
-_TEST_ACCOUNTS     = {8251195567, 6731325660}
+_TEST_ACCOUNTS     = TEST_ACCOUNT_IDS       # из .env: AMBAR_TEST_IDS
 
 # ── Crypto payments: staged rollout gate ──────────────────────────────────────
 # While CRYPTO_PAYMENTS_FOR_ALL is off, only "admin" accounts see a working
@@ -72,6 +72,10 @@ def _crypto_enabled_for(uid: int) -> bool:
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
+# Сколько привилегированных id прочитано из .env — по этой строке видно, что
+# файл на месте и списки не пустые. Сами id в журнал не пишем.
+log.info(f"[ids] фаундер: {'есть' if FOUNDER_ID else 'НЕТ'} · ÉLITE: {len(PREMIUM_IDS)} · "
+         f"worldwide: {len(WORLDWIDE_IDS)} · тестовых: {len(TEST_ACCOUNT_IDS)}")
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  "*",
@@ -705,8 +709,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     _user_verified = False
     try:
         user_doc = await db.get_user(uid)
-        _TEST_ALWAYS_FIRST = {8251195567, 6731325660}  # DEBUG: always treat as first order
-        is_first_order = (uid in _TEST_ALWAYS_FIRST) or (user_doc is None or user_doc.get("orders_total", 0) == 0)
+        # тестовые аккаунты (AMBAR_TEST_IDS) всегда считаем «первым заказом»
+        is_first_order = (uid in _TEST_ACCOUNTS) or (user_doc is None or user_doc.get("orders_total", 0) == 0)
         # Whether the customer is already vetted. The operator hold below keys off
         # THIS, not "first order", so it stays in lock-step with the app's wall — an
         # unverified customer is held until they submit the form no matter how many
@@ -1713,20 +1717,13 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 
 
 # ── GET /api/me ───────────────────────────────────────────────────────────────
-# Privileged IDs stored server-side only — never sent to the client
-_FOUNDER_ID = 7865205960
-# ÉLITE premium tier: up to 10 cards, serial "N° XX / 10".
-# Order matters — list index + 1 is the card number.
-_PREMIUM_IDS = [686932322, 1459370603]
+# Привилегированные id живут только в .env (репозиторий публичный):
+# AMBAR_FOUNDER_ID, AMBAR_PREMIUM_IDS, AMBAR_WORLDWIDE_IDS. Порядок в списках
+# важен — номер карточки это место в списке (N° 02 / 10).
+_FOUNDER_ID = FOUNDER_ID
+_PREMIUM_IDS = PREMIUM_IDS          # ÉLITE, не больше 10 карточек
+_WORLDWIDE_IDS = WORLDWIDE_IDS      # WORLDWIDE, не больше 100
 assert len(_PREMIUM_IDS) <= 10, "ÉLITE premium is capped at 10 cards"
-# Worldwide Premium tier: up to 100 cards, serial "N° XXX / 100".
-# Order matters — list index + 1 is the card number. Append new holders to
-# the end so their cards get the next sequential number (003, 004, ...).
-_WORLDWIDE_IDS = [
-    323390062,    # card #001
-    7236406959,   # card #002
-    1154453658,   # card #003
-]
 assert len(_WORLDWIDE_IDS) <= 100, "Worldwide PREMIUM is capped at 100 cards"
 
 async def handle_me(request: web.Request) -> web.Response:

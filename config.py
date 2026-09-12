@@ -28,6 +28,20 @@ MANAGER_IDS = {
     if x.strip().isdigit()
 }
 
+# ── Привилегированные клиенты ───────────────────────────────────────────────
+# Раньше эти telegram-id лежали числами в api_server.py и operator_bot.py, а
+# репозиторий публичный. Теперь только .env (AMBAR_FOUNDER_ID,
+# AMBAR_PREMIUM_IDS, AMBAR_WORLDWIDE_IDS, AMBAR_TEST_IDS). Порядок в списках
+# ВАЖЕН: номер карточки — это место в списке (N° 01 / 10 и т.д.).
+def _id_list(env_name: str) -> list[int]:
+    return [int(x.strip()) for x in os.getenv(env_name, "").split(",") if x.strip().isdigit()]
+
+
+FOUNDER_ID = int(os.getenv("AMBAR_FOUNDER_ID", "0") or 0)
+PREMIUM_IDS = _id_list("AMBAR_PREMIUM_IDS")        # ÉLITE, до 10 карточек
+WORLDWIDE_IDS = _id_list("AMBAR_WORLDWIDE_IDS")    # WORLDWIDE, до 100 карточек
+TEST_ACCOUNT_IDS = set(_id_list("AMBAR_TEST_IDS"))  # заказы этих в статистику не идут
+
 # Token for @ambar_manage_bot — the bot that launches the owner miniapp.
 # Separate from the customer BOT_TOKEN because initData is HMAC'd per-bot:
 # a miniapp launched from @ambar_manage_bot produces initData signed with

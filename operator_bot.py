@@ -23,7 +23,8 @@ WEBAPP_URL           = os.getenv("WEBAPP_URL", "")
 # iPad POS for manual phone-in orders (operator/index.html, served by ambar-api)
 OPERATOR_WEBAPP_URL  = os.getenv("OPERATOR_WEBAPP_URL", "https://ambar-delivery.com/operator/")
 SUPPORT_BOT_USERNAME = "ambar_support_bot"
-_TEST_ACCOUNTS = {8251195567, 6731325660}
+# Привилегированные id — только из .env (репозиторий публичный)
+from config import FOUNDER_ID as _FOUNDER_ID, PREMIUM_IDS as _PREMIUM_IDS, TEST_ACCOUNT_IDS as _TEST_ACCOUNTS
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
@@ -559,9 +560,6 @@ def _esc(t):
     """Escape HTML special chars."""
     return str(t).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
-
-_FOUNDER_ID = 7865205960
-_PREMIUM_IDS = [686932322, 1459370603]
 
 def _card_tier(uid, orders_done=0, total_spent=0):
     """Return display label for customer card/loyalty tier."""

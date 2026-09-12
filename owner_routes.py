@@ -32,9 +32,11 @@ OWNER_BOT_TOKEN = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
 DUBAI_TZ = timezone(timedelta(hours=4))
 
 # Who is allowed to see/operate the "Доступ для менеджеров" section.
-# Currently single owner (7865205960) plus legacy access for 686932322
-# during the transition. Remove 686932322 once new owner is fully onboarded.
-LEGACY_MGR_UI_ACCESS = {686932322}
+# Currently a single owner plus legacy access for the previous account during
+# the transition (id в .env: AMBAR_LEGACY_MGR_IDS). Убрать, когда переход
+# закончится.
+LEGACY_MGR_UI_ACCESS = {int(x.strip()) for x in os.getenv("AMBAR_LEGACY_MGR_IDS", "").split(",")
+                        if x.strip().isdigit()}
 
 
 def _can_manage_users(uid: int) -> bool:
@@ -2735,7 +2737,7 @@ async def handle_managers_list(request):
     async def _identify(tg_id: int) -> dict:
         """Имя и @username для id из .env — там кроме самого id ничего нет.
         Ищем в клиентах, потом в журнале доступа: этого хватает, чтобы в списке
-        стояли живые имена, а не «User 7865205960», и чтобы работала ссылка на
+        стояли живые имена, а не «User 123456789», и чтобы работала ссылка на
         профиль."""
         try:
             u = await db.get_user(int(tg_id)) or {}
@@ -2794,7 +2796,7 @@ async def handle_managers_list(request):
         "managers":         managers,
         "current_user":     request["owner_id"],
         # Capability flag for the UI — true for OWNER_IDS and the legacy
-        # access set (currently 686932322). Lets the frontend show block
+        # access set (AMBAR_LEGACY_MGR_IDS). Lets the frontend show block
         # buttons even when the user isn't strictly in OWNER_IDS.
         "can_manage_users": _can_manage_users(request["owner_id"]),
     }, headers=CORS_HEADERS)

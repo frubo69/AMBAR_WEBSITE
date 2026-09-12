@@ -3307,8 +3307,6 @@ button.path:active{transform:scale(.995)}
    «Подтвердить» в строке дня, кнопка подтверждения в дне, отметка «подтверждено» */
 .fb-capv{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);letter-spacing:0;text-transform:none;margin-right:8px}
 .fb-capv u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
-.fb-pend{min-width:20px;height:20px;border-radius:10px;padding:0 6px;margin-right:8px;display:inline-flex;align-items:center;justify-content:center;
-  background:var(--gold);color:#1a1408;font:700 11px 'DM Sans',sans-serif;letter-spacing:0;font-style:normal}
 .fb-okbtn{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;margin-left:4px;
   color:var(--gold2);font:700 12px 'DM Sans',sans-serif}
 .fb-okbtn .fb-fill-em{margin:0}
@@ -17737,8 +17735,7 @@ function fbHubHtml(b, err){
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
   </div>
   <div class="sc fb-hub fb-safe">
-    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span>${
-      b.safe.pending ? `<i class="fb-pend" data-f="safe.pending">${b.safe.pending}</i>` : ''}<b class="fb-safe-v${b.safe.total < 0 ? ' dn' : ''}" data-f="safe.total" data-fc="neg">${fbFmt(b.safe.total)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>
+    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${b.safe.total < 0 ? ' dn' : ''}" data-f="safe.total" data-fc="neg">${fbFmt(b.safe.total)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>
     <div class="fb-safe-k">
       ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе'})}
       ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg'})}

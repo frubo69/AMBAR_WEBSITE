@@ -38,6 +38,7 @@ log = logging.getLogger(__name__)
 DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, как во всей системе
 MAX_AMOUNT = 10_000_000
+MAX_SPAN = 31                  # окно платежа: сколько дней после даты им можно платить
 USD_FALLBACK = 3.67
 
 DAY_FIELDS = ('handed_fact', 'ordered_fact', 'aside', 'collected', 'extra_rp', 'pay')
@@ -298,35 +299,47 @@ def _add_months(day: str, n: int) -> str:
     return f"{y:04d}-{m:02d}-{min(d.day, calendar.monthrange(y, m)[1]):02d}"
 
 
+def _add_days(day: str, n: int) -> str:
+    return (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=n)).strftime("%Y-%m-%d")
+
+
 def _schedule(ln: dict, month: str, today: str) -> dict:
-    """Платёж раз в period месяцев от даты next: когда следующий (первая дата
-    не раньше сегодня) и попадает ли платёж в этот месяц. Без даты — как
-    ежемесячный: план каждый месяц, следующего платежа нет."""
+    """Платёж раз в period месяцев от даты next: когда следующий (первое окно,
+    которое ещё не прошло) и попадает ли платёж в этот месяц. Без даты — как
+    ежемесячный: план каждый месяц, следующего платежа нет.
+
+    Платёж бывает не днём, а промежутком (рент машин: «со 2 по 5»): span —
+    сколько дней он длится после next, окно закрывается по next_to."""
     try:
         period = max(1, min(MAX_PERIOD, int(ln.get("period") or 1)))
     except (TypeError, ValueError):
         period = 1
+    try:
+        span = max(0, min(MAX_SPAN, int(ln.get("span") or 0)))
+    except (TypeError, ValueError):
+        span = 0
     nxt = str(ln.get("next") or "")
     try:
         datetime.strptime(nxt, "%Y-%m-%d")
     except ValueError:
         nxt = ""
     if not nxt:
-        return dict(period=period, next="", next_due="", due_in=period == 1)
+        return dict(period=period, span=0, next="", next_due="", next_to="", due_in=period == 1)
     first, last = month + "-01", _month_days(month)[-1]
-    # платёж в этом месяце — любая дата ряда next ± k·period
+    # платёж в этом месяце — любое окно ряда next ± k·period, задевшее месяц
     due_in = False
     for k in range(-40, 41):
         d = _add_months(nxt, k * period)
-        if first <= d <= last:
+        if d <= last and _add_days(d, span) >= first:
             due_in = True
             break
         if d > last and k >= 0:
             break
     due = nxt
-    while due < today:
+    while _add_days(due, span) < today:        # окно ещё идёт — дата не убегает
         due = _add_months(due, period)
-    return dict(period=period, next=nxt, next_due=due, due_in=due_in)
+    return dict(period=period, span=span, next=nxt, next_due=due,
+                next_to=_add_days(due, span), due_in=due_in)
 
 
 def _is_pool(ln: dict) -> bool:
@@ -1006,6 +1019,9 @@ async def handle_budget_set(request):
         nxt = str(body.get("next") or "").strip()
         if nxt:
             nxt = _day_arg(nxt)
+        span = int(_num(body.get("span")) or 0)
+        if not 0 <= span <= MAX_SPAN:
+            return _json({"error": "bad_span"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
@@ -1022,6 +1038,8 @@ async def handle_budget_set(request):
             period = int(old.get("period") or 1)
         if "next" not in body:
             nxt = str(old.get("next") or "")
+        if "span" not in body:
+            span = int(old.get("span") or 0)
         if note is None:
             note = str(old.get("note") or "")
         if "cur" not in body:
@@ -1034,10 +1052,12 @@ async def handle_budget_set(request):
     if kind != "office" and name in POOL_NAMES:
         kind = "pool"
     if kind == "pool":
-        period, nxt = 1, ""                       # без даты платежа: только бюджет на месяц
+        period, nxt, span = 1, "", 0              # без даты платежа: только бюджет на месяц
+    if not nxt:
+        span = 0
     doc = {"_id": lid, "month": month, "name": name, "plan": plan, "due": due,
            "note": note or "", "kind": kind, "group": group, "cur": cur or "AED",
-           "period": period, "next": nxt,
+           "period": period, "next": nxt, "span": span,
            "ord": ordv if ordv is not None else 0, "by": who}
     await db.fin_budget_set(doc)
     await _touch(month)

@@ -44,7 +44,8 @@ def line(prefix):
 parts += [line("let dpTarget ="), line("let dpView ="), line("let dpFrom ="), line("let dpTo ="), line("const MONTHS_RU_SHORT ="),
           line("let dpSingle ="), line("const _ymd ="), "const dateOv = document.getElementById('dateOverlay');",
           fn("openDate"), line("function closeDate()"), fn("dpStep"), line("function sameDay("), line("function strDate("),
-          fn("renderDp"), fn("pickDp"), fn("updateDpLbl"), line("function dpReset()")]
+          fn("renderDp"), fn("pickDp"), fn("updateDpLbl"), fn("dpApply"), line("function dpReset()"),
+          "function movePill(){}"]
 overlay = src[src.index('<div class="stk-ov" id="accOv">'):]
 overlay = overlay[:overlay.index('<div class="stk-foot" id="accFoot"></div>') + len('<div class="stk-foot" id="accFoot"></div>')] + "\n</div>"
 # страница «Анализ» — поверх главной, наезжает справа
@@ -121,7 +122,11 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('page')){ const [k, ...r] = Q.get('page').split(':'); fbPageOpen(k, r.join(':')); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('page') && Q.get('edit')){ const [k, ...r] = Q.get('edit').split(':'); fbFillEdit(k, r.join(':')); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('wheel')){ fbPillOpen(); await new Promise(r => setTimeout(r, 400)); }
-    if(Q.get('cal')){ openDate('fbNext'); await new Promise(r => setTimeout(r, 300)); }
+    if(Q.get('cal')){ openDate(Q.get('cal') === 'span' ? 'fbSpan' : 'fbNext'); await new Promise(r => setTimeout(r, 300)); }
+    if(Q.get('days')){ const [a1, b1] = Q.get('days').split('-').map(Number);   // отметить даты в календаре
+      const cell = n => [...document.querySelectorAll('#dpGrid .dp-cell:not(.off)')].find(e => e.textContent === String(n));
+      if(Q.get('fwd')) { [...document.querySelectorAll('.dp-month-hdr .dp-nav')].pop().click(); await new Promise(r => setTimeout(r, 150)); }
+      if(cell(a1)) cell(a1).click(); if(b1 && cell(b1)) cell(b1).click(); await new Promise(r => setTimeout(r, 150)); }
     if(Q.get('an')){ await fbAnOpen(); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('due')){          // срок платежа у первого билдинга — через N дней от сегодня
       const l0 = ((fbBook(FB.month).budget || {}).lines || []).find(l => l.group === 'rent' && !l.office);

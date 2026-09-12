@@ -10847,24 +10847,30 @@ const MONTHS_RU_SHORT = ['янв','фев','мар','апр','мая','июн','
 
 // Одна дата (платёж статьи бюджета): без быстрых отрезков и подвала, будущее
 // открыто, листать можно в обе стороны, нажатие на день сразу выбирает.
+let dpFuture = false;
 let dpSingle = false;
 function openDate(targetId){
   dpTarget = targetId;
   dpSingle = targetId === 'fbNext';
+  dpFuture = targetId === 'fbSpan';      // окно платежа: даты вперёд, две отметки
   dateOv.classList.toggle('single', dpSingle);
   const today = new Date();
   dpView = new Date(today.getFullYear(), today.getMonth(), 1);
   dpFrom = null;
   dpTo = null;
-  if(dpSingle && FB.editNext){
+  if((dpSingle || dpFuture) && FB.editNext){
     const d = new Date(FB.editNext + 'T00:00:00');
-    if(!isNaN(d)){ dpFrom = d; dpTo = d; dpView = new Date(d.getFullYear(), d.getMonth(), 1); }
+    if(!isNaN(d)){
+      dpFrom = d;
+      dpTo = new Date(d.getTime() + (dpFuture ? (FB.editSpan || 0) : 0) * 86400000);
+      dpView = new Date(d.getFullYear(), d.getMonth(), 1);
+    }
   }
   renderDp();
   dateOv.classList.add('show');
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){}
 }
-function closeDate(){ dateOv.classList.remove('show'); dateOv.classList.remove('single'); dpSingle = false; }
+function closeDate(){ dateOv.classList.remove('show'); dateOv.classList.remove('single'); dpSingle = false; dpFuture = false; }
 dateOv.addEventListener('click',e=>{ if(e.target===dateOv) closeDate(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && dateOv.classList.contains('show')) closeDate(); });
 
@@ -10903,7 +10909,7 @@ function renderDp(){
     el.textContent = c.d.getDate();
     // Будущее выбирать нечем: заказов там ещё нет, а выбранный «завтрашний»
     // период показывал бы пустоту и выглядел поломкой.
-    const future = !dpSingle && c.d > today;
+    const future = !dpSingle && !dpFuture && c.d > today;
     if(future) el.classList.add('future');
     if(sameDay(c.d, today)) el.classList.add('today');
     if(dpFrom && sameDay(c.d, dpFrom)) el.classList.add('range-start');
@@ -10917,7 +10923,7 @@ function renderDp(){
   // Листать вперёд дальше текущего месяца незачем — там пусто.
   const nav = document.querySelector('.dp-month-hdr .dp-nav:last-child');
   if(nav){
-    const ahead = !dpSingle && ((y > today.getFullYear()) ||
+    const ahead = !dpSingle && !dpFuture && ((y > today.getFullYear()) ||
                   (y === today.getFullYear() && m >= today.getMonth()));
     nav.classList.toggle('dim', ahead);
     nav.disabled = ahead;
@@ -10952,9 +10958,12 @@ function updateDpLbl(){
   if(apply){
     // Нечего применять — кнопка не должна выглядеть рабочей.
     apply.disabled = !dpFrom;
-    apply.textContent = days > 1 ? `Показать ${days} ${pluralize(days,'день','дня','дней')}`
-                                 : (dpFrom ? 'Показать этот день' : 'Выберите даты');
+    if(dpFuture) apply.textContent = days > 1 ? `Платёж ${days} ${pluralize(days,'день','дня','дней')}`
+                                              : (dpFrom ? 'Платёж в этот день' : 'Выберите даты');
+    else apply.textContent = days > 1 ? `Показать ${days} ${pluralize(days,'день','дня','дней')}`
+                                      : (dpFrom ? 'Показать этот день' : 'Выберите даты');
   }
+  if(dpFuture && lbl && !dpTo){ lbl.innerHTML = `<span class="hint">Второй датой — до какого числа платим</span>`; return; }
   if(!lbl) return;
   if(dpFrom && dpTo){
     // Один месяц — не повторяем его дважды: «20 — 22 августа», а не
@@ -10987,6 +10996,8 @@ function dpApply(){
   if(!dpTo) dpTo = dpFrom;
   // дата платежа статьи бюджета: одна дата, без диапазона
   if(dpTarget === 'fbNext'){ fbNextPick(_ymd(dpFrom)); closeDate(); return; }
+  // окно платежа ренту: с какого по какое число можно платить
+  if(dpTarget === 'fbSpan'){ fbSpanPick(dpFrom, dpTo); closeDate(); return; }
   const chip = document.getElementById('rangeChip-'+dpTarget);
   if(chip){
     chip.style.display = 'flex';
@@ -18509,15 +18520,19 @@ function fbDueDays(ymd){
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.round((d - today) / 86400000);
 }
-function fbDueHtml(ymd){
+function fbDueHtml(ymd, to){
   const d = new Date(ymd + 'T00:00:00');
   if(isNaN(d)) return '';
   const days = fbDueDays(ymd);
   const cls = days <= 1 ? 'dn' : days <= 7 ? 'warn' : 'ok';
-  return `Следующий платёж: <b class="fb-due ${cls}">${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}</b>`;
+  const dt = x => `${x.getDate()}.${String(x.getMonth() + 1).padStart(2, '0')}.${x.getFullYear()}`;
+  const d2 = to && to !== ymd ? new Date(to + 'T00:00:00') : null;
+  // окно платежа: «2.10 — 5.10.2026», платить можно в любой из этих дней
+  const t = d2 && !isNaN(d2) ? `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')} — ${dt(d2)}` : dt(d);
+  return `${d2 ? 'Платёж' : 'Следующий платёж'}: <b class="fb-due ${cls}">${t}</b>`;
 }
 function fbLineSub(l){
-  if(l.next_due) return fbDueHtml(l.next_due);
+  if(l.next_due) return fbDueHtml(l.next_due, l.next_to);
   if(l.period > 1) return [`раз в ${l.period} мес`, `в месяц ${fbFmt(l.plan_m || 0)}`, l.note ? escS(l.note) : ''].filter(Boolean).join(' · ');
   return l.note ? escS(l.note) : '';   // «потратили · осталось» владелец просил не писать
 }
@@ -18529,7 +18544,8 @@ function fbLineRow(l, kid, nameHtml){
   // таблетка периода сама раскрывается в барабан на своём месте (fbPillTap)
   const extra = `<div class="fb-edit2 fb-sched">
       <div class="fb-pill" id="fbPill" onclick="fbPillTap(event)"><div class="fb-pill-w" id="fbPeriod" onscroll="fbWheelScroll(this)">${fbWheelItems(FB.editPeriod || 1)}</div></div><span class="fb-wheel-l">раз в<br>мес</span>
-      <button class="fb-datebtn${FB.editNext ? ' on' : ''}" id="fbNextBtn" onclick="openDate('fbNext')">${IC('cal', 15)}<span>${FB.editNext ? fbDayT(FB.editNext) : 'дата платежа'}</span></button>
+      <button class="fb-datebtn${FB.editNext ? ' on' : ''}" id="fbNextBtn" onclick="openDate('${l.group === 'car' ? 'fbSpan' : 'fbNext'}')">${IC('cal', 15)}<span>${
+        FB.editNext ? fbSpanT(FB.editNext, FB.editSpan || 0) : (l.group === 'car' ? 'дни платежа' : 'дата платежа')}</span></button>
     </div>
     <div class="fb-edit2">
       <input class="fb-txt" placeholder="Заметка" autocomplete="off" maxlength="80" id="fbFillNote" value="${escS(l.note || '')}">${
@@ -18593,9 +18609,25 @@ function fbPillClose(){
 function fbPillOutside(e){ if(!(e.target && e.target.closest && e.target.closest('#fbPill'))) fbPillClose(); }
 // Дата следующего платежа — из общего календаря (openDate → dpApply).
 function fbNextPick(ymd){
-  FB.editNext = ymd;
-  const b = document.getElementById('fbNextBtn');
-  if(b){ b.classList.toggle('on', !!ymd); b.querySelector('span').textContent = ymd ? fbDayT(ymd) : 'дата платежа'; }
+  FB.editNext = ymd; FB.editSpan = 0;
+  fbNextBtnPaint();
+}
+// Окно платежа: со 2 по 5 — платить можно в любой из этих дней (рент машин)
+function fbSpanPick(from, to){
+  FB.editNext = _ymd(from);
+  FB.editSpan = to ? Math.max(0, Math.round((to - from) / 86400000)) : 0;
+  fbNextBtnPaint();
+}
+function fbSpanT(ymd, span){
+  if(!span) return fbDayT(ymd);
+  const to = _ymd(new Date(new Date(ymd + 'T12:00:00Z').getTime() + span * 86400000));
+  // один месяц — не повторяем его дважды: «2 — 5 октября»
+  return to.slice(0, 7) === ymd.slice(0, 7) ? `${+ymd.slice(8)} — ${fbDayT(to)}` : `${fbDayT(ymd)} — ${fbDayT(to)}`;
+}
+function fbNextBtnPaint(){
+  const b = document.getElementById('fbNextBtn'); if(!b) return;
+  b.classList.toggle('on', !!FB.editNext);
+  b.querySelector('span').textContent = FB.editNext ? fbSpanT(FB.editNext, FB.editSpan || 0) : 'дата платежа';
 }
 // Карточка-ссылка группы: название, что внутри, итог и стрелка вправо —
 // открывает страницу.
@@ -18749,6 +18781,7 @@ function fbFillEdit(kind, id){
              : kind === 'line' ? (ln.cur || 'AED') : null;
   FB.editPeriod = kind === 'line' ? (ln.period || 1) : 1;
   FB.editNext = kind === 'line' ? (ln.next || '') : '';
+  FB.editSpan = kind === 'line' ? (ln.span || 0) : 0;
   FB.wheelOpen = false; document.removeEventListener('pointerdown', fbPillOutside, true);
   fbBudRepaint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -18784,7 +18817,7 @@ async function fbFillOk(){
             group: e.kind === 'line' ? (l ? l.group : '') : (e.id === 'office' ? 'rent' : e.id), as: _meName()};
     if(document.getElementById('fbFillNote')) body.note = fbTxt('fbFillNote');   // без поля заметки — прежняя остаётся
     if(e.kind === 'new' && e.id === 'office') body.office = true;
-    if(e.kind === 'line'){ body.period = FB.editPeriod || 1; body.next = FB.editNext || ''; body.cur = FB.editCur || 'AED'; }
+    if(e.kind === 'line'){ body.period = FB.editPeriod || 1; body.next = FB.editNext || ''; body.span = FB.editSpan || 0; body.cur = FB.editCur || 'AED'; }
   }
   try{
     const res = await ownerApi.ownerFetch(url, {method: 'POST', body});

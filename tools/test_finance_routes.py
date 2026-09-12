@@ -396,11 +396,16 @@ async def main():
     print("— график платежей: раз в N месяцев от даты, следующий считается сам")
     eq("_add_months: 31 янв + 1 = 28 фев, + 3 = 30 апр", (fr._add_months("2026-01-31", 1), fr._add_months("2026-01-31", 3)), ("2026-02-28", "2026-04-30"))
     q = dict(period=3, next="2026-10-01")
-    eq("сентябрь: платежа нет, следующий 1 окт", fr._schedule(q, "2026-09", "2026-09-10"), dict(period=3, next="2026-10-01", next_due="2026-10-01", due_in=False))
+    eq("сентябрь: платежа нет, следующий 1 окт", fr._schedule(q, "2026-09", "2026-09-10"), dict(period=3, span=0, next="2026-10-01", next_due="2026-10-01", next_to="2026-10-01", due_in=False))
     eq("октябрь: платёж в месяце", fr._schedule(q, "2026-10", "2026-10-01")["due_in"], True)
     eq("2 октября: следующий уже 1 января", fr._schedule(q, "2026-10", "2026-10-02")["next_due"], "2027-01-01")
     eq("июль (раньше даты): платёж был 1 июля — в месяце", fr._schedule(q, "2026-07", "2026-09-10")["due_in"], True)
-    eq("без даты — ежемесячный", fr._schedule(dict(period=1), "2026-09", "2026-09-10"), dict(period=1, next="", next_due="", due_in=True))
+    eq("без даты — ежемесячный", fr._schedule(dict(period=1), "2026-09", "2026-09-10"), dict(period=1, span=0, next="", next_due="", next_to="", due_in=True))
+    # окно платежа (рент машин «со 2 по 5»): пока окно идёт, дата не убегает
+    w = dict(period=1, next="2026-09-02", span=3)
+    eq("окно 2–5: 5 сентября платёж всё ещё этот", (fr._schedule(w, "2026-09", "2026-09-05")["next_due"], fr._schedule(w, "2026-09", "2026-09-05")["next_to"]), ("2026-09-02", "2026-09-05"))
+    eq("окно 2–5: 6 сентября — уже октябрьское", fr._schedule(w, "2026-09", "2026-09-06")["next_due"], "2026-10-02")
+    eq("окно 30 сент — 3 окт: платёж есть и в октябре", fr._schedule(dict(period=3, next="2026-09-30", span=3), "2026-10", "2026-09-10")["due_in"], True)
     eq("без даты, но раз в 3 — плана в месяце нет", fr._schedule(dict(period=3), "2026-09", "2026-09-10")["due_in"], False)
     BUDGET.append(dict(_id="L20", month=M, name="Аренда Силикон", plan=15500, due=0, note="", kind="", ord=20, group="rent", period=3, next="2026-10-01"))
     bq = (await fr.build(M))["budget"]

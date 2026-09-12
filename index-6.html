@@ -3546,7 +3546,7 @@ let _verifySource=''; // friend | operator | social | search | other
 let _cryptoVerifyCtx=null; // pending crypto checkout awaiting the pre-payment source form
 
 function _isVerified(){
-  return localStorage.getItem('ambar_verified')==='1';
+  return localStorage.getItem('ambar_verified')==='1' || FOUNDER;
 }
 
 function _hideAllVerifySteps(){
@@ -3923,12 +3923,17 @@ function t(k){return TX[lang][k]||TX.ru[k]||k;}
 // ждём, пока бот его запишет. Пока номер не подтверждён, поле ввода закрыто:
 // ручное редактирование открывается только поверх подтверждённого номера.
 let PHONE_VERIFIED = '';
+// Фаундер: номер не подтверждает — вписывает любой (свой или того, кому везём),
+// адрес разовый и в книгу не сохраняется. Флаг приходит с сервера.
+let FOUNDER = localStorage.getItem('ambar_founder') === '1';
 
 function _phoneUI(){
-  const verified = !!PHONE_VERIFIED;
+  // фаундеру подтверждать нечего: поле открыто пустым, «поделиться номером» нет
+  const free = FOUNDER && !PHONE_VERIFIED;
+  const verified = !!PHONE_VERIFIED || free;
   const inp = el('phone-in');
   el('phone-share-box').style.display = verified ? 'none' : 'block';
-  el('phone-ok').style.display        = verified ? 'flex' : 'none';
+  el('phone-ok').style.display        = (verified && !free) ? 'flex' : 'none';
   el('phone-extra-wrap').style.display= verified ? 'block' : 'none';
   el('phone-lbl').style.display       = verified ? '' : 'none';
   const row = el('phone-row'); if(row) row.style.display = verified ? 'flex' : 'none';
@@ -3943,9 +3948,10 @@ function _phoneUI(){
 function _syncOrderBtn(){
   const b = el('confirm-order-btn') || document.getElementById('co-confirm');
   if(!b) return;
-  b.disabled = !PHONE_VERIFIED;
-  b.style.opacity = PHONE_VERIFIED ? '' : '.45';
-  b.style.pointerEvents = PHONE_VERIFIED ? '' : 'none';
+  const ok = !!PHONE_VERIFIED || FOUNDER;
+  b.disabled = !ok;
+  b.style.opacity = ok ? '' : '.45';
+  b.style.pointerEvents = ok ? '' : 'none';
 }
 
 async function _fetchVerifiedPhone(){
@@ -3953,6 +3959,8 @@ async function _fetchVerifiedPhone(){
     const r = await fetch(`${AMBAR_API}/api/me`, {headers:{'Authorization':'tma '+(tg?.initData||'')}});
     if(!r.ok) return '';
     const d = await r.json();
+    FOUNDER = !!d.founder;
+    if(FOUNDER) localStorage.setItem('ambar_founder','1'); else localStorage.removeItem('ambar_founder');
     return d.phone_verified || '';
   }catch(e){ return ''; }
 }
@@ -6864,7 +6872,7 @@ function placeOrder(){
   const addr=getSaved()[activeAddrIdx];
   if(!addr){showToast(t('noAddrWarning'),'err');return;}
 
-  if(!PHONE_VERIFIED){
+  if(!PHONE_VERIFIED && !FOUNDER){
     showToast(lang==='ru'?'Сначала подтвердите номер':'Please verify your number first','err');
     el('phone-share-btn')?.scrollIntoView({block:'center',behavior:'smooth'});
     haptic.error(); return;
@@ -6955,6 +6963,13 @@ function placeOrder(){
     }
   }).catch(err=>{console.error('Order fetch error:', err);});
 
+  // Адрес фаундера — разовый: он ушёл в заказ (операторы и водитель его видят),
+  // а в сохранённых больше не лежит.
+  if(FOUNDER){
+    const _arr=getSaved(); _arr.splice(activeAddrIdx,1); setSaved(_arr);
+    setActiveAddr(_arr.length?0:null);
+    if(typeof renderSavedCards==='function') renderSavedCards();
+  }
   const _placedIds=Object.keys(cart);
   const _snap={cart:{...cart},beerPcs:{...beerPcs},tip};
   cart={};beerPcs={};tip=0;saveCart();el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');

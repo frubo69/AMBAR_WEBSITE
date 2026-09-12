@@ -536,7 +536,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
         _u = await db.get_user(uid)
     except Exception:
         _u = None
-    if not (_u or {}).get("phone_verified") and uid not in _TEST_ACCOUNTS:
+    # Фаундер — исключение: он заказывает и на себя, и на других, номер в
+    # заказе тот, который он вписал (владелец, 12 сен 2026).
+    if not (_u or {}).get("phone_verified") and uid not in _TEST_ACCOUNTS and uid != _FOUNDER_ID:
         log.warning(f"[order] uid={uid} без подтверждённого номера — отказ")
         return web.json_response({"error": "phone_not_verified"},
                                  status=403, headers=CORS_HEADERS)
@@ -788,16 +790,22 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         await db._increment_user(uid, orders_total=1)
         # Адрес заказа — в книгу адресов клиента. Раньше он жил только в памяти
         # его телефона: сменил устройство — и адресов будто не было никогда.
-        try:
-            await db.save_address(uid, {
-                "address": address,
-                "label": (src.get("address_label") or "").strip()[:80],
-                "gmap_link": gmap_link, "is_gps": is_gps,
-                "lat": (loc or {}).get("lat", 0), "lon": (loc or {}).get("lon", 0),
-                "office_id": office_id, "office_name": office_nm,
-            })
-        except Exception as e:
-            log.warning(f"[order] адрес не сохранён в профиль {uid}: {e}")
+        # Фаундер — мимо книги: он возит по чужим адресам, они разовые и в его
+        # истории им делать нечего (в самом заказе адрес, конечно, остаётся —
+        # по нему едет водитель).
+        if uid == _FOUNDER_ID:
+            log.info(f"[order] #{oid}: адрес фаундера разовый — в книгу не пишем")
+        else:
+            try:
+                await db.save_address(uid, {
+                    "address": address,
+                    "label": (src.get("address_label") or "").strip()[:80],
+                    "gmap_link": gmap_link, "is_gps": is_gps,
+                    "lat": (loc or {}).get("lat", 0), "lon": (loc or {}).get("lon", 0),
+                    "office_id": office_id, "office_name": office_nm,
+                })
+            except Exception as e:
+                log.warning(f"[order] адрес не сохранён в профиль {uid}: {e}")
 
     # ── Customer confirmation (single live status msg, edited through lifecycle) ─
     # Purge the live msgs from previous *finished* orders so the chat stays clean.
@@ -1812,6 +1820,9 @@ async def handle_me(request: web.Request) -> web.Response:
         # «Без оплаты» — такой же белый список: способ виден только тем, кому
         # владелец его включил (сервер всё равно перепроверяет).
         "free_allowed": bool(user_doc.get("free_allowed")) if user_doc else False,
+        # Фаундер: номер не подтверждает, вписывает свой или чужой, адрес
+        # разовый. Приложение по этому флагу открывает поле и кнопку заказа.
+        "founder": uid == _FOUNDER_ID,
         "debt": round(float(user_doc.get("debt") or 0), 2) if user_doc else 0,
     }, headers=CORS_HEADERS)
 

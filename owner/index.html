@@ -3148,6 +3148,10 @@ button.path:active{transform:scale(.995)}
 .fb-add .fb-who{flex:1 1 100%}
 /* «Кому оформляем»: на кого уже тратили в этом месяце — золотая таблетка и
    плашка с суммой, чтобы не искать глазами мелкую цифру */
+.crw-c-k{font-style:normal;font-size:12px;font-weight:600;color:var(--sub);white-space:nowrap}
+/* название с числом водителей не режем многоточием: на узком экране число
+   уходит строкой ниже, но остаётся видно целиком */
+.crw-c-n.wrap{white-space:normal;line-height:1.25}
 .crw-p.fb-spent,.crw-op.fb-spent{background:var(--gold-soft);border-color:rgba(201,169,110,.6);color:var(--gold2)}
 .crw-p.fb-spent .crw-p-a{background:rgba(201,169,110,.2);color:var(--gold2)}
 .fb-who-s{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:2px 7px 2px 5px;border-radius:999px;
@@ -19457,7 +19461,7 @@ function fbWhoPaint(){
   const cards = (CREW.districts || []).map(d => `<div class="crw-c">
       <div class="crw-c-h">
         <span class="crew-code">${escS(d.code)}</span>
-        <span class="crw-c-n">${escS(d.name)}</span>
+        <span class="crw-c-n wrap">${escS(d.name)}${crewDrvCount(d)}</span>
         ${d.operator ? `<button class="crw-op${on(d.operator)}" data-n="${escS(d.operator)}" onclick="fbLinePay('${id}', this.dataset.n)">
           <span class="crw-op-n">${IC('headset', 15)}${escS(d.operator)}${tag(d.operator)}</span></button>` : ''}
       </div>
@@ -30815,7 +30819,7 @@ function crewRender(){
     return `<div class="crw-c${d.moved ? ' moved' : ''}">
       <div class="crw-c-h">
         <span class="crew-code">${escS(d.code)}</span>
-        <span class="crw-c-n">${escS(d.name)}</span>
+        <span class="crw-c-n wrap">${escS(d.name)}${crewDrvCount(d)}</span>
         <button class="crw-op${d.moved ? ' moved' : ''}" onclick="crewPick('${d.id}')">
           <span class="crw-op-n">${IC('headset', 15)}${escS(d.operator || '—')}</span>
           ${d.moved ? `<i>обычно ${escS(d.base)}</i>` : ''}
@@ -30833,6 +30837,12 @@ function crewRender(){
     ${per}`;
 }
 
+
+// Сколько водителей на районе — сразу после названия: «JVC (3 водителя)»
+function crewDrvCount(d){
+  const n = (d.drivers || []).length;
+  return ` <i class="crw-c-k">(${n} ${pluralize(n, 'водитель', 'водителя', 'водителей')})</i>`;
+}
 
 // Подвал появляется только когда есть что сохранять — и говорит, сколько.
 function crewFoot(){

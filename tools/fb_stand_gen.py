@@ -29,7 +29,7 @@ parts = [
     fn("accIsBack"), fn("accDayWord"), fn("dayBarOff"), fn("dayBarLabels"), fn("dayBarPaint"),
     fn("_dayNavFor"), fn("_dayNav"), fn("bindDayBars"), fn("daySwipe"), fn("dayBarStep"),
     fn("dayBarArrow"), fn("dayBarHome"), fn("_heroFlip"), fn("askDialog"), fn("closePinPop"),
-    fn("pluralize"), "let CREW = null;", fn("crewLoad"),
+    fn("pluralize"), "let CREW = null;", fn("crewLoad"), fn("crewDrvCount"),
 ]
 # календарь одной даты (платёж статьи): разметка и функции — настоящие
 _d0 = src.index('<div class="cmd-overlay" id="dateOverlay">')

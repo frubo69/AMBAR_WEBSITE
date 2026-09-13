@@ -682,14 +682,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .wo-btn.ghost{padding:14px 12px;font-size:14.5px;color:var(--sub);background:var(--card);
   border-color:var(--border2)}
 /* Перемещение: куда везём — пять кодов в ряд над камерой, выбранный золотом. */
-.mv-to{display:flex;gap:6px;margin:0 0 10px}
-.mv-to button{flex:1;height:40px;border-radius:12px;cursor:pointer;font-family:inherit;
-  font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--gold2);
-  background:var(--card3);border:1px solid var(--border2)}
-.mv-to button.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--text)}
-.mv-x{flex:0 0 auto;width:30px;height:30px;border-radius:9px;cursor:pointer;font-family:inherit;
-  font-size:14px;line-height:1;color:var(--muted);background:none;border:1px solid var(--border2)}
-.mv-x:active{color:var(--dn);transform:scale(.92)}
 .mv-ret{flex:0 0 auto;padding:8px 11px;border-radius:9px;cursor:pointer;font-family:inherit;
   font-size:11.5px;font-weight:700;color:var(--sub);background:none;border:1px solid var(--border2)}
 .mv-ret:active{transform:scale(.96)}
@@ -2770,6 +2762,35 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .cam-hint{margin-left:auto;padding-bottom:4px;font-size:11.5px;text-align:right;
   color:rgba(255,255,255,.7);max-width:52%}
 .cam-hint.warn{color:var(--warn)}
+/* Перемещение сканом: камера на весь свободный экран, потом страница бутылки
+   (название, фото товара, сведения, куда везём, золотая кнопка внизу). */
+.mv-mid.scan{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.mv-cam{flex:1;min-height:0;aspect-ratio:auto;border-radius:0;margin:0}
+.mv-cam .cam-frame{left:12%;right:12%;top:50%;bottom:auto;height:0;padding-bottom:76%;transform:translateY(-50%)}
+.mvi{padding:4px 0 8px}
+.mvi-name{margin:2px 2px 12px;font-size:22px;font-weight:700;line-height:26px;letter-spacing:-.3px;color:var(--text)}
+.mvi-img{height:240px;border-radius:16px;background:#10141D;border:1px solid #1A1E29;display:flex;align-items:center;
+  justify-content:center;overflow:hidden;color:var(--muted)}
+.mvi-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.mvi-warn{display:flex;align-items:center;gap:9px;margin-top:10px;padding:11px 13px;border-radius:12px;
+  background:var(--warn-soft);color:var(--warn);font-size:13.5px;line-height:1.35}
+.mvi-warn svg{flex:0 0 auto}
+.mvi-info{margin-top:10px;padding:4px 14px;border-radius:14px;background:#10141D;border:1px solid #1A1E29}
+.mvi-info div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;
+  border-top:1px solid rgba(255,255,255,.05);font-size:13.5px}
+.mvi-info div:first-child{border-top:0}
+.mvi-info span{flex:0 0 auto;color:var(--muted)}
+.mvi-info b{min-width:0;font-weight:600;text-align:right;color:var(--text)}
+.mvi-l{margin:18px 2px 8px;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#777C99}
+.mvi-to{display:flex;flex-direction:column;gap:7px}
+.mvi-d{display:flex;align-items:center;gap:12px;height:50px;padding:0 14px;border-radius:13px;background:#131321;
+  border:1px solid #292A3F;color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.mvi-d b{flex:0 0 44px;font-size:14px;font-weight:700;color:var(--gold2)}
+.mvi-d span{flex:1;min-width:0;font-size:14.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mvi-d i{flex:0 0 auto;display:flex;align-items:center;font-style:normal;font-size:12px;color:var(--gold2)}
+.mvi-d.on{border-color:rgba(201,169,110,.6);background:var(--gold-soft)}
+.mvi-d.here{opacity:.5} .mvi-d.here i{color:var(--muted)}
+.mv-go{width:100%;height:52px;border-radius:14px;font-size:16px;font-weight:700}
 
 .sc-row{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;
   border-radius:12px;background:var(--card);border:1px solid var(--border2)}
@@ -3635,34 +3656,23 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     </div>
   </div>
 </div>
-<!-- Перемещение сканом: сначала куда везём, потом крышки одна за другой.
-     Каждая уезжает сразу, в обе книги; «✕» на строке возвращает свою. -->
-<div class="sheet" id="mvSheet" onclick="if(event.target===this)mvDone()">
-  <div class="sheet-in">
-    <div class="wo-add-hd">
-      <div>
-        <div class="sheet-t">Переместить</div>
-        <div class="wo-add-s" id="mvS">одна крышка — одна бутылка</div>
-      </div>
-      <button class="wo-add-x" onclick="mvDone()" aria-label="Закрыть">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
+<!-- Перемещение сканом: камера во весь экран, как на приёмке. Прочитали код —
+     страница бутылки: название, фото товара, что о ней известно, куда везём и
+     кнопка подтверждения. После переезда — снова камера, следующая бутылка. -->
+<div class="sup-scr" id="mvScr">
+  <div class="sup-top">
+    <button class="sup-back" onclick="mvBack()" aria-label="Назад">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="sup-top-b">
+      <div class="sup-top-t" id="mvT">Переместить</div>
+      <div class="sup-top-s" id="mvS">Наведите камеру на код крышки</div>
     </div>
-    <div class="mv-to" id="mvTo"></div>
-    <div class="cam">
-      <video id="mvV" playsinline muted autoplay></video>
-      <div class="cam-frame" id="mvF">
-        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
-        <div class="cam-badge" id="mvB"></div>
-      </div>
-    </div>
-    <div class="wo-why" id="mvSay" style="margin:0 2px">Выберите, куда везём</div>
-    <div class="wo-feed" id="mvFeed"></div>
-    <div class="wo-add-foot">
-      <button class="wo-go" onclick="mvDone()">Готово</button>
-    </div>
+    <div class="sup-top-v" id="mvN"></div>
   </div>
+  <div class="sup-mid mv-mid" id="mvMid"></div>
+  <div class="sup-bot" id="mvBot"></div>
 </div>
 <!-- Скан бутылки для охраны. Отдельным листом, а не внутри карточки: камера
      на четверть экрана бесполезна, а карточка с камерой перестаёт быть строкой
@@ -5938,7 +5948,7 @@ function woScanDone(){
 // и район назначения. Район выбирается один раз на проход — в машине обычно
 // партия в одно место, — дальше крышки одна за другой. Каждый переезд пишется
 // сразу в обе книги; «✕» на строке возвращает бутылку, но только свою.
-var MV = {to: '', rows: [], total: 0, busy: false};
+var MV = {item: null, code: '', to: '', total: 0, busy: false, mode: 'scan'};
 var MV_D = [], MV_LOG = [], MV_DAY = '', _mvAt = 0;
 
 async function mvLoad(force){
@@ -5952,113 +5962,110 @@ async function mvLoad(force){
   }catch(e){}
 }
 
+// Экран во весь рост, как приёмка: камера, потом страница бутылки (владелец,
+// 14 сен 2026: «сканирование во весь экран как у нас везде; обнаружил
+// бутылку — страница с фото товара, сведениями и выбором района»).
 async function mvOpen(){
-  MV = {to: '', rows: [], total: 0, busy: false};
-  if(!MV_D.length) await mvLoad(true);
-  if(!MV_D.length){ toast('Не удалось загрузить районы', 'err'); return; }
-  document.getElementById('mvSheet').classList.add('show');
-  mvToPaint();
-  _mvSay('Выберите, куда везём', '');
-  mvFeedPaint();
-  try{
-    await SCAN.start(document.getElementById('mvV'), mvCode, null,
-                     () => _mvSay('эта уже отсканирована', 'err'), null);
-  }catch(e){
-    toast('Нет доступа к камере', 'err');
-    mvDone();
-  }
+  MV = {item: null, code: '', to: '', total: 0, busy: false, mode: 'scan'};
+  if(!MV_D.length) mvLoad(true);
+  document.getElementById('mvScr').classList.add('show');
+  mvScan();
 }
-
-function mvToPaint(){
-  const box = document.getElementById('mvTo'); if(!box) return;
-  box.innerHTML = MV_D.map(d => `<button class="${MV.to === d.id ? 'on' : ''}"
-      onclick="mvPick('${esc(d.id)}')" aria-label="${esc(d.name)}">${esc(d.code || d.id)}</button>`).join('');
-}
-
-function mvPick(id){
-  MV.to = id; mvToPaint();
-  const d = MV_D.find(x => x.id === id) || {};
-  _mvSay(`Везём на ${d.code || ''} ${d.name || ''} — наведите на код крышки`, '');
-  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-}
-
-function _mvSay(текст, вид){
-  const f = document.getElementById('mvF'), b = document.getElementById('mvSay');
-  if(b) b.textContent = текст;
-  if(f) f.className = 'cam-frame' + (вид ? ' ' + вид : '');
-}
-
-async function mvCode(code){
-  if(MV.busy) return;
-  if(!MV.to){
-    _mvSay('Сначала выберите, куда везём', 'err');
-    SCAN.seen.delete(code); SCAN.seenAt.delete(code);
-    return;
-  }
-  MV.busy = true;
-  const row = {code, name: '', state: 'sending', say: 'отправляю…'};
-  MV.rows.unshift(row); mvFeedPaint();
-  try{
-    const r = await drvApi.drvFetch('/api/driver/stock/move', {method: 'POST', body: {code, to: MV.to}});
-    row.name = r.name || r.label || code;
-    if(r.ok){
-      row.state = 'ok'; row.say = `${r.from_code || ''} → ${r.to_code || ''}`;
-      MV.total++;
-      _mvSay(`${row.name} · переехала`, 'ok');
-      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    }else{
-      row.state = 'dup'; row.say = r.say || 'не переехала';
-      _mvSay(row.say, 'err');
-      try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
-    }
-  }catch(e){
-    row.state = 'fail'; row.say = 'не отправилось, поднесите ещё раз';
-    _mvSay(row.say, 'err');
-    SCAN.seen.delete(code); SCAN.seenAt.delete(code);
-  }finally{
-    mvFeedPaint();
-    setTimeout(() => { MV.busy = false; }, 700);
-  }
-}
-
-function mvFeedPaint(){
-  const box = document.getElementById('mvFeed'); if(!box) return;
-  const s = document.getElementById('mvS');
-  if(s) s.textContent = MV.total
-    ? `${MV.total} ${plural(MV.total, 'бутылка', 'бутылки', 'бутылок')} ${MV.total === 1 ? 'переехала' : 'переехали'}`
-    : 'одна крышка — одна бутылка';
-  box.innerHTML = MV.rows.slice(0, 40).map(r => {
-    const cls = r.state === 'ok' ? '' : r.state === 'sending' ? '' : 'no';
-    return `<div class="wo-done ${cls}">
-      ${svg(ICO.move, 17)}
-      <span class="wo-done-b">
-        <span class="wo-done-t">${esc(r.name || r.code)}</span>
-        <span class="wo-done-v ${r.state === 'ok' ? 'ok' : cls || 'wait'}">${esc(r.say)}</span>
-      </span>
-      ${r.state === 'ok' ? `<button class="mv-x" onclick="mvUndo('${esc(r.code)}')" aria-label="Вернуть">✕</button>` : ''}
+function _mvHead(t, sub){ _setText('mvT', t); _setText('mvS', sub); }
+async function mvScan(){
+  MV.mode = 'scan'; MV.item = null; MV.code = ''; MV.to = '';
+  _mvHead('Переместить', 'Наведите камеру на код крышки');
+  document.getElementById('mvN').innerHTML = MV.total
+    ? `${MV.total}<u> ${MV.total === 1 ? 'переехала' : 'переехали'}</u>` : '';
+  const mid = document.getElementById('mvMid');
+  mid.className = 'sup-mid mv-mid scan';
+  mid.innerHTML = `<div class="cam mv-cam">
+      <video id="mvV" playsinline muted autoplay></video>
+      <div class="cam-frame" id="mvF">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="cam-badge" id="mvB"></div>
+      </div>
+      <div class="cam-left"><span class="cam-hint" id="mvHint">Одна крышка — одна бутылка</span></div>
     </div>`;
-  }).join('');
-}
-
-// Не ту бутылку поднесли — вернуть там же, где случилось. Сервер вернёт
-// только мой последний переезд этой бутылки.
-async function mvUndo(code){
-  try{ await drvApi.drvFetch('/api/driver/stock/move/undo', {method: 'POST', body: {code}}); }
+  document.getElementById('mvBot').innerHTML = '';
+  try{ await SCAN.start(document.getElementById('mvV'), mvCode, null, null, null); }   // start сам сбрасывает уже виденные коды
   catch(e){
-    toast(e && e.status === 403 ? 'Это не ваш переезд' : 'Не удалось вернуть', 'err');
-    return;
+    const h = document.getElementById('mvHint');
+    if(h){ h.textContent = 'Нет доступа к камере'; h.classList.add('warn'); }
   }
-  MV.rows = MV.rows.filter(r => r.code !== code);
-  MV.total = Math.max(0, MV.total - 1);
-  SCAN.seen.delete(code); SCAN.seenAt.delete(code);
-  mvFeedPaint();
-  _mvSay('Бутылка вернулась', '');
-  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
+// Код прочитан — камера гаснет, спрашиваем у сервера, что это за бутылка.
+async function mvCode(code){
+  if(MV.busy || MV.mode !== 'scan') return;
+  MV.busy = true; SCAN.stop();
+  const f = document.getElementById('mvF'); if(f) f.className = 'cam-frame ok';
+  try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  let info;
+  try{ info = await drvApi.drvFetch('/api/driver/stock/code?code=' + encodeURIComponent(code)); }
+  catch(e){
+    toast('Не удалось прочитать код — попробуйте ещё раз', 'err');
+    MV.busy = false; mvScan(); return;
+  }
+  MV.busy = false; MV.code = code; MV.item = info; MV.to = ''; MV.mode = 'item';
+  mvItemPaint();
+}
+
+function mvItemPaint(){
+  const it = MV.item || {}, d = it.district || {}, ok = !!it.ok;
+  _mvHead(ok ? 'Переместить' : 'Бутылка', it.label ? `Код ${it.label}` : 'Код с крышки');
+  document.getElementById('mvN').innerHTML = '';
+  const mid = document.getElementById('mvMid');
+  mid.className = 'sup-mid mv-mid';
+  const rows = [
+    ['Категория', it.cat || '—'],
+    ['Цена', it.price ? `${fmt(it.price)} AED` : '—'],
+    ['Сейчас', d.code ? `${d.code} · ${d.name || ''}` : (it.say || '—')],
+    ['Код', it.label || it.code || MV.code],
+    ['В реестре', it.at ? fxdWhen(it.at) : '—'],
+    ['Переездов', it.moves ? `${it.moves}${it.last_move ? ` · последний ${it.last_move.from_code} → ${it.last_move.to_code}` : ''}` : 'не было'],
+  ];
+  const dl = (it.districts && it.districts.length) ? it.districts : MV_D;
+  mid.innerHTML = `<div class="mvi">
+    <div class="mvi-name">${esc(it.name || 'Неизвестная бутылка')}</div>
+    <div class="mvi-img">${it.img ? `<img src="${esc(it.img)}" alt="">` : svgThin(ICO.box, 64)}</div>
+    ${ok ? '' : `<div class="mvi-warn">${svg(ICO.warn, 16)}<span>${esc(it.say || 'Эту бутылку перевезти нельзя')}</span></div>`}
+    <div class="mvi-info">${rows.map(([l, v]) => `<div><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div>
+    ${ok ? `<div class="mvi-l">Куда переместить</div>
+    <div class="mvi-to">${dl.map(x => {
+      const here = x.id === d.id, on = MV.to === x.id;
+      return `<button class="mvi-d${on ? ' on' : ''}${here ? ' here' : ''}" ${here ? 'disabled' : `onclick="mvPick('${esc(x.id)}')"`}>
+        <b>${esc(x.code || x.id)}</b><span>${esc(x.name || '')}</span><i>${here ? 'здесь' : (on ? svg(ICO.ok, 16) : '')}</i></button>`;
+    }).join('')}</div>` : ''}
+  </div>`;
+  document.getElementById('mvBot').innerHTML = ok
+    ? `<button class="btn btn-pri mv-go" id="mvGo" onclick="mvConfirm()" ${MV.to ? '' : 'disabled'}>Подтвердить перемещение</button>`
+    : `<button class="btn btn-pri mv-go" onclick="mvScan()">Сканировать другую</button>`;
+  mid.scrollTop = 0;
+}
+function mvPick(id){ MV.to = id; mvItemPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
+
+async function mvConfirm(){
+  if(MV.busy || !MV.to || !MV.code) return; MV.busy = true;
+  const b = document.getElementById('mvGo'); if(b){ b.disabled = true; b.textContent = 'Перемещаем…'; }
+  try{
+    const r = await drvApi.drvFetch('/api/driver/stock/move', {method: 'POST', body: {code: MV.code, to: MV.to}});
+    if(r.ok){
+      MV.total++;
+      toast(`${r.name || (MV.item || {}).name || 'Бутылка'} → ${r.to_code || ''}`);
+      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      MV.busy = false; mvScan(); return;
+    }
+    toast(r.say || 'Не переехала', 'err');
+    try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
+  }catch(e){ toast('Не отправилось — попробуйте ещё раз', 'err'); }
+  MV.busy = false; mvItemPaint();
+}
+// Стрелка назад: со страницы бутылки — к камере, с камеры — закрыть.
+function mvBack(){ if(MV.mode === 'item'){ mvScan(); return; } mvDone(); }
 function mvDone(){
   SCAN.stop();
-  document.getElementById('mvSheet').classList.remove('show');
+  document.getElementById('mvScr').classList.remove('show');
   if(MV.total){
     toast(`Перевезли ${MV.total} ${plural(MV.total, 'бутылку', 'бутылки', 'бутылок')}`);
     mvLoad(true);

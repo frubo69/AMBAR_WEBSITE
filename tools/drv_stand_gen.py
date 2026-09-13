@@ -67,6 +67,12 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     window.__FAILN = (window.__FAILN || 0) + 1;
     if(!lim || window.__FAILN <= +lim){ const e = new Error('stand fail'); e.status = +(ST_Q.get('code') || 500); throw e; }
   }
+  const ST_DISTR = [{id:'alg', code:'B1', name:'Алгусес'}, {id:'jvc', code:'B2', name:'JVC'}, {id:'dm', code:'B3', name:'Дубай Марина'}, {id:'bbay', code:'B4', name:'Бизнес Бей'}, {id:'silicon', code:'B5', name:'Силикон Оазис'}];
+  if(path === '/api/driver/stock/moves') return {day: '2026-09-14', rows: [], districts: ST_DISTR};
+  if(path.indexOf('/api/driver/stock/code') === 0) return ST_Q.get('badcode')
+    ? {ok: false, verdict: 'written', say: 'была списана', code: 'AMB-0001-Q', label: 'Q-0001', name: 'Absolut 1 ltr', img: 'https://ambar-delivery.com/products/p1.webp', cat: 'Водка', price: 95, district: {id:'dm', code:'B3', name:'Дубай Марина'}, at: _agoIso(3*24*60), moves: 0, last_move: null, districts: ST_DISTR}
+    : {ok: true, verdict: 'ok', say: '', code: 'AMB-0001-Q', label: 'Q-0001', name: 'Absolut 1 ltr', img: 'https://ambar-delivery.com/products/p1.webp', cat: 'Водка', price: 95, district: {id:'dm', code:'B3', name:'Дубай Марина'}, at: _agoIso(3*24*60), moves: 1, last_move: {from_code:'B1', to_code:'B3', at: _agoIso(60)}, districts: ST_DISTR};
+  if(path === '/api/driver/stock/move' && m === 'POST') return {ok: true, verdict: 'ok', name: 'Absolut 1 ltr', from_code: 'B3', to_code: 'B1'};
   if(path === '/api/driver/orders') return {day: '2026-09-11', active: (ST_Q.get('noorders') || ST_Q.get('tab') === 'shift' && !ST_Q.get('route')) ? [] : ST_ACTIVE, done: [{...ST_ORDER2, order_id: 'AMB00000009', delivered_at: _agoIso(38)}], total_aed: 95, panic: false};
   if(path === '/api/driver/expenses' && m === 'POST'){ stLog('API POST ' + path + ' ' + JSON.stringify(opts.body || {})); return {ok: true}; }
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0, working: true, meal_rates: {working: 80, off: 40},
@@ -155,6 +161,8 @@ async function standBoot(){
   shPaint();   // как в бою: boot() → shLoad() → shPaint() — замок смены/гео
   await new Promise(r => setTimeout(r, 80));
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
+  // ?open=mv — сканер перемещения; &code=1 — как будто код прочитан (камеры на стенде нет); &badcode=1 — списанная; &pick=1 — район выбран
+  if(ST_Q.get('open') === 'mv'){ await mvOpen(); if(ST_Q.get('code')){ await new Promise(r => setTimeout(r, 300)); await mvCode('AMB-0001-Q'); if(ST_Q.get('pick')) mvPick('alg'); } }
   // ?open=inc — лист входящего заказа; &mock=1 — цифры как на макете владельца
   // (один Absolut, 95 AED, принят 00:43, доставка 50 мин, быть до 01:33, не просрочен)
   if(ST_Q.get('open') === 'inc') incShow(ST_ORDER);
@@ -191,7 +199,7 @@ src = src.replace("\nboot();", "\nstandBoot();")
 # Ширина экрана стенда: по умолчанию 390 (безголовый Chrome не уже 500), для
 # сравнения с макетами владельца — 430: python3 tools/drv_stand_gen.py <dir> 430
 W = sys.argv[2] if len(sys.argv) > 2 else '390'
-src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:WPX;margin:0;overflow:visible}.sheet{right:auto;width:WPX}.hdr{width:WPX}.tabbar{width:WPX}.call-bar{width:WPX}.shscr{width:WPX;right:auto}.inc{width:WPX;right:auto}.sheet-in{max-width:WPX}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:WPX}</style></head>""".replace('WPX', W + 'px'), 1)
+src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:WPX;margin:0;overflow:visible}.sheet{right:auto;width:WPX}.hdr{width:WPX}.tabbar{width:WPX}.call-bar{width:WPX}.shscr{width:WPX;right:auto}.inc{width:WPX;right:auto}.sup-scr{width:WPX;right:auto}.sheet-in{max-width:WPX}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:WPX}</style></head>""".replace('WPX', W + 'px'), 1)
 src = src.replace("</body>", '<div id="sterr"></div></body>', 1)
 # для снимков журнал стенда мешает: длинные строки растягивают страницу шире 390
 src = src.replace("</head>", "<script>if(new URLSearchParams(location.search).get('nolog'))document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sterr');if(e)e.style.display='none'});</script></head>", 1)

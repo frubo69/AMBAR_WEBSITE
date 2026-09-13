@@ -864,6 +864,47 @@ async def handle_move_scan(request):
 
 
 @require_driver
+async def handle_code_info(request):
+    """?code= → что за бутылка, до переезда: название и фото товара из каталога,
+    где числится, когда записана, сколько раз ездила. Водитель сначала видит,
+    что везёт, и только потом выбирает куда. Telegram-id не отдаём."""
+    import stock_routes
+    from config_offices import OFFICE_IDS, OFFICE_CODES, OFFICE_NAMES
+    code = re.sub(r"\s+", "", str(request.query.get("code") or ""))[:120]
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    districts = [{"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, "")} for o in OFFICE_IDS]
+    doc = await db.qr_get(code)
+    if not doc:
+        return web.json_response({"ok": False, "verdict": "unknown", "say": stock_routes.MOVE_SAY["unknown"],
+                                  "code": code, "districts": districts}, headers=CORS_HEADERS)
+    st = (doc.get("status") or "active").strip()
+    pid = str(doc.get("product_id") or "")
+    p = stock_routes._catalog().get(pid) or {}
+    src = (doc.get("district") or "").strip()
+    moves = doc.get("moves") or []
+    last = moves[-1] if moves else None
+    verdict = "ok" if st == "active" else st
+    if verdict == "ok" and src not in OFFICE_IDS:
+        verdict = "nohome"
+    if verdict == "ok" and not p:
+        verdict = "no_item"
+    return web.json_response({
+        "ok": verdict == "ok", "verdict": verdict, "say": stock_routes.MOVE_SAY.get(verdict, ""),
+        "code": code, "label": doc.get("label") or "",
+        "name": p.get("name") or doc.get("product_name") or "",
+        "img": p.get("img") or "", "cat": p.get("cat") or "",
+        "price": stock_routes._price(p) if p else 0,
+        "district": {"id": src, "code": OFFICE_CODES.get(src, ""), "name": OFFICE_NAMES.get(src, "")},
+        "at": doc.get("at"), "moves": len(moves),
+        "last_move": ({"from_code": OFFICE_CODES.get(str(last.get("from") or ""), ""),
+                       "to_code": OFFICE_CODES.get(str(last.get("to") or ""), ""),
+                       "at": last.get("at")} if last else None),
+        "districts": districts,
+    }, headers=CORS_HEADERS)
+
+
+@require_driver
 async def handle_move_undo(request):
     """{code} — вернуть бутылку: только если последний переезд — мой."""
     import stock_routes
@@ -2255,6 +2296,7 @@ def setup(app):
         ("/api/driver/writeoff/scan",           handle_writeoff_scan, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),
         ("/api/driver/stock/moves",             handle_moves,       "GET"),
+        ("/api/driver/stock/code",              handle_code_info,   "GET"),
         ("/api/driver/stock/move",              handle_move_scan,   "POST"),
         ("/api/driver/stock/move/undo",         handle_move_undo,   "POST"),
         ("/api/driver/stock/move/{tid}",        handle_move_del,    "DELETE"),

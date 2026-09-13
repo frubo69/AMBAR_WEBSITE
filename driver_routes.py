@@ -1300,11 +1300,11 @@ async def handle_rates(request):
             continue
         out.append({"code": code, "name": r.get("name") or code, "sym": FX_SYM.get(code, code),
                     "rate": float(rate), "cash": bool(r.get("cash_aed")),
-                    "main": code in main})
+                    "market": float(r.get("aed") or 0) or None, "main": code in main})
     out.sort(key=lambda r: (0 if r["main"] else 1,
                             main.index(r["code"]) if r["code"] in main else 0, r["code"]))
     return web.json_response({"rates": out, "at": d.get("fetched_iso") or "",
-                              "ok": bool(out)}, headers=CORS_HEADERS)
+                              "silent": bool(d.get("silent")), "ok": bool(out)}, headers=CORS_HEADERS)
 
 
 @require_driver

@@ -56,7 +56,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0};
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift') return ST_SHIFT;
-  if(path === '/api/driver/rates') return ST_RATES;
+  if(path === '/api/driver/rates') return ST_FX;
   if(path === '/api/driver/catalog') return ST_CAT;
   if(path === '/api/driver/profile') return ST_PROF;
   if(path.endsWith('/chat') && m === 'GET') return {order_id: ST_ORDER.order_id, chat: [{by:'driver', name:'Али', text:'Клиент не отвечает', at:_agoIso(4), kind:'client'}, {by:'operator', name:'Парвиз', text:'Ждите 5 минут, звоню клиенту', at:_agoIso(2), kind:''}], operator: 'Парвиз'};
@@ -65,6 +65,15 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   return {ok: true};
 }};
 // профиль: зарплата и списания за месяц
+const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), silent: false, rates: [
+  {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true},
+  {code:'EUR', name:'Евро', sym:'€', rate:4.012, market:3.998, cash:true, main:true},
+  {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0402, market:0.0399, cash:true, main:true},
+  {code:'UZS', name:'Узбекский сум', sym:'', rate:0.00029, market:0.00029, cash:false, main:true},
+  {code:'KGS', name:'Киргизский сом', sym:'', rate:0.042, market:0.042, cash:false, main:true},
+  {code:'TJS', name:'Таджикский сомони', sym:'', rate:0.336, market:0.336, cash:false, main:false},
+  {code:'KZT', name:'Казахский тенге', sym:'', rate:0.0068, market:0.0068, cash:false, main:false},
+  {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:4.66, market:4.66, cash:false, main:false}]};
 const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t: 'Водитель', code: 'B1', district: 'jvc',
   district_name: 'JVC', since: '2025-05-12', active: true, rate: 5000, cur: 'AED', unit: 'month', days: 26,
   accrued: 5000, plus: 0, minus: 1750, fines: 1350, holds: 400, to_pay: 3250, paid: 0, left: 3250, debt: 0,

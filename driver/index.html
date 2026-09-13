@@ -2814,6 +2814,28 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-tile b{display:block;margin-top:3px;font-size:15.5px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.2px}
 .pf-tile i{display:block;margin-top:1px;font-style:normal;font-size:10px;color:var(--muted);white-space:nowrap}
 .pf-none{padding:16px;font-size:13.5px;color:var(--muted)}
+.pf-tile.pf-tap{font-family:inherit;text-align:left;cursor:pointer}
+.pf-tile.pf-tap:active{border-color:rgba(201,169,110,.45)}
+.pf-tap-c{flex:0 0 auto;display:flex;align-self:center;margin-left:auto;color:var(--gold2)}
+/* Курс валют: та же таблица, что у владельца в «Финансах» */
+.pf-back{display:flex;align-items:center;gap:11px;margin:0 0 12px}
+.pf-back button{width:36px;height:36px;border-radius:11px;border:1px solid var(--border2);background:var(--card);
+  color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.pf-back b{font-size:19px;font-weight:700;color:var(--text)}
+.pf-fxc{padding:12px}
+.pf-fxq{width:100%;height:40px;margin:0 0 10px;padding:0 13px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);font-family:inherit;font-size:13px}
+.pf-fxq:focus{outline:none;border-color:rgba(201,169,110,.45)}
+.pf-fxr{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border2)}
+.pf-fxr:first-child{border-top:0}
+.pf-fxc-code,.pf-fxc span{}
+.pf-fxr .pf-fxc{flex:0 0 42px;font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--gold2)}
+.pf-fxn{flex:1;min-width:0;font-size:12.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-fxv{flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}
+.pf-fxv b{display:block;font-size:14px;font-weight:700;line-height:1.15;color:var(--text)}
+.pf-fxv i{display:block;margin-top:2px;font-style:normal;font-size:10.5px;font-weight:600;color:var(--up);line-height:1.25}
+.pf-fxv i.none{color:var(--dim);font-weight:500}
+.pf-fxnote{margin:10px 2px 0;font-size:11px;line-height:1.55;color:var(--dim)}
 
 </style>
 </head>
@@ -3996,7 +4018,7 @@ const PROF_M = ['Январь', 'Февраль', 'Март', 'Апрель', '�
                 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const PROF_MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля',
                  'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-let PROF = null, PROF_MONTH = '', PROF_BUSY = false;
+let PROF = null, PROF_MONTH = '', PROF_BUSY = false, PROF_PAGE = '', FXD = null, FXD_Q = '';
 // fmt() ставит пробел вместо запятой — у дробной суммы получалось «3 680 5».
 // Деньги в профиле целые, десятые — в пользу водителя: начисления вверх,
 // списания вниз. Слово владельца: «десятые округляй до 1 дирхама в их сторону».
@@ -4020,6 +4042,53 @@ async function profLoad(){
   }catch(e){ if(PROF_MONTH !== (PROF && PROF.month)) PROF = null; }
   PROF_BUSY = false;
   if(TAB === 'profile') profPaint();
+  fxdLoad();
+}
+// Курсы — те же, что у владельца в «Финансах»: где обменник обновился, его, иначе рыночный
+async function fxdLoad(){
+  if(FXD) return;
+  try{ FXD = await drvApi.drvFetch('/api/driver/rates'); }catch(e){ FXD = null; }
+  if(TAB === 'profile') profPaint();
+}
+function fxdN(v){ return v >= 1 ? (+v).toFixed(3) : (+v).toFixed(4); }
+function fxdMain(){
+  const r = ((FXD && FXD.rates) || []).find(x => x.code === 'USD') || ((FXD && FXD.rates) || [])[0];
+  return r ? {code: r.code, v: fxdN(r.rate), cash: r.cash} : null;
+}
+function fxdWhen(iso){
+  const d = iso ? new Date(iso.length <= 19 ? iso + 'Z' : iso) : null;
+  if(!d || isNaN(d)) return '';
+  const hh = d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+  return d.toDateString() === new Date().toDateString() ? `сегодня в ${hh}`
+    : `${d.getUTCDate()} ${PROF_MG[d.getUTCMonth()]}, ${hh}`;
+}
+function profRates(){ PROF_PAGE = 'rates'; FXD_Q = ''; profPaint(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
+function profBack(){ PROF_PAGE = ''; profPaint(); window.scrollTo({top: 0}); }
+function fxdFind(v){
+  FXD_Q = v;
+  const box = document.getElementById('pfFxList'); if(box) box.innerHTML = fxdRows();
+}
+function fxdRows(){
+  const rows = (FXD && FXD.rates) || [], q = (FXD_Q || '').trim().toLowerCase();
+  const shown = q ? rows.filter(r => r.code.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q))
+                  : rows.filter(r => r.main || r.cash);
+  if(!shown.length) return `<div class="pf-none">${rows.length ? 'Такой валюты нет' : 'Курсы не загрузились'}</div>`;
+  return shown.map(r => `<div class="pf-fxr">
+      <span class="pf-fxc">${esc(r.code)}</span>
+      <span class="pf-fxn">${esc(r.name || r.code)}</span>
+      <span class="pf-fxv"><b>${fxdN(r.rate)} AED</b>${r.cash
+        ? `<i>обменник${r.market ? ' · рынок ' + fxdN(r.market) : ''}</i>`
+        : '<i class="none">рыночный · обменник молчит</i>'}</span>
+    </div>`).join('');
+}
+function profRatesHtml(){
+  return `<div class="pf-back"><button onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button><b>Курс валют</b></div>
+    <div class="card pf-fxc">
+      <input class="pf-fxq" id="pfFxQ" placeholder="Поиск валюты" autocomplete="off" oninput="fxdFind(this.value)">
+      <div id="pfFxList">${fxdRows()}</div>
+    </div>
+    <div class="pf-fxnote">Дирхамов за единицу валюты. Где обменник обновил курс — он, иначе рыночный.${
+      FXD && FXD.at ? (FXD.silent ? ` Источник молчит, последнее ${fxdWhen(FXD.at)}.` : ` Обновлено ${fxdWhen(FXD.at)}.`) : ''}</div>`;
 }
 function profStep(n){
   const now = profMonthNow(), [y, m] = (PROF_MONTH || now).split('-').map(Number);
@@ -4036,6 +4105,7 @@ function profPaint(){
   box.innerHTML = profHtml();
 }
 function profHtml(){
+  if(PROF_PAGE === 'rates') return profRatesHtml();
   const p = PROF, m = PROF_MONTH || profMonthNow();
   const head = profHead(p);
   if(!p) return head + `<div class="card">${PROF_BUSY ? 'Загрузка…' : 'Не удалось загрузить зарплату'}</div>`;
@@ -4056,10 +4126,18 @@ function profHtml(){
     </div>
     <div class="pf-tiles">
       <div class="pf-tile"><span>${svg(ICO.note, 17)}</span><div><u>Всего списаний</u><b>${sk(p.month_total, 'down')}</b><i>в этом месяце</i></div></div>
-      <div class="pf-tile"><span>${svg(ICO.cal, 17)}</span><div><u>Количество списаний</u><b>${fmt(Math.round(p.month_count || 0))}</b><i>в этом месяце</i></div></div>
+      ${profFxTile()}
     </div>
   </div>`;
   return head + money;
+}
+function profFxTile(){
+  const m = fxdMain();
+  return `<button class="pf-tile pf-tap" onclick="profRates()">
+      <span>${svg(ICO.cash, 17)}</span>
+      <div><u>Курс валют</u><b>${m ? m.v + ' AED' : '—'}</b><i>${m ? `за 1 ${m.code} · ${m.cash ? 'обменник' : 'рынок'}` : 'нажмите, чтобы открыть'}</i></div>
+      <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
+    </button>`;
 }
 function profHead(p){
   const code = (p && p.code) || '', dist = (p && p.district_name) || '', role = (p && p.role_t) || 'Водитель';

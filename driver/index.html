@@ -4248,10 +4248,12 @@ function fxdSpark(r){
     <polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 function fxdRows(){
-  const rows = (FXD && FXD.rates) || [], q = (FXD_Q || '').trim().toLowerCase();
+  // Показываем только те валюты, что владелец оставил: основные и USDT.
+  // Ниже юаня шёл алфавитный хвост источника (афгани, кванза и прочее) — убран.
+  const rows = ((FXD && FXD.rates) || []).filter(r => r.main || r.kind === 'crypto');
+  const q = (FXD_Q || '').trim().toLowerCase();
   let shown = rows;
-  if(FXD_F === 'main') shown = rows.filter(r => r.main);
-  else if(FXD_F === 'fiat') shown = rows.filter(r => r.kind !== 'crypto');
+  if(FXD_F === 'fiat') shown = rows.filter(r => r.kind !== 'crypto');
   else if(FXD_F === 'crypto') shown = rows.filter(r => r.kind === 'crypto');
   if(q) shown = shown.filter(r => r.code.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q));
   if(!shown.length) return `<div class="pf-none">${rows.length ? 'Такой валюты нет' : 'Курсы не загрузились'}</div>`;
@@ -4278,7 +4280,7 @@ function fxdRows(){
 function profRatesHtml(){
   const d = new Date();
   const day = `${d.getDate()} ${PROF_MG[d.getMonth()]} ${d.getFullYear()}`;
-  const chips = [['all', 'Все'], ['main', 'Популярные'], ['fiat', 'Фиат'], ['crypto', 'Криптовалюты']];
+  const chips = [['all', 'Все'], ['fiat', 'Фиат'], ['crypto', 'Криптовалюты']];
   return `<div class="fxh">
       <button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
       <b class="fxh-t">Курс валют</b>

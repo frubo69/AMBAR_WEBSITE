@@ -69,15 +69,12 @@ const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), sile
   {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true, kind:'fiat', prev:3.6686, change:0.12, spark:[3.668,3.669,3.6705,3.669,3.6715,3.673]},
   {code:'EUR', name:'Евро', sym:'€', rate:4.261, market:4.258, cash:true, main:true, kind:'fiat', prev:4.2644, change:-0.08, spark:[4.272,4.269,4.2655,4.267,4.2644,4.261]},
   {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:5.015, market:5.01, cash:false, main:true, kind:'fiat', prev:5.0075, change:0.15, spark:[5.0,5.004,5.002,5.009,5.0075,5.015]},
-  {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0435, market:0.0433, cash:true, main:true, kind:'fiat', prev:0.0436, change:-0.21, spark:[0.0441,0.0439,0.0438,0.0437,0.0436,0.0435]},
+  {code:'RUB', name:'Рубль', sym:'₽', rate:0.0435, market:0.0433, cash:true, main:true, kind:'fiat', prev:0.0436, change:-0.21, spark:[0.0441,0.0439,0.0438,0.0437,0.0436,0.0435]},
   {code:'TRY', name:'Турецкая лира', sym:'₺', rate:0.0756, market:0.0755, cash:false, main:true, kind:'fiat', prev:0.0754, change:0.32, spark:[0.0749,0.0751,0.075,0.0753,0.0754,0.0756]},
   {code:'CNY', name:'Юань', sym:'¥', rate:0.5456, market:0.5454, cash:false, main:true, kind:'fiat', prev:0.5446, change:0.18, spark:[0.5432,0.5438,0.5435,0.5442,0.5446,0.5456]},
-  {code:'CAD', name:'Канадский доллар', sym:'$', rate:2.695, market:2.694, cash:false, main:false, kind:'fiat', prev:2.6964, change:-0.05, spark:[2.702,2.7,2.698,2.699,2.6964,2.695]},
-  {code:'DKK', name:'Датская крона', sym:'', rate:0.5848, market:0.5846, cash:false, main:false, kind:'fiat', prev:0.5842, change:0.11, spark:[0.5836,0.5839,0.5838,0.5841,0.5842,0.5848]},
-  {code:'KES', name:'Кенийский шиллинг', sym:'', rate:0.0296, market:0.0296, cash:false, main:false, kind:'fiat', prev:0.0295, change:0.27, spark:[0.0293,0.0294,0.0294,0.0295,0.0295,0.0296]},
-  {code:'UZS', name:'Узбекский сум', sym:'', rate:0.00029, market:0.00029, cash:false, main:false, kind:'fiat', prev:0.00029, change:0.0, spark:[]},
-  {code:'KGS', name:'Киргизский сом', sym:'', rate:0.042, market:0.042, cash:false, main:false, kind:'fiat', prev:0.0419, change:0.09, spark:[0.0418,0.0419,0.0419,0.0419,0.0419,0.042]},
-  {code:'KZT', name:'Казахский тенге', sym:'', rate:0.0068, market:0.0068, cash:false, main:false, kind:'fiat', prev:0.0068, change:-0.03, spark:[0.00682,0.00681,0.00681,0.0068,0.0068,0.0068]},
+  {code:'TJS', name:'Таджикский сомони', sym:'', rate:0.3978, market:0.3978, cash:false, main:true, kind:'fiat', prev:0.3974, change:0.10, spark:[0.3969,0.3972,0.3971,0.3975,0.3974,0.3978]},
+  {code:'AFN', name:'AFN', sym:'', rate:0.057, market:0.057, cash:false, main:false, kind:'fiat', prev:0.0569, change:0.17, spark:[0.0568,0.0569,0.0569,0.0569,0.0569,0.057]},
+  {code:'KZT', name:'Тенге', sym:'', rate:0.0081, market:0.0081, cash:false, main:false, kind:'fiat', prev:0.0081, change:-0.03, spark:[]},
   {code:'USDT', name:'Tether USDT', sym:'', rate:3.673, market:3.673, cash:false, main:true, kind:'crypto', prev:3.6716, change:0.04, spark:[3.671,3.6705,3.672,3.6715,3.6716,3.673]}]};
 // первый день: истории ещё нет — ни процентов, ни графика
 if(ST_Q.get('fxnew')){ ST_FX.days = 0; ST_FX.rates.forEach(r => { r.change = null; r.prev = null; r.spark = []; }); }

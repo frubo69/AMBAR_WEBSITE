@@ -2794,16 +2794,27 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-mn button{width:30px;height:30px;border-radius:50%;border:1px solid var(--border3);background:var(--card2);
   color:var(--gold2);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .pf-mn i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
-.pf-sum{display:flex;align-items:stretch;gap:3px;padding:0 11px}
-.pf-box{flex:1;min-width:0;min-height:70px;display:flex;flex-direction:column;justify-content:center;gap:6px;
-  padding:10px 3px;border-radius:13px;border:1px solid rgba(255,255,255,.07);background:#12122a;text-align:center}
-.pf-box u{display:flex;align-items:center;justify-content:center;min-height:23px;text-decoration:none;font-size:9.5px;
-  line-height:1.15;color:var(--muted);letter-spacing:-.1px}
-.pf-box b{display:block;font-size:14px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.2px}
-.pf-box b.dn{color:#F26A6A}
-.pf-box.gold{border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
-.pf-box.gold b{color:var(--gold2)}
-.pf-op{align-self:center;font-size:12px;color:var(--muted)}
+.pf-h-t{min-width:0}
+.pf-h-t b{display:block;font-size:15px;font-weight:700;color:var(--text);line-height:1.2}
+.pf-h-t i{display:block;margin-top:1px;font-style:normal;font-size:11px;color:var(--muted);line-height:1.2}
+.pf-mn-p{display:flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--border3);
+  background:var(--card2);font-style:normal;font-size:12px;font-weight:600;color:var(--sub);white-space:nowrap}
+/* Формула: четыре столбца, разделённые тонкой чертой; знак действия стоит на
+   черте. Размеры сняты с макета владельца (значение 11.5, подпись 9.5, значок 14). */
+.pf-f{display:flex;align-items:stretch;justify-content:space-between;padding:2px 11px 13px}
+.pf-fc{flex:0 1 auto;min-width:0}
+.pf-fc u{display:block;text-decoration:none;font-size:9.5px;line-height:1.15;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-fv{display:flex;align-items:center;gap:4px;margin-top:6px}
+.pf-fv em{flex:0 0 auto;display:flex;color:var(--muted)}
+.pf-fv b{font-size:11px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;
+  white-space:nowrap;letter-spacing:-.2px}
+.pf-fc.fine .pf-fv em,.pf-fc.fine .pf-fv b{color:#F26A6A}
+.pf-fc.zero .pf-fv em{color:var(--dim)}
+.pf-fc.zero .pf-fv b{color:var(--text)}
+.pf-fc.pay .pf-fv em,.pf-fc.pay .pf-fv b{color:var(--gold2)}
+.pf-fo{flex:0 0 auto;display:flex;align-items:flex-end;padding:0 5px 5px;
+  border-left:1px solid var(--border2);font-size:11px;line-height:1;color:var(--muted)}
 .pf-tiles{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:11px}
 .pf-tile{display:flex;align-items:center;gap:9px;padding:11px 8px;border-radius:13px;background:#12122a;
   border:1px solid rgba(255,255,255,.06);min-width:0}
@@ -3835,6 +3846,10 @@ const ICO = {
   out:  '<path d="M7 17 17 7"/><path d="M9 7h8v8"/>',
   into: '<path d="M17 7 7 17"/><path d="M15 17H7V9"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
+  // Формула зарплаты: стопка монет, восклицание в круге, минус в круге
+  coins:'<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>',
+  excl: '<circle cx="12" cy="12" r="9"/><path d="M12 7.6v5.2M12 16.2h.01"/>',
+  minusc:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12h7.6"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
   stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -4383,19 +4398,22 @@ function profHtml(){
   const p = PROF, m = PROF_MONTH || profMonthNow();
   const head = profHead(p) + profWarn();
   const sk = (v, favor) => p ? profSum(v, favor) : skb(58, 14);
+  const col = (cls, label, ico, val, favor) => `<div class="pf-fc ${cls}">
+      <u>${label}</u><span class="pf-fv"><em>${svg(ico, 13)}</em><b>${sk(val, favor)}</b></span></div>`;
   const money = `<div class="card pf-pay">
-    <div class="pf-h"><span class="pf-h-i">${svg(ICO.wallet, 17)}</span><b>Зарплата</b>
+    <div class="pf-h"><span class="pf-h-i">${svg(ICO.wallet, 17)}</span>
+      <div class="pf-h-t"><b>Зарплата</b><i>${profMonthT(m)}</i></div>
       <span class="pf-mn"><button onclick="profStep(-1)" aria-label="Предыдущий месяц">${svg(ICO.back, 14)}</button>
-        <i>${profMonthT(m)}</i>
+        <i class="pf-mn-p">${profMonthT(m)}</i>
         <button onclick="profStep(1)" aria-label="Следующий месяц">${svg(ICO.chevR, 14)}</button></span></div>
-    <div class="pf-sum">
-      <div class="pf-box"><u>Базовая зарплата</u><b>${sk(p && p.accrued)}</b></div>
-      <span class="pf-op">−</span>
-      <div class="pf-box"><u>Штрафы</u><b class="dn">${sk(p && p.fines, 'down')}</b></div>
-      <span class="pf-op">−</span>
-      <div class="pf-box"><u>Удержания</u><b class="dn">${sk(p && p.holds, 'down')}</b></div>
-      <span class="pf-op">=</span>
-      <div class="pf-box gold"><u>К выплате</u><b>${sk(p && p.to_pay)}</b></div>
+    <div class="pf-f">
+      ${col('', 'Базовая', ICO.coins, p && p.accrued)}
+      <span class="pf-fo">−</span>
+      ${col(p && !p.fines ? 'zero' : 'fine', 'Штрафы', ICO.excl, p && p.fines, 'down')}
+      <span class="pf-fo">−</span>
+      ${col(p && !p.holds ? 'zero' : 'fine', 'Удержания', ICO.minusc, p && p.holds, 'down')}
+      <span class="pf-fo">=</span>
+      ${col('pay', 'К выплате', ICO.wallet, p && p.to_pay)}
     </div>
     <div class="pf-tiles">
       <button class="pf-tile pf-tap" onclick="profHist()"><span>${svg(ICO.note, 17)}</span>

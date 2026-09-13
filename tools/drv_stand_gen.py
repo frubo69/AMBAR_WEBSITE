@@ -101,6 +101,8 @@ const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t:
     {id: 'p7', kind: 'fine', t: 'Штраф', amount: 1500, per_month: 0, day: '2026-08-18', at: '2026-08-18T08:30:00', reason: 'Авария по вине водителя · Повреждение автомобиля', note: '', due: 0, left: 0, done: true, cancelled: false},
     {id: 'p8', kind: 'fine', t: 'Штраф', amount: 500, per_month: 0, day: '2026-08-10', at: '2026-08-10T14:55:00', reason: 'Несоблюдение ПДД · Проезд на красный сигнал', note: '', due: 0, left: 0, done: true, cancelled: false},
     {id: 'p9', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-08-02', at: '2026-08-02T07:20:00', reason: 'Использование телефона за рулём · Во время движения', note: '', due: 0, left: 0, done: true, cancelled: false}]};
+// ?big=1 — крупные суммы: проверка, что формула зарплаты не обрезается
+if(ST_Q.get('big')){ Object.assign(ST_PROF, {accrued: 15000, fines: 12500, holds: 10000, to_pay: 11500, month_total: 22500}); }
 const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(120), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
 async function standBoot(){
   ME = {name: 'Али', district: 'alg', district_code: 'B4'};

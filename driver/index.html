@@ -2811,17 +2811,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-tile u{display:block;text-decoration:none;font-size:10px;color:var(--muted)}
 .pf-tile b{display:block;margin-top:2px;font-size:14.5px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
 .pf-tile i{display:block;font-style:normal;font-size:10px;color:var(--muted)}
-.pf-tabs{display:flex;gap:6px;margin:0 0 10px}
-.pf-tabs button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px;
-  border-radius:12px;border:1px solid var(--border2);background:var(--card);color:var(--muted);
-  font-family:inherit;font-size:10.5px;font-weight:600;cursor:pointer}
-.pf-tabs button.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft);color:var(--gold2)}
-.pf-f{margin:0 0 8px}
-.pf-fb{display:flex;align-items:center;gap:7px;height:36px;padding:0 12px;border-radius:12px;border:1px solid var(--border3);
-  background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.pf-fb svg:first-child{color:var(--gold2)}
-.pf-menu{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
-.pf-menu[hidden]{display:none}
 .pf-row{display:flex;align-items:flex-start;gap:10px;margin:0 0 8px;padding:12px 10px 12px 12px;border-radius:14px;
   border:1px solid var(--border2);background:linear-gradient(180deg,#161629 0%,#0F0F20 100%)}
 .pf-row-i{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
@@ -2838,14 +2827,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-row-v b{display:block;margin-top:5px;font-size:14.5px;font-weight:800;color:#F26A6A;font-variant-numeric:tabular-nums}
 .pf-row.off{opacity:.55}
 .pf-row.off .pf-row-v b{text-decoration:line-through;color:var(--muted)}
-.pf-list{padding:2px 0}
-.pf-l{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:8px 14px;
-  border-top:1px solid var(--border2);font-size:13.5px;color:var(--sub)}
-.pf-l:first-child{border-top:0}
-.pf-l b{font-size:14.5px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;text-align:right}
-.pf-l b.gold{color:var(--gold2)}
-.pf-l b.dn{color:#F26A6A}
-.pf-l b.up{color:var(--up)}
 .pf-none{padding:16px;font-size:13.5px;color:var(--muted)}
 
 </style>
@@ -4029,8 +4010,7 @@ const PROF_M = ['Январь', 'Февраль', 'Март', 'Апрель', '�
                 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const PROF_MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля',
                  'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-let PROF = null, PROF_MONTH = '', PROF_TAB = 'hist', PROF_F = 'all', PROF_BUSY = false;
-const PROF_FT = {all: 'Все', fine: 'Штрафы', hold: 'Удержания', off: 'Отменённые'};
+let PROF = null, PROF_MONTH = '', PROF_BUSY = false;
 function profMonthNow(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function profMonthT(m){ const [y, mm] = String(m || '').split('-'); return `${PROF_M[+mm - 1] || ''} ${y || ''}`; }
 function profDayT(d){
@@ -4056,12 +4036,6 @@ function profStep(n){
   const min = back.getUTCFullYear() + '-' + String(back.getUTCMonth() + 1).padStart(2, '0');
   if(next > now || next < min) return;
   PROF_MONTH = next; PROF = null; profPaint(); profLoad();
-  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-}
-function profTab(t){ PROF_TAB = t; profPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
-function profFilter(k){ PROF_F = k; profPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
-function profMenu(){
-  const m = document.getElementById('profMenu'); if(m) m.hidden = !m.hidden;
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // Значок по нарушению: машина, телефон, парковка, часы — остальное бумагой
@@ -4102,11 +4076,7 @@ function profHtml(){
       <div class="pf-tile"><span>${svg(ICO.cal, 17)}</span><div><u>Количество списаний</u><b>${fmt(p.month_count)}</b><i>в этом месяце</i></div></div>
     </div>
   </div>`;
-  const tabs = `<div class="pf-tabs">
-    ${[['hist', 'История списаний', ICO.note], ['pay', 'Детали зарплаты', ICO.chart], ['me', 'Личные данные', ICO.user]]
-      .map(([k, t, i]) => `<button class="${PROF_TAB === k ? 'on' : ''}" onclick="profTab('${k}')">${svg(i, 15)}<span>${t}</span></button>`).join('')}
-  </div>`;
-  return head + money + tabs + (PROF_TAB === 'hist' ? profHist(p) : PROF_TAB === 'pay' ? profPayTab(p) : profMeTab(p));
+  return head + money + profHist(p);
 }
 function profHead(p){
   const code = (p && p.code) || '', dist = (p && p.district_name) || '', role = (p && p.role_t) || 'Водитель';
@@ -4125,9 +4095,7 @@ function profHead(p){
   </div>`;
 }
 function profHist(p){
-  const all = (p.items || []).filter(it => PROF_F === 'all' ? true
-    : PROF_F === 'off' ? it.cancelled : (PROF_F === 'fine' ? it.kind === 'fine' : it.kind !== 'fine') && !it.cancelled);
-  const rows = all.map(it => {
+  const rows = (p.items || []).map(it => {
     const t = it.reason ? it.reason.split(' · ')[0] : (it.kind === 'hold' ? 'Свободное удержание' : it.t || 'Списание');
     const tier = it.reason ? it.reason.split(' · ').slice(1).join(' · ') : '';
     const line2 = [it.t, tier, it.cancelled ? 'отменён' : (it.per_month ? `по ${fmt(it.per_month)} в месяц` : '')].filter(Boolean).join(' · ');
@@ -4137,40 +4105,8 @@ function profHist(p){
       <span class="pf-row-v"><u>${esc(profDayT(it.day))}</u><b>${fmt(it.amount)} AED</b></span>
     </div>`;
   }).join('');
-  return `<div class="pf-f"><button class="pf-fb" onclick="profMenu()">${svg(ICO.filter, 14)}<span>${PROF_FT[PROF_F]}</span>${svg(ICO.chev, 13)}</button></div>
-    <div class="pf-menu" id="profMenu" hidden>${Object.keys(PROF_FT).map(k =>
-      `<button class="chip${PROF_F === k ? ' on' : ''}" onclick="profFilter('${k}')">${PROF_FT[k]}</button>`).join('')}</div>
-    ${rows || `<div class="card pf-none">${p.items && p.items.length ? 'В этом наборе пусто' : 'Списаний не было'}</div>`}`;
+  return rows || '<div class="card pf-none">Списаний не было</div>';
 }
-function profPayTab(p){
-  const r = (t, v, cls) => `<div class="pf-l"><span>${t}</span><b class="${cls || ''}">${v}</b></div>`;
-  const sk = v => fmt(v || 0) + ' AED';
-  const rate = p.rate === null || p.rate === undefined ? 'не задан'
-    : `${fmt(p.rate)} ${p.cur === 'USD' ? '$' : 'AED'} ${p.unit === 'day' ? 'в день' : 'в месяц'}`;
-  return `<div class="card pf-list">
-    ${r('Ставка', rate)}
-    ${r('Дней в месяце', fmt(p.days))}
-    ${r('Начислено', sk(p.accrued))}
-    ${p.plus ? r('Премии', '+ ' + sk(p.plus), 'up') : ''}
-    ${r('Штрафы', '− ' + sk(p.fines), 'dn')}
-    ${r('Удержания', '− ' + sk(p.holds), 'dn')}
-    ${r('К выплате', sk(p.to_pay), 'gold')}
-    ${r('Выплачено', sk(p.paid))}
-    ${r('Осталось', sk(p.left), 'gold')}
-    ${p.debt ? r('Останется долг', sk(p.debt), 'dn') : ''}
-  </div>`;
-}
-function profMeTab(p){
-  const r = (t, v) => `<div class="pf-l"><span>${t}</span><b>${esc(v || '—')}</b></div>`;
-  return `<div class="card pf-list">
-    ${r('Имя', p.name)}
-    ${r('Район', [p.code, p.district_name].filter(Boolean).join(' · '))}
-    ${r('Должность', p.role_t || 'Водитель')}
-    ${r('Статус', p.active === false ? 'Не работает' : 'Активен')}
-    ${p.since ? r('Работает с', profDayT(p.since)) : ''}
-  </div>`;
-}
-
 // Пустой экран: значок, заголовок, строка объяснения.
 function blank(ico, title, sub, cls){
   return `<div class="blank ${cls || ''}">

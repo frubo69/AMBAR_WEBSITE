@@ -3161,67 +3161,116 @@ button.path:active{transform:scale(.995)}
   font-style:normal;font-size:11px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2));font-variant-numeric:tabular-nums}
 .fb-who-s u{text-decoration:none;font-size:9px;font-weight:700;opacity:.75}
-/* «Штрафы и удержания»: две кнопки внизу «Штрафов/авансов/долгов» */
-.fb-pen2{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 14px;border-top:1px solid rgba(255,255,255,.05)}
-.fb-pen2-b{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 8px 13px;border-radius:14px;
-  border:1px solid rgba(201,169,110,.32);background:var(--card2);font-family:inherit;text-align:center;cursor:pointer;
+/* «Штрафы и удержания» и шаги штрафного листа — размеры сняты с макета владельца (экран 390) */
+.sc.fb-pen2c{background:linear-gradient(180deg,#151935 0%,#10132b 100%);border-color:rgba(255,255,255,.06)}
+.fb-pen-cap{font-size:14.5px;font-weight:600;color:#E8E8EF;line-height:1.3}
+.fb-pen2c > .fb-pen-cap{padding:16px 16px 0;font-weight:700;color:#F3F3F7}
+.fb-pen2{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:12px 12px 14px}
+.fb-pen2-b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:114px;padding:14px 4px;
+  border-radius:12px;border:1.5px solid rgba(201,169,110,.55);background:#0f1229;font-family:inherit;text-align:center;cursor:pointer;
   transition:transform .12s var(--e1)}
 .fb-pen2-b:active{transform:scale(.97);border-color:var(--gold2)}
-.fb-pen2-b em{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-style:normal;
+.fb-pen2-b em{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-style:normal;
   color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.fb-pen2-b em svg{stroke-width:2.2}
-.fb-pen2-b b{font-size:13px;font-weight:700;color:var(--text);line-height:1.2}
-.fb-pen2-b i{font-style:normal;font-size:10.5px;line-height:1.3;color:var(--muted)}
-/* штрафной лист: вид нарушения — карточка с золотой рамкой, как плитки РП− */
-.fb-penc{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 9px;padding:14px 10px 14px 14px;border-radius:15px;
-  border:1px solid rgba(201,169,110,.5);background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+.fb-pen2-b em svg{width:18px;height:18px;stroke-width:2.3}
+.fb-pen2-b b{font-size:13.5px;font-weight:700;color:#F2F2F6;line-height:1.2;white-space:nowrap}
+.fb-pen2-b i{font-style:normal;font-size:11.5px;line-height:1.35;color:#8b8b98;max-width:142px}
+/* шапка шагов: крупный заголовок, без месяца и без полосы */
+#accOv.pen-ui .stk-top{border-bottom-color:transparent;background:var(--bg)}
+#accOv.pen-ui .stk-top-r{gap:14px}
+#accOv.pen-ui .stk-x{width:36px;height:36px;border-radius:11px;border-color:transparent;background:#171a3a;color:#fff}
+#accOv.pen-ui .stk-ttl-t{font-size:20.5px;font-weight:700;letter-spacing:-.3px;line-height:1.2}
+#accOv.pen-ui .stk-ttl-s{display:none}
+#accOv.pen-ui .stk-mid{padding:8px 16px calc(24px + var(--safe-bottom))}
+/* «За что штраф?»: вид нарушения — высокая карточка с золотой рамкой */
+.fb-penc{display:flex;align-items:flex-start;gap:21px;width:100%;min-height:120px;margin:0 0 12px;padding:20px 16px 20px 19px;
+  border-radius:16px;border:1.5px solid rgba(201,169,110,.7);background:linear-gradient(180deg,#141733 0%,#10122a 100%);
   font-family:inherit;text-align:left;color:inherit;cursor:pointer}
 .fb-penc:active{border-color:var(--gold2)}
-.fb-penc > em:first-child{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  font-style:normal;color:var(--gold2);background:var(--gold-soft)}
-.fb-penc .fb-e-b b{font-size:15px;font-weight:700;color:var(--gold2)}
-.fb-penc .fb-e-b i{white-space:normal;font-size:11.5px;color:var(--sub)}
-.fb-pen-list .fb-e:first-child{border-top:0}
-.fb-pen-list .fb-e{min-height:52px}
-.fb-pen-list .fb-e-b b{font-size:14px;white-space:normal}
-.fb-pen-tier .fb-e-b i{font-size:13px;font-weight:700;color:var(--gold2);margin-top:3px}
-/* выбор водителя: поиск и районы с кружками */
-.fb-pen-q{display:flex;align-items:center;gap:8px;height:42px;margin:0 0 10px;padding:0 14px;border-radius:12px;
-  border:1px solid var(--border2);background:var(--card);color:var(--muted)}
-.fb-pen-q input{flex:1;min-width:0;height:100%;border:0;outline:0;background:none;color:var(--text);font-family:inherit;font-size:14px}
-.fb-pen-q input::placeholder{color:var(--dim)}
-.fb-pen-r{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:8px 14px;border:0;
-  border-top:1px solid rgba(255,255,255,.05);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;
+.fb-penc-i{flex:0 0 auto;width:49px;height:49px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+  font-style:normal;color:var(--gold2);background:#1b1b29}
+.fb-penc-b{flex:1;min-width:0;padding-top:5px}
+.fb-penc-b b{display:block;font-size:16px;font-weight:600;color:var(--gold2);line-height:1.3}
+.fb-penc-b i{display:block;margin-top:8px;max-width:152px;font-style:normal;font-size:13.5px;line-height:1.3;color:#C4C4CF}
+.fb-penc .fb-chev{width:35px;height:35px;margin-top:7px;background:#252027}
+/* списки нарушений и степеней: высокие строки, чёткие разделители */
+.fb-pen-list{margin:0 0 12px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:#0f0f1f}
+.fb-pen-row{display:flex;align-items:center;gap:12px;width:100%;min-height:74px;padding:12px 16px 12px 20px;border:0;
+  border-top:1px solid #2a2939;background:none;font-family:inherit;text-align:left;color:inherit;cursor:pointer}
+.fb-pen-row:first-child{border-top:0}
+.fb-pen-row:active{background:rgba(255,255,255,.03)}
+.fb-pen-rb{flex:1;min-width:0}
+.fb-pen-rb b{display:block;max-width:215px;font-size:15.5px;font-weight:600;line-height:1.38;color:#EEEDF3}
+.fb-pen-rb i{display:block;margin-top:7px;font-style:normal;font-size:16px;font-weight:600;line-height:1.3;color:#C7C6CF;
+  font-variant-numeric:tabular-nums}
+.fb-pen-tier{min-height:85px;padding-left:21px}
+.fb-pen-tier .fb-pen-rb b{font-size:16px}
+.fb-pen-row .fb-chev{width:38px;height:38px;background:#252027}
+.fb-pen-row .fb-chev,.fb-penc .fb-chev,.fb-pen-who .fb-chev{color:#EDC47B}
+.fb-pen-row .fb-chev svg,.fb-penc .fb-chev svg{width:17px;height:17px;stroke-width:2.8}
+.fb-pen-who .fb-chev svg{width:15px;height:15px;stroke-width:2.8}
+/* выбор водителя */
+.fb-pen-lbl{margin:0 2px 10px;font-size:16px;font-weight:700;color:#F1F1F5}
+.fb-pen-q{display:flex;align-items:center;gap:12px;height:48px;margin:0 0 12px;padding:0 16px;border-radius:14px;
+  border:1px solid rgba(201,169,110,.25);background:#0d0e1d;color:#b49a6b}
+.fb-pen-q input{flex:1;min-width:0;height:100%;border:0;outline:0;background:none;color:var(--text);font-family:inherit;font-size:15px}
+.fb-pen-q input::placeholder{color:#7c7c89}
+.fb-pen-g{margin:0 0 12px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.07);background:#0d0e1d}
+.fb-pen-gh{display:flex;align-items:baseline;gap:8px;min-height:44px;padding:11px 16px 9px 10px;background:#1c1a21;
+  border-bottom:1px solid rgba(255,255,255,.05)}
+.fb-pen-gh b{flex:0 0 auto;width:34px;font-size:19px;font-weight:700;color:var(--gold2)}
+.fb-pen-gh span{font-size:15px;font-weight:600;color:var(--gold2)}
+.fb-pen-gh i{font-style:normal;font-size:15px;font-weight:500;color:#9d9ba7;margin-left:-4px}
+.fb-pen-r{display:flex;align-items:center;gap:20px;width:100%;min-height:45px;padding:0 16px 0 19px;border:0;
+  border-top:1px solid #1b1a28;background:none;color:#F3F3F7;font-family:inherit;font-size:15.5px;font-weight:600;
   text-align:left;cursor:pointer}
-.fb-pen-g .crw-c-h + .fb-pen-r{border-top:0}
+.fb-pen-gh + .fb-pen-r{border-top:0}
 .fb-pen-r:active{background:rgba(201,169,110,.06)}
-.fb-radio{flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.28)}
-.on > .fb-radio{border-color:var(--gold2);background:radial-gradient(circle,var(--gold2) 0 4px,transparent 4.6px)}
+.fb-radio{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:2px solid #7f7f8b}
+.on > .fb-radio{border-color:transparent;background:radial-gradient(circle,#f7e6be 0 3.5px,#d5b273 4px 100%)}
 .fb-pen-r.on{color:var(--gold2)}
 .fb-pen-r[hidden],.fb-pen-g[hidden],.fb-pen-none[hidden],.fb-pen-parts[hidden]{display:none}
-/* назначить штраф / удержание: карточки-итоги, способ, комментарий, кнопка */
-.fb-pen-sum{display:flex;align-items:center;gap:14px;width:100%;padding:14px 12px 14px 16px;font-family:inherit;text-align:left;color:inherit}
-.fb-pen-sum > em:first-child{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  font-style:normal;color:var(--gold2);background:var(--gold-soft)}
-.fb-pen-sum .fb-e-b b{font-size:15px;font-weight:700;white-space:normal}
-.fb-pen-sum .fb-e-b i{font-size:13px;color:var(--sub);white-space:normal}
-.fb-pen-sum .fb-e-b u{display:block;margin-top:6px;text-decoration:none;font-size:16px;font-weight:800;color:var(--text);
-  font-variant-numeric:tabular-nums}
-.fb-pen-who{cursor:pointer}
-.fb-pen-who:active{border-color:var(--gold2)}
-.fb-pen-opt{display:flex;align-items:flex-start;gap:12px;width:100%;padding:12px 16px;border:0;border-top:1px solid rgba(255,255,255,.05);
-  background:none;color:inherit;font-family:inherit;text-align:left;cursor:pointer}
-.fb-pen-opt .fb-radio{margin-top:1px}
-.fb-pen-opt .fb-e-b b{font-size:14px}
-.fb-pen-opt .fb-e-b i{white-space:normal}
-.fb-pen-parts{padding:2px 16px 14px 48px}
+/* «Назначить штраф» и «Удержание» */
+.fb-pen-card{display:flex;align-items:center;gap:18px;width:100%;margin:0 0 12px;padding:16px;border-radius:16px;
+  border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#11132a 0%,#0d0f22 100%);
+  font-family:inherit;text-align:left;color:inherit}
+button.fb-pen-card{cursor:pointer}
+button.fb-pen-card:active{border-color:rgba(201,169,110,.5)}
+.fb-pen-sum{min-height:107px;padding:18px 16px}
+.fb-pen-ic{flex:0 0 auto;width:60px;height:60px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  font-style:normal;color:var(--gold2);background:#1b1a24}
+.fb-pen-cb{flex:1;min-width:0}
+.fb-pen-cb b{display:block;font-size:15.5px;font-weight:600;line-height:1.3;color:#F0F0F5}
+.fb-pen-cb i{display:block;margin-top:3px;font-style:normal;font-size:15.5px;font-weight:500;line-height:1.3;color:#E3E3EA}
+.fb-pen-cb u{display:block;margin-top:12px;text-decoration:none;font-size:16px;font-weight:700;color:#F5F5F9;font-variant-numeric:tabular-nums}
+.fb-pen-who{min-height:79px;padding:14px 16px}
+.fb-pen-ava{flex:0 0 auto;width:49px;height:49px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-style:normal;color:#fff;background:#2a2c45}
+.fb-pen-who .fb-pen-cb b{font-size:15.5px;font-weight:700}
+.fb-pen-who .fb-pen-cb i{margin-top:5px;font-size:13px;color:#B3B3BF}
+.fb-pen-who .fb-chev{width:32px;height:32px;background:#252027}
+.fb-pen-how,.fb-pen-form{display:block;padding:0}
+.fb-pen-caph{padding:14px 16px 13px;border-bottom:1px solid rgba(255,255,255,.07)}
+.fb-pen-opt{display:flex;align-items:flex-start;gap:16px;width:100%;padding:16px 16px 10px 17px;border:0;background:none;
+  color:inherit;font-family:inherit;text-align:left;cursor:pointer}
+.fb-pen-opt + .fb-pen-opt{padding-top:10px;padding-bottom:18px}
+.fb-pen-opt .fb-radio{width:28px;height:28px}
+.fb-pen-opt .fb-pen-cb{padding-top:3px}
+.fb-pen-opt .fb-pen-cb b{font-size:14.5px;font-weight:700}
+.fb-pen-opt .fb-pen-cb i{margin-top:8px;font-size:13px;font-weight:500;color:#8E8E9B}
+.fb-pen-parts{padding:0 16px 16px 61px}
 .fb-pen-seg{display:inline-flex}
-.fb-pen-per{display:block;margin-top:8px;font-style:normal;font-size:12px;font-weight:600;color:var(--gold2)}
-.fb-pen-in{padding:10px 16px 14px}
-.fb-pen-in .fb-txt{width:100%;height:42px;font-size:14px}
-.fb-pen-in .fb-txt.fb-pen-ta{height:auto;min-height:84px;padding:10px 12px;line-height:1.4;resize:none;display:block}
-.fb-pen-go{display:block;width:100%;height:52px;margin:4px 0 18px;border:0;border-radius:14px;cursor:pointer;
-  font-family:inherit;font-size:15px;font-weight:800;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.fb-pen-per{display:block;margin-top:8px;font-style:normal;font-size:12.5px;font-weight:600;color:var(--gold2)}
+.fb-pen-sec{padding:14px 16px 16px}
+.fb-pen-sec + .fb-pen-sec{border-top:1px solid rgba(255,255,255,.07)}
+.fb-pen-sec .fb-pen-cap{margin-bottom:12px;font-weight:700;color:#F4F4F8}
+.fb-pen-inp{display:block;width:100%;height:52px;padding:0 14px;border-radius:12px;border:1px solid #2a2b3e;background:#0a0b16;
+  color:var(--text);font-family:inherit;font-size:15px;font-weight:500;-webkit-appearance:none}
+.fb-pen-inp::placeholder{color:#7e7e8b}
+.fb-pen-inp:focus{outline:none;border-color:rgba(201,169,110,.55)}
+textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resize:none}
+.fb-pen-go{display:block;width:100%;height:53px;margin:14px 0 18px;border:0;border-radius:13px;cursor:pointer;
+  font-family:inherit;font-size:16px;font-weight:700;color:#1c1508;background:linear-gradient(90deg,#cca76a 0%,#eacc91 100%)}
 .fb-pen-go:active{transform:scale(.98)}
 /* «Зарплаты»: сколько сотрудников — золотая таблетка справа в шапке */
 .fb-staffn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px 0 10px;border-radius:999px;
@@ -20010,7 +20059,7 @@ function fbItemsHtml(b){
       <div class="crw-c-h"><span class="crw-c-n wrap">Без района</span></div>
       <div class="crw-c-b">${rest.map(p => pill(p.name, p.role === 'driver' ? 'car' : p.role === 'other' ? 'user' : 'headset')).join('')}</div>
     </div>` : '';
-  return tiles + stars + cards + restCard + `<div class="sc">${fbCapT('Штрафы и удержания')}
+  return tiles + stars + cards + restCard + `<div class="sc fb-pen2c"><div class="fb-pen-cap">Штрафы и удержания</div>
       <div class="fb-pen2">
         <button class="fb-pen2-b" onclick="fbPenOpen()"><em>${IC('note', 20)}</em><b>Штрафной лист</b><i>Выбрать нарушение и назначить штраф</i></button>
         <button class="fb-pen2-b" onclick="fbHoldOpen()"><em>${IC('minus', 20)}</em><b>Свободное удержание</b><i>Указать сумму вручную</i></button>
@@ -20023,8 +20072,10 @@ function fbItemsHtml(b){
 // и комментарий. Каждый шаг — страница справа, стрелка назад — на шаг назад,
 // «Применить» возвращает к районам. Суммы пока из макета владельца: логику
 // листа он объяснит отдельно, у нарушений без степеней сумму вписывают.
+// машина спереди, сплошная — как на макете у «Авто»
+const FB_PEN_CAR = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" fill-rule="evenodd"><path d="M6.2 5.8A2 2 0 0 1 8.1 4.5h7.8a2 2 0 0 1 1.9 1.3L19.2 10H20a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-1v1.2a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-1.2H8.6v1.2a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1.2H4a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1h.8zM7.2 10h9.6l-1.1-3.2a.8.8 0 0 0-.8-.6H9.1a.8.8 0 0 0-.8.6zM6.5 14.8a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm11 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zM9.5 15h5v-1.4h-5z"/></svg>`;
 const FB_PEN = [
-  {id: 'auto', t: 'Авто', sub: 'Нарушения, связанные с автомобилем', ic: 'car', items: [
+  {id: 'auto', t: 'Авто', sub: 'Нарушения, связанные с автомобилем', ic: 'car', svg: FB_PEN_CAR, items: [
     {id: 'speed', t: 'Превышение скорости', tiers: [
       {t: '20 – 30 км/ч', amount: 600}, {t: '31 – 50 км/ч', amount: 1000}, {t: '51 – 70 км/ч', amount: 1500},
       {t: '71 – 100 км/ч', amount: 2500}, {t: 'Более 100 км/ч', amount: 4000}]},
@@ -20038,7 +20089,9 @@ const FB_PEN = [
 function fbPenOn(){ return !!(FB.pen && document.getElementById('fbPenBody')); }
 function fbPenOpen(){ FB.pen = {mode: 'fine', cat: null, vio: null, tier: null, who: null, how: 'once', months: 2}; fbPenGo('cats'); }
 function fbHoldOpen(){ FB.pen = {mode: 'hold', who: null}; fbPenGo('who'); }
-function fbPenExit(){ FB.pen = null; ACC_BACK = null; accOpen('finitems'); }
+function fbPenExit(){ FB.pen = null; ACC_BACK = null; fbPenUi(false); accOpen('finitems'); }
+// Шапка шагов — как в макете владельца: крупный заголовок без месяца
+function fbPenUi(on){ const ov = document.getElementById('accOv'); if(ov) ov.classList.toggle('pen-ui', !!on); }
 function fbPenCur(){
   const P = FB.pen || {}, cat = FB_PEN.find(c => c.id === P.cat) || null;
   const vio = cat ? (cat.items || []).find(v => v.id === P.vio) || null : null;
@@ -20049,20 +20102,20 @@ function fbPenGo(step, anim){
   const b = fbBook(FB.month); if(!b || !FB.pen) return;
   const {P, cat, vio, tier} = fbPenCur();
   P.step = step;
-  let title = '', sub = fbMonthT(b.month), html = '', back;
+  let title = '', html = '', back;
   if(step === 'cats'){ title = 'За что штраф?'; html = fbPenCatsHtml(); back = fbPenExit; }
   else if(step === 'vios'){ title = cat.t; html = fbPenViosHtml(cat); back = () => fbPenGo('cats', 'back'); }
   else if(step === 'tiers'){ title = vio.t; html = fbPenTiersHtml(vio); back = () => fbPenGo('vios', 'back'); }
   else if(step === 'who'){
     const hold = P.mode === 'hold';
     title = hold ? 'Свободное удержание' : 'Выбрать водителя';
-    sub = hold ? 'выбрать водителя' : [vio.t, tier ? tier.t : ''].filter(Boolean).join(' · ');
-    html = fbPenWhoHtml();
+    html = fbPenWhoHtml(hold);
     back = hold ? fbPenExit : () => fbPenGo(vio.tiers ? 'tiers' : 'vios', 'back');
   }
   else if(step === 'fine'){ title = 'Назначить штраф'; html = fbPenFineHtml(cat, vio, tier); back = () => fbPenGo('who', 'back'); }
   else if(step === 'hold'){ title = 'Удержание'; html = fbPenHoldHtml(); back = () => fbPenGo('who', 'back'); }
-  _setText('accTitle', title); _setText('accSub', sub);
+  fbPenUi(true);
+  _setText('accTitle', title); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page ${anim || 'in'}" id="fbPenBody">${html}</div>`;
   mid.scrollTop = 0;
@@ -20070,13 +20123,13 @@ function fbPenGo(step, anim){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbPenCatsHtml(){
-  return FB_PEN.map(c => `<button class="fb-penc" onclick="fbPenCat('${c.id}')"><em>${IC(c.ic, 20)}</em>
-      <span class="fb-e-b"><b>${escS(c.t)}</b><i>${escS(c.sub)}</i></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('');
+  return FB_PEN.map(c => `<button class="fb-penc" onclick="fbPenCat('${c.id}')"><em class="fb-penc-i">${c.svg || IC(c.ic, 26)}</em>
+      <span class="fb-penc-b"><b>${escS(c.t)}</b><i>${escS(c.sub)}</i></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('');
 }
 function fbPenCat(id){ Object.assign(FB.pen, {cat: id, vio: null, tier: null}); fbPenGo('vios'); }
 function fbPenViosHtml(cat){
-  return `<div class="sc fb-pen-list">${(cat.items || []).map(v => `<button class="fb-e fb-bl" onclick="fbPenVio('${v.id}')">
-      <span class="fb-e-b"><b>${escS(v.t)}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
+  return `<div class="fb-pen-list">${(cat.items || []).map(v => `<button class="fb-pen-row" onclick="fbPenVio('${v.id}')">
+      <span class="fb-pen-rb"><b>${escS(v.t)}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
 }
 function fbPenVio(id){
   const {cat} = fbPenCur(), vio = cat && (cat.items || []).find(v => v.id === id); if(!vio) return;
@@ -20084,20 +20137,21 @@ function fbPenVio(id){
   fbPenGo(vio.tiers ? 'tiers' : 'who');
 }
 function fbPenTiersHtml(vio){
-  return `<div class="sc fb-pen-list">${vio.tiers.map((t, i) => `<button class="fb-e fb-bl fb-pen-tier" onclick="fbPenTier(${i})">
-      <span class="fb-e-b"><b>${escS(t.t)}</b><i>${fbFmt(t.amount)} AED</i></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
+  return `<div class="fb-pen-list">${vio.tiers.map((t, i) => `<button class="fb-pen-row fb-pen-tier" onclick="fbPenTier(${i})">
+      <span class="fb-pen-rb"><b>${escS(t.t)}</b><i>${fbFmt(t.amount)} AED</i></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
 }
 function fbPenTier(i){ FB.pen.tier = i; fbPenGo('who'); }
-// Водители по районам, как в «Кто на каком районе»; поиск прячет лишнее
-function fbPenWhoHtml(){
+// Водители по районам; поиск прячет лишнее
+function fbPenWhoHtml(hold){
   if(!CREW) return '<div class="exp-empty">Не удалось загрузить людей</div>';
   const cur = (FB.pen.who || {}).name;
-  const groups = (CREW.districts || []).filter(d => (d.drivers || []).length).map(d => `<div class="crw-c fb-pen-g">
-      <div class="crw-c-h"><span class="crew-code">${escS(d.code)}</span><span class="crw-c-n wrap">${escS(d.name)}${crewDrvCount(d)}</span></div>
+  const groups = (CREW.districts || []).filter(d => (d.drivers || []).length).map(d => `<div class="fb-pen-g">
+      <div class="fb-pen-gh"><b>${escS(d.code)}</b><span>${escS(d.name)}</span><i>(${d.drivers.length} ${pluralize(d.drivers.length, 'водитель', 'водителя', 'водителей')})</i></div>
       ${d.drivers.map(n => `<button class="fb-pen-r${n === cur ? ' on' : ''}" data-n="${escS(n)}" data-d="${escS(d.id)}" onclick="fbPenWho(this)">
         <span class="fb-radio"></span><span class="fb-pen-rn">${escS(n)}</span></button>`).join('')}
     </div>`).join('');
-  return `<label class="fb-pen-q">${IC('search', 16)}<input id="fbPenQ" type="text" placeholder="Поиск водителя" autocomplete="off"
+  return `${hold ? '<div class="fb-pen-lbl">Выбрать водителя</div>' : ''}
+    <label class="fb-pen-q">${IC('search', 18)}<input id="fbPenQ" type="text" placeholder="Поиск водителя" autocomplete="off"
       oninput="fbPenFilter(this.value)"></label>
     ${groups || '<div class="exp-empty">Водителей нет</div>'}
     <div class="exp-empty fb-pen-none" hidden>Никого не нашли</div>`;
@@ -20122,38 +20176,42 @@ function fbPenWho(btn){
   // отметка успевает мелькнуть — и следующий шаг
   setTimeout(() => { if(fbPenOn() && FB.pen.step === 'who') fbPenGo(FB.pen.mode === 'hold' ? 'hold' : 'fine'); }, 170);
 }
-function fbPenWhoCard(){
-  const w = FB.pen.who || {};
-  return `<button class="sc fb-pen-sum fb-pen-who" onclick="fbPenGo('who', 'back')"><em>${IC('user', 20)}</em>
-      <span class="fb-e-b"><b>${escS(w.name || '')}</b><i>${escS([w.code, w.dname].filter(Boolean).join(' · '))}</i></span>
-      <em class="fb-chev">${_SC_CHEV}</em></button>`;
+// человек — сплошной значок в квадрате, как в макете; в штрафе нажимается (сменить)
+const FB_PEN_AVA = `<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><circle cx="12" cy="7.6" r="4.3"/>
+  <path d="M3.6 20.3c0-4.1 3.7-6.9 8.4-6.9s8.4 2.8 8.4 6.9c0 .6-.4.9-.9.9H4.5c-.5 0-.9-.3-.9-.9z"/></svg>`;
+function fbPenWhoCard(tap){
+  const w = FB.pen.who || {}, inner = `<em class="fb-pen-ava">${FB_PEN_AVA}</em>
+      <span class="fb-pen-cb"><b>${escS(w.name || '')}</b><i>${escS([w.code, w.dname].filter(Boolean).join(' • '))}</i></span>`;
+  return tap ? `<button class="fb-pen-card fb-pen-who" onclick="fbPenGo('who', 'back')">${inner}<em class="fb-chev">${_SC_CHEV}</em></button>`
+             : `<div class="fb-pen-card fb-pen-who">${inner}</div>`;
 }
-function fbPenAmtCard(){
-  return `<div class="sc">${fbCapT('Сумма (AED)')}<div class="fb-pen-in">
-      <input class="fb-txt" id="fbPenAmt" inputmode="decimal" placeholder="Введите сумму" autocomplete="off" oninput="fbPenPartsPaint()"></div></div>`;
+function fbPenAmtSec(){
+  return `<div class="fb-pen-sec"><div class="fb-pen-cap">Сумма (AED)</div>
+      <input class="fb-pen-inp" id="fbPenAmt" inputmode="decimal" placeholder="Введите сумму" autocomplete="off" oninput="fbPenPartsPaint()"></div>`;
 }
-function fbPenCmtCard(){
-  return `<div class="sc">${fbCapT('Комментарий')}<div class="fb-pen-in">
-      <textarea class="fb-txt fb-pen-ta" id="fbPenCmt" maxlength="80" placeholder="Добавить комментарий…"></textarea></div></div>`;
+function fbPenCmtSec(){
+  return `<div class="fb-pen-sec"><div class="fb-pen-cap">Комментарий</div>
+      <textarea class="fb-pen-inp fb-pen-ta" id="fbPenCmt" maxlength="80" placeholder="Добавить комментарий…"></textarea></div>`;
 }
 function fbPenFineHtml(cat, vio, tier){
   const P = FB.pen;
-  return `<div class="sc fb-pen-sum"><em>${IC(cat.ic, 22)}</em>
-      <span class="fb-e-b"><b>${escS(vio.t)}</b>${tier ? `<i>${escS(tier.t)}</i><u>${fbFmt(tier.amount)} AED</u>` : ''}</span></div>
-    ${fbPenWhoCard()}
-    ${tier ? '' : fbPenAmtCard()}
-    <div class="sc">${fbCapT('Способ удержания')}
+  return `<div class="fb-pen-card fb-pen-sum"><em class="fb-pen-ic">${cat.svg || IC(cat.ic, 30)}</em>
+      <span class="fb-pen-cb"><b>${escS(vio.t)}</b>${tier ? `<i>${escS(tier.t)}</i><u>${fbFmt(tier.amount)} AED</u>` : ''}</span></div>
+    ${fbPenWhoCard(true)}
+    <div class="fb-pen-card fb-pen-how">
+      <div class="fb-pen-cap fb-pen-caph">Способ удержания</div>
       <button class="fb-pen-opt${P.how !== 'parts' ? ' on' : ''}" data-v="once" onclick="fbPenHow('once')"><span class="fb-radio"></span>
-        <span class="fb-e-b"><b>Разово</b><i>Снять всю сумму с ближайшей зарплаты</i></span></button>
+        <span class="fb-pen-cb"><b>Разово</b><i>Снять всю сумму с ближайшей зарплаты</i></span></button>
       <button class="fb-pen-opt${P.how === 'parts' ? ' on' : ''}" data-v="parts" onclick="fbPenHow('parts')"><span class="fb-radio"></span>
-        <span class="fb-e-b"><b>По частям</b><i>Разделить на несколько месяцев</i></span></button>
+        <span class="fb-pen-cb"><b>По частям</b><i>Разделить на несколько месяцев</i></span></button>
       <div class="fb-pen-parts" id="fbPenParts"${P.how === 'parts' ? '' : ' hidden'}>${fbPenPartsHtml()}</div>
     </div>
-    ${fbPenCmtCard()}
+    <div class="fb-pen-card fb-pen-form">${tier ? '' : fbPenAmtSec()}${fbPenCmtSec()}</div>
     <button class="fb-pen-go" onclick="fbPenApply()">Применить штраф</button>`;
 }
 function fbPenHoldHtml(){
-  return `${fbPenWhoCard()}${fbPenAmtCard()}${fbPenCmtCard()}
+  return `${fbPenWhoCard(false)}
+    <div class="fb-pen-card fb-pen-form">${fbPenAmtSec()}${fbPenCmtSec()}</div>
     <button class="fb-pen-go" onclick="fbPenApply()">Применить удержание</button>`;
 }
 function fbPenAmount(){ const {tier} = fbPenCur(); return tier ? tier.amount : fbAmt('fbPenAmt'); }
@@ -20513,6 +20571,7 @@ async function accLoadSummaries(){
 
 function accOpen(id){
   if(id === 'stock'){ openStock(); return; }          // у склада уже свой экран
+  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui'); }   // шапка штрафного листа
   _setRail('accRail', '');
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
@@ -20577,6 +20636,7 @@ function accClose(){
 
 function _accClose(){
   ACC_BACK = null;
+  document.getElementById('accOv').classList.remove('pen-ui');
   CKL_RETURN = false;
   SCAN.stop();
   supPollStop();

@@ -204,7 +204,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('pen') || Q.get('hold')){
       tap('#accMid .fb-pen2-b', e => e.innerText.includes(Q.get('pen') ? 'Штрафной' : 'Свободное')); await W(300);
       if(Q.get('pencat')){ tap('#fbPenBody .fb-penc', e => (e.getAttribute('onclick') || '').includes("'" + Q.get('pencat') + "'")); await W(300); }
-      if(Q.get('penvio')){ tap('#fbPenBody .fb-bl', e => (e.getAttribute('onclick') || '').includes("'" + Q.get('penvio') + "'")); await W(300); }
+      if(Q.get('penvio')){ tap('#fbPenBody .fb-pen-row', e => (e.getAttribute('onclick') || '').includes("'" + Q.get('penvio') + "'")); await W(300); }
       if(Q.get('pentier') !== null){ tap('#fbPenBody .fb-pen-tier', e => (e.getAttribute('onclick') || '').includes('(' + Q.get('pentier') + ')')); await W(300); }
       if(Q.get('penq')){ const q = document.getElementById('fbPenQ'); q.value = Q.get('penq'); fbPenFilter(q.value); await W(100); }
       if(Q.get('penwho')){ tap('#fbPenBody .fb-pen-r', e => e.dataset.n === Q.get('penwho')); await W(500); }

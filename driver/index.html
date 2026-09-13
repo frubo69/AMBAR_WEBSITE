@@ -7421,7 +7421,7 @@ function xpZone(kind, what, sent, n){
   const src = свой ? свой.photo : (sent ? (rcp ? (sent.photo && sent.thumb) : (sent.car_photo && sent.car_thumb)) : '');
   const плохо = !свой && sent && (rcp ? (sent.photo && sent.photo_ok === 'no') : (sent.car_photo && sent.car_ok === 'no'));
   const lock = rcp && !src && !xpCarDone(kind);           // чек ждёт фото машины
-  const t = rcp ? ['Фото чека', lock ? 'Сначала сделайте фото машины' : 'Загрузите фото чека или квитанции', lock ? 'После фото машины' : 'Снять чек']
+  const t = rcp ? ['Фото чека', lock ? 'Сначала сделайте фото машины' : 'Загрузите фото чека или квитанции', lock ? 'Сначала машина' : 'Снять чек']
                 : ['Фото машины', 'Сделайте фото автомобиля после мойки', 'Добавить фото'];
   return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}${lock ? ' lock' : ''}" onclick="carTap('${kind}','${what}')">
     ${n ? `<span class="xp-zn">${n}</span>` : ''}

@@ -80,6 +80,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path === '/api/driver/rates') return ST_FX;
   if(path === '/api/driver/catalog') return ST_CAT;
   if(path === '/api/driver/profile') return ST_PROF;
+  if(path.endsWith('/chat') && m === 'GET' && ST_Q.get('nochat')) return {order_id: ST_ORDER.order_id, chat: []};   // ?nochat=1 — пустой разговор
   if(path.endsWith('/chat') && m === 'GET') return {order_id: ST_ORDER.order_id, chat: [{by:'driver', name:'Али', text:'Клиент не отвечает', at:_agoIso(4), kind:'client'}, {by:'operator', name:'Парвиз', text:'Ждите 5 минут, звоню клиенту', at:_agoIso(2), kind:''}], operator: 'Парвиз'};
   stLog('API ' + m + ' ' + path + ' ' + JSON.stringify(opts.body || {}));
   if(path.endsWith('/fx')) { const r = ST_RATES.rates.find(x => x.code === (opts.body || {}).code); ST_ORDER.pay_fx = r ? {code: r.code, name: r.name, sym: r.sym, rate: r.rate, amount: Math.round(ST_ORDER.total / r.rate * 100) / 100} : null; return {ok: true, pay_fx: ST_ORDER.pay_fx}; }

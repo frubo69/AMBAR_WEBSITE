@@ -1654,6 +1654,39 @@ body.xp-on{background:#070A12}
    бутылки, и через неделю в споре нужен заказ вместе с разговором. */
 .case-w{display:flex;flex-direction:column;gap:8px;max-height:44dvh;overflow-y:auto;
   padding:2px 2px 4px;margin-bottom:12px}
+/* Лист «Оператор» — по макету владельца (14 сен 2026; экран 430 pt).
+   Шапка: заголовок 20, номер заказа 13, квадратная кнопка закрытия. Подпись
+   ЧТО СЛУЧИЛОСЬ капсом, сетка 2×2 кнопок по 55, красная строка отмены во всю
+   ширину, разделитель, поле с золотой квадратной кнопкой. Без пояснений. */
+#caseSheet .sheet-in{padding:19px 17.7px calc(18px + var(--safe-bottom,0px)) 17.2px;border-radius:20px 20px 0 0;background:#0B0B14}
+#caseSheet .sheet-hd{align-items:flex-start;gap:10px;margin-bottom:0}
+#caseSheet .sheet-t{font-size:20px;font-weight:700;line-height:24px;letter-spacing:-.2px;color:#F8F8F9;margin:0}
+#caseSheet .sheet-s{margin:6px 0 0;font-size:13px;font-weight:500;line-height:16px;color:#7C809B}
+#caseSheet .sheet-x{width:33px;height:33px;border-radius:10px;background:#1C1B2C;border:0;color:#B3B7D0}
+#caseSheet .sheet-x svg{width:22px;height:22px}
+.case-l{display:block;width:100%;margin:12px 0 14px;padding:0;border:0;background:none;text-align:left;font-family:inherit;
+  font-size:12px;font-weight:600;letter-spacing:1.2px;line-height:15px;text-transform:uppercase;color:#777C99;cursor:pointer}
+.case-l.first{margin-top:32px}
+.case-l:active{color:var(--gold2)}
+.case-g{display:grid;grid-template-columns:1fr 1fr;gap:8px 7.5px}
+.case-b{display:flex;align-items:center;gap:13px;height:55px;padding:0 8px 0 16px;border-radius:14px;box-sizing:border-box;
+  background:#131321;border:1px solid #292A3F;color:#F8F8FB;font-family:inherit;font-size:13.5px;font-weight:500;line-height:1.2;
+  text-align:left;cursor:pointer;min-width:0}
+.case-b span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.case-b:active{transform:scale(.98);border-color:rgba(201,169,110,.4)}
+.case-b svg{flex:0 0 auto;color:#F3D38D}
+.case-b.wide{grid-column:1 / -1}
+.case-b.danger{color:#E75C5F}
+.case-b.danger svg{color:#EF6162}
+.case-say{display:flex;align-items:center;gap:8px;margin-top:20px;padding-top:19.5px;border-top:1px solid #1C1C2C}
+.case-say input{flex:1;min-width:0;height:56px;padding:0 22px;border-radius:14px;box-sizing:border-box;background:#0F0F1A;
+  border:1px solid #22233A;color:var(--text);font-family:inherit;font-size:14.5px;outline:none}
+.case-say input::placeholder{color:#767A91}
+.case-say input:focus{border-color:rgba(201,169,110,.5)}
+.case-go{flex:0 0 auto;width:56px;height:56px;border-radius:14px;border:none;background:#F3CE85;color:#15110A;
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+.case-go:active{transform:scale(.94)}
+.case-go:disabled{opacity:.4;pointer-events:none}
 .msg{max-width:86%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4}
 .msg.me{align-self:flex-end;background:var(--gold-soft);
   border:1px solid rgba(201,169,110,.3);border-bottom-right-radius:5px}
@@ -1670,38 +1703,9 @@ body.xp-on{background:#070A12}
 
 /* Ситуации в одно касание. Названы так, как их произносит водитель, — он
    думает «клиент не отвечает», а не «мне нужна правка состава». */
-.case-l{display:flex;align-items:center;gap:8px;width:100%;padding:8px 2px;margin-bottom:5px;
-  border:none;background:none;cursor:pointer;font-family:inherit;font-size:10px;
-  font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
-.case-l:active{color:var(--gold2)}
-.case-l-go{display:flex;margin-left:auto;color:var(--dim);transition:transform .18s var(--e1)}
-.case-l-go.on{transform:rotate(180deg)}
-.case-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
-.case-b{display:flex;align-items:center;gap:9px;padding:12px 13px;border-radius:13px;
-  cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;
-  color:var(--text);background:var(--card2);border:1px solid var(--border3);
-  transition:.15s var(--e1);min-height:56px}
-.case-b:active{transform:scale(.97);border-color:rgba(201,169,110,.4)}
-.case-b svg{flex:0 0 auto;color:var(--gold2)}
-.case-b.wide{grid-column:1 / -1;min-height:0}
-.case-b.danger{color:var(--dn)}
-.case-b.danger svg{color:var(--dn)}
 
 /* Поле ответа приколочено к низу листа: разговор читают сверху вниз, а
    отвечают, не возвращаясь наверх. */
-.case-say{display:flex;align-items:center;gap:8px;padding-top:12px;
-  border-top:1px solid var(--border2)}
-.case-say input{flex:1;min-width:0;padding:13px 14px;border-radius:13px;
-  border:1px solid var(--border2);background:var(--bg3);color:var(--text);
-  font-family:inherit;font-size:14px;outline:none}
-.case-say input:focus{border-color:rgba(201,169,110,.5)}
-.case-go{flex:0 0 auto;width:48px;height:48px;border-radius:14px;border:none;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
-.case-go:active{transform:scale(.94)}
-.case-go:disabled{opacity:.4;pointer-events:none}
-.case-empty{padding:18px 4px 20px;text-align:center;font-size:12.5px;color:var(--muted);
-  line-height:1.55}
 
 /* Кнопка разговора на карточке заказа */
 .ord-chat{position:relative;flex:0 0 auto;width:54px;border-radius:13px;
@@ -3947,7 +3951,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
       <input id="caseText" type="text" placeholder="Написать оператору" autocomplete="off"
              enterkeyhint="send" onkeydown="if(event.key==='Enter')caseSend()">
       <button class="case-go" id="caseGo" onclick="caseSend()" aria-label="Отправить">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 12h15M13 6l6 6-6 6"/></svg>
       </button>
@@ -9850,10 +9854,16 @@ function gmPaint(){
 let CASE_OID = null, CASE_CHAT = [], CASE_BUSY = false, CASE_LIST = true;
 
 const CASES = [
-  ['client',  'Клиент не отвечает', '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'],
-  ['address', 'Не найти адрес',     '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><path d="M12 7v6M12 15h.01"/>'],
-  ['wait',    'Прошу подождать',    '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+  ['client',  'Клиент не отвечает', '<circle cx="12" cy="12" r="10"/><path d="M12 7.5v5.5M12 16.5h.01"/>'],
+  ['address', 'Не найти адрес',     '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="2.5"/>'],
+  ['wait',    'Прошу подождать',    '<circle cx="12" cy="12" r="10"/><path d="M12 7v5.5l3.5 2"/>'],
 ];
+// Значки листа «Оператор» одним весом: 24 px, обводка 1.8, скруглённые концы.
+const CASE_ICO = {
+  other:  '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+  cancel: '<circle cx="12" cy="12" r="10"/><path d="M5.5 5.5l13 13"/>',
+};
+const csvg = d => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
 function caseToggle(){
   CASE_LIST = !CASE_LIST;
@@ -9918,22 +9928,18 @@ function caseRender(){
   // уезжает вверх, а половину листа занимает то, чем уже воспользовались.
   // Поэтому после нажатия он сворачивается сам, а заголовок остаётся кнопкой:
   // ситуация может смениться, и второй повод должен быть в одно касание.
+  // Пояснений на листе нет (владелец, 14 сен 2026): после номера заказа сразу
+  // подпись и кнопки. Подпись остаётся кнопкой: свёрнутый список раскрывается ею.
   box.innerHTML =
-    (CASE_CHAT.length
-      ? `<div class="case-w" id="caseW">${msgs}</div>`
-      : `<div class="case-empty">Оператор видит этот заказ и ответит здесь же.<br>
-           Нажмите, что случилось, или напишите своими словами.</div>`)
-    + `<button class="case-l" onclick="caseToggle()">
-         <span>Что случилось</span>
-         <i class="case-l-go${CASE_LIST ? ' on' : ''}">${svg(ICO.chev || '<path d="M6 9l6 6 6-6"/>', 15)}</i>
-       </button>
+    (CASE_CHAT.length ? `<div class="case-w" id="caseW">${msgs}</div>` : '')
+    + `<button class="case-l${CASE_CHAT.length ? '' : ' first'}" onclick="caseToggle()">Что случилось</button>
        <div class="case-g" ${CASE_LIST ? '' : 'hidden'}>
          ${CASES.map(([k, t, ico]) => `<button class="case-b" onclick="caseSay('${k}')">
-           ${svg(ico, 18)}<span>${t}</span></button>`).join('')}
+           ${csvg(ico)}<span>${t}</span></button>`).join('')}
          <button class="case-b" onclick="caseItems()">
-           ${svg(ICO.edit, 18)}<span>Хочет другое</span></button>
+           ${csvg(CASE_ICO.other)}<span>Хочет другое</span></button>
          <button class="case-b wide danger" onclick="caseCancel()">
-           ${svg(ICO.ban, 17)}<span>Клиент отказался — прошу отменить</span></button>
+           ${csvg(CASE_ICO.cancel)}<span>Клиент отказался — прошу отменить</span></button>
        </div>`;
   const w = document.getElementById('caseW');
   if(w) w.scrollTop = w.scrollHeight;

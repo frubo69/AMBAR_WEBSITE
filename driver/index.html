@@ -909,6 +909,52 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .oe button:active{background:var(--gold-soft)}
 .oe button.busy svg{animation:oespin .9s linear infinite}
 @keyframes oespin{to{transform:rotate(360deg)}}
+/* Смена — по макету владельца: три шага лентой слева (кружок + линия), у каждого
+   карточка с заголовком, подписью, плашкой состояния и вложенной строкой, куда
+   можно перейти. Ниже — золотая кнопка и подпись, когда она оживёт. */
+.stq{display:flex;align-items:center;gap:8px;padding:2px 2px 12px;font-size:13px;color:var(--muted)}
+.stq b{font-weight:700;color:var(--text)}
+.stq i{width:7px;height:7px;border-radius:50%;background:var(--dim);font-style:normal}
+.stq i.run{background:var(--up);box-shadow:0 0 0 3px rgba(76,175,125,.18)}
+.st{display:flex;gap:12px;margin:0 0 14px;position:relative}
+.st-l{flex:0 0 30px;position:relative}
+.st-c{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--border3);background:var(--bg2);color:var(--sub);font-size:13.5px;font-weight:700;position:relative;z-index:1}
+.st.ok .st-c{background:#2F7D57;border-color:#3E9C6E;color:#fff}
+.st.now .st-c{border-color:var(--gold2);color:var(--gold2);background:rgba(201,169,110,.10)}
+.st-l::after{content:'';position:absolute;left:14px;top:32px;bottom:-16px;width:2px;background:var(--border3)}
+.st.ok .st-l::after{background:rgba(62,156,110,.55)}
+.st:last-child .st-l::after{display:none}
+.st-b{flex:1;min-width:0;padding:13px 13px 12px;border-radius:18px;background:rgba(255,255,255,.025);
+  border:1px solid var(--border2)}
+.st.ok .st-b{background:rgba(62,156,110,.06);border-color:rgba(62,156,110,.28)}
+.st.now .st-b{border-color:rgba(201,169,110,.30)}
+.st-h{display:flex;align-items:flex-start;gap:10px}
+.st-h > div{flex:1;min-width:0}
+.st-t{display:block;font-size:15.5px;font-weight:700;color:var(--text);letter-spacing:-.2px;line-height:1.25}
+.st-s{display:block;margin-top:4px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--muted);letter-spacing:-.1px}
+.st-k{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;
+  font-size:12px;font-weight:600;white-space:nowrap;border:1px solid var(--border3);background:rgba(255,255,255,.04);color:var(--sub)}
+.st-k.ok{background:rgba(62,156,110,.14);border-color:rgba(62,156,110,.35);color:#6FCF97}
+.st-k.wait{background:var(--gold-soft);border-color:rgba(201,169,110,.35);color:var(--gold2)}
+.st-k.no{background:rgba(224,85,85,.12);border-color:rgba(224,85,85,.35);color:#E8746F}
+.st-r{display:flex;align-items:center;gap:11px;width:100%;margin:12px 0 0;padding:10px;border-radius:14px;border:0;
+  background:rgba(255,255,255,.045);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
+.st-r.plain{cursor:default}
+.st-r:not(.plain):active{background:rgba(255,255,255,.08)}
+.st-r span.i{flex:0 0 auto;width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  background:var(--gold-soft);color:var(--gold2)}
+.st-r span.b{flex:1;min-width:0}
+.st-r b{display:block;font-size:14px;font-weight:600;color:var(--text);line-height:1.25}
+.st-r i{display:block;margin-top:2px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--muted)}
+.st-r em{flex:0 0 auto;display:flex;color:var(--muted)}
+.st-go{width:100%;height:52px;margin:10px 0 0;border-radius:16px;border:0;font-family:inherit;font-size:17px;font-weight:700;
+  color:#1a1508;background:linear-gradient(135deg,var(--gold),var(--gold2));cursor:pointer;
+  box-shadow:0 10px 26px rgba(201,169,110,.22)}
+.st-go:active{transform:scale(.99)}
+.st-go[disabled]{background:linear-gradient(135deg,rgba(201,169,110,.45),rgba(232,201,138,.45));color:rgba(26,21,8,.75);
+  box-shadow:none;cursor:default}
+.st-note{margin:12px 0 0;text-align:center;font-size:13px;line-height:1.4;color:var(--muted)}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
@@ -7119,6 +7165,20 @@ function mealBox(){
    Теперь оно есть. Здесь всё, что относится к состоянию дня: сколько идёт
    смена, что сделано, что мешает её закрыть, и сама кнопка. Заказы, расходы и
    товар остались работой — тут только рубильник и счёт. */
+// Что показать во второй строке шага «расходы»: по каждому обязательному —
+// сумма или «не было».
+function shExpLine(){
+  const names = {fuel: 'Бензин', wash: 'Мойка'};
+  const parts = [];
+  for(const k of ['fuel', 'wash']){
+    const sent = EXP ? _expSent(k) : null;
+    if(sent && EXP_ST(sent) !== 'rejected') parts.push(`${names[k]} ${fmt(sent.amount || 0)} AED`);
+    else if(EXP && (EXP.no_expense || {})[k]) parts.push(`${names[k].toLowerCase()}: не было`);
+  }
+  if(!parts.length) return 'Заполнены';
+  const allNone = parts.every(x => x.endsWith('не было'));
+  return allNone ? 'Бензин, мойка: отмечено как отсутствуют' : parts.join(' · ');
+}
 function renderShift(){
   const box = document.getElementById('body');
   if(!SH){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
@@ -7126,71 +7186,75 @@ function renderShift(){
   const geo = SH.geo || {};
   const must = SH.must || [];
   const route = SH.in_route || [];
-  const mustNames = (SH.must_names || must).join(', ');
+  const mustNames = (SH.must_names || must).map(x => String(x).toLowerCase());
+  const doneList = ((ORDERS || {}).done || []);
+  const lastAt = doneList.map(o => o.delivered_at || o.timestamp).filter(Boolean).sort().pop();
+  const мин = on && SH.opened_at ? Math.max(0, Math.round((Date.now() - new Date(SH.opened_at)) / 60000)) : 0;
+  const dur = мин >= 60 ? `${Math.floor(мин / 60)} ч ${мин % 60} мин` : `${мин} мин`;
 
-  // Счёт смены — ровно то, что известно точно: заказы из своего списка и
-  // расходы из своих ответов. Питание не расход, а выплата, его здесь нет.
-  const done = ((ORDERS || {}).done || []).length;
-  const live = ((EXP || {}).extras || []).filter(x => EXP_ST(x) !== 'rejected');
-  const spent = live.reduce((a, x) => a + (x.amount || 0), 0);
-  const мин = on && SH.opened_at
-    ? Math.max(0, Math.round((Date.now() - new Date(SH.opened_at)) / 60000)) : 0;
-  const вСмене = мин >= 60 ? `${Math.floor(мин/60)}:${String(мин%60).padStart(2,'0')}` : `0:${String(мин).padStart(2,'0')}`;
-
-  // Состояние — плашкой в шапке карточки, а не заголовком с подписью.
-  const st = on ? ['run', `идёт с ${hhmm(SH.opened_at)}`]
-    : SH.closed ? ['ok', `закрыта в ${hhmm(SH.closed_at)}`] : ['', 'не открыта'];
-
-  // Строка чек-листа: кружок состояния, слово, что мешает, и стрелка туда,
-  // где это делают. Порядок — порядок дня: сперва оператор, потом
-  // геопозиция, потом смена; в открытой — сперва заказы, потом расходы.
-  const row = (state, t, sub, go) => `<${go ? 'button' : 'div'} class="dc-r${go ? '' : ' plain'}"${
-      go ? ` onclick="${go}"` : ''}>
-      <span class="dc-st ${state}">${svg(state === 'ok' ? ICO.ok : state === 'no' ? ICO.close : ICO.clock, 13)}</span>
-      <span class="dc-b">${t}<i class="${state === 'no' ? 'dn' : state === 'warn' ? 'warn' : ''}">${sub}</i></span>
-      ${go ? `<em>${svg('<path d="M9 6l6 6-6 6"/>', 13)}</em>` : ''}
-    </${go ? 'button' : 'div'}>`;
-
-  const canOpen = SH.working === true && !!geo.ok;
-  const canClose = on && !must.length && !route.length;
-
-  const условия = on
-    ? row(route.length ? 'warn' : 'ok', 'Заказы в пути',
-          route.length ? `${route.length} ${plural(route.length,'заказ','заказа','заказов')} — отметьте доставку` : 'все доставлены',
-          route.length ? "setTab('orders')" : '')
-      + row(must.length ? 'no' : 'ok', 'Расходы за день',
-          must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'заполнены',
-          must.length ? "setTab('expenses')" : '')
-    : row(SH.working === true ? 'ok' : SH.working === false ? 'no' : '', 'Оператор отметил вас',
-          SH.working === true ? 'отмечено'
-            : SH.working === false ? 'сегодня выходной — если ошибка, напишите оператору'
-            : 'оператор отмечает бригаду в начале смены', '')
-      + row(geo.ok ? 'ok' : 'no', 'Геопозиция',
-          geo.ok ? (geo.endless ? 'транслируется, не кончится сама' : `транслируется ещё ${_hleft(geo.left_min)}`)
-                 : 'оператор не видит, где вы — включите трансляцию',
-          geo.ok ? '' : 'tutOpen()');
-
-  box.innerHTML = `
-    <div class="dc">
-      <div class="dc-cap"><span>Смена</span><span class="dst ${st[0]}" style="flex:0 0 auto">${st[1]}</span></div>
-      <div class="dt-g">
-        <button class="dt tap" onclick="setTab('history')"><span class="dt-l">Доставлено</span>
-          <b class="dt-v">${done}</b><span class="dt-u">${plural(done,'заказ','заказа','заказов')}</span></button>
-        <button class="dt tap gold" onclick="setTab('expenses')"><span class="dt-l">Расход</span>
-          <b class="dt-v">${fmt(spent)}</b><span class="dt-u">AED</span></button>
-        <div class="dt${on ? '' : ' dim'}"><span class="dt-l">В смене</span>
-          <b class="dt-v">${on ? вСмене : '—'}</b><span class="dt-u">${on ? 'часов' : 'не идёт'}</span></div>
+  // Шаг ленты: номер, состояние (ok / now / wait), заголовок, подпись, плашка,
+  // вложенная строка со значком и переходом.
+  const step = (n, state, title, sub, chip, row) => `<div class="st ${state}">
+      <div class="st-l"><span class="st-c">${state === 'ok' ? svg(ICO.ok, 15) : n}</span></div>
+      <div class="st-b">
+        <div class="st-h"><div><b class="st-t">${n}. ${title}</b><i class="st-s">${sub}</i></div>
+          <span class="st-k ${chip[0]}">${svg(chip[0] === 'ok' ? ICO.ok : chip[0] === 'no' ? ICO.close : ICO.clock, 13)}${chip[1]}</span></div>
+        <${row.go ? 'button' : 'div'} class="st-r${row.go ? '' : ' plain'}"${row.go ? ` onclick="${row.go}"` : ''}>
+          <span class="i">${svg(row.ico, 18)}</span>
+          <span class="b"><b>${row.t}</b><i>${row.s}</i></span>
+          ${row.go ? `<em>${svg(ICO.chevR, 14)}</em>` : ''}
+        </${row.go ? 'button' : 'div'}>
       </div>
-    </div>
-    <div class="dc">
-      <div class="dc-cap"><span>${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span><i>по порядку</i></div>
-      ${условия}
-    </div>
-    <div class="dv-sp"></div>
-    <div class="dv-foot">${on
-      ? `<button class="btn btn-pri" ${canClose ? '' : 'disabled'} onclick="shClose()">Закрыть смену</button>`
-      : `<button class="btn btn-pri" ${canOpen ? '' : 'disabled'} onclick="shOpen()">${
-          SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}</div>`;
+    </div>`;
+
+  let steps, btn, note, status;
+  if(on){
+    const s1 = !route.length, s2 = !must.length, ready = s1 && s2;
+    steps = step(1, s1 ? 'ok' : 'now', 'Завершить все заказы',
+        s1 ? 'Все активные заказы выполнены' : 'Отметьте доставку по каждому заказу',
+        s1 ? ['ok', 'Готово'] : ['wait', 'В пути'],
+        s1 ? {ico: ICO.box, t: 'Активных заказов нет',
+              s: lastAt ? `Последний заказ завершён в ${hhmm(lastAt)}` : 'Сегодня заказов пока не было', go: "setTab('orders')"}
+           : {ico: ICO.box, t: `${route.length} ${plural(route.length,'заказ','заказа','заказов')} в пути`,
+              s: 'Откройте заказы и отметьте доставку', go: "setTab('orders')"})
+      + step(2, s2 ? 'ok' : (s1 ? 'now' : ''), 'Заполнить расходы',
+        s2 ? 'Все обязательные расходы внесены или отмечены как отсутствующие'
+           : `Ответьте про ${esc(_shAsk(must))} — сумма или «не было»`,
+        s2 ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
+        s2 ? {ico: ICO.note, t: 'Расходы заполнены', s: esc(shExpLine()), go: "setTab('expenses')"}
+           : {ico: ICO.note, t: `Не отвечено: ${esc(mustNames.join(', '))}`,
+              s: 'Впишите сумму или отметьте «не было»', go: "setTab('expenses')"})
+      + step(3, ready ? 'now' : '', 'Закрыть смену',
+        'Когда заказы доставлены и расходы заполнены',
+        ['wait', 'Ожидание'],
+        {ico: ICO.user, t: 'Смена ещё не закрыта',
+         s: ready ? 'Нажмите кнопку ниже — заказы больше не придут' : 'Сначала выполните шаги выше'});
+    btn = `<button class="st-go" ${ready ? '' : 'disabled'} onclick="shClose()">Закрыть смену</button>`;
+    note = ready ? 'Все шаги выполнены — смену можно закрывать' : 'Кнопка станет активной, когда все шаги будут выполнены';
+    status = `<i class="run"></i>Смена идёт с <b>${hhmm(SH.opened_at)}</b> · ${dur}`;
+  }else{
+    const marked = SH.working === true, g = !!geo.ok, canOpen = marked && g;
+    steps = step(1, marked ? 'ok' : 'now', 'Отметка оператора',
+        'Кто сегодня работает, отмечает оператор в начале смены',
+        marked ? ['ok', 'Готово'] : SH.working === false ? ['no', 'Выходной'] : ['wait', 'Ожидание'],
+        marked ? {ico: ICO.user, t: 'Вы отмечены на смене', s: 'Питание за рабочий день начислено'}
+               : SH.working === false ? {ico: ICO.user, t: 'Сегодня вы отмечены как выходной', s: 'Если это ошибка — напишите оператору'}
+               : {ico: ICO.user, t: 'Оператор ещё не отметил вас', s: 'Опаздывает — напишите ему'})
+      + step(2, g ? 'ok' : (marked ? 'now' : ''), 'Геопозиция',
+        'Оператор должен видеть, где вы — иначе заказ не отдать',
+        g ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
+        g ? {ico: SH_ICO.geo, t: 'Трансляция идёт', s: geo.endless ? 'Не кончится сама' : `Хватит ещё на ${_hleft(geo.left_min)}`}
+          : {ico: SH_ICO.geo, t: 'Трансляция выключена', s: 'Включите в чате с ботом — показать по шагам', go: 'tutOpen()'})
+      + step(3, canOpen ? 'now' : '', SH.closed ? 'Открыть смену снова' : 'Открыть смену',
+        'Когда оператор отметил и трансляция идёт',
+        SH.closed ? ['ok', 'Закрыта'] : ['wait', 'Ожидание'],
+        SH.closed ? {ico: ICO.clock, t: `Смена закрыта в ${hhmm(SH.closed_at)}`, s: 'Заказы больше не придут. Ошиблись — откройте снова'}
+                  : {ico: ICO.clock, t: 'Смена не открыта', s: 'Пока закрыта, заказы не приходят и отметить ничего нельзя'});
+    btn = `<button class="st-go" ${canOpen ? '' : 'disabled'} onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`;
+    note = canOpen ? 'Всё готово — можно открывать' : 'Кнопка станет активной, когда все шаги будут выполнены';
+    status = SH.closed ? `<i></i>Смена закрыта в <b>${hhmm(SH.closed_at)}</b>` : `<i></i>Смена не открыта`;
+  }
+  box.innerHTML = `<div class="stq">${status}</div>${steps}${btn}<div class="st-note">${note}</div>`;
 }
 
 function renderExpenses(){

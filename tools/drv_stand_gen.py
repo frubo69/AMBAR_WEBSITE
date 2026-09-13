@@ -66,8 +66,8 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     window.__FAILN = (window.__FAILN || 0) + 1;
     if(!lim || window.__FAILN <= +lim){ const e = new Error('stand fail'); e.status = +(ST_Q.get('code') || 500); throw e; }
   }
-  if(path === '/api/driver/orders') return {day: '2026-09-11', active: ST_Q.get('noorders') ? [] : [ST_ORDER, ST_ORDER2], done: [], total_aed: 0, panic: false};
-  if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0};
+  if(path === '/api/driver/orders') return {day: '2026-09-11', active: (ST_Q.get('noorders') || ST_Q.get('tab') === 'shift' && !ST_Q.get('route')) ? [] : [ST_ORDER, ST_ORDER2], done: [{...ST_ORDER2, order_id: 'AMB00000009', delivered_at: _agoIso(38)}], total_aed: 95, panic: false};
+  if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0, extras: [], by_kind: {}, no_expense: ST_Q.get('must') ? {} : {fuel: true, wash: true}, pending_answer: ST_Q.get('must') ? ['fuel', 'wash'] : []};
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift') return ST_SHIFT;
   if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;
@@ -115,7 +115,14 @@ const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t:
     {id: 'p9', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-08-02', at: '2026-08-02T07:20:00', reason: 'Использование телефона за рулём · Во время движения', note: '', due: 0, left: 0, done: true, cancelled: false}]};
 // ?big=1 — крупные суммы: проверка, что формула зарплаты не обрезается
 if(ST_Q.get('big')){ Object.assign(ST_PROF, {accrued: 15000, fines: 12500, holds: 10000, to_pay: 11500, month_total: 22500}); }
-const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(120), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
+const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(134), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
+// состояния смены для стенда: ?route=1 — заказ в пути, ?must=1 — не отвечено про расходы,
+// ?shoff=1 — смена не открыта, ?shclosed=1 — закрыта, ?nogeo=1 — трансляции нет
+if(ST_Q.get('route')) ST_SHIFT.in_route = ['AMB82300EB5'];
+if(ST_Q.get('must')){ ST_SHIFT.must = ['fuel', 'wash']; ST_SHIFT.must_names = ['Бензин', 'Мойка']; }
+if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
+if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); }
+if(ST_Q.get('nogeo')){ ST_SHIFT.geo.ok = false; ST_SHIFT.geo.stream = false; }
 async function standBoot(){
   ME = {name: 'Али', district: 'alg', district_code: 'B4'};
   try{ document.getElementById('dAv').textContent = 'АЛ'; document.getElementById('dName').textContent = 'Али'; }catch(e){}

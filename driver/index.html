@@ -7274,15 +7274,9 @@ function renderExpenses(){
   // Итог смены — наверху, первой карточкой: за ним сюда и заходят. Внизу
   // закреплено единственное действие, которое нужно в любой момент, —
   // списать бой или брак.
+  // Плашки «Расходы за смену» сверху нет (владелец, 13 сен): итог и «не
+  // сдано» видны на экране смены, здесь — сразу карточки расходов.
   box.innerHTML = `
-    <div class="dc">
-      <div class="dc-cap"><span>Расходы за смену</span><b>${fmt(total)}<u>AED</u></b></div>
-      ${pend || (EXP.pending_answer || []).length ? `<div class="dc-r plain">
-        <span class="dc-st ${(EXP.pending_answer || []).length ? 'no' : 'warn'}">${svg((EXP.pending_answer || []).length ? ICO.close : ICO.clock, 13)}</span>
-        <span class="dc-b">${(EXP.pending_answer || []).length
-          ? `Не сдано: ${(EXP.pending_answer || []).map(k => ({fuel:'бензин', wash:'мойка'})[k] || k).join(', ')}<i class="dn">ответьте — иначе смену не закрыть</i>`
-          : `Ждут решения старшего<i>${fmt(pend)} AED</i>`}</span></div>` : ''}
-    </div>
     ${mealBox()}
     ${expBox('fuel', 'Бензин', ICO.fuel)}
     ${expBox('wash', 'Мойка',  ICO.wash)}

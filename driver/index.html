@@ -2894,23 +2894,24 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 /* История списаний — страница по макету владельца: сверху стрелка назад и
    месяц, под ними заголовок во всю ширину, три числа одной карточкой, список
    листается сам, «К выплате» прибито снизу. */
+.hdr.page .hdr-brand,.hdr.page .hdr-call,.hdr.page .hdr-me{display:none}
+.hdr-pg{position:relative;display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.hdr-pg > b{flex:1;min-width:0;font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdr-pg .fxh-b{flex:0 0 auto}
 .hs-page{display:flex;flex-direction:column;
   height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar))}
-.hs-top{display:flex;align-items:center;gap:10px;padding:2px 0 10px;position:relative}
-.hs-mb{margin-left:auto;display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:12px;
-  border:1px solid var(--border2);background:var(--card);color:var(--sub);font-family:inherit;font-size:12px;
+.hs-mb{flex:0 0 auto;display:flex;align-items:center;gap:6px;height:34px;padding:0 10px;border-radius:12px;
+  border:1px solid var(--border2);background:var(--card);color:var(--sub);font-family:inherit;font-size:11.5px;
   font-weight:600;white-space:nowrap;cursor:pointer}
 .hs-mb svg:first-child{color:var(--gold2)}
 .hs-mb svg:last-child{color:var(--muted)}
-.hs-mp{position:absolute;top:40px;right:0;z-index:30;width:168px;max-height:238px;overflow-y:auto;
+.hs-mp{position:absolute;top:44px;right:0;z-index:30;width:168px;max-height:238px;overflow-y:auto;
   padding:6px;border-radius:14px;border:1px solid var(--border2);background:var(--bg2);
   box-shadow:0 18px 40px rgba(0,0,0,.55)}
 .hs-mp button{display:block;width:100%;padding:9px 10px;border:0;border-radius:10px;background:none;
   color:var(--sub);font-family:inherit;font-size:12.5px;text-align:left;cursor:pointer}
 .hs-mp button.on{background:var(--gold-soft);color:var(--gold2);font-weight:700}
-.hs-ttl{padding:0 0 12px}
-.hs-ttl b{display:block;font-size:21px;font-weight:700;color:var(--text);letter-spacing:-.3px;line-height:1.15}
-.hs-ttl i{display:block;margin-top:3px;font-style:normal;font-size:12px;color:var(--muted)}
 /* три числа одной карточкой, столбцы через тонкую черту */
 .hs-tiles{display:flex;align-items:stretch;justify-content:space-between;gap:0;
   margin:0 0 10px;padding:11px;border-radius:16px;background:var(--card2);border:1px solid rgba(255,255,255,.05)}
@@ -3012,7 +3013,11 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 <!-- Шапка приложения: марка слева, кто на смене справа. Всегда на виду и
      всегда одна и та же — цифры переехали в свои вкладки, потому что в шапке
      они меняли смысл при каждом переключении. -->
-<header class="hdr">
+<header class="hdr" id="hdr">
+  <!-- На отдельных страницах (история списаний, карточка списания) шапка
+       превращается в заголовок страницы: стрелка назад и название вместо
+       логотипа — так просил владелец. -->
+  <div class="hdr-pg" id="hdrPg" hidden></div>
   <!-- Тройное касание по названию открывает экстренный экран. Случайно так не
        выходит, а нарочно получается не глядя: логотип всегда на одном месте,
        в левом верхнем углу, и он один и тот же во всех наших приложениях. -->
@@ -4169,6 +4174,7 @@ function expPulse(){
 
 function setTab(t){
   TAB = t; EXP_EDIT = null;
+  if(t !== 'profile') hdrPage('');
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory();
   else if(t === 'profile'){ profPaint(); profLoad(); }
@@ -4396,6 +4402,36 @@ function profStep(n){
 function profPaint(){
   const box = document.getElementById('body'); if(!box) return;
   box.innerHTML = profHtml();
+  profHdr();
+}
+// Шапка приложения на страницах профиля: стрелка назад и название вместо
+// логотипа. Пустая строка возвращает обычную шапку с логотипом и звонком.
+function hdrPage(html){
+  const h = document.getElementById('hdr'), b = document.getElementById('hdrPg');
+  if(!h || !b) return;
+  if(html) b.innerHTML = html;
+  b.hidden = !html;
+  h.classList.toggle('page', !!html);
+}
+function profHdr(){
+  if(TAB !== 'profile' || !PROF_PAGE) return hdrPage('');
+  const back = `<button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
+  if(PROF_PAGE === 'hist'){
+    const m = PROF_MONTH || profMonthNow(), months = [];
+    for(let i = 0; i < 12; i++){
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+      months.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+    }
+    return hdrPage(`${back}<b>История списаний</b>
+      <button class="hs-mb" onclick="hsMonth()">${svg(ICO.cal, 14)}${esc(profMonthT(m))}${svg(ICO.chev, 13)}</button>
+      ${HS_MOPEN ? `<div class="hs-mp">${months.map(x =>
+        `<button class="${x === m ? 'on' : ''}" onclick="hsMonthPick('${x}')">${profMonthT(x)}</button>`).join('')}</div>` : ''}`);
+  }
+  if(PROF_PAGE === 'item'){
+    const it = hsItems().find(x => x.id === HS_ITEM);
+    return hdrPage(`${back}<b>${esc(it ? hsCut(it).head : 'Списание')}</b>`);
+  }
+  hdrPage('');
 }
 function profWarn(){
   if(!PROF_ERR) return '';
@@ -4512,13 +4548,6 @@ function profHistHtml(){
   }
   const chips = [['all', 'Все'], ['fine', 'Штрафы'], ['hold', 'Удержания']];
   return `<div class="hs-page">
-    <div class="hs-top">
-      <button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
-      <button class="hs-mb" onclick="hsMonth()">${svg(ICO.cal, 14)}${esc(profMonthT(m))}${svg(ICO.chev, 13)}</button>
-      ${HS_MOPEN ? `<div class="hs-mp">${months.map(x =>
-        `<button class="${x === m ? 'on' : ''}" onclick="hsMonthPick('${x}')">${profMonthT(x)}</button>`).join('')}</div>` : ''}
-    </div>
-    <div class="hs-ttl"><b>История списаний</b><i>Все штрафы и удержания водителя</i></div>
     <div class="hs-tiles">
       <div class="hs-t"><span>${svg(ICO.wallet, 16)}</span>
         <div><u>Всего списано</u><b>${v(p && p.month_total, 'down')}</b></div></div>
@@ -4558,12 +4587,7 @@ function profItemHtml(){
     ['Состояние', it.cancelled ? 'Отменён — из зарплаты не вычитается'
       : (it.done ? 'Списано полностью' : (it.left ? `Осталось ${profSum(it.left, 'down')}` : 'В этом месяце'))],
   ].filter(Boolean);
-  return `<div class="fxh">
-      <button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
-      <b class="fxh-t">${esc(c.head)}</b>
-      <i class="fxh-s">${k === 'hold' ? 'Удержание из зарплаты' : 'Штраф'}</i>
-    </div>
-    <div class="hs-one">
+  return `<div class="hs-one">
       <div class="hs-one-h hs-r ${k}"><span class="hs-i">${svg(hsIco(it), 22)}</span>
         <div><b>${esc(c.tail || c.head)}</b><i>${esc(hsWhen(it))}</i></div></div>
       <div class="hs-one-am ${k}${it.cancelled ? ' off' : ''}"><u>${it.cancelled ? 'Штраф отменён' : 'Списано из зарплаты'}</u>

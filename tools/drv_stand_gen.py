@@ -70,6 +70,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0};
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift') return ST_SHIFT;
+  if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;
   if(path === '/api/driver/rates') return ST_FX;
   if(path === '/api/driver/catalog') return ST_CAT;
   if(path === '/api/driver/profile') return ST_PROF;
@@ -78,6 +79,12 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path.endsWith('/fx')) { const r = ST_RATES.rates.find(x => x.code === (opts.body || {}).code); ST_ORDER.pay_fx = r ? {code: r.code, name: r.name, sym: r.sym, rate: r.rate, amount: Math.round(ST_ORDER.total / r.rate * 100) / 100} : null; return {ok: true, pay_fx: ST_ORDER.pay_fx}; }
   return {ok: true};
 }};
+// история заказов: вчера было три заказа, сегодня пусто
+const ST_HIST = {ok: true, today: '2026-09-13', days: [
+  {day: '2026-09-12', count: 3, aed: 640, cash: 440, online: 200, avg_min: 23, orders: [
+    {order_id: 'AMB00000011', address: 'Marina Walk 7, башня 2', total: 295, delivered_at: '2026-09-12T10:20:00', timestamp: '2026-09-12T09:50:00', items: [{qty: 2}], mins: 24, pay_fx: null},
+    {order_id: 'AMB00000012', address: 'JVC, Diamond Views 3', total: 170, delivered_at: '2026-09-12T12:05:00', timestamp: '2026-09-12T11:40:00', items: [{qty: 1}], mins: 18, pay_fx: null},
+    {order_id: 'AMB00000013', address: 'Downtown, Burj Views', total: 175, delivered_at: '2026-09-12T15:30:00', timestamp: '2026-09-12T15:02:00', items: [{qty: 3}], mins: 27, pay_fx: null}]}]};
 // профиль: зарплата и списания за месяц
 const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), silent: false, days: 6, rates: [
   {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true, kind:'fiat', prev:3.6686, change:0.12, spark:[3.668,3.669,3.6705,3.669,3.6715,3.673]},
@@ -120,6 +127,8 @@ async function standBoot(){
   if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
+  if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); histStep(1); }
+  if(ST_Q.get('open') === 'pick'){ await new Promise(r => setTimeout(r, 150)); histPick(); }
   if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 150)); profHist(); if(ST_Q.get('chip')) hsPick(ST_Q.get('chip')); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); if(ST_Q.get('mon')) hsMonth(); }
   if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }
   await new Promise(r => setTimeout(r, 120));

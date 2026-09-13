@@ -67,6 +67,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     if(!lim || window.__FAILN <= +lim){ const e = new Error('stand fail'); e.status = +(ST_Q.get('code') || 500); throw e; }
   }
   if(path === '/api/driver/orders') return {day: '2026-09-11', active: (ST_Q.get('noorders') || ST_Q.get('tab') === 'shift' && !ST_Q.get('route')) ? [] : [ST_ORDER, ST_ORDER2], done: [{...ST_ORDER2, order_id: 'AMB00000009', delivered_at: _agoIso(38)}], total_aed: 95, panic: false};
+  if(path === '/api/driver/expenses' && m === 'POST'){ stLog('API POST ' + path + ' ' + JSON.stringify(opts.body || {})); return {ok: true}; }
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0, working: true, meal_rates: {working: 80, off: 40},
     kinds: [{id:'fuel',t:'Заправка',receipt:true},{id:'wash',t:'Мойка',receipt:true},{id:'parking',t:'Парковка',receipt:true},{id:'guard',t:'Охрана'},{id:'kfc',t:'KFC · премия'},{id:'we_gave',t:'Мы вернули'},{id:'owed_us',t:'Нам должны'},{id:'we_got',t:'Нам вернули',plus:true},{id:'we_owe',t:'Мы должны',plus:true},{id:'other',t:'Что-то ещё'}],
     extras: ST_Q.get('expfull') ? [{id:'x1', kind:'fuel', amount:120, status:'approved', photo:'p', comment:''}, {id:'x2', kind:'parking', kind_t:'Парковка', amount:25, status:'pending', comment:'Marina Mall'}] : [],

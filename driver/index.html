@@ -2895,6 +2895,9 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
    месяц, под ними заголовок во всю ширину, три числа одной карточкой, список
    листается сам, «К выплате» прибито снизу. */
 .hdr.page .hdr-brand,.hdr.page .hdr-call,.hdr.page .hdr-me{display:none}
+/* display:flex сильнее атрибута hidden — пустая заготовка занимала место и
+   толкала логотип вправо. Прятать явно. */
+.hdr-pg[hidden]{display:none}
 .hdr-pg{position:relative;display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .hdr-pg > b{flex:1;min-width:0;font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.2px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

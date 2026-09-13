@@ -4871,6 +4871,21 @@ async def fin_pay_item_get(iid: str) -> dict | None:
     return await d.fin_pay_items.find_one({"_id": iid})
 
 
+async def fx_day_set(day: str, rates: dict) -> None:
+    """Курсы на конец дня — чтобы назавтра было с чем сравнить: источник отдаёт
+    только сегодняшнее число, истории у него нет."""
+    d = _db_or_none()
+    if d is None: return
+    await d.fx_days.update_one({"_id": day}, {"$set": {"rates": rates, "at": datetime.now(timezone.utc)}},
+                               upsert=True)
+
+
+async def fx_days(limit: int = 8) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.fx_days.find({}).sort("_id", -1).to_list(length=limit)
+
+
 async def fin_pay_item_set(iid: str, fields: dict) -> bool:
     """Пересмотр или отмена штрафа: запись остаётся, меняются поля."""
     d = _db_or_none()

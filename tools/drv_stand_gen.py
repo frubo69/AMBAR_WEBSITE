@@ -65,15 +65,22 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   return {ok: true};
 }};
 // профиль: зарплата и списания за месяц
-const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), silent: false, rates: [
-  {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true},
-  {code:'EUR', name:'Евро', sym:'€', rate:4.012, market:3.998, cash:true, main:true},
-  {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0402, market:0.0399, cash:true, main:true},
-  {code:'UZS', name:'Узбекский сум', sym:'', rate:0.00029, market:0.00029, cash:false, main:true},
-  {code:'KGS', name:'Киргизский сом', sym:'', rate:0.042, market:0.042, cash:false, main:true},
-  {code:'TJS', name:'Таджикский сомони', sym:'', rate:0.336, market:0.336, cash:false, main:false},
-  {code:'KZT', name:'Казахский тенге', sym:'', rate:0.0068, market:0.0068, cash:false, main:false},
-  {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:4.66, market:4.66, cash:false, main:false}]};
+const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), silent: false, days: 6, rates: [
+  {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true, kind:'fiat', prev:3.6686, change:0.12, spark:[3.668,3.669,3.6705,3.669,3.6715,3.673]},
+  {code:'EUR', name:'Евро', sym:'€', rate:4.261, market:4.258, cash:true, main:true, kind:'fiat', prev:4.2644, change:-0.08, spark:[4.272,4.269,4.2655,4.267,4.2644,4.261]},
+  {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:5.015, market:5.01, cash:false, main:true, kind:'fiat', prev:5.0075, change:0.15, spark:[5.0,5.004,5.002,5.009,5.0075,5.015]},
+  {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0435, market:0.0433, cash:true, main:true, kind:'fiat', prev:0.0436, change:-0.21, spark:[0.0441,0.0439,0.0438,0.0437,0.0436,0.0435]},
+  {code:'TRY', name:'Турецкая лира', sym:'₺', rate:0.0756, market:0.0755, cash:false, main:true, kind:'fiat', prev:0.0754, change:0.32, spark:[0.0749,0.0751,0.075,0.0753,0.0754,0.0756]},
+  {code:'CNY', name:'Юань', sym:'¥', rate:0.5456, market:0.5454, cash:false, main:true, kind:'fiat', prev:0.5446, change:0.18, spark:[0.5432,0.5438,0.5435,0.5442,0.5446,0.5456]},
+  {code:'CAD', name:'Канадский доллар', sym:'$', rate:2.695, market:2.694, cash:false, main:false, kind:'fiat', prev:2.6964, change:-0.05, spark:[2.702,2.7,2.698,2.699,2.6964,2.695]},
+  {code:'DKK', name:'Датская крона', sym:'', rate:0.5848, market:0.5846, cash:false, main:false, kind:'fiat', prev:0.5842, change:0.11, spark:[0.5836,0.5839,0.5838,0.5841,0.5842,0.5848]},
+  {code:'KES', name:'Кенийский шиллинг', sym:'', rate:0.0296, market:0.0296, cash:false, main:false, kind:'fiat', prev:0.0295, change:0.27, spark:[0.0293,0.0294,0.0294,0.0295,0.0295,0.0296]},
+  {code:'UZS', name:'Узбекский сум', sym:'', rate:0.00029, market:0.00029, cash:false, main:false, kind:'fiat', prev:0.00029, change:0.0, spark:[]},
+  {code:'KGS', name:'Киргизский сом', sym:'', rate:0.042, market:0.042, cash:false, main:false, kind:'fiat', prev:0.0419, change:0.09, spark:[0.0418,0.0419,0.0419,0.0419,0.0419,0.042]},
+  {code:'KZT', name:'Казахский тенге', sym:'', rate:0.0068, market:0.0068, cash:false, main:false, kind:'fiat', prev:0.0068, change:-0.03, spark:[0.00682,0.00681,0.00681,0.0068,0.0068,0.0068]},
+  {code:'USDT', name:'Tether USDT', sym:'', rate:3.673, market:3.673, cash:false, main:true, kind:'crypto', prev:3.6716, change:0.04, spark:[3.671,3.6705,3.672,3.6715,3.6716,3.673]}]};
+// первый день: истории ещё нет — ни процентов, ни графика
+if(ST_Q.get('fxnew')){ ST_FX.days = 0; ST_FX.rates.forEach(r => { r.change = null; r.prev = null; r.spark = []; }); }
 const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t: 'Водитель', code: 'B1', district: 'jvc',
   district_name: 'JVC', since: '2025-05-12', active: true, rate: 5000, cur: 'AED', unit: 'month', days: 26,
   accrued: 5000, plus: 0, minus: 1750, fines: 1350, holds: 400, to_pay: 3250, paid: 0, left: 3250, debt: 0,
@@ -97,6 +104,7 @@ async function standBoot(){
   if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
+  if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }
   await new Promise(r => setTimeout(r, 120));
   const card = document.querySelector('.oc');
   let over = 0;
@@ -110,6 +118,8 @@ assert src.count("\nboot();") == 1
 src = src.replace("\nboot();", "\nstandBoot();")
 src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:390px;margin:0;overflow:visible}.sheet{right:auto;width:390px}.sheet-in{max-width:390px}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:390px}</style></head>""", 1)
 src = src.replace("</body>", '<div id="sterr"></div></body>', 1)
+# для снимков журнал стенда мешает: длинные строки растягивают страницу шире 390
+src = src.replace("</head>", "<script>if(new URLSearchParams(location.search).get('nolog'))document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sterr');if(e)e.style.display='none'});</script></head>", 1)
 os.makedirs(OUT, exist_ok=True)
 open(os.path.join(OUT, "drv.html"), "w", encoding="utf-8").write(src)
 print("drv.html written")

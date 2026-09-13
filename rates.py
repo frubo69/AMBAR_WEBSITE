@@ -271,6 +271,12 @@ async def get_rates(force: bool = False) -> dict:
         _CACHE["at"] = now
         _CACHE["fail_at"] = 0.0
         usd = next((r for r in rows if r["code"] == "USD"), None)
+        try:                                   # снимок дня: завтра будет «вчера»
+            import db as _db
+            await _db.fx_day_set(datetime.now(DUBAI_TZ).strftime("%Y-%m-%d"),
+                                 {r["code"]: (r.get("cash_aed") or r["aed"]) for r in rows})
+        except Exception as e:                    # noqa: BLE001
+            log.warning(f"[rates] снимок дня не записан: {e}")
         log.info(f"[rates] обновлено · валют {len(rows)}"
                  f" · наличными {_CACHE.get('cash_n', 0)}"
                  + (f" · доллар рынок {usd['aed']}"

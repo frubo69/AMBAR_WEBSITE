@@ -1301,10 +1301,37 @@ async def handle_rates(request):
         out.append({"code": code, "name": r.get("name") or code, "sym": FX_SYM.get(code, code),
                     "rate": float(rate), "cash": bool(r.get("cash_aed")),
                     "market": float(r.get("aed") or 0) or None, "main": code in main})
+    # USDT: платежи в нём принимаем, курс — доллар один к одному
+    usd = next((r for r in out if r["code"] == "USD"), None)
+    if usd:
+        out.append({"code": "USDT", "name": "Tether USDT", "sym": "USDT", "rate": usd["rate"],
+                    "cash": usd["cash"], "market": usd["market"], "main": True, "kind": "crypto"})
+    for r in out:
+        r.setdefault("kind", "fiat")
+    # история по дням: вчерашний курс для процента и последние дни для графика
+    try:
+        hist = await db.fx_days(8)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[driver] история курсов не прочитана: {e}")
+        hist = []
+    today = datetime.now(DUBAI_TZ).strftime("%Y-%m-%d")
+    past = [h for h in hist if str(h.get("_id")) != today][:7]          # свежие сверху
+    for r in out:
+        code = "USD" if r["code"] == "USDT" else r["code"]
+        vals = []
+        for h in reversed(past):                                        # от старых к новым
+            v = (h.get("rates") or {}).get(code)
+            if v:
+                vals.append(round(float(v), 6))
+        prev = vals[-1] if vals else None
+        r["prev"] = prev
+        r["change"] = round((r["rate"] / prev - 1) * 100, 2) if prev else None
+        r["spark"] = (vals + [r["rate"]]) if len(vals) >= 2 else []
     out.sort(key=lambda r: (0 if r["main"] else 1,
                             main.index(r["code"]) if r["code"] in main else 0, r["code"]))
     return web.json_response({"rates": out, "at": d.get("fetched_iso") or "",
-                              "silent": bool(d.get("silent")), "ok": bool(out)}, headers=CORS_HEADERS)
+                              "silent": bool(d.get("silent")), "days": len(past),
+                              "ok": bool(out)}, headers=CORS_HEADERS)
 
 
 @require_driver

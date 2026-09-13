@@ -152,8 +152,17 @@ html.kb body{padding-bottom:50vh}
      блокирующим тегом: пока чужой домен не ответит, страница не рисуется вовсе,
      а недоступен он ровно тогда, когда недоступно всё остальное. Копия лежит
      рядом, оригинал остаётся страховкой на случай, если Telegram обновит API. -->
-<script src="/vendor/telegram-web-app.js"></script>
-<script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
+<script>
+window.Telegram = {WebApp: new Proxy({initData: 'x', version: '8.0', platform: 'ios', colorScheme: 'dark',
+  themeParams: {}, viewportHeight: 800, viewportStableHeight: 800, isExpanded: true,
+  HapticFeedback: {impactOccurred(){}, notificationOccurred(){}, selectionChanged(){}},
+  BackButton: {show(){}, hide(){}, onClick(){}, offClick(){}}, MainButton: {hide(){}, show(){}, setText(){}, onClick(){}},
+  LocationManager: null, ready(){}, expand(){}, onEvent(){}, offEvent(){}, close(){}, showConfirm(t, cb){ cb(true); },
+  showAlert(t, cb){ cb && cb(); }, openLink(){}, openTelegramLink(){}, setHeaderColor(){}, setBackgroundColor(){},
+  enableClosingConfirmation(){}, disableVerticalSwipes(){}, requestFullscreen(){}, initDataUnsafe: {user: {id: 1, first_name: 'Али'}}},
+  {get(t, k){ return k in t ? t[k] : (() => {}); }})};
+</script>
+
 <link rel="stylesheet" href="/vendor/fonts.css">
 <style>
 :root{
@@ -2818,14 +2827,14 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-tile.pf-tap:active{border-color:rgba(201,169,110,.45)}
 .pf-tap-c{flex:0 0 auto;display:flex;align-self:center;margin-left:auto;color:var(--gold2)}
 /* Курс валют — отдельная страница, размеры сняты с макета владельца */
-.fxh{display:grid;grid-template-columns:36px minmax(0,1fr) auto;column-gap:10px;row-gap:3px;
-  align-items:center;padding:2px 0 12px}
-.fxh-b{grid-row:1/3;align-self:center;width:36px;height:36px;border-radius:12px;border:1px solid var(--border2);
-  background:var(--card);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.fxh{display:flex;align-items:center;gap:10px;padding:2px 0 12px}
+.fxh-b{flex:0 0 auto;width:36px;height:36px;border-radius:12px;border:1px solid var(--border2);background:var(--card);
+  color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
 .fxh-b:active{border-color:rgba(201,169,110,.45)}
-.fxh-t{grid-column:2;grid-row:1;font-size:20px;font-weight:700;line-height:1.15;color:var(--text);letter-spacing:-.2px}
-.fxh-s{grid-column:2/4;grid-row:2;font-style:normal;font-size:11.5px;line-height:1.25;color:var(--muted)}
-.fxh-d{grid-column:3;grid-row:1;display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:12px;
+.fxh-t{flex:1;min-width:0}
+.fxh-t b{display:block;font-size:20px;font-weight:700;line-height:1.15;color:var(--text);letter-spacing:-.2px}
+.fxh-t i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;line-height:1.25;color:var(--muted)}
+.fxh-d{flex:0 0 auto;display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:12px;
   border:1px solid var(--border2);background:var(--card);color:var(--sub);font-size:11.5px;font-weight:600;white-space:nowrap}
 .fxh-d svg{color:var(--gold2)}
 .fxq{display:flex;align-items:center;gap:10px;height:46px;margin:0 0 12px;padding:0 14px;border-radius:15px;
@@ -2834,10 +2843,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .fxq input{flex:1;min-width:0;border:0;background:none;color:var(--text);font-family:inherit;font-size:13.5px}
 .fxq input:focus{outline:none}
 .fxq input::placeholder{color:var(--dim)}
-.fxf{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.fxf{display:flex;gap:8px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .fxf::-webkit-scrollbar{display:none}
-.fxf button{flex:0 0 auto;height:33px;padding:0 13px;border-radius:999px;border:1px solid var(--border2);
-  background:var(--card);color:var(--sub);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.fxf button{flex:0 0 auto;height:33px;padding:0 16px;border-radius:999px;border:1px solid var(--border2);
+  background:var(--card);color:var(--sub);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
 .fxf button.on{background:var(--gold2);border-color:var(--gold2);color:#15130d;font-weight:700}
 .fxr{margin:0 0 5px;border-radius:14px;background:var(--card2);border:1px solid rgba(255,255,255,.05)}
 .fxr.hot{border-color:rgba(201,169,110,.5);background:linear-gradient(180deg,rgba(201,169,110,.10),rgba(201,169,110,.04))}
@@ -2852,7 +2861,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .fxr-b b{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:800;letter-spacing:.2px;color:var(--text);line-height:1.15}
 .fxr-b i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;color:var(--muted);line-height:1.2;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fxr-hot{flex:0 0 auto;font-style:normal;padding:2px 7px;border-radius:6px;background:var(--gold-soft);color:var(--gold2);
+.fxr-hot{flex:0 0 auto;padding:2px 7px;border-radius:6px;background:var(--gold-soft);color:var(--gold2);
   font-size:9px;font-weight:700;letter-spacing:.1px}
 .fxr-v{flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}
 .fxr-v b{display:block;font-size:15.5px;font-weight:800;line-height:1.15;color:var(--text);white-space:nowrap;letter-spacing:-.2px}
@@ -2870,7 +2879,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-fxnote{margin:10px 2px 0;font-size:11px;line-height:1.55;color:var(--dim)}
 
 </style>
-</head>
+<style>html,body{height:auto;min-height:0}body{width:390px;margin:0;overflow:visible}.sheet{right:auto;width:390px}.sheet-in{max-width:390px}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:390px}</style></head>
 <body>
 <div id="safeProbe" aria-hidden="true"
   style="position:fixed;top:0;left:-9999px;width:1px;height:var(--safe-top);pointer-events:none"></div>
@@ -3613,7 +3622,95 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <div class="deny-s" id="denyS"></div>
 </div>
 
-<script src="api.js"></script>
+<script>
+const ST_Q = new URLSearchParams(location.search);
+const ST_LOG = []; function stLog(m){ ST_LOG.push(m); const e = document.getElementById('sterr'); if(e) e.textContent = ST_LOG.join('\n'); }
+window.onerror = (m, s, l, c) => stLog('ERROR ' + m + ' @' + l + ':' + c);
+const ST_NOW = new Date();
+const _agoIso = mins => new Date(ST_NOW.getTime() - mins * 60000).toISOString().replace('Z', '');
+const ST_ORDER = {
+  order_id: 'AMB82300EB5', status: 'approved', address: 'Ноябрьская улица 12А', gmap_link: 'https://maps', location: {lat: 25.1, lon: 55.1},
+  district: 'Алгусес', customer_name: 'Клиент', source: ST_Q.get('src') || 'app', tip: 0,
+  items: [{id: 'absolut', name: 'Absolut 1 ltr', qty: 1, pcs: null, price: 95, line_total: 95, gift: false},
+          {id: 'gin', name: "Gordon's London Dry 0.7", qty: 2, pcs: null, price: 100, line_total: 200, gift: false}],
+  total: 295, comment: 'ТЕСТ', payment_method: '', prepaid: false, timestamp: _agoIso(5), confirmed_at: _agoIso(1),
+  delivered_at: '', deliver_by: '03:49', eta: 30, driver_ack_at: 'x', driver_req: null, chat_n: 1, chat_new: 0, chat_at: '',
+  settle: null, owed: 0, pay_fx: null, chat_last: {text: 'Ждите 5 минут, звоню клиенту', at: _agoIso(2), name: 'Парвиз'}};
+if(ST_Q.get('fx')) ST_ORDER.pay_fx = {code: 'USD', name: 'Доллар США', sym: '$', rate: 3.67, amount: 80.38, at: ''};
+if(ST_Q.get('req')) ST_ORDER.driver_req = {kind: ST_Q.get('req'), status: 'open', text: ST_Q.get('req') === 'cancel' ? 'Клиент отказался' : '',
+  diff: ST_Q.get('req') === 'edit' ? [{kind: 'add', name: 'Beluga', qty: 1}] : [], total: 400, at: _agoIso(1)};
+if(ST_Q.get('chat')) ST_ORDER.chat_new = 1;
+if(ST_Q.get('stl')) ST_ORDER.settle = {taken: 110.1, diff: 10.1, by: 'Али', at: '', fx: {code: 'USD', amount: 30, rate: 3.67, sym: '$'}};
+const ST_ORDER2 = {...ST_ORDER, order_id: 'AMB00000002', address: 'Marina Walk 7', items: [ST_ORDER.items[0]], total: 95, deliver_by: '04:20', pay_fx: null, driver_req: null, chat_new: 0};
+const ST_RATES = {rates: [{code:'USD', name:'Доллар США', sym:'$', rate:3.67, cash:true, main:true}, {code:'EUR', name:'Евро', sym:'€', rate:4.02, cash:true, main:true},
+  {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:4.65, cash:false, main:true}, {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0405, cash:true, main:true},
+  {code:'TRY', name:'Турецкая лира', sym:'₺', rate:0.089, cash:false, main:true}, {code:'CNY', name:'Китайский юань', sym:'¥', rate:0.51, cash:false, main:true},
+  {code:'KZT', name:'Казахстанский тенге', sym:'₸', rate:0.0069, cash:false, main:false}, {code:'INR', name:'Индийская рупия', sym:'₹', rate:0.0415, cash:false, main:false}], at: 't', ok: true};
+const ST_CAT = {items: [
+  {id:'absolut', name:'Absolut 1 ltr', cat:'Водка', price:100, app:95, pack:false},
+  {id:'gin', name:"Gordon's London Dry 0.7", cat:'Джин', price:105, app:100, pack:false},
+  {id:'beer', name:'Heineken 0.33', cat:'Пиво', price:12, app:11, pack:true, p12:140, p24:275, app12:135, app24:265},
+  {id:'jd', name:"Jack Daniel's 1 ltr", cat:'Виски', price:180, app:170, pack:false}], cats: ['Водка','Джин','Пиво','Виски']};
+window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
+  const m = (opts.method || 'GET');
+  if(path === '/api/driver/orders') return {day: '2026-09-11', active: [ST_ORDER, ST_ORDER2], done: [], total_aed: 0, panic: false};
+  if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0};
+  if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
+  if(path === '/api/driver/shift') return ST_SHIFT;
+  if(path === '/api/driver/rates') return ST_FX;
+  if(path === '/api/driver/catalog') return ST_CAT;
+  if(path === '/api/driver/profile') return ST_PROF;
+  if(path.endsWith('/chat') && m === 'GET') return {order_id: ST_ORDER.order_id, chat: [{by:'driver', name:'Али', text:'Клиент не отвечает', at:_agoIso(4), kind:'client'}, {by:'operator', name:'Парвиз', text:'Ждите 5 минут, звоню клиенту', at:_agoIso(2), kind:''}], operator: 'Парвиз'};
+  stLog('API ' + m + ' ' + path + ' ' + JSON.stringify(opts.body || {}));
+  if(path.endsWith('/fx')) { const r = ST_RATES.rates.find(x => x.code === (opts.body || {}).code); ST_ORDER.pay_fx = r ? {code: r.code, name: r.name, sym: r.sym, rate: r.rate, amount: Math.round(ST_ORDER.total / r.rate * 100) / 100} : null; return {ok: true, pay_fx: ST_ORDER.pay_fx}; }
+  return {ok: true};
+}};
+// профиль: зарплата и списания за месяц
+const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), silent: false, days: 6, rates: [
+  {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true, kind:'fiat', prev:3.6686, change:0.12, spark:[3.668,3.669,3.6705,3.669,3.6715,3.673]},
+  {code:'EUR', name:'Евро', sym:'€', rate:4.261, market:4.258, cash:true, main:true, kind:'fiat', prev:4.2644, change:-0.08, spark:[4.272,4.269,4.2655,4.267,4.2644,4.261]},
+  {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:5.015, market:5.01, cash:false, main:true, kind:'fiat', prev:5.0075, change:0.15, spark:[5.0,5.004,5.002,5.009,5.0075,5.015]},
+  {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0435, market:0.0433, cash:true, main:true, kind:'fiat', prev:0.0436, change:-0.21, spark:[0.0441,0.0439,0.0438,0.0437,0.0436,0.0435]},
+  {code:'TRY', name:'Турецкая лира', sym:'₺', rate:0.0756, market:0.0755, cash:false, main:true, kind:'fiat', prev:0.0754, change:0.32, spark:[0.0749,0.0751,0.075,0.0753,0.0754,0.0756]},
+  {code:'CNY', name:'Юань', sym:'¥', rate:0.5456, market:0.5454, cash:false, main:true, kind:'fiat', prev:0.5446, change:0.18, spark:[0.5432,0.5438,0.5435,0.5442,0.5446,0.5456]},
+  {code:'CAD', name:'Канадский доллар', sym:'$', rate:2.695, market:2.694, cash:false, main:false, kind:'fiat', prev:2.6964, change:-0.05, spark:[2.702,2.7,2.698,2.699,2.6964,2.695]},
+  {code:'DKK', name:'Датская крона', sym:'', rate:0.5848, market:0.5846, cash:false, main:false, kind:'fiat', prev:0.5842, change:0.11, spark:[0.5836,0.5839,0.5838,0.5841,0.5842,0.5848]},
+  {code:'KES', name:'Кенийский шиллинг', sym:'', rate:0.0296, market:0.0296, cash:false, main:false, kind:'fiat', prev:0.0295, change:0.27, spark:[0.0293,0.0294,0.0294,0.0295,0.0295,0.0296]},
+  {code:'UZS', name:'Узбекский сум', sym:'', rate:0.00029, market:0.00029, cash:false, main:false, kind:'fiat', prev:0.00029, change:0.0, spark:[]},
+  {code:'KGS', name:'Киргизский сом', sym:'', rate:0.042, market:0.042, cash:false, main:false, kind:'fiat', prev:0.0419, change:0.09, spark:[0.0418,0.0419,0.0419,0.0419,0.0419,0.042]},
+  {code:'KZT', name:'Казахский тенге', sym:'', rate:0.0068, market:0.0068, cash:false, main:false, kind:'fiat', prev:0.0068, change:-0.03, spark:[0.00682,0.00681,0.00681,0.0068,0.0068,0.0068]},
+  {code:'USDT', name:'Tether USDT', sym:'', rate:3.673, market:3.673, cash:false, main:true, kind:'crypto', prev:3.6716, change:0.04, spark:[3.671,3.6705,3.672,3.6715,3.6716,3.673]}]};
+const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t: 'Водитель', code: 'B1', district: 'jvc',
+  district_name: 'JVC', since: '2025-05-12', active: true, rate: 5000, cur: 'AED', unit: 'month', days: 26,
+  accrued: 5000, plus: 0, minus: 1750, fines: 1350, holds: 400, to_pay: 3250, paid: 0, left: 3250, debt: 0,
+  month_total: 1750, month_count: 5,
+  items: [
+    {id: 'p1', kind: 'fine', t: 'Штраф', amount: 1000, per_month: 0, day: '2026-09-12', reason: 'Превышение скорости · 71 – 100 км/ч', note: 'Превышение скорости на E311', due: 1000, left: 0, done: true, cancelled: false},
+    {id: 'p2', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-09-08', reason: '', note: 'Аванс за топливо', due: 400, left: 0, done: true, cancelled: false},
+    {id: 'p3', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-05', reason: 'Использование телефона за рулём · Во время движения', note: 'Использование телефона за рулем', due: 350, left: 0, done: true, cancelled: false},
+    {id: 'p4', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-01', reason: 'Неправильная парковка · В неположенном месте', note: 'Парковка в запрещённой зоне', due: 350, left: 0, done: true, cancelled: false},
+    {id: 'p5', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-08-28', reason: 'Опоздание на смену', note: 'Опоздание более 30 минут', due: 0, left: 0, done: true, cancelled: false},
+    {id: 'p6', kind: 'fine', t: 'Штраф', amount: 600, per_month: 0, day: '2026-08-20', reason: 'Неправильная парковка', note: '', due: 0, left: 0, done: false, cancelled: true}]};
+const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(120), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
+async function standBoot(){
+  ME = {name: 'Али', district: 'alg', district_code: 'B4'};
+  try{ document.getElementById('dAv').textContent = 'АЛ'; document.getElementById('dName').textContent = 'Али'; }catch(e){}
+  SH = ST_SHIFT;
+  await load();
+  setTab(ST_Q.get('tab') || 'orders');
+  await new Promise(r => setTimeout(r, 80));
+  if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
+  if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
+  if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
+  if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
+  if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }
+  await new Promise(r => setTimeout(r, 120));
+  const card = document.querySelector('.oc');
+  let over = 0;
+  document.querySelectorAll('.oc-it span, .oc-addr-t, .oc .dc-cap i').forEach(el => { if(el.scrollWidth > el.clientWidth + 1) over++; });
+  stLog('MEASURE w=' + document.documentElement.scrollWidth + ' card=' + (card ? Math.round(card.getBoundingClientRect().height) : 0) + ' overflow=' + over);
+}
+</script>
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script>
@@ -4117,12 +4214,12 @@ const FXD_FLAG = {
   AZN: '<rect width="24" height="8" fill="#00b9e4"/><rect y="8" width="24" height="8" fill="#ed2939"/><rect y="16" width="24" height="8" fill="#3f9c35"/>',
   SAR: '<rect width="24" height="24" fill="#006c35"/><path d="M5 13h14M7 16h10" stroke="#fff" stroke-width="1.6"/>',
   EGP: '<rect width="24" height="8" fill="#ce1126"/><rect y="8" width="24" height="8" fill="#fff"/><rect y="16" width="24" height="8" fill="#000"/>',
-  CAD: '<rect width="24" height="24" fill="#fff"/><rect width="6" height="24" fill="#d80621"/><rect x="18" width="6" height="24" fill="#d80621"/><path d="M12 5.2l1.1 2.5 2.3-.6-.8 2.3 2.1-.5-1.3 1.9 1.5 1.1-2.5 1 .4 1.5-2.3-.4v2.7h-1.2v-2.7l-2.3.4.4-1.5-2.5-1 1.5-1.1L7.1 8.9l2.1.5-.8-2.3 2.3.6z" fill="#d80621"/>',
+  CAD: '<rect width="24" height="24" fill="#fff"/><rect width="6" height="24" fill="#d80621"/><rect x="18" width="6" height="24" fill="#d80621"/><path d="M12 7l1.6 3.4 3-1-1.4 3 2 1-3 1.2.4 2.4-2.6-1.4-2.6 1.4.4-2.4-3-1.2 2-1-1.4-3 3 1z" fill="#d80621"/>',
   AUD: '<rect width="24" height="24" fill="#012169"/><path d="M0 0l10 10M10 0L0 10" stroke="#fff" stroke-width="2"/><circle cx="17" cy="17" r="2" fill="#fff"/>',
   JPY: '<rect width="24" height="24" fill="#fff"/><circle cx="12" cy="12" r="6" fill="#bc002d"/>',
   CHF: '<rect width="24" height="24" fill="#d52b1e"/><path d="M12 6v12M6 12h12" stroke="#fff" stroke-width="3.4"/>',
   DKK: '<rect width="24" height="24" fill="#c60c30"/><path d="M9 0v24M0 12h24" stroke="#fff" stroke-width="4"/>',
-  KES: '<rect width="24" height="24" fill="#006600"/><rect width="24" height="7.4" fill="#000"/><rect y="8.4" width="24" height="7.2" fill="#bb0000"/><path d="M0 7.4h24M0 16.6h24" stroke="#fff" stroke-width="1"/><ellipse cx="12" cy="12" rx="2.6" ry="5.2" fill="#bb0000" stroke="#fff" stroke-width="1"/>',
+  KES: '<rect width="24" height="8" fill="#000"/><rect y="8" width="24" height="8" fill="#bb0000"/><rect y="16" width="24" height="8" fill="#006600"/>',
   USDT:'<rect width="24" height="24" fill="#26a17b"/><path d="M7 7h10v2.6h-3.6V18h-2.8V9.6H7z" fill="#fff"/>',
 };
 function fxdFlag(r){
@@ -4137,13 +4234,8 @@ function fxdSpark(r){
   const w = 46, h = 24, min = Math.min(...v), max = Math.max(...v), d = (max - min) || 1;
   const pts = v.map((x, i) => `${(i / (v.length - 1) * w).toFixed(1)},${(h - (x - min) / d * (h - 4) - 2).toFixed(1)}`).join(' ');
   const up = v[v.length - 1] >= v[0], c = up ? '#4CAF7D' : '#E05555';
-  const id = 'sp' + Math.random().toString(36).slice(2, 8);
-  return `<svg class="fxr-s" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${c}" stop-opacity=".26"/><stop offset="1" stop-color="${c}" stop-opacity="0"/>
-    </linearGradient></defs>
-    <polygon points="0,${h} ${pts} ${w},${h}" fill="url(#${id})"/>
-    <polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `<svg class="fxr-s" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><polyline points="${pts}"
+    fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 function fxdRows(){
   const rows = (FXD && FXD.rates) || [], q = (FXD_Q || '').trim().toLowerCase();
@@ -4152,14 +4244,15 @@ function fxdRows(){
   else if(FXD_F === 'fiat') shown = rows.filter(r => r.kind !== 'crypto');
   else if(FXD_F === 'crypto') shown = rows.filter(r => r.kind === 'crypto');
   if(q) shown = shown.filter(r => r.code.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q));
+  else if(FXD_F === 'all') shown = shown.filter(r => r.main || r.cash);
   if(!shown.length) return `<div class="pf-none">${rows.length ? 'Такой валюты нет' : 'Курсы не загрузились'}</div>`;
-  return shown.map((r, i) => {
+  return shown.map(r => {
     const ch = r.change === null || r.change === undefined ? null : +r.change;
-    const open = FXD_OPEN === r.code, hot = i === 0 && !q;     // главная валюта — первой и выделена
-    return `<div class="fxr${hot ? ' hot' : ''}${open ? ' open' : ''}">
+    const open = FXD_OPEN === r.code;
+    return `<div class="fxr${r.main ? ' hot' : ''}${open ? ' open' : ''}">
       <button class="fxr-h" onclick="fxdOpen('${esc(r.code)}')">
         ${fxdFlag(r)}
-        <span class="fxr-b"><b>${esc(r.code)}${hot ? '<em class="fxr-hot">Популярная</em>' : ''}</b><i>${esc(r.name || r.code)}</i></span>
+        <span class="fxr-b"><b>${esc(r.code)}</b><i>${esc(r.name || r.code)}</i></span>
         <span class="fxr-v"><b>${fxdN(r.rate)} AED</b>${ch === null ? '' :
           `<i class="${ch >= 0 ? 'up' : 'dn'}">${ch >= 0 ? '↑' : '↓'} ${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%</i>`}</span>
         ${fxdSpark(r)}
@@ -4179,9 +4272,8 @@ function profRatesHtml(){
   const chips = [['all', 'Все'], ['main', 'Популярные'], ['fiat', 'Фиат'], ['crypto', 'Криптовалюты']];
   return `<div class="fxh">
       <button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
-      <b class="fxh-t">Курс валют</b>
+      <div class="fxh-t"><b>Курс валют</b><i>Актуальные курсы обмена на сегодня</i></div>
       <span class="fxh-d">${svg(ICO.cal, 14)}${esc(day)}</span>
-      <i class="fxh-s">Актуальные курсы обмена на сегодня</i>
     </div>
     <label class="fxq">${svg(ICO.search, 17)}<input id="pfFxQ" placeholder="Поиск валюты" autocomplete="off"
       value="${esc(FXD_Q)}" oninput="fxdFind(this.value)"></label>
@@ -9078,7 +9170,7 @@ document.getElementById('editSheet').addEventListener('click', e => {
   if(e.target.id === 'editSheet') closeEdit();
 });
 
-boot();
+standBoot();
 </script>
 
 <!-- Тап по шапке — наверх.
@@ -10777,5 +10869,5 @@ try{
 }catch(e){}
 
 </script>
-</body>
+<div id="sterr"></div></body>
 </html>

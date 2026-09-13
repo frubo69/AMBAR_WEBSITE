@@ -156,6 +156,7 @@ async function standBoot(){
     if(ST_Q.get('open') === 'inc'){ ST_ORDER.confirmed_at = d.toISOString(); ST_ORDER.deliver_by = '01:33'; }
     window._isLate = () => false;
   }
+  if(ST_Q.get('one')) ST_ACTIVE.length = 1;   // &one=1 — один заказ в работе (лента с одним чипом)
   await load();
   setTab(ST_Q.get('tab') || 'orders');
   shPaint();   // как в бою: boot() → shLoad() → shPaint() — замок смены/гео
@@ -171,6 +172,7 @@ async function standBoot(){
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') && ST_Q.get('open').indexOf('exp:') === 0){ await new Promise(r => setTimeout(r, 150)); expGo(ST_Q.get('open').slice(4)); }
   if(ST_Q.get('open') === 'orders'){ await new Promise(r => setTimeout(r, 150)); profOrders(); }
+  if(ST_Q.get('open') === 'ordhist'){ await new Promise(r => setTimeout(r, 150)); ordHist(); }   // история из ленты заказов
   if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); }
   if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }
   if(ST_Q.get('open') === 'pick'){ await new Promise(r => setTimeout(r, 150)); histPick(); }

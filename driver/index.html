@@ -344,10 +344,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    работе, тап или свайп переключает. В карточке: номер и район, кнопка «•••»,
    кольцо с обратным отсчётом до «быть до» (зелёный; ≤3 мин — жёлтый; ≤1 мин
    и просрочка — красный), ниже секции-плашки и «Чат» / «Доставил». ── */
-.ocs{position:relative;display:flex;gap:7.5px;overflow-x:auto;scroll-snap-type:x proximity;scroll-padding:0 13px 0 11px;
-  margin:0 -13px;padding:5.5px 13px 0 11px;
+.ocs-w{display:flex;align-items:flex-start;gap:7.5px;margin:0 -13px;padding:0 13px 0 0}
+.ocs{position:relative;flex:1 1 auto;min-width:0;display:flex;gap:7.5px;overflow-x:auto;scroll-snap-type:x proximity;scroll-padding:0 22px 0 11px;
+  padding:5.5px 22px 0 11px;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
   scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .ocs::-webkit-scrollbar{display:none}
+/* История заказов — квадрат справа от ленты (владелец, 14 сен 2026): та же
+   высота, что у чипа, значок как у строки «История заказов» в профиле. */
+.ocs-h{flex:0 0 54.5px;height:54.5px;margin-top:5.5px;box-sizing:border-box;border-radius:12px;padding:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
+.ocs-h:active{transform:scale(.96)}
 .ocs-c{position:relative;flex:0 0 148px;min-width:0;height:54.5px;box-sizing:border-box;border-radius:12px;background:#0F131C;
   border:1px solid #171B26;padding:13.5px 10px 0 25.8px;text-align:left;font-family:inherit;color:inherit;
   scroll-snap-align:start;cursor:pointer;display:block}
@@ -4225,6 +4233,7 @@ const ICO = {
   minusc:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12h7.6"/>',
   sort: '<path d="M4 7h15M4 12h10M4 17h6"/>',
   clip: '<rect x="5" y="4.5" width="14" height="17" rx="2.2"/><path d="M9 2.5h6v3.5H9z"/><path d="M9 12h6M9 16h4.5"/>',
+  hist: '<path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
   stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -4503,7 +4512,7 @@ function setTab(t){
   hdrPage('');                         // страницы профиля, истории и расходов поставят свою сами
   // Нажатие на вкладку — это её корень: вложенная страница, где человек был
   // до этого, не должна встречать его при возврате.
-  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false; XP_PARK_EDIT = ''; FX_PICK = null;
+  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false; XP_PARK_EDIT = ''; FX_PICK = null; ORD_HIST = false;
   document.body.classList.remove('xp-on');
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'profile'){ profPaint(); profLoad(); }
@@ -4605,6 +4614,7 @@ function fxdWhen(iso){
 function profRates(){ PROF_PAGE = 'rates'; FXD_Q = ''; FXD_F = 'all'; FXD_OPEN = ''; profPaint(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
 function profBack(){
   if(FX_PICK){ fxClose(); window.scrollTo({top: 0}); return; }   // со страницы выбора валюты — к заказу
+  if(ORD_HIST){ ordHistClose(); return; }                        // из истории над заказами — к карточке
   PROF_PAGE = PROF_PAGE === 'item' ? 'hist' : '';   // из карточки списания — назад в историю
   HS_MOPEN = false; profPaint(); window.scrollTo({top: 0});
 }
@@ -4809,7 +4819,7 @@ function profHtml(){
     </div>
   </div>`;
   const orders = `<button class="card pf-row" onclick="profOrders()">
-    <span class="pf-row-i">${svg('<path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/>', 19)}</span>
+    <span class="pf-row-i">${svg(ICO.hist, 19)}</span>
     <span class="pf-row-b"><b>История заказов</b><i>Заказы по дням, поиск по адресу и номеру</i></span>
     <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
   </button>`;
@@ -4823,7 +4833,7 @@ function profOrders(){
   window.scrollTo({top: 0});
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
-const histShown = () => TAB === 'profile' && PROF_PAGE === 'orders';
+const histShown = () => (TAB === 'profile' && PROF_PAGE === 'orders') || (TAB === 'orders' && ORD_HIST);
 // ── История списаний ──────────────────────────────────────────────────────
 // Отдельная страница: сверху месяц и три плитки, список листается внутри
 // своего окошка, «Итог по месяцу» прибит снизу — так просил владелец.
@@ -5141,13 +5151,18 @@ function orderCard(o, i){
 // Полоса чипов над карточкой: по одному на заказ в работе. Цвет точки и
 // времени — место в очереди: первый зелёный, второй жёлтый, дальше серые.
 // Под выбранным чипом — короткая полоска-указатель.
+// Справа от ленты — кнопка «История заказов» (владелец, 14 сен 2026): лента
+// уходит под неё с растушёвкой, кнопка на месте при любой прокрутке. Из-за
+// неё полоса теперь есть и при одном заказе.
 function ocChips(active, cur){
-  return `<div class="ocs" id="ocs" onscroll="ocBar()">${active.map((o, i) => `
+  return `<div class="ocs-w"><div class="ocs" id="ocs" onscroll="ocBar()">${active.map((o, i) => `
     <button class="ocs-c k${Math.min(i, 2)}${o === cur ? ' on' : ''}" onclick="ocPick('${esc(o.order_id)}')">
       <span class="ocs-d"></span>
       <span class="ocs-1"><b>#${esc(o.order_id)}</b><i>${o.deliver_by ? esc(o.deliver_by) : '—'}</i></span>
       <span class="ocs-2">${esc(o.district || '')}</span>
-    </button>`).join('')}</div><div class="ocs-bar" id="ocsBar"></div>`;
+    </button>`).join('')}</div>
+    <button class="ocs-h" onclick="ordHist()" aria-label="История заказов">${svg(ICO.hist, 24)}</button></div>
+    <div class="ocs-bar" id="ocsBar"></div>`;
 }
 function ocBar(){
   const s = document.getElementById('ocs'), b = document.getElementById('ocsBar');
@@ -5167,6 +5182,21 @@ function ocChipsShow(){
   ocBar();
 }
 function ocPick(oid){ OPEN_OID = oid; _tap('light'); renderOrders(); }
+// История заказов из вкладки «Заказы» — та же страница, что из профиля:
+// renderOrders отдаёт экран ей, пока ORD_HIST. «Назад», нажатие на вкладку
+// и принятый заказ возвращают к карточке.
+let ORD_HIST = false;
+function ordHist(){
+  ORD_HIST = true; HIST_PAGE = ''; HIST_PICK = false;
+  if(!HIST) loadHistory(); else renderHistory();
+  window.scrollTo({top: 0}); _tap('light');
+}
+function ordHistClose(){
+  if(!ORD_HIST) return;
+  ORD_HIST = false; hdrPage('');
+  if(TAB === 'orders') renderOrders();
+  window.scrollTo({top: 0});
+}
 // Комментарий свёрнут в строку; тап раскрывает. Что раскрыто — помним между перерисовками.
 const OC_NOTE_OPEN = new Set();
 function ocNote(oid){
@@ -6358,6 +6388,7 @@ function renderOrders(){
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
   if(FX_PICK){ box.innerHTML = profRatesHtml(); return; }
+  if(ORD_HIST){ renderHistory(); return; }   // история над заказами — как в профиле
   if(!active.length){
     box.innerHTML = `<div class="oe">
       <img src="img/empty-orders.png" alt="" width="744" height="505">
@@ -6374,7 +6405,7 @@ function renderOrders(){
   const cur = active.find(o => o.order_id === OPEN_OID) || active[0];
   const strip = document.getElementById('ocs');
   const keepX = strip ? strip.scrollLeft : null;   // перерисовка раз в 5 с не должна сбрасывать прокрутку ленты
-  box.innerHTML = (active.length > 1 ? ocChips(active, cur) : '') + orderCard(cur, active.indexOf(cur));
+  box.innerHTML = ocChips(active, cur) + orderCard(cur, active.indexOf(cur));
   const s2 = document.getElementById('ocs');
   if(s2 && keepX !== null) s2.scrollLeft = keepX;
   ocChipsShow();
@@ -8291,6 +8322,7 @@ async function incAccept(){
     toast('Принято — оператор видит');
   }catch(e){ toast('Не отправилось — повторите'); incKnobReset(); return; }
   incHide(); _wakeOff();
+  ordHistClose();             // принял заказ — на экране должна быть его карточка, а не история
   await load();
 }
 

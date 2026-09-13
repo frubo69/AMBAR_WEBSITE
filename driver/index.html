@@ -4465,6 +4465,7 @@ function profPaint(){
   const box = document.getElementById('body'); if(!box) return;
   box.innerHTML = profHtml();
   profHdr();
+  fitAll();
 }
 // Шапка приложения на страницах профиля: стрелка назад и название вместо
 // логотипа. Пустая строка возвращает обычную шапку с логотипом и звонком.
@@ -5939,6 +5940,7 @@ function renderOrders(){
       <i>Сейчас нет активных заказов.<br>Отдохните — новые поездки скоро появятся.</i>
       <button onclick="ordRefresh(this)">${svg(ICO.refresh, 22)}Обновить</button>
     </div>`;
+    fitAll();
     return;
   }
   // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные —
@@ -5953,6 +5955,27 @@ function renderOrders(){
     </div>` : '');
 }
 
+// Экран, на котором содержимого меньше экрана, не должен листаться — только
+// пружинить. Формула через 100dvh на телефоне в телеграме промахивалась почти
+// на сотню пикселей (вебвью считает высоту иначе, чем браузер), и страница
+// уезжала под шапку. Теперь высоту блока добиваем по настоящим размерам:
+// от его верха до нижнего отступа страницы.
+const FIT_SEL = [['.he', 0], ['.oe', 0], ['.hs-page', 1]];
+function fitFill(el, exact){
+  if(!el) return;
+  // Телеграм знает, сколько вебвью видно на самом деле; берём меньшее из двух,
+  // но не верим нулю и мелочи, которые он отдаёт в момент перестройки.
+  let vh = window.innerHeight || document.documentElement.clientHeight;
+  try{ const t = tg.viewportStableHeight; if(t > 300 && t < vh) vh = t; }catch(e){}
+  const padB = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+  const top = el.getBoundingClientRect().top + (window.scrollY || 0);
+  const h = Math.floor(vh - padB - top);
+  if(h <= 0) return;
+  if(exact) el.style.height = h + 'px'; else el.style.minHeight = h + 'px';
+}
+function fitAll(){ FIT_SEL.forEach(([sel, ex]) => fitFill(document.querySelector(sel), ex)); }
+window.addEventListener('resize', fitAll);
+try{ tg.onEvent('viewportChanged', fitAll); }catch(e){}
 // «Обновить» на пустом экране: тот же опрос, что и по таймеру, только сейчас.
 async function ordRefresh(btn){
   if(btn && btn.classList.contains('busy')) return;
@@ -6235,6 +6258,7 @@ function renderHistory(){
       <b>${HIST_OFF ? 'В этот день заказов не было' : 'Сегодня заказов ещё не было'}</b>
       <i>Листайте дни пальцем — соседние рядом</i>
     </div>`;
+    fitAll();
     _histFocus();
     return;
   }

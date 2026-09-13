@@ -992,7 +992,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   display:flex;flex-direction:column;min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar));color:#fff}
 body.xp-on{background:#070A12}
 .xp-h{display:flex;align-items:center;gap:14px;padding:2px 0 16px}
-.xp-hi{flex:0 0 auto;width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;
+.xp-hi{flex:0 0 auto;width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;
   background:#121217;color:var(--xgold)}
 .xp-h b{display:block;font-size:28px;font-weight:700;color:#fff;letter-spacing:-.4px;line-height:1.1}
 .xp-h i{display:block;margin-top:6px;font-style:normal;font-size:14.5px;color:var(--xsub)}
@@ -1028,16 +1028,17 @@ body.xp-on{background:#070A12}
   min-height:0;height:100%;padding:20px 18px 18px;border-radius:16px;border:1.5px solid var(--xline);background:var(--xcard);
   font-family:inherit;color:#fff;cursor:pointer;overflow:hidden}
 .xp-z::before{content:'';position:absolute;inset:7px;border-radius:12px;border:1.5px dashed var(--xdash);pointer-events:none}
-.xp-zn{position:absolute;left:14px;top:14px;width:20px;height:20px;border-radius:50%;background:var(--xgold);color:#1a1408;
-  font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.xp-zn{position:absolute;left:14px;top:14px;width:22px;height:22px;border-radius:50%;background:var(--xgold);color:#1a1408;
+  font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
 .xp-z > svg{color:var(--xgold);margin-top:10px}
 .xp-z b{display:block;margin-top:10px;font-size:15px;font-weight:700;text-align:center}
 .xp-z i{display:block;margin-top:5px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--xdesc);text-align:center}
 .xp-zb{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:34px;margin-top:12px;border-radius:9px;
   border:1px solid var(--xbtnb);background:var(--xbtn);color:#fff;font-size:13px;font-weight:600}
 .xp-zb svg{color:var(--xgold)}
-.xp-ph:not(.one) .xp-z{padding:20px 12px 14px}
-.xp-ph:not(.one) .xp-zb{font-size:12px;gap:6px;padding:0 6px}
+.xp-gal{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+.xp-ph:not(.one) .xp-z{padding:20px 10px 14px}
+.xp-ph:not(.one) .xp-zb{font-size:12px;gap:6px;padding:0 5px;white-space:nowrap}
 .xp-ph:not(.one) .xp-z i{font-size:12px}
 .xp-z.set{padding:0;border-color:rgba(246,194,101,.55)}
 .xp-z.set::before{display:none}
@@ -7394,9 +7395,20 @@ function expTileVal(kind){
 // Выбор «был расход / не было» на странице бензина или мойки — до отправки
 // живёт только на экране; сохранённое читается из ответа сервера.
 const EXP_CH = {}, XP_EDIT = new Set();
-const XP_T = {fuel: {t: 'Бензин', s: 'Укажите сумму и прикрепите чек', no: 'Сегодня не заправлялись', ico: ICO.fuel},
-              wash: {t: 'Мойка',  s: 'Укажите сумму и прикрепите фото', no: 'Сегодня не было мойки', ico: ICO.wash}};
 const ICO_CAM = '<path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>';
+// Машина спереди — крыша, кузов, две фары, колёса; в шапке «Мойки» над ней пузырьки
+const ICO_CARF = '<path d="M6 12.5l1.6-4.2A2 2 0 0 1 9.5 7h5a2 2 0 0 1 1.9 1.3l1.6 4.2"/>'
+  + '<path d="M4.5 12.5h15a1.5 1.5 0 0 1 1.5 1.5v3a1 1 0 0 1-1 1h-16a1 1 0 0 1-1-1v-3a1.5 1.5 0 0 1 1.5-1.5z"/>'
+  + '<circle cx="7.5" cy="15.2" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="15.2" r="1.1" fill="currentColor" stroke="none"/>'
+  + '<path d="M10 15.2h4M6.5 18v1.5M17.5 18v1.5"/>';
+const ICO_WASHCAR = '<circle cx="7.5" cy="4.2" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="3" r="1.3" fill="currentColor" stroke="none"/>'
+  + '<circle cx="16.5" cy="4.2" r="1" fill="currentColor" stroke="none"/>'
+  + '<path d="M6.5 13.5l1.5-3.6A2 2 0 0 1 9.8 8.6h4.4a2 2 0 0 1 1.8 1.3l1.5 3.6"/>'
+  + '<path d="M5 13.5h14a1.5 1.5 0 0 1 1.5 1.5v2.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V15A1.5 1.5 0 0 1 5 13.5z"/>'
+  + '<circle cx="8" cy="16" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"/><path d="M10.5 16h3M7 18.5V20M17 18.5V20"/>';
+const ICO_GAL = '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="M4 17.5l4.6-4.6 3 3 3.2-3.6 5.7 5.2"/>';
+const XP_T = {fuel: {t: 'Бензин', s: 'Укажите сумму и прикрепите чек', no: 'Сегодня не заправлялись', ico: ICO.fuel},
+              wash: {t: 'Мойка',  s: 'Укажите сумму и прикрепите фото', no: 'Сегодня не было мойки', ico: ICO_WASHCAR}};
 function xpChoice(kind){
   if(EXP_CH[kind]) return EXP_CH[kind];
   return ((EXP.no_expense || {})[kind] && !_expSent(kind)) ? 'no' : 'yes';
@@ -7424,13 +7436,38 @@ function xpZone(kind, what, sent, n){
   const src = свой ? свой.photo : (sent ? (rcp ? (sent.photo && sent.thumb) : (sent.car_photo && sent.car_thumb)) : '');
   const плохо = !свой && sent && (rcp ? (sent.photo && sent.photo_ok === 'no') : (sent.car_photo && sent.car_ok === 'no'));
   const lock = rcp && !src && !xpCarDone(kind);           // чек ждёт фото машины
-  const t = rcp ? ['Фото чека', lock ? 'Сначала сделайте фото машины' : 'Загрузите фото чека или квитанции', lock ? 'Сначала машина' : 'Снять чек']
+  const t = rcp ? ['Фото чека', lock ? 'Сначала сделайте фото машины' : 'Загрузите фото чека или квитанции', lock ? 'Сначала машина' : 'Выбрать из галереи']
                 : ['Фото машины', 'Сделайте фото автомобиля после мойки', 'Добавить фото'];
-  return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}${lock ? ' lock' : ''}" onclick="carTap('${kind}','${what}')">
+  const go = rcp && !lock ? `xpGal('${kind}')` : `carTap('${kind}','${what}')`;
+  const bico = rcp && !lock ? ICO_GAL : ICO_CAM;
+  return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}${lock ? ' lock' : ''}" onclick="${go}">
     ${n ? `<span class="xp-zn">${n}</span>` : ''}
-    ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svg(ICO_CAM, 16)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
-          : `${svg(rcp ? ICO_RCP : ICO.car, 30)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svg(ICO_CAM, 16)}${t[2]}</span>`}
+    ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svg(bico, 17)}${плохо ? 'Старший не принял — переснять' : (rcp ? 'Выбрать другое' : 'Переснять')}</span>`
+          : `${svg(rcp ? ICO_RCP : ICO_CARF, 34)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svg(bico, 17)}${t[2]}</span>`}
   </button>`;
+}
+// Чек из галереи телефона: скрытое поле файла, снимок ужимаем так же, как в
+// списании — 1280 по длинной стороне и крошка для списка.
+function xpGal(kind){
+  const inp = document.getElementById('xpGal_' + kind); if(!inp) return carTap(kind, 'rcp');
+  inp.value = ''; inp.click();
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function xpGalShot(inp, kind){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  const img = new Image(), fr = new FileReader();
+  fr.onload = () => { img.src = fr.result; };
+  img.onload = () => {
+    const mk = (max, q) => { const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q); };
+    EXP_SHOT = {kind, photo: mk(1280, .72), thumb: mk(96, .5)};
+    inp.value = '';
+    renderExpenses();
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  img.onerror = () => toast('Снимок не открылся, выберите другой', 'err');
+  fr.readAsDataURL(f);
 }
 function xpSave(btn, kind){
   const mode = btn.dataset.mode || '';
@@ -7463,7 +7500,8 @@ function expPage(kind){
     : `<div class="xp-l">Фото для подтверждения</div>
        <div class="xp-ph one">${xpZone(kind, 'rcp', kept, 0)}</div>`;
   return `<div class="xp">
-    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 28)}</span><div><b>${T.t}</b></div></div>
+    <input class="xp-gal" type="file" accept="image/*" id="xpGal_${kind}" onchange="xpGalShot(this,'${kind}')">
+    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 30)}</span><div><b>${T.t}</b></div></div>
     <div class="xp-ch">
       <button class="xp-c${yes ? ' on' : ''}" onclick="xpPick('${kind}','yes')"><span class="xp-ci">${yes ? svg(ICO.ok, 15) : ''}</span>
         <div><b>Был расход</b><i>${sent ? fmt(sent.amount) + ' AED' : 'Укажу сумму'}</i></div></button>

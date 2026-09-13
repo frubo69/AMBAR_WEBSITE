@@ -136,9 +136,6 @@ html.kb body{padding-bottom:50vh}
   border-radius:16px;padding:4px;margin-bottom:10px}
 .hnav-t{font-size:14px} .hnav-s{font-size:10.5px}
 .hfind{background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:10px}
-.hrow{padding:11px 16px;border-radius:0}
-.hrow + .hrow{box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-.hrow-v{color:var(--gold2)}
 .shscr .shc{border-radius:0;background:none;border:0;border-top:1px solid rgba(255,255,255,.05);padding:12px 16px}
 .shscr .shc:first-child{border-top:0}
 #shList{border-radius:16px;overflow:hidden;background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
@@ -863,19 +860,28 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* Заказ в дне: во сколько привёз, куда и сколько. Тем же порядком, что и в
    свёрнутом активном заказе, — привычка одна на всё приложение. */
-.hrow{display:flex;align-items:center;gap:11px;width:100%;padding:10px 8px;
-  border:none;background:none;cursor:pointer;text-align:left;color:var(--text);
-  font-family:inherit;border-radius:10px}
-.hrow:active{background:var(--card2)}
-.hrow + .hrow{box-shadow:inset 0 1px 0 var(--border2)}
-.hrow-t{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
-  font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.hrow-b{flex:1;min-width:0}
-.hrow-a{display:block;font-size:14px;font-weight:600;line-height:1.25;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hrow-s{display:block;font-size:11px;color:var(--muted);margin-top:1px}
-.hrow-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:14.5px;
-  font-weight:700;color:var(--gold3);font-variant-numeric:tabular-nums}
+/* Заказы дня — по макету владельца: шапка дня «Сегодня · 12 заказов • 800 AED»
+   и отдельные карточки 46 px: время, адрес, чип оплаты, сумма, стрелка.
+   Нажатие открывает заказ отдельной страницей. */
+.hd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:4px 2px 10px}
+.hd b{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.2px}
+.hd span{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.hd span u{width:4px;height:4px;border-radius:50%;background:var(--gold2);text-decoration:none}
+.hd span em{font-style:normal;font-size:14px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+.ho{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 14px 0 16px;margin:0 0 7px;
+  border-radius:15px;border:1px solid rgba(255,255,255,.05);background:var(--card2);font-family:inherit;color:var(--text);
+  text-align:left;cursor:pointer}
+.ho:active{background:#181834}
+.ho-t{flex:0 0 auto;min-width:40px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.ho-a{flex:1;min-width:0;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ho-p{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;height:21px;padding:0 8px;border-radius:8px;
+  font-size:11px;font-weight:600;background:rgba(255,255,255,.06);color:var(--sub);white-space:nowrap}
+.ho-p svg{color:#B9B6D8}
+.ho-p.cash{background:var(--gold-soft);color:var(--gold2)} .ho-p.cash svg{color:var(--gold2)}
+.ho-p.debt{background:rgba(243,180,74,.14);color:#F3B44A} .ho-p.debt svg{color:#F3B44A}
+.ho-p.free{background:rgba(224,85,85,.13);color:#E8746F} .ho-p.free svg{color:#E8746F}
+.ho-v{flex:0 0 auto;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.2px}
+.ho-c{flex:0 0 auto;display:flex;color:var(--gold2)}
 
 /* прочее */
 .empty{padding:46px 20px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.6}
@@ -4236,7 +4242,7 @@ function expPulse(){
 
 function setTab(t){
   TAB = t; EXP_EDIT = null;
-  if(t !== 'profile') hdrPage('');
+  hdrPage('');                         // страницы профиля и истории поставят свою сами
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory();
   else if(t === 'profile'){ profPaint(); profLoad(); }
@@ -4472,7 +4478,7 @@ function profPaint(){
 function hdrPage(html){
   const h = document.getElementById('hdr'), b = document.getElementById('hdrPg');
   if(!h || !b) return;
-  if(html) b.innerHTML = html;
+  b.innerHTML = html || '';
   b.hidden = !html;
   h.classList.toggle('page', !!html);
 }
@@ -6079,6 +6085,23 @@ let HIST_DAYS = 30, HIST_ORD = '', HIST_Q = '';
 // сегодня, вчера, позавчера.
 let HIST_OFF = 0;                    // на сколько дней назад смотрим
 let HIST_PICK = false, HIST_DIR = '';  // открыт ли список дат; откуда прилетел день (для анимации)
+let HIST_PAGE = '';                     // какой заказ открыт отдельной страницей
+function histOpen(oid){ HIST_PAGE = oid; renderHistory(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
+function histBack(){ HIST_PAGE = ''; renderHistory(); window.scrollTo({top: 0}); }
+// Слово для шапки дня: сегодня и вчера — словом, дальше «11 сентября».
+function histDayWord(off){
+  if(off === 0) return 'Сегодня';
+  if(off === 1) return 'Вчера';
+  const d = new Date(histIso(off) + 'T12:00:00Z');
+  return `${d.getUTCDate()} ${PROF_MG[d.getUTCMonth()]}`;
+}
+// Чип оплаты в строке: карта (онлайн), наличные, в долг, без оплаты.
+function histPay(o){
+  if(o.payment_method === 'free') return {k: 'free', t: 'Без оплаты', i: ICO.warn};
+  if(o.payment_method === 'debt') return {k: 'debt', t: 'В долг', i: ICO.clock};
+  if(o.prepaid || o.payment_method === 'transfer' || o.payment_method === 'card') return {k: 'card', t: 'Карта', i: ICO.cash};
+  return {k: 'cash', t: 'Наличные', i: ICO.wallet};
+}
 // Дата словами: «13 сентября 2026». В списке дат первые две — «Сегодня» и «Вчера».
 function histDateT(off){
   const d = new Date(histIso(off) + 'T12:00:00Z');
@@ -6089,7 +6112,7 @@ function histPickDay(off){
   HIST_PICK = false;
   if(off === HIST_OFF) return renderHistory();
   HIST_DIR = off > HIST_OFF ? 'r' : 'l';
-  HIST_OFF = off; HIST_ORD = ''; HIST_Q = '';
+  HIST_OFF = off; HIST_ORD = ''; HIST_Q = ''; HIST_PAGE = '';
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   if(off >= HIST_DAYS - 1 && HIST_DAYS < 120){ HIST_DAYS = 120; loadHistory(); return; }
   renderHistory();
@@ -6134,7 +6157,7 @@ function histStep(d){
   const next = HIST_OFF + d;
   if(next < 0 || HIST_BUSY) return;
   HIST_DIR = d > 0 ? 'r' : 'l';
-  HIST_OFF = next; HIST_ORD = ''; HIST_Q = ''; HIST_PICK = false;
+  HIST_OFF = next; HIST_ORD = ''; HIST_Q = ''; HIST_PICK = false; HIST_PAGE = '';
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   if(next >= HIST_DAYS - 1 && HIST_DAYS < 120){ HIST_DAYS = 120; loadHistory(); return; }
   renderHistory();
@@ -6195,6 +6218,18 @@ function histFound(){
 
 function renderHistory(){
   const box = document.getElementById('body');
+  if(HIST_PAGE){
+    const all = []; ((HIST && HIST.days) || []).forEach(g => (g.orders || []).forEach(o => all.push(o)));
+    const o = all.find(x => x.order_id === HIST_PAGE);
+    if(o){
+      hdrPage(`<button class="fxh-b" onclick="histBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
+        <b>${hhmm(o.delivered_at || o.timestamp)} · ${esc(o.address) || 'Телефонный заказ'}</b>`);
+      box.innerHTML = histCard(o);
+      return;
+    }
+    HIST_PAGE = '';
+  }
+  hdrPage('');
   const iso = histIso(HIST_OFF);
   const g = ((HIST && HIST.days) || []).find(x => x.day === iso) || null;
   // Числа в шапке — про день на экране, а не про месяц: месяц не отвечает ни
@@ -6237,8 +6272,8 @@ function renderHistory(){
 
   if(found){
     box.innerHTML = head + (found.length
-      ? `<div class="dc"><div class="dc-cap"><span>Нашлось</span><b>${found.length}</b></div>`
-        + found.map(o => histRow(o, true)).join('') + '</div>'
+      ? `<div class="hd"><b>Нашлось</b><span><i>${found.length} ${plural(found.length,'заказ','заказа','заказов')}</i></span></div>`
+        + found.map(o => histRow(o, true)).join('')
       : blank(ICO.search, 'Ничего не нашлось',
           'Искать можно по части адреса или по номеру заказа', 'short'));
     _histFocus();
@@ -6264,7 +6299,9 @@ function renderHistory(){
   }
 
   box.innerHTML = head
-    + `<div class="dc" ontouchstart="histTs(event)" ontouchend="histTe(event)"><div class="dc-cap"><span>Что возили</span><b>${g.count}<u>${plural(g.count,'заказ','заказа','заказов')}</u></b></div>`
+    + `<div ontouchstart="histTs(event)" ontouchend="histTe(event)">
+      <div class="hd"><b>${histDayWord(HIST_OFF)}</b>
+        <span><i>${g.count} ${plural(g.count,'заказ','заказа','заказов')}</i><u></u><em>${fmt(g.aed)} AED</em></span></div>`
     + (g.orders || []).map(o => histRow(o)).join('') + '</div>';
   _histFocus();
 }
@@ -6282,17 +6319,13 @@ function _histFocus(){
 // Строка заказа в истории. Раскрывается в ту же карточку, что и на других
 // экранах: заказ не должен выглядеть по-разному в двух местах.
 function histRow(o, withDay){
-  const open = HIST_ORD === o.order_id;
-  if(open) return `<div onclick="histOrd('${esc(o.order_id)}')">${histCard(o)}</div>`;
-  const n = (o.items || []).reduce((a, i) => a + (i.qty || 0), 0);
-  return `<button class="hrow" onclick="histOrd('${esc(o.order_id)}')">
-    <span class="hrow-t">${hhmm(o.delivered_at || o.timestamp)}</span>
-    <span class="hrow-b">
-      <span class="hrow-a">${esc(o.address) || 'Адрес не указан'}</span>
-      <span class="hrow-s">${withDay ? dayLbl(o._day) + ' · ' : ''}${n} ${
-        plural(n,'бутылка','бутылки','бутылок')}${o.mins ? ` · ${o.mins} мин` : ''}</span>
-    </span>
-    <span class="hrow-v">${o.pay_fx ? `${fxFmt(o.pay_fx.amount, o.pay_fx.sym)} <i>· ${fmt(o.total)}</i>` : fmt(o.total)}</span>
+  const p = histPay(o);
+  return `<button class="ho" onclick="histOpen('${esc(o.order_id)}')">
+    <b class="ho-t">${hhmm(o.delivered_at || o.timestamp)}</b>
+    <span class="ho-a">${withDay ? dayLbl(o._day) + ' · ' : ''}${esc(o.address) || 'Телефонный заказ'}</span>
+    <span class="ho-p ${p.k}">${svg(p.i, 12)}${p.t}</span>
+    <b class="ho-v">${o.pay_fx ? fxFmt(o.pay_fx.amount, o.pay_fx.sym) : fmt(o.total) + ' AED'}</b>
+    <em class="ho-c">${svg(ICO.chevR, 13)}</em>
   </button>`;
 }
 

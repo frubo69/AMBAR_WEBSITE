@@ -82,9 +82,9 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
 // история заказов: вчера было три заказа, сегодня пусто
 const ST_HIST = {ok: true, today: '2026-09-13', days: [
   {day: '2026-09-12', count: 3, aed: 640, cash: 440, online: 200, avg_min: 23, orders: [
-    {order_id: 'AMB00000011', address: 'Marina Walk 7, башня 2', total: 295, delivered_at: '2026-09-12T10:20:00', timestamp: '2026-09-12T09:50:00', items: [{qty: 2}], mins: 24, pay_fx: null},
-    {order_id: 'AMB00000012', address: 'JVC, Diamond Views 3', total: 170, delivered_at: '2026-09-12T12:05:00', timestamp: '2026-09-12T11:40:00', items: [{qty: 1}], mins: 18, pay_fx: null},
-    {order_id: 'AMB00000013', address: 'Downtown, Burj Views', total: 175, delivered_at: '2026-09-12T15:30:00', timestamp: '2026-09-12T15:02:00', items: [{qty: 3}], mins: 27, pay_fx: null}]}]};
+    {order_id: 'AMB00000011', address: 'Dubai Marina', total: 295, delivered_at: '2026-09-12T12:24:00', timestamp: '2026-09-12T11:50:00', items: [{id:'absolut', name:'Absolut 1 ltr', qty: 2, price: 95}], mins: 24, pay_fx: null, prepaid: true, payment_method: 'card', district: 'Marina'},
+    {order_id: 'AMB00000012', address: 'Business Bay', total: 170, delivered_at: '2026-09-12T11:48:00', timestamp: '2026-09-12T11:20:00', items: [{id:'gin', name:"Gordon's London Dry 0.7", qty: 1, price: 100}], mins: 18, pay_fx: null, prepaid: false, payment_method: 'cash', district: 'Business Bay'},
+    {order_id: 'AMB00000013', address: 'Deira City Centre', total: 175, delivered_at: '2026-09-12T10:32:00', timestamp: '2026-09-12T10:02:00', items: [{id:'jd', name:"Jack Daniel's 1 ltr", qty: 1, price: 180}], mins: 27, pay_fx: null, prepaid: true, payment_method: 'card', district: 'Deira'}]}]};
 // профиль: зарплата и списания за месяц
 const ST_FX = {ok: true, at: new Date(Date.now() - 40*60000).toISOString(), silent: false, days: 6, rates: [
   {code:'USD', name:'Доллар США', sym:'$', rate:3.673, market:3.6725, cash:true, main:true, kind:'fiat', prev:3.6686, change:0.12, spark:[3.668,3.669,3.6705,3.669,3.6715,3.673]},
@@ -128,6 +128,7 @@ async function standBoot(){
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); histStep(1); }
+  if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }
   if(ST_Q.get('open') === 'pick'){ await new Promise(r => setTimeout(r, 150)); histPick(); }
   if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 150)); profHist(); if(ST_Q.get('chip')) hsPick(ST_Q.get('chip')); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); if(ST_Q.get('mon')) hsMonth(); }
   if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }

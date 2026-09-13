@@ -133,6 +133,15 @@ async function standBoot(){
   ME = {name: 'Али', district: 'alg', district_code: 'B4'};
   try{ document.getElementById('dAv').textContent = 'АЛ'; document.getElementById('dName').textContent = 'Али'; }catch(e){}
   SH = ST_SHIFT;
+  // &mock=1 — цифры как на макетах владельца: один Absolut, 95 AED, принят
+  // 00:43 (37 мин назад для карточки), доставка 50 мин, быть до 01:33, не просрочен
+  if(ST_Q.get('mock')){
+    const d = new Date(); d.setHours(0, 43, 0, 0);
+    Object.assign(ST_ORDER, {order_id: 'AMB3207975F', items: [ST_ORDER.items[0]], total: 95, eta: 50, deliver_by: '01:33',
+      confirmed_at: new Date(Date.now() - 37 * 60000).toISOString(), chat_n: 0});
+    if(ST_Q.get('open') === 'inc') ST_ORDER.confirmed_at = d.toISOString();
+    window._isLate = () => false;
+  }
   await load();
   setTab(ST_Q.get('tab') || 'orders');
   shPaint();   // как в бою: boot() → shLoad() → shPaint() — замок смены/гео
@@ -140,14 +149,7 @@ async function standBoot(){
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
   // ?open=inc — лист входящего заказа; &mock=1 — цифры как на макете владельца
   // (один Absolut, 95 AED, принят 00:43, доставка 50 мин, быть до 01:33, не просрочен)
-  if(ST_Q.get('open') === 'inc'){
-    if(ST_Q.get('mock')){
-      const d = new Date(); d.setHours(0, 43, 0, 0);
-      Object.assign(ST_ORDER, {items: [ST_ORDER.items[0]], total: 95, eta: 50, deliver_by: '01:33', confirmed_at: d.toISOString()});
-      window._isLate = () => false;
-    }
-    incShow(ST_ORDER);
-  }
+  if(ST_Q.get('open') === 'inc') incShow(ST_ORDER);
   if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);

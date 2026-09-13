@@ -6,6 +6,11 @@ import os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 src = open(os.path.join(ROOT, "driver", "index.html"), encoding="utf-8").read()
+# картинки приложения — рядом со стендом, пути в разметке относительные
+import shutil
+_img = os.path.join(ROOT, "driver", "img")
+if os.path.isdir(_img):
+    shutil.copytree(_img, os.path.join(OUT, "img"), dirs_exist_ok=True)
 
 TG = """<script>
 window.Telegram = {WebApp: new Proxy({initData: 'x', version: '8.0', platform: 'ios', colorScheme: 'dark',
@@ -61,7 +66,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     window.__FAILN = (window.__FAILN || 0) + 1;
     if(!lim || window.__FAILN <= +lim){ const e = new Error('stand fail'); e.status = +(ST_Q.get('code') || 500); throw e; }
   }
-  if(path === '/api/driver/orders') return {day: '2026-09-11', active: [ST_ORDER, ST_ORDER2], done: [], total_aed: 0, panic: false};
+  if(path === '/api/driver/orders') return {day: '2026-09-11', active: ST_Q.get('noorders') ? [] : [ST_ORDER, ST_ORDER2], done: [], total_aed: 0, panic: false};
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0};
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift') return ST_SHIFT;

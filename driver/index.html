@@ -846,6 +846,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    строка серого текста под самой шапкой: она читалась как обрезанная страница.
    Теперь значок, заголовок и одна поясняющая строка стоят в оптическом центре
    свободного места — там, куда падает взгляд, когда смотреть больше не на что. */
+/* Пустой экран «Заказы» — по макету владельца: иллюстрация (вырезана из его
+   картинки, фон подведён под наш), заголовок, две строки и золотая кнопка.
+   Края картинки растушёваны маской — чтобы прямоугольник не читался даже
+   при разнице фона в пару уровней. */
+.oe{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  padding:6px 22px 34px;min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
+.oe img{display:block;width:340px;max-width:100%;height:auto;margin:0 auto 6px;
+  -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 50%,#000 84%,transparent 100%);
+  mask-image:radial-gradient(ellipse 100% 100% at 50% 50%,#000 84%,transparent 100%)}
+.oe b{display:block;font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.15;color:var(--text)}
+.oe i{display:block;margin-top:12px;font-style:normal;font-size:14.5px;line-height:1.4;color:var(--muted);max-width:346px}
+.oe button{display:inline-flex;align-items:center;justify-content:center;gap:12px;margin-top:30px;min-width:212px;height:54px;
+  padding:0 30px;border-radius:999px;border:1.5px solid var(--gold2);background:none;color:var(--gold2);
+  font-family:inherit;font-size:17px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oe button:active{background:var(--gold-soft)}
+.oe button.busy svg{animation:oespin .9s linear infinite}
+@keyframes oespin{to{transform:rotate(360deg)}}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
@@ -5877,7 +5894,12 @@ function renderOrders(){
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
   if(!active.length){
-    box.innerHTML = geoBar() + blank(ICO.box, 'Заказов нет');
+    box.innerHTML = geoBar() + `<div class="oe">
+      <img src="img/empty-orders.png" alt="" width="744" height="505">
+      <b>Заказов нет</b>
+      <i>Сейчас нет активных заказов.<br>Отдохните — новые поездки скоро появятся.</i>
+      <button onclick="ordRefresh(this)">${svg(ICO.refresh, 22)}Обновить</button>
+    </div>`;
     return;
   }
   // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные —
@@ -5892,6 +5914,17 @@ function renderOrders(){
     </div>` : '');
 }
 
+// «Обновить» на пустом экране: тот же опрос, что и по таймеру, только сейчас.
+async function ordRefresh(btn){
+  if(btn && btn.classList.contains('busy')) return;
+  if(btn) btn.classList.add('busy');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  const t0 = Date.now();
+  try{ await load(); }catch(e){}
+  // пусть значок сделает хотя бы один оборот — иначе нажатие не видно
+  await new Promise(r => setTimeout(r, Math.max(0, 700 - (Date.now() - t0))));
+  const b = document.querySelector('.oe button'); if(b) b.classList.remove('busy');
+}
 // Строка о геопозиции. Когда всё в порядке — молчит и не занимает места.
 function geoBar(){
   const g = (SH || {}).geo;

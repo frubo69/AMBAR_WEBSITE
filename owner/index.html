@@ -3191,7 +3191,14 @@ button.path:active{transform:scale(.995)}
   font-style:normal;color:var(--gold2);background:#1b1b29}
 .fb-penc-b{flex:1;min-width:0;padding-top:5px}
 .fb-penc-b b{display:block;font-size:16px;font-weight:600;color:var(--gold2);line-height:1.3}
-.fb-penc-b i{display:block;margin-top:8px;max-width:152px;font-style:normal;font-size:13.5px;line-height:1.3;color:#C4C4CF}
+.fb-penc-b i{display:block;margin-top:8px;font-style:normal;font-size:13.5px;line-height:1.3;color:#C4C4CF;white-space:pre-line}
+.fb-penc.plain{border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#0f1022 0%,#0c0d1c 100%)}
+.fb-penc.plain:active{border-color:rgba(201,169,110,.6)}
+.fb-penc.plain .fb-penc-i{color:#A3A3B0;background:#181824}
+.fb-penc.plain .fb-penc-b b{color:#D9D9E1}
+.fb-penc.plain .fb-penc-b i{color:#858592}
+.fb-penc.plain .fb-chev{background:#1a1a24;color:#9A9AA6}
+.fb-pen-cb i.fb-pen-cs{font-size:13.5px;color:#9C9CA8}
 .fb-penc .fb-chev{width:35px;height:35px;margin-top:7px;background:#252027}
 /* списки нарушений и степеней: высокие строки, чёткие разделители */
 .fb-pen-list{margin:0 0 12px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:#0f0f1f}
@@ -20074,8 +20081,16 @@ function fbItemsHtml(b){
 // листа он объяснит отдельно, у нарушений без степеней сумму вписывают.
 // машина спереди, сплошная — как на макете у «Авто»
 const FB_PEN_CAR = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" fill-rule="evenodd"><path d="M6.2 5.8A2 2 0 0 1 8.1 4.5h7.8a2 2 0 0 1 1.9 1.3L19.2 10H20a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-1v1.2a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-1.2H8.6v1.2a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1.2H4a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1h.8zM7.2 10h9.6l-1.1-3.2a.8.8 0 0 0-.8-.6H9.1a.8.8 0 0 0-.8.6zM6.5 14.8a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm11 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zM9.5 15h5v-1.4h-5z"/></svg>`;
+// значки видов из макета: документ, человек, щит, футболка, три точки
+const FB_PEN_SVG = (d, fill) => `<svg viewBox="0 0 24 24" width="26" height="26" ${fill
+  ? 'fill="currentColor" fill-rule="evenodd"' : 'fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"'}>${d}</svg>`;
+const FB_PEN_DOC = FB_PEN_SVG('<path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.8z"/><path d="M14 2.8v5h5M8.6 12.3h6.8M8.6 16h5"/>');
+const FB_PEN_CLIENT = FB_PEN_SVG('<circle cx="12" cy="7.8" r="4.1"/><path d="M4 20c0-3.9 3.6-6.6 8-6.6s8 2.7 8 6.6c0 .6-.4 1-.9 1H4.9c-.5 0-.9-.4-.9-1z"/>', true);
+const FB_PEN_SHIELD = FB_PEN_SVG('<path d="M12 2.9l7.2 2.8v5.6c0 4.7-3.2 8.3-7.2 9.8-4-1.5-7.2-5.1-7.2-9.8V5.7z"/><path d="M9.3 12.1l2 2 3.6-3.9"/>');
+const FB_PEN_SHIRT = FB_PEN_SVG('<path d="M8.6 3.3 3.9 5.6 2.2 10.1l3.2 1.5v8.3c0 .6.4 1 1 1h11.2c.6 0 1-.4 1-1v-8.3l3.2-1.5-1.7-4.5-4.7-2.3a3.5 3.5 0 0 1-6.8 0z"/>', true);
+const FB_PEN_DOTS = FB_PEN_SVG('<circle cx="5.8" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18.2" cy="12" r="2"/>', true);
 const FB_PEN = [
-  {id: 'auto', t: 'Авто', sub: 'Нарушения, связанные с автомобилем', ic: 'car', svg: FB_PEN_CAR, items: [
+  {id: 'auto', t: 'Авто', sub: 'Нарушения, связанные\nс автомобилем', ic: 'car', svg: FB_PEN_CAR, hot: true, items: [
     {id: 'speed', t: 'Превышение скорости', tiers: [
       {t: '20 – 30 км/ч', amount: 600}, {t: '31 – 50 км/ч', amount: 1000}, {t: '51 – 70 км/ч', amount: 1500},
       {t: '71 – 100 км/ч', amount: 2500}, {t: 'Более 100 км/ч', amount: 4000}]},
@@ -20085,7 +20100,18 @@ const FB_PEN = [
     {id: 'parking', t: 'Неправильная парковка'},
     {id: 'phone', t: 'Использование телефона за рулём'},
     {id: 'other', t: 'Другое'}]},
+  // своих списков и цен пока нет: сразу к водителю, сумму вписывают
+  {id: 'docs', t: 'Документы', sub: 'Нарушения по документам', svg: FB_PEN_DOC},
+  {id: 'client', t: 'Клиент', sub: 'Нарушения в работе\nс клиентами', svg: FB_PEN_CLIENT},
+  {id: 'discipline', t: 'Дисциплина', sub: 'Нарушения дисциплины', svg: FB_PEN_SHIELD},
+  {id: 'look', t: 'Внешний вид', sub: 'Нарушения внешнего вида', svg: FB_PEN_SHIRT},
+  {id: 'misc', t: 'Другое', sub: 'Прочие нарушения', svg: FB_PEN_DOTS},
 ];
+// за что — одной строкой в записи: нарушение и степень, а без списка — вид
+function fbPenReason(){
+  const {cat, vio, tier} = fbPenCur();
+  return vio ? [vio.t, tier ? tier.t : ''].filter(Boolean).join(' · ') : cat ? cat.t : '';
+}
 function fbPenOn(){ return !!(FB.pen && document.getElementById('fbPenBody')); }
 function fbPenOpen(){ FB.pen = {mode: 'fine', cat: null, vio: null, tier: null, who: null, how: 'once', months: 2}; fbPenGo('cats'); }
 function fbHoldOpen(){ FB.pen = {mode: 'hold', who: null}; fbPenGo('who'); }
@@ -20110,7 +20136,7 @@ function fbPenGo(step, anim){
     const hold = P.mode === 'hold';
     title = hold ? 'Свободное удержание' : 'Выбрать водителя';
     html = fbPenWhoHtml(hold);
-    back = hold ? fbPenExit : () => fbPenGo(vio.tiers ? 'tiers' : 'vios', 'back');
+    back = hold ? fbPenExit : () => fbPenGo(!vio ? 'cats' : vio.tiers ? 'tiers' : 'vios', 'back');
   }
   else if(step === 'fine'){ title = 'Назначить штраф'; html = fbPenFineHtml(cat, vio, tier); back = () => fbPenGo('who', 'back'); }
   else if(step === 'hold'){ title = 'Удержание'; html = fbPenHoldHtml(); back = () => fbPenGo('who', 'back'); }
@@ -20123,10 +20149,14 @@ function fbPenGo(step, anim){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbPenCatsHtml(){
-  return FB_PEN.map(c => `<button class="fb-penc" onclick="fbPenCat('${c.id}')"><em class="fb-penc-i">${c.svg || IC(c.ic, 26)}</em>
+  return FB_PEN.map(c => `<button class="fb-penc${c.hot ? '' : ' plain'}" onclick="fbPenCat('${c.id}')"><em class="fb-penc-i">${c.svg || IC(c.ic, 26)}</em>
       <span class="fb-penc-b"><b>${escS(c.t)}</b><i>${escS(c.sub)}</i></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('');
 }
-function fbPenCat(id){ Object.assign(FB.pen, {cat: id, vio: null, tier: null}); fbPenGo('vios'); }
+function fbPenCat(id){
+  const cat = FB_PEN.find(c => c.id === id); if(!cat) return;
+  Object.assign(FB.pen, {cat: id, vio: null, tier: null});
+  fbPenGo((cat.items || []).length ? 'vios' : 'who');
+}
 function fbPenViosHtml(cat){
   return `<div class="fb-pen-list">${(cat.items || []).map(v => `<button class="fb-pen-row" onclick="fbPenVio('${v.id}')">
       <span class="fb-pen-rb"><b>${escS(v.t)}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
@@ -20196,7 +20226,8 @@ function fbPenCmtSec(){
 function fbPenFineHtml(cat, vio, tier){
   const P = FB.pen;
   return `<div class="fb-pen-card fb-pen-sum"><em class="fb-pen-ic">${cat.svg || IC(cat.ic, 30)}</em>
-      <span class="fb-pen-cb"><b>${escS(vio.t)}</b>${tier ? `<i>${escS(tier.t)}</i><u>${fbFmt(tier.amount)} AED</u>` : ''}</span></div>
+      <span class="fb-pen-cb"><b>${escS(vio ? vio.t : cat.t)}</b>${tier ? `<i>${escS(tier.t)}</i><u>${fbFmt(tier.amount)} AED</u>`
+        : vio ? '' : `<i class="fb-pen-cs">${escS(cat.sub.replace(/\n/g, ' '))}</i>`}</span></div>
     ${fbPenWhoCard(true)}
     <div class="fb-pen-card fb-pen-how">
       <div class="fb-pen-cap fb-pen-caph">Способ удержания</div>
@@ -20246,7 +20277,7 @@ async function fbPenApply(){
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/item', {method: 'POST', body: {
       name, kind: hold ? 'hold' : 'fine', amount, per_month: months > 1 ? Math.ceil(amount / months) : 0, from: 'this',
       month: FB.month, day: _dayIsoFor(0), note: fbTxt('fbPenCmt'),
-      reason: hold || !vio ? '' : [vio.t, tier ? tier.t : ''].filter(Boolean).join(' · '), as: _meName()}});
+      reason: hold ? '' : fbPenReason(), as: _meName()}});
     if(res.book) fbApply(res.book);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     fbPenExit();

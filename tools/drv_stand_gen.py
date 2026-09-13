@@ -141,8 +141,9 @@ async function standBoot(){
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') && ST_Q.get('open').indexOf('exp:') === 0){ await new Promise(r => setTimeout(r, 150)); expGo(ST_Q.get('open').slice(4)); }
-  if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); histStep(1); }
-  if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }
+  if(ST_Q.get('open') === 'orders'){ await new Promise(r => setTimeout(r, 150)); profOrders(); }
+  if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); }
+  if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }
   if(ST_Q.get('open') === 'pick'){ await new Promise(r => setTimeout(r, 150)); histPick(); }
   if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 150)); profHist(); if(ST_Q.get('chip')) hsPick(ST_Q.get('chip')); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); if(ST_Q.get('mon')) hsMonth(); }
   if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }

@@ -86,12 +86,15 @@ const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t:
   accrued: 5000, plus: 0, minus: 1750, fines: 1350, holds: 400, to_pay: 3250, paid: 0, left: 3250, debt: 0,
   month_total: 1750, month_count: 5,
   items: [
-    {id: 'p1', kind: 'fine', t: 'Штраф', amount: 1000, per_month: 0, day: '2026-09-12', reason: 'Превышение скорости · 71 – 100 км/ч', note: 'Превышение скорости на E311', due: 1000, left: 0, done: true, cancelled: false},
-    {id: 'p2', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-09-08', reason: '', note: 'Аванс за топливо', due: 400, left: 0, done: true, cancelled: false},
-    {id: 'p3', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-05', reason: 'Использование телефона за рулём · Во время движения', note: 'Использование телефона за рулем', due: 350, left: 0, done: true, cancelled: false},
-    {id: 'p4', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-01', reason: 'Неправильная парковка · В неположенном месте', note: 'Парковка в запрещённой зоне', due: 350, left: 0, done: true, cancelled: false},
-    {id: 'p5', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-08-28', reason: 'Опоздание на смену', note: 'Опоздание более 30 минут', due: 0, left: 0, done: true, cancelled: false},
-    {id: 'p6', kind: 'fine', t: 'Штраф', amount: 600, per_month: 0, day: '2026-08-20', reason: 'Неправильная парковка', note: '', due: 0, left: 0, done: false, cancelled: true}]};
+    {id: 'p1', kind: 'fine', t: 'Штраф', amount: 1000, per_month: 0, day: '2026-09-12', at: '2026-09-12T10:23:00', reason: 'Превышение скорости · 71 – 100 км/ч', note: 'Превышение скорости на E311', due: 1000, left: 0, done: true, cancelled: false},
+    {id: 'p2', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-09-08', at: '2026-09-08T06:12:00', reason: '', note: 'Аванс за топливо', due: 400, left: 0, done: true, cancelled: false},
+    {id: 'p3', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-05', at: '2026-09-05T12:45:00', reason: 'Использование телефона за рулём · Во время движения', note: 'Использование телефона за рулем', due: 350, left: 0, done: true, cancelled: false},
+    {id: 'p4', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-01', at: '2026-09-01T05:17:00', reason: 'Неправильная парковка · В неположенном месте', note: 'Парковка в запрещённой зоне', due: 350, left: 0, done: true, cancelled: false},
+    {id: 'p5', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-08-28', at: '2026-08-28T04:05:00', reason: 'Опоздание на смену', note: 'Опоздание более 30 минут', due: 0, left: 0, done: true, cancelled: false},
+    {id: 'p6', kind: 'fine', t: 'Штраф', amount: 600, per_month: 0, day: '2026-08-20', at: '2026-08-20T08:30:00', reason: 'Неправильная парковка', note: '', due: 0, left: 0, done: false, cancelled: true},
+    {id: 'p7', kind: 'fine', t: 'Штраф', amount: 1500, per_month: 0, day: '2026-08-18', at: '2026-08-18T08:30:00', reason: 'Авария по вине водителя · Повреждение автомобиля', note: '', due: 0, left: 0, done: true, cancelled: false},
+    {id: 'p8', kind: 'fine', t: 'Штраф', amount: 500, per_month: 0, day: '2026-08-10', at: '2026-08-10T14:55:00', reason: 'Несоблюдение ПДД · Проезд на красный сигнал', note: '', due: 0, left: 0, done: true, cancelled: false},
+    {id: 'p9', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-08-02', at: '2026-08-02T07:20:00', reason: 'Использование телефона за рулём · Во время движения', note: '', due: 0, left: 0, done: true, cancelled: false}]};
 const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(120), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
 async function standBoot(){
   ME = {name: 'Али', district: 'alg', district_code: 'B4'};
@@ -104,6 +107,7 @@ async function standBoot(){
   if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
+  if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 150)); profHist(); if(ST_Q.get('chip')) hsPick(ST_Q.get('chip')); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); if(ST_Q.get('mon')) hsMonth(); }
   if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }
   await new Promise(r => setTimeout(r, 120));
   const card = document.querySelector('.oc');

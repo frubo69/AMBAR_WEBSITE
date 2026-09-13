@@ -660,7 +660,8 @@ async def person_card(name: str, month: str) -> dict:
                 holds += due
         items.append(dict(id=str(it.get("_id")), kind=it.get("kind"), t=pay.KINDS.get(it.get("kind"), ""),
                           amount=pay._i(pay._n(it.get("amount"))), per_month=pay._i(pay._n(it.get("per_month"))),
-                          day=it.get("day") or "", start=str(it.get("from") or "")[:7],
+                          day=it.get("day") or "", at=str(it.get("at") or ""),  # время — в историю списаний
+                          start=str(it.get("from") or "")[:7],
                           reason=it.get("reason") or "", note=it.get("note") or "",
                           due=pay._i(due), left=0 if gone else sch["after"], done=False if gone else sch["done"],
                           cancelled=gone))

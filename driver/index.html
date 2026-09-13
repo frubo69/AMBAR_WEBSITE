@@ -2867,6 +2867,105 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .fxr-d span{flex:1;min-width:0;padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.04)}
 .fxr-d u{display:block;text-decoration:none;font-size:9.5px;color:var(--dim);letter-spacing:.1px}
 .fxr-d b{display:block;margin-top:2px;font-size:11.5px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+/* История списаний — страница по макету владельца: список листается внутри
+   своего окошка, «Итог по месяцу» прибит снизу и не уезжает. */
+.hs-page .fxh-t{font-size:18.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-page .fxh-d{padding:0 10px;gap:5px;font-size:11px}
+.hs-page .fxh-d svg:last-child{color:var(--muted)}
+.hs-page{display:flex;flex-direction:column;
+  height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar))}
+.hs-mwrap{position:relative}
+.hs-mp{position:absolute;top:38px;right:0;z-index:30;width:168px;max-height:238px;overflow-y:auto;
+  padding:6px;border-radius:14px;border:1px solid var(--border2);background:var(--bg2);
+  box-shadow:0 18px 40px rgba(0,0,0,.55)}
+.hs-mp button{display:block;width:100%;padding:9px 10px;border:0;border-radius:10px;background:none;
+  color:var(--sub);font-family:inherit;font-size:12.5px;text-align:left;cursor:pointer}
+.hs-mp button.on{background:var(--gold-soft);color:var(--gold2);font-weight:700}
+.hs-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 10px}
+.hs-tile{display:flex;align-items:center;gap:7px;padding:9px 7px;border-radius:14px;background:var(--card2);
+  border:1px solid rgba(255,255,255,.05);min-width:0}
+.hs-tile > div{min-width:0}
+.hs-tile span{flex:0 0 auto;width:28px;height:28px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;background:rgba(255,255,255,.06);color:var(--sub)}
+.hs-tile.fine span{background:rgba(224,85,85,.14);color:#E88}
+.hs-tile.hold span{background:var(--gold-soft);color:var(--gold2)}
+.hs-tile u{display:block;text-decoration:none;font-size:9px;line-height:1.15;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-tile b{display:block;margin-top:3px;font-size:14.5px;font-weight:800;color:var(--text);letter-spacing:-.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.hs-tile.fine b{color:#E8746F}
+.hs-tile.hold b{color:var(--gold2)}
+.hs-tile i{display:block;margin-top:2px;font-style:normal;font-size:9px;color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-f{display:flex;align-items:center;gap:6px;margin:0 0 8px}
+.hs-f button{flex:0 0 auto;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--border2);
+  background:var(--card);color:var(--sub);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.hs-f button.on{background:var(--gold2);border-color:var(--gold2);color:#15130d;font-weight:700}
+.hs-sort{margin-left:auto;display:flex;align-items:center;gap:5px;height:32px;padding:0 10px;border-radius:11px;
+  border:1px solid var(--border2);background:var(--card);color:var(--sub);font-family:inherit;font-size:11px;
+  font-weight:600;white-space:nowrap;cursor:pointer}
+.hs-sort svg{color:var(--gold2)}
+.hs-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:6px;border-radius:16px;border:1px solid var(--border2);background:rgba(255,255,255,.018)}
+.hs-r{display:flex;align-items:center;gap:8px;width:100%;padding:8px;margin:0 0 6px;border:0;border-radius:12px;
+  background:var(--card2);font-family:inherit;text-align:left;cursor:pointer}
+.hs-r:last-child{margin-bottom:0}
+.hs-r:active{background:#181834}
+.hs-r.off{opacity:.55}
+.hs-i{flex:0 0 auto;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.06);color:var(--sub)}
+.hs-r.fine .hs-i{background:rgba(224,85,85,.13);color:#E88}
+.hs-r.hold .hs-i{background:var(--gold-soft);color:var(--gold2)}
+.hs-b{flex:1;min-width:0}
+.hs-b b{display:block;font-size:12px;font-weight:700;color:var(--text);line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-b i{display:block;margin-top:1px;font-style:normal;font-size:10px;color:var(--muted);line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-b u{display:block;margin-top:2px;text-decoration:none;font-size:9.5px;color:var(--dim);line-height:1.2;white-space:nowrap}
+.hs-r.off .hs-b b{text-decoration:line-through}
+.hs-v{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.hs-tag{padding:2px 6px;border-radius:6px;font-size:8.5px;font-weight:700;white-space:nowrap}
+.hs-tag.fine{background:rgba(224,85,85,.16);color:#E8746F}
+.hs-tag.hold{background:rgba(90,140,255,.16);color:#8FAEF5}
+.hs-am{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;
+  white-space:nowrap;letter-spacing:-.2px}
+.hs-r.off .hs-am{color:var(--dim);text-decoration:line-through}
+.hs-c{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--sub);
+  display:flex;align-items:center;justify-content:center}
+.hs-none{padding:22px 12px;text-align:center;font-size:12.5px;color:var(--muted)}
+.hs-sum{flex:0 0 auto;display:flex;align-items:center;gap:10px;margin:10px 0 0;padding:10px;border-radius:16px;
+  background:var(--card2);border:1px solid rgba(255,255,255,.05)}
+.hs-sum-i{flex:0 0 auto;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:rgba(255,255,255,.06);color:var(--sub)}
+.hs-sum-t{flex:0 0 auto;min-width:0}
+.hs-sum-t b{display:block;font-size:12.5px;font-weight:700;color:var(--text);line-height:1.2}
+.hs-sum-t i{display:block;margin-top:2px;font-style:normal;font-size:10px;color:var(--muted)}
+.hs-sum-r{flex:1;min-width:0}
+.hs-sum-r div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 6px;border-radius:7px}
+.hs-sum-r u{text-decoration:none;font-size:10px;color:var(--muted);white-space:nowrap}
+.hs-sum-r b{font-size:11.5px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hs-sum-r div.pay{margin-top:2px;padding:4px 6px;background:var(--gold-soft)}
+.hs-sum-r div.pay u{color:var(--gold2)}
+.hs-sum-r div.pay b{font-size:13px;font-weight:800;color:var(--gold2)}
+/* Карточка одного списания */
+.hs-one{padding:14px;border-radius:16px;background:var(--card2);border:1px solid rgba(255,255,255,.05)}
+.hs-one-h{display:flex;align-items:center;gap:11px;width:auto;padding:0;margin:0;background:none;border-radius:0}
+.hs-one-h .hs-i{width:46px;height:46px;border-radius:14px}
+.hs-one-h b{display:block;font-size:15px;font-weight:800;color:var(--text);line-height:1.2}
+.hs-one-h i{display:block;margin-top:3px;font-style:normal;font-size:11.5px;color:var(--muted)}
+.hs-one-am{margin:14px 0 0;padding:12px;border-radius:14px;background:rgba(224,85,85,.10);text-align:center}
+.hs-one-am u{display:block;text-decoration:none;font-size:10.5px;color:var(--muted)}
+.hs-one-am b{display:block;margin-top:3px;font-size:24px;font-weight:800;color:#E8746F;letter-spacing:-.6px}
+.hs-one-am.hold{background:var(--gold-soft)}
+.hs-one-am.hold b{color:var(--gold2)}
+.hs-one-am.off{background:rgba(255,255,255,.05)}
+.hs-one-am.off b{color:var(--dim);text-decoration:line-through}
+.hs-one-l{margin:12px 0 0}
+.hs-one-l div{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:9px 0;
+  border-top:1px solid var(--border2)}
+.hs-one-l div:first-child{border-top:0}
+.hs-one-l u{flex:0 0 auto;text-decoration:none;font-size:11.5px;color:var(--muted)}
+.hs-one-l b{font-size:12px;font-weight:600;color:var(--text);text-align:right}
 .pf-fxnote{margin:10px 2px 0;font-size:11px;line-height:1.55;color:var(--dim)}
 
 </style>
@@ -4095,7 +4194,10 @@ function fxdWhen(iso){
     : `${d.getUTCDate()} ${PROF_MG[d.getUTCMonth()]}, ${hh}`;
 }
 function profRates(){ PROF_PAGE = 'rates'; FXD_Q = ''; FXD_F = 'all'; FXD_OPEN = ''; profPaint(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
-function profBack(){ PROF_PAGE = ''; profPaint(); window.scrollTo({top: 0}); }
+function profBack(){
+  PROF_PAGE = PROF_PAGE === 'item' ? 'hist' : '';   // из карточки списания — назад в историю
+  HS_MOPEN = false; profPaint(); window.scrollTo({top: 0});
+}
 function fxdFind(v){ FXD_Q = v; fxdPaintList(); }
 function fxdPick(k){ FXD_F = k; profPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
 function fxdOpen(code){ FXD_OPEN = FXD_OPEN === code ? '' : code; fxdPaintList(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
@@ -4207,6 +4309,8 @@ function profPaint(){
 }
 function profHtml(){
   if(PROF_PAGE === 'rates') return profRatesHtml();
+  if(PROF_PAGE === 'hist')  return profHistHtml();
+  if(PROF_PAGE === 'item')  return profItemHtml();
   const p = PROF, m = PROF_MONTH || profMonthNow();
   const head = profHead(p);
   if(!p) return head + `<div class="card">${PROF_BUSY ? 'Загрузка…' : 'Не удалось загрузить зарплату'}</div>`;
@@ -4226,11 +4330,142 @@ function profHtml(){
       <div class="pf-box gold"><u>К выплате</u><b>${sk(p.to_pay)}</b></div>
     </div>
     <div class="pf-tiles">
-      <div class="pf-tile"><span>${svg(ICO.note, 17)}</span><div><u>Всего списаний</u><b>${sk(p.month_total, 'down')}</b><i>в этом месяце</i></div></div>
+      <button class="pf-tile pf-tap" onclick="profHist()"><span>${svg(ICO.note, 17)}</span>
+        <div><u>Всего списаний</u><b>${sk(p.month_total, 'down')}</b><i>${p.month_count ? 'смотреть историю' : 'списаний не было'}</i></div>
+        <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em></button>
       ${profFxTile()}
     </div>
   </div>`;
   return head + money;
+}
+// ── История списаний ──────────────────────────────────────────────────────
+// Отдельная страница: сверху месяц и три плитки, список листается внутри
+// своего окошка, «Итог по месяцу» прибит снизу — так просил владелец.
+let HS_F = 'all', HS_SORT = 'new', HS_MOPEN = false, HS_ITEM = '';
+function profHist(){ PROF_PAGE = 'hist'; HS_F = 'all'; HS_SORT = 'new'; HS_MOPEN = false; profPaint();
+  window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
+function hsPick(k){ HS_F = k; profPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
+function hsSort(){ HS_SORT = HS_SORT === 'new' ? 'old' : 'new'; profPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
+function hsMonth(){ HS_MOPEN = !HS_MOPEN; profPaint(); }
+function hsMonthPick(m){
+  HS_MOPEN = false;
+  if(m === PROF_MONTH) return profPaint();
+  PROF_MONTH = m; PROF = null; profPaint(); profLoad();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function hsOpen(id){ HS_ITEM = id; PROF_PAGE = 'item'; profPaint(); window.scrollTo({top: 0});
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
+function hsItems(){ return ((PROF && PROF.items) || []).filter(i => i.kind === 'fine' || i.kind === 'hold'); }
+function hsCut(it){
+  const r = String(it.reason || '').split('·').map(x => x.trim()).filter(Boolean);
+  const head = r[0] || (it.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
+  const tail = r.slice(1).join(' · ') || it.note || '';
+  return {head, tail};
+}
+function hsIco(it){
+  const t = (String(it.reason || '') + ' ' + String(it.note || '')).toLowerCase();
+  if(/скорост/.test(t)) return ICO.car;
+  if(/телефон/.test(t)) return ICO.mobile;
+  if(/парков/.test(t)) return ICO.nopark;
+  if(/опозда|смен/.test(t)) return ICO.clock;
+  if(/авари|дтп|поврежд/.test(t)) return ICO.warn;
+  if(/пдд|светофор|красн|правил|знак/.test(t)) return ICO.note;
+  if(/топлив|бензин|аванс|заправ/.test(t)) return ICO.fuel;
+  if(/мойк/.test(t)) return ICO.wash;
+  return it.kind === 'hold' ? ICO.wallet : ICO.car;
+}
+function hsWhen(it){
+  const d = profDayT(it.day), t = hhmm(it.at);
+  return d ? (t ? `${d} · ${t}` : d) : '';
+}
+function hsRows(){
+  let list = hsItems();
+  if(HS_F === 'fine') list = list.filter(i => i.kind === 'fine');
+  if(HS_F === 'hold') list = list.filter(i => i.kind === 'hold');
+  if(HS_SORT === 'old') list = list.slice().reverse();
+  if(!list.length) return `<div class="hs-none">${hsItems().length ? 'В этом отборе пусто' : 'Списаний не было'}</div>`;
+  return list.map(it => {
+    const c = hsCut(it), k = it.kind === 'hold' ? 'hold' : 'fine';
+    return `<button class="hs-r ${k}${it.cancelled ? ' off' : ''}" onclick="hsOpen('${esc(it.id)}')">
+      <span class="hs-i">${svg(hsIco(it), 19)}</span>
+      <span class="hs-b"><b>${esc(c.head)}</b>${c.tail ? `<i>${esc(c.tail)}</i>` : ''}<u>${esc(hsWhen(it))}</u></span>
+      <span class="hs-v"><span class="hs-am">${profSum(it.amount, 'down')}</span>
+        <span class="hs-tag ${k}">${it.cancelled ? 'Отменён' : (k === 'hold' ? 'Удержание' : 'Штраф')}</span></span>
+      <em class="hs-c">${svg(ICO.chevR, 11)}</em>
+    </button>`;
+  }).join('');
+}
+function profHistHtml(){
+  const p = PROF, m = PROF_MONTH || profMonthNow();
+  const items = hsItems();
+  const nf = items.filter(i => i.kind === 'fine' && !i.cancelled && i.due > 0).length;
+  const nh = items.filter(i => i.kind === 'hold' && !i.cancelled && i.due > 0).length;
+  const nsub = n => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'списание'
+    : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'списания' : 'списаний')}`;
+  const months = [];
+  for(let i = 0; i < 12; i++){
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+    months.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  const chips = [['all', 'Все'], ['fine', 'Штрафы'], ['hold', 'Удержания']];
+  return `<div class="hs-page">
+    <div class="fxh hs-mwrap">
+      <button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
+      <b class="fxh-t">История списаний</b>
+      <button class="fxh-d" onclick="hsMonth()">${svg(ICO.cal, 14)}${esc(profMonthT(m))}${svg(ICO.chev, 13)}</button>
+      <i class="fxh-s">Все штрафы и удержания водителя</i>
+      ${HS_MOPEN ? `<div class="hs-mp">${months.map(x =>
+        `<button class="${x === m ? 'on' : ''}" onclick="hsMonthPick('${x}')">${profMonthT(x)}</button>`).join('')}</div>` : ''}
+    </div>
+    <div class="hs-tiles">
+      <div class="hs-tile"><span>${svg(ICO.wallet, 16)}</span>
+        <div><u>Всего списано</u><b>${profSum((p && p.month_total) || 0, 'down')}</b><i>в этом месяце</i></div></div>
+      <div class="hs-tile fine"><span>${svg(ICO.ban, 16)}</span>
+        <div><u>Штрафы</u><b>${profSum((p && p.fines) || 0, 'down')}</b><i>${nsub(nf)}</i></div></div>
+      <div class="hs-tile hold"><span>${svg(ICO.cash, 16)}</span>
+        <div><u>Удержания</u><b>${profSum((p && p.holds) || 0, 'down')}</b><i>${nsub(nh)}</i></div></div>
+    </div>
+    <div class="hs-f">
+      ${chips.map(([k, t]) => `<button class="${HS_F === k ? 'on' : ''}" onclick="hsPick('${k}')">${t}</button>`).join('')}
+      <button class="hs-sort" onclick="hsSort()">${svg(ICO.filter, 13)}${HS_SORT === 'new' ? 'Сначала новые' : 'Сначала старые'}</button>
+    </div>
+    <div class="hs-list">${hsRows()}</div>
+    <div class="hs-sum">
+      <span class="hs-sum-i">${svg(ICO.chart, 18)}</span>
+      <span class="hs-sum-t"><b>Итог по месяцу</b><i>${esc(profMonthT(m))}</i></span>
+      <span class="hs-sum-r">
+        <div><u>Базовая зарплата</u><b>${profSum((p && p.accrued) || 0)}</b></div>
+        <div><u>Всего списано</u><b>− ${profSum((p && p.month_total) || 0, 'down')}</b></div>
+        <div class="pay"><u>К выплате</u><b>${profSum((p && p.to_pay) || 0)}</b></div>
+      </span>
+    </div>
+  </div>`;
+}
+function profItemHtml(){
+  const it = hsItems().find(x => x.id === HS_ITEM);
+  if(!it) return profHistHtml();
+  const c = hsCut(it), k = it.kind === 'hold' ? 'hold' : 'fine';
+  const rows = [
+    ['Вид', k === 'hold' ? 'Удержание' : 'Штраф'],
+    ['Когда', hsWhen(it) || '—'],
+    it.note && it.note !== c.tail ? ['Примечание', it.note] : null,
+    it.per_month ? ['Списывают', `по ${fmt(it.per_month)} AED в месяц`] : null,
+    ['Состояние', it.cancelled ? 'Отменён — из зарплаты не вычитается'
+      : (it.done ? 'Списано полностью' : (it.left ? `Осталось ${profSum(it.left, 'down')}` : 'В этом месяце'))],
+  ].filter(Boolean);
+  return `<div class="fxh">
+      <button class="fxh-b" onclick="profBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>
+      <b class="fxh-t">${esc(c.head)}</b>
+      <i class="fxh-s">${k === 'hold' ? 'Удержание из зарплаты' : 'Штраф'}</i>
+    </div>
+    <div class="hs-one">
+      <div class="hs-one-h hs-r ${k}"><span class="hs-i">${svg(hsIco(it), 22)}</span>
+        <div><b>${esc(c.tail || c.head)}</b><i>${esc(hsWhen(it))}</i></div></div>
+      <div class="hs-one-am ${k}${it.cancelled ? ' off' : ''}"><u>${it.cancelled ? 'Штраф отменён' : 'Списано из зарплаты'}</u>
+        <b>${profSum(it.amount, 'down')}</b></div>
+      <div class="hs-one-l">${rows.map(([u, b]) => `<div><u>${esc(u)}</u><b>${esc(b)}</b></div>`).join('')}</div>
+    </div>
+    <div class="pf-fxnote">Вопросы по списанию — старшему: здесь только запись, изменить её из приложения нельзя.</div>`;
 }
 function profFxTile(){
   const m = fxdMain();

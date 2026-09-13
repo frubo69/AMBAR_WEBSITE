@@ -123,6 +123,7 @@ if(ST_Q.get('must')){ ST_SHIFT.must = ['fuel', 'wash']; ST_SHIFT.must_names = ['
 if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
 if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); }
 if(ST_Q.get('nogeo')){ ST_SHIFT.geo.ok = false; ST_SHIFT.geo.stream = false; }
+if(ST_Q.get('dayclosed')){ ST_SHIFT.day_closed = true; ST_SHIFT.day_closed_at = _agoIso(12); }
 async function standBoot(){
   ME = {name: 'Али', district: 'alg', district_code: 'B4'};
   try{ document.getElementById('dAv').textContent = 'АЛ'; document.getElementById('dName').textContent = 'Али'; }catch(e){}

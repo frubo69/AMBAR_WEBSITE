@@ -350,13 +350,16 @@ async def _shift_view(me: dict) -> dict:
     # День района закрыт оператором — значит заказов сегодня больше не будет, и
     # неотвеченные расходы превращаются из «успею» в «держу всех». Водителю про
     # это надо сказать, а не ждать, пока он сам зайдёт на вкладку.
-    закрыт = False
+    закрыт, закрыт_в = False, None
     try:
-        закрыт = bool((await db.shifts_for_day(day)).get(me.get("district") or ""))
+        doc_ = (await db.shifts_for_day(day)).get(me.get("district") or "") or {}
+        закрыт = bool(doc_)
+        закрыт_в = doc_.get("closed_at") or doc_.get("at") or doc_.get("ts")
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] закрытие дня не прочиталось: {e}")
     return {
         "day": day, "working": d.get("working"), "day_closed": закрыт,
+        "day_closed_at": _iso_at(закрыт_в) if закрыт_в else "",
         "opened": bool(opened), "opened_at": _iso_at(opened),
         "closed": bool(closed), "closed_at": _iso_at(closed),
         "geo": geo, "must": must,
@@ -446,9 +449,16 @@ async def handle_shift_close(request):
     if route:
         return web.json_response({"error": "orders_in_route", "ids": route},
                                  status=409, headers=CORS_HEADERS)
-    # Закрытия дня оператором не ждём (раньше ждали, и смена висела до утра):
-    # водитель отдал последний заказ и ответил по расходам — он свободен.
-    # Оператор видит закрытую смену у себя в бригаде и заказ ему не отдаст.
+    # Сначала смену района закрывает оператор, и только потом — водитель свою
+    # (владелец, 13 сен 2026: «третьим шагом должно быть оператор закрыл смену,
+    # и уже четвёртым — водитель закрывает»). До этого ждать не требовали.
+    try:
+        день_закрыт = bool((await db.shifts_for_day(day)).get(me.get("district") or ""))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] закрытие дня не прочиталось: {e}")
+        день_закрыт = False
+    if not день_закрыт:
+        return web.json_response({"error": "day_open"}, status=409, headers=CORS_HEADERS)
     await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
     log.info(f"[driver] {me['name']}: смена закрыта")
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)

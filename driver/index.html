@@ -948,7 +948,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   color:#1a1508;background:linear-gradient(135deg,var(--gold),var(--gold2));cursor:pointer;
   box-shadow:0 10px 26px rgba(201,169,110,.22)}
 .st-go:active{transform:scale(.99)}
-.st-go[disabled]{background:linear-gradient(135deg,rgba(201,169,110,.45),rgba(232,201,138,.45));color:rgba(26,21,8,.75);
+.st-go[disabled]{background:linear-gradient(135deg,#5F5136,#766545);color:rgba(255,238,204,.55);
   box-shadow:none;cursor:default}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
@@ -5201,6 +5201,11 @@ async function shClose(){
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     return;
   }
+  if(!SH.day_closed){
+    toast('Оператор ещё не закрыл смену района', 'err');
+    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    return;
+  }
   ASK = {t:'Закрыть смену?', s:'Заказы больше не придут, и отметить по ним ничего '
         + 'будет нельзя. Если закрыли по ошибке — откройте снова, пока идёт трансляция.',
         btn:'Закрыть смену', fn: shCloseGo};
@@ -5216,7 +5221,7 @@ async function shCloseGo(){
   }catch(e){
     const p = e.payload || {};
     const msg = p.error === 'expenses_left' ? 'Сначала ответьте по расходам'
-              : p.error === 'day_open' ? 'Оператор ещё не закрыл день — смену закрыть нельзя'
+              : p.error === 'day_open' ? 'Оператор ещё не закрыл смену района — подождите'
               : p.error === 'orders_in_route'
                 ? `У вас ${(p.ids||[]).length} ${plural((p.ids||[]).length,'заказ','заказа','заказов')} в пути — сначала отметьте доставку`
                 : 'Не получилось';
@@ -7184,8 +7189,6 @@ function renderShift(){
   const mustNames = (SH.must_names || must).map(x => String(x).toLowerCase());
   const doneList = ((ORDERS || {}).done || []);
   const lastAt = doneList.map(o => o.delivered_at || o.timestamp).filter(Boolean).sort().pop();
-  const мин = on && SH.opened_at ? Math.max(0, Math.round((Date.now() - new Date(SH.opened_at)) / 60000)) : 0;
-  const dur = мин >= 60 ? `${Math.floor(мин / 60)} ч ${мин % 60} мин` : `${мин} мин`;
 
   // Шаг ленты: номер, состояние (ok / now / wait), заголовок, подпись, плашка,
   // вложенная строка со значком и переходом.
@@ -7202,9 +7205,9 @@ function renderShift(){
       </div>
     </div>`;
 
-  let steps, btn, note, status;
+  let steps, btn;
   if(on){
-    const s1 = !route.length, s2 = !must.length, ready = s1 && s2;
+    const s1 = !route.length, s2 = !must.length, s3 = !!SH.day_closed, ready = s1 && s2 && s3;
     steps = step(1, s1 ? 'ok' : 'now', 'Завершить все заказы',
         s1 ? 'Все активные заказы выполнены' : 'Отметьте доставку по каждому заказу',
         s1 ? ['ok', 'Готово'] : ['wait', 'В пути'],
@@ -7219,14 +7222,19 @@ function renderShift(){
         s2 ? {ico: ICO.note, t: 'Расходы заполнены', s: esc(shExpLine()), go: "setTab('expenses')"}
            : {ico: ICO.note, t: `Не отвечено: ${esc(mustNames.join(', '))}`,
               s: 'Впишите сумму или отметьте «не было»', go: "setTab('expenses')"})
-      + step(3, ready ? 'now' : '', 'Закрыть смену',
-        'Когда заказы доставлены и расходы заполнены',
+      + step(3, s3 ? 'ok' : (s1 && s2 ? 'now' : ''), 'Оператор закрыл смену',
+        'Оператор закрывает смену района после проверки',
+        s3 ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
+        s3 ? {ico: ICO.user, t: 'Оператор закрыл смену',
+              s: SH.day_closed_at ? `Закрыта в ${hhmm(SH.day_closed_at)} — заказов сегодня больше не будет` : 'Заказов сегодня больше не будет'}
+           : {ico: ICO.user, t: 'Смена ещё не закрыта',
+              s: 'Оператор подтвердит закрытие смены после проверки'})
+      + step(4, ready ? 'now' : '', 'Закрыть смену',
+        'Когда первые три шага выполнены',
         ['wait', 'Ожидание'],
-        {ico: ICO.user, t: 'Смена ещё не закрыта',
-         s: ready ? 'Нажмите кнопку ниже — заказы больше не придут' : 'Сначала выполните шаги выше'});
+        {ico: ICO.clock, t: 'Ваша смена ещё не закрыта',
+         s: ready ? 'Нажмите кнопку ниже — на сегодня всё' : 'Сначала выполните шаги выше'});
     btn = `<button class="st-go" ${ready ? '' : 'disabled'} onclick="shClose()">Закрыть смену</button>`;
-    note = ready ? 'Все шаги выполнены — смену можно закрывать' : 'Кнопка станет активной, когда все шаги будут выполнены';
-    status = `<i class="run"></i>Смена идёт с <b>${hhmm(SH.opened_at)}</b> · ${dur}`;
   }else{
     const marked = SH.working === true, g = !!geo.ok, canOpen = marked && g;
     steps = step(1, marked ? 'ok' : 'now', 'Отметка оператора',
@@ -7246,8 +7254,6 @@ function renderShift(){
         SH.closed ? {ico: ICO.clock, t: `Смена закрыта в ${hhmm(SH.closed_at)}`, s: 'Заказы больше не придут. Ошиблись — откройте снова'}
                   : {ico: ICO.clock, t: 'Смена не открыта', s: 'Пока закрыта, заказы не приходят и отметить ничего нельзя'});
     btn = `<button class="st-go" ${canOpen ? '' : 'disabled'} onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`;
-    note = canOpen ? 'Всё готово — можно открывать' : 'Кнопка станет активной, когда все шаги будут выполнены';
-    status = SH.closed ? `<i></i>Смена закрыта в <b>${hhmm(SH.closed_at)}</b>` : `<i></i>Смена не открыта`;
   }
   box.innerHTML = `<div class="stl">${steps}</div><div class="dv-sp"></div><div class="dv-foot">${btn}</div>`;
 }

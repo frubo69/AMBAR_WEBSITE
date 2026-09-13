@@ -950,6 +950,40 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .st-go:active{transform:scale(.99)}
 .st-go[disabled]{background:linear-gradient(135deg,#6F5D3D,#806F4C);color:#000;-webkit-text-fill-color:#000;opacity:1;
   box-shadow:none;cursor:default}
+/* Расходы — по макету владельца: заголовок, «Итого за смену», раздел
+   «Основные расходы» плитками 2×2 (питание, бензин, мойка, парковка), раздел
+   «Прочее» одной карточкой. Каждая плитка — вход на свою страницу с прежней
+   карточкой заполнения. */
+.ex-ttl{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.4px;line-height:1.15;padding:2px 0 12px}
+.ex-tot{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border-radius:16px;border:1px solid rgba(201,169,110,.28);
+  background:linear-gradient(135deg,rgba(201,169,110,.10),rgba(201,169,110,.03));font-family:inherit;color:var(--text);
+  text-align:left;cursor:pointer}
+.ex-tot:active{background:rgba(201,169,110,.14)}
+.ex-i{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.22);color:var(--gold2)}
+.ex-tot > div{flex:1;min-width:0}
+.ex-tot u{display:block;text-decoration:none;font-size:12px;color:var(--muted)}
+.ex-tot b{display:block;margin-top:2px;font-size:20px;font-weight:800;color:var(--gold2);letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.ex-c{flex:0 0 auto;display:flex;color:var(--gold2)}
+.ex-sec{display:flex;align-items:center;gap:10px;margin:18px 0 12px;padding:0 2px 10px;border-bottom:1px solid var(--border2)}
+.ex-sec svg{color:var(--gold2)}
+.ex-sec b{font-size:17px;font-weight:600;color:var(--text)}
+.ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ex-tile{position:relative;display:block;width:100%;min-height:118px;padding:14px 34px 14px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.05);
+  background:var(--card2);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
+.ex-tile:active{background:#181834}
+.ex-tile .ex-i{width:42px;height:42px}
+.ex-tile u{display:block;margin-top:12px;text-decoration:none;font-size:12.5px;color:var(--sub)}
+.ex-tile b{display:block;margin-top:5px;font-size:14.5px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ex-tile b.dim{color:var(--muted);font-weight:600}
+.ex-tile b.no{color:#E8746F}
+.ex-tile .ex-c{position:absolute;right:12px;top:50%;transform:translateY(-50%)}
+.ex-oth{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.05);
+  background:var(--card2);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
+.ex-oth:active{background:#181834}
+.ex-oth > div{flex:1;min-width:0}
+.ex-oth b{display:block;font-size:15.5px;font-weight:600}
+.ex-oth i{display:block;margin-top:3px;font-style:normal;font-size:12px;line-height:1.35;color:var(--muted)}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
@@ -4284,7 +4318,10 @@ function expPulse(){
 
 function setTab(t){
   TAB = t; EXP_EDIT = null;
-  hdrPage('');                         // страницы профиля и истории поставят свою сами
+  hdrPage('');                         // страницы профиля, истории и расходов поставят свою сами
+  // Нажатие на вкладку — это её корень: вложенная страница, где человек был
+  // до этого, не должна встречать его при возврате.
+  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false;
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory();
   else if(t === 'profile'){ profPaint(); profLoad(); }
@@ -6901,8 +6938,9 @@ const EXP_KIND_ICO = {
   parking: 'park', kfc: 'gift', guard: 'guard',
   we_gave: 'out',  we_owe: 'out', we_got: 'into', owed_us: 'into'};
 
-function expKindCards(){
-  const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash');
+function expKindCards(only){
+  const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash'
+    && (!only || only.includes(k.id)));
   if(!виды.length) return '<div class="card exp-card"><div class="exp-none">Загрузка…</div></div>';
   return виды.map(k => {
     const ico = ICO[EXP_KIND_ICO[k.id]] || ICO.note;
@@ -7255,10 +7293,20 @@ function renderShift(){
   box.innerHTML = `<div class="stl">${steps}</div><div class="dv-sp"></div><div class="dv-foot">${btn}</div>`;
 }
 
+// Какая страница расходов открыта: '' — обзор плитками, иначе meal / fuel /
+// wash / parking / other / all. У страницы своя шапка со стрелкой назад.
+let EXP_PAGE = '';
+const EXP_PAGE_T = {meal: 'Питание', fuel: 'Бензин', wash: 'Мойка', parking: 'Парковка', other: 'Прочее', all: 'Итого за смену'};
+function expGo(page){ EXP_PAGE = page; EXP_MORE = false; render(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
+function expBack(){ EXP_PAGE = ''; render(); window.scrollTo({top: 0}); }
+// Что написать на плитке: сумма, «Не было», «Не заполнено» или прочерк.
+function expTileVal(kind){
+  const sent = _expSent(kind);
+  if(sent && EXP_ST(sent) !== 'rejected') return `<b>${fmt(sent.amount || 0)} AED</b>`;
+  if((EXP.no_expense || {})[kind]) return '<b class="dim">Не было</b>';
+  return '<b class="no">Не заполнено</b>';
+}
 function renderExpenses(){
-  // Полоса смены отсюда ушла в свой раздел: закрывать смену со страницы
-  // расходов было удобно ровно до того дня, когда человек начал искать, где
-  // вообще посмотреть, идёт ли она.
   const box = document.getElementById('body');
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   // Всего за смену — то, что водитель потратил сам и что не отклонили.
@@ -7266,27 +7314,52 @@ function renderExpenses(){
   // платят ему, а не он: «−80» в конце пустой смены читалось как долг.
   const live = (EXP.extras || []).filter(x => EXP_ST(x) !== 'rejected');
   const total = live.reduce((a, x) => a + (x.amount || 0), 0);
-  const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
   const other = (EXP.extras || []).filter(x => x.kind !== 'fuel' && x.kind !== 'wash');
-  // Итог смены — наверху, первой карточкой: за ним сюда и заходят. Внизу
-  // закреплено единственное действие, которое нужно в любой момент, —
-  // списать бой или брак.
-  // Плашки «Расходы за смену» сверху нет (владелец, 13 сен): итог и «не
-  // сдано» видны на экране смены, здесь — сразу карточки расходов.
+  const park = other.filter(x => x.kind === 'parking'), rest = other.filter(x => x.kind !== 'parking');
+  const parkSum = park.filter(x => EXP_ST(x) !== 'rejected').reduce((a, x) => a + (x.amount || 0), 0);
+  const r = EXP.meal_rates || {working: 80, off: 40};
+  const meal = EXP.working === true ? `${r.working} AED` : EXP.working === false ? `${r.off} AED` : '';
+
+  if(EXP_PAGE){
+    const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
+    hdrPage(back + `<b>${EXP_PAGE_T[EXP_PAGE] || 'Расходы'}</b>`);
+    let html = '';
+    if(EXP_PAGE === 'meal') html = mealBox();
+    else if(EXP_PAGE === 'fuel') html = expBox('fuel', 'Бензин', ICO.fuel);
+    else if(EXP_PAGE === 'wash') html = expBox('wash', 'Мойка', ICO.wash);
+    else if(EXP_PAGE === 'parking') html = park.map(otherBox).join('') + expKindCards(['parking']);
+    else if(EXP_PAGE === 'other') html = rest.map(otherBox).join('')
+      + expKindCards(((EXP.kinds || []).map(k => k.id)).filter(k => k !== 'parking'));
+    else html = expBox('fuel', 'Бензин', ICO.fuel) + expBox('wash', 'Мойка', ICO.wash) + other.map(otherBox).join('')
+      + (other.length ? '' : `<div class="pf-fxnote">Других расходов за смену пока нет.</div>`);
+    box.innerHTML = html;
+    return;
+  }
+  hdrPage('');
   box.innerHTML = `
-    ${mealBox()}
-    ${expBox('fuel', 'Бензин', ICO.fuel)}
-    ${expBox('wash', 'Мойка',  ICO.wash)}
-
-    ${other.map(otherBox).join('')}
-
-    ${EXP_MORE ? `
-        <div class="sect"><span class="sect-t">Доп. расходы</span>
-          <button class="sect-i" onclick="EXP_MORE=false;render()"
-            aria-label="Свернуть">${svg(ICO.close, 14)}</button></div>
-        ${expKindCards()}`
-      : `<button class="exp-add" onclick="EXP_MORE=true;render()">
-          ${svg(ICO.plus2, 15)} Ещё расход</button>`}
+    <div class="ex-ttl">Расходы за смену</div>
+    <button class="ex-tot" onclick="expGo('all')">
+      <span class="ex-i">${svg(ICO.wallet, 19)}</span>
+      <div><u>Итого за смену</u><b>${fmt(total)} AED</b></div>
+      <em class="ex-c">${svg(ICO.chevR, 16)}</em>
+    </button>
+    <div class="ex-sec">${svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M15 15h3M16.5 13.5v3"/><circle cx="17" cy="19.5" r="1.2"/>', 22)}<b>Основные расходы</b></div>
+    <div class="ex-grid">
+      <button class="ex-tile" onclick="expGo('meal')"><span class="ex-i">${svg(ICO.meal, 20)}</span>
+        <u>Питание</u>${meal ? `<b>${meal}</b>` : '<b class="dim">Отметит оператор</b>'}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
+      <button class="ex-tile" onclick="expGo('fuel')"><span class="ex-i">${svg(ICO.fuel, 20)}</span>
+        <u>Бензин</u>${expTileVal('fuel')}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
+      <button class="ex-tile" onclick="expGo('wash')"><span class="ex-i">${svg(ICO.wash, 20)}</span>
+        <u>Мойка</u>${expTileVal('wash')}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
+      <button class="ex-tile" onclick="expGo('parking')"><span class="ex-i">${svg(ICO.park, 20)}</span>
+        <u>Парковка</u>${parkSum ? `<b>${fmt(parkSum)} AED</b>` : '<b class="dim">Не было</b>'}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
+    </div>
+    <div class="ex-sec">${svg(ICO.note, 22)}<b>Прочее</b></div>
+    <button class="ex-oth" onclick="expGo('other')">
+      <span class="ex-i">${svg(ICO.note, 19)}</span>
+      <div><b>Прочее</b><i>Охрана, KFC, возвраты, долги и другое${rest.length ? ` · ${rest.length} ${plural(rest.length,'запись','записи','записей')}` : ''}</i></div>
+      <em class="ex-c">${svg(ICO.chevR, 16)}</em>
+    </button>
     <div class="wo-sp"></div>
     <div class="wo-fix"><button class="wo-btn" onclick="woOpen()">
       ${svg(ICO.trash, 19)}<span>Списать бой или брак</span></button></div>`;

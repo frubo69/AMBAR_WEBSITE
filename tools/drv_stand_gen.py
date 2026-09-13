@@ -52,6 +52,15 @@ const ST_CAT = {items: [
   {id:'jd', name:"Jack Daniel's 1 ltr", cat:'Виски', price:180, app:170, pack:false}], cats: ['Водка','Джин','Пиво','Виски']};
 window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   const m = (opts.method || 'GET');
+  // Проверка «пока грузится»: ?slow=мс задерживает ответы, ?fail=profile|rates роняет их
+  const _sl = +(ST_Q.get('slow') || 0);
+  if(_sl && /\/(profile|rates)$/.test(path)) await new Promise(r => setTimeout(r, _sl));
+  const _f = ST_Q.get('fail') || '';
+  if(_f && path.indexOf('/api/driver/' + _f) === 0){
+    const lim = ST_Q.get('failn');                // ?failn=1 — сорвать только первые N, дальше как обычно
+    window.__FAILN = (window.__FAILN || 0) + 1;
+    if(!lim || window.__FAILN <= +lim){ const e = new Error('stand fail'); e.status = +(ST_Q.get('code') || 500); throw e; }
+  }
   if(path === '/api/driver/orders') return {day: '2026-09-11', active: [ST_ORDER, ST_ORDER2], done: [], total_aed: 0, panic: false};
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0};
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};

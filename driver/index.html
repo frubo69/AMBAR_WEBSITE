@@ -344,7 +344,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    работе, тап или свайп переключает. В карточке: номер и район, кнопка «•••»,
    кольцо с обратным отсчётом до «быть до» (зелёный; ≤3 мин — жёлтый; ≤1 мин
    и просрочка — красный), ниже секции-плашки и «Чат» / «Доставил». ── */
-.ocs{position:relative;display:flex;gap:7.5px;overflow-x:auto;scroll-snap-type:x proximity;margin:0 -13px;padding:5.5px 13px 0 15px;
+.ocs{position:relative;display:flex;gap:7.5px;overflow-x:auto;scroll-snap-type:x proximity;scroll-padding:0 13px 0 11px;
+  margin:0 -13px;padding:5.5px 13px 0 11px;
   scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .ocs::-webkit-scrollbar{display:none}
 .ocs-c{position:relative;flex:0 0 142px;min-width:0;height:54.5px;box-sizing:border-box;border-radius:12px;background:#0F131C;
@@ -5183,7 +5184,7 @@ function ocChipsShow(){
   const s = document.getElementById('ocs'); if(!s) return;
   const c = s.querySelector('.ocs-c.on');
   if(c){
-    const l = c.offsetLeft - 13, r = l + c.offsetWidth + 26;
+    const l = c.offsetLeft - 11, r = l + c.offsetWidth + 22;
     if(l < s.scrollLeft) s.scrollLeft = Math.max(0, l - 8);
     else if(r > s.scrollLeft + s.clientWidth) s.scrollLeft = r - s.clientWidth + 8;
   }

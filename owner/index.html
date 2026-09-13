@@ -3284,20 +3284,47 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-pen-del:active{transform:scale(.98)}
 .fb-pen-ghi b{display:flex;align-items:center;color:var(--gold2)}
 .fb-pen-rs{margin-left:auto;font-style:normal;font-size:13px;font-weight:500;color:#858592}
-/* история штрафов под кнопками */
-.fb-ph-cap{margin:18px 2px 10px;font-weight:700;color:#F3F3F7}
-.fb-ph-row{min-height:72px;padding:12px 12px 12px 18px}
-.fb-ph-row .fb-pen-rb b{max-width:none;font-size:15.5px}
-.fb-ph-row .fb-pen-rb i{margin-top:3px;font-size:13.5px;font-weight:500;color:#C4C4CF;white-space:normal}
-.fb-ph-row .fb-pen-rb s{display:block;margin-top:4px;text-decoration:none;font-size:12px;color:#858592}
-.fb-ph-v{flex:0 0 auto;text-align:right;white-space:nowrap}
-.fb-ph-v b{font-size:16px;font-weight:700;color:#F0F0F5;font-variant-numeric:tabular-nums}
-.fb-ph-v u{margin-left:3px;text-decoration:none;font-size:10px;font-weight:700;color:#858592}
-.fb-ph-row .fb-chev{width:32px;height:32px}
-.fb-ph-row.off{cursor:default}
-.fb-ph-row.off .fb-pen-rb,.fb-ph-row.off .fb-ph-v{opacity:.5}
-.fb-ph-row.off .fb-ph-v b{text-decoration:line-through}
-.fb-ph-row[hidden]{display:none}
+/* история штрафов: карточка с шапкой и фильтром, строки со значком и статусом */
+.sc.fb-ph{padding:14px 12px 6px;background:linear-gradient(180deg,#101024 0%,#0c0c1a 100%);border-color:rgba(255,255,255,.07)}
+.fb-ph-h{display:flex;align-items:center;gap:10px;padding:0 4px 14px}
+.fb-ph-h em{display:flex;color:var(--gold2)}
+.fb-ph-h b{font-size:17px;font-weight:700;color:#F3F3F8}
+.fb-ph-f{display:flex;align-items:center;gap:7px;height:36px;margin-left:auto;padding:0 11px;border-radius:12px;
+  border:1px solid rgba(255,255,255,.13);background:#12122a;color:#E6E6EE;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.fb-ph-f svg{color:var(--gold2)}
+.fb-ph-f i{display:flex;color:var(--muted);transform:rotate(90deg)}
+.fb-ph-menu{display:flex;flex-wrap:wrap;gap:7px;padding:0 4px 12px}
+.fb-ph-menu[hidden]{display:none}
+.fb-ph-menu button{padding:7px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#12122a;
+  color:var(--sub);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.fb-ph-menu button.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft);color:var(--gold2)}
+.fb-ph-r{display:flex;align-items:flex-start;gap:10px;width:100%;margin:0 0 10px;padding:13px 8px 13px 11px;border-radius:16px;
+  border:1px solid rgba(255,255,255,.05);background:#15152c;font-family:inherit;text-align:left;color:inherit;cursor:pointer}
+.fb-ph-r:active{border-color:rgba(201,169,110,.45)}
+.fb-ph-r[hidden]{display:none}
+.fb-ph-i{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-style:normal;color:#B9B9C6;background:#1d1d34}
+.fb-ph-b{flex:1;min-width:0}
+.fb-ph-b b{display:block;font-size:14.5px;font-weight:700;color:#F1F1F6;line-height:1.25;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.fb-ph-b i{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:#A9A9B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-ph-b s{display:block;margin-top:3px;text-decoration:none;font-size:12px;color:#7E7E8C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-ph-r2{flex:0 0 auto;width:92px;text-align:right}
+.fb-ph-r2 u{display:block;text-decoration:none;font-size:10px;color:#8A8A97;white-space:nowrap}
+.fb-ph-r2 b{display:block;margin-top:5px;font-size:14.5px;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.fb-ph-st{display:inline-block;margin-top:6px;padding:3px 8px;border-radius:999px;font-style:normal;font-size:10.5px;font-weight:700;white-space:nowrap}
+.fb-ph-st.live{color:#EFD09B;background:rgba(201,169,110,.16);border:1px solid rgba(201,169,110,.4)}
+.fb-ph-st.paid{color:#6FD79B;background:rgba(58,168,110,.16);border:1px solid rgba(58,168,110,.42)}
+.fb-ph-st.wait{color:#9EA6CE;background:rgba(120,132,188,.14);border:1px solid rgba(120,132,188,.34)}
+.fb-ph-st.off{color:#BCBDC8;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13)}
+.fb-ph-r .fb-chev{width:26px;height:26px;margin:11px 0 0 -2px;color:#F0C97E;
+  background:linear-gradient(135deg,rgba(201,169,110,.34),rgba(201,169,110,.14))}
+.fb-ph-r.off{cursor:default}
+.fb-ph-r.off .fb-ph-b,.fb-ph-r.off .fb-ph-i{opacity:.55}
+.fb-ph-r.off .fb-ph-r2 b{color:#8A8A97;text-decoration:line-through}
+.fb-ph-none{padding:6px 6px 18px;font-size:13.5px;color:#858592}
+.fb-ph-more{display:block;width:100%;height:46px;margin:2px 0 10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;
+  background:#12122a;color:var(--gold2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
 .fb-nw{white-space:nowrap}
 .fb-ph-none{padding:18px;font-size:13.5px;color:#858592}
 .fb-ph-more{display:block;width:100%;height:46px;margin:0 0 12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;
@@ -13133,6 +13160,8 @@ function _animCount(el, to){
 const IC_P = {
   bell:     '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
   minus:    '<path d="M6 12h12"/>',
+  filter:   '<path d="M3.5 5h17l-6.6 7.6V19l-3.8 2v-8.4z"/>',
+  nopark:   '<circle cx="12" cy="12" r="8.6"/><path d="M9.8 16.6V7.6h2.7a2.7 2.7 0 0 1 0 5.4H9.8"/><path d="M5.9 18.1 18.1 5.9"/>',
   // Значки фильтра истории: рисуем сами то, что читается без подписи —
   // пачка денег, паспорт, заправочный пистолет, здание, билет, сим, рупор
   money:    '<rect x="2" y="8" width="16" height="9.5" rx="1.8"/><circle cx="10" cy="12.75" r="2.2"/><path d="M6 8v9.5M14 8v9.5"/><path d="M6 5.5h14a2 2 0 0 1 2 2V14"/>',
@@ -20031,8 +20060,11 @@ async function accFinItems(){
   const b = await fbMonthScreen('Штрафы/авансы/долги'); if(!b) return;
   FB.itemWho = null; FB.pen = null;
   document.getElementById('accMid').innerHTML = fbItemsHtml(b);
-  // люди понадобятся на шаге «Выбрать водителя» — подтянуть заранее
-  if(!CREW) crewLoad();
+  // люди нужны и на шаге выбора, и в истории (район у имени) — подтянуть и перерисовать
+  if(!CREW) crewLoad().then(() => {
+    const mid = document.getElementById('accMid'), cur = fbBook(FB.month);
+    if(CREW && mid && cur && ACC_VIEW === 'finitems' && !fbPenOn()) mid.innerHTML = fbItemsHtml(cur);
+  });
 }
 function fbItemsHtml(b){
   const pay = fbCur(b), month = b.month, sums = {fine: 0, advance: 0, loan: 0};
@@ -20061,28 +20093,58 @@ function fbItemsHtml(b){
 // История штрафов и удержаний: последние сверху, десять сразу, дальше «Показать ещё».
 // Нажал на штраф — «Пересмотреть»: сумма, способ, комментарий или отмена.
 // Отменённый остаётся в истории зачёркнутым и не нажимается.
+const FB_PH_F = {all: 'Все', live: 'Снимаются', paid: 'Оплаченные', wait: 'Ждут', off: 'Отменённые'};
+const FB_PH_ST = {live: 'Снимается', paid: 'Оплачен', wait: 'Ждёт', off: 'Отменён'};
+// Штраф в истории: пока снимается с зарплаты — «Снимается», снялся весь —
+// «Оплачен», начнётся со следующего месяца — «Ждёт», отменили — «Отменён».
+function fbPenHistSt(h){
+  return h.cancelled ? 'off' : (h.start && h.start > FB.month) ? 'wait' : h.done ? 'paid' : 'live';
+}
 function fbPenHistHtml(b){
-  const hist = fbCur(b).history || [];
-  if(!hist.length) return `<div class="fb-pen-cap fb-ph-cap">История штрафов</div>
-    <div class="fb-pen-list fb-ph-list"><div class="fb-ph-none">Штрафов ещё не было</div></div>`;
-  return `<div class="fb-pen-cap fb-ph-cap">История штрафов</div>
-    <div class="fb-pen-list fb-ph-list">${hist.map((h, i) => fbPenHistRow(h, i >= 10)).join('')}</div>
-    ${hist.length > 10 ? '<button class="fb-ph-more" onclick="fbPenHistMore(this)">Показать ещё</button>' : ''}`;
+  const hist = fbCur(b).history || [], f = FB.phF || 'all';
+  const rows = hist.filter(h => f === 'all' || fbPenHistSt(h) === f);
+  return `<div class="sc fb-ph">
+    <div class="fb-ph-h"><em>${IC('clock', 19)}</em><b>История штрафов</b>
+      <button class="fb-ph-f" onclick="fbPhMenu()">${IC('filter', 15)}<span>${FB_PH_F[f]}</span><i>${_SC_CHEV}</i></button>
+    </div>
+    <div class="fb-ph-menu" id="fbPhMenu" hidden>${Object.keys(FB_PH_F).map(k =>
+      `<button class="${k === f ? 'on' : ''}" onclick="fbPhPick('${k}')">${FB_PH_F[k]}</button>`).join('')}</div>
+    ${rows.length ? rows.map((h, i) => fbPenHistRow(h, i >= 10)).join('')
+      : `<div class="fb-ph-none">${hist.length ? 'В этом наборе пусто' : 'Штрафов ещё не было'}</div>`}
+    ${rows.length > 10 ? '<button class="fb-ph-more" onclick="fbPenHistMore(this)">Показать ещё</button>' : ''}
+  </div>`;
 }
 function fbPenHistRow(h, hide){
-  const title = h.reason || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
-  const state = h.cancelled ? 'отменён' + (h.cancelled_by ? ' · ' + h.cancelled_by : '')
-    : [h.per_month ? `по ${fbFmt(h.per_month)} в месяц` : '',
-       h.revised ? (h.was !== null && h.was !== undefined && h.was !== h.amount ? `пересмотрен, было ${fbFmt(h.was)}` : 'пересмотрен') : ''].filter(Boolean).join(' · ');
-  const meta = [fbDayT(h.day), h.by ? 'записал ' + h.by : '', state].filter(Boolean).join(' · ');
+  const st = fbPenHistSt(h), cat = h.kind === 'hold' ? null : fbPenCatOf(h);
+  const vio = cat ? (cat.items || []).find(v => v.t === String(h.reason || '').split(' · ')[0]) : null;
+  const icon = vio && (vio.svg || vio.ic) ? (vio.svg || IC(vio.ic, 22))
+    : cat ? (cat.svg || IC(cat.ic, 22)) : IC(h.kind === 'hold' ? 'minus' : 'note', 22);
+  const parts = String(h.reason || '').split(' · ');
+  const title = parts[0] || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
+  const det = [parts.slice(1).join(' · '), h.note].filter(Boolean).join(' · ');
+  const sub = fbPenSubOf(h.name, true);
   const tag = h.cancelled ? 'div' : 'button';
-  return `<${tag} class="fb-pen-row fb-ph-row${h.cancelled ? ' off' : ''}"${hide ? ' hidden' : ''}${h.cancelled ? '' : ` onclick="fbPenEdit('${escS(h.id)}')"`}>
-      <span class="fb-pen-rb"><b>${escS(h.name)}</b><i>${fbPenNb(escS(title))}${h.note ? ' · ' + escS(h.note) : ''}</i><s>${escS(meta)}</s></span>
-      <span class="fb-ph-v"><b>−${fbFmt(h.amount)}</b><u>AED</u></span>
+  return `<${tag} class="fb-ph-r${h.cancelled ? ' off' : ''}"${hide ? ' hidden' : ''}${h.cancelled ? '' : ` onclick="fbPenEdit('${escS(h.id)}')"`}>
+      <em class="fb-ph-i">${icon}</em>
+      <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
+        det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
+      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${fbFmt(h.amount)} AED</b>
+        <i class="fb-ph-st ${st}">${FB_PH_ST[st]}</i></span>
       ${h.cancelled ? '' : `<em class="fb-chev">${_SC_CHEV}</em>`}</${tag}>`;
 }
+function fbPenHistDay(day){ return day ? `${fbDayT(day)} ${String(day).slice(0, 4)}` : ''; }
+function fbPhMenu(){
+  const m = document.getElementById('fbPhMenu'); if(!m) return;
+  m.hidden = !m.hidden;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbPhPick(k){
+  FB.phF = k;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const b = fbBook(FB.month); if(b) document.getElementById('accMid').innerHTML = fbItemsHtml(b);
+}
 function fbPenHistMore(btn){
-  const rows = [...document.querySelectorAll('#accMid .fb-ph-row[hidden]')];
+  const rows = [...document.querySelectorAll('#accMid .fb-ph-r[hidden]')];
   rows.slice(0, 10).forEach(r => { r.hidden = false; });
   if(rows.length <= 10) btn.remove();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -20111,8 +20173,8 @@ const FB_PEN = [
     {id: 'pdd', t: 'Несоблюдение ПДД'},
     {id: 'crash', t: 'Авария по вине водителя'},
     {id: 'damage', t: 'Повреждение автомобиля'},
-    {id: 'parking', t: 'Неправильная парковка'},
-    {id: 'phone', t: 'Использование телефона за рулём'},
+    {id: 'parking', t: 'Неправильная парковка', ic: 'nopark'},
+    {id: 'phone', t: 'Использование телефона за рулём', ic: 'mobile'},
     {id: 'other', t: 'Другое'}]},
   // своих списков и цен пока нет: сразу к водителю, сумму вписывают
   {id: 'docs', t: 'Документы', sub: 'Нарушения по документам', svg: FB_PEN_DOC},
@@ -20207,10 +20269,10 @@ function fbPenWhoHtml(hold){
   (CREW.districts || []).forEach(d => { if(d.operator){ if(!ops.has(d.operator)) ops.set(d.operator, []); ops.get(d.operator).push(d.code); } });
   const opG = ops.size ? `<div class="fb-pen-g">
       <div class="fb-pen-gh fb-pen-ghi"><b>${IC('headset', 18)}</b><span>Операторы</span><i>(${ops.size})</i></div>
-      ${[...ops].map(([n, codes]) => row(n, 'Оператор • ' + codes.join(', '), codes.join(', '))).join('')}</div>` : '';
+      ${[...ops].map(([n, codes]) => row(n, 'Оператор · ' + codes.join(', '), codes.join(', '))).join('')}</div>` : '';
   const drvG = (CREW.districts || []).filter(d => (d.drivers || []).length).map(d => `<div class="fb-pen-g">
       <div class="fb-pen-gh"><b>${escS(d.code)}</b><span>${escS(d.name)}</span><i>(${d.drivers.length} ${pluralize(d.drivers.length, 'водитель', 'водителя', 'водителей')})</i></div>
-      ${d.drivers.map(n => row(n, `${d.code} • ${d.name}`)).join('')}</div>`).join('');
+      ${d.drivers.map(n => row(n, `${d.code} · ${d.name}`)).join('')}</div>`).join('');
   const groups = starG + opG + drvG;
   return `${hold ? '<div class="fb-pen-lbl">Выбрать сотрудника</div>' : ''}
     <label class="fb-pen-q">${IC('search', 18)}<input id="fbPenQ" type="text" placeholder="Поиск сотрудника" autocomplete="off"
@@ -20238,13 +20300,14 @@ function fbPenWho(btn){
   setTimeout(() => { if(fbPenOn() && FB.pen.step === 'who') fbPenGo(FB.pen.mode === 'hold' ? 'hold' : 'fine'); }, 170);
 }
 // Кто это по расписанию — для карточки человека, когда он пришёл не из выбора
-function fbPenSubOf(name){
+function fbPenSubOf(name, short){
   if(!CREW) return '';
-  if((CREW.stars || []).includes(name)) return 'Старший';
+  // в истории строка узкая: старшего подписывать незачем, оператору хватит районов
+  if((CREW.stars || []).includes(name)) return short ? '' : 'Старший';
   const ds = CREW.districts || [], op = ds.filter(d => d.operator === name).map(d => d.code);
-  if(op.length) return 'Оператор • ' + op.join(', ');
+  if(op.length) return (short ? '' : 'Оператор · ') + op.join(', ');
   const d = ds.find(x => (x.drivers || []).includes(name));
-  return d ? `${d.code} • ${d.name}` : '';
+  return d ? `${d.code} · ${d.name}` : '';
 }
 // человек — сплошной значок в квадрате, как в макете; в штрафе нажимается (сменить)
 const FB_PEN_AVA = `<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><circle cx="12" cy="7.6" r="4.3"/>

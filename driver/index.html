@@ -984,66 +984,77 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ex-oth > div{flex:1;min-width:0}
 .ex-oth b{display:block;font-size:15.5px;font-weight:600}
 .ex-oth i{display:block;margin-top:3px;font-style:normal;font-size:12px;line-height:1.35;color:var(--muted)}
-/* Страница расхода (бензин, мойка) — по макету владельца: крупная шапка со
-   значком, выбор «Был расход / Расхода не было», сумма, чек, комментарий,
-   закреплённая кнопка «Сохранить». */
-.xp-h{display:flex;align-items:center;gap:14px;padding:4px 0 18px}
-.xp-hi{flex:0 0 auto;width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.05);border:1px solid var(--border2);color:var(--gold2)}
-.xp-h b{display:block;font-size:27px;font-weight:700;color:var(--text);letter-spacing:-.4px;line-height:1.1}
-.xp-h i{display:block;margin-top:5px;font-style:normal;font-size:13.5px;color:var(--muted)}
-.xp-ch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 22px}
-.xp-c{display:flex;align-items:center;gap:9px;min-height:70px;padding:12px 10px;border-radius:16px;border:1px solid var(--border2);
-  background:var(--card2);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
-.xp-c.on{border-color:var(--gold2);background:rgba(201,169,110,.12)}
+/* Страница расхода (бензин, мойка) — по макету владельца, цвета сняты с него
+   пипеткой: фон #070A12 (не чёрный), карточки #0A0D17, рамки #23263E, золото
+   #F6C265, серый текст #8E98C0, пунктир #35394E. Палитра живёт только здесь. */
+.xp{--xbg:#070A12;--xcard:#0A0D17;--xcard2:#090C16;--xline:#23263E;--xline2:#272B46;--xgold:#F6C265;--xgold2:#E9B455;
+  --xsub:#8E98C0;--xdesc:#B4BFE3;--xdash:#35394E;--xbtn:#252936;--xbtnb:#2C2D45;--xradio:#464660;--xdiv:#40415C;
+  margin:-6px -13px 0;padding:6px 15px 0;background:var(--xbg);min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar));color:#fff}
+body.xp-on{background:#070A12}
+.xp-back{display:inline-flex;align-items:center;gap:6px;padding:6px 4px 6px 0;margin:0 0 14px;border:0;background:none;
+  font-family:inherit;font-size:19px;font-weight:600;color:var(--xgold);cursor:pointer}
+.xp-h{display:flex;align-items:center;gap:16px;padding:0 0 20px}
+.xp-hi{flex:0 0 auto;width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+  background:#121217;color:var(--xgold)}
+.xp-h b{display:block;font-size:28px;font-weight:700;color:#fff;letter-spacing:-.4px;line-height:1.1}
+.xp-h i{display:block;margin-top:6px;font-style:normal;font-size:14.5px;color:var(--xsub)}
+.xp-ch{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 24px}
+.xp-c{display:flex;align-items:center;gap:10px;min-height:66px;padding:12px 10px;border-radius:16px;border:1.5px solid var(--xline);
+  background:var(--xcard2);font-family:inherit;color:#fff;text-align:left;cursor:pointer}
+.xp-c.on{border-color:var(--xgold);background:#1A1812}
 .xp-c[disabled]{opacity:.45;cursor:default}
-.xp-ci{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border3);display:flex;align-items:center;
+.xp-ci{flex:0 0 auto;width:28px;height:28px;border-radius:50%;border:2px solid var(--xradio);display:flex;align-items:center;
   justify-content:center;color:#1a1408}
-.xp-c.on .xp-ci{border-color:var(--gold2);background:var(--gold2)}
+.xp-c.on .xp-ci{border-color:var(--xgold);background:var(--xgold)}
 .xp-c > div{min-width:0}
-.xp-c b{display:block;font-size:13.5px;font-weight:700;line-height:1.2;white-space:nowrap}
-.xp-c i{display:block;margin-top:3px;font-style:normal;font-size:11px;line-height:1.25;color:var(--muted)}
-.xp-c.on i{color:var(--gold2)}
-.xp-l{font-size:13.5px;color:var(--muted);padding:0 2px 8px}
-.xp-amt{display:flex;align-items:center;gap:0;height:62px;margin:0 0 22px;padding:0 12px 0 16px;border-radius:16px;
-  border:1px solid var(--border2);background:var(--card2)}
-.xp-amt:focus-within{border-color:rgba(201,169,110,.5)}
-.xp-amt > span{flex:0 0 auto;font-size:17px;color:var(--muted);padding-right:16px;border-right:1px solid var(--border3);margin-right:16px}
-.xp-amt input{flex:1;min-width:0;border:0;background:none;color:var(--text);font-family:inherit;font-size:26px;font-weight:700;
+.xp-c b{display:block;font-size:14px;font-weight:700;line-height:1.2;white-space:nowrap}
+.xp-c i{display:block;margin-top:3px;font-style:normal;font-size:11.5px;line-height:1.25;color:var(--xsub)}
+.xp-c.on i{color:var(--xgold)}
+.xp-l{font-size:14.5px;color:#F4F6FF;padding:0 0 9px}
+.xp-l i{display:block;margin-top:3px;font-style:normal;font-size:13px;color:var(--xsub)}
+.xp-amt{display:flex;align-items:center;height:52px;margin:0 0 24px;padding:0 12px 0 16px;border-radius:14px;
+  border:1.5px solid var(--xline2);background:#080B13}
+.xp-amt:focus-within{border-color:var(--xgold)}
+.xp-amt > span{flex:0 0 auto;font-size:17px;color:var(--xsub);padding-right:16px;border-right:1px solid var(--xdiv);margin-right:16px}
+.xp-amt input{flex:1;min-width:0;border:0;background:none;color:#fff;font-family:inherit;font-size:24px;font-weight:700;
   letter-spacing:-.3px;outline:none;-webkit-appearance:none}
-.xp-amt input::placeholder{color:var(--dim);font-weight:500}
-.xp-amt.sent input{color:var(--sub)}
-.xp-x{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.08);color:var(--sub);cursor:pointer;padding:0}
+.xp-amt input::placeholder{color:var(--xradio);font-weight:500}
+.xp-amt.sent input{color:var(--xdesc)}
+.xp-x{flex:0 0 auto;width:28px;height:28px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;
+  background:#2A2D45;color:#fff;cursor:pointer;padding:0}
 .xp-x[hidden]{display:none}
 .xp-amt .exp-mk{flex:0 0 auto;margin-left:6px}
-.xp-rc{margin:0 0 22px;padding:14px;border-radius:18px;border:1px solid var(--border2);background:var(--card2)}
-.xp-rc.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.xp-z{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;
-  min-height:170px;padding:16px;border-radius:14px;border:1.5px dashed rgba(168,168,192,.32);background:rgba(0,0,6,.35);
-  font-family:inherit;color:var(--text);cursor:pointer;overflow:hidden}
-.xp-rc.two .xp-z{min-height:150px;padding:12px 8px}
-.xp-z svg{color:var(--gold2)}
-.xp-z b{display:block;margin-top:6px;font-size:16px;font-weight:700;text-align:center}
-.xp-rc.two .xp-z b{font-size:14px}
-.xp-z i{display:block;font-style:normal;font-size:13px;line-height:1.35;color:var(--muted);text-align:center;max-width:260px}
-.xp-rc.two .xp-z i{font-size:11.5px}
-.xp-z.set{border-style:solid;border-color:rgba(201,169,110,.45);padding:0}
+.xp-ph{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 24px}
+.xp-ph.one{grid-template-columns:1fr}
+.xp-z{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:100%;
+  min-height:184px;padding:14px 10px 12px;border-radius:16px;border:1.5px solid var(--xline);background:var(--xcard);
+  font-family:inherit;color:#fff;cursor:pointer;overflow:hidden}
+.xp-z::before{content:'';position:absolute;inset:7px;border-radius:12px;border:1.5px dashed var(--xdash);pointer-events:none}
+.xp-zn{position:absolute;left:14px;top:14px;width:20px;height:20px;border-radius:50%;background:var(--xgold);color:#1a1408;
+  font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.xp-z > svg{color:var(--xgold);margin-top:14px}
+.xp-z b{display:block;margin-top:12px;font-size:15px;font-weight:700;text-align:center}
+.xp-z i{display:block;margin-top:6px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--xdesc);text-align:center}
+.xp-zb{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:34px;margin-top:14px;border-radius:9px;
+  border:1px solid var(--xbtnb);background:var(--xbtn);color:#fff;font-size:13px;font-weight:600}
+.xp-zb svg{color:var(--xgold)}
+.xp-z.set{padding:0;border-color:rgba(246,194,101,.55)}
+.xp-z.set::before{display:none}
 .xp-z.set img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.xp-z.set u{position:absolute;left:10px;right:10px;bottom:10px;text-decoration:none;font-size:12px;font-weight:600;text-align:center;
-  padding:6px 8px;border-radius:9px;background:rgba(0,0,6,.72);color:var(--text)}
-.xp-z.bad{border-color:#E05555;border-style:solid}
-.xp-z.bad u{color:#F5A3A3}
-.xp-cm{display:block;width:100%;min-height:92px;padding:14px 16px;margin:0 0 6px;border-radius:16px;border:1px solid var(--border2);
-  background:var(--card2);color:var(--text);font-family:inherit;font-size:15px;line-height:1.4;resize:none;outline:none}
-.xp-cm:focus{border-color:rgba(201,169,110,.5)}
-.xp-cm::placeholder{color:var(--muted)}
-.xp-cm[readonly]{color:var(--sub)}
-.xp-go{width:100%;height:58px;border-radius:18px;border:0;font-family:inherit;font-size:19px;font-weight:700;color:#1a1408;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));cursor:pointer;box-shadow:0 10px 26px rgba(201,169,110,.22)}
+.xp-z.set .xp-zb{position:absolute;left:10px;right:10px;bottom:10px;width:auto;margin:0;background:rgba(7,10,18,.82)}
+.xp-z.bad{border-color:#E05555}
+.xp-z.bad .xp-zb{color:#F5A3A3}
+.xp-cm{display:block;width:100%;min-height:76px;padding:14px 16px;margin:0 0 8px;border-radius:14px;border:1.5px solid var(--xline);
+  background:#0A0E18;color:#fff;font-family:inherit;font-size:15px;line-height:1.4;resize:none;outline:none}
+.xp-cm:focus{border-color:var(--xgold)}
+.xp-cm::placeholder{color:var(--xsub)}
+.xp-cm[readonly]{color:var(--xdesc)}
+.xp-go{width:100%;height:52px;border-radius:14px;border:0;font-family:inherit;font-size:18px;font-weight:700;color:#3D3127;
+  background:linear-gradient(90deg,#F6C265,#E9B455);cursor:pointer;box-shadow:0 10px 26px rgba(246,194,101,.18)}
 .xp-go:active{transform:scale(.99)}
-.xp-go.sec{background:var(--card2);border:1px solid var(--border3);color:var(--text);box-shadow:none}
-.xp-go[disabled]{background:linear-gradient(135deg,#6F5D3D,#806F4C);color:#000;box-shadow:none;cursor:default}
+.xp-go.sec{background:var(--xbtn);border:1px solid var(--xbtnb);color:#fff;box-shadow:none}
+.xp-go[disabled]{background:linear-gradient(90deg,#7A6238,#6E5834);color:#000;box-shadow:none;cursor:default}
+.xp .dv-foot{background:linear-gradient(180deg,rgba(7,10,18,0),#070A12 40%);padding-top:12px;left:0;right:0;padding-left:15px;padding-right:15px}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
@@ -4382,6 +4393,7 @@ function setTab(t){
   // Нажатие на вкладку — это её корень: вложенная страница, где человек был
   // до этого, не должна встречать его при возврате.
   EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false;
+  document.body.classList.remove('xp-on');
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory();
   else if(t === 'profile'){ profPaint(); profLoad(); }
@@ -7370,8 +7382,9 @@ function expTileVal(kind){
 // Выбор «был расход / не было» на странице бензина или мойки — до отправки
 // живёт только на экране; сохранённое читается из ответа сервера.
 const EXP_CH = {}, XP_EDIT = new Set();
-const XP_T = {fuel: {t: 'Бензин', s: 'Укажите сумму и прикрепите чек', no: 'Не заправлялись', ico: ICO.fuel},
-              wash: {t: 'Мойка',  s: 'Укажите сумму, снимите машину и чек', no: 'Машину не мыли', ico: ICO.wash}};
+const XP_T = {fuel: {t: 'Бензин', s: 'Укажите сумму и прикрепите чек', no: 'Сегодня не заправлялись', ico: ICO.fuel},
+              wash: {t: 'Мойка',  s: 'Укажите сумму и прикрепите фото', no: 'Сегодня не было мойки', ico: ICO.wash}};
+const ICO_CAM = '<path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>';
 function xpChoice(kind){
   if(EXP_CH[kind]) return EXP_CH[kind];
   return ((EXP.no_expense || {})[kind] && !_expSent(kind)) ? 'no' : 'yes';
@@ -7390,17 +7403,20 @@ function xpTyped(kind){
   if(b && !b.dataset.mode) b.disabled = !has;
 }
 function xpClear(kind){ const inp = document.getElementById('e_' + kind); if(inp){ inp.value = ''; xpTyped(kind); inp.focus(); } }
-// Зона снимка: пустая — пунктир и подсказка, со снимком — сам кадр и «переснять».
-function xpZone(kind, what, sent){
+// Зона снимка: пустая — пунктирная рамка, номер шага, значок, подсказка и
+// кнопка; со снимком — сам кадр и «Переснять». Снимаем только камерой —
+// галереи здесь нет (правило владельца), поэтому обе кнопки открывают камеру.
+function xpZone(kind, what, sent, n){
   const rcp = what === 'rcp';
   const свой = rcp ? (EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null) : (CAR_SHOT.photo ? CAR_SHOT : null);
   const src = свой ? свой.photo : (sent ? (rcp ? (sent.photo && sent.thumb) : (sent.car_photo && sent.car_thumb)) : '');
   const плохо = !свой && sent && (rcp ? (sent.photo && sent.photo_ok === 'no') : (sent.car_photo && sent.car_ok === 'no'));
-  const t = rcp ? ['Добавить чек', 'Нажмите, чтобы загрузить фото чека или квитанции']
-                : ['Снять машину', 'Машина на мойке, пока её моют'];
+  const t = rcp ? ['Фото чека', 'Загрузите фото чека или квитанции', 'Снять чек']
+                : ['Фото машины', 'Сделайте фото автомобиля после мойки', 'Добавить фото'];
   return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}" onclick="carTap('${kind}','${what}')">
-    ${src ? `<img src="${src}" alt=""><u>${плохо ? 'Старший не принял — переснять' : (rcp ? 'Чек · нажмите, чтобы переснять' : 'Машина · нажмите, чтобы переснять')}</u>`
-          : `${svg(rcp ? ICO_RCP : ICO.wash, 40)}<b>${t[0]}</b><i>${t[1]}</i>`}
+    ${n ? `<span class="xp-zn">${n}</span>` : ''}
+    ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svg(ICO_CAM, 16)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
+          : `${svg(rcp ? ICO_RCP : ICO.car, 30)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svg(ICO_CAM, 16)}${t[2]}</span>`}
   </button>`;
 }
 function xpSave(btn, kind){
@@ -7428,14 +7444,18 @@ function expPage(kind){
   else if(locked) btn = {t: 'Изменить', mode: 'edit', cls: 'sec'};
   else btn = {t: 'Сохранить', mode: ''};
   const comment = sent && sent.comment && sent.comment !== T.t && sent.comment !== 'Заправка' ? sent.comment : '';
-  const zones = kind === 'wash' ? `<div class="xp-rc two">${xpZone(kind, 'car', kept)}${xpZone(kind, 'rcp', kept)}</div>`
-                                : `<div class="xp-rc">${xpZone(kind, 'rcp', kept)}</div>`;
+  const zones = kind === 'wash'
+    ? `<div class="xp-l">Фото для подтверждения<i>Сначала фото машины, затем чек</i></div>
+       <div class="xp-ph">${xpZone(kind, 'car', kept, 1)}${xpZone(kind, 'rcp', kept, 2)}</div>`
+    : `<div class="xp-l">Фото для подтверждения<i>Чек или квитанция с заправки</i></div>
+       <div class="xp-ph one">${xpZone(kind, 'rcp', kept, 0)}</div>`;
   return `<div class="xp">
-    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 28)}</span><div><b>${T.t}</b><i>${T.s}</i></div></div>
+    <button class="xp-back" onclick="expBack()">${svg(ICO.back, 20)}Назад</button>
+    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 30)}</span><div><b>${T.t}</b><i>${T.s}</i></div></div>
     <div class="xp-ch">
-      <button class="xp-c${yes ? ' on' : ''}" onclick="xpPick('${kind}','yes')"><span class="xp-ci">${yes ? svg(ICO.ok, 14) : ''}</span>
+      <button class="xp-c${yes ? ' on' : ''}" onclick="xpPick('${kind}','yes')"><span class="xp-ci">${yes ? svg(ICO.ok, 15) : ''}</span>
         <div><b>Был расход</b><i>${sent ? fmt(sent.amount) + ' AED' : 'Укажу сумму'}</i></div></button>
-      <button class="xp-c${yes ? '' : ' on'}" ${sent ? 'disabled' : ''} onclick="xpPick('${kind}','no')"><span class="xp-ci">${yes ? '' : svg(ICO.ok, 14)}</span>
+      <button class="xp-c${yes ? '' : ' on'}" ${sent ? 'disabled' : ''} onclick="xpPick('${kind}','no')"><span class="xp-ci">${yes ? '' : svg(ICO.ok, 15)}</span>
         <div><b>Расхода не было</b><i>${T.no}</i></div></button>
     </div>
     ${yes ? `
@@ -7443,9 +7463,8 @@ function expPage(kind){
     <div class="xp-amt${locked ? ' sent' : ''}"><span>AED</span>
       <input id="e_${kind}" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
         value="${sent ? sent.amount : ''}"${locked ? ' readonly' : ''} oninput="xpTyped('${kind}')">
-      ${locked ? expMark(sent) : `<button class="xp-x" id="x_${kind}" ${sent ? '' : 'hidden'} onclick="xpClear('${kind}')" aria-label="Очистить">${svg(ICO.close, 12)}</button>`}
+      ${locked ? expMark(sent) : `<button class="xp-x" id="x_${kind}" ${sent ? '' : 'hidden'} onclick="xpClear('${kind}')" aria-label="Очистить">${svg(ICO.close, 13)}</button>`}
     </div>
-    <div class="xp-l">${kind === 'wash' ? 'Машина и чек' : 'Чек'}</div>
     ${zones}
     <div class="xp-l">Комментарий (необязательно)</div>
     <textarea class="xp-cm" id="c_${kind}" maxlength="200" placeholder="Добавьте комментарий"${locked ? ' readonly' : ''}>${esc(comment)}</textarea>
@@ -7471,8 +7490,9 @@ function renderExpenses(){
 
   if(EXP_PAGE){
     const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
-    const own = EXP_PAGE === 'fuel' || EXP_PAGE === 'wash';   // у этих страниц свой крупный заголовок
-    hdrPage(back + `<b>${own ? 'Расходы' : (EXP_PAGE_T[EXP_PAGE] || 'Расходы')}</b>`);
+    const own = EXP_PAGE === 'fuel' || EXP_PAGE === 'wash';   // у этих страниц своя шапка и «Назад»
+    if(own) hdrPage(''); else hdrPage(back + `<b>${EXP_PAGE_T[EXP_PAGE] || 'Расходы'}</b>`);
+    document.body.classList.toggle('xp-on', own);
     let html = '';
     if(EXP_PAGE === 'meal') html = mealBox();
     else if(own) html = expPage(EXP_PAGE);
@@ -7485,6 +7505,7 @@ function renderExpenses(){
     return;
   }
   hdrPage('');
+  document.body.classList.remove('xp-on');
   box.innerHTML = `
     <div class="ex-ttl">Расходы за смену</div>
     <button class="ex-tot" onclick="expGo('all')">

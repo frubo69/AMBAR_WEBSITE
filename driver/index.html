@@ -2893,35 +2893,34 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .inc-glow.on{animation:incFlash 1.05s cubic-bezier(.3,0,.2,1) 3}
 @keyframes incFlash{0%{opacity:0}18%{opacity:.42}55%{opacity:.06}100%{opacity:0}}
 
-/* Верх: пульсирующая точка + секундомер. Заполняет место осмысленно и сразу
-   говорит: это только что прилетело и ждёт тебя. */
-/* Статус — первая строка листа: живая точка, надпись и время ожидания в один
-   ряд. Ничего не висит само по себе посреди экрана. */
-.inc-row-new{display:flex;align-items:center;gap:10px;padding:14px 17px;
-  background:linear-gradient(90deg,rgba(201,169,110,.16),rgba(201,169,110,.03))}
-.inc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--gold2);
-  animation:incDot 1.8s ease-out infinite}
-@keyframes incDot{0%{box-shadow:0 0 0 0 rgba(232,201,138,.55)}
-  70%{box-shadow:0 0 0 11px rgba(232,201,138,0)}100%{box-shadow:0 0 0 0 rgba(232,201,138,0)}}
-.inc-title{font-size:12px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;
-  color:var(--gold2)}
-.inc-wait{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:13px;
-  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
-
-/* Лист с деталями */
-/* Лист по высоте содержимого, но не выше трёх четвертей экрана: длинный заказ
-   прокручивается внутри, ползунок всегда на виду. */
-.inc-sheet{display:flex;flex-direction:column;max-height:74vh;background:var(--bg3);
-  border-radius:24px;border:1px solid var(--border2);
+/* Лист входящего заказа — по макету владельца (14 сен 2026; экран 430 pt,
+   лист 406). Сверху золотая полоса статуса с живой точкой и секундомером,
+   ниже район и три плитки времени со значками, дальше строки с квадратным
+   значком слева: куда (с кнопкой маршрута), комментарий, что везём, оплата с
+   итогом за вертикальной чертой. Размеры сняты с макета по пикселям. */
+.inc-sheet{display:flex;flex-direction:column;max-height:76vh;background:#0A0C14;
+  border-radius:12px;border:1px solid #1B1C2A;
   box-shadow:0 -10px 40px rgba(0,0,0,.65);overflow:hidden}
-.inc-row-items{min-height:0;overflow-y:auto}
-.inc-row{padding:15px 17px;border-top:1px solid var(--border2)}
-.inc-row:first-child{border-top:none}
-.inc-row-time{padding:13px 17px}
-.inc-dist{display:block;font-size:13.5px;font-weight:700;color:var(--gold2);margin-bottom:10px}
+.inc-row-new{flex:0 0 auto;display:flex;align-items:center;height:48px;padding:0 18.5px 0 21px;
+  border-bottom:1px solid rgba(201,169,110,.34);
+  background:linear-gradient(90deg,rgba(201,169,110,.48) 0%,rgba(201,169,110,.36) 10%,
+    rgba(201,169,110,.24) 20%,rgba(201,169,110,.17) 40%,rgba(201,169,110,.09) 60%,
+    rgba(201,169,110,.04) 80%,rgba(201,169,110,.03) 100%)}
+.inc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#F8CE7E;
+  animation:incDot 1.8s ease-out infinite}
+@keyframes incDot{0%{box-shadow:0 0 14px 5px rgba(248,206,126,.38),0 0 0 0 rgba(232,201,138,.55)}
+  70%{box-shadow:0 0 14px 5px rgba(248,206,126,.38),0 0 0 11px rgba(232,201,138,0)}
+  100%{box-shadow:0 0 14px 5px rgba(248,206,126,.38),0 0 0 0 rgba(232,201,138,0)}}
+.inc-title{margin-left:12.5px;font-size:13px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;
+  color:#FFE69C;line-height:1}
+.inc-wait{margin-left:auto;position:relative;top:1.5px;font-size:13px;font-weight:500;color:#C7C8E1;line-height:1;
+  font-variant-numeric:tabular-nums}
+.inc-head{flex:0 0 auto;padding:13px 13px 12px}
+.inc-dist{display:block;margin:0 0 6px 7px;font-size:20px;font-weight:700;line-height:24px;color:#fff}
 /* Время — три отдельных факта в ряд, как приборная панель: когда приняли,
    сколько обещали клиенту и к какому часу быть на месте. Подпись в углу мелким
-   шрифтом ни на один из этих вопросов не отвечала. */
+   шрифтом ни на один из этих вопросов не отвечала. (Общая полоса — она же в
+   истории заказов; у входящего свой вид со значками, .inc-ts ниже.) */
 .tstrip{display:flex;border-radius:13px;background:var(--card2);
   border:1px solid var(--border2);overflow:hidden}
 .ts{flex:1;min-width:0;padding:9px 11px;border-left:1px solid var(--border2)}
@@ -2935,41 +2934,66 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .ts.due .ts-v{color:var(--up)}
 .ts.late{background:var(--dn-soft)}
 .ts.late .ts-l,.ts.late .ts-v{color:var(--dn)}
-.inc-l{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:7px}
-.inc-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11.5px}
-.inc-addr{font-size:25px;font-weight:800;line-height:1.15;letter-spacing:-.5px}
-/* Комментарий — обычная строка листа, без рамок: он важен, но кричать ему
-   незачем, водитель читает его сразу после адреса. */
-.inc-note{font-size:15px;line-height:1.4;color:var(--text)}
-.inc-items{display:flex;flex-direction:column;gap:9px}
-.inc-items div{display:flex;gap:10px;font-size:15px}
-.inc-items div span{flex:1;min-width:0;color:var(--text)}
-.inc-items div b{color:var(--gold2);font-variant-numeric:tabular-nums;flex-shrink:0}
-/* Деньги — последняя строка листа и самая крупная: это то, с чем курьер
-   выходит из машины. */
-/* Оплата и сумма — одной строкой, но двумя блоками: чем платят важно ровно
-   настолько же, сколько платят. */
-.inc-row-pay{flex:0 0 auto;display:grid;grid-template-columns:1fr auto;
-  column-gap:14px;row-gap:8px;align-items:baseline;background:rgba(201,169,110,.05)}
-.inc-l-r{justify-content:flex-end}
-.inc-row-pay .inc-l{margin-bottom:0}
-.inc-row-pay .inc-method-s{grid-column:1 / -1;margin-top:-3px}
-/* Способ оплаты — короткой строкой со значком, без переносов: это факт, а не
-   абзац. Уточнение уходит вниз мелким. */
-.inc-method{display:flex;align-items:center;gap:7px;font-size:17px;font-weight:700;
-  line-height:1.1;color:var(--text);white-space:nowrap}
-.inc-method svg{flex-shrink:0;opacity:.9}
-.inc-method-s{font-size:12px;color:var(--muted);padding-left:24px}
-.inc-total{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
-  line-height:1;letter-spacing:-1px;color:var(--gold3);white-space:nowrap}
-.inc-total i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px;
-  margin-left:5px}
-.inc-row-pay.debt{background:var(--warn-soft)}
+.inc-ts{height:61px;border-radius:10px;border:1px solid #191B29;background:linear-gradient(180deg,#171821,#0F101D)}
+.inc-ts .ts{flex:0 0 auto;display:flex;align-items:flex-start;gap:12px;padding:10px 0 0 12px;border-left:1px solid #1F1F33}
+.inc-ts .ts:first-child{border-left:0}
+.inc-ts .ts:nth-child(1){width:126px}
+.inc-ts .ts:nth-child(2){width:132px}
+.inc-ts .ts:nth-child(3){flex:1 1 auto}
+.inc-ts .ts-i{width:28px;height:28px;flex:0 0 28px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;background:linear-gradient(145deg,#2B2726,#1A1A21);color:#84859F}
+.inc-ts .ts-eta .ts-i{background:linear-gradient(145deg,#3F3328,#1F1C23);color:#E3BE72}
+.inc-ts .ts-b{display:flex;flex-direction:column;min-width:0;margin-top:2px}
+.inc-ts .ts-l{font-size:9px;font-weight:700;letter-spacing:1.5px;line-height:11px;color:#757896;overflow:visible}
+.inc-ts .ts-v{margin-top:3px;font-size:18px;font-weight:700;line-height:22px;letter-spacing:-.2px;color:#F4F3F6}
+.inc-ts .ts.due{padding-left:8.5px;background:linear-gradient(160deg,rgba(76,175,125,.30),rgba(76,175,125,.06));
+  box-shadow:inset 0 0 0 1px rgba(76,175,125,.22)}
+.inc-ts .ts.due .ts-i{background:linear-gradient(145deg,#17352D,#111E22);color:#4CB887}
+.inc-ts .ts.due .ts-l,.inc-ts .ts.due .ts-v{color:#51CD92}
+.inc-ts .ts.late{padding-left:8.5px;background:linear-gradient(160deg,rgba(226,75,74,.28),rgba(226,75,74,.06));
+  box-shadow:inset 0 0 0 1px rgba(226,75,74,.22)}
+.inc-ts .ts.late .ts-i{background:linear-gradient(145deg,#3A1F22,#1E1418);color:var(--dn)}
+.inc-ts .ts.late .ts-l,.inc-ts .ts.late .ts-v{color:var(--dn)}
+/* Строки листа: квадрат со значком, колонка «подпись / значение», справа —
+   кнопка или сумма. Полосы-разделители во всю ширину листа. */
+.inc-row{flex:0 0 auto;display:flex;align-items:center;padding:12.5px 13.5px 12.5px 14.5px;border-top:1px solid #161725}
+.inc-ic{width:41px;height:41px;flex:0 0 41px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  color:#F6CF86;background:linear-gradient(155deg,#0B0D14 40%,#2A2420);border:1px solid rgba(201,169,110,.2)}
+.inc-b{flex:1 1 auto;min-width:0;margin-left:26px}
+.inc-l{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#787B96;line-height:11px;
+  display:flex;align-items:baseline;white-space:nowrap}
+.inc-l b{margin-left:10px;font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;color:#C2C2D9}
+.inc-addr{margin-top:4px;font-size:16px;font-weight:700;line-height:20px;letter-spacing:-.2px;color:#fff}
+.inc-route{flex:0 0 auto;display:flex;align-items:center;gap:10px;height:39px;padding:0 13px 0 14px;margin-left:12px;
+  border-radius:10px;border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.06);color:#F4CD7E;
+  font-family:inherit;font-size:13px;font-weight:600;line-height:1;cursor:pointer}
+.inc-route svg{color:#FFE696;flex:0 0 auto}
+.inc-route:active{transform:scale(.97)}
+.inc-route[hidden]{display:none}
+.inc-note{margin-top:3px;font-size:14px;font-weight:500;line-height:18px;color:#fff}
+/* Длинный состав листается внутри строки, остальное стоит на месте. */
+.inc-row-items{flex:1 1 auto;min-height:0}
+.inc-row-items .inc-b{display:flex;flex-direction:column;max-height:100%;min-height:0}
+.inc-items{display:flex;flex-direction:column;gap:8px;margin-top:5px;min-height:0;overflow-y:auto}
+.inc-items div{display:flex;align-items:baseline;gap:10px;font-size:15px;font-weight:500;line-height:19px}
+.inc-items div span{flex:1;min-width:0;color:#fff}
+.inc-items div b{color:#F3CB82;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;padding-right:5px}
+.inc-row-pay{padding:12.5px 23.5px 30.5px 14.5px}
+.inc-method{margin-top:6px;font-size:16px;font-weight:700;line-height:20px;color:#fff;white-space:nowrap}
+.inc-method-s{font-size:12px;line-height:15px;color:var(--muted);margin-top:2px}
+.inc-sum{flex:0 0 auto;align-self:center;position:relative;top:3px;margin-left:14px;padding-left:20px;
+  border-left:1px solid #1E1F31;box-sizing:border-box;min-width:87.5px;min-height:52.6px;
+  display:flex;flex-direction:column;justify-content:center}
+.inc-sum .inc-l{color:#6D6F8D}
+.inc-total{margin-top:4px;font-size:35px;font-weight:700;line-height:36px;letter-spacing:-.5px;color:#F9D183;
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.inc-total i{font-style:normal;font-size:12px;font-weight:600;color:#797A99;letter-spacing:.3px;margin-left:6px}
 .inc-row-pay.debt .inc-method,.inc-row-pay.debt .inc-total{color:var(--warn)}
-.inc-row-pay.debt .inc-method-s,.inc-row-pay.paid .inc-method-s{color:inherit;opacity:.75}
-.inc-row-pay.paid{background:var(--up-soft)}
+.inc-row-pay.debt .inc-method-s{color:inherit;opacity:.75}
 .inc-row-pay.paid .inc-method,.inc-row-pay.paid .inc-total{color:var(--up)}
+.inc-row-pay.paid .inc-method-s{color:inherit;opacity:.75}
+/* Выбор карт открывается поверх входящего заказа. */
+#mapSheet{z-index:210}
 
 /* Действие */
 .inc-foot{flex:0 0 auto;padding-top:12px}
@@ -3928,39 +3952,52 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <!-- Шторка целиком: лист + действие. Уехать от неё нельзя, пока не принял. -->
   <div class="inc-wrap">
   <div class="inc-sheet">
-    <div class="inc-row inc-row-new">
+    <div class="inc-row-new">
       <span class="inc-dot"></span>
       <span class="inc-title">Новый заказ</span>
-      <span class="inc-wait" id="incWait">0:00</span>
+      <span class="inc-wait" id="incWait">00:00</span>
     </div>
-    <div class="inc-row inc-row-time">
+    <div class="inc-head">
       <span class="inc-dist" id="incDist">—</span>
-      <div class="tstrip" id="incTime"></div>
+      <div class="tstrip inc-ts" id="incTime"></div>
     </div>
 
     <div class="inc-row">
-      <div class="inc-l">Куда</div>
-      <div class="inc-addr" id="incAddr">—</div>
+      <span class="inc-ic"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+      <div class="inc-b">
+        <div class="inc-l">Куда</div>
+        <div class="inc-addr" id="incAddr">—</div>
+      </div>
+      <button class="inc-route" id="incRoute" onclick="route(INC.order_id)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L3 10.6l7.6 2.8 2.8 7.6z" fill="currentColor"/></svg><span>Маршрут</span></button>
     </div>
 
     <div class="inc-row" id="incNoteRow" hidden>
-      <div class="inc-l">Комментарий к заказу</div>
-      <div class="inc-note" id="incNote"></div>
+      <span class="inc-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg></span>
+      <div class="inc-b">
+        <div class="inc-l">Комментарий к заказу</div>
+        <div class="inc-note" id="incNote"></div>
+      </div>
     </div>
 
     <div class="inc-row inc-row-items">
-      <div class="inc-l">Что везём <b id="incCount"></b></div>
-      <div class="inc-items" id="incItems"></div>
+      <span class="inc-ic"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></span>
+      <div class="inc-b">
+        <div class="inc-l">Что везём <b id="incCount"></b></div>
+        <div class="inc-items" id="incItems"></div>
+      </div>
     </div>
 
     <div class="inc-row inc-row-pay">
-      <!-- Сетка, а не два блока рядом: подписи стоят в одном ряду, значения —
-           в другом, и ни одна колонка не может уехать по высоте. -->
-      <div class="inc-l">Оплата</div>
-      <div class="inc-l inc-l-r" id="incPayL">Итого</div>
-      <div class="inc-method" id="incPay"></div>
-      <div class="inc-total"><span id="incTotal">0</span><i>AED</i></div>
-      <div class="inc-method-s" id="incPayS"></div>
+      <span class="inc-ic" id="incPayIc"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg></span>
+      <div class="inc-b">
+        <div class="inc-l">Оплата</div>
+        <div class="inc-method" id="incPay"></div>
+        <div class="inc-method-s" id="incPayS"></div>
+      </div>
+      <div class="inc-sum">
+        <div class="inc-l" id="incPayL">Итого</div>
+        <div class="inc-total"><span id="incTotal">0</span><i>AED</i></div>
+      </div>
     </div>
   </div>
 
@@ -7836,14 +7873,34 @@ function _isLate(hm){
   return diff < 0;
 }
 
+// Плитки времени входящего заказа: те же три факта, что в timeStrip, но со
+// значками в квадратах — как на макете листа.
+const INC_ICO = {
+  cube: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
+  card: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
+};
+function incStrip(o){
+  const took = hhmm(o.confirmed_at || o.timestamp);
+  const late = _isLate(o.deliver_by);
+  return [
+    took ? ['took', ICO.clock, 'Принят', took, ''] : null,
+    o.eta ? ['eta', INC_ICO.cube, 'Доставка', o.eta + ' мин', ''] : null,
+    o.deliver_by ? ['due', ICO.clock, 'Быть до', esc(o.deliver_by), late ? 'late' : 'due'] : null,
+  ].filter(Boolean).map(([k, ic, l, v, cls]) =>
+    `<div class="ts ts-${k} ${cls}"><span class="ts-i">${svg(ic, 19)}</span>`
+    + `<span class="ts-b"><span class="ts-l">${l}</span><span class="ts-v">${v}</span></span></div>`
+  ).join('');
+}
+
 function incShow(o){
   INC = o;
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
   const nopay = o.payment_method === 'free';
   const n = (o.items||[]).length;
   document.getElementById('incDist').textContent = o.district || '';
-  document.getElementById('incTime').innerHTML = timeStrip(o);
+  document.getElementById('incTime').innerHTML = incStrip(o);
   document.getElementById('incAddr').textContent = o.address || 'Адрес не указан';
+  document.getElementById('incRoute').hidden = !(o.gmap_link || (o.location && o.location.lat) || o.address);
   document.getElementById('incCount').textContent =
     n + ' ' + (n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций'));
   // Деньги: сколько и чем. Оплаченный и долговой заказ обязаны читаться сразу —
@@ -7859,8 +7916,10 @@ function incShow(o){
     : (debt
       ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
       // У наличных уточнять нечего: «Наличными» — это и есть всё сообщение.
-      : {ico: ICO.cash, t: 'Наличными',       s: ''}));
-  document.getElementById('incPay').innerHTML = svg(PAY.ico, 17) + PAY.t;
+      : {ico: INC_ICO.card, t: 'Наличными',   s: ''}));
+  // Значок оплаты живёт в квадрате слева, как у остальных строк листа.
+  document.getElementById('incPayIc').innerHTML = svg(PAY.ico, 24);
+  document.getElementById('incPay').textContent = PAY.t;
   const ps = document.getElementById('incPayS');
   ps.textContent = PAY.s; ps.hidden = !PAY.s;
   document.getElementById('incItems').innerHTML = (o.items||[]).map(it =>
@@ -7878,7 +7937,7 @@ function incShow(o){
   const w = document.getElementById('incWait');
   if(_incW) clearInterval(_incW);
   const tick = () => { const s = Math.round((Date.now()-t0)/1000);
-    w.textContent = Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+    w.textContent = String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
   tick(); _incW = setInterval(tick, 1000);
   if(_incT) clearInterval(_incT);
   // Пока не принял — напоминаем, но конечное число раз: три минуты сигналов

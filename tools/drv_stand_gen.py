@@ -138,6 +138,16 @@ async function standBoot(){
   shPaint();   // как в бою: boot() → shLoad() → shPaint() — замок смены/гео
   await new Promise(r => setTimeout(r, 80));
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
+  // ?open=inc — лист входящего заказа; &mock=1 — цифры как на макете владельца
+  // (один Absolut, 95 AED, принят 00:43, доставка 50 мин, быть до 01:33, не просрочен)
+  if(ST_Q.get('open') === 'inc'){
+    if(ST_Q.get('mock')){
+      const d = new Date(); d.setHours(0, 43, 0, 0);
+      Object.assign(ST_ORDER, {items: [ST_ORDER.items[0]], total: 95, eta: 50, deliver_by: '01:33', confirmed_at: d.toISOString()});
+      window._isLate = () => false;
+    }
+    incShow(ST_ORDER);
+  }
   if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
   if(ST_Q.get('open') === 'stl') stlOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
@@ -162,7 +172,7 @@ src = src.replace("\nboot();", "\nstandBoot();")
 # Ширина экрана стенда: по умолчанию 390 (безголовый Chrome не уже 500), для
 # сравнения с макетами владельца — 430: python3 tools/drv_stand_gen.py <dir> 430
 W = sys.argv[2] if len(sys.argv) > 2 else '390'
-src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:WPX;margin:0;overflow:visible}.sheet{right:auto;width:WPX}.hdr{width:WPX}.tabbar{width:WPX}.call-bar{width:WPX}.shscr{width:WPX;right:auto}.sheet-in{max-width:WPX}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:WPX}</style></head>""".replace('WPX', W + 'px'), 1)
+src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:WPX;margin:0;overflow:visible}.sheet{right:auto;width:WPX}.hdr{width:WPX}.tabbar{width:WPX}.call-bar{width:WPX}.shscr{width:WPX;right:auto}.inc{width:WPX;right:auto}.sheet-in{max-width:WPX}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:WPX}</style></head>""".replace('WPX', W + 'px'), 1)
 src = src.replace("</body>", '<div id="sterr"></div></body>', 1)
 # для снимков журнал стенда мешает: длинные строки растягивают страницу шире 390
 src = src.replace("</head>", "<script>if(new URLSearchParams(location.search).get('nolog'))document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sterr');if(e)e.style.display='none'});</script></head>", 1)

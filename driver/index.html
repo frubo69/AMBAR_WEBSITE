@@ -912,10 +912,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Смена — по макету владельца: три шага лентой слева (кружок + линия), у каждого
    карточка с заголовком, подписью, плашкой состояния и вложенной строкой, куда
    можно перейти. Ниже — золотая кнопка и подпись, когда она оживёт. */
-.stq{display:flex;align-items:center;gap:8px;padding:2px 2px 12px;font-size:13px;color:var(--muted)}
-.stq b{font-weight:700;color:var(--text)}
-.stq i{width:7px;height:7px;border-radius:50%;background:var(--dim);font-style:normal}
-.stq i.run{background:var(--up);box-shadow:0 0 0 3px rgba(76,175,125,.18)}
 .st{display:flex;gap:12px;margin:0 0 14px;position:relative}
 .st-l{flex:0 0 30px;position:relative}
 .st-c{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -924,7 +920,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .st.now .st-c{border-color:var(--gold2);color:var(--gold2);background:rgba(201,169,110,.10)}
 .st-l::after{content:'';position:absolute;left:14px;top:32px;bottom:-16px;width:2px;background:var(--border3)}
 .st.ok .st-l::after{background:rgba(62,156,110,.55)}
-.st:last-child .st-l::after{display:none}
+.stl .st:last-child .st-l::after{display:none}
 .st-b{flex:1;min-width:0;padding:13px 13px 12px;border-radius:18px;background:rgba(255,255,255,.025);
   border:1px solid var(--border2)}
 .st.ok .st-b{background:rgba(62,156,110,.06);border-color:rgba(62,156,110,.28)}
@@ -948,13 +944,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .st-r b{display:block;font-size:14px;font-weight:600;color:var(--text);line-height:1.25}
 .st-r i{display:block;margin-top:2px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--muted)}
 .st-r em{flex:0 0 auto;display:flex;color:var(--muted)}
-.st-go{width:100%;height:52px;margin:10px 0 0;border-radius:16px;border:0;font-family:inherit;font-size:17px;font-weight:700;
+.st-go{width:100%;height:52px;margin:0;border-radius:16px;border:0;font-family:inherit;font-size:17px;font-weight:700;
   color:#1a1508;background:linear-gradient(135deg,var(--gold),var(--gold2));cursor:pointer;
   box-shadow:0 10px 26px rgba(201,169,110,.22)}
 .st-go:active{transform:scale(.99)}
 .st-go[disabled]{background:linear-gradient(135deg,rgba(201,169,110,.45),rgba(232,201,138,.45));color:rgba(26,21,8,.75);
   box-shadow:none;cursor:default}
-.st-note{margin:12px 0 0;text-align:center;font-size:13px;line-height:1.4;color:var(--muted)}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
@@ -7254,7 +7249,7 @@ function renderShift(){
     note = canOpen ? 'Всё готово — можно открывать' : 'Кнопка станет активной, когда все шаги будут выполнены';
     status = SH.closed ? `<i></i>Смена закрыта в <b>${hhmm(SH.closed_at)}</b>` : `<i></i>Смена не открыта`;
   }
-  box.innerHTML = `<div class="stq">${status}</div>${steps}${btn}<div class="st-note">${note}</div>`;
+  box.innerHTML = `<div class="stl">${steps}</div><div class="dv-sp"></div><div class="dv-foot">${btn}</div>`;
 }
 
 function renderExpenses(){

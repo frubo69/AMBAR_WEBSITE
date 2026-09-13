@@ -1359,6 +1359,29 @@ async def handle_pay_item_edit(request):
 
 
 @require_owner
+async def handle_pay_item_restore(request):
+    """POST {id, month, as} — вернуть отменённый штраф или удержание: снова
+    снимается с зарплаты, пометка об отмене уходит."""
+    try:
+        body = await request.json()
+        iid = str(body.get("id") or "")
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    old = await db.fin_pay_item_get(iid)
+    if not old:
+        return _json({"error": "not_found"}, 404)
+    if old.get("kind") not in pay.PENALTY_KINDS:
+        return _json({"error": "not_penalty"}, 400)
+    if old.get("cancelled_at"):
+        await db.fin_pay_item_set(iid, {"cancelled_at": None, "cancelled_by": "",
+                                        "restored_at": datetime.now(timezone.utc), "restored_by": _who(body)})
+        await _touch(min(month, str(old.get("from") or old.get("day") or month)[:7]))
+        log.info(f"[fin] зарплаты: {old.get('name')} {pay.KINDS.get(old.get('kind'), '')} {old.get('amount')} возвращён · {_who(body) or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
 async def handle_pay_out(request):
     """POST {name, amount, day, month, note, as} — выплата зарплаты из фонда:
     деньги выходят днём day, зарплата — за месяц month (по умолчанию месяц дня)."""
@@ -1416,6 +1439,7 @@ def setup(app):
         ("/api/owner/finance/book/pay/item", handle_pay_item_add, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_del, "DELETE"),
         ("/api/owner/finance/book/pay/item/edit", handle_pay_item_edit, "POST"),
+        ("/api/owner/finance/book/pay/item/restore", handle_pay_item_restore, "POST"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),
     )
     seen = set()

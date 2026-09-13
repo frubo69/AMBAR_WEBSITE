@@ -217,7 +217,7 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     }
     // пересмотр из истории: penedit=N (N-я неотменённая строка), дальше penamt/penhow/penmonths/pencmt и pensave=1 или pencancel=1
     if(Q.get('penedit') !== null){
-      const r = [...document.querySelectorAll('#accMid .fb-ph-row:not(.off)')][+Q.get('penedit')];
+      const r = [...document.querySelectorAll('#accMid .fb-ph-r')][+Q.get('penedit')];
       if(r) r.click(); else log('SCENARIO no hist row'); await W(400);
       if(Q.get('penamt')){ const a = document.getElementById('fbPenAmt'); a.value = Q.get('penamt'); a.dispatchEvent(new Event('input')); }
       if(Q.get('penhow')){ fbPenHow(Q.get('penhow')); await W(100); }

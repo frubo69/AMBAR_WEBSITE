@@ -296,7 +296,8 @@ async def main():
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month="2026-13", field="storage", value=1)))
     eq("bad month → 400", r.status, 400)
     inner2 = {n: getattr(fr, n) for n in ("handle_budget_set", "handle_budget_del", "handle_budget_fill",
-                                            "handle_pay_item_add", "handle_pay_item_del", "handle_pay_item_edit", "handle_pay_out",
+                                            "handle_pay_item_add", "handle_pay_item_del", "handle_pay_item_edit",
+                                            "handle_pay_item_restore", "handle_pay_out",
                                             "handle_pay_month_set", "handle_pay_person")}
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=50, line="zzz")))
     eq("entry: чужая строка бюджета → 400", r.status, 400)
@@ -497,6 +498,15 @@ async def main():
     eq("отменённый не пересматривается → 409", r.status, 409)
     r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id=hold_id, month=M)))
     eq("повторная отмена — без ошибки", r.status, 200)
+    r = await raw(inner2["handle_pay_item_restore"])(_req("POST", dict(id=hold_id, month=M, **{"as": "Вл"})))
+    book = json.loads(r.text)["book"]
+    ali2 = next(p_ for p_ in book["pay"]["people"] if p_["name"] == "Али")
+    hb = next(x for x in book["pay"]["history"] if x["id"] == hold_id)
+    eq("вернуть отменённое: снова в расчёте и без пометки",
+       (r.status, WRITES[-1][2]["cancelled_at"], WRITES[-1][2]["restored_by"], hb["cancelled"], any(it["id"] == hold_id for it in ali2["items"])),
+       (200, None, "Вл", False, True))
+    r = await raw(inner2["handle_pay_item_restore"])(_req("POST", dict(id="i2", month=M)))
+    eq("аванс не возвращается → 400", r.status, 400)
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="bad", amount=1)))
     eq("плохой вид → 400", r.status, 400)
     r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id="i2", month=M)))

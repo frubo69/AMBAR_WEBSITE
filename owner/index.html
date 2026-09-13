@@ -3319,9 +3319,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-ph-st.off{color:#BCBDC8;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13)}
 .fb-ph-r .fb-chev{width:26px;height:26px;margin:11px 0 0 -2px;color:#F0C97E;
   background:linear-gradient(135deg,rgba(201,169,110,.34),rgba(201,169,110,.14))}
-.fb-ph-r.off{cursor:default}
 .fb-ph-r.off .fb-ph-b,.fb-ph-r.off .fb-ph-i{opacity:.55}
 .fb-ph-r.off .fb-ph-r2 b{color:#8A8A97;text-decoration:line-through}
+.fb-ph-r.off .fb-chev{color:#9A9AA6;background:rgba(255,255,255,.06)}
+.fb-pen-val{font-size:16px;font-weight:700;color:#F1F1F6;font-variant-numeric:tabular-nums}
+.fb-pen-val.sub{font-size:14px;font-weight:500;color:#C4C4CF}
 .fb-ph-none{padding:6px 6px 18px;font-size:13.5px;color:#858592}
 .fb-ph-more{display:block;width:100%;height:46px;margin:2px 0 10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;
   background:#12122a;color:var(--gold2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
@@ -20123,14 +20125,13 @@ function fbPenHistRow(h, hide){
   const title = parts[0] || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
   const det = [parts.slice(1).join(' · '), h.note].filter(Boolean).join(' · ');
   const sub = fbPenSubOf(h.name, true);
-  const tag = h.cancelled ? 'div' : 'button';
-  return `<${tag} class="fb-ph-r${h.cancelled ? ' off' : ''}"${hide ? ' hidden' : ''}${h.cancelled ? '' : ` onclick="fbPenEdit('${escS(h.id)}')"`}>
+  return `<button class="fb-ph-r${h.cancelled ? ' off' : ''}"${hide ? ' hidden' : ''} onclick="fbPenEdit('${escS(h.id)}')">
       <em class="fb-ph-i">${icon}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
       <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${fbFmt(h.amount)} AED</b>
         <i class="fb-ph-st ${st}">${FB_PH_ST[st]}</i></span>
-      ${h.cancelled ? '' : `<em class="fb-chev">${_SC_CHEV}</em>`}</${tag}>`;
+      <em class="fb-chev">${_SC_CHEV}</em></button>`;
 }
 function fbPenHistDay(day){ return day ? `${fbDayT(day)} ${String(day).slice(0, 4)}` : ''; }
 function fbPhMenu(){
@@ -20216,7 +20217,12 @@ function fbPenGo(step, anim){
   }
   else if(step === 'fine'){ title = 'Назначить штраф'; html = fbPenFineHtml(cat, vio, tier); back = () => fbPenGo('who', 'back'); }
   else if(step === 'hold'){ title = 'Удержание'; html = fbPenHoldHtml(); back = () => fbPenGo('who', 'back'); }
-  else if(step === 'edit'){ title = P.item.kind === 'hold' ? 'Пересмотреть удержание' : 'Пересмотреть штраф'; html = fbPenEditHtml(P.item); back = fbPenExit; }
+  else if(step === 'edit'){
+    const it = P.item, чего = it.kind === 'hold' ? 'удержание' : 'штраф';
+    title = it.cancelled ? (it.kind === 'hold' ? 'Отменённое удержание' : 'Отменённый штраф')
+                         : 'Пересмотреть ' + чего;
+    html = fbPenEditHtml(it); back = fbPenExit;
+  }
   fbPenUi(true);
   _setText('accTitle', title); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
@@ -20357,7 +20363,7 @@ function fbPenCatOf(h){
 }
 function fbPenEdit(id){
   const b = fbBook(FB.month); if(!b) return;
-  const h = (fbCur(b).history || []).find(x => x.id === id); if(!h || h.cancelled) return;
+  const h = (fbCur(b).history || []).find(x => x.id === id); if(!h) return;
   const parts = h.per_month > 0 && h.per_month < h.amount;
   FB.pen = {mode: 'edit', item: h, how: parts ? 'parts' : 'once', months: parts ? Math.max(2, Math.ceil(h.amount / h.per_month)) : 2,
             who: {name: h.name, sub: fbPenSubOf(h.name) || (h.kind === 'hold' ? 'Удержание' : 'Штраф')}};
@@ -20378,10 +20384,17 @@ function fbPenEditHtml(h){
       <span class="fb-pen-cb"><b>${fbPenNb(escS(h.reason || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф')))}</b>
         <i class="fb-pen-cs">${escS(meta)}</i>${was}</span></div>
     ${fbPenWhoCard(false)}
-    ${fbPenHowCard()}
-    <div class="fb-pen-card fb-pen-form">${fbPenAmtSec(h.amount)}${fbPenCmtSec(h.note)}</div>
-    <button class="fb-pen-go" onclick="fbPenSave()">Сохранить</button>
-    <button class="fb-pen-del" onclick="fbPenCancel()">Отменить ${what}</button>`;
+    ${h.cancelled ? `<div class="fb-pen-card fb-pen-form">
+        <div class="fb-pen-sec"><div class="fb-pen-cap">Сумма</div><div class="fb-pen-val">${fbFmt(h.amount)} AED</div></div>
+        ${h.note ? `<div class="fb-pen-sec"><div class="fb-pen-cap">Комментарий</div><div class="fb-pen-val sub">${escS(h.note)}</div></div>` : ''}
+        <div class="fb-pen-sec"><div class="fb-pen-cap">Отменён</div><div class="fb-pen-val sub">${
+          escS([fbPenHistDay(h.cancelled_day), h.cancelled_by].filter(Boolean).join(' · ') || 'отменён')}</div></div>
+      </div>
+      <button class="fb-pen-go" onclick="fbPenRestore()">Вернуть ${what}</button>`
+    : `${fbPenHowCard()}
+      <div class="fb-pen-card fb-pen-form">${fbPenAmtSec(h.amount)}${fbPenCmtSec(h.note)}</div>
+      <button class="fb-pen-go" onclick="fbPenSave()">Сохранить</button>
+      <button class="fb-pen-del" onclick="fbPenCancel()">Отменить ${what}</button>`}`;
 }
 async function fbPenSave(){
   if(!fbPenOn() || FB.pen.busy || FB.pen.mode !== 'edit') return;
@@ -20400,6 +20413,22 @@ async function fbPenSave(){
   }catch(e){
     P.busy = false;
     _toast('Не удалось сохранить');
+  }
+}
+async function fbPenRestore(){
+  if(!fbPenOn() || FB.pen.busy || FB.pen.mode !== 'edit') return;
+  const P = FB.pen, h = P.item, what = h.kind === 'hold' ? 'Удержание' : 'Штраф';
+  P.busy = true;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/item/restore',
+      {method: 'POST', body: {id: h.id, month: FB.month, as: _meName()}});
+    if(res.book) fbApply(res.book);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    fbPenExit();
+    _toast(`${what === 'Штраф' ? 'Штраф возвращён' : 'Удержание возвращено'} · ${h.name}`);
+  }catch(e){
+    P.busy = false;
+    _toast('Не удалось вернуть');
   }
 }
 async function fbPenCancel(){

@@ -23,6 +23,7 @@ from finance_calc import _n, _i
 KINDS = {'fine': 'Штраф', 'advance': 'Аванс', 'loan': 'Долг', 'bonus': 'Премия', 'hold': 'Удержание'}
 CASH_KINDS = ('advance', 'loan')            # деньги выданы на руки — расход фонда
 MINUS_KINDS = ('fine', 'advance', 'loan', 'hold')   # снимаются с зарплаты
+PENALTY_KINDS = ('fine', 'hold')   # «Штрафы и удержания»: пересматриваются и отменяются без стирания
 PAY_KINDS = ('salary', 'advance', 'loan')  # записи фонда, которые считаются зарплатами
 ROLES = ('other', 'senior', 'operator', 'driver')      # руководство первым, как в тетради
 ROLE_T = {'other': 'Старшие', 'senior': 'Старший оператор', 'operator': 'Операторы', 'driver': 'Водители'}
@@ -78,6 +79,8 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
     accrued = rate_aed if unit == 'month' else rate_aed * _n(days)
     rows, plus, minus, debt = [], 0.0, 0.0, 0.0
     for it in items:
+        if it.get('cancelled_at'):             # отменённый штраф — только в истории
+            continue
         s = schedule(it, month)
         if it.get('kind') == 'bonus':
             plus += s['due']

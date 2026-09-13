@@ -181,6 +181,10 @@ async def fin_pay_items_get(): return [dict(i) for i in ITEMS]
 async def fin_pay_item_add(doc): ITEMS.append(dict(doc))
 async def fin_pay_item_get(iid): return next((dict(i) for i in ITEMS if i["_id"] == iid), None)
 async def fin_pay_item_del(iid): ITEMS[:] = [i for i in ITEMS if i["_id"] != iid]; return True
+async def fin_pay_item_set(iid, fields):
+    for i in ITEMS:
+        if i["_id"] == iid: i.update(fields); return True
+    return False
 async def shift_days_worked(a, b): return [x for x in SHIFTS if a <= x[0] <= b]
 async def fin_entries_where(q): return [dict(e) for e in ENTRIES if all(e.get(k) == v for k, v in q.items())]
 async def fin_carry_invalidate(m):
@@ -190,7 +194,7 @@ for n_, f in dict(fin_budget_get=fin_budget_get, fin_budget_line_get=fin_budget_
                   fin_budget_del=fin_budget_del, fin_people_get=fin_people_get, fin_person_set=fin_person_set,
                   fin_pay_months_upto=fin_pay_months_upto, fin_pay_month_set=fin_pay_month_set,
                   fin_pay_items_get=fin_pay_items_get, fin_pay_item_add=fin_pay_item_add, fin_pay_item_get=fin_pay_item_get,
-                  fin_pay_item_del=fin_pay_item_del, shift_days_worked=shift_days_worked,
+                  fin_pay_item_del=fin_pay_item_del, fin_pay_item_set=fin_pay_item_set, shift_days_worked=shift_days_worked,
                   fin_entries_where=fin_entries_where, fin_carry_invalidate=fin_carry_invalidate).items():
     setattr(db, n_, f)
 import types

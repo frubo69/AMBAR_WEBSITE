@@ -4871,6 +4871,14 @@ async def fin_pay_item_get(iid: str) -> dict | None:
     return await d.fin_pay_items.find_one({"_id": iid})
 
 
+async def fin_pay_item_set(iid: str, fields: dict) -> bool:
+    """Пересмотр или отмена штрафа: запись остаётся, меняются поля."""
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.fin_pay_items.update_one({"_id": iid}, {"$set": fields})
+    return bool(r.matched_count)
+
+
 async def fin_pay_item_del(iid: str) -> bool:
     d = _db_or_none()
     if d is None: return False

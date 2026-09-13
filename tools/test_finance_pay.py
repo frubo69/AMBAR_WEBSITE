@@ -42,6 +42,9 @@ rh = fp.person_month(dict(name="Х", role="driver"), "2026-09", dict(rate=3000, 
                      [], 3.67)
 eq("удержание снимается как штраф; штраф по частям — 300 в этом месяце", (rh["minus"], rh["to_pay"], rh["debt"]), (550, 2450, 300))
 eq("вид и причина в строках", [(x["t"], x["reason"]) for x in rh["items"]], [("Удержание", ""), ("Штраф", "Превышение скорости · 20 – 30 км/ч")])
+rc = fp.person_month(dict(name="Х", role="driver"), "2026-09", dict(rate=3000, unit="month", cur="AED"), 0,
+                     [dict(_id="h", kind="hold", amount=250, per_month=0, **{"from": "2026-09"}, cancelled_at="2026-09-13T01:00:00")], [], 3.67)
+eq("отменённое удержание не снимается и не в строках", (rc["minus"], len(rc["items"])), (0, 0))
 r2 = fp.person_month(dict(name="В", role="driver"), "2026-09", dict(rate=150, unit="day", cur="AED", days=10), 25, [], [], 3.67)
 eq("ставка в день × вписанные дни: 150 × 10", (r2["accrued"], r2["days"], r2["days_set"], r2["days_auto"]), (1500, 10, True, 25))
 r3 = fp.person_month(dict(name="С", role="operator"), "2026-09", dict(rate=None), 0, [], [], 3.67)

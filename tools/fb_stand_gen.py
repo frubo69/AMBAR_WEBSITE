@@ -215,6 +215,17 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
       if(Q.get('penapply')){ tap('#fbPenBody .fb-pen-go'); await W(1500); }
       for(let i = 0; i < +(Q.get('penback') || 0); i++){ accBack(); await W(350); }
     }
+    // пересмотр из истории: penedit=N (N-я неотменённая строка), дальше penamt/penhow/penmonths/pencmt и pensave=1 или pencancel=1
+    if(Q.get('penedit') !== null){
+      const r = [...document.querySelectorAll('#accMid .fb-ph-row:not(.off)')][+Q.get('penedit')];
+      if(r) r.click(); else log('SCENARIO no hist row'); await W(400);
+      if(Q.get('penamt')){ const a = document.getElementById('fbPenAmt'); a.value = Q.get('penamt'); a.dispatchEvent(new Event('input')); }
+      if(Q.get('penhow')){ fbPenHow(Q.get('penhow')); await W(100); }
+      if(Q.get('penmonths')){ fbPenMonths(+Q.get('penmonths')); await W(100); }
+      if(Q.get('pencmt') !== null){ document.getElementById('fbPenCmt').value = Q.get('pencmt'); }
+      if(Q.get('pensave')){ tap('#fbPenBody .fb-pen-go'); await W(1500); }
+      if(Q.get('pencancel')){ tap('#fbPenBody .fb-pen-del'); await W(300); if(document.getElementById('askOk')) document.getElementById('askOk').click(); await W(1500); }
+    }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {

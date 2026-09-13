@@ -630,7 +630,32 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     for r in res["people"]:
         p = next((x for x in people if x["name"] == r["name"]), {})
         r["pnote"] = p.get("pnote", "")
+    res["history"] = _penalty_history(items, month)
     return res
+
+
+def _penalty_history(items: list, month: str, limit: int = 60) -> list:
+    """История штрафов и удержаний для «Штрафов/авансов/долгов»: последние
+    сверху, отменённые и пересмотренные — с пометкой. От людей не зависит: кого
+    убрали из зарплат, того штрафы тоже видно."""
+    out = []
+    for it in sorted(items, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
+        if it.get("kind") not in pay.PENALTY_KINDS:
+            continue
+        s = pay.schedule(it, month)
+        gone = bool(it.get("cancelled_at"))
+        out.append(dict(id=str(it.get("_id")), name=it.get("name") or "", kind=it.get("kind"),
+                        t=pay.KINDS.get(it.get("kind"), ""), amount=pay._i(pay._n(it.get("amount"))),
+                        per_month=pay._i(pay._n(it.get("per_month"))), start=str(it.get("from") or "")[:7],
+                        day=it.get("day") or "", note=it.get("note") or "", reason=it.get("reason") or "",
+                        by=it.get("by") or "", cancelled=gone, cancelled_by=it.get("cancelled_by") or "",
+                        cancelled_day=str(it.get("cancelled_at") or "")[:10],
+                        revised=bool(it.get("revised_at")), revised_by=it.get("revised_by") or "",
+                        was=None if it.get("was") is None else pay._i(pay._n(it.get("was"))),
+                        left=0 if gone else s["after"], done=False if gone else s["done"]))
+        if len(out) >= limit:
+            break
+    return out
 
 
 # ── Месяц целиком ────────────────────────────────────────────────────────────
@@ -1281,11 +1306,55 @@ async def handle_pay_item_del(request):
     old = await db.fin_pay_item_get(iid)
     if not old:
         return _json({"error": "not_found"}, 404)
-    await db.fin_pay_item_del(iid)
-    if old.get("entry"):
-        await db.fin_entry_del(str(old["entry"]))
-    await _touch(min(month, str(old.get("day") or month)[:7]))
-    log.info(f"[fin] зарплаты: {old.get('name')} {old.get('kind')} {old.get('amount')} убрано · {_who(body) or '—'}")
+    if old.get("kind") in pay.PENALTY_KINDS:
+        # штраф и удержание не стираются: отменённый остаётся в истории
+        if not old.get("cancelled_at"):
+            await db.fin_pay_item_set(iid, {"cancelled_at": datetime.now(timezone.utc), "cancelled_by": _who(body)})
+    else:
+        await db.fin_pay_item_del(iid)
+        if old.get("entry"):
+            await db.fin_entry_del(str(old["entry"]))
+    await _touch(min(month, str(old.get("from") or old.get("day") or month)[:7]))
+    log.info(f"[fin] зарплаты: {old.get('name')} {old.get('kind')} {old.get('amount')} "
+             f"{'отменено' if old.get('kind') in pay.PENALTY_KINDS else 'убрано'} · {_who(body) or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
+async def handle_pay_item_edit(request):
+    """POST {id, amount, per_month, note, month, as} — пересмотреть штраф или
+    удержание: сумма, график, комментарий. Аванс и долг так не правятся — за ними
+    запись расхода фонда. Первая сумма запоминается в was — в истории «было»."""
+    try:
+        body = await request.json()
+        iid = str(body.get("id") or "")
+        amount = _num(body.get("amount"))
+        if amount is None or amount <= 0:
+            return _json({"error": "bad_amount"}, 400)
+        per_month = _num(body.get("per_month")) or 0
+        if per_month < 0:
+            return _json({"error": "bad_number"}, 400)
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    old = await db.fin_pay_item_get(iid)
+    if not old:
+        return _json({"error": "not_found"}, 404)
+    if old.get("kind") not in pay.PENALTY_KINDS:
+        return _json({"error": "not_penalty"}, 400)
+    if old.get("cancelled_at"):
+        return _json({"error": "cancelled"}, 409)
+    note = body.get("note")
+    fields = {"amount": amount, "per_month": per_month if per_month < amount else 0,
+              "note": str(old.get("note") or "" if note is None else note).strip()[:80],
+              "revised_at": datetime.now(timezone.utc), "revised_by": _who(body)}
+    if _num(old.get("amount")) != amount and old.get("was") is None:
+        fields["was"] = old.get("amount")
+    await db.fin_pay_item_set(iid, fields)
+    await _touch(min(month, str(old.get("from") or old.get("day") or month)[:7]))
+    parts = f" по {fields['per_month']}/мес" if fields["per_month"] else ""
+    log.info(f"[fin] зарплаты: {old.get('name')} {pay.KINDS.get(old.get('kind'), '')} пересмотрен "
+             f"{old.get('amount')} → {amount}{parts} · {_who(body) or '—'}")
     return _json({"ok": True, "book": await build(month)})
 
 
@@ -1346,6 +1415,7 @@ def setup(app):
         ("/api/owner/finance/book/pay/order", handle_pay_order, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_add, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_del, "DELETE"),
+        ("/api/owner/finance/book/pay/item/edit", handle_pay_item_edit, "POST"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),
     )
     seen = set()

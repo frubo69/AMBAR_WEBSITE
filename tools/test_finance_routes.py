@@ -107,12 +107,17 @@ async def fin_pay_items_get(): return [dict(i) for i in ITEMS]
 async def fin_pay_item_add(doc): WRITES.append(("item", doc)); ITEMS.append(dict(doc))
 async def fin_pay_item_get(iid): return next((dict(i) for i in ITEMS if i["_id"] == iid), None)
 async def fin_pay_item_del(iid): WRITES.append(("idel", iid)); ITEMS[:] = [i for i in ITEMS if i["_id"] != iid]; return True
+async def fin_pay_item_set(iid, fields):
+    WRITES.append(("iset", iid, dict(fields)))
+    for i in ITEMS:
+        if i["_id"] == iid: i.update(fields); return True
+    return False
 async def shift_days_worked(a, b): return [x for x in SHIFTS if a <= x[0] <= b]
 for n, f in dict(fin_budget_get=fin_budget_get, fin_budget_line_get=fin_budget_line_get, fin_budget_set=fin_budget_set,
                  fin_budget_del=fin_budget_del, fin_people_get=fin_people_get, fin_person_set=fin_person_set,
                  fin_pay_months_upto=fin_pay_months_upto, fin_pay_month_set=fin_pay_month_set,
                  fin_pay_items_get=fin_pay_items_get, fin_pay_item_add=fin_pay_item_add, fin_pay_item_get=fin_pay_item_get,
-                 fin_pay_item_del=fin_pay_item_del, shift_days_worked=shift_days_worked).items():
+                 fin_pay_item_del=fin_pay_item_del, fin_pay_item_set=fin_pay_item_set, shift_days_worked=shift_days_worked).items():
     setattr(db, n, f)
 import types
 _rates = types.ModuleType("rates")
@@ -291,7 +296,7 @@ async def main():
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month="2026-13", field="storage", value=1)))
     eq("bad month → 400", r.status, 400)
     inner2 = {n: getattr(fr, n) for n in ("handle_budget_set", "handle_budget_del", "handle_budget_fill",
-                                            "handle_pay_item_add", "handle_pay_item_del", "handle_pay_out",
+                                            "handle_pay_item_add", "handle_pay_item_del", "handle_pay_item_edit", "handle_pay_out",
                                             "handle_pay_month_set", "handle_pay_person")}
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=50, line="zzz")))
     eq("entry: чужая строка бюджета → 400", r.status, 400)
@@ -461,6 +466,37 @@ async def main():
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="hold", amount=250, note="бой")))
     eq("свободное удержание: вид hold, без записи расхода, без причины", (r.status, WRITES[-1][0], WRITES[-1][1]["kind"], WRITES[-1][1]["entry"], "reason" in WRITES[-1][1]),
        (200, "item", "hold", "", False))
+    hold_id = WRITES[-1][1]["_id"]
+    fine_id = next(w[1]["_id"] for w in reversed(WRITES) if w[0] == "item" and w[1].get("reason"))
+    # пересмотр: сумма и график меняются, первая сумма запоминается
+    r = await raw(inner2["handle_pay_item_edit"])(_req("POST", dict(id=fine_id, amount=400, per_month=200, note="снизили", month=M, **{"as": "Вл"})))
+    eq("пересмотр штрафа: сумма, по частям, комментарий, было 600", (r.status, WRITES[-1][0], WRITES[-1][2]["amount"], WRITES[-1][2]["per_month"],
+       WRITES[-1][2]["note"], WRITES[-1][2]["was"], WRITES[-1][2]["revised_by"]), (200, "iset", 400, 200, "снизили", 600, "Вл"))
+    r = await raw(inner2["handle_pay_item_edit"])(_req("POST", dict(id=fine_id, amount=300, per_month=500, month=M)))
+    eq("второй пересмотр: «было» остаётся первым, шаг больше суммы → разово, комментарий прежний",
+       (r.status, "was" in WRITES[-1][2], WRITES[-1][2]["per_month"], WRITES[-1][2]["note"]), (200, False, 0, "снизили"))
+    hist = json.loads(r.text)["book"]["pay"]["history"]
+    h = next(x for x in hist if x["id"] == fine_id)
+    eq("история: пересмотрен, было 600, сейчас 300, причина", (h["revised"], h["was"], h["amount"], h["reason"], h["cancelled"]),
+       (True, 600, 300, "Превышение скорости · 20 – 30 км/ч", False))
+    r = await raw(inner2["handle_pay_item_edit"])(_req("POST", dict(id="i2", amount=100, month=M)))
+    eq("аванс так не пересматривается → 400", r.status, 400)
+    r = await raw(inner2["handle_pay_item_edit"])(_req("POST", dict(id=fine_id, amount=0, month=M)))
+    eq("пересмотр без суммы → 400", r.status, 400)
+    # отмена: запись не стирается, из расчёта уходит, в истории — отменён
+    minus_before = next(p_ for p_ in json.loads(r.text if False else (await raw(inner2["handle_pay_item_edit"])(_req("POST", dict(id=hold_id, amount=250, month=M)))).text)["book"]["pay"]["people"] if p_["name"] == "Али")["minus"]
+    r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id=hold_id, month=M, **{"as": "Вл"})))
+    book = json.loads(r.text)["book"]
+    ali = next(p_ for p_ in book["pay"]["people"] if p_["name"] == "Али")
+    hh = next(x for x in book["pay"]["history"] if x["id"] == hold_id)
+    eq("отмена удержания: не стёрто, помечено, из расчёта −250, в истории отменён",
+       (r.status, WRITES[-1][0], "cancelled_at" in WRITES[-1][2], any(i["_id"] == hold_id for i in ITEMS), minus_before - ali["minus"],
+        hh["cancelled"], hh["cancelled_by"], any(it["id"] == hold_id for it in ali["items"])),
+       (200, "iset", True, True, 250, True, "Вл", False))
+    r = await raw(inner2["handle_pay_item_edit"])(_req("POST", dict(id=hold_id, amount=10, month=M)))
+    eq("отменённый не пересматривается → 409", r.status, 409)
+    r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id=hold_id, month=M)))
+    eq("повторная отмена — без ошибки", r.status, 200)
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="bad", amount=1)))
     eq("плохой вид → 400", r.status, 400)
     r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id="i2", month=M)))

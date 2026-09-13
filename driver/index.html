@@ -482,29 +482,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .oc-foot .btn{flex:1}
 .oc-owe{display:flex;align-items:center;gap:11px;background:var(--warn-soft);
   border-top:1px solid rgba(255,255,255,.05);padding:12px 16px}
-/* Лист валют: строка на валюту, сумма в ней крупно, курс подписью. */
-.fx-q{width:100%;padding:12px 13px;border-radius:12px;margin:0 0 10px;font-family:inherit;font-size:15px;
-  color:var(--text);background:var(--bg2);border:1px solid var(--border2);outline:none}
-.fx-q:focus{border-color:rgba(201,169,110,.5)}
-.fx-list{max-height:52dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;padding:0 2px}
-.fx-r{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 12px;border-radius:13px;
-  border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;text-align:left;
-  cursor:pointer}
-.fx-r + .fx-r{border-top-color:rgba(255,255,255,.05)}
-.fx-r:active{background:var(--card2)}
-.fx-r.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45)}
-.fx-c{flex:0 0 46px;width:46px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
-  font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--gold2);background:var(--card2);
-  border:1px solid var(--border3)}
-.fx-b{flex:1;min-width:0}
-.fx-b b{display:block;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fx-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
-.fx-v{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;
-  color:var(--gold2);letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.fx-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);
-  margin-left:4px}
-.fx-grp{font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);
-  padding:10px 12px 4px}
+
 /* Плитки каталога при правке состава — как в заявке на другую базу у старшего:
    фото, название, цена; тап по фото кладёт одну, «−» и «+» правят число. */
 .pt-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:2px 0 10px}
@@ -3204,6 +3182,8 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .fxf button.on{background:var(--gold2);border-color:var(--gold2);color:#15130d;font-weight:700}
 .fxr{margin:0 0 5px;border-radius:14px;background:var(--card2);border:1px solid rgba(255,255,255,.05)}
 .fxr.hot{border-color:rgba(201,169,110,.5);background:linear-gradient(180deg,rgba(201,169,110,.10),rgba(201,169,110,.04))}
+/* Выбор валюты оплаты идёт на этой же странице: выбранная — золотой рамкой. */
+.fxr.sel{border-color:var(--gold2);background:var(--gold-soft)}
 .fxr-h{display:flex;align-items:center;gap:10px;width:100%;height:54px;padding:0 10px;border:0;background:none;
   font-family:inherit;text-align:left;cursor:pointer}
 .fxr.open .fxr-h{height:52px}
@@ -3603,24 +3583,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   </div>
 </div>
 
-<!-- Клиент платит валютой: список валют с суммой заказа в каждой, курс из
-     «Финансов». Выбор замораживает курс; сменить можно, пока заказ в пути. -->
-<div class="sheet" id="fxSheet" onclick="if(event.target===this)fxClose()">
-  <div class="sheet-in">
-    <div class="sheet-hd">
-      <div style="flex:1;min-width:0">
-        <div class="sheet-t">Валюта оплаты</div>
-        <div class="sheet-s" id="fxFor">—</div>
-      </div>
-      <button class="sheet-x" onclick="fxClose()" aria-label="Закрыть">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off" oninput="fxRender()">
-    <div class="fx-list" id="fxList"><div class="empty" style="padding:18px">Загрузка курсов…</div></div>
-  </div>
-</div>
 
 <!-- Списание: бой, брак, просрочка, потеря. Фотография обязательна — это
      единственное, что отличает списание от способа закрыть недостачу. -->
@@ -4531,7 +4493,7 @@ function setTab(t){
   hdrPage('');                         // страницы профиля, истории и расходов поставят свою сами
   // Нажатие на вкладку — это её корень: вложенная страница, где человек был
   // до этого, не должна встречать его при возврате.
-  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false; XP_PARK_EDIT = '';
+  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false; XP_PARK_EDIT = ''; FX_PICK = null;
   document.body.classList.remove('xp-on');
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'profile'){ profPaint(); profLoad(); }
@@ -4613,11 +4575,11 @@ async function fxdLoad(again){
   try{ FXD = await drvApi.drvFetch('/api/driver/rates'); FXD_ERR = ''; }
   catch(e){
     FXD = null; FXD_ERR = errText(e);
-    if(!again) setTimeout(() => { if(TAB === 'profile') fxdLoad(true); }, 2000);
+    if(!again) setTimeout(() => { if(TAB === 'profile' || FX_PICK) fxdLoad(true); }, 2000);
   }
-  if(TAB === 'profile') profPaint();
+  if(TAB === 'profile' || FX_PICK) fxdPaint();
 }
-function fxdRetry(){ FXD_ERR = ''; profPaint(); fxdLoad(); }
+function fxdRetry(){ FXD_ERR = ''; fxdPaint(); fxdLoad(); }
 function fxdN(v){ return v >= 1 ? (+v).toFixed(3) : (+v).toFixed(4); }
 function fxdMain(){
   const r = ((FXD && FXD.rates) || []).find(x => x.code === 'USD') || ((FXD && FXD.rates) || [])[0];
@@ -4632,12 +4594,18 @@ function fxdWhen(iso){
 }
 function profRates(){ PROF_PAGE = 'rates'; FXD_Q = ''; FXD_F = 'all'; FXD_OPEN = ''; profPaint(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
 function profBack(){
+  if(FX_PICK){ fxClose(); window.scrollTo({top: 0}); return; }   // со страницы выбора валюты — к заказу
   PROF_PAGE = PROF_PAGE === 'item' ? 'hist' : '';   // из карточки списания — назад в историю
   HS_MOPEN = false; profPaint(); window.scrollTo({top: 0});
 }
 function fxdFind(v){ FXD_Q = v; fxdPaintList(); }
-function fxdPick(k){ FXD_F = k; profPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
-function fxdOpen(code){ FXD_OPEN = FXD_OPEN === code ? '' : code; fxdPaintList(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
+function fxdPaint(){ if(FX_PICK) renderOrders(); else profPaint(); }
+function fxdPick(k){ FXD_F = k; fxdPaint(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
+// На странице выбора нажатие на курс — это выбор валюты для заказа.
+function fxdOpen(code){
+  if(FX_PICK){ fxPick(code); return; }
+  FXD_OPEN = FXD_OPEN === code ? '' : code; fxdPaintList(); try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
 function fxdPaintList(){ const b = document.getElementById('pfFxList'); if(b) b.innerHTML = fxdRows(); }
 // Флаг — своим рисунком, без эмодзи: узнаваемая полоска, а не картинка страны
 const FXD_FLAG = {
@@ -4709,7 +4677,8 @@ function fxdRows(){
   return shown.map((r, i) => {
     const ch = r.change === null || r.change === undefined ? null : +r.change;
     const open = FXD_OPEN === r.code, hot = i === 0 && !q;     // главная валюта — первой и выделена
-    return `<div class="fxr${hot ? ' hot' : ''}${open ? ' open' : ''}">
+    const sel = !!FX_PICK && (((_ordById(FX_PICK) || {}).pay_fx || {}).code === r.code);
+    return `<div class="fxr${hot ? ' hot' : ''}${open ? ' open' : ''}${sel ? ' sel' : ''}">
       <button class="fxr-h" onclick="fxdOpen('${esc(r.code)}')">
         ${fxdFlag(r)}
         <span class="fxr-b"><b>${esc(r.code)}${hot ? '<em class="fxr-hot">Популярная</em>' : ''}</b><i>${esc(r.name || r.code)}</i></span>
@@ -6321,46 +6290,22 @@ async function stlSend(){
 // Курсы — из «Финансов» владельца (наличные обменника, где свежие, иначе
 // рынок), дирхамов за единицу. В списке сразу видно, сколько это в каждой
 // валюте; выбор замораживает курс на заказе, сменить можно до закрытия.
-let FX = {rates: null, at: 0, oid: null, busy: false};
-async function fxOpen(oid){
+let FX = {oid: null, busy: false};
+// Выбор валюты — та же страница «Курс валют», что в профиле (владелец, 14 сен
+// 2026): открывается поверх заказов, нажатие на курс выбирает его. FX_PICK —
+// номер заказа, пока идёт выбор; renderOrders рисует страницу вместо карточек.
+let FX_PICK = null;
+function fxOpen(oid){
   const o = _ordById(oid); if(!o) return;
-  FX.oid = oid;
-  document.getElementById('fxFor').textContent = `Заказ #${oid} · ${fmt(o.total)} AED`;
-  document.getElementById('fxQ').value = '';
-  document.getElementById('fxSheet').classList.add('show');
+  FX_PICK = oid; FX.oid = oid;
+  FXD_Q = ''; FXD_F = 'all'; FXD_OPEN = '';
+  renderOrders(); window.scrollTo({top: 0});
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
-  if(!FX.rates || Date.now() - FX.at > 10 * 60 * 1000){
-    try{
-      const r = await drvApi.drvFetch('/api/driver/rates');
-      FX.rates = r.rates || []; FX.at = Date.now();
-    }catch(e){ FX.rates = FX.rates || []; }
-  }
-  fxRender();
+  fxdLoad();
 }
-function fxClose(){ document.getElementById('fxSheet').classList.remove('show'); FX.oid = null; }
-function fxRender(){
-  const o = _ordById(FX.oid); const box = document.getElementById('fxList');
-  if(!o || !box) return;
-  const cur = (o.pay_fx || {}).code || '';
-  const q = (document.getElementById('fxQ').value || '').trim().toLowerCase();
-  const rows = (FX.rates || []).filter(r => !q || r.code.toLowerCase().includes(q)
-                                            || String(r.name || '').toLowerCase().includes(q));
-  if(!FX.rates) { box.innerHTML = '<div class="empty" style="padding:18px">Загрузка курсов…</div>'; return; }
-  if(!FX.rates.length){ box.innerHTML = '<div class="empty" style="padding:18px">Курсов сейчас нет — расчёт в дирхамах</div>'; return; }
-  const row = r => `<button class="fx-r${cur === r.code ? ' on' : ''}" onclick="fxPick('${esc(r.code)}')">
-      <span class="fx-c">${esc(r.sym !== r.code ? r.sym : r.code)}</span>
-      <span class="fx-b"><b>${esc(r.name)}</b><i>${esc(r.code)} · ${fxFmt(r.rate)} AED за 1${r.cash ? ' · обменник' : ''}</i></span>
-      <span class="fx-v">${fxFmt(o.total / r.rate)}<u>${esc(r.sym)}</u></span>
-    </button>`;
-  const main = rows.filter(r => r.main), rest = rows.filter(r => !r.main);
-  box.innerHTML = `<button class="fx-r${cur ? '' : ' on'}" onclick="fxPick('')">
-      <span class="fx-c">AED</span>
-      <span class="fx-b"><b>Дирхамы</b><i>как в заказе</i></span>
-      <span class="fx-v">${fmt(o.total)}<u>AED</u></span></button>`
-    + (main.length ? `<div class="fx-grp">Основные</div>${main.map(row).join('')}` : '')
-    + (rest.length ? `<div class="fx-grp">Остальные</div>${rest.map(row).join('')}` : '')
-    + (!rows.length ? '<div class="empty" style="padding:18px">Ничего не нашлось</div>' : '');
-}
+function fxClose(){ FX_PICK = null; FX.oid = null; if(TAB === 'orders') renderOrders(); }
+// «Считать в дирхамах» из меню оплаты — снять валюту с заказа.
+function fxReset(oid){ FX.oid = oid; fxPick(''); }
 async function fxPick(code){
   if(FX.busy || !FX.oid) return; FX.busy = true;
   try{
@@ -6369,7 +6314,7 @@ async function fxPick(code){
     const o = _ordById(FX.oid); if(o) o.pay_fx = r.pay_fx || null;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast(r.pay_fx ? `Считаем в ${r.pay_fx.code}: ${fxFmt(r.pay_fx.amount, r.pay_fx.sym)}` : 'Считаем в дирхамах');
-    fxClose(); renderOrders();
+    fxClose(); window.scrollTo({top: 0});
     load();
   }catch(e){
     if(shBlocked(e)) return;
@@ -6405,6 +6350,7 @@ function renderOrders(){
   const box = document.getElementById('body');
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
+  if(FX_PICK){ box.innerHTML = profRatesHtml(); return; }
   if(!active.length){
     box.innerHTML = `<div class="oe">
       <img src="img/empty-orders.png" alt="" width="744" height="505">
@@ -8341,8 +8287,6 @@ async function incAccept(){
   await load();
 }
 
-
-
 // ── действия ──────────────────────────────────────────────────────────────
 // confirm() в телеграме показывается через раз — своё окно надёжнее и
 // выглядит как остальное приложение.
@@ -9449,13 +9393,14 @@ function payMenu(oid){
   const fx = o && o.pay_fx, st = o && o.settle && o.settle.diff;
   document.getElementById('payMenuList').innerHTML = `
     <button class="btn btn-sec map-b" onclick="payMenuGo('fx','${esc(oid)}')">${fx ? 'Сменить валюту' : 'Оплата валютой'}</button>
+    ${fx ? `<button class="btn btn-sec map-b" onclick="payMenuGo('aed','${esc(oid)}')">Считать в дирхамах</button>` : ''}
     <button class="btn btn-sec map-b" onclick="payMenuGo('stl','${esc(oid)}')">${st ? 'Исправить расчёт' : 'Рассчитались не ровно'}</button>`;
   document.getElementById('payMenu').classList.add('show');
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
 }
 function payMenuGo(k, oid){
   document.getElementById('payMenu').classList.remove('show');
-  if(k === 'fx') fxOpen(oid); else stlOpen(oid);
+  if(k === 'fx') fxOpen(oid); else if(k === 'aed') fxReset(oid); else stlOpen(oid);
 }
 
 // Спрашиваем один раз. Сменить выбор можно долгим нажатием на ту же кнопку.

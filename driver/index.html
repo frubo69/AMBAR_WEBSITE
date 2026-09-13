@@ -1030,7 +1030,7 @@ body.xp-on{background:#070A12}
    значок 33×26 на 39 px от верха, название 16/500 #CDCED3, описание 13 #9899AD,
    кнопка 32 px #141420 с рамкой #282B34, радиус 12, у самого низа (13 px). */
 .xp-z{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;width:100%;
-  min-height:0;height:auto;padding:39px 16px 13px;border-radius:14px;border:1px solid #1F2130;background:#0A0D16;
+  min-height:0;height:auto;padding:39px 17px 15px;border-radius:14px;border:1px solid #1F2130;background:#0A0D16;
   font-family:inherit;color:#fff;cursor:pointer;overflow:hidden}
 .xp-z::before{content:'';position:absolute;inset:10px;border-radius:10px;border:1.5px dashed #35394E;pointer-events:none}
 .xp-zn{position:absolute;left:16px;top:14px;width:21px;height:21px;border-radius:50%;background:#EBCA87;color:#1a1408;
@@ -1038,8 +1038,9 @@ body.xp-on{background:#070A12}
 .xp-z > svg{flex:0 0 auto;color:#EBCA87;margin:0}
 .xp-z b{display:block;margin-top:15px;font-size:14px;font-weight:500;line-height:18px;color:#CDCED3;text-align:center;letter-spacing:-.1px}
 .xp-z i{display:block;margin-top:5px;font-style:normal;font-size:12px;line-height:16px;color:#9899AD;text-align:center}
-.xp-zb{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:32px;margin-top:14px;padding-top:0;border-radius:12px;
-  border:1px solid #282B34;background:#141420;color:#E9E9EE;font-size:13px;font-weight:400;white-space:nowrap}
+.xp-zb{display:flex;align-items:center;justify-content:center;gap:20px;width:100%;height:32px;margin-top:14px;padding:0 0 0 0;border-radius:12px;
+  border:1px solid #282B34;background:#141420;color:#E9E9EE;font-size:13px;font-weight:400;letter-spacing:-.1px;white-space:nowrap}
+.xp-zb svg{flex:0 0 auto}
 .xp-zb svg{color:#EBCA87}
 .xp-ph.one .xp-z i{max-width:280px}
 .xp-z.lock > svg,.xp-z.lock b,.xp-z.lock i{opacity:.4}
@@ -7397,12 +7398,16 @@ function expTileVal(kind){
 // Выбор «был расход / не было» на странице бензина или мойки — до отправки
 // живёт только на экране; сохранённое читается из ответа сервера.
 const EXP_CH = {}, XP_EDIT = new Set();
-const ICO_CAM = '<path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>';
+const ICO_CAM = '<path d="M2.8 8.2a1.6 1.6 0 0 1 1.6-1.6h3.3l1.7-2.1h5.2l1.7 2.1h3.3a1.6 1.6 0 0 1 1.6 1.6v9.2a1.6 1.6 0 0 1-1.6 1.6H4.4a1.6 1.6 0 0 1-1.6-1.6z"/>'
+  + '<circle cx="12" cy="12.6" r="3.3"/><circle cx="17.9" cy="9.6" r=".7" fill="currentColor" stroke="none"/>';
 // Машина спереди — крыша, кузов, две фары, колёса; в шапке «Мойки» над ней пузырьки
-const ICO_CARF = '<path d="M6 12.5l1.6-4.2A2 2 0 0 1 9.5 7h5a2 2 0 0 1 1.9 1.3l1.6 4.2"/>'
-  + '<path d="M4.5 12.5h15a1.5 1.5 0 0 1 1.5 1.5v3a1 1 0 0 1-1 1h-16a1 1 0 0 1-1-1v-3a1.5 1.5 0 0 1 1.5-1.5z"/>'
-  + '<circle cx="7.5" cy="15.2" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="15.2" r="1.1" fill="currentColor" stroke="none"/>'
-  + '<path d="M10 15.2h4M6.5 18v1.5M17.5 18v1.5"/>';
+const ICO_CARF = '<path d="M4.6 9.6L6.8 5.3Q7.3 4.1 8.6 4.1h6.8q1.3 0 1.8 1.2l2.2 4.3"/>'
+  + '<rect x="1.7" y="9.6" width="20.6" height="7.2" rx="2"/>'
+  + '<circle cx="5.9" cy="13.2" r="1.05" fill="currentColor" stroke="none"/><circle cx="18.1" cy="13.2" r="1.05" fill="currentColor" stroke="none"/>'
+  + '<path d="M9.4 13.2h5.2" stroke-width="1.6"/>'
+  + '<rect x="2.7" y="16.8" width="2.6" height="3.4" rx=".9"/><rect x="18.7" y="16.8" width="2.6" height="3.4" rx=".9"/>';
+// Значки карточек рисуем тонкой линией 1.4 — как в макете (там ~6% ширины значка)
+const svgThin = (d, w) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICO_WASHCAR = '<circle cx="7.5" cy="4.2" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="3" r="1.3" fill="currentColor" stroke="none"/>'
   + '<circle cx="16.5" cy="4.2" r="1" fill="currentColor" stroke="none"/>'
   + '<path d="M6.5 13.5l1.5-3.6A2 2 0 0 1 9.8 8.6h4.4a2 2 0 0 1 1.8 1.3l1.5 3.6"/>'
@@ -7448,8 +7453,8 @@ function xpZone(kind, what, sent, n){
   const bico = ICO_CAM;
   return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}${lock ? ' lock' : ''}" onclick="${go}">
     ${n ? `<span class="xp-zn">${n}</span>` : ''}
-    ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svg(bico, 17)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
-          : `${rcp ? svg(ICO_RCP, 33) : svg(ICO_CARF, 36)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svg(bico, 17)}${t[2]}</span>`}
+    ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svgThin(bico, 21)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
+          : `${rcp ? svgThin(ICO_RCP, 33) : svgThin(ICO_CARF, 36)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svgThin(bico, 21)}${t[2]}</span>`}
   </button>`;
 }
 function xpSave(btn, kind){

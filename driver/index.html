@@ -1022,29 +1022,32 @@ body.xp-on{background:#070A12}
   background:#2A2D45;color:#fff;cursor:pointer;padding:0}
 .xp-x[hidden]{display:none}
 .xp-amt .exp-mk{flex:0 0 auto;margin-left:6px}
-.xp-ph{flex:1 1 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px;min-height:132px}
+.xp-ph{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px}
 .xp-ph.one{grid-template-columns:1fr}
-.xp-z{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:100%;
-  min-height:0;height:100%;padding:20px 18px 18px;border-radius:16px;border:1.5px solid var(--xline);background:var(--xcard);
+/* Карточка снимка — размеры сняты с макета владельца по пикселям (экран 430 pt):
+   карточка #0A0D16 с рамкой #1F2130 и радиусом 14, пунктир #35394E на 10 px
+   внутри, номер шага 21 px в золотом кружке #EBCA87 в 16/14 px от углов,
+   значок 33×26 на 39 px от верха, название 16/500 #CDCED3, описание 13 #9899AD,
+   кнопка 32 px #141420 с рамкой #282B34, радиус 12, у самого низа (13 px). */
+.xp-z{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;width:100%;
+  min-height:0;height:auto;padding:39px 16px 13px;border-radius:14px;border:1px solid #1F2130;background:#0A0D16;
   font-family:inherit;color:#fff;cursor:pointer;overflow:hidden}
-.xp-z::before{content:'';position:absolute;inset:7px;border-radius:12px;border:1.5px dashed var(--xdash);pointer-events:none}
-.xp-zn{position:absolute;left:14px;top:14px;width:22px;height:22px;border-radius:50%;background:var(--xgold);color:#1a1408;
-  font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
-.xp-z > svg{color:var(--xgold);margin-top:10px}
-.xp-z b{display:block;margin-top:10px;font-size:15px;font-weight:700;text-align:center}
-.xp-z i{display:block;margin-top:5px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--xdesc);text-align:center}
-.xp-zb{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:34px;margin-top:12px;border-radius:9px;
-  border:1px solid var(--xbtnb);background:var(--xbtn);color:#fff;font-size:13px;font-weight:600}
-.xp-zb svg{color:var(--xgold)}
-.xp-ph:not(.one) .xp-z{padding:20px 10px 14px}
-.xp-ph:not(.one) .xp-zb{font-size:12px;gap:6px;padding:0 5px;white-space:nowrap}
-.xp-ph:not(.one) .xp-z i{font-size:12px}
-.xp-z.set{padding:0;border-color:rgba(246,194,101,.55)}
+.xp-z::before{content:'';position:absolute;inset:10px;border-radius:10px;border:1.5px dashed #35394E;pointer-events:none}
+.xp-zn{position:absolute;left:16px;top:14px;width:21px;height:21px;border-radius:50%;background:#EBCA87;color:#1a1408;
+  font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.xp-z > svg{flex:0 0 auto;color:#EBCA87;margin:0}
+.xp-z b{display:block;margin-top:15px;font-size:14px;font-weight:500;line-height:18px;color:#CDCED3;text-align:center;letter-spacing:-.1px}
+.xp-z i{display:block;margin-top:5px;font-style:normal;font-size:12px;line-height:16px;color:#9899AD;text-align:center}
+.xp-zb{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:32px;margin-top:14px;padding-top:0;border-radius:12px;
+  border:1px solid #282B34;background:#141420;color:#E9E9EE;font-size:13px;font-weight:400;white-space:nowrap}
+.xp-zb svg{color:#EBCA87}
+.xp-ph.one .xp-z i{max-width:280px}
+.xp-z.lock > svg,.xp-z.lock b,.xp-z.lock i{opacity:.4}
+.xp-z.lock .xp-zb{opacity:.55;color:var(--xsub)} .xp-z.lock .xp-zb svg{color:var(--xsub)}
+.xp-z.set{padding:0;border-color:rgba(235,202,135,.55)}
 .xp-z.set::before{display:none}
 .xp-z.set img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .xp-z.set .xp-zb{position:absolute;left:10px;right:10px;bottom:10px;width:auto;margin:0;background:rgba(7,10,18,.82)}
-.xp-z.lock > svg,.xp-z.lock b,.xp-z.lock i{opacity:.4}
-.xp-z.lock .xp-zb{opacity:.55;color:var(--xsub)} .xp-z.lock .xp-zb svg{color:var(--xsub)}
 .xp-z.bad{border-color:#E05555}
 .xp-z.bad .xp-zb{color:#F5A3A3}
 .xp-cm{display:block;width:100%;min-height:64px;padding:12px 16px;margin:0;border-radius:14px;border:1.5px solid var(--xline);
@@ -4396,7 +4399,7 @@ function setTab(t){
   hdrPage('');                         // страницы профиля, истории и расходов поставят свою сами
   // Нажатие на вкладку — это её корень: вложенная страница, где человек был
   // до этого, не должна встречать его при возврате.
-  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false;
+  EXP_PAGE = ''; HIST_PAGE = ''; PROF_PAGE = ''; HS_MOPEN = HS_SOPEN = HIST_PICK = false; XP_PARK_EDIT = '';
   document.body.classList.remove('xp-on');
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory();
@@ -7406,7 +7409,11 @@ const ICO_WASHCAR = '<circle cx="7.5" cy="4.2" r="1" fill="currentColor" stroke=
   + '<path d="M5 13.5h14a1.5 1.5 0 0 1 1.5 1.5v2.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V15A1.5 1.5 0 0 1 5 13.5z"/>'
   + '<circle cx="8" cy="16" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"/><path d="M10.5 16h3M7 18.5V20M17 18.5V20"/>';
 const XP_T = {fuel: {t: 'Бензин', s: 'Укажите сумму и прикрепите чек', no: 'Сегодня не заправлялись', ico: ICO.fuel},
-              wash: {t: 'Мойка',  s: 'Укажите сумму и прикрепите фото', no: 'Сегодня не было мойки', ico: ICO_WASHCAR}};
+              wash: {t: 'Мойка',  s: 'Укажите сумму и прикрепите фото', no: 'Сегодня не было мойки', ico: ICO_WASHCAR},
+              parking: {t: 'Парковка', s: '', no: '', ico: ICO.park}};
+let XP_PARK_EDIT = '';                 // какую запись парковки правим ('' — новая)
+function xpParkEdit(id){ XP_PARK_EDIT = id || ''; EXP_EDIT = id ? 'o_' + id : null; renderExpenses(); window.scrollTo({top: 0});
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
 function xpChoice(kind){
   if(EXP_CH[kind]) return EXP_CH[kind];
   return ((EXP.no_expense || {})[kind] && !_expSent(kind)) ? 'no' : 'yes';
@@ -7442,7 +7449,7 @@ function xpZone(kind, what, sent, n){
   return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}${lock ? ' lock' : ''}" onclick="${go}">
     ${n ? `<span class="xp-zn">${n}</span>` : ''}
     ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svg(bico, 17)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
-          : `${svg(rcp ? ICO_RCP : ICO_CARF, 34)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svg(bico, 17)}${t[2]}</span>`}
+          : `${rcp ? svg(ICO_RCP, 33) : svg(ICO_CARF, 36)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svg(bico, 17)}${t[2]}</span>`}
   </button>`;
 }
 function xpSave(btn, kind){
@@ -7455,7 +7462,43 @@ function xpSave(btn, kind){
   if(mode === 'redo') return expRedo(kind);
   sendExpense(btn, kind);
 }
+// Парковка: за день записей может быть несколько, «не было» ей не отвечают.
+// Сверху — сегодняшние записи (нажатие открывает запись в форме ниже), под ними
+// форма новой: сумма, чек камерой, где парковались, закреплённая «Сохранить».
+function expParkPage(){
+  const T = XP_T.parking;
+  const recs = (EXP.extras || []).filter(x => x.kind === 'parking');
+  const cur = XP_PARK_EDIT ? recs.find(x => x.id === XP_PARK_EDIT) : null;
+  const fid = cur ? 'o_' + cur.id : 'parking';          // так sendExpense поймёт, новая это или правка
+  const list = recs.length ? `<div class="xp-l">Сегодня</div><div class="xp-recs">${recs.map(x => `
+    <button class="xp-rec${cur && cur.id === x.id ? ' on' : ''}" onclick="xpParkEdit('${x.id}')">
+      <span class="exp-mk ${EXP_ST(x)}">${svg(ICO[EXP_ICO[EXP_ST(x)]] || ICO.ok, 14)}</span>
+      <span class="b"><b>${fmt(x.amount)} AED</b>${x.comment ? `<i>${esc(x.comment)}</i>` : ''}</span>
+      <em>${svg(ICO.chevR, 14)}</em>
+    </button>`).join('')}</div>` : '';
+  const shot = EXP_SHOT.kind === 'parking' && EXP_SHOT.photo ? EXP_SHOT : null;
+  const zone = cur
+    ? (cur.thumb ? `<div class="xp-ph one"><div class="xp-z set"><img src="${cur.thumb}" alt=""><span class="xp-zb">${svg(ICO_RCP, 16)}Чек уже приложен</span></div></div>` : '')
+    : `<div class="xp-ph one">${xpZone('parking', 'rcp', shot ? null : null, 0)}</div>`;
+  return `<div class="xp">
+    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 30)}</span><div><b>${cur ? 'Парковка · правка' : 'Парковка'}</b></div></div>
+    ${list}
+    <div class="xp-l">Сумма расхода</div>
+    <div class="xp-amt"><span>AED</span>
+      <input id="e_${fid}" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
+        value="${cur ? cur.amount : ''}" oninput="xpTyped('${fid}')">
+      <button class="xp-x" id="x_${fid}" ${cur ? '' : 'hidden'} onclick="xpClear('${fid}')" aria-label="Очистить">${svg(ICO.close, 13)}</button>
+    </div>
+    ${zone ? `<div class="xp-l">Фото для подтверждения</div>${zone}` : ''}
+    <div class="xp-l">Где парковались</div>
+    <textarea class="xp-cm" id="c_${fid}" maxlength="200" placeholder="Название места или адрес">${esc(cur ? cur.comment || '' : '')}</textarea>
+    ${cur ? `<button class="xp-cancel" onclick="xpParkEdit('')">Отменить правку — новая запись</button>` : ''}
+    <div class="dv-sp"></div>
+    <div class="dv-foot"><button class="xp-go" id="xb_${fid}" data-mode="" ${cur ? '' : 'disabled'} onclick="xpSave(this,'${fid}')">Сохранить</button></div>
+  </div>`;
+}
 function expPage(kind){
+  if(kind === 'parking') return expParkPage();
   const T = XP_T[kind], sent = _expSent(kind), kept = _expKept(kind);
   const отклонён = sent && EXP_ST(sent) === 'rejected';
   const плохой = отклонён ? (sent.car_photo && sent.car_ok === 'no' ? 'car' : sent.photo && sent.photo_ok === 'no' ? 'rcp' : '') : '';
@@ -7515,13 +7558,13 @@ function renderExpenses(){
 
   if(EXP_PAGE){
     const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
-    const own = EXP_PAGE === 'fuel' || EXP_PAGE === 'wash';   // у этих страниц свой крупный заголовок внутри
+    const own = EXP_PAGE === 'fuel' || EXP_PAGE === 'wash' || EXP_PAGE === 'parking';   // свой крупный заголовок внутри
     hdrPage(back + `<b>${own ? 'Расходы' : (EXP_PAGE_T[EXP_PAGE] || 'Расходы')}</b>`);
     document.body.classList.toggle('xp-on', own);
     let html = '';
     if(EXP_PAGE === 'meal') html = mealBox();
     else if(own) html = expPage(EXP_PAGE);
-    else if(EXP_PAGE === 'parking') html = park.map(otherBox).join('') + expKindCards(['parking']);
+    else if(EXP_PAGE === 'parking') html = expPage('parking');
     else if(EXP_PAGE === 'other') html = rest.map(otherBox).join('')
       + expKindCards(((EXP.kinds || []).map(k => k.id)).filter(k => k !== 'parking'));
     else html = expBox('fuel', 'Бензин', ICO.fuel) + expBox('wash', 'Мойка', ICO.wash) + other.map(otherBox).join('')
@@ -9907,7 +9950,7 @@ async function sendExpense(btn, kind){
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
-    EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind];
+    EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind]; XP_PARK_EDIT = '';
     EXP_MORE = false; EXP_EDIT = null; EXP_SHOT = {kind:'', photo:'', thumb:''};
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}
     await shLoad();

@@ -159,7 +159,10 @@ assert src.count('<script src="api.js"></script>') == 1
 src = src.replace('<script src="api.js"></script>', API)
 assert src.count("\nboot();") == 1
 src = src.replace("\nboot();", "\nstandBoot();")
-src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:390px;margin:0;overflow:visible}.sheet{right:auto;width:390px}.hdr{width:390px}.tabbar{width:390px}.call-bar{width:390px}.shscr{width:390px;right:auto}.sheet-in{max-width:390px}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:390px}</style></head>""", 1)
+# Ширина экрана стенда: по умолчанию 390 (безголовый Chrome не уже 500), для
+# сравнения с макетами владельца — 430: python3 tools/drv_stand_gen.py <dir> 430
+W = sys.argv[2] if len(sys.argv) > 2 else '390'
+src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:WPX;margin:0;overflow:visible}.sheet{right:auto;width:WPX}.hdr{width:WPX}.tabbar{width:WPX}.call-bar{width:WPX}.shscr{width:WPX;right:auto}.sheet-in{max-width:WPX}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:WPX}</style></head>""".replace('WPX', W + 'px'), 1)
 src = src.replace("</body>", '<div id="sterr"></div></body>', 1)
 # для снимков журнал стенда мешает: длинные строки растягивают страницу шире 390
 src = src.replace("</head>", "<script>if(new URLSearchParams(location.search).get('nolog'))document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sterr');if(e)e.style.display='none'});</script></head>", 1)

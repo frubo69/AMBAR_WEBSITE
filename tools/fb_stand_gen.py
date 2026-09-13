@@ -222,9 +222,9 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
       if(Q.get('penamt')){ const a = document.getElementById('fbPenAmt'); a.value = Q.get('penamt'); a.dispatchEvent(new Event('input')); }
       if(Q.get('penhow')){ fbPenHow(Q.get('penhow')); await W(100); }
       if(Q.get('penmonths')){ fbPenMonths(+Q.get('penmonths')); await W(100); }
-      if(Q.get('pencmt') !== null){ document.getElementById('fbPenCmt').value = Q.get('pencmt'); }
-      if(Q.get('pensave')){ tap('#fbPenBody .fb-pen-go'); await W(1500); }
-      if(Q.get('pencancel')){ tap('#fbPenBody .fb-pen-del'); await W(300); if(document.getElementById('askOk')) document.getElementById('askOk').click(); await W(1500); }
+      if(Q.get('pencmt') !== null){ const c = document.getElementById('fbPenCmt'); c.value = Q.get('pencmt'); c.dispatchEvent(new Event('input')); }
+      if(Q.get('pensave')){ tap('#accFoot .fb-pen-go'); await W(1500); }            // кнопка в подвале: «Сохранить изменения» или «Вернуть»
+      if(Q.get('pencancel')){ tap('#accFoot .fb-pen-go.dn'); await W(300); if(document.getElementById('askOk')) document.getElementById('askOk').click(); await W(1500); }
     }
     await new Promise(r => setTimeout(r, 60));
     const M = [];

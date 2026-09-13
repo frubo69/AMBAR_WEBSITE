@@ -3279,9 +3279,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-pen-go{display:block;width:100%;height:53px;margin:14px 0 18px;border:0;border-radius:13px;cursor:pointer;
   font-family:inherit;font-size:16px;font-weight:700;color:#1c1508;background:linear-gradient(90deg,#cca76a 0%,#eacc91 100%)}
 .fb-pen-go:active{transform:scale(.98)}
-.fb-pen-del{display:block;width:100%;height:50px;margin:-6px 0 18px;border-radius:13px;border:1px solid rgba(224,85,85,.45);
-  background:rgba(224,85,85,.08);color:#E05555;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
-.fb-pen-del:active{transform:scale(.98)}
+.fb-pen-go.dn{background:linear-gradient(90deg,#e05a5a 0%,#cf4646 100%);color:#fff}
+.fb-pen-foot{padding:12px 16px calc(12px + var(--safe-bottom))}
+.fb-pen-foot .fb-pen-go{margin:0}
+.fb-pen-last{margin-bottom:4px}
 .fb-pen-ghi b{display:flex;align-items:center;color:var(--gold2)}
 .fb-pen-rs{margin-left:auto;font-style:normal;font-size:13px;font-weight:500;color:#858592}
 /* история штрафов: карточка с шапкой и фильтром, строки со значком и статусом */
@@ -20192,7 +20193,7 @@ function fbPenReason(){
 function fbPenOn(){ return !!(FB.pen && document.getElementById('fbPenBody')); }
 function fbPenOpen(){ FB.pen = {mode: 'fine', cat: null, vio: null, tier: null, who: null, how: 'once', months: 2}; fbPenGo('cats'); }
 function fbHoldOpen(){ FB.pen = {mode: 'hold', who: null}; fbPenGo('who'); }
-function fbPenExit(){ FB.pen = null; ACC_BACK = null; fbPenUi(false); accOpen('finitems'); }
+function fbPenExit(){ FB.pen = null; ACC_BACK = null; fbPenUi(false); fbPenFoot(); accOpen('finitems'); }
 // Шапка шагов — как в макете владельца: крупный заголовок без месяца
 function fbPenUi(on){ const ov = document.getElementById('accOv'); if(ov) ov.classList.toggle('pen-ui', !!on); }
 function fbPenCur(){
@@ -20228,6 +20229,8 @@ function fbPenGo(step, anim){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page ${anim || 'in'}" id="fbPenBody">${html}</div>`;
   mid.scrollTop = 0;
+  if(step === 'edit') P.dirty = false;
+  fbPenFoot();
   ACC_BACK = back;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -20326,11 +20329,13 @@ function fbPenWhoCard(tap){
 }
 function fbPenAmtSec(v){
   return `<div class="fb-pen-sec"><div class="fb-pen-cap">Сумма (AED)</div>
-      <input class="fb-pen-inp" id="fbPenAmt" inputmode="decimal" placeholder="Введите сумму" autocomplete="off"${v ? ` value="${v}"` : ''} oninput="fbPenPartsPaint()"></div>`;
+      <input class="fb-pen-inp" id="fbPenAmt" inputmode="decimal" placeholder="Введите сумму" autocomplete="off"${v ? ` value="${v}"` : ''}
+        oninput="fbPenPartsPaint(); fbPenDirty()"></div>`;
 }
 function fbPenCmtSec(v){
   return `<div class="fb-pen-sec"><div class="fb-pen-cap">Комментарий</div>
-      <textarea class="fb-pen-inp fb-pen-ta" id="fbPenCmt" maxlength="80" placeholder="Добавить комментарий…">${escS(v || '')}</textarea></div>`;
+      <textarea class="fb-pen-inp fb-pen-ta" id="fbPenCmt" maxlength="80" placeholder="Добавить комментарий…"
+        oninput="fbPenDirty()">${escS(v || '')}</textarea></div>`;
 }
 function fbPenFineHtml(cat, vio, tier){
   const P = FB.pen;
@@ -20384,17 +20389,14 @@ function fbPenEditHtml(h){
       <span class="fb-pen-cb"><b>${fbPenNb(escS(h.reason || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф')))}</b>
         <i class="fb-pen-cs">${escS(meta)}</i>${was}</span></div>
     ${fbPenWhoCard(false)}
-    ${h.cancelled ? `<div class="fb-pen-card fb-pen-form">
+    ${h.cancelled ? `<div class="fb-pen-card fb-pen-form fb-pen-last">
         <div class="fb-pen-sec"><div class="fb-pen-cap">Сумма</div><div class="fb-pen-val">${fbFmt(h.amount)} AED</div></div>
         ${h.note ? `<div class="fb-pen-sec"><div class="fb-pen-cap">Комментарий</div><div class="fb-pen-val sub">${escS(h.note)}</div></div>` : ''}
         <div class="fb-pen-sec"><div class="fb-pen-cap">Отменён</div><div class="fb-pen-val sub">${
           escS([fbPenHistDay(h.cancelled_day), h.cancelled_by].filter(Boolean).join(' · ') || 'отменён')}</div></div>
-      </div>
-      <button class="fb-pen-go" onclick="fbPenRestore()">Вернуть ${what}</button>`
+      </div>`
     : `${fbPenHowCard()}
-      <div class="fb-pen-card fb-pen-form">${fbPenAmtSec(h.amount)}${fbPenCmtSec(h.note)}</div>
-      <button class="fb-pen-go" onclick="fbPenSave()">Сохранить</button>
-      <button class="fb-pen-del" onclick="fbPenCancel()">Отменить ${what}</button>`}`;
+      <div class="fb-pen-card fb-pen-form fb-pen-last">${fbPenAmtSec(h.amount)}${fbPenCmtSec(h.note)}</div>`}`;
 }
 async function fbPenSave(){
   if(!fbPenOn() || FB.pen.busy || FB.pen.mode !== 'edit') return;
@@ -20414,6 +20416,29 @@ async function fbPenSave(){
     P.busy = false;
     _toast('Не удалось сохранить');
   }
+}
+// Подвал страницы: одна кнопка и всегда на виду. Ничего не менял — «Отменить
+// штраф» (красная); поменял сумму, способ или комментарий — «Сохранить
+// изменения»; у отменённого — «Вернуть штраф».
+function fbPenDirtyNow(){
+  const P = FB.pen, h = P && P.item; if(!h) return false;
+  const amount = fbAmt('fbPenAmt'), per = P.how === 'parts' ? Math.ceil((amount || 0) / P.months) : 0;
+  return amount !== h.amount || per !== (h.per_month || 0) || fbTxt('fbPenCmt') !== (h.note || '');
+}
+function fbPenFoot(){
+  const foot = document.getElementById('accFoot'); if(!foot) return;
+  const P = FB.pen;
+  if(!P || P.step !== 'edit' || !P.item){ foot.innerHTML = ''; return; }
+  const h = P.item, what = h.kind === 'hold' ? 'удержание' : 'штраф';
+  foot.innerHTML = `<div class="fb-pen-foot">${h.cancelled
+    ? `<button class="fb-pen-go" onclick="fbPenRestore()">Вернуть ${what}</button>`
+    : P.dirty ? `<button class="fb-pen-go" onclick="fbPenSave()">Сохранить изменения</button>`
+              : `<button class="fb-pen-go dn" onclick="fbPenCancel()">Отменить ${what}</button>`}</div>`;
+}
+function fbPenDirty(){
+  const P = FB.pen; if(!P || P.step !== 'edit' || !P.item || P.item.cancelled) return;
+  const d = fbPenDirtyNow();
+  if(d !== P.dirty){ P.dirty = d; fbPenFoot(); }
 }
 async function fbPenRestore(){
   if(!fbPenOn() || FB.pen.busy || FB.pen.mode !== 'edit') return;
@@ -20480,9 +20505,10 @@ function fbPenHow(v){
   document.querySelectorAll('#fbPenBody .fb-pen-opt').forEach(x => x.classList.toggle('on', x.dataset.v === v));
   const box = document.getElementById('fbPenParts');
   if(box){ box.hidden = v !== 'parts'; fbPenPartsPaint(); }
+  fbPenDirty();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
-function fbPenMonths(m){ if(!FB.pen) return; FB.pen.months = m; fbPenPartsPaint(); try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
+function fbPenMonths(m){ if(!FB.pen) return; FB.pen.months = m; fbPenPartsPaint(); fbPenDirty(); try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
 async function fbPenApply(){
   if(!fbPenOn() || FB.pen.busy) return;
   const {P, vio, tier} = fbPenCur(), hold = P.mode === 'hold';

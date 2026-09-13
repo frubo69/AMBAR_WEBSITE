@@ -3389,7 +3389,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     <div class="wo-add-hd">
       <div>
         <div class="sheet-t">Списать товар</div>
-        <div class="wo-add-s">уйдёт старшему на согласование</div>
       </div>
       <button class="wo-add-x" onclick="woClose()" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
@@ -5343,7 +5342,7 @@ function woPaint(){
       ${WO_KINDS.map(k => `<button class="${WO.kind === k ? 'on' : ''}"
         onclick="woKind('${k}')">${k}</button>`).join('')}
     </div>
-    <div class="wo-why">${WO.kind ? esc(WO_WHY[WO.kind]) : 'Выберите, что случилось'}</div>`;
+`;
 
   const позиция = WO.item
     ? `<button class="wo-chosen" onclick="woUnpick()">
@@ -5390,9 +5389,7 @@ function woPaint(){
           value="${esc(WO.note || '')}" oninput="woNote(this.value)">`
     : `<div class="wo-l2">Фотография</div>` + снимок
       + `<input class="wo-note2" maxlength="200" placeholder="Комментарий — что произошло"
-          value="${esc(WO.note || '')}" oninput="woNote(this.value)">
-         <div class="wo-tip">Дальше камера: одна крышка — одна бутылка, позиция и
-           точка возьмутся из кода.</div>`);
+          value="${esc(WO.note || '')}" oninput="woNote(this.value)">`);
 
   woSegPill();
   const go = document.getElementById('woGo');

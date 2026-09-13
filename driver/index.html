@@ -2813,22 +2813,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-tile u{display:block;min-height:23px;text-decoration:none;font-size:9.5px;line-height:1.15;color:var(--muted);letter-spacing:-.1px}
 .pf-tile b{display:block;margin-top:3px;font-size:15.5px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.2px}
 .pf-tile i{display:block;margin-top:1px;font-style:normal;font-size:10px;color:var(--muted);white-space:nowrap}
-.pf-row{display:flex;align-items:flex-start;gap:10px;margin:0 0 8px;padding:12px 10px 12px 12px;border-radius:14px;
-  border:1px solid var(--border2);background:linear-gradient(180deg,#161629 0%,#0F0F20 100%)}
-.pf-row-i{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  color:#B9B9C6;background:#1d1d34}
-.pf-row-b{flex:1;min-width:0}
-.pf-row-b b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-  font-size:14.5px;font-weight:700;color:var(--text);line-height:1.25}
-.pf-row-b i{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:var(--sub);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pf-row-b s{display:block;margin-top:3px;text-decoration:none;font-size:12px;color:var(--muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pf-row-v{flex:0 0 auto;width:92px;text-align:right}
-.pf-row-v u{display:block;text-decoration:none;font-size:10px;color:var(--muted);white-space:nowrap}
-.pf-row-v b{display:block;margin-top:5px;font-size:14.5px;font-weight:800;color:#F26A6A;font-variant-numeric:tabular-nums}
-.pf-row.off{opacity:.55}
-.pf-row.off .pf-row-v b{text-decoration:line-through;color:var(--muted)}
 .pf-none{padding:16px;font-size:13.5px;color:var(--muted)}
 
 </style>
@@ -4047,16 +4031,6 @@ function profStep(n){
   PROF_MONTH = next; PROF = null; profPaint(); profLoad();
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
 }
-// Значок по нарушению: машина, телефон, парковка, часы — остальное бумагой
-function profIco(it){
-  const r = (it.reason || '').toLowerCase();
-  if(it.kind !== 'fine') return ICO.minus;
-  if(r.includes('скорост') || r.includes('пдд') || r.includes('автомоб') || r.includes('авар')) return ICO.car;
-  if(r.includes('телефон')) return ICO.mobile;
-  if(r.includes('парков')) return ICO.nopark;
-  if(r.includes('опозд') || r.includes('дисциплин')) return ICO.clock;
-  return ICO.note;
-}
 function profPaint(){
   const box = document.getElementById('body'); if(!box) return;
   box.innerHTML = profHtml();
@@ -4085,7 +4059,7 @@ function profHtml(){
       <div class="pf-tile"><span>${svg(ICO.cal, 17)}</span><div><u>Количество списаний</u><b>${fmt(Math.round(p.month_count || 0))}</b><i>в этом месяце</i></div></div>
     </div>
   </div>`;
-  return head + money + profHist(p);
+  return head + money;
 }
 function profHead(p){
   const code = (p && p.code) || '', dist = (p && p.district_name) || '', role = (p && p.role_t) || 'Водитель';
@@ -4102,19 +4076,6 @@ function profHead(p){
       ${since ? `<i>Работает с<br>${esc(since)}</i>` : ''}
     </div>
   </div>`;
-}
-function profHist(p){
-  const rows = (p.items || []).map(it => {
-    const t = it.reason ? it.reason.split(' · ')[0] : (it.kind === 'hold' ? 'Свободное удержание' : it.t || 'Списание');
-    const tier = it.reason ? it.reason.split(' · ').slice(1).join(' · ') : '';
-    const line2 = [it.t, tier, it.cancelled ? 'отменён' : (it.per_month ? `по ${fmt(it.per_month)} в месяц` : '')].filter(Boolean).join(' · ');
-    return `<div class="pf-row${it.cancelled ? ' off' : ''}">
-      <span class="pf-row-i">${svg(profIco(it), 19)}</span>
-      <span class="pf-row-b"><b>${esc(t)}</b><i>${esc(line2)}</i>${it.note ? `<s>${esc(it.note)}</s>` : ''}</span>
-      <span class="pf-row-v"><u>${esc(profDayT(it.day))}</u><b>${profSum(it.amount, 'down')}</b></span>
-    </div>`;
-  }).join('');
-  return rows || '<div class="card pf-none">Списаний не было</div>';
 }
 // Пустой экран: значок, заголовок, строка объяснения.
 function blank(ico, title, sub, cls){

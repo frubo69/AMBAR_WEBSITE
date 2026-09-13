@@ -196,6 +196,25 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
         await new Promise(r => setTimeout(r, 1500));
       }
     }
+    // штрафной лист / свободное удержание: pen=1 | hold=1, дальше по шагам нажатиями:
+    // pencat=auto, penvio=speed, pentier=0, penq=поиск, penwho=имя, penhow=parts, penmonths=3, penamt, pencmt, penapply=1, penback=N
+    const W = ms => new Promise(r => setTimeout(r, ms));
+    const tap = (sel, pred) => { const e = [...document.querySelectorAll(sel)].find(pred || (() => true));
+                                 if(e) e.click(); else log('SCENARIO no ' + sel); return e; };
+    if(Q.get('pen') || Q.get('hold')){
+      tap('#accMid .fb-pen2-b', e => e.innerText.includes(Q.get('pen') ? 'Штрафной' : 'Свободное')); await W(300);
+      if(Q.get('pencat')){ tap('#fbPenBody .fb-penc', e => (e.getAttribute('onclick') || '').includes("'" + Q.get('pencat') + "'")); await W(300); }
+      if(Q.get('penvio')){ tap('#fbPenBody .fb-bl', e => (e.getAttribute('onclick') || '').includes("'" + Q.get('penvio') + "'")); await W(300); }
+      if(Q.get('pentier') !== null){ tap('#fbPenBody .fb-pen-tier', e => (e.getAttribute('onclick') || '').includes('(' + Q.get('pentier') + ')')); await W(300); }
+      if(Q.get('penq')){ const q = document.getElementById('fbPenQ'); q.value = Q.get('penq'); fbPenFilter(q.value); await W(100); }
+      if(Q.get('penwho')){ tap('#fbPenBody .fb-pen-r', e => e.dataset.n === Q.get('penwho')); await W(500); }
+      if(Q.get('penhow')){ fbPenHow(Q.get('penhow')); await W(100); }
+      if(Q.get('penmonths')){ fbPenMonths(+Q.get('penmonths')); await W(100); }
+      if(Q.get('penamt')){ const a = document.getElementById('fbPenAmt'); a.value = Q.get('penamt'); a.dispatchEvent(new Event('input')); await W(100); }
+      if(Q.get('pencmt')){ document.getElementById('fbPenCmt').value = Q.get('pencmt'); }
+      if(Q.get('penapply')){ tap('#fbPenBody .fb-pen-go'); await W(1500); }
+      for(let i = 0; i < +(Q.get('penback') || 0); i++){ accBack(); await W(350); }
+    }
     await new Promise(r => setTimeout(r, 60));
     const M = [];
     document.querySelectorAll('.fb-r, .aud-t, .shl-card, .sc-cap').forEach(el => {

@@ -36,6 +36,12 @@ r = fp.person_month(p, "2026-09", dict(rate=1750, unit="month", cur="USD", days=
 eq("1750 $ × 3.686 = 6450.5; +100 −500 = 6050.5; выплачено 5950 → остаток 100.5",
    (r["rate_aed"], r["accrued"], r["plus"], r["minus"], r["to_pay"], r["paid"], r["left"]), (6450.5, 6450.5, 100, 500, 6050.5, 5950, 100.5))
 eq("дней по приложению, не вписаны", (r["days"], r["days_set"]), (21, False))
+rh = fp.person_month(dict(name="Х", role="driver"), "2026-09", dict(rate=3000, unit="month", cur="AED"), 0,
+                     [dict(_id="h", kind="hold", amount=250, per_month=0, **{"from": "2026-09"}, note="бой"),
+                      dict(_id="f", kind="fine", amount=600, per_month=300, **{"from": "2026-09"}, reason="Превышение скорости · 20 – 30 км/ч")],
+                     [], 3.67)
+eq("удержание снимается как штраф; штраф по частям — 300 в этом месяце", (rh["minus"], rh["to_pay"], rh["debt"]), (550, 2450, 300))
+eq("вид и причина в строках", [(x["t"], x["reason"]) for x in rh["items"]], [("Удержание", ""), ("Штраф", "Превышение скорости · 20 – 30 км/ч")])
 r2 = fp.person_month(dict(name="В", role="driver"), "2026-09", dict(rate=150, unit="day", cur="AED", days=10), 25, [], [], 3.67)
 eq("ставка в день × вписанные дни: 150 × 10", (r2["accrued"], r2["days"], r2["days_set"], r2["days_auto"]), (1500, 10, True, 25))
 r3 = fp.person_month(dict(name="С", role="operator"), "2026-09", dict(rate=None), 0, [], [], 3.67)

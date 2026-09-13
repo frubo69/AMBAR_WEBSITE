@@ -455,6 +455,12 @@ async def main():
        (200, "entry", "advance", "Али", "", "item", "2026-10", True))
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="fine", amount=300, per_month=100)))
     eq("штраф: без записи расхода, с этого месяца", (r.status, WRITES[-1][0], WRITES[-1][1]["from"], WRITES[-1][1]["entry"]), (200, "item", "2026-09", ""))
+    r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="fine", amount=600, reason="Превышение скорости · 20 – 30 км/ч", note="Шейх Зайед")))
+    eq("штраф по листу: причина отдельно от комментария", (r.status, WRITES[-1][1]["reason"], WRITES[-1][1]["note"]),
+       (200, "Превышение скорости · 20 – 30 км/ч", "Шейх Зайед"))
+    r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="hold", amount=250, note="бой")))
+    eq("свободное удержание: вид hold, без записи расхода, без причины", (r.status, WRITES[-1][0], WRITES[-1][1]["kind"], WRITES[-1][1]["entry"], "reason" in WRITES[-1][1]),
+       (200, "item", "hold", "", False))
     r = await raw(inner2["handle_pay_item_add"])(_req("POST", dict(name="Али", kind="bad", amount=1)))
     eq("плохой вид → 400", r.status, 400)
     r = await raw(inner2["handle_pay_item_del"])(_req("DELETE", dict(id="i2", month=M)))

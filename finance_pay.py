@@ -19,9 +19,10 @@ from __future__ import annotations
 
 from finance_calc import _n, _i
 
-KINDS = {'fine': 'Штраф', 'advance': 'Аванс', 'loan': 'Долг', 'bonus': 'Премия'}
+# hold — «Свободное удержание»: сумма вручную, не штраф по листу и не выданные деньги
+KINDS = {'fine': 'Штраф', 'advance': 'Аванс', 'loan': 'Долг', 'bonus': 'Премия', 'hold': 'Удержание'}
 CASH_KINDS = ('advance', 'loan')            # деньги выданы на руки — расход фонда
-MINUS_KINDS = ('fine', 'advance', 'loan')   # снимаются с зарплаты
+MINUS_KINDS = ('fine', 'advance', 'loan', 'hold')   # снимаются с зарплаты
 PAY_KINDS = ('salary', 'advance', 'loan')  # записи фонда, которые считаются зарплатами
 ROLES = ('other', 'senior', 'operator', 'driver')      # руководство первым, как в тетради
 ROLE_T = {'other': 'Старшие', 'senior': 'Старший оператор', 'operator': 'Операторы', 'driver': 'Водители'}
@@ -86,7 +87,8 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
         rows.append(dict(id=it.get('_id'), kind=it.get('kind'), t=KINDS.get(it.get('kind'), ''),
                          amount=_i(_n(it.get('amount'))), per_month=_i(_n(it.get('per_month'))),
                          start=str(it.get('from') or '')[:7], day=it.get('day') or '',
-                         note=it.get('note') or '', entry=it.get('entry') or '', **s))
+                         note=it.get('note') or '', reason=it.get('reason') or '',
+                         entry=it.get('entry') or '', **s))
     to_pay = accrued + plus - minus
     paid = sum(_n(e.get('amount')) for e in payouts)
     return dict(

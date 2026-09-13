@@ -1223,9 +1223,10 @@ async def handle_pay_month_set(request):
 
 @require_owner
 async def handle_pay_item_add(request):
-    """POST {name, kind, amount, per_month, from: this|next|YYYY-MM, day, note, as}
-    — штраф, аванс, долг или премия. Аванс и долг — деньги выданы из фонда:
-    запись расхода в тот же день."""
+    """POST {name, kind, amount, per_month, from: this|next|YYYY-MM, day, note, reason, as}
+    — штраф, аванс, долг, премия или удержание. Аванс и долг — деньги выданы из
+    фонда: запись расхода в тот же день. reason — за что по штрафному листу
+    («Превышение скорости · 20 – 30 км/ч»), note — комментарий."""
     try:
         body = await request.json()
         name = str(body.get("name") or "").strip()[:40]
@@ -1246,6 +1247,7 @@ async def handle_pay_item_add(request):
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
     note = str(body.get("note") or "").strip()[:80]
+    reason = str(body.get("reason") or "").strip()[:80]
     iid = secrets.token_hex(5)
     entry_id = ""
     if kind in pay.CASH_KINDS:
@@ -1256,9 +1258,10 @@ async def handle_pay_item_add(request):
                                 "by": who, "at": datetime.now(timezone.utc)})
     await db.fin_pay_item_add({"_id": iid, "name": name, "kind": kind, "amount": amount,
                                "per_month": per_month, "from": start, "day": day, "note": note,
+                               **({"reason": reason} if reason else {}),
                                "entry": entry_id, "by": who, "at": datetime.now(timezone.utc)})
     await _touch(min(month, day[:7]))
-    log.info(f"[fin] зарплаты: {name} {pay.KINDS[kind]} {amount} с {start}"
+    log.info(f"[fin] зарплаты: {name} {pay.KINDS[kind]}{f' ({reason})' if reason else ''} {amount} с {start}"
              f"{f' по {per_month}/мес' if per_month else ''} · {who or '—'}")
     if kind in pay.CASH_KINDS:
         await backdate.notify(day, who, f"финансы: {pay.KINDS[kind].lower()} {name}", f"{amount} AED")

@@ -4306,39 +4306,6 @@ async function geoPush(force, ask){
   }finally{ GEO.busy = false; }
 }
 
-// Нажали на строку — надо не объяснить, а починить.
-//
-// Порядок такой: сперва пробуем спросить разрешение (телеграм покажет своё
-// окно). Если он этого не умеет — версия старая — или человек уже отказал,
-// уводим в чат с ботом. Там объяснено, как включить трансляцию: она живёт в
-// скрепке телеграма и работает в любой версии, без разрешений внутри
-// приложения.
-//
-// Тост здесь был тупиком: он ничего не чинил, а на узком экране ещё и
-// обрезался на полуслове.
-async function geoFix(){
-  const lm = await geoReady();
-  const can = !!lm;
-
-  if(can && !(lm.isAccessRequested && !lm.isAccessGranted)){
-    GEO.denied = false;
-    await geoPush(true, true);
-    if(GEO.state === 'on'){ _tap('ok'); return; }
-  }
-  if(can && typeof lm.openSettings === 'function'
-     && lm.isAccessRequested && !lm.isAccessGranted){
-    try{ lm.openSettings(); return; }catch(e){}
-  }
-  // Последняя и самая надёжная дорога: чат с ботом. Но сперва просим бота
-  // прислать туда кнопку — иначе выйдет пустой жест: приложение закроется, а
-  // в чате человека ничего не ждёт. Клавиатура с кнопкой появляется только
-  // вместе с сообщением, и если бот давно молчал, её там нет.
-  _tap('light');
-  toast('Открываю чат — там написано, что включить');
-  try{ await drvApi.drvFetch('/api/driver/geo/help', {method:'POST'}); }catch(e){}
-  setTimeout(() => { try{ tg.close(); }catch(e){} }, 900);
-}
-
 async function load(){
   try{
     // Заказы опрашиваются каждые пять секунд — от них зависит, поедет ли
@@ -5178,9 +5145,12 @@ function shPaint(){
   // владельца: на смене обязан быть виден; не вернулась до конца смены —
   // вход закрывается.
   const lost = on && !(geo.watch_ok !== undefined ? geo.watch_ok : geo.ok);
-  // Пропажа геопозиции экран не запирает (владелец, 11 сен 2026): о ней
-  // говорит полоса на заказах, а заказы остаются заказами.
-  const blocked = !on;
+  // Водитель выключил трансляцию — вход закрыт до тех пор, пока не включит
+  // (владелец, 13 сен 2026: «просто отбирай доступ, как было до этого»).
+  // Стоянка без движения при живой трансляции замок не даёт: телефон в
+  // кармане шлёт точку редко, это не выключенная геолокация.
+  const off = on && (geo.stream !== undefined ? !geo.stream : !geo.ok);
+  const blocked = !on || off;
   // Кнопка смены в панели светится, пока смена идёт: состояние дня видно с
   // любого экрана, не заходя внутрь.
   const mid = document.getElementById('tbShIc');
@@ -5193,27 +5163,14 @@ function shPaint(){
   const list = document.getElementById('shList');
   const go = document.getElementById('shGo');
 
-  // Геопозиция пропала на открытой смене. Два случая, и водителю говорим,
-  // который: «выключил» чинится в чате, «два часа на одном месте» — ехать
-  // (а если едет, а точка стоит — чинить геолокацию в телефоне).
-  if(lost){
-    const stale = !!geo.stream;
-    const h = Math.floor((geo.still_sec || 0) / 3600), m = Math.floor(((geo.still_sec || 0) % 3600) / 60);
+  // Трансляция выключена на открытой смене: вход закрыт, на экране — как
+  // включить обратно. Чинится в чате с ботом геопозиции.
+  if(off){
     ico.innerHTML = svg(SH_ICO.geo, 30);
-    document.getElementById('shT').textContent = stale
-      ? 'Оператор видит вас на одном месте' : 'Геопозиция не транслируется';
-    document.getElementById('shS').textContent = stale
-      ? `Без движения уже ${h ? h + ' ч ' : ''}${m} мин.`
-      : 'Смена идёт, но оператор не видит, где вы. Заказы не придут, пока трансляция не вернётся.';
-    list.innerHTML = stale ? `
-      <div class="shc">
-        <span class="shc-i">${svg(SH_ICO.dot, 14)}</span>
-        <span class="shc-b">
-          <span class="shc-t">Едете, а точка стоит — проверьте геолокацию в телефоне</span>
-          <span class="shc-s">Телеграму нужен доступ к геопозиции «Всегда». Не помогло — выключите трансляцию в чате и включите заново.</span>
-          ${_geoWay()}
-        </span>
-      </div>` : `
+    document.getElementById('shT').textContent = 'Геопозиция не транслируется';
+    document.getElementById('shS').textContent =
+      'Смена идёт, но оператор не видит, где вы. Заказы не придут, пока трансляция не вернётся.';
+    list.innerHTML = `
       <div class="shc">
         <span class="shc-i">${svg(SH_ICO.dot, 14)}</span>
         <span class="shc-b">
@@ -6120,7 +6077,7 @@ function renderOrders(){
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
   if(!active.length){
-    box.innerHTML = geoBar() + `<div class="oe">
+    box.innerHTML = `<div class="oe">
       <img src="img/empty-orders.png" alt="" width="744" height="505">
       <b>Заказов нет</b>
       <i>Сейчас нет активных заказов.<br>Отдохните — новые поездки скоро появятся.</i>
@@ -6134,7 +6091,7 @@ function renderOrders(){
   if(active.length && !active.some(o => o.order_id === OPEN_OID)) OPEN_OID = active[0].order_id;
   const cur = active.find(o => o.order_id === OPEN_OID) || active[0];
   const rest = active.filter(o => o !== cur);
-  box.innerHTML = geoBar() + ordHead(active) + orderCard(cur, active.indexOf(cur)) +
+  box.innerHTML = ordHead(active) + orderCard(cur, active.indexOf(cur)) +
     (rest.length ? `<div class="dc">
       <div class="dc-cap"><span>Следующие</span><b>${rest.length}<u>${plural(rest.length,'заказ','заказа','заказов')}</u></b></div>
       ${rest.map(o => ordMini(o, active.indexOf(o))).join('')}
@@ -6173,26 +6130,6 @@ async function ordRefresh(btn){
   await new Promise(r => setTimeout(r, Math.max(0, 700 - (Date.now() - t0))));
   const b = document.querySelector('.oe button'); if(b) b.classList.remove('busy');
 }
-// Строка о геопозиции. Когда всё в порядке — молчит и не занимает места.
-function geoBar(){
-  const g = (SH || {}).geo;
-  // Судим как сторож: трансляция выключена — или два часа без движения.
-  // Старая точка при живой трансляции — не повод: телефон в кармане
-  // присылает её раз в несколько минут.
-  if(g ? (g.watch_ok !== undefined ? g.watch_ok : g.ok) : GEO.state !== 'off') return '';
-  const still = g && g.stream;
-  const sec = (g || {}).still_sec || 0, h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-  const head = still ? 'Два часа без движения' : 'Оператор не видит, где вы';
-  const sub = still
-    ? `на одном месте уже ${h ? h + ' ч ' : ''}${m} мин — оператор это видит`
-    : 'нажмите — пришлём в чат, как включить трансляцию';
-  return `<div class="dc dn"><button class="dc-r" onclick="geoFix()">
-    <span class="dc-st no">${svg(ICO.pin, 13)}</span>
-    <span class="dc-b">${head}<i class="dn">${sub}</i></span>
-    <em>${svg('<path d="M9 6l6 6-6 6"/>', 13)}</em>
-  </button></div>`;
-}
-
 // Шапка вкладки: что на руках прямо сейчас. Крупно — наличные, которые
 // предстоит собрать; рядом оплаченное заранее и бутылки. Просрочка — строкой.
 function ordHead(active){

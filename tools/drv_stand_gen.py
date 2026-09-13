@@ -135,6 +135,7 @@ async function standBoot(){
   SH = ST_SHIFT;
   await load();
   setTab(ST_Q.get('tab') || 'orders');
+  shPaint();   // как в бою: boot() → shLoad() → shPaint() — замок смены/гео
   await new Promise(r => setTimeout(r, 80));
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') === 'edit'){ openEdit(ST_ORDER.order_id); await pickOpen(); if(ST_Q.get('pick')) pickStep('gin', 0, 1); }
@@ -158,7 +159,7 @@ assert src.count('<script src="api.js"></script>') == 1
 src = src.replace('<script src="api.js"></script>', API)
 assert src.count("\nboot();") == 1
 src = src.replace("\nboot();", "\nstandBoot();")
-src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:390px;margin:0;overflow:visible}.sheet{right:auto;width:390px}.hdr{width:390px}.tabbar{width:390px}.call-bar{width:390px}.sheet-in{max-width:390px}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:390px}</style></head>""", 1)
+src = src.replace("</head>", """<style>html,body{height:auto;min-height:0}body{width:390px;margin:0;overflow:visible}.sheet{right:auto;width:390px}.hdr{width:390px}.tabbar{width:390px}.call-bar{width:390px}.shscr{width:390px;right:auto}.sheet-in{max-width:390px}#sterr{white-space:pre-wrap;font:11px/1.3 monospace;color:#f88;padding:10px;width:390px}</style></head>""", 1)
 src = src.replace("</body>", '<div id="sterr"></div></body>', 1)
 # для снимков журнал стенда мешает: длинные строки растягивают страницу шире 390
 src = src.replace("</head>", "<script>if(new URLSearchParams(location.search).get('nolog'))document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sterr');if(e)e.style.display='none'});</script></head>", 1)

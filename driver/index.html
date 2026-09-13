@@ -989,16 +989,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    #F6C265, серый текст #8E98C0, пунктир #35394E. Палитра живёт только здесь. */
 .xp{--xbg:#070A12;--xcard:#0A0D17;--xcard2:#090C16;--xline:#23263E;--xline2:#272B46;--xgold:#F6C265;--xgold2:#E9B455;
   --xsub:#8E98C0;--xdesc:#B4BFE3;--xdash:#35394E;--xbtn:#252936;--xbtnb:#2C2D45;--xradio:#464660;--xdiv:#40415C;
-  margin:-6px -13px 0;padding:6px 15px 0;background:var(--xbg);min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar));color:#fff}
+  display:flex;flex-direction:column;min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar));color:#fff}
 body.xp-on{background:#070A12}
-.xp-back{display:inline-flex;align-items:center;gap:6px;padding:6px 4px 6px 0;margin:0 0 14px;border:0;background:none;
-  font-family:inherit;font-size:19px;font-weight:600;color:var(--xgold);cursor:pointer}
-.xp-h{display:flex;align-items:center;gap:16px;padding:0 0 20px}
-.xp-hi{flex:0 0 auto;width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+.xp-h{display:flex;align-items:center;gap:14px;padding:2px 0 16px}
+.xp-hi{flex:0 0 auto;width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;
   background:#121217;color:var(--xgold)}
 .xp-h b{display:block;font-size:28px;font-weight:700;color:#fff;letter-spacing:-.4px;line-height:1.1}
 .xp-h i{display:block;margin-top:6px;font-style:normal;font-size:14.5px;color:var(--xsub)}
-.xp-ch{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 24px}
+.xp-ch{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 16px}
 .xp-c{display:flex;align-items:center;gap:10px;min-height:66px;padding:12px 10px;border-radius:16px;border:1.5px solid var(--xline);
   background:var(--xcard2);font-family:inherit;color:#fff;text-align:left;cursor:pointer}
 .xp-c.on{border-color:var(--xgold);background:#1A1812}
@@ -1010,9 +1008,9 @@ body.xp-on{background:#070A12}
 .xp-c b{display:block;font-size:14px;font-weight:700;line-height:1.2;white-space:nowrap}
 .xp-c i{display:block;margin-top:3px;font-style:normal;font-size:11.5px;line-height:1.25;color:var(--xsub)}
 .xp-c.on i{color:var(--xgold)}
-.xp-l{font-size:14.5px;color:#F4F6FF;padding:0 0 9px}
+.xp-l{font-size:14px;color:#F4F6FF;padding:0 0 8px}
 .xp-l i{display:block;margin-top:3px;font-style:normal;font-size:13px;color:var(--xsub)}
-.xp-amt{display:flex;align-items:center;height:52px;margin:0 0 24px;padding:0 12px 0 16px;border-radius:14px;
+.xp-amt{display:flex;align-items:center;height:48px;margin:0 0 16px;padding:0 12px 0 16px;border-radius:14px;
   border:1.5px solid var(--xline2);background:#080B13}
 .xp-amt:focus-within{border-color:var(--xgold)}
 .xp-amt > span{flex:0 0 auto;font-size:17px;color:var(--xsub);padding-right:16px;border-right:1px solid var(--xdiv);margin-right:16px}
@@ -1024,18 +1022,18 @@ body.xp-on{background:#070A12}
   background:#2A2D45;color:#fff;cursor:pointer;padding:0}
 .xp-x[hidden]{display:none}
 .xp-amt .exp-mk{flex:0 0 auto;margin-left:6px}
-.xp-ph{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 24px}
+.xp-ph{flex:1 1 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px;min-height:132px}
 .xp-ph.one{grid-template-columns:1fr}
 .xp-z{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:100%;
-  min-height:184px;padding:14px 10px 12px;border-radius:16px;border:1.5px solid var(--xline);background:var(--xcard);
+  min-height:0;height:100%;padding:14px 10px 12px;border-radius:16px;border:1.5px solid var(--xline);background:var(--xcard);
   font-family:inherit;color:#fff;cursor:pointer;overflow:hidden}
 .xp-z::before{content:'';position:absolute;inset:7px;border-radius:12px;border:1.5px dashed var(--xdash);pointer-events:none}
 .xp-zn{position:absolute;left:14px;top:14px;width:20px;height:20px;border-radius:50%;background:var(--xgold);color:#1a1408;
   font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
-.xp-z > svg{color:var(--xgold);margin-top:14px}
-.xp-z b{display:block;margin-top:12px;font-size:15px;font-weight:700;text-align:center}
-.xp-z i{display:block;margin-top:6px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--xdesc);text-align:center}
-.xp-zb{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:34px;margin-top:14px;border-radius:9px;
+.xp-z > svg{color:var(--xgold);margin-top:10px}
+.xp-z b{display:block;margin-top:10px;font-size:15px;font-weight:700;text-align:center}
+.xp-z i{display:block;margin-top:5px;font-style:normal;font-size:12.5px;line-height:1.35;color:var(--xdesc);text-align:center}
+.xp-zb{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:34px;margin-top:12px;border-radius:9px;
   border:1px solid var(--xbtnb);background:var(--xbtn);color:#fff;font-size:13px;font-weight:600}
 .xp-zb svg{color:var(--xgold)}
 .xp-z.set{padding:0;border-color:rgba(246,194,101,.55)}
@@ -1044,7 +1042,7 @@ body.xp-on{background:#070A12}
 .xp-z.set .xp-zb{position:absolute;left:10px;right:10px;bottom:10px;width:auto;margin:0;background:rgba(7,10,18,.82)}
 .xp-z.bad{border-color:#E05555}
 .xp-z.bad .xp-zb{color:#F5A3A3}
-.xp-cm{display:block;width:100%;min-height:76px;padding:14px 16px;margin:0 0 8px;border-radius:14px;border:1.5px solid var(--xline);
+.xp-cm{display:block;width:100%;min-height:64px;padding:12px 16px;margin:0;border-radius:14px;border:1.5px solid var(--xline);
   background:#0A0E18;color:#fff;font-family:inherit;font-size:15px;line-height:1.4;resize:none;outline:none}
 .xp-cm:focus{border-color:var(--xgold)}
 .xp-cm::placeholder{color:var(--xsub)}
@@ -1054,7 +1052,8 @@ body.xp-on{background:#070A12}
 .xp-go:active{transform:scale(.99)}
 .xp-go.sec{background:var(--xbtn);border:1px solid var(--xbtnb);color:#fff;box-shadow:none}
 .xp-go[disabled]{background:linear-gradient(90deg,#7A6238,#6E5834);color:#000;box-shadow:none;cursor:default}
-.xp .dv-foot{background:linear-gradient(180deg,rgba(7,10,18,0),#070A12 40%);padding-top:12px;left:0;right:0;padding-left:15px;padding-right:15px}
+.xp .dv-foot{background:linear-gradient(180deg,rgba(7,10,18,0),#070A12 40%);padding-top:12px;left:0;right:0;padding-left:13px;padding-right:13px}
+.xp .dv-sp{flex:0 0 auto}
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
@@ -6120,7 +6119,7 @@ function renderOrders(){
 // на сотню пикселей (вебвью считает высоту иначе, чем браузер), и страница
 // уезжала под шапку. Теперь высоту блока добиваем по настоящим размерам:
 // от его верха до нижнего отступа страницы.
-const FIT_SEL = [['.he', 0], ['.oe', 0], ['.hs-page', 1]];
+const FIT_SEL = [['.he', 0], ['.oe', 0], ['.hs-page', 1], ['.xp', 1]];
 function fitFill(el, exact){
   if(!el) return;
   // Телеграм знает, сколько вебвью видно на самом деле; берём меньшее из двух,
@@ -7445,13 +7444,12 @@ function expPage(kind){
   else btn = {t: 'Сохранить', mode: ''};
   const comment = sent && sent.comment && sent.comment !== T.t && sent.comment !== 'Заправка' ? sent.comment : '';
   const zones = kind === 'wash'
-    ? `<div class="xp-l">Фото для подтверждения<i>Сначала фото машины, затем чек</i></div>
+    ? `<div class="xp-l">Фото для подтверждения</div>
        <div class="xp-ph">${xpZone(kind, 'car', kept, 1)}${xpZone(kind, 'rcp', kept, 2)}</div>`
-    : `<div class="xp-l">Фото для подтверждения<i>Чек или квитанция с заправки</i></div>
+    : `<div class="xp-l">Фото для подтверждения</div>
        <div class="xp-ph one">${xpZone(kind, 'rcp', kept, 0)}</div>`;
   return `<div class="xp">
-    <button class="xp-back" onclick="expBack()">${svg(ICO.back, 20)}Назад</button>
-    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 30)}</span><div><b>${T.t}</b><i>${T.s}</i></div></div>
+    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 28)}</span><div><b>${T.t}</b></div></div>
     <div class="xp-ch">
       <button class="xp-c${yes ? ' on' : ''}" onclick="xpPick('${kind}','yes')"><span class="xp-ci">${yes ? svg(ICO.ok, 15) : ''}</span>
         <div><b>Был расход</b><i>${sent ? fmt(sent.amount) + ' AED' : 'Укажу сумму'}</i></div></button>
@@ -7490,8 +7488,8 @@ function renderExpenses(){
 
   if(EXP_PAGE){
     const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
-    const own = EXP_PAGE === 'fuel' || EXP_PAGE === 'wash';   // у этих страниц своя шапка и «Назад»
-    if(own) hdrPage(''); else hdrPage(back + `<b>${EXP_PAGE_T[EXP_PAGE] || 'Расходы'}</b>`);
+    const own = EXP_PAGE === 'fuel' || EXP_PAGE === 'wash';   // у этих страниц свой крупный заголовок внутри
+    hdrPage(back + `<b>${own ? 'Расходы' : (EXP_PAGE_T[EXP_PAGE] || 'Расходы')}</b>`);
     document.body.classList.toggle('xp-on', own);
     let html = '';
     if(EXP_PAGE === 'meal') html = mealBox();
@@ -7502,6 +7500,7 @@ function renderExpenses(){
     else html = expBox('fuel', 'Бензин', ICO.fuel) + expBox('wash', 'Мойка', ICO.wash) + other.map(otherBox).join('')
       + (other.length ? '' : `<div class="pf-fxnote">Других расходов за смену пока нет.</div>`);
     box.innerHTML = html;
+    if(own) fitAll();
     return;
   }
   hdrPage('');

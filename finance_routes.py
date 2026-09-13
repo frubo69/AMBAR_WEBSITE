@@ -634,6 +634,47 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     return res
 
 
+async def person_card(name: str, month: str) -> dict:
+    """Зарплата и списания одного человека за месяц — для профиля в приложении
+    водителя. Отдаём только его: чужие суммы туда не попадают."""
+    book = await build(month)
+    pay_ = book.get("pay") or {}
+    p = next((x for x in (pay_.get("people") or []) if x.get("name") == name), None)
+    try:
+        raw = [i for i in await db.fin_pay_items_get() if str(i.get("name") or "") == name]
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] удержания {name} не прочитаны: {e}")
+        raw = []
+    items, fines, holds, cnt = [], 0.0, 0.0, 0
+    for it in sorted(raw, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
+        if it.get("kind") == "bonus":
+            continue
+        sch = pay.schedule(it, month)
+        gone = bool(it.get("cancelled_at"))
+        due = 0.0 if gone else sch["due"]
+        if due > 0:
+            cnt += 1
+            if it.get("kind") == "fine":
+                fines += due
+            else:
+                holds += due
+        items.append(dict(id=str(it.get("_id")), kind=it.get("kind"), t=pay.KINDS.get(it.get("kind"), ""),
+                          amount=pay._i(pay._n(it.get("amount"))), per_month=pay._i(pay._n(it.get("per_month"))),
+                          day=it.get("day") or "", start=str(it.get("from") or "")[:7],
+                          reason=it.get("reason") or "", note=it.get("note") or "",
+                          due=pay._i(due), left=0 if gone else sch["after"], done=False if gone else sch["done"],
+                          cancelled=gone))
+    out = dict(month=month, name=name, fines=pay._i(fines), holds=pay._i(holds),
+               month_total=pay._i(fines + holds), month_count=cnt, items=items,
+               usd=pay_.get("usd"), found=bool(p))
+    for k in ("role", "rate", "rate_aed", "unit", "cur", "days", "days_auto", "days_set",
+              "accrued", "plus", "minus", "to_pay", "paid", "left", "debt", "payouts"):
+        out[k] = (p or {}).get(k)
+    out["role_t"] = {"driver": "Водитель", "operator": "Оператор",
+                     "senior": "Старший оператор", "other": "Старший"}.get((p or {}).get("role") or "", "")
+    return out
+
+
 def _penalty_history(items: list, month: str, limit: int = 60) -> list:
     """История штрафов и удержаний для «Штрафов/авансов/долгов»: последние
     сверху, отменённые и пересмотренные — с пометкой. От людей не зависит: кого

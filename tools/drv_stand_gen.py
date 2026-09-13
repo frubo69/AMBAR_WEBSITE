@@ -58,11 +58,24 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path === '/api/driver/shift') return ST_SHIFT;
   if(path === '/api/driver/rates') return ST_RATES;
   if(path === '/api/driver/catalog') return ST_CAT;
+  if(path === '/api/driver/profile') return ST_PROF;
   if(path.endsWith('/chat') && m === 'GET') return {order_id: ST_ORDER.order_id, chat: [{by:'driver', name:'Али', text:'Клиент не отвечает', at:_agoIso(4), kind:'client'}, {by:'operator', name:'Парвиз', text:'Ждите 5 минут, звоню клиенту', at:_agoIso(2), kind:''}], operator: 'Парвиз'};
   stLog('API ' + m + ' ' + path + ' ' + JSON.stringify(opts.body || {}));
   if(path.endsWith('/fx')) { const r = ST_RATES.rates.find(x => x.code === (opts.body || {}).code); ST_ORDER.pay_fx = r ? {code: r.code, name: r.name, sym: r.sym, rate: r.rate, amount: Math.round(ST_ORDER.total / r.rate * 100) / 100} : null; return {ok: true, pay_fx: ST_ORDER.pay_fx}; }
   return {ok: true};
 }};
+// профиль: зарплата и списания за месяц
+const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t: 'Водитель', code: 'B1', district: 'jvc',
+  district_name: 'JVC', since: '2025-05-12', active: true, rate: 5000, cur: 'AED', unit: 'month', days: 26,
+  accrued: 5000, plus: 0, minus: 1750, fines: 1350, holds: 400, to_pay: 3250, paid: 0, left: 3250, debt: 0,
+  month_total: 1750, month_count: 5,
+  items: [
+    {id: 'p1', kind: 'fine', t: 'Штраф', amount: 1000, per_month: 0, day: '2026-09-12', reason: 'Превышение скорости · 71 – 100 км/ч', note: 'Превышение скорости на E311', due: 1000, left: 0, done: true, cancelled: false},
+    {id: 'p2', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-09-08', reason: '', note: 'Аванс за топливо', due: 400, left: 0, done: true, cancelled: false},
+    {id: 'p3', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-05', reason: 'Использование телефона за рулём · Во время движения', note: 'Использование телефона за рулем', due: 350, left: 0, done: true, cancelled: false},
+    {id: 'p4', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-01', reason: 'Неправильная парковка · В неположенном месте', note: 'Парковка в запрещённой зоне', due: 350, left: 0, done: true, cancelled: false},
+    {id: 'p5', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-08-28', reason: 'Опоздание на смену', note: 'Опоздание более 30 минут', due: 0, left: 0, done: true, cancelled: false},
+    {id: 'p6', kind: 'fine', t: 'Штраф', amount: 600, per_month: 0, day: '2026-08-20', reason: 'Неправильная парковка', note: '', due: 0, left: 0, done: false, cancelled: true}]};
 const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(120), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
 async function standBoot(){
   ME = {name: 'Али', district: 'alg', district_code: 'B4'};

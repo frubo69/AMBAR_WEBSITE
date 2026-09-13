@@ -373,6 +373,34 @@ async def _shift_view(me: dict) -> dict:
 
 
 @require_driver
+async def handle_profile(request):
+    """Профиль водителя: его зарплата за месяц и его же списания. Чужого здесь
+    не бывает — имя берём из подписи телеграма, а не из запроса."""
+    me = request["driver"]
+    month = str(request.query.get("month") or "")[:7]
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        month = _biz_day()[:7]
+    import finance_routes as fin
+    try:
+        card = await fin.person_card(me["name"], month)
+    except Exception as e:                        # noqa: BLE001
+        log.error(f"[driver] профиль {me['name']}: {e}")
+        return web.json_response({"error": "book"}, status=500, headers=CORS_HEADERS)
+    from config_offices import OFFICE_NAMES, OFFICE_CODES
+    card["district"] = me.get("district") or staff.base_district(me["name"]) or ""
+    card["district_name"] = OFFICE_NAMES.get(card["district"], "")
+    card["code"] = OFFICE_CODES.get(card["district"], "")
+    try:
+        doc = await db.get_driver_by_name(me["name"]) or {}
+    except Exception:                             # noqa: BLE001
+        doc = {}
+    since = doc.get("created") or doc.get("linked_at") or doc.get("at")
+    card["since"] = str(since)[:10] if since else ""
+    card["active"] = not bool(doc.get("hidden") or doc.get("blocked"))
+    return web.json_response(card, headers=CORS_HEADERS)
+
+
+@require_driver
 async def handle_shift(request):
     return web.json_response(await _shift_view(request["driver"]), headers=CORS_HEADERS)
 
@@ -2193,6 +2221,7 @@ def setup(app):
         ("/api/driver/stock/move",              handle_move_scan,   "POST"),
         ("/api/driver/stock/move/undo",         handle_move_undo,   "POST"),
         ("/api/driver/stock/move/{tid}",        handle_move_del,    "DELETE"),
+        ("/api/driver/profile",                 handle_profile,     "GET"),
         ("/api/driver/shift",                   handle_shift,       "GET"),
         ("/api/driver/shift/open",              handle_shift_open,  "POST"),
         ("/api/driver/shift/close",             handle_shift_close, "POST"),

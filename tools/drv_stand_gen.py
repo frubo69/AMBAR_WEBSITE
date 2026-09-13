@@ -46,6 +46,7 @@ if(ST_Q.get('req')) ST_ORDER.driver_req = {kind: ST_Q.get('req'), status: 'open'
 if(ST_Q.get('chat')) ST_ORDER.chat_new = 1;
 if(ST_Q.get('stl')) ST_ORDER.settle = {taken: 110.1, diff: 10.1, by: 'Али', at: '', fx: {code: 'USD', amount: 30, rate: 3.67, sym: '$'}};
 const ST_ORDER2 = {...ST_ORDER, order_id: 'AMB00000002', address: 'Marina Walk 7', items: [ST_ORDER.items[0]], total: 95, deliver_by: '04:20', pay_fx: null, driver_req: null, chat_new: 0};
+let ST_ACTIVE = [ST_ORDER, ST_ORDER2];   // список заказов в работе; mock=1 добавляет третий
 const ST_RATES = {rates: [{code:'USD', name:'Доллар США', sym:'$', rate:3.67, cash:true, main:true}, {code:'EUR', name:'Евро', sym:'€', rate:4.02, cash:true, main:true},
   {code:'GBP', name:'Фунт стерлингов', sym:'£', rate:4.65, cash:false, main:true}, {code:'RUB', name:'Российский рубль', sym:'₽', rate:0.0405, cash:true, main:true},
   {code:'TRY', name:'Турецкая лира', sym:'₺', rate:0.089, cash:false, main:true}, {code:'CNY', name:'Китайский юань', sym:'¥', rate:0.51, cash:false, main:true},
@@ -66,7 +67,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     window.__FAILN = (window.__FAILN || 0) + 1;
     if(!lim || window.__FAILN <= +lim){ const e = new Error('stand fail'); e.status = +(ST_Q.get('code') || 500); throw e; }
   }
-  if(path === '/api/driver/orders') return {day: '2026-09-11', active: (ST_Q.get('noorders') || ST_Q.get('tab') === 'shift' && !ST_Q.get('route')) ? [] : [ST_ORDER, ST_ORDER2], done: [{...ST_ORDER2, order_id: 'AMB00000009', delivered_at: _agoIso(38)}], total_aed: 95, panic: false};
+  if(path === '/api/driver/orders') return {day: '2026-09-11', active: (ST_Q.get('noorders') || ST_Q.get('tab') === 'shift' && !ST_Q.get('route')) ? [] : ST_ACTIVE, done: [{...ST_ORDER2, order_id: 'AMB00000009', delivered_at: _agoIso(38)}], total_aed: 95, panic: false};
   if(path === '/api/driver/expenses' && m === 'POST'){ stLog('API POST ' + path + ' ' + JSON.stringify(opts.body || {})); return {ok: true}; }
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0, working: true, meal_rates: {working: 80, off: 40},
     kinds: [{id:'fuel',t:'Заправка',receipt:true},{id:'wash',t:'Мойка',receipt:true},{id:'parking',t:'Парковка',receipt:true},{id:'guard',t:'Охрана'},{id:'kfc',t:'KFC · премия'},{id:'we_gave',t:'Мы вернули'},{id:'owed_us',t:'Нам должны'},{id:'we_got',t:'Нам вернули',plus:true},{id:'we_owe',t:'Мы должны',plus:true},{id:'other',t:'Что-то ещё'}],
@@ -137,9 +138,15 @@ async function standBoot(){
   // 00:43 (37 мин назад для карточки), доставка 50 мин, быть до 01:33, не просрочен
   if(ST_Q.get('mock')){
     const d = new Date(); d.setHours(0, 43, 0, 0);
-    Object.assign(ST_ORDER, {order_id: 'AMB3207975F', items: [ST_ORDER.items[0]], total: 95, eta: 50, deliver_by: '01:33',
-      confirmed_at: new Date(Date.now() - 37 * 60000).toISOString(), chat_n: 0});
-    if(ST_Q.get('open') === 'inc') ST_ORDER.confirmed_at = d.toISOString();
+    // mock=1: до «быть до» ~1,5 мин (жёлтый), кольцо ~20 %; mock=2: ~21,5 мин (зелёный)
+    const green = ST_Q.get('mock') === '2';
+    const due = new Date(Date.now() + (green ? 21.5 : 1.55) * 60000);
+    const hm = String(due.getHours()).padStart(2, '0') + ':' + String(due.getMinutes()).padStart(2, '0');
+    Object.assign(ST_ORDER, {order_id: 'AMB3207975F', items: [ST_ORDER.items[0]], total: 95, eta: 50, deliver_by: hm,
+      confirmed_at: new Date(Date.now() - (green ? 5 : 6.5) * 60000).toISOString(), chat_n: 0});
+    Object.assign(ST_ORDER2, {order_id: 'AMB3207991C', district: 'Дубай Марина', deliver_by: '02:10'});
+    ST_ACTIVE.push({...ST_ORDER2, order_id: 'AMB3208003A', district: 'Джумейра', deliver_by: '02:45', address: 'Jumeirah 1'});
+    if(ST_Q.get('open') === 'inc'){ ST_ORDER.confirmed_at = d.toISOString(); ST_ORDER.deliver_by = '01:33'; }
     window._isLate = () => false;
   }
   await load();
@@ -160,6 +167,15 @@ async function standBoot(){
   if(ST_Q.get('open') === 'pick'){ await new Promise(r => setTimeout(r, 150)); histPick(); }
   if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 150)); profHist(); if(ST_Q.get('chip')) hsPick(ST_Q.get('chip')); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); if(ST_Q.get('mon')) hsMonth(); }
   if(ST_Q.get('open') === 'rates'){ await new Promise(r => setTimeout(r, 150)); profRates(); if(ST_Q.get('chip')) fxdPick(ST_Q.get('chip')); if(ST_Q.get('row')) fxdOpen(ST_Q.get('row')); }
+  // ?dbg=sel1,sel2 — размеры элементов в конце страницы (для промеров без браузера)
+  if(ST_Q.get('dbg')){
+    await new Promise(r => setTimeout(r, 200));
+    const out = document.createElement('pre'); out.id = 'dbgout';
+    out.textContent = ST_Q.get('dbg').split(',').map(sel => Array.from(document.querySelectorAll(sel)).slice(0, 4).map(el => {
+      const r = el.getBoundingClientRect(); return `${sel} x ${r.left.toFixed(1)}-${r.right.toFixed(1)} y ${(r.top + scrollY).toFixed(1)}-${(r.bottom + scrollY).toFixed(1)} w ${r.width.toFixed(1)} h ${r.height.toFixed(1)}`;
+    }).join('\n')).join('\n');
+    document.body.appendChild(out);
+  }
   await new Promise(r => setTimeout(r, 120));
   const card = document.querySelector('.oc');
   let over = 0;

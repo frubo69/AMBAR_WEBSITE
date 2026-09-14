@@ -1616,6 +1616,9 @@ async def _audit_lines(district: str, day: str) -> tuple:
             "expected": e, "actual": a, "diff": d,     # >0 — не хватает бутылок
             "noqr": int(noqr.get(pid) or 0),
             "loss": _loss_of(pid, d) if d > 0 else 0,  # закупка за пропавшие
+            # Недостача удерживается по прайсу (правило владельца): это и
+            # есть сумма в отчёте и в окне «Удержать за недостачу».
+            "due": _sale_of(pid, d) if d > 0 else 0,
         })
     lines.sort(key=lambda r: r["no"])
     return lines, counted
@@ -1629,7 +1632,7 @@ def _audit_totals(lines: list) -> dict:
         "expected": sum(l["expected"] for l in lines),
         "actual": sum(l["actual"] for l in lines),
         "short_qty": sum(l["diff"] for l in short),
-        "short_aed": sum(l["loss"] for l in short),
+        "short_aed": sum(l["due"] for l in short),      # по прайсу
         "over_qty": sum(-l["diff"] for l in over),
         "noqr": sum(l["noqr"] for l in lines),
         "positions": len(live),
@@ -1785,7 +1788,7 @@ async def handle_audit_finish(request):
                 "code": c.get("code", ""), "verdict": c.get("verdict", ""),
                 "home": c.get("home", ""), "home_code": OFFICE_CODES.get(c.get("home") or "", "")})
     short_lines = [{"id": l["id"], "name": l["name"], "qty": l["diff"],
-                    "loss": l["loss"], "price": l["price"], "unit": l["unit"]}
+                    "loss": l["loss"], "due": l["due"], "price": l["price"], "unit": l["unit"]}
                    for l in lines if l["diff"] > 0]
     over_lines = []
     for l in lines:
@@ -2474,6 +2477,35 @@ def _loss_of(pid: str, qty: int) -> int:
         return 0
 
 
+def _sale_of(pid: str, qty: int) -> int:
+    """За сколько это продаём: прайс за бутылку × количество, AED. Цена в
+    прайсе — за учётную единицу (у пива ящик), поэтому делим, как и в закупке."""
+    try:
+        p = _catalog().get(pid) or {}
+        return int(round(_price(p) / max(1, _unit(p)) * max(0, int(qty or 0))))
+    except Exception:                                        # noqa: BLE001
+        return 0
+
+
+# Правило владельца (14 сен 2026): за бой, брак и просрочку удерживают
+# закупочную цену — убыток, а не наценку: бутылку разбили, а не украли. За
+# утерю и недостачу — полную цену по прайсу: бутылки нет, и продать её уже
+# нельзя, а куда она делась, никто не сказал.
+_COMP_FULL = ("потеря", "недостача")
+
+
+def _comp_basis(kind: str) -> str:
+    return "прайс" if (kind or "").strip() in _COMP_FULL else "закупка"
+
+
+def _comp_of(pid: str, qty: int, kind: str) -> int:
+    """Сколько удержать с виновного по правилу, AED. Цены нет — ноль: сумму
+    впишет человек, а не программа наугад."""
+    if _comp_basis(kind) == "прайс":
+        return _sale_of(pid, qty)
+    return _loss_of(pid, qty)
+
+
 async def _loss_load():
     """Подтянуть цены закупки. Зовётся перед выдачей списаний: строка сама
     ходить в базу не может, а считать без цен — значит показать нули."""
@@ -2503,6 +2535,10 @@ def _wo_row(r: dict, cat: dict) -> dict:
         # удерживают убыток, а не упущенную выручку: он разбил бутылку, а не
         # украл наценку.
         "loss": _loss_of(pid, qty),
+        # Сколько удерживать по правилу: бой/брак/просрочка — закупка, утеря и
+        # недостача — прайс. Это сумма по умолчанию в окне удержания.
+        "due": _comp_of(pid, qty, r.get("kind", "")),
+        "due_by": _comp_basis(r.get("kind", "")),
         "kind": r.get("kind", ""), "note": r.get("note", ""),
         "by": r.get("by", ""), "district": r.get("district", ""),
         "district_code": r.get("district_code", ""), "thumb": r.get("thumb", ""),
@@ -2647,7 +2683,7 @@ async def _blame_set(wid: str, body: dict, request, by_name: str, note: str = ""
     сумма = body.get("comp")
     await _loss_load()
     сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
-               else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
+               else _comp_of(doc.get("item") or "", int(doc.get("qty") or 0), doc.get("kind", "")))
     split = _split_parse(body)
     if split:
         кто = ", ".join(x["who"] for x in split)
@@ -2911,7 +2947,7 @@ async def handle_writeoff_decide(request):
         виновный = (str(body.get("who") or "").strip()[:60]
                     or str(doc.get("by") or "").strip()[:60])
         сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
-                   else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
+                   else _comp_of(doc.get("item") or "", int(doc.get("qty") or 0), doc.get("kind", "")))
         split = _split_parse(body)
         if split:
             виновный = ", ".join(x["who"] for x in split)

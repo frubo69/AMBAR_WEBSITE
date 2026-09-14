@@ -15341,7 +15341,7 @@ function audReport(rep){
   if(short){
     const rows = (short.lines || []).map(l => `<div class="aud-r">${img(l.id)}
       <span class="ord-r-n">${escS(l.name)}</span>
-      <span class="aud-d"><b class="dn">−${fmt(l.qty)}</b>${l.loss ? `<i>${fmt(l.loss)} AED</i>` : ''}</span></div>`).join('');
+      <span class="aud-d"><b class="dn">−${fmt(l.qty)}</b>${(l.due || l.loss) ? `<i>${fmt(l.due || l.loss)} AED</i>` : ''}</span></div>`).join('');
     const foot = short.resolved_at
       ? `<div class="aud-done">${_AUD_CHECK}<span>${short.blame
           ? `Удержано <b>${fmt(short.amount)} AED</b> · ${escS(short.who || '')}`
@@ -15543,8 +15543,9 @@ async function audOver(){
 
 // ── удержание за недостачу ──────────────────────────────────────────────────
 // То же окно, что у боя: с кого (можно нескольких), сколько, за что. Сумма по
-// умолчанию — закупка пропавших бутылок: с человека удерживают убыток, а не
-// упущенную выручку. Двое и больше — доли поровну, правятся, «Удержать» горит
+// умолчанию — полная цена пропавших бутылок по прайсу (правило владельца,
+// 14 сен 2026: утеря и недостача — полная компенсация; бой, брак и просрочка —
+// по закупке). Двое и больше — доли поровну, правятся, «Удержать» горит
 // только при точной сумме.
 async function audHoldOpen(){
   const rep = STK.report, s = rep && rep.audit && rep.audit.short; if(!s) return;
@@ -15571,7 +15572,7 @@ async function audHoldOpen(){
         <div class="wo-c-h">
           <div class="wo-c-t">Удержать за недостачу</div>
           <div class="wo-c-s">${fmt(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')} · ${
-            s.aed ? `закупка ${fmt(s.aed)} AED` : 'закупочной цены нет'}</div>
+            s.aed ? `прайс ${fmt(s.aed)} AED` : 'цены в прайсе нет'}</div>
         </div>
         <div class="wo-c-l">С кого <i>можно нескольких</i></div>
         <div class="wo-c-crew" id="audHoldWho">${(cards + tail)
@@ -30886,10 +30887,11 @@ async function woCompOpen(ev, id, режим){
       <div class="crw-c-b">${[...seniors, ...extra].map(n => chip(n, 'headset')).join('')}</div>
     </div>` : '';
   const list = cards + tail;
-  // Сумма по умолчанию — то, во что бутылка обошлась НАМ, а не то, за сколько
-  // она продавалась. С водителя удерживают убыток, а не упущенную выручку.
-  // Закупки нет — поле пустое: пусть впишет человек, чем программа наугад.
-  const amount = (r.comp || {}).amount || r.loss || '';
+  // Сумма по умолчанию — по правилу владельца: за бой, брак и просрочку —
+  // закупка (убыток, а не наценка), за утерю и недостачу — полная цена по
+  // прайсу. Считает сервер (due). Цены нет — поле пустое: пусть впишет
+  // человек, чем программа наугад.
+  const amount = (r.comp || {}).amount || r.due || '';
   // Уже разложенное по людям удержание открывается с теми же людьми.
   const split = (r.comp || {}).split || null;
   const chosen = new Set(split ? split.map(x => x.who) : (who ? [who] : []));
@@ -30902,8 +30904,8 @@ async function woCompOpen(ev, id, режим){
           ? 'Согласовать: кто платит'
           : 'Удержать за списание'}</div>
         <div class="wo-c-s">${escS(r.name)} × ${fmt(r.qty)} · ${escS(r.kind)}${
-          r.loss ? ` · закупка ${fmt(r.loss)} AED`
-                 : ' · закупочной цены нет'}</div>
+          r.due ? ` · ${r.due_by === 'прайс' ? 'прайс' : 'закупка'} ${fmt(r.due)} AED`
+                : ' · цены нет'}</div>
       </div>
       <div class="wo-c-l">С кого <i>можно нескольких</i></div>
       <div class="wo-c-crew" id="woCompWho">${list

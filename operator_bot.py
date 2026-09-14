@@ -140,7 +140,7 @@ PRODUCTS = [
     {"id":"p92", "name":"Bottega Rose 0.75",           "price":190, "cat":"Просекко"},
     {"id":"p93", "name":"Bottega Gold 0.75",           "price":240, "cat":"Просекко"},
     # ── Вино / Wine ───────────────────────────────────────────────────────────
-    {"id":"p96",  "name":"Jacob Creek Chardonnay 0.75",    "price":95, "cat":"Вино"},
+    {"id":"p96",  "name":"Jacob Creek Chardonnay Pinot Noir 0.75", "price":95, "cat":"Просекко"},
     {"id":"p97",  "name":"Pinot Grigio Cesari 0.75",      "price":95, "cat":"Вино"},
     {"id":"p98",  "name":"Le Grand Noir SB 0.75",         "price":95, "cat":"Вино"},
     {"id":"p105", "name":"Jacob Creek Shiraz 0.75",        "price":95, "cat":"Вино"},

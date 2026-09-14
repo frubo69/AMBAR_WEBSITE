@@ -2333,6 +2333,44 @@ async def handle_supply_hold(request):
 
 @require_driver
 @_no_test
+async def handle_supply_buy(request):
+    """Закупочная цена позиции заявки на другую базу — вписывает водитель по
+    приезду, до сканирования: {district, product_id, price, qty?}. Пустая
+    цена стирает запись. Ответ — задача целиком, с ценами и итогом."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    pid = str(body.get("product_id") or "").strip()
+    sup = await db.supply_get(sid)
+    if not sup or sup.get("status") != "open":
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if (sup.get("kind") or "main") != "extra":
+        return web.json_response({"error": "not_extra"}, status=400, headers=CORS_HEADERS)
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("driver") != me["name"]:
+        return web.json_response({"error": "not_mine"}, status=403, headers=CORS_HEADERS)
+    try:
+        price = round(float(body.get("price") or 0), 2)
+        qty = int(body.get("qty") or 0)
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_number"}, status=400, headers=CORS_HEADERS)
+    r = await supply_routes.buy_set(sup, pid, price, qty, me["name"],
+                                    int((request.get("tg") or {}).get("id") or 0))
+    if not r["ok"]:
+        return web.json_response({"error": r["error"]}, status=400, headers=CORS_HEADERS)
+    sup = await db.supply_get(sid)
+    return web.json_response(
+        supply_routes._task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, me["name"]),
+        headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_driver
+@_no_test
 async def handle_supply_noscan(request):
     """Товар забрали, коды не читали. Задача остаётся открытой — досканировать."""
     import supply_routes
@@ -2397,6 +2435,7 @@ def setup(app):
         ("/api/driver/supply/{sid}/finish",     handle_supply_finish, "POST"),
         ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
         ("/api/driver/supply/{sid}/hold",       handle_supply_hold,   "POST"),
+        ("/api/driver/supply/{sid}/buy",        handle_supply_buy,    "POST"),
     )
     seen = set()
     for path, handler, method in routes:

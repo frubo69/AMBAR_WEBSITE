@@ -1869,6 +1869,26 @@ body.xp-on{background:#070A12}
 .dli{width:100%;border:0;background:none;cursor:pointer;font-family:inherit;text-align:left;
   color:var(--text);padding:11px 0}
 .dli:first-child{border-top:0}
+/* Цены доп. заявки — экран перед приёмкой: строка = картинка, название с
+   «сколько», поле цены справа с единицей под ним. Вписанная строка золотится. */
+.xpr{display:flex;align-items:center;gap:12px;padding:10px 12px;border-top:1px solid var(--border2)}
+.xpr:first-child{border-top:0}
+.xpr-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.xpr-b b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xpr-b i{font-style:normal;font-size:12px;color:var(--muted)}
+.xpr.ok .xpr-b i{color:var(--gold2)}
+.xpr-in{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.xpr-in input{width:98px;height:44px;border-radius:12px;border:1px solid var(--border2);background:var(--card2);
+  color:#fff;font-family:inherit;font-size:20px;font-weight:700;text-align:right;padding:0 12px;font-variant-numeric:tabular-nums}
+.xpr-in input::placeholder{color:var(--muted);font-weight:500}
+.xpr-in input:focus{outline:none;border-color:var(--gold2)}
+.xpr.ok .xpr-in input{border-color:rgba(201,169,110,.45)}
+.xpr-in u{text-decoration:none;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.xpr-sum{display:flex;align-items:center;gap:10px;width:100%;margin:10px 0;padding:12px 14px;cursor:pointer;
+  font-family:inherit;color:var(--text);text-align:left}
+.xpr-sum span{flex:1;font-size:13.5px;font-weight:600}
+.xpr-sum b{font-family:'Space Grotesk',sans-serif;font-size:16px;color:var(--gold2)}
+.xpr-sum i{font-style:normal;font-size:12px;color:var(--muted)}
 .dli:active{background:var(--card2)}
 .dli.ok{opacity:.5;pointer-events:none}
 .dpl-n i{display:block;font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
@@ -8962,7 +8982,7 @@ async function supClaim(sid, oid){
 
 // ── экран задачи ───────────────────────────────────────────────────────────
 async function supOpen(sid, oid, pre){
-  TASK = pre || null; TASK_UPD = null;
+  TASK = pre || null; TASK_UPD = null; PRICES_OPEN = false;
   document.getElementById('supScr').classList.add('show');
   supRenderTask();
   if(!pre){
@@ -8987,6 +9007,7 @@ function supBack(){
 // перечитывает строки и показывает, что именно изменилось. Каждый скан несёт
 // свою версию: разошлась — сервер бутылку не примет и вернёт свежую задачу.
 var TASK_UPD = null, _supPollT = null, _supPollBusy = false;
+var PRICES_OPEN = false;      // экран цен открыт руками («изменить»), а не по необходимости
 function supPollStart(){ supPollStop(); _supPollT = setInterval(supPollTick, 5000); }
 function supPollStop(){ if(_supPollT){ clearInterval(_supPollT); _supPollT = null; } }
 async function supPollTick(){
@@ -9033,9 +9054,79 @@ function supTaskApply(r){
 }
 function supUpdOk(){ TASK_UPD = null; supRenderTask(); }
 
+// ── цены заявки на другую базу ──
+// Заявку на другую базу заводят, не зная цен: их узнают на базе. Поэтому по
+// приезду, до сканирования и до «без сканирования», водитель вписывает, за
+// сколько взял каждую позицию (владелец, 14 сен 2026). Одна строка — одно
+// поле, сохраняется само при вводе; «Дальше» открывается, когда вписано всё.
+function supRenderPrices(){
+  const t = TASK; if(!t) return;
+  _setText('supT', 'Сколько заплатили');
+  _setText('supS', t.base || 'другая база');
+  document.getElementById('supV').style.display = 'none';
+  document.getElementById('supAct').style.display = 'none';
+  const lines = t.lines.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  document.getElementById('supMid').innerHTML = `<div class="dcard xpr-list">${lines.map(l => `
+    <div class="xpr${l.price > 0 ? ' ok' : ''}" id="xpr-${esc(l.id)}">
+      <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
+      <span class="xpr-b"><b>${esc(l.name)}</b><i>${supPriceSub(l)}</i></span>
+      <span class="xpr-in">
+        <input inputmode="decimal" enterkeyhint="next" placeholder="0" autocomplete="off"
+               value="${l.price > 0 ? l.price : ''}" onfocus="this.select()"
+               onchange="supPriceSave('${esc(l.id)}', this)">
+        <u>AED / ${esc(l.unit_name || 'бутылку')}</u>
+      </span>
+    </div>`).join('')}</div>`;
+  document.getElementById('supBot').innerHTML = `
+    <div class="sup-tot">
+      <span class="sup-tot-l">Итого закупка</span>
+      <span class="sup-tot-v" id="xprTot">${fmt(t.cost || 0)}<u> AED</u></span>
+    </div>
+    <button class="btn btn-pri" id="xprGo" onclick="supPricesDone()"></button>`;
+  supPricesRefresh();
+}
+function supPriceSub(l){
+  const n = l.qty_total || l.need;
+  return `${fmt(n)} ${plural(n, 'бутылка', 'бутылки', 'бутылок')}${
+    l.price > 0 ? ` · ${fmt(Math.round(l.price * (l.units || 1)))} AED` : ''}`;
+}
+// Строки и итог — на месте, поле с фокусом не трогаем.
+function supPricesRefresh(){
+  const t = TASK; if(!t) return;
+  (t.lines || []).forEach(l => {
+    const row = document.getElementById('xpr-' + l.id); if(!row) return;
+    row.classList.toggle('ok', l.price > 0);
+    const i = row.querySelector('.xpr-b i'); if(i) i.textContent = supPriceSub(l);
+  });
+  const tot = document.getElementById('xprTot');
+  if(tot) tot.innerHTML = `${fmt(t.cost || 0)}<u> AED</u>`;
+  const go = document.getElementById('xprGo');
+  if(go){
+    const left = (t.lines || []).filter(l => !(l.price > 0)).length;
+    go.disabled = !!left;
+    go.textContent = left ? `Впишите цены · осталось ${left}` : 'Дальше';
+  }
+}
+async function supPriceSave(pid, inp){
+  const t = TASK; if(!t) return;
+  const price = parseFloat(String(inp.value || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/buy`,
+      {method:'POST', body:{district: t.district, product_id: pid, price}});
+    if(r && r.lines) TASK = r;
+    try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  }catch(e){ toast('Не удалось сохранить цену', 'err'); return; }
+  supPricesRefresh();
+}
+function supPricesDone(){ PRICES_OPEN = false; supRenderTask(); window.scrollTo({top: 0}); }
+function supPricesOpen(){ PRICES_OPEN = true; supRenderTask(); window.scrollTo({top: 0}); }
+
 function supRenderTask(){
   const t = TASK;
   if(!t) return;
+  // Заявка на другую базу без цен — сначала цены, потом всё остальное.
+  if(t.extra && (PRICES_OPEN || t.prices_ok === false)) return supRenderPrices();
   const ns = !!t.noscan_at;
   _setText('supT', `${t.district_code} · ${t.district_name}`);
   _setText('supS', t.extra ? (t.base || 'другая база') : supWhen(t));
@@ -9078,6 +9169,9 @@ function supRenderTask(){
         <b>${esc(t.hold.who)} вносит сейчас</b><i>${fmt(t.got)} из ${fmt(t.need)}</i></div>
       <div class="dupd-s">Коды с полки вносит старший. Здесь видно, сколько уже внесено; сканировать можно будет, когда он закончит.</div>
     </div>` : '';
+  // У заявки на другую базу над списком — что она стоила; отсюда цены правят.
+  const xprSum = t.extra && t.prices_ok ? `<button class="dcard xpr-sum" onclick="supPricesOpen()">
+      <span>Закупка на базе</span><b>${fmt(t.cost || 0)} AED</b><i>изменить</i></button>` : '';
   document.getElementById('supMid').innerHTML = upd + holdCard + `<div class="dtop">
       <span class="dtop-b"><span class="dchip ${t.left ? (ns ? 'warn' : '') : 'ok'}">${
           t.left ? (ns ? 'без сканирования' : t.got ? 'идёт приёмка' : 'ждёт')
@@ -9086,7 +9180,7 @@ function supRenderTask(){
           ns ? 'отсканировано' : 'добрано'}</span></span>
       <span class="dtop-n ${ns && t.left ? 'warn' : ''}">${fmt(t.got)}<i>из ${fmt(t.need)} ${plural(t.need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
-    </div>
+    </div>${xprSum}
     <div class="dcard dlist">${lines.map(l => `
       <button class="dpl dli ${l.left ? '' : 'ok'}" ${held ? 'disabled' : ''} onclick="supLineOpen('${l.id}')">
         <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
@@ -9151,6 +9245,10 @@ async function noscanSend(){
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/noscan`,
       {method:'POST', body:{district: t.district}});
+    if(!r.ok && r.verdict === 'prices_needed'){
+      finClose(); if(r.task) TASK = r.task; PRICES_OPEN = true; supRenderTask();
+      toast('Сначала впишите цены', 'err'); return;
+    }
     if(!r.ok) throw new Error(r.verdict);
     finClose();
     document.getElementById('supScr').classList.remove('show');
@@ -9331,6 +9429,13 @@ SCANQ.onDone = (err, r, job) => {
   }
   // Задача изменилась, пока сканировали: бутылку не приняли. Показываем, что
   // поменялось, и отпускаем код — после «Понятно» её сканируют заново.
+  if(r.verdict === 'prices_needed'){
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
+    if(r.task) TASK = r.task;
+    supLineClose(); PRICES_OPEN = true; supRenderTask();
+    toast('Сначала впишите цены', 'err');
+    return;
+  }
   if(r.verdict === 'outdated'){
     if(row){ row.state = 'fail'; row.label = 'заявка обновлена'; }
     SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);

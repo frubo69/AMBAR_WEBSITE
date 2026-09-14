@@ -648,16 +648,97 @@ def _hold_view(task: dict, me: str, now=None) -> dict:
             "live": bool(live and who != me), "mine": bool(live and who == me)}
 
 
+# ── закупочные цены заявки на другую базу ────────────────────────────────────
+# Цены такой заявки заранее не известны: их узнают на базе. Поэтому водитель
+# вписывает их по приезду, до сканирования и до «принять без сканирования»
+# (владелец, 14 сен 2026): пока цены не вписаны, сервер приёмку не начинает.
+# Цена — за учётную единицу (ящик у пива, бутылка у остального), как в чеке
+# базы и как в карточке старшего; хранится в buys заявки и дальше идёт в
+# стоимость склада и в финансы (stock_value.cost_map, finance _purchases).
+def _buy_unit(pid: str) -> dict:
+    import stock_routes
+    n = stock_routes._unit(stock_routes._catalog().get(pid) or {})
+    return {"n": n, "name": "ящик" if n > 1 else "бутылку"}
+
+
+def _prices_missing(sup: dict, oid: str) -> list:
+    """Позиции района без закупочной цены — только у заявок на другие базы."""
+    if (sup.get("kind") or "main") != "extra":
+        return []
+    buys = sup.get("buys") or {}
+    out = []
+    for it in sup.get("items") or []:
+        if int((it.get("by_district") or {}).get(oid) or 0) <= 0:
+            continue
+        try:
+            price = float((buys.get(it["id"]) or {}).get("price") or 0)
+        except (TypeError, ValueError):
+            price = 0.0
+        if price <= 0:
+            out.append(it["id"])
+    return out
+
+
+async def buy_set(sup: dict, pid: str, price: float, qty: int, who: str, by_id: int) -> dict:
+    """Записать (price > 0) или стереть (price <= 0) закупочную цену позиции.
+    Строка ищется в недоборе основной заявки или в составе заявки на другую
+    базу. Одна запись и для старшего, и для водителя."""
+    sid = sup.get("_id")
+    short = _shortfall(sup)
+    row = next((r for r in short["rows"] if r["id"] == pid), None)
+    if not row and (sup.get("kind") or "main") == "extra":
+        it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
+        if it:
+            row = {"id": pid, "name": it.get("name") or "", "gap": int(it.get("qty") or 0)}
+    if not row:
+        return {"ok": False, "error": "not_in_shortfall"}
+    if price < 0 or qty < 0 or price > 100000 or qty > 100000:
+        return {"ok": False, "error": "bad_number"}
+    if not qty:
+        qty = int(row.get("gap") or 0)          # взяли, сколько не хватало
+    было = ((sup.get("buys") or {}).get(pid) or {}).get("price")
+    now = datetime.now(timezone.utc)
+    doc = None if price <= 0 else {
+        "price": price, "qty": qty, "name": row.get("name") or "",
+        "at": now, "by": int(by_id or 0), "by_name": who,
+    }
+    if not await db.supply_buy_set(sid, pid, doc):
+        return {"ok": False, "error": "not_saved"}
+    log.info(f"[supply] закупка {pid}: {price} × {qty} ({sid}) · {who or '—'}")
+    _buy_note((sid, int(by_id or 0)), who, sup.get("day") or "",
+              {"id": pid, "name": row.get("name") or "", "price": price, "qty": qty,
+               "was": было if (было is not None and было != price) else None})
+    return {"ok": True}
+
+
 def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
     """Задача глазами водителя: что забрать и сколько уже принято."""
     lines = []
+    extra = (sup.get("kind") or "main") == "extra"
+    buys = sup.get("buys") or {}
+    cost = 0.0
     for it in sup.get("items") or []:
         need = int((it.get("by_district") or {}).get(oid) or 0)
         if not need:
             continue
         got = int((it.get("got") or {}).get(oid) or 0)
-        lines.append({"id": it["id"], "name": it.get("name", ""),
-                      "need": need, "got": got, "left": max(0, need - got)})
+        line = {"id": it["id"], "name": it.get("name", ""),
+                "need": need, "got": got, "left": max(0, need - got)}
+        if extra:
+            # Цена за учётную единицу и сколько таких единиц во всей заявке:
+            # экран цен у водителя считает по ним «= N AED» и итог.
+            u = _buy_unit(it["id"])
+            try:
+                price = float((buys.get(it["id"]) or {}).get("price") or 0)
+            except (TypeError, ValueError):
+                price = 0.0
+            total_qty = int(it.get("qty") or 0)
+            units = max(1, round(total_qty / u["n"]))
+            line.update(price=price, unit_n=u["n"], unit_name=u["name"],
+                        qty_total=total_qty, units=units)
+            if price > 0:
+                cost += price * units
+        lines.append(line)
     # Недобранное — вверх: закрытые строки водителю больше не нужны, а искать
     # среди них следующую бутылку он будет каждый раз.
     lines.sort(key=lambda l: (l["left"] == 0, l["name"]))
@@ -697,6 +778,8 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "lines": lines,
         # Кто сканирует прямо сейчас — и что это не мы.
         "hold": _hold_view(task, me),
+        # Заявка на другую базу: пока цены не вписаны, приёмка не начинается.
+        **({"prices_ok": all(l["price"] > 0 for l in lines), "cost": round(cost)} if extra else {}),
     }
 
 
@@ -778,6 +861,11 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
+    # Заявка на другую базу: сперва цены (водитель их узнаёт на базе), потом
+    # бутылки. Старший с полки вносит коды без этого — цены он видит у себя.
+    if not owner and _prices_missing(sup, oid):
+        return {"ok": False, "verdict": "prices_needed",
+                "task": _task_view(sid, sup, oid, task, me)}
     # Задачу сейчас сканирует другой — старший с полки или водитель из
     # машины. Двух рук на одной задаче не бывает: бутылку не принимаем и
     # говорим, кто занят.
@@ -983,6 +1071,9 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
         return {"ok": False, "verdict": "closed"}
     if task.get("noscan_at"):
         return {"ok": False, "verdict": "already"}
+    if not owner and _prices_missing(sup, oid):
+        return {"ok": False, "verdict": "prices_needed",
+                "task": _task_view(sid, sup, oid, task, me)}
     now = datetime.now(timezone.utc)
     await db.supply_task_start(sid, oid, now)
     doc = await db.supply_task_noscan(sid, oid, me, now)
@@ -1707,18 +1798,6 @@ async def handle_buy(request):
     except Exception:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     pid = str(body.get("product_id") or "").strip()
-    short = _shortfall(sup)
-    row = next((r for r in short["rows"] if r["id"] == pid), None)
-    # У доп. заявки недобора нет — там цену вписывают на каждую позицию
-    # состава: это и есть то, что купили на базе. Цена уходит в стоимость
-    # склада тем же путём (stock_value.cost_map читает buys всех поставок).
-    if not row and (sup.get("kind") or "main") == "extra":
-        it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
-        if it:
-            row = {"id": pid, "name": it.get("name") or "", "gap": int(it.get("qty") or 0)}
-    if not row:
-        return web.json_response({"error": "not_in_shortfall"}, status=400,
-                                 headers=CORS_HEADERS)
     try:
         price = round(float(body.get("price") or 0), 2)
     except (TypeError, ValueError):
@@ -1727,23 +1806,14 @@ async def handle_buy(request):
         qty = int(body.get("qty") or 0)
     except (TypeError, ValueError):
         qty = 0
-    if price < 0 or qty < 0 or price > 100000 or qty > 100000:
-        return web.json_response({"error": "bad_number"}, status=400, headers=CORS_HEADERS)
-    if not qty:
-        qty = int(row.get("gap") or 0)          # взяли, сколько не хватало
-    было = ((sup.get("buys") or {}).get(pid) or {}).get("price")
     who = str(body.get("as") or "").strip()[:40]
-    now = datetime.now(timezone.utc)
-    doc = None if price <= 0 else {
-        "price": price, "qty": qty, "name": row.get("name") or "",
-        "at": now, "by": int(request.get("owner_id") or 0), "by_name": who,
-    }
-    if not await db.supply_buy_set(sid, pid, doc):
-        return web.json_response({"error": "not_saved"}, status=500, headers=CORS_HEADERS)
-    log.info(f"[supply] закупка {pid}: {price} × {qty} ({sid})")
-    _buy_note((sid, int(request.get("owner_id") or 0)), who, sup.get("day") or "",
-              {"id": pid, "name": row.get("name") or "", "price": price, "qty": qty,
-               "was": было if (было is not None and было != price) else None})
+    # Та же запись, что у водителя по приезду на базу (buy_set): у доп.
+    # заявки цена вписывается на каждую позицию состава и уходит в стоимость
+    # склада (stock_value.cost_map читает buys всех поставок).
+    r = await buy_set(sup, pid, price, qty, who, int(request.get("owner_id") or 0))
+    if not r["ok"]:
+        return web.json_response({"error": r["error"]},
+                                 status=500 if r["error"] == "not_saved" else 400, headers=CORS_HEADERS)
     sup = await db.supply_get(sid)
     return web.json_response({"ok": True, "buys": (sup or {}).get("buys") or {}},
                              headers=CORS_HEADERS,

@@ -85,6 +85,32 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     no_expense: (ST_Q.get('must') || ST_Q.get('exp2')) ? {} : (ST_Q.get('expdone') ? {wash: true, parking: true} : ST_Q.get('expfull') ? {wash: true} : {fuel: true, wash: true, parking: true}), pending_answer: ST_Q.get('must') ? ['fuel', 'wash', 'parking'] : ST_Q.get('exp2') ? ['wash', 'parking'] : []};
   // &supdyn=1 — район B1 свободен, на 3–4 опросе его берёт другой, потом отдаёт:
   // проверка, что вкладка «Товар» перерисовывается сама, без перезапуска
+  // &supx=1 — заявка на другую базу (Al Hamra Cellar), моя задача B1 из трёх
+  // позиций без цен (&priced=1 — цены уже вписаны); буй/hold/noscan подменены
+  if(ST_Q.get('supx')){
+    window.__buys = window.__buys || (ST_Q.get('priced') ? {absolut: 62, gin: 55, beer: 96} : {});
+    const __xTask = () => {
+      const L = [{id:'absolut', name:'Absolut 1 ltr', need:12, qty_total:24, unit_n:1, unit_name:'бутылку'},
+                 {id:'gin', name:"Gordon's London Dry 0.7", need:6, qty_total:6, unit_n:1, unit_name:'бутылку'},
+                 {id:'beer', name:'Heineken 0.33', need:48, qty_total:96, unit_n:24, unit_name:'ящик'}]
+        .map(l => { const p = +(window.__buys[l.id] || 0); return {...l, got: 0, left: l.need, price: p, units: Math.max(1, Math.round(l.qty_total / l.unit_n))}; });
+      const cost = L.reduce((a, l) => a + (l.price > 0 ? l.price * l.units : 0), 0);
+      const need = L.reduce((a, l) => a + l.need, 0);
+      return {supply_id: 's2', at: _agoIso(40), day: '2026-09-14', district: 'jvc', district_code: 'B1', district_name: 'JVC',
+        driver: 'Али', mine: true, extra: true, base: 'Al Hamra Cellar', claimed_at: _agoIso(30), started_at: '', done_at: '',
+        locked: false, lock_at: '', erev: 0, noscan_at: '', noscan_by: '', cancelled_at: '', cancelled_by: '', note: '', gaps: [],
+        need, got: 0, left: need, positions: L.length, lines: L, hold: {who: '', kind: '', live: false, mine: false},
+        prices_ok: L.every(l => l.price > 0), cost: Math.round(cost)};
+    };
+    if(path === '/api/driver/supply') return {mine: [__xTask()], free: [], extra: [], taken: []};
+    if(path === '/api/driver/supply/s2' && m === 'GET') return __xTask();
+    if(path === '/api/driver/supply/s2/buy'){ const b = opts.body || {}; if(+b.price > 0) window.__buys[b.product_id] = +b.price; else delete window.__buys[b.product_id];
+      stLog('API POST buy ' + JSON.stringify(b)); return __xTask(); }
+    if(path === '/api/driver/supply/s2/hold') return {ok: true, sec: 25, hold: {who: 'Али', kind: 'driver', live: false, mine: true}};
+    if(path === '/api/driver/supply/s2/noscan'){ const t = __xTask(); stLog('API POST noscan');
+      return t.prices_ok ? {ok: true, ...t, noscan_at: _agoIso(0)} : {ok: false, verdict: 'prices_needed', task: t}; }
+    if(path === '/api/driver/supply/s2/release') return {ok: true};
+  }
   if(path === '/api/driver/supply' && ST_Q.get('supdyn')){
     window.__supN = (window.__supN || 0) + 1;
     const t = {supply_id: 's1', district: 'jvc', district_code: 'B1', district_name: 'JVC', need: 24, got: 0,
@@ -192,6 +218,7 @@ async function standBoot(){
   if(ST_Q.get('open') && ST_Q.get('open').indexOf('exp:') === 0){ await new Promise(r => setTimeout(r, 150)); expGo(ST_Q.get('open').slice(4)); }
   if(ST_Q.get('open') === 'orders'){ await new Promise(r => setTimeout(r, 150)); profOrders(); }
   if(ST_Q.get('open') === 'ordhist'){ await new Promise(r => setTimeout(r, 150)); ordHist(); }   // история из ленты заказов
+  if(ST_Q.get('open') === 'supx'){ await new Promise(r => setTimeout(r, 300)); supOpen('s2', 'jvc'); }   // задача доп. заявки
   if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); }
   if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }
   if(ST_Q.get('open') === 'pick'){ await new Promise(r => setTimeout(r, 150)); histPick(); }

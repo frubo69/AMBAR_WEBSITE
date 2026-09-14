@@ -372,34 +372,42 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ocs-2{display:block;margin-top:7px;font-size:11px;line-height:15px;font-weight:500;color:#8B8FA8;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .ocs-bar{height:5px;width:63.6px;border-radius:2.5px;background:#6E70A0;margin:5.6px 0 8.6px;transition:margin-left .2s}
-.oc{margin:0 0 12px;padding:0 10.8px 14px 11.2px;border-radius:14px;background:#0D111A;border:1px solid #1D212C;
+.oc{margin:0 0 12px;padding:0 10.8px 12px 11.2px;border-radius:14px;background:#0D111A;border:1px solid #1D212C;
   overflow:visible;box-shadow:none}
 .oc.next{border-color:#1D212C;box-shadow:none}
-.oc-top{position:relative;height:276.5px}
-.oc-hd-l{position:absolute;left:8px;top:17.6px;right:60px;min-width:0}
+.oc-top{position:relative;height:185px}
+.oc-hd-l{position:absolute;left:8px;top:14px;right:60px;min-width:0}
 .oc-hd-l b{display:block;font-size:22px;font-weight:700;line-height:26px;letter-spacing:-.3px;color:#F8F8FB;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .oc-hd-l span{display:block;margin-top:3.3px;font-size:15px;font-weight:500;line-height:19px;color:#696D89;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.oc-more{position:absolute;right:2.6px;top:13.7px;width:38px;height:35px;border-radius:12px;background:#141821;
+.oc-more{position:absolute;right:2.6px;top:11px;width:38px;height:35px;border-radius:12px;background:#141821;
   border:1px solid #1A1E29;display:flex;align-items:center;justify-content:center;gap:2.6px;cursor:pointer;padding:0}
 .oc-more i{display:block;width:4px;height:4px;border-radius:50%;background:#F0F2F7}
 .oc-more:active{transform:scale(.95)}
-/* Кольцо: серый след 1.5, дуга остатка 7 со свечением, начало сверху, по часовой */
-.oc-cd{position:absolute;left:50%;top:55px;width:232px;height:232px;margin-left:-116px;color:#79F5B6}
+/* Полукруг-«солнце на закате» (владелец, 14 сен 2026): дуга радиусом 122 сидит
+   на горизонте, под её вершиной флажок, подпись и время — базовая линия цифр
+   на горизонте. Серый след 1.5, дуга остатка 7 со свечением; остаток гаснет
+   слева направо (дуга держится за правый край — за срок). Вершина дуги
+   поднимается до строки района, между ней и «•••». */
+.oc-cd{position:absolute;left:50%;top:37.5px;width:258px;height:140px;margin-left:-129px;color:#79F5B6}
 .oc-cd.warn{color:#F5D25A}
 .oc-cd.dn{color:#FF6B6B}
 .oc-ring{position:absolute;inset:0;overflow:visible}
 .oc-arc{transition:stroke-dashoffset 1s linear;filter:drop-shadow(0 0 5px currentColor)}
-.oc-cd-f{position:absolute;left:50%;top:40.5px;margin-left:-10px;width:20px;height:20px}
-.oc-cd-l{position:absolute;left:0;right:0;top:72.8px;text-align:center;font-size:15px;font-weight:500;line-height:19px;color:#70748E}
-.oc-cd-t{position:absolute;left:0;right:0;top:98px;text-align:center;font-size:72px;font-weight:700;line-height:72px;
+.oc-cd-f{position:absolute;left:50%;top:29px;margin-left:-10px;width:20px;height:20px}
+.oc-cd-l{position:absolute;left:0;right:0;top:54px;text-align:center;font-size:15px;font-weight:500;line-height:19px;color:#70748E}
+.oc-cd-t{position:absolute;left:0;right:0;top:71.5px;text-align:center;font-size:72px;font-weight:700;line-height:72px;
   letter-spacing:-1px;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(121,245,182,.5)}
 .oc-cd.warn .oc-cd-t{text-shadow:0 0 16px rgba(245,210,90,.5)}
 .oc-cd.dn .oc-cd-t{text-shadow:0 0 16px rgba(255,107,107,.5)}
-.oc-cd-t.long{font-size:50px;line-height:72px;letter-spacing:-.5px}
+/* Просрочка со знаком и часы — уже, чтобы не задевать дугу; top подобран так,
+   чтобы базовая линия цифр осталась на горизонте (строка 72, кегль меньше) */
+.oc-cd-t.neg{font-size:56px;letter-spacing:-.6px;top:76.5px}
+.oc-cd-t.long{font-size:46px;letter-spacing:-.5px;top:80px}
+.oc-cd-t.long.neg{font-size:42px;top:81.5px}
 /* Секции-плашки */
-.oc-sec{position:relative;display:flex;align-items:flex-start;margin-top:9px;padding:10.6px 8.7px 11px 9px;border-radius:10px;
+.oc-sec{position:relative;display:flex;align-items:flex-start;margin-top:8px;padding:9px 8.7px 9px 9px;border-radius:10px;
   background:#10141D;border:1px solid #1A1E29}
 .oc-ic{width:43px;height:43px;flex:0 0 43px;box-sizing:border-box;border-radius:9px;display:flex;align-items:center;
   justify-content:center;color:#E9D29C;background:#181819;border:1px solid #222126}
@@ -410,7 +418,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .oc-l i{font-style:normal;margin:0 6px}
 .oc-l b{font-weight:500;color:#696D89}
 .oc-sec.items .oc-l{padding-right:100px}
-.oc-btn{position:absolute;right:8.7px;top:9.5px;display:flex;align-items:center;gap:8px;height:29px;padding:0 12.5px 0 10.6px;
+.oc-btn{position:absolute;right:8.7px;top:8px;display:flex;align-items:center;gap:8px;height:29px;padding:0 12.5px 0 10.6px;
   border-radius:9px;background:#121622;border:1px solid #1A1D2C;color:#F0F2F7;font-family:inherit;font-size:14px;
   font-weight:600;line-height:1;cursor:pointer}
 .oc-btn svg{color:#D8D9E6}
@@ -425,7 +433,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .oc-map{flex:0 0 auto;margin:.5px 0 0 8px;display:flex;align-items:center;gap:8px;height:40.4px;padding:0 11px 0 12px;
   border-radius:10px;background:#191816;border:1px solid #272829;color:#E6CF9C;font-family:inherit;font-size:14px;
   font-weight:600;line-height:1;cursor:pointer;white-space:nowrap}
-.oc-sec.addr{padding:10px 8.7px 7px 9px}
+.oc-sec.addr{padding:8.5px 8.7px 6px 9px}
 .oc-sec.note{padding:6px 8.7px 6px 9px;cursor:pointer}
 .oc-sec.note .oc-b{margin-top:4.9px}
 .oc-note{margin-top:2px;font-size:13.5px;font-weight:500;line-height:17px;color:#F1F2F6;white-space:nowrap;overflow:hidden;
@@ -435,7 +443,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   color:#6F7392;display:flex;align-items:center;justify-content:center;transition:transform .2s}
 .oc-sec.note.open .oc-chev{transform:rotate(180deg)}
 /* Оплата: справа столбиком итог и «Валютой ⌄» */
-.oc-sec.pay{padding:6.7px 8.7px 3px 9px}
+.oc-sec.pay{padding:5px 8.7px 2px 9px}
 .oc-sec.pay .oc-ic{margin-top:6.5px}
 .oc-sec.pay .oc-b{margin-top:9.1px}
 .oc-pay-m{margin-top:3px;font-size:16px;font-weight:700;line-height:20px;color:#F1F2F6;white-space:nowrap}
@@ -472,7 +480,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   margin-bottom:2px}
 .oc .ord-owe{margin-top:9px;border-radius:10px}
 /* Низ: «Чат» и «Доставил» */
-.oc-ft{display:flex;gap:9.9px;margin-top:14.2px}
+.oc-ft{display:flex;gap:9.9px;margin-top:12px}
 .oc-chat{position:relative;flex:0 0 163.2px;height:51px;box-sizing:border-box;border-radius:12px;background:#131723;
   border:1px solid #1D212D;display:flex;align-items:center;justify-content:center;gap:13.6px;color:#F0F2F7;
   font-family:inherit;font-size:15px;font-weight:600;line-height:1;cursor:pointer}
@@ -5069,21 +5077,21 @@ function orderCard(o, i){
   // Кольцо: сколько осталось до «быть до». Первое состояние рисуем сразу,
   // дальше каждую секунду обновляет ocTick.
   const cd = ocCountdown(o);
-  const C = (2 * Math.PI * 110).toFixed(2);
   const frac = cd ? Math.max(0, Math.min(1, cd.left / cd.total)) : 0;
+  // Полукруг: след слева направо, дуга остатка идёт от правого края к левому —
+  // так её штрих гаснет слева направо, как просил владелец.
   const ring = cd ? `<div class="oc-cd ${ocState(cd.left)}" data-oid="${oid}">
-      <svg class="oc-ring" viewBox="0 0 232 232" width="232" height="232">
-        <circle cx="116" cy="116" r="110" fill="none" stroke="#1B1F2A" stroke-width="1.5"/>
-        <circle class="oc-arc" cx="116" cy="116" r="110" fill="none" stroke="currentColor" stroke-width="7"
-          stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - frac)).toFixed(1)}"
-          transform="rotate(-90 116 116)"/>
+      <svg class="oc-ring" viewBox="0 0 258 140" width="258" height="140">
+        <path d="${OC_ARC_TRACK}" fill="none" stroke="#1B1F2A" stroke-width="1.5"/>
+        <path class="oc-arc" d="${OC_ARC_PATH}" fill="none" stroke="currentColor" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="${OC_ARC_L}" stroke-dashoffset="${(OC_ARC_L * (1 - frac)).toFixed(1)}"/>
       </svg>
       <span class="oc-cd-f">${svgThin(OC_ICO.flag, 20)}</span>
       <span class="oc-cd-l">Времени осталось:</span>
-      <span class="oc-cd-t${Math.abs(cd.left) >= 3600 ? ' long' : ''}">${ocFmt(cd.left)}</span>
+      <span class="oc-cd-t${ocTCls(cd.left)}">${ocFmt(cd.left)}</span>
     </div>` : `<div class="oc-cd" data-oid="${oid}">
-      <svg class="oc-ring" viewBox="0 0 232 232" width="232" height="232">
-        <circle cx="116" cy="116" r="110" fill="none" stroke="#1B1F2A" stroke-width="1.5"/></svg>
+      <svg class="oc-ring" viewBox="0 0 258 140" width="258" height="140">
+        <path d="${OC_ARC_TRACK}" fill="none" stroke="#1B1F2A" stroke-width="1.5"/></svg>
       <span class="oc-cd-f">${svgThin(OC_ICO.flag, 20)}</span>
       <span class="oc-cd-l">Времени осталось:</span>
       <span class="oc-cd-t" style="color:#3A3F55;text-shadow:none">—</span>
@@ -5250,19 +5258,26 @@ function ocFmt(left){
   const mm = String(m).padStart(2, '0'), ss = String(sec).padStart(2, '0');
   return (neg ? '−' : '') + (h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`);
 }
-// Зелёный, за три минуты жёлтый, за минуту и после срока — красный (владелец, 14 сен 2026).
-function ocState(left){ return left <= 60 ? 'dn' : (left <= 180 ? 'warn' : 'ok'); }
+// Зелёный, за десять минут жёлтый, за три минуты и после срока — красный (владелец, 14 сен 2026).
+function ocState(left){ return left <= 180 ? 'dn' : (left <= 600 ? 'warn' : 'ok'); }
+// Полукруг: радиус 122, центр (129,132) в поле 258×140. След — слева направо,
+// дуга остатка — от правого края (срок) к левому: её длина = доля остатка.
+const OC_ARC_TRACK = 'M7 132A122 122 0 0 1 251 132';
+const OC_ARC_PATH  = 'M251 132A122 122 0 0 0 7 132';
+const OC_ARC_L = Math.PI * 122;
+// Класс кегля: просрочка со знаком и часы — уже, чтобы цифры не задевали дугу.
+function ocTCls(left){ return (Math.abs(left) >= 3600 ? ' long' : '') + (left < 0 ? ' neg' : ''); }
 function ocTick(){
   const els = document.querySelectorAll('.oc-cd[data-oid]');
   if(!els.length) return;
-  const C = 2 * Math.PI * 110;
+  const C = OC_ARC_L;
   els.forEach(el => {
     const o = ((ORDERS && ORDERS.active) || []).find(x => x.order_id === el.dataset.oid);
     const cd = o && ocCountdown(o); if(!cd) return;
     const st = ocState(cd.left);
     if(!el.classList.contains(st)){ el.classList.remove('ok', 'warn', 'dn'); el.classList.add(st); }
     const t = el.querySelector('.oc-cd-t');
-    if(t){ t.textContent = ocFmt(cd.left); t.classList.toggle('long', Math.abs(cd.left) >= 3600); }
+    if(t){ t.textContent = ocFmt(cd.left); t.classList.toggle('long', Math.abs(cd.left) >= 3600); t.classList.toggle('neg', cd.left < 0); }
     const arc = el.querySelector('.oc-arc');
     if(arc){ const f = Math.max(0, Math.min(1, cd.left / cd.total)); arc.style.strokeDashoffset = (C * (1 - f)).toFixed(1); }
   });

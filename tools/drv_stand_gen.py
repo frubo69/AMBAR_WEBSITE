@@ -145,12 +145,14 @@ async function standBoot(){
   // 00:43 (37 мин назад для карточки), доставка 50 мин, быть до 01:33, не просрочен
   if(ST_Q.get('mock')){
     const d = new Date(); d.setHours(0, 43, 0, 0);
-    // mock=1: до «быть до» ~1,5 мин (жёлтый), кольцо ~20 %; mock=2: ~21,5 мин (зелёный)
+    // mock=1: до «быть до» ~1,5 мин (красный); mock=2: ~21,5 мин (зелёный); mock=3: ~6,5 мин (жёлтый);
+    // mock=4: просрочен на ~9 мин; mock=5: ~1 ч 09 мин (длинный кегль)
     const green = ST_Q.get('mock') === '2';
-    const due = new Date(Date.now() + (green ? 21.5 : 1.55) * 60000);
+    const MIN = {1: 1.55, 2: 21.5, 3: 6.5, 4: -9.1, 5: 69.2}[ST_Q.get('mock')] || 1.55;
+    const due = new Date(Date.now() + MIN * 60000);
     const hm = String(due.getHours()).padStart(2, '0') + ':' + String(due.getMinutes()).padStart(2, '0');
     Object.assign(ST_ORDER, {order_id: 'AMB3207975F', items: [ST_ORDER.items[0]], total: 95, eta: 50, deliver_by: hm,
-      confirmed_at: new Date(Date.now() - (green ? 5 : 6.5) * 60000).toISOString(), chat_n: 0});
+      confirmed_at: new Date(Date.now() - (green ? 5 : (MIN > 30 ? 20 : 6.5)) * 60000).toISOString(), chat_n: 0});
     Object.assign(ST_ORDER2, {order_id: 'AMB3207991C', district: 'Дубай Марина', deliver_by: '02:10'});
     ST_ACTIVE.push({...ST_ORDER2, order_id: 'AMB3208003A', district: 'Джумейра', deliver_by: '02:45', address: 'Jumeirah 1'});
     if(ST_Q.get('open') === 'inc'){ ST_ORDER.confirmed_at = d.toISOString(); ST_ORDER.deliver_by = '01:33'; }

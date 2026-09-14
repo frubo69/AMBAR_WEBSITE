@@ -2630,6 +2630,18 @@ async def supplies_with_open_tasks(limit: int = 10) -> list:
     return await cur.to_list(length=limit)
 
 
+async def supplies_since(day_from: str, limit: int = 80) -> list:
+    """Поставки с учётного дня и позже, любого статуса, с задачами и составом —
+    история приёмок водителя: закрытая задача не исчезает, в неё заходят
+    посмотреть, что и сколько принимали."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.supplies.find({"day": {"$gte": day_from}},
+                           {"items": 1, "tasks": 1, "kind": 1, "base": 1, "day": 1,
+                            "at": 1, "status": 1, "buys": 1}).sort("at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
 async def intake_since(district: str, since) -> dict:
     """Сколько бутылок принято на район после указанного момента: позиция → шт.
 

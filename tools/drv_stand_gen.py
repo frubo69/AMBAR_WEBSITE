@@ -111,6 +111,22 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
       return t.prices_ok ? {ok: true, ...t, noscan_at: _agoIso(0)} : {ok: false, verdict: 'prices_needed', task: t}; }
     if(path === '/api/driver/supply/s2/release') return {ok: true};
   }
+  // &suphist=1 — история приёмок: две закрытые задачи (доп. база с ценами и основная без сканирования)
+  if(ST_Q.get('suphist')){
+    const H = {
+      s3: {supply_id: 's3', district: 'jvc', district_code: 'B1', district_name: 'JVC', extra: true, base: 'Al Hamra Cellar', day: '2026-09-13',
+           done_at: _agoIso(600), noscan_at: '', need: 66, got: 66, positions: 3, cost: 2202, prices_ok: true,
+           lines: [{id:'absolut', name:'Absolut 1 ltr', need:12, got:12, left:0, price:62, unit_name:'бутылку'}, {id:'gin', name:"Gordon's London Dry 0.7", need:6, got:6, left:0, price:55, unit_name:'бутылку'}, {id:'beer', name:'Heineken 0.33', need:48, got:48, left:0, price:96, unit_name:'ящик'}]},
+      s4: {supply_id: 's4', district: 'tecom', district_code: 'B2', district_name: 'Теком', extra: false, base: '', day: '2026-09-12',
+           done_at: _agoIso(2000), noscan_at: _agoIso(2100), need: 48, got: 40, positions: 2,
+           lines: [{id:'absolut', name:'Absolut 1 ltr', need:24, got:24, left:0}, {id:'jd', name:"Jack Daniel's 1 ltr", need:24, got:16, left:8}]}};
+    const full = k => ({...H[k], at: _agoIso(3000), driver: 'Али', mine: true, claimed_at: _agoIso(2900), started_at: _agoIso(2800),
+      locked: true, lock_at: '', erev: 0, noscan_by: '', cancelled_at: '', cancelled_by: '', note: '', gaps: [], hold: {who:'', kind:'', live:false, mine:false}});
+    if(path === '/api/driver/supply/history') return {rows: [H.s3, H.s4].map(r => ({...r, lines: undefined}))};
+    if(path === '/api/driver/supply/s3' && m === 'GET') return full('s3');
+    if(path === '/api/driver/supply/s4' && m === 'GET') return full('s4');
+  }
+  if(path === '/api/driver/supply/history') return {rows: []};
   if(path === '/api/driver/supply' && ST_Q.get('supdyn')){
     window.__supN = (window.__supN || 0) + 1;
     const t = {supply_id: 's1', district: 'jvc', district_code: 'B1', district_name: 'JVC', need: 24, got: 0,

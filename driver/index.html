@@ -8794,8 +8794,25 @@ async function supLoad(){
   try{ SUP = await drvApi.drvFetch('/api/driver/supply'); }
   catch(e){ SUP = SUP || {mine:[], free:[], taken:[]}; }
   supBadge();
-  woLoad(); mvLoad();
+  woLoad(); mvLoad(); supHistLoad();
   if(TAB === 'supply') renderSupply();
+}
+
+// Закрытые приёмки за месяц — не исчезают, а лежат внизу «Товара» историей
+// (владелец, 14 сен 2026): в строку можно провалиться и посмотреть задачу.
+var SUP_HIST = [], _shAt = 0;
+async function supHistLoad(){
+  if(Date.now() - _shAt < 30000) return;
+  _shAt = Date.now();
+  try{
+    const r = await drvApi.drvFetch('/api/driver/supply/history');
+    SUP_HIST = r.rows || [];
+    if(TAB === 'supply') renderSupply();
+  }catch(e){}
+}
+function supHistWhen(iso){
+  const d = _d(iso);
+  return d ? d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}) + ' · ' + hhmm(iso) : '';
 }
 
 // Списанное за смену читаем с сервера, а не помним вкладкой: приложение
@@ -8958,6 +8975,14 @@ function woFoot(){
     ${MV_LOG.length ? `<div class="sect" style="margin-top:26px">
       <span class="sect-t">Перемещения</span>
       <span class="sect-v">${MV_LOG.length}</span></div>${mv}` : ''}
+    ${(SUP_HIST || []).length ? `<div class="sect" style="margin-top:26px">
+      <span class="sect-t">История приёмок</span>
+      <span class="sect-v">${SUP_HIST.length}</span></div>
+    <div class="dcard dlist">${SUP_HIST.map(r => `<button class="dpl dli" onclick="supOpen('${esc(r.supply_id)}','${esc(r.district)}')">
+      <span class="sup-code">${esc(r.district_code)}</span>
+      <span class="dpl-n">${esc(r.extra ? (r.base || 'Другая база') : 'Основная заявка')}<i>${supHistWhen(r.done_at)} · ${fmt(r.got)} ${plural(r.got,'бутылка','бутылки','бутылок')}${
+        r.noscan_at && r.got < r.need ? ' · без сканирования' : ''}</i></span>
+      <em class="ex-c">${svg(ICO.chevR, 16)}</em></button>`).join('')}</div>` : ''}
     <div class="wo-sp"></div>
     <div class="wo-fix"><button class="wo-btn ghost" onclick="mvOpen()">
       ${svg(ICO.move, 18)}<span>Переместить бутылки</span></button></div>`;
@@ -8990,7 +9015,7 @@ async function supOpen(sid, oid, pre){
     catch(e){ toast('Не удалось открыть', 'err'); return supBack(); }
     supRenderTask();
   }
-  supPollStart();
+  if(!(TASK && TASK.done_at)) supPollStart();
 }
 
 function supBack(){
@@ -9122,9 +9147,42 @@ async function supPriceSave(pid, inp){
 function supPricesDone(){ PRICES_OPEN = false; supRenderTask(); window.scrollTo({top: 0}); }
 function supPricesOpen(){ PRICES_OPEN = true; supRenderTask(); window.scrollTo({top: 0}); }
 
+// Закрытая приёмка — та же карточка, но только смотреть: что принимали,
+// сколько и по чём, без кнопок и без опроса.
+function supRenderDone(){
+  const t = TASK; if(!t) return;
+  const ns = !!t.noscan_at && t.got < t.need;
+  _setText('supT', `${t.district_code} · ${t.district_name}`);
+  _setText('supS', `Приёмка завершена · ${supHistWhen(t.done_at)}${t.extra ? ' · ' + (t.base || 'другая база') : ''}`);
+  document.getElementById('supV').style.display = 'none';
+  document.getElementById('supAct').style.display = 'none';
+  const lines = t.lines.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const pct = t.need ? Math.min(100, Math.round(t.got / t.need * 100)) : 100;
+  const xprSum = t.extra && t.cost ? `<div class="dcard xpr-sum"><span>Закупка на базе</span><b>${fmt(t.cost)} AED</b></div>` : '';
+  document.getElementById('supMid').innerHTML = `<div class="dtop">
+      <span class="dtop-b"><span class="dchip ${ns ? 'warn' : 'ok'}">${ns ? 'без сканирования' : 'принято'}</span>
+        <span class="dtop-s">${lines.length} ${plural(lines.length,'позиция','позиции','позиций')}</span></span>
+      <span class="dtop-n">${fmt(t.got)}<i>из ${fmt(t.need)} ${plural(t.need,'бутылки','бутылок','бутылок')}</i></span>
+      <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
+    </div>${xprSum}
+    <div class="dcard dlist">${lines.map(l => `
+      <div class="dpl dli ${l.got >= l.need ? 'ok' : ''}">
+        <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">
+        <span class="dpl-n">${esc(l.name)}${t.extra && l.price > 0 ? `<i>${fmt(l.price)} AED / ${esc(l.unit_name || 'бутылку')}</i>` : ''}</span>
+        <span class="dpl-q">${l.got}<u>/${l.need}</u></span>
+      </div>`).join('')}</div>`;
+  document.getElementById('supBot').innerHTML = `
+    <div class="sup-tot">
+      <span class="sup-tot-l">Принято</span>
+      <span class="sup-tot-v">${fmt(t.got)}<u> из ${fmt(t.need)}</u></span>
+    </div>`;
+}
+
 function supRenderTask(){
   const t = TASK;
   if(!t) return;
+  if(t.done_at) return supRenderDone();
   // Заявка на другую базу без цен — сначала цены, потом всё остальное.
   if(t.extra && (PRICES_OPEN || t.prices_ok === false)) return supRenderPrices();
   const ns = !!t.noscan_at;

@@ -2182,6 +2182,35 @@ async def handle_supply_list(request):
 
 @require_driver
 @_no_test
+async def handle_supply_history(request):
+    """Мои закрытые приёмки за месяц (владелец, 14 сен 2026: «пусть не
+    исчезает, а перемещается в историю, чтобы проваливаться и просматривать»).
+    Строка — район, база, когда закрыли, сколько принято; карточка — та же
+    задача, только для просмотра (GET /supply/{sid})."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        days = max(1, min(90, int(request.query.get("days", "30"))))
+    except ValueError:
+        days = 30
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    rows = []
+    for sup in await db.supplies_since(since):
+        sid = sup.get("_id")
+        for oid, t in (sup.get("tasks") or {}).items():
+            if (t.get("driver") or "") != me["name"] or not t.get("done_at"):
+                continue
+            v = supply_routes._task_view(sid, sup, oid, t, me["name"])
+            rows.append({k: v.get(k) for k in ("supply_id", "district", "district_code", "district_name",
+                                                 "extra", "base", "day", "done_at", "noscan_at",
+                                                 "need", "got", "positions")})
+    rows.sort(key=lambda r: str(r.get("done_at") or ""), reverse=True)
+    return web.json_response({"rows": rows[:40]}, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_driver
+@_no_test
 async def handle_supply_claim(request):
     """Взять задачу. Достаётся одному — кто нажал первым."""
     import supply_routes
@@ -2402,6 +2431,7 @@ def setup(app):
         ("/api/driver/expenses/photo/{item_id}", handle_expense_photo, "GET"),
         ("/api/driver/bottle",                  handle_bottle_look, "GET"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
+        ("/api/driver/supply/history",          handle_supply_history, "GET"),   # раньше {sid}: иначе «history» — это sid
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
         ("/api/driver/writeoff/scan",           handle_writeoff_scan, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),

@@ -3099,6 +3099,7 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
         doc["$set"].update({"mv_lat": pt["lat"], "mv_lon": pt["lon"], "mv_at": at})
     if stop_live:
         doc["$unset"] = {"until": ""}
+        doc["$set"]["stopped_at"] = at
     elif until is not None:
         doc["$set"]["until"] = until
     if acc is not None:
@@ -3119,6 +3120,41 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
     except Exception as e:                       # noqa: BLE001
         import logging as _lg
         _lg.getLogger("db").warning(f"маршрут дня не записан ({name}): {e}")
+
+
+async def driver_pos_stop(name: str, at=None) -> None:
+    """Трансляция кончилась без точки: чат с ботом удалён или бот заблокирован
+    (15 сен 2026). Срок гасим, момент запоминаем — приложение и сторож
+    смотрят на него, а не ждут, пока точка остынет."""
+    db = _db_or_none()
+    if db is None or not name: return
+    await db.driver_pos.update_one(
+        {"_id": name},
+        {"$unset": {"until": ""}, "$set": {"stopped_at": at or datetime.now(timezone.utc)}})
+
+
+# Пробы чатов бота геопозиции: своё последнее сообщение в чате водителя.
+# Телеграм не сообщает об удалении переписки, поэтому бот раз в минуту трогает
+# это сообщение; пропало — чата нет, трансляции нет.
+async def geo_probe_set(chat_id: int, name: str, mid: int) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.geo_probes.replace_one(
+        {"_id": int(chat_id)},
+        {"_id": int(chat_id), "name": name, "mid": int(mid), "at": datetime.now(timezone.utc)},
+        upsert=True)
+
+
+async def geo_probe_all() -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.geo_probes.find({}).to_list(length=500)
+
+
+async def geo_probe_clear(chat_id: int) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.geo_probes.delete_one({"_id": int(chat_id)})
 
 
 async def driver_pos_all(names: list = None) -> list:

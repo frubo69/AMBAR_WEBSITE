@@ -27,7 +27,8 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (Application, CommandHandler, MessageHandler,
-                          ContextTypes, filters)
+                          ChatMemberHandler, ContextTypes, filters)
+import asyncio
 
 import config_staff as staff
 import db
@@ -79,6 +80,7 @@ async def post_init(app):
         log.warning(f"реестр при старте: {e}")
     import asyncio as _aio
     _aio.get_event_loop().create_task(staff.roster_loop(30))
+    _aio.get_event_loop().create_task(_probe_loop(app.bot))
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -202,11 +204,11 @@ async def _lego_wall(ctx, chat: int, name: str):
         from telegram.error import RetryAfter
     except Exception:                        # noqa: BLE001
         RetryAfter = ()                      # type: ignore[assignment]
-    sent = 0
+    sent, last = 0, None
     for i, part in enumerate(PARTS, 1):
         for attempt in (1, 2):
             try:
-                await ctx.bot.send_message(chat, part, disable_web_page_preview=True)
+                last = await ctx.bot.send_message(chat, part, disable_web_page_preview=True)
                 sent += 1
                 break
             except RetryAfter as e:          # type: ignore[misc]
@@ -216,6 +218,103 @@ async def _lego_wall(ctx, chat: int, name: str):
                 break
         await _aio.sleep(0.5)
     log.info(f"{name}: история LEGO отправлена, частей {sent} из {len(PARTS)}")
+    # Последнее сообщение — проба: раз в минуту бот трогает его, и если его
+    # больше нет, значит чат удалён вместе с трансляцией (см. _probe_once).
+    if last is not None:
+        try:
+            await db.geo_probe_set(chat, name, last.message_id)
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"проба {name} не записана: {e}")
+
+
+# ── удалённый чат и заблокированный бот (владелец, 15 сен 2026) ─────────────
+# Телеграм не сообщает боту, что человек удалил переписку: точки просто
+# перестают приходить, а сервер считает трансляцию живой, пока не остынет
+# якорь стояния. «Удалил переписку — бот больше не спрашивает». Поэтому два
+# сторожа: блокировку бота телеграм присылает событием my_chat_member — гасим
+# трансляцию в ту же секунду; удаление чата ловим пробой — раз в минуту бот
+# трогает своё последнее сообщение в чате, и если его больше нет, чата нет.
+PROBE_EVERY = 60
+
+
+async def _stream_gone(name: str, why: str):
+    now = datetime.now(timezone.utc)
+    try:
+        await db.driver_pos_stop(name, now)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"остановка трансляции {name}: {e}")
+    try:
+        await geo_watch.on_stream(name, on=False, now=now)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"о потере трансляции {name} не сообщили: {e}")
+    log.info(f"трансляция потеряна: {name} · {why}")
+
+
+async def on_my_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Заблокировал бота (или удалил чат с остановкой) — трансляции нет."""
+    cm = update.my_chat_member
+    if not cm or not cm.new_chat_member or not cm.from_user:
+        return
+    status = getattr(cm.new_chat_member, "status", "")
+    kind, name = _role(cm.from_user.id)
+    if kind != "driver":
+        return
+    if status in ("kicked", "left"):
+        try:
+            await db.geo_probe_clear(cm.chat.id)
+        except Exception:                        # noqa: BLE001
+            pass
+        await _stream_gone(name, "бот заблокирован")
+
+
+async def _probe_once(bot) -> int:
+    """Один круг проб. Возвращает, сколько трансляций признано потерянными."""
+    from telegram.error import BadRequest, Forbidden
+    now = datetime.now(timezone.utc)
+    gone_n = 0
+    for p in await db.geo_probe_all():
+        name, chat, mid = p.get("name"), p.get("_id"), p.get("mid")
+        if not name or not chat or not mid:
+            continue
+        rows = await db.driver_pos_all([name])
+        r = (rows or [{}])[0] if rows else {}
+        until = r.get("until")
+        if until is not None and getattr(until, "tzinfo", None) is None:
+            until = until.replace(tzinfo=timezone.utc)
+        if not until or until <= now:
+            continue                             # трансляции и так нет — трогать нечего
+        gone = False
+        try:
+            await bot.edit_message_reply_markup(chat_id=chat, message_id=mid, reply_markup=None)
+        except BadRequest as e:
+            m = str(e).lower()
+            if "not modified" in m:
+                pass                             # сообщение на месте
+            elif "not found" in m or "message_id_invalid" in m or "chat not found" in m:
+                gone = True
+            else:
+                log.debug(f"проба {name}: {e}")
+        except Forbidden:
+            gone = True                          # бот заблокирован
+        except Exception as e:                   # noqa: BLE001
+            log.debug(f"проба {name}: {e}")
+        if gone:
+            gone_n += 1
+            try:
+                await db.geo_probe_clear(chat)
+            except Exception:                    # noqa: BLE001
+                pass
+            await _stream_gone(name, "чат удалён")
+    return gone_n
+
+
+async def _probe_loop(bot):
+    while True:
+        await asyncio.sleep(PROBE_EVERY)
+        try:
+            await _probe_once(bot)
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"круг проб: {e}")
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -234,9 +333,10 @@ def main():
     app.add_handler(MessageHandler(filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE & filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+    app.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
     log.info(f"бот геопозиции запущен · водителей {len(staff.DRIVER_IDS)} · "
              f"старших {len(staff.SENIOR_STAR_IDS)}")
-    app.run_polling(allowed_updates=["message", "edited_message"])
+    app.run_polling(allowed_updates=["message", "edited_message", "my_chat_member"])
 
 
 if __name__ == "__main__":

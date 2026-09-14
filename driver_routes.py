@@ -316,6 +316,10 @@ async def _geo_state(name: str, since=None) -> dict:
     # С какой минуты стоит на месте (якорь из db.driver_pos_set). Пропал —
     # только без движения GEO_LOST_SEC подряд: точка раз в несколько минут из
     # кармана — это стоянка, а не пропажа.
+    # Трансляция остановлена (сам выключил, удалил чат, заблокировал бота)
+    # после последней точки: точка ещё свежая, а связи уже нет.
+    stopped_at = _dt_of(r.get("stopped_at"))
+    stopped = bool(stopped_at and (not at or stopped_at >= at))
     mv_at = _dt_of(r.get("mv_at")) or at
     since = _dt_of(since)
     if mv_at and since and since > mv_at:
@@ -329,7 +333,7 @@ async def _geo_state(name: str, since=None) -> dict:
             "until": "" if endless else (_iso_at(until) if until else ""),
             "left_min": 0 if endless else left, "endless": endless,
             "age_sec": int((now - at).total_seconds()) if at else None,
-            "still_sec": still, "lost": lost,
+            "still_sec": still, "lost": lost, "stopped": stopped,
             # для сторожа: трансляция идёт и человек не пропал
             "watch_ok": live and not lost}
 
@@ -370,7 +374,8 @@ async def _geo_for(me: dict, since=None) -> dict:
     свежая точка из самого приложения; сторож его не ведёт."""
     geo = await _geo_state(me["name"], since=since)
     if _tq(me):
-        geo.update(ok=geo["fresh"], stream=geo["fresh"], watch_ok=geo["fresh"],
+        alive = bool(geo["fresh"] and not geo.get("stopped"))
+        geo.update(ok=alive, stream=alive, watch_ok=alive,
                    lost=False, endless=True, until="", left_min=0)
     return geo
 

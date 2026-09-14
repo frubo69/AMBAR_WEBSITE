@@ -1992,6 +1992,13 @@ async def link_driver(code: str, telegram_id: int, tg: dict) -> dict | None:
         return_document=True,
     )
     if r:
+        # Один аккаунт — один водитель: последняя привязка снимает прежние.
+        # Иначе владелец, открыв ссылку «Худобы», остался бы заодно и
+        # «Тест-водителем», и кто он в приложении, решал бы порядок списков.
+        await db.drivers.update_many(
+            {"telegram_id": int(telegram_id), "name": {"$ne": r.get("name")}},
+            {"$set": {"telegram_id": None, "unlinked_at": datetime.now(timezone.utc),
+                      "unlinked_why": "rebound"}})
         r.pop("_id", None)
     return r
 

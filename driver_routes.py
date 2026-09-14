@@ -945,12 +945,14 @@ async def handle_code_info(request):
         "img": p.get("img") or "", "cat": p.get("cat") or "",
         "price": stock_routes._price(p) if p else 0,
         "district": {"id": src, "code": OFFICE_CODES.get(src, ""), "name": OFFICE_NAMES.get(src, "")},
-        "at": doc.get("at"), "moves": len(moves),
+        # Даты из Mongo — datetime, JSON их не берёт: на каждой НАШЕЙ бутылке
+        # ручка падала в 500, а чужой код (без документа) проходил (14 сен 2026).
+        "at": _iso_at(doc.get("at")), "moves": len(moves),
         "last_move": ({"from_code": OFFICE_CODES.get(str(last.get("from") or ""), ""),
                        "to_code": OFFICE_CODES.get(str(last.get("to") or ""), ""),
-                       "at": last.get("at")} if last else None),
+                       "at": _iso_at(last.get("at"))} if last else None),
         "districts": districts,
-    }, headers=CORS_HEADERS)
+    }, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
 @require_driver

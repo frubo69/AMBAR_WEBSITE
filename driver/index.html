@@ -5688,7 +5688,9 @@ function shPaint(){
   more.hidden = true;
 
   const shut = SH.closed;
-  ico.innerHTML = `<div class="shscr-i">${svg(shut ? SH_ICO.done : SH_ICO.clock, 30)}</div>`;
+  // Иллюстрация в том же стиле, что у «геопозиция не транслируется»: старый
+  // значок в квадрате выбивался из экрана (владелец, 15 сен 2026).
+  ico.innerHTML = `<img class="shscr-img" src="img/${shut ? 'shift-done' : 'shift-off'}.png?v=1" alt="">`;
   document.getElementById('shT').textContent = shut ? 'Смена закрыта' : 'Смена не открыта';
   document.getElementById('shS').textContent = shut
     ? `Закрыли в ${hhmm(SH.closed_at)}. Заказы больше не придут — если это ошибка, откройте снова.`

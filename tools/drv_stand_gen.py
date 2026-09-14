@@ -127,6 +127,9 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     if(path === '/api/driver/supply/s4' && m === 'GET') return full('s4');
   }
   if(path === '/api/driver/supply/history') return {rows: []};
+  // бутылка охране по коду: 'habr' — наша, остальное — не наша
+  if(path === '/api/driver/bottle') return opts.params && opts.params.code === 'habr'
+    ? {ok: true, bottle: 'Absolut 1 ltr', cost: 62} : {ok: false, say: 'не наша бутылка'};
   if(path === '/api/driver/supply' && ST_Q.get('supdyn')){
     window.__supN = (window.__supN || 0) + 1;
     const t = {supply_id: 's1', district: 'jvc', district_code: 'B1', district_name: 'JVC', need: 24, got: 0,

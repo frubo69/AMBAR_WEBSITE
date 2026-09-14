@@ -2850,6 +2850,8 @@ button.path:active{transform:scale(.995)}
 .xe-tile:active{transform:scale(.985)}
 .xe-tile-ico{display:flex;color:var(--gold2);opacity:.85}
 .xe-tile-c{font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.xe-tile:disabled{opacity:.45;cursor:default}
+.xe-tile:disabled .xe-tile-c{text-transform:none;letter-spacing:0;font-weight:600;font-size:11px;padding:0 8px;text-align:center}
 .xe-tile.set{border:1px solid rgba(201,169,110,.45);color:#fff}
 .xe-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .xe-tile.set .xe-tile-c{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 8px;text-align:left;
@@ -26835,11 +26837,13 @@ function expAddList(r){
     const ico = XE_ICO[XE_KIND_ICO[k.id]] || XE_ICO.note;
     const бут = k.scan && EXP_GUARD.driver === r.name && EXP_GUARD.code ? EXP_GUARD : null;
     const снят = EXP_SHOT.kind === k.id && !!EXP_SHOT.photo;
-    const поле = k.scan
+    // Охрана: либо бутылка (цену называет код, поле не редактируется), либо
+    // наличные суммой — одно из двух, как у водителя (владелец, 14 сен 2026).
+    const поле = k.scan && бут
       ? `<div class="xe-field sent"><span class="xe-none">${
-          бут ? (бут.cost ? fmt(бут.cost) + ' AED' : 'цена не заведена') : '—'}</span></div>`
+          бут.cost ? fmt(бут.cost) + ' AED' : 'цена не заведена'}</span></div>`
       : `<div class="xe-field"><input class="amt" id="amt-${k.id}" type="text" inputmode="numeric"
-           placeholder="AED" autocomplete="off" oninput="xeTyped('${k.id}')"
+           placeholder="${k.scan ? 'AED наличными' : 'AED'}" autocomplete="off" oninput="xeTyped('${k.id}')"
            onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')"></div>`;
     const плитка = k.receipt
       ? `<div class="xe-tiles"><button class="xe-tile${снят ? ' set' : ''}" id="rcp-${k.id}"
@@ -26854,9 +26858,9 @@ function expAddList(r){
                <span class="xe-tile-b"><b>${escS(бут.name || 'бутылка')}</b><i>${
                  бут.cost ? fmt(бут.cost) + ' AED' : 'цена не заведена'}</i></span>
                <span class="xe-tile-c">Бутылка</span></button>`
-          : `<button class="xe-tile" onclick="gdScan('${n}')" aria-label="Бутылка">
+          : `<button class="xe-tile" id="gd-tile" onclick="gdScan('${n}')" aria-label="Бутылка">
                <span class="xe-tile-ico">${xsvg(XE_QR, 30)}</span>
-               <span class="xe-tile-c">Бутылка</span></button>`}</div>`
+               <span class="xe-tile-c" id="gd-tile-c">Бутылка</span></button>`}</div>`
         : '';
     const готово = k.scan ? !!бут : false;
     return `<div class="xe-card${k.plus ? ' plus' : ''}">
@@ -26883,10 +26887,23 @@ function expAddList(r){
 function xeTyped(kind){
   const k = expKind(kind); if(!k) return;
   const b = document.getElementById('xb-' + kind); if(!b) return;
-  const сумма = k.scan ? !!(EXP_GUARD.code)
-    : !!String((document.getElementById('amt-' + kind) || {}).value || '').replace(/\D/g, '');
+  if(k.scan) gdLock();
+  const сумма = (k.scan && !!EXP_GUARD.code)
+    || !!String((document.getElementById('amt-' + kind) || {}).value || '').replace(/\D/g, '');
   const слова = String((document.getElementById('cmt-' + kind) || {}).value || '').trim();
-  b.disabled = !(сумма && (!k.who || слова));
+  b.disabled = !(сумма && (!(k.who || k.scan) || слова));
+}
+// Сумма вписана — сканер закрыт, и плитка сама говорит, что сделать.
+function gdAmt(){
+  const a = document.getElementById('amt-guard');
+  return a ? String(a.value || '').replace(/\D/g, '') : '';
+}
+function gdLock(){
+  const t = document.getElementById('gd-tile'), c = document.getElementById('gd-tile-c');
+  if(!t) return;
+  const locked = !!gdAmt();
+  t.disabled = locked;
+  if(c) c.textContent = locked ? 'Сотрите сумму, чтобы сканировать' : 'Бутылка';
 }
 function xeTypedAll(){ EXP_KINDS.forEach(k => xeTyped(k.id)); }
 
@@ -26907,6 +26924,7 @@ const GD_SAY = {no_code:'код не прочитан', unknown:'нет в ре�
                 taken:'эту уже записали'};
 
 async function gdScan(driver){
+  if(gdAmt()){ _toast('Сначала сотрите сумму'); return; }
   if(!await accAskBack('Охрана')) return;
   EXP_GUARD = {driver, code:'', name:'', cost:0};
   ACC_BACK = gdBack;
@@ -27057,15 +27075,16 @@ function expToggleForm(driver){
 async function expAddExtra(driver, kindId){
   const k = expKind(kindId) || expKind('other');
   if(!await accAskBack(k.t)) return;
-  // Охране платят бутылкой: сумму берём с кода, а не из поля.
+  // Охране платят бутылкой или наличными: с бутылкой сумму называет код,
+  // без неё — поле; одно из двух.
   const бут = k.scan ? (EXP_GUARD.driver === driver && EXP_GUARD.code ? EXP_GUARD : null) : null;
-  const amount = k.scan ? (бут ? бут.cost : 0)
+  const amount = бут ? бут.cost
     : parseInt((document.getElementById('amt-' + k.id)?.value || '').replace(/\D/g,''), 10);
   const comment = (document.getElementById('cmt-' + k.id)?.value || '').trim();
-  if(k.scan && !бут){ _toast('Сканируйте бутылку'); return; }
+  if(k.scan && !бут && !amount){ _toast('Сканируйте бутылку или впишите сумму'); return; }
   // Трата без объяснения через неделю не отличить от опечатки — поэтому слова
   // обязательны, и сказать об этом надо здесь, а не после отправки.
-  if((!amount && !k.scan) || !comment){
+  if((!amount && !бут) || !comment){
     _toast(!comment ? (k.who ? 'Впишите, кто' : 'Впишите комментарий') : 'Впишите сумму');
     return;
   }

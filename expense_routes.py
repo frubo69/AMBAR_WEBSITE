@@ -254,14 +254,17 @@ async def handle_extra_add(request):
     # сколько за неё отдали при закупке — тот же путь, что у водителя.
     бутылка = None
     if kid == "guard":
+        # Либо бутылка по коду, либо наличные суммой — как у водителя.
         from driver_routes import _guard_bottle
-        бутылка, беда = await _guard_bottle(body.get("code"))
-        if беда:
-            return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
-        amount = бутылка["cost"]
+        code = str(body.get("code") or "").strip()
+        if code:
+            бутылка, беда = await _guard_bottle(code)
+            if беда:
+                return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
+            amount = бутылка["cost"]
     # Без суммы записывать нечего, без комментария — незачем: через неделю такой
     # расход не отличить от опечатки.
-    if (amount <= 0 and kid != "guard") or not comment:
+    if (amount <= 0 and бутылка is None) or not comment:
         return web.json_response({"error": "amount_and_comment_required"},
                                  status=400, headers=CORS_HEADERS)
     # Чек — не формальность: заправку, мойку и парковку оплачивают на стороне,

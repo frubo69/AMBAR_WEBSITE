@@ -1922,10 +1922,18 @@ async def handle_expense_add(request):
     # говорит только, кому отдал.
     бутылка = None
     if kind == "guard":
-        бутылка, беда = await _guard_bottle(body.get("code"))
-        if беда:
-            return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
-        amount = бутылка["cost"]
+        # Либо бутылка (код с QR — цену называет закупка), либо наличные
+        # (сумма руками) — одно из двух, иного не дано (владелец, 14 сен 2026).
+        # Пришли оба — верим коду: сумма при бутылке не вписывается.
+        code = str(body.get("code") or "").strip()
+        if code:
+            бутылка, беда = await _guard_bottle(code)
+            if беда:
+                return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
+            amount = бутылка["cost"]
+        elif amount <= 0:
+            return web.json_response({"error": "code_or_amount"},
+                                     status=400, headers=CORS_HEADERS)
         if not comment:
             return web.json_response({"error": "no_comment"},
                                      status=400, headers=CORS_HEADERS)

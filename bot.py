@@ -476,7 +476,7 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             # Превью — отдельный маленький файл, как и просит Bot API, а не та же
             # большая картинка.
             photo_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg?v=2",
-            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}_thumb.jpg?v=2",
+            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}_thumb.jpg?v=3",
             photo_width=1280, photo_height=640,
             title=("Приглашение по-русски" if lang == "ru" else "Invite in English") + where,
             description=("Фото, текст и кнопка — без ссылки в тексте"

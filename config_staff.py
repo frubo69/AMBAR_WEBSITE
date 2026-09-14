@@ -199,13 +199,16 @@ def driver_by_tg(telegram_id) -> dict | None:
 # входит в приложение как «Тест-водитель»: видит только тест-заказы, его смены
 # и точки не идут ни в деньги, ни сторожу. Район — первый из расписания, он
 # нужен только для подписи в карточке.
-def test_driver(telegram_id) -> dict | None:
+def test_driver(telegram_id, force: bool = False) -> dict | None:
+    """force — аккаунт заодно настоящий водитель, но приложение попросило
+    тест-режим переключателем (заголовок X-Ambar-Test); без force боевая
+    роль важнее."""
     from config import TEST_DRIVER_IDS, TEST_DRIVER_NAME
     try:
         tid = int(telegram_id or 0)
     except (TypeError, ValueError):
         return None
-    if tid not in TEST_DRIVER_IDS or tid in DRIVER_BY_TG:
+    if tid not in TEST_DRIVER_IDS or (tid in DRIVER_BY_TG and not force):
         return None
     from config_offices import OFFICE_CODES, OFFICE_NAMES
     st = DISTRICT_STAFF[0]
@@ -233,8 +236,10 @@ def driver_chats(name: str) -> list:
     if tid:
         return [tid]
     if is_test_driver(name):
+        # Все тест-аккаунты, даже если кто-то из них заодно настоящий
+        # водитель: телефон один, и сообщение о тест-заказе должно дойти.
         from config import TEST_DRIVER_IDS
-        return sorted(TEST_DRIVER_IDS - set(DRIVER_BY_TG))
+        return sorted(TEST_DRIVER_IDS)
     return []
 
 

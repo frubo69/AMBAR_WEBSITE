@@ -23,6 +23,9 @@
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     const url = AMBAR_API + path + qs;
     const headers = { 'Authorization': 'tma ' + getInitData() };
+    // Тест-режим: тестер, который заодно настоящий водитель, включает его в
+    // профиле; сервер верит заголовку только тест-аккаунтам.
+    try { if (localStorage.getItem('drv_test') === '1') headers['X-Ambar-Test'] = '1'; } catch (_) {}
     const reqOpts = { method, headers, signal };
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';

@@ -98,8 +98,14 @@ def require_driver(fn):
         except Exception as e:
             log.warning(f"[driver] перестановка не прочитана: {e}")
         # Настоящий водитель — по AMBAR_DRIVER_IDS; иначе тест-водитель
-        # (config.TEST_DRIVER_IDS): тот же экран, но только тест-заказы.
-        me = staff.driver_by_tg(user.get("id")) or staff.test_driver(user.get("id"))
+        # (config.TEST_DRIVER_IDS): тот же экран, но только тест-заказы. Кто и
+        # то и другое — по умолчанию настоящий, тест включает переключатель
+        # в профиле приложения (заголовок X-Ambar-Test).
+        from config import TEST_DRIVER_IDS as _TD_IDS
+        uid = user.get("id")
+        me = staff.driver_by_tg(uid)
+        if uid in _TD_IDS and (not me or request.headers.get("X-Ambar-Test", "") == "1"):
+            me = staff.test_driver(uid, force=True) or me
         if not me:
             log.warning(f"[driver] отказ: tg={user.get('id')} ({user.get('username')}) не в списке")
             return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
@@ -536,7 +542,10 @@ async def handle_ping(request):
         "ok": True,
         "driver": {**{k: me[k] for k in ("id", "name", "district", "district_code",
                                          "district_name", "operator")},
-                   "test": _tq(me)},
+                   "test": _tq(me),
+                   # Тестер, который заодно настоящий водитель, переключает режим сам.
+                   "test_allowed": (request.get("tg") or {}).get("id") in
+                                   __import__("config").TEST_DRIVER_IDS},
         "day": _biz_day(),
         "panic": bool(await db.panic_get(me["name"])),
     }, headers=CORS_HEADERS)

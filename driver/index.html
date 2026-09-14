@@ -4243,6 +4243,7 @@ const ICO = {
   sort: '<path d="M4 7h15M4 12h10M4 17h6"/>',
   clip: '<rect x="5" y="4.5" width="14" height="17" rx="2.2"/><path d="M9 2.5h6v3.5H9z"/><path d="M9 12h6M9 16h4.5"/>',
   hist: '<path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/>',
+  flask: '<path d="M9 3h6"/><path d="M10 3v6.5L5 18a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-8.5V3"/><path d="M7.5 15h9"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
   stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -4839,7 +4840,21 @@ function profHtml(){
     <span class="pf-row-b"><b>История заказов</b><i>Заказы по дням, поиск по адресу и номеру</i></span>
     <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
   </button>`;
-  return head + money + orders;
+  // Тест-режим — только тестерам (сервер отдаёт test_allowed): строка показывает
+  // состояние, нажатие переключает и перезагружает приложение.
+  const testRow = ME && ME.test_allowed ? `<button class="card pf-row" onclick="testToggle()">
+    <span class="pf-row-i">${svg(ICO.flask, 19)}</span>
+    <span class="pf-row-b"><b>Тест-режим</b><i>${ME.test ? 'Включён — только тест-заказы' : 'Выключен — боевая смена'}</i></span>
+    <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
+  </button>` : '';
+  return head + money + orders + testRow;
+}
+function testToggle(){
+  let on = false;
+  try{ on = localStorage.getItem('drv_test') === '1'; localStorage.setItem('drv_test', on ? '0' : '1'); }catch(e){}
+  toast(on ? 'Тест-режим выключен' : 'Тест-режим включён');
+  _tap('light');
+  setTimeout(() => location.reload(), 400);
 }
 // История заказов открывается из профиля отдельной страницей: та же страница,
 // что раньше была вкладкой, только с кнопкой назад в шапке.

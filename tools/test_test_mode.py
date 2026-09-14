@@ -317,6 +317,18 @@ async def main():
     eq("настоящий водитель: test=False", (st, r["driver"]["test"], r["driver"]["name"]), (200, False, "Худоба"))
     st, r = await call(dr.handle_ping, drreq(9))
     eq("чужой — 403", st, 403)
+    # тестер, который заодно настоящий водитель: по умолчанию настоящий,
+    # тест-режим только по заголовку переключателя
+    staff.DRIVER_IDS["Худоба"] = 1; staff.DRIVER_BY_TG[1] = "Худоба"
+    st, r = await call(dr.handle_ping, drreq(1))
+    eq("водитель+тестер без переключателя: Худоба, test_allowed", (r["driver"]["name"], r["driver"]["test"], r["driver"]["test_allowed"]), ("Худоба", False, True))
+    dr._valid_init_data = lambda s, t: {"id": 1, "first_name": "В"}
+    req = make_mocked_request("GET", "/x", headers={"Authorization": "tma x", "X-Ambar-Test": "1"})
+    st, r = await call(dr.handle_ping, req)
+    eq("водитель+тестер с переключателем: Тест-водитель", (r["driver"]["name"], r["driver"]["test"]), (TD, True))
+    eq("driver_chats тест-водителя и при боевой роли аккаунта", staff.driver_chats(TD), [1])
+    del staff.DRIVER_IDS["Худоба"]; del staff.DRIVER_BY_TG[1]
+    staff.DRIVER_IDS["Худоба"] = 555; staff.DRIVER_BY_TG[555] = "Худоба"
     ORDERS["T1"].update(status="approved", driver=TD, confirmed_at=datetime.now(timezone.utc).isoformat(), deliver_by="23:59")
     ORDERS["R2"] = {**copy.deepcopy(ORDERS["R1"]), "order_id": "R2", "status": "approved", "driver": TD}
     LOG.clear()

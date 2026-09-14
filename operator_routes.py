@@ -137,6 +137,17 @@ def _districts_for(request, districts: list) -> list:
     return districts
 
 
+def no_test_mode(handler):
+    """Смены районов и скрытый режим — боевые рубильники: из тест-режима они
+    не нажимаются, тест — про ход заказа, а не про чужую смену."""
+    @wraps(handler)
+    async def wrapped(request):
+        if _tflag(request):
+            return web.json_response({"error": "test_mode"}, status=403, headers=CORS_HEADERS)
+        return await handler(request)
+    return wrapped
+
+
 def _drivers_of(order_or_test, dist: dict | None = None, districts: list | None = None) -> set:
     """Кому можно отдать заказ: тестовый — только тест-водителю, настоящий —
     водителям района (или всех районов, если район не задан)."""
@@ -1086,7 +1097,10 @@ async def handle_queue(request):
     lanes["done"].sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return web.json_response({
         "as": who, "senior": next(x["senior"] for x in people if x["name"] == who),
-        "districts": [d for d in districts if d["id"] in scope],
+        # Панель берёт водителей для назначения отсюда: тест-оператору — только
+        # тест-водитель, иначе лист назначения показывает настоящих, а сервер
+        # их для тест-заказа не принимает.
+        "districts": [d for d in _districts_for(request, districts) if d["id"] in scope],
         "new": lanes["new"], "work": lanes["work"], "done": lanes["done"],
         "counts": counts, "day": day.isoformat(),
         "now": datetime.now(timezone.utc).isoformat(),
@@ -2566,6 +2580,7 @@ async def handle_shift(request):
 # открывает смену. Пока она не открыта, заказы обрабатывать нельзя — смотреть
 # можно всё.
 @require_operator
+@no_test_mode
 async def handle_shift_open(request):
     """Открыть смену района и отметить, кто из водителей сегодня работает."""
     try:
@@ -2671,6 +2686,7 @@ async def handle_shift_log(request):
 
 
 @require_operator
+@no_test_mode
 async def handle_shift_close(request):
     """Закрыть смену района.
 
@@ -2747,6 +2763,7 @@ async def handle_shift_close(request):
 
 
 @require_operator
+@no_test_mode
 async def handle_shift_reopen(request):
     """Открыть смену обратно: закрыли, а телефон зазвонил."""
     try:
@@ -2911,6 +2928,7 @@ async def _op_panic_note(name: str, on: bool, districts: list, back: list = None
 
 
 @require_operator
+@no_test_mode
 async def handle_op_panic(request):
     """Спрятать приложение или вернуть его.
 
@@ -3079,6 +3097,7 @@ async def drv_panic(name: str, on: bool, кто: str, откуда: str = "пл�
 
 
 @require_operator
+@no_test_mode
 async def handle_drv_panic(request):
     """Включить или снять скрытый режим водителя с планшета."""
     try:

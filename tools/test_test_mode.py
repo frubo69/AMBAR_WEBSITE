@@ -272,6 +272,9 @@ async def main():
     op.OPERATOR_IDS.remove(1)
     st, r = await call(op.handle_queue, opreq(1, query="as=" + config.TEST_PERSON))
     eq("очередь тест-оператора: только T1", sorted(x["order_id"] for x in r["new"]), ["T1"])
+    eq("очередь тест-оператора: в районах только тест-водитель", {tuple(d["drivers"]) for d in r["districts"]}, {(TD,)})
+    st, r = await call(op.handle_shift_open, opreq(1, "POST", body={"as": config.TEST_PERSON, "district": "jvc"}))
+    eq("смена района из тест-режима — 403 test_mode", (st, r.get("error")), (403, "test_mode"))
     op._people = lambda districts: [{"name": "Парвиз", "senior": True, "districts": [d["id"] for d in districts]}]
     st, r = await call(op.handle_queue, opreq(7, query="as=Парвиз"))
     eq("очередь настоящего оператора: только R1", sorted(x["order_id"] for x in r["new"]), ["R1"])

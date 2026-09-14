@@ -1017,14 +1017,15 @@ body.test-drv .wo-fix{display:none}
    заполнено), плитки 196×116 r12, квадрат значка 41 r9 нейтральный с тонким
    золотым глифом, пилюля «Готово» 22 в правом верхнем углу заполненной
    плитки, подпись 15,5 лиловая, значение 18 жирным, шеврон по центру текста. */
-.ex-sec{display:flex;align-items:center;gap:11px;margin:18px 0 12px;padding:0 2px 10px;border-bottom:1px solid var(--border2)}
+.ex-sec{display:flex;align-items:center;gap:9px;margin:18px 0 12px;padding:0 0 10px 1px;border-bottom:1px solid var(--border2)}
 .ex-sec svg{color:var(--gold2)}
-.ex-sec b{font-size:19px;font-weight:700;color:var(--text);letter-spacing:-.2px;line-height:22px}
-.ex-cnt{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:999px;box-sizing:border-box;
-  border:1px solid rgba(139,143,168,.35);background:rgba(139,143,168,.07);font-size:13px;font-weight:700;line-height:1;
-  color:#8B8FA8;font-variant-numeric:tabular-nums;letter-spacing:.2px}
-.ex-cnt.ok{color:var(--gold2);border-color:rgba(201,169,110,.6);background:rgba(201,169,110,.10)}
+.ex-sec b{flex:0 0 auto;font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.3px;line-height:22px}
+.ex-cnt{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;box-sizing:border-box;
+  border:1px solid rgba(201,169,110,.55);background:rgba(201,169,110,.08);font-size:13px;font-weight:700;line-height:1;
+  color:var(--gold2);font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.ex-cnt.ok{border-color:rgba(201,169,110,.65);background:rgba(201,169,110,.12)}
 .ex-cnt svg{color:var(--gold2)}
+.ex-hint{flex:1;min-width:0;font-size:11.5px;line-height:1.2;color:#8B8FA8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ex-tile{position:relative;display:block;width:100%;min-height:116px;padding:13.5px 34px 11.5px 13.5px;border-radius:12px;border:1px solid #1A1E2A;
   background:#10131D;font-family:inherit;color:var(--text);text-align:left;cursor:pointer;box-sizing:border-box}
@@ -1035,10 +1036,12 @@ body.test-drv .wo-fix{display:none}
 .ex-tile b.dim{color:#8B8FA8;font-weight:600}
 .ex-tile b.no{color:#E8746F}
 .ex-tile .ex-c{position:absolute;right:13px;top:71%;transform:translateY(-50%)}
-.ex-ok{position:absolute;right:10.7px;top:12.5px;display:inline-flex;align-items:center;gap:7px;height:22px;padding:0 10px 0 9px;
+.ex-ok{position:absolute;right:10.7px;top:12.5px;display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 7px 0 6px;
   border-radius:999px;box-sizing:border-box;border:1px solid rgba(201,169,110,.45);background:rgba(201,169,110,.10);
-  font-size:13.5px;font-weight:500;line-height:1;color:var(--gold2);white-space:nowrap}
+  font-size:11px;font-weight:500;line-height:1;color:var(--gold2);white-space:nowrap;letter-spacing:-.1px}
 .ex-ok svg{color:var(--gold2)}
+.ex-ok.need{color:#E8746F;border-color:rgba(232,116,111,.45);background:rgba(232,116,111,.10)}
+.ex-ok.need svg{color:#E8746F}
 .ex-oth{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.05);
   background:var(--card2);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
 .ex-oth:active{background:#181834}
@@ -7717,7 +7720,7 @@ function expTileVal(kind){
   const sent = _expSent(kind);
   if(sent && EXP_ST(sent) !== 'rejected') return `<b>${fmt(sent.amount || 0)} AED</b>`;
   if((EXP.no_expense || {})[kind]) return '<b class="dim">Не было</b>';
-  return '<b class="no">Не заполнено</b>';
+  return '<b class="dim">Не было</b>';                    // незаполненное показывает пилюля «Нужно заполнить»
 }
 // Выбор «был расход / не было» на странице бензина или мойки — до отправки
 // живёт только на экране; сохранённое читается из ответа сервера.
@@ -7744,7 +7747,7 @@ const ICO_WASHCAR = '<circle cx="6.5" cy="3.8" r=".9" fill="currentColor" stroke
   + '<rect x="2.7" y="20" width="2.6" height="3.2" rx=".9"/><rect x="18.7" y="20" width="2.6" height="3.2" rx=".9"/>';
 const XP_T = {fuel: {t: 'Бензин', s: 'Укажите сумму и прикрепите чек', no: 'Сегодня не заправлялись', ico: ICO.fuel},
               wash: {t: 'Мойка',  s: 'Укажите сумму и прикрепите фото', no: 'Сегодня не было мойки', ico: ICO_WASHCAR},
-              parking: {t: 'Парковка', s: '', no: '', ico: ICO.park}};
+              parking: {t: 'Парковка', s: '', no: 'Сегодня не платили', ico: ICO.park}};
 let XP_PARK_EDIT = '';                 // какую запись парковки правим ('' — новая)
 function xpParkEdit(id){ XP_PARK_EDIT = id || ''; EXP_EDIT = id ? 'o_' + id : null; renderExpenses(); window.scrollTo({top: 0});
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){} }
@@ -7814,8 +7817,28 @@ function expParkPage(){
   const zone = cur
     ? (cur.thumb ? `<div class="xp-ph one"><div class="xp-z set"><img src="${cur.thumb}" alt=""><span class="xp-zb">${svg(ICO_RCP, 16)}Чек уже приложен</span></div></div>` : '')
     : `<div class="xp-ph one">${xpZone('parking', 'rcp', shot ? null : null, 0)}</div>`;
+  // Парковка — обязательный ответ, как бензин и мойка: пока записей нет,
+  // сверху выбор «была / не было»; «не было» уходит той же ручкой, что у них.
+  const none = !!((EXP.no_expense || {}).parking) && !recs.length;
+  const yes = recs.length ? true : xpChoice('parking') === 'yes';
+  const choice = recs.length ? '' : `<div class="xp-ch">
+      <button class="xp-c${yes ? ' on' : ''}" onclick="xpPick('parking','yes')"><span class="xp-ci">${yes ? svg(ICO.ok, 15) : ''}</span>
+        <div><b>Была парковка</b><i>Укажу сумму</i></div></button>
+      <button class="xp-c${yes ? '' : ' on'}" onclick="xpPick('parking','no')"><span class="xp-ci">${yes ? '' : svg(ICO.ok, 15)}</span>
+        <div><b>Парковки не было</b><i>${T.no}</i></div></button>
+    </div>`;
+  if(!yes){
+    const btn = none ? {t: 'Изменить', mode: 'unnone', cls: ' sec'} : {t: 'Сохранить', mode: 'none', cls: ''};
+    return `<div class="xp">
+    <div class="xp-h"><span class="xp-hi">${svg(T.ico, 30)}</span><div><b>Парковка</b></div></div>
+    ${choice}
+    <div class="dv-sp"></div>
+    <div class="dv-foot"><button class="xp-go${btn.cls}" id="xb_parking" data-mode="${btn.mode}" onclick="xpSave(this,'parking')">${btn.t}</button></div>
+  </div>`;
+  }
   return `<div class="xp">
     <div class="xp-h"><span class="xp-hi">${svg(T.ico, 30)}</span><div><b>${cur ? 'Парковка · правка' : 'Парковка'}</b></div></div>
+    ${choice}
     ${list}
     <div class="xp-l">Сумма расхода</div>
     <div class="xp-amt"><span>AED</span>
@@ -7897,10 +7920,11 @@ function renderExpenses(){
   // мойка — запись или «не было», парковка — запись; без записи она считается
   // закрытой, когда отвечено по обязательным: нечего заполнять — значит готово.
   const ansd = k => !!(_expSent(k) && EXP_ST(_expSent(k)) !== 'rejected') || !!((EXP.no_expense || {})[k]);
-  const doneK = {meal: !!meal, fuel: ansd('fuel'), wash: ansd('wash')};
-  doneK.parking = !!parkSum || (doneK.fuel && doneK.wash);
+  const doneK = {meal: !!meal, fuel: ansd('fuel'), wash: ansd('wash'), parking: !!parkSum || !!((EXP.no_expense || {}).parking)};
   const nDone = Object.values(doneK).filter(Boolean).length;
-  const okPill = k => doneK[k] ? `<span class="ex-ok">${svg(OC_ICO.check, 13)}Готово</span>` : '';
+  const nNeed = ['fuel', 'wash', 'parking'].filter(k => !doneK[k]).length;   // питание отмечает оператор — водителю не заполнять
+  const okPill = k => doneK[k] ? `<span class="ex-ok">${svg(OC_ICO.check, 12)}Заполнено</span>`
+    : (k === 'meal' ? '' : `<span class="ex-ok need">${svg(ICO.excl, 12)}Нужно заполнить</span>`);
 
   if(EXP_PAGE){
     const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
@@ -7929,7 +7953,8 @@ function renderExpenses(){
       <em class="ex-c">${svg(ICO.chevR, 16)}</em>
     </button>
     <div class="ex-sec">${svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M15 15h3M16.5 13.5v3"/><circle cx="17" cy="19.5" r="1.2"/>', 20)}<b>Основные расходы</b>
-      <span class="ex-cnt${nDone === 4 ? ' ok' : ''}">${nDone}/4${nDone === 4 ? svg(OC_ICO.check, 14) : ''}</span></div>
+      <span class="ex-cnt${nDone === 4 ? ' ok' : ''}">${nDone}/4${nDone === 4 ? svg(OC_ICO.check, 14) : ''}</span>${
+        nNeed ? `<span class="ex-hint">Заполните ещё ${nNeed} ${plural(nNeed, 'позицию', 'позиции', 'позиций')}</span>` : ''}</div>
     <div class="ex-grid">
       <button class="ex-tile" onclick="expGo('meal')"><span class="ex-i">${svgThin(ICO.meal, 22)}</span>${okPill('meal')}
         <u>Питание</u>${meal ? `<b>${meal}</b>` : '<b class="dim">Отметит оператор</b>'}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>

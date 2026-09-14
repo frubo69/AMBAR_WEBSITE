@@ -1626,9 +1626,16 @@ async def _staff_fresh():
 @require_owner
 async def handle_staff(request):
     """Кто на каком районе — и кого туда можно поставить."""
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
+
+
+async def _staff_payload() -> dict:
+    """Штат целиком: районы, операторы, водители и их телефоны. Одним куском,
+    потому что его же отдают ручки перестановок и телефонов после своих
+    изменений — без второго прохода через охрану."""
     await _staff_fresh()
     moves = await db.staff_map_get()
-    return web.json_response({
+    return {
         "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
                        "name": OFFICE_NAMES.get(d, d),
                        "operator": staff.DISTRICT_OPERATOR.get(d, ""),
@@ -1653,7 +1660,7 @@ async def handle_staff(request):
                                     if n in staff.DISTRICT_DRIVERS.get(d, [])), "")
                               != staff.base_district(n)}
                     for n in staff.driver_names()],
-    }, headers=CORS_HEADERS)
+    }
 
 
 # ── телефоны водителей: заведение, ссылка для входа, отвязка ────────────────
@@ -1735,7 +1742,7 @@ async def handle_drivers_add(request):
     await db.driver_add(name, district, request.get("owner_id") or 0, bool(body.get("test")))
     await staff.sync(force=True)
     log.info(f"[staff] заведён водитель {name} · {OFFICE_CODES.get(district)} ({request.get('owner_id')})")
-    return await handle_staff(request)
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1775,7 +1782,7 @@ async def handle_drivers_unlink(request):
     await db.unlink_driver(name)
     await staff.sync(force=True)
     log.info(f"[staff] телефон отвязан: {name} ({request.get('owner_id')})")
-    return await handle_staff(request)
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1798,7 +1805,7 @@ async def handle_staff_set(request):
         await db.driver_map_set(drv, district if district != staff.base_district(drv) else "")
         await _staff_fresh()
         log.info(f"[staff] водитель {drv} → {OFFICE_CODES.get(district)}")
-        return await handle_staff(request)
+        return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
     name = (body.get("operator") or "").strip()
     if name and name not in staff.operator_names():
@@ -1808,7 +1815,7 @@ async def handle_staff_set(request):
     await db.staff_map_set(district, name if name != staff.base_operator(district) else "")
     await _staff_fresh()
     log.info(f"[staff] {OFFICE_CODES.get(district)} → {name or staff.base_operator(district)}")
-    return await handle_staff(request)
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1821,7 +1828,7 @@ async def handle_staff_reset(request):
     await db.driver_map_clear()
     await _staff_fresh()
     log.info("[staff] перестановки сняты — расписание как в коде")
-    return await handle_staff(request)
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
 @require_owner

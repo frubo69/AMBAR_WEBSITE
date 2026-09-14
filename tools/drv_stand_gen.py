@@ -77,9 +77,11 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path === '/api/driver/expenses' && m === 'POST'){ stLog('API POST ' + path + ' ' + JSON.stringify(opts.body || {})); return {ok: true}; }
   if(path === '/api/driver/expenses') return {day: '2026-09-11', drivers: [], totals: {}, held: [], held_total: 0, working: true, meal_rates: {working: 80, off: 40},
     kinds: [{id:'fuel',t:'Заправка',receipt:true},{id:'wash',t:'Мойка',receipt:true},{id:'parking',t:'Парковка',receipt:true},{id:'guard',t:'Охрана'},{id:'kfc',t:'KFC · премия'},{id:'we_gave',t:'Мы вернули'},{id:'owed_us',t:'Нам должны'},{id:'we_got',t:'Нам вернули',plus:true},{id:'we_owe',t:'Мы должны',plus:true},{id:'other',t:'Что-то ещё'}],
-    extras: ST_Q.get('expfull') ? [{id:'x1', kind:'fuel', amount:120, status:'approved', photo:'p', comment:''}, {id:'x2', kind:'parking', kind_t:'Парковка', amount:25, status:'pending', comment:'Marina Mall'}] : [],
-    by_kind: ST_Q.get('expfull') ? {fuel:{sum:120,count:1}, parking:{sum:25,count:1}} : {},
-    no_expense: ST_Q.get('must') ? {} : (ST_Q.get('expfull') ? {wash: true} : {fuel: true, wash: true}), pending_answer: ST_Q.get('must') ? ['fuel', 'wash'] : []};
+    // &expdone=1 — как на макете «Основные расходы»: питание 80, бензин 2 AED, мойки и парковки не было
+    extras: ST_Q.get('expdone') ? [{id:'x1', kind:'fuel', amount:2, status:'approved', photo:'p', comment:''}]
+      : ST_Q.get('expfull') ? [{id:'x1', kind:'fuel', amount:120, status:'approved', photo:'p', comment:''}, {id:'x2', kind:'parking', kind_t:'Парковка', amount:25, status:'pending', comment:'Marina Mall'}] : [],
+    by_kind: ST_Q.get('expdone') ? {fuel:{sum:2,count:1}} : ST_Q.get('expfull') ? {fuel:{sum:120,count:1}, parking:{sum:25,count:1}} : {},
+    no_expense: ST_Q.get('must') ? {} : (ST_Q.get('expdone') ? {wash: true} : ST_Q.get('expfull') ? {wash: true} : {fuel: true, wash: true}), pending_answer: ST_Q.get('must') ? ['fuel', 'wash'] : []};
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift') return ST_SHIFT;
   if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;

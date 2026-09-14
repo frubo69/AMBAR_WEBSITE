@@ -1012,19 +1012,33 @@ body.test-drv .wo-fix{display:none}
 .ex-tot u{display:block;text-decoration:none;font-size:12px;color:var(--muted)}
 .ex-tot b{display:block;margin-top:2px;font-size:20px;font-weight:800;color:var(--gold2);letter-spacing:-.4px;font-variant-numeric:tabular-nums}
 .ex-c{flex:0 0 auto;display:flex;color:var(--gold2)}
-.ex-sec{display:flex;align-items:center;gap:10px;margin:18px 0 12px;padding:0 2px 10px;border-bottom:1px solid var(--border2)}
+/* «Основные расходы» по макету владельца (14 сен 2026, экран 430, ≈3,3 px/pt):
+   шапка раздела 19/700 с пилюлей-счётчиком «4/4 ✓» (золотая, когда всё
+   заполнено), плитки 196×116 r12, квадрат значка 41 r9 нейтральный с тонким
+   золотым глифом, пилюля «Готово» 22 в правом верхнем углу заполненной
+   плитки, подпись 15,5 лиловая, значение 18 жирным, шеврон по центру текста. */
+.ex-sec{display:flex;align-items:center;gap:11px;margin:18px 0 12px;padding:0 2px 10px;border-bottom:1px solid var(--border2)}
 .ex-sec svg{color:var(--gold2)}
-.ex-sec b{font-size:17px;font-weight:600;color:var(--text)}
+.ex-sec b{font-size:19px;font-weight:700;color:var(--text);letter-spacing:-.2px;line-height:22px}
+.ex-cnt{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:999px;box-sizing:border-box;
+  border:1px solid rgba(139,143,168,.35);background:rgba(139,143,168,.07);font-size:13px;font-weight:700;line-height:1;
+  color:#8B8FA8;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.ex-cnt.ok{color:var(--gold2);border-color:rgba(201,169,110,.6);background:rgba(201,169,110,.10)}
+.ex-cnt svg{color:var(--gold2)}
 .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.ex-tile{position:relative;display:block;width:100%;min-height:118px;padding:14px 34px 14px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.05);
-  background:var(--card2);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
-.ex-tile:active{background:#181834}
-.ex-tile .ex-i{width:42px;height:42px}
-.ex-tile u{display:block;margin-top:12px;text-decoration:none;font-size:12.5px;color:var(--sub)}
-.ex-tile b{display:block;margin-top:5px;font-size:14.5px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
-.ex-tile b.dim{color:var(--muted);font-weight:600}
+.ex-tile{position:relative;display:block;width:100%;min-height:116px;padding:13.5px 34px 11.5px 13.5px;border-radius:12px;border:1px solid #1A1E2A;
+  background:#10131D;font-family:inherit;color:var(--text);text-align:left;cursor:pointer;box-sizing:border-box}
+.ex-tile:active{background:#141826}
+.ex-tile .ex-i{width:41px;height:41px;border-radius:9px;background:#171A25;border:1px solid #262A38;color:#E8C98A}
+.ex-tile u{display:block;margin-top:9px;text-decoration:none;font-size:15.5px;line-height:19px;font-weight:500;color:#8B8FA8}
+.ex-tile b{display:block;margin-top:1px;font-size:18px;line-height:22px;font-weight:700;letter-spacing:-.2px;color:#F1F2F6;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ex-tile b.dim{color:#8B8FA8;font-weight:600}
 .ex-tile b.no{color:#E8746F}
-.ex-tile .ex-c{position:absolute;right:12px;top:50%;transform:translateY(-50%)}
+.ex-tile .ex-c{position:absolute;right:13px;top:71%;transform:translateY(-50%)}
+.ex-ok{position:absolute;right:10.7px;top:12.5px;display:inline-flex;align-items:center;gap:7px;height:22px;padding:0 10px 0 9px;
+  border-radius:999px;box-sizing:border-box;border:1px solid rgba(201,169,110,.45);background:rgba(201,169,110,.10);
+  font-size:13.5px;font-weight:500;line-height:1;color:var(--gold2);white-space:nowrap}
+.ex-ok svg{color:var(--gold2)}
 .ex-oth{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.05);
   background:var(--card2);font-family:inherit;color:var(--text);text-align:left;cursor:pointer}
 .ex-oth:active{background:#181834}
@@ -7878,6 +7892,15 @@ function renderExpenses(){
   const parkSum = park.filter(x => EXP_ST(x) !== 'rejected').reduce((a, x) => a + (x.amount || 0), 0);
   const r = EXP.meal_rates || {working: 80, off: 40};
   const meal = EXP.working === true ? `${r.working} AED` : EXP.working === false ? `${r.off} AED` : '';
+  // Заполненные плитки — с пилюлей «Готово», в шапке раздела счётчик (макет
+  // владельца, 14 сен 2026). Питание закрывает отметка оператора, бензин и
+  // мойка — запись или «не было», парковка — запись; без записи она считается
+  // закрытой, когда отвечено по обязательным: нечего заполнять — значит готово.
+  const ansd = k => !!(_expSent(k) && EXP_ST(_expSent(k)) !== 'rejected') || !!((EXP.no_expense || {})[k]);
+  const doneK = {meal: !!meal, fuel: ansd('fuel'), wash: ansd('wash')};
+  doneK.parking = !!parkSum || (doneK.fuel && doneK.wash);
+  const nDone = Object.values(doneK).filter(Boolean).length;
+  const okPill = k => doneK[k] ? `<span class="ex-ok">${svg(OC_ICO.check, 13)}Готово</span>` : '';
 
   if(EXP_PAGE){
     const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
@@ -7905,15 +7928,16 @@ function renderExpenses(){
       <div><u>Итого за смену</u><b>${fmt(total)} AED</b></div>
       <em class="ex-c">${svg(ICO.chevR, 16)}</em>
     </button>
-    <div class="ex-sec">${svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M15 15h3M16.5 13.5v3"/><circle cx="17" cy="19.5" r="1.2"/>', 22)}<b>Основные расходы</b></div>
+    <div class="ex-sec">${svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M15 15h3M16.5 13.5v3"/><circle cx="17" cy="19.5" r="1.2"/>', 20)}<b>Основные расходы</b>
+      <span class="ex-cnt${nDone === 4 ? ' ok' : ''}">${nDone}/4${nDone === 4 ? svg(OC_ICO.check, 14) : ''}</span></div>
     <div class="ex-grid">
-      <button class="ex-tile" onclick="expGo('meal')"><span class="ex-i">${svg(ICO.meal, 20)}</span>
+      <button class="ex-tile" onclick="expGo('meal')"><span class="ex-i">${svgThin(ICO.meal, 22)}</span>${okPill('meal')}
         <u>Питание</u>${meal ? `<b>${meal}</b>` : '<b class="dim">Отметит оператор</b>'}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
-      <button class="ex-tile" onclick="expGo('fuel')"><span class="ex-i">${svg(ICO.fuel, 20)}</span>
+      <button class="ex-tile" onclick="expGo('fuel')"><span class="ex-i">${svgThin(ICO.fuel, 22)}</span>${okPill('fuel')}
         <u>Бензин</u>${expTileVal('fuel')}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
-      <button class="ex-tile" onclick="expGo('wash')"><span class="ex-i">${svgThin(ICO_WASHCAR, 26)}</span>
+      <button class="ex-tile" onclick="expGo('wash')"><span class="ex-i">${svgThin(ICO_WASHCAR, 27)}</span>${okPill('wash')}
         <u>Мойка</u>${expTileVal('wash')}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
-      <button class="ex-tile" onclick="expGo('parking')"><span class="ex-i">${svg(ICO.park, 20)}</span>
+      <button class="ex-tile" onclick="expGo('parking')"><span class="ex-i">${svgThin(ICO.park, 22)}</span>${okPill('parking')}
         <u>Парковка</u>${parkSum ? `<b>${fmt(parkSum)} AED</b>` : '<b class="dim">Не было</b>'}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>
     </div>
     <div class="ex-sec">${svg(ICO.note, 22)}<b>Прочее</b></div>

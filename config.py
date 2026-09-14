@@ -56,7 +56,11 @@ TEST_ACCOUNT_IDS = set(_id_list("AMBAR_TEST_IDS"))  # заказы этих в �
 # тест-роль никогда не отбирает настоящую работу.
 TEST_ORDER_IDS = set(_id_list("AMBAR_TEST_ORDER_IDS")) or set(OWNER_IDS)
 TEST_OPERATOR_IDS = set(_id_list("AMBAR_TEST_OPERATOR_IDS")) or set(OWNER_IDS)
-TEST_DRIVER_IDS = set(_id_list("AMBAR_TEST_DRIVER_IDS")) or set(OWNER_IDS)
+# Тест-водитель с 15 сен 2026 привязывается ссылкой через базу (drivers,
+# test: true), как и настоящие. Список в .env остался запасным путём: строки
+# нет — владельцы; строка есть, но пустая — никого (владелец снят с него).
+TEST_DRIVER_IDS = (set(_id_list("AMBAR_TEST_DRIVER_IDS")) if os.getenv("AMBAR_TEST_DRIVER_IDS") is not None
+                   else set(OWNER_IDS))
 TEST_DRIVER_NAME = (os.getenv("AMBAR_TEST_DRIVER_NAME") or "Тест-водитель").strip() or "Тест-водитель"
 TEST_PERSON = "Тест"        # «кто за планшетом» у тест-оператора
 

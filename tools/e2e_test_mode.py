@@ -44,8 +44,9 @@ async def main():
     check("тест-роли заданы (пусто = владельцы)", bool(config.TEST_OPERATOR_IDS and config.TEST_DRIVER_IDS))
     both = config.TEST_OPERATOR_IDS & set(pos.OPERATOR_IDS)
     print(f"  · тестер и настоящий оператор в одном лице: {len(both)} акк. — тест-режим включается переключателем в панели")
-    check("тест-водитель не пересекается с AMBAR_DRIVER_IDS", not (config.TEST_DRIVER_IDS & set(staff.DRIVER_BY_TG)))
-    tid = next(iter(config.TEST_DRIVER_IDS)); me_t = staff.test_driver(tid)
+    bothd = config.TEST_DRIVER_IDS & set(staff.DRIVER_BY_TG)
+    print(f"  · тестер и настоящий водитель в одном лице: {len(bothd)} акк. — тест-режим включается в профиле приложения")
+    tid = next(iter(config.TEST_DRIVER_IDS)); me_t = staff.test_driver(tid, force=True)
     check("test_driver() узнаёт тест-аккаунт", bool(me_t and me_t.get("test")), me_t and me_t["name"])
     day = bizday.biz_day()
     districts = await pos._fresh_districts(); d = districts[0]

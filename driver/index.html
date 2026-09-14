@@ -5856,7 +5856,7 @@ function shsPaintMid(){
       <div class="shs-v">${m ? aed(m.tips) : sk(100)}</div>
       ${m ? (m.tips_by || []).map(x => row(esc(x.who), aed(x.aed))).join('') : ''}
       <div class="shs-s">${m ? (m.tips
-          ? `наличными ${fmt(m.tips_cash)}${m.tips_other ? ' · по безналу ' + fmt(m.tips_other) : ''} · отдать операторам`
+          ? `отдать операторам из наличных на руках${m.tips_other ? ` · ${fmt(m.tips_other)} из них по безналу` : ''}`
           : 'чая сегодня не было') : sk(150)}</div>
     </div>
     <div class="shs-hero dcard">
@@ -5864,6 +5864,7 @@ function shsPaintMid(){
       <div class="shs-v">${m ? aed(m.on_hand) : sk(120)}</div>
       <div class="shs-s">${m ? `взято наличными ${fmt(m.cash_taken)} − расходы ${fmt(m.spent)}${
           m.got ? ' + приход ' + fmt(m.got) : ''}` : sk(180)}</div>
+      ${m && m.tips ? `<div class="shs-r sum"><span>После чая операторам</span><b>${aed(Math.max(0, m.on_hand - m.tips))}</b></div>` : ''}
     </div>`;
   if(m){
     const p = m.pay || {};

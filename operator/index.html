@@ -25,6 +25,7 @@
 <script src="api.js"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
+<script src="/vendor/ambar-fail.js?v=1"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -4212,7 +4213,7 @@ async function openCust(cid){
   curCust=null; $('custBody').innerHTML='<div class="ord-mut" style="padding:20px">Загрузка…</div>';
   showOv('custOv'); haptic('light');
   try{ curCust = await opApi.opFetch(`/api/operator/customer/${cid}`); renderCust(); }
-  catch(e){ $('custBody').innerHTML='<div class="ord-mut" style="padding:20px">Не удалось загрузить</div>'; }
+  catch(e){ $('custBody').innerHTML=loadFail(); }
 }
 // Метка источника хранится как есть — «chat», «post_marina». В карточке она
 // должна читаться, а не требовать знания наших внутренних имён.
@@ -4865,7 +4866,7 @@ async function whereLoad(){
   }catch(e){
     // Есть что показывать — показываем: сорвавшееся обновление не повод
     // стирать карточку под пальцем. Пусто — тогда и говорим, что не вышло.
-    if(!WH.data) whSet('<div class="wh-note" style="border:0">Не удалось загрузить</div>');
+    if(!WH.data) whSet(loadFail());
     return;
   }
   WH.data = d;
@@ -5603,7 +5604,7 @@ async function shiftOpen(){
   showOv('shiftOv'); haptic('light');
   $('shiftList').innerHTML = '<div class="acc-sub">Загрузка…</div>';
   try{ SHIFT = await opApi.opFetch('/api/operator/shift', {params:{as:curOp}}); }
-  catch(e){ $('shiftList').innerHTML = '<div class="acc-sub">Не удалось загрузить</div>'; return; }
+  catch(e){ $('shiftList').innerHTML = loadFail(); return; }
   shiftPaint();
   shiftPill();
 }
@@ -5746,7 +5747,7 @@ async function shLogOpen(){
   $('shLogBody').innerHTML = '<div class="acc-sub">Загрузка…</div>';
   let d;
   try{ d = await opApi.opFetch('/api/operator/shift/log', {params:{days:7}}); }
-  catch(e){ $('shLogBody').innerHTML = '<div class="acc-sub">Не удалось загрузить</div>'; return; }
+  catch(e){ $('shLogBody').innerHTML = loadFail(); return; }
   $('shLogBody').innerHTML = (d.list || []).length
     ? d.list.map(x => `<div class="shl-day">${_dayRu(x.day)}</div><div class="shl-card">`
       + x.rows.map(r => {

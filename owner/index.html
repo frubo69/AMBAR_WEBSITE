@@ -39,6 +39,7 @@ html.kb .stk-mid{padding-bottom:50vh}
 <script src="api.js"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
+<script src="/vendor/ambar-fail.js?v=1"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -11869,7 +11870,7 @@ async function whereLoad(){
     d = await ownerApi.ownerFetch('/api/owner/where', {params: {}});
   }catch(e){
     document.getElementById('whList').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   WH.data = d;
@@ -14389,7 +14390,7 @@ async function stkPicker(тихо){
   }
   catch(e){
     document.getElementById('stkMid').innerHTML =
-      '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   STK.districts = st.districts;
@@ -14460,7 +14461,7 @@ async function stkAuditPick(){
     STK.status = st; STK.reg = reg; STK.districts = st.districts;
     if(aud && aud.audits) STK.audits = aud.audits;
   }catch(e){
-    box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    box.innerHTML = loadFail();
     return;
   }
   if(STK.view !== 'audit-pick') return;
@@ -14515,7 +14516,7 @@ async function stkMovesHist(){
   let res;
   try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers', {params:{days: 30}}); }
   catch(e){
-    box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    box.innerHTML = loadFail();
     return;
   }
   STK.moves = res.transfers || []; STK.moves30 = STK.moves;
@@ -14673,7 +14674,7 @@ async function stkMovesPage(){
   try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers'); }
   catch(e){
     document.getElementById('stkMid').innerHTML =
-      '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+      loadFail(); return; }
   STK.moves = res.transfers || [];
   const бут = STK.moves.reduce((a, m) => a + (m.bottles || 0), 0);
   _stkHead('Перемещения', STK.moves.length
@@ -15011,7 +15012,7 @@ async function stkHistPaint(){
       ? await ownerApi.ownerFetch('/api/owner/stock/transfers')
       : await ownerApi.ownerFetch('/api/owner/stock/audits');
   }catch(e){
-    box.innerHTML = '<div class="stkh-e" style="color:var(--dn)">Не удалось загрузить</div>';
+    box.innerHTML = loadFail();
     return;
   }
   if(STK.hist !== свой) return;            // успели переключить — не мешаем
@@ -15856,7 +15857,7 @@ async function stkAudits(district, from){
   box.innerHTML = '<div class="stk-empty">Загрузка…</div>';
   let res;
   try{ res = await ownerApi.ownerFetch('/api/owner/stock/audits', {params:{limit: 120}}); }
-  catch(e){ box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  catch(e){ box.innerHTML = loadFail(); return; }
   if(STK.view !== 'audits') return;
   await stkLoadContext();
   const list = res.audits || [];
@@ -17061,7 +17062,7 @@ async function ordsLoad(){
   catch(e){
     if(my !== _ordsSeq) return;
     document.getElementById('accMid').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   if(my !== _ordsSeq) return;
@@ -17177,7 +17178,7 @@ async function accChecklist(keepDay){
   try{ CKL = await ownerApi.ownerFetch('/api/owner/checklist', {params:_p}); }
   catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail('accChecklist()');
     return;
   }
   CKL_CNT = (CKL && CKL.counts) || null;
@@ -17385,7 +17386,7 @@ async function accCashRound(){
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
   catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   crRender();
@@ -18258,7 +18259,7 @@ async function fbDayReload(){
     try{ await fbLoad(month); }
     catch(e){
       const body = document.getElementById('finDayBody');
-      if(body) body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      if(body) body.innerHTML = loadFail();
       return;
     }
   }
@@ -18374,7 +18375,7 @@ async function fbMonthScreen(title){
     document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
     try{ await fbLoad(m); }
     catch(e){
-      document.getElementById('accMid').innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      document.getElementById('accMid').innerHTML = loadFail();
       return null;
     }
   } else if(fbStale(m)){
@@ -19844,7 +19845,7 @@ async function fbAnOpen(){
   if(!b){
     mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
     try{ b = await fbLoad(month); }
-    catch(e){ mid.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+    catch(e){ mid.innerHTML = loadFail(); return; }
     if(!ov.classList.contains('show')) return;        // успели уйти назад
   }
   mid.innerHTML = `<div class="sc"><div id="fbList-an">${fbAnalysis(b)}</div></div>`;   // название — в шапке страницы
@@ -21017,7 +21018,7 @@ async function accExpDay(){
   await loadExpenses(accDay());
   const d = EXP.data, body = document.getElementById('expInner');
   if(!body) return;
-  if(!d){ body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  if(!d){ body.innerHTML = loadFail(); return; }
   // День больше не пишем в шапку: его говорит полоса под ней, и второй раз
   // мелким шрифтом он только спорит сам с собой.
   _setText('accSub', '');
@@ -21045,7 +21046,7 @@ async function accOrder(){
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}}); }
   catch(e){ document.getElementById('accMid').innerHTML =
-    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+    loadFail(); return; }
   ACC_ORDER = d;
   ORD = {d, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null, fold:{}};
   // Поставку спрашиваем здесь же: без неё непонятно, на каком мы шаге.
@@ -21657,7 +21658,7 @@ async function ordPrices(){
   try{ d = await ownerApi.ownerFetch('/api/owner/stock/prices'); }
   catch(e){
     document.getElementById('oprMid').innerHTML =
-      '<div class="opr-none" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   OPR.rows = d.rows || []; OPR.d = d;
@@ -22462,7 +22463,7 @@ async function qrHome(тихо){
   try{ ACC_IN = await ownerApi.ownerFetch('/api/owner/supply/intake', {params:{as: _meName()}}); }
   catch(e){
     if(!тихо) document.getElementById('accMid').innerHTML =
-      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   if(QR_IN || document.getElementById('qrList') || RCV_LINE) return;   // ушли дальше, пока ехало
@@ -22571,7 +22572,7 @@ async function qrHistory(){
   box.innerHTML = '<div class="scan-empty">Загрузка…</div>';
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/qr/history', {params:{days: 30}}); }
-  catch(e){ box.innerHTML = '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  catch(e){ box.innerHTML = loadFail(); return; }
   if(document.getElementById('qrIn') || QR_IN) return;
   const groups = r.groups || [];
   const всего = groups.reduce((a, g) => a + (g.n || 0), 0);
@@ -23153,7 +23154,7 @@ async function accWallet(){
   try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet'); }
   catch(e){
     if(!ACC_WAL) document.getElementById('accMid').innerHTML =
-      `<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>`;
+      loadFail();
     return;
   }
   if(ACC_VIEW === 'wallet') walBody(ACC_WAL);
@@ -23383,7 +23384,7 @@ async function walPickLoad(iso, q){
     {params: q ? {period:'month', q} : {period:'month', from: iso, to: iso}}); }
   catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   const rows = (r.groups || []).flatMap(g => g.rows || [])
@@ -24585,7 +24586,7 @@ async function supLoad(sid){
   try{ SUP_D = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(sid)); }
   catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   supRender();
@@ -25616,7 +25617,7 @@ async function accSupCancel(){
       ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(x.supply_id))));
   }catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     _setText('accSub', '');
     return;
   }
@@ -25788,7 +25789,7 @@ async function accGift(){
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/promotions', {params:{days:30}}); }
   catch(e){ document.getElementById('accMid').innerHTML =
-    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+    loadFail(); return; }
   ACC_GIFT = d;
   const t = d.totals;
   _setText('accSub', `${escS(d.gift.name)} · от ${fmt(d.gift.min_aed)} AED · ${d.days} дней`);
@@ -25831,7 +25832,7 @@ async function accPromo(){
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/promo'); }
   catch(e){ document.getElementById('accMid').innerHTML =
-    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+    loadFail(); return; }
   ACC_PROMO = d;
   PR.open = null;
   const t = d.totals;
@@ -26039,7 +26040,7 @@ async function loadExpenses(day){
   }catch(e){
     const box = document.getElementById('expSum');
     if(box) box.innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   renderExpenses();
@@ -30073,7 +30074,7 @@ async function accShifts(тихо){
     ACC_SH = await ownerApi.ownerFetch('/api/owner/stock/shifts', {params:{day}});
   }catch(e){
     document.getElementById('accMid').innerHTML = accDayBar('shDay') +
-      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   if(ACC_SH) ACC_SH.day = day;
@@ -30221,7 +30222,7 @@ async function accNorms(district){
     NM_D = NM.district;
   }catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      loadFail();
     return;
   }
   nmPaint();
@@ -31198,7 +31199,7 @@ async function accCheck(){
     CHK_DRV = dr; ACC_CHK = h;
   }catch(e){
     document.getElementById('accMid').innerHTML =
-      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return;
+      loadFail(); return;
   }
   chkHome();
 }
@@ -31532,7 +31533,7 @@ function crewDirty(){
 function crewRender(){
   const box = document.getElementById('accMid');
   if(!CREW){ box.innerHTML =
-    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+    loadFail(); return; }
   if(!CREW_D) CREW_D = _copy(CREW);
   const S = CREW_D;
   const dOf = id => S.districts.find(x => x.id === id) || {};

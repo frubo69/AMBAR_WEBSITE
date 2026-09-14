@@ -8865,10 +8865,14 @@ function renderSupply(){
   const body = document.getElementById('body');
   const S = SUP || {mine:[], free:[], extra:[], taken:[]};
   S.extra = S.extra || [];
-  if(!S.mine.length && !S.free.length && !S.extra.length && !S.taken.length){
+  // Район, который взял другой водитель, у остальных исчезает (владелец,
+  // 14 сен 2026): список товара — это то, что ещё можно взять, а не сводка
+  // по всем. Когда взяли всё — экран пуст, как если бы заявки не было.
+  if(!S.mine.length && !S.free.length && !S.extra.length){
     body.innerHTML = blank('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/>',
-      'Принимать нечего',
-      'Как только старший загрузит ответ магазина, поставка появится здесь',
+      S.taken.length ? 'Всё разобрали' : 'Принимать нечего',
+      S.taken.length ? 'Районы этой поставки уже взяли другие водители'
+                     : 'Как только старший загрузит ответ магазина, поставка появится здесь',
       'short') + woFoot();
     return;
   }
@@ -8889,15 +8893,6 @@ function renderSupply(){
     h += `<div class="sect"><span class="sect-t">Другие базы</span>
             <span class="sect-v">${S.extra.length}</span></div>`;
     h += S.extra.map(supCard).join('');
-  }
-  if(S.taken.length){
-    h += `<div class="sect"><span class="sect-t">Забрали другие</span></div>`;
-    h += S.taken.map(t => `<div class="sup-row">
-      <span class="sup-code">${esc(t.district_code)}</span>
-      <span class="sup-row-b">
-        <span class="sup-row-t">${esc(t.driver)}</span>
-        <span class="sup-row-s">${fmt(t.need)} бут. · принято ${fmt(t.got)}</span>
-      </span></div>`).join('');
   }
   body.innerHTML = h + woFoot();
 }

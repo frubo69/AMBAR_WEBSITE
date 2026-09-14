@@ -31,6 +31,7 @@ import db
 import backdate
 import finance_calc as calc
 import finance_pay as pay
+import pay_notify as _pn          # сообщения водителю о его деньгах (штрафы, удержания, зарплата)
 from owner_auth import require_owner, CORS_HEADERS
 
 log = logging.getLogger(__name__)
@@ -1323,11 +1324,14 @@ async def handle_pay_item_add(request):
                                 "comment": note or pay.KINDS[kind], "who": name,
                                 "line": "", "kind": kind, "item": iid,
                                 "by": who, "at": datetime.now(timezone.utc)})
-    await db.fin_pay_item_add({"_id": iid, "name": name, "kind": kind, "amount": amount,
-                               "per_month": per_month, "from": start, "day": day, "note": note,
-                               **({"reason": reason} if reason else {}),
-                               "entry": entry_id, "by": who, "at": datetime.now(timezone.utc)})
+    item = {"_id": iid, "name": name, "kind": kind, "amount": amount,
+            "per_month": per_month, "from": start, "day": day, "note": note,
+            **({"reason": reason} if reason else {}),
+            "entry": entry_id, "by": who, "at": datetime.now(timezone.utc)}
+    await db.fin_pay_item_add(item)
     await _touch(min(month, day[:7]))
+    # Водителю — тем же днём, в его бот: что назначили, за что и как удерживается.
+    await _pn.tell_safe(name, _pn.added(item, who))
     log.info(f"[fin] зарплаты: {name} {pay.KINDS[kind]}{f' ({reason})' if reason else ''} {amount} с {start}"
              f"{f' по {per_month}/мес' if per_month else ''} · {who or '—'}")
     if kind in pay.CASH_KINDS:
@@ -1352,10 +1356,12 @@ async def handle_pay_item_del(request):
         # штраф и удержание не стираются: отменённый остаётся в истории
         if not old.get("cancelled_at"):
             await db.fin_pay_item_set(iid, {"cancelled_at": datetime.now(timezone.utc), "cancelled_by": _who(body)})
+            await _pn.tell_safe(old.get("name"), _pn.cancelled(old, _who(body)))
     else:
         await db.fin_pay_item_del(iid)
         if old.get("entry"):
             await db.fin_entry_del(str(old["entry"]))
+        await _pn.tell_safe(old.get("name"), _pn.removed(old, _who(body)))
     await _touch(min(month, str(old.get("from") or old.get("day") or month)[:7]))
     log.info(f"[fin] зарплаты: {old.get('name')} {old.get('kind')} {old.get('amount')} "
              f"{'отменено' if old.get('kind') in pay.PENALTY_KINDS else 'убрано'} · {_who(body) or '—'}")
@@ -1394,6 +1400,7 @@ async def handle_pay_item_edit(request):
         fields["was"] = old.get("amount")
     await db.fin_pay_item_set(iid, fields)
     await _touch(min(month, str(old.get("from") or old.get("day") or month)[:7]))
+    await _pn.tell_safe(old.get("name"), _pn.edited(old, {**old, **fields}, _who(body)))
     parts = f" по {fields['per_month']}/мес" if fields["per_month"] else ""
     log.info(f"[fin] зарплаты: {old.get('name')} {pay.KINDS.get(old.get('kind'), '')} пересмотрен "
              f"{old.get('amount')} → {amount}{parts} · {_who(body) or '—'}")
@@ -1419,6 +1426,7 @@ async def handle_pay_item_restore(request):
         await db.fin_pay_item_set(iid, {"cancelled_at": None, "cancelled_by": "",
                                         "restored_at": datetime.now(timezone.utc), "restored_by": _who(body)})
         await _touch(min(month, str(old.get("from") or old.get("day") or month)[:7]))
+        await _pn.tell_safe(old.get("name"), _pn.restored(old, _who(body)))
         log.info(f"[fin] зарплаты: {old.get('name')} {pay.KINDS.get(old.get('kind'), '')} {old.get('amount')} возвращён · {_who(body) or '—'}")
     return _json({"ok": True, "book": await build(month)})
 
@@ -1444,6 +1452,7 @@ async def handle_pay_out(request):
            "by": who, "at": datetime.now(timezone.utc)}
     await db.fin_entry_add(doc)
     await _touch(min(month, day[:7]))
+    await _pn.tell_safe(name, _pn.payout(amount, day, month, doc["comment"], who))
     log.info(f"[fin] зарплата {name} {amount} за {month} ({day}) · {who or '—'}")
     await backdate.notify(day, who, f"финансы: зарплата {name}", f"{amount} AED")
     return _json({"ok": True, "id": doc["_id"], "book": await build(month)})

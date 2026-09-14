@@ -3030,13 +3030,10 @@ async def _writeoff_comp_tell(doc: dict):
     Молча вычесть из зарплаты значит дать человеку узнать о решении в день
     выплаты и поспорить тогда, когда доказывать уже нечем. Сообщение приходит
     в тот же день и тем же путём, что и решение по списанию."""
-    import os as _os
-    import config_staff as _staff
-    from api_server import tg_send
+    # Отправка — через pay_notify: тот же адресат по имени (и тест-водитель),
+    # тот же скрытый режим и тот же реестр сообщений, что у штрафов.
+    import pay_notify as _pn
     comp = doc.get("comp") or {}
-    token = _os.getenv("DRIVER_BOT_TOKEN", "")
-    if not token:
-        return
     name = doc.get("name") or doc.get("item") or "товар"
     qty = int(doc.get("qty") or 0)
     kind = doc.get("kind") or "списание"
@@ -3046,18 +3043,13 @@ async def _writeoff_comp_tell(doc: dict):
     if not parts:
         # Снятое удержание адресуем тому, с кого его снимали, — имени в
         # документе больше нет, поэтому берём водителя, который списывал.
-        tid = _staff.DRIVER_IDS.get((doc.get("by") or "").strip())
-        if tid:
-            await tg_send(token, tid, f"Удержание снято\n{name} × {qty} · {kind}", parse_mode=None)
+        await _pn.tell_safe(doc.get("by"), f"✅ Удержание снято\n{name} × {qty} · {kind}", parse_mode=None)
         return
     for part in parts:
-        tid = _staff.DRIVER_IDS.get((part.get("who") or "").strip())
-        if not tid:
-            continue
-        text = (f"С вас удержано {int(part.get('amount') or 0)} AED\n"
+        text = (f"📎 С вас удержано {int(part.get('amount') or 0)} AED\n"
                 f"{name} × {qty} · {kind}"
                 + (f"\n{comp.get('note')}" if comp.get("note") else ""))
-        await tg_send(token, tid, text, parse_mode=None)
+        await _pn.tell_safe(part.get("who"), text, parse_mode=None)
 
 
 async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):
@@ -3086,16 +3078,11 @@ async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):
     except Exception as e:
         log.warning(f"[writeoff] кнопки не сняты: {e}")
     try:
-        import os as _os
-        import config_staff as _staff
-        from api_server import tg_send
-        tid = _staff.DRIVER_IDS.get((doc.get("by") or "").strip())
-        token = _os.getenv("DRIVER_BOT_TOKEN", "")
-        if tid and token:
-            await tg_send(token, tid,
-                          wm.driver_text(doc.get("name", ""), int(doc.get("qty") or 0),
-                                         ok, doc.get("decided_note", "")),
-                          parse_mode=None)
+        import pay_notify as _pn
+        await _pn.tell_safe(doc.get("by"),
+                            wm.driver_text(doc.get("name", ""), int(doc.get("qty") or 0),
+                                           ok, doc.get("decided_note", "")),
+                            parse_mode=None)
     except Exception as e:
         log.warning(f"[writeoff] водителю не ушло: {e}")
 

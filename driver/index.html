@@ -2620,6 +2620,41 @@ body.call-mini .cs-safe-scrim{display:none}
 .call-bar-go{font-size:11px;color:var(--muted)}
 body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .sup-scr.show{display:flex}
+/* ── Итоги смены перед закрытием ── */
+.shs{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+.shs-hero,.shs-tip{border-radius:18px;padding:16px 16px 14px}
+.shs-tip{background:linear-gradient(160deg,rgba(201,169,110,.24),rgba(201,169,110,.05));border:1px solid rgba(201,169,110,.62)}
+.shs-l{font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.shs-tip .shs-l{color:var(--gold2)}
+.shs-v{margin-top:6px;font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1.05;letter-spacing:-.5px}
+.shs-tip .shs-v{color:var(--gold);font-size:42px}
+.shs-v u{text-decoration:none;font-size:16px;color:var(--muted);margin-left:6px;letter-spacing:0}
+.shs-tip .shs-v u{color:var(--gold2)}
+.shs-s{margin-top:7px;font-size:12.5px;color:var(--muted)}
+.shs-tip .shs-s{color:var(--sub)}
+.shs-card{border-radius:16px;padding:12px 14px 6px}
+.shs-h{font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.shs-r{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--border2)}
+.shs-h + .shs-r{border-top:0}
+.shs-r span{font-size:13.5px;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shs-r b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;white-space:nowrap}
+.shs-r b u{text-decoration:none;font-size:11px;color:var(--muted);margin-left:4px}
+.shs-r.sum span,.shs-r.sum b{color:var(--text)}
+.shs-r.plus b{color:var(--ok,#5BC489)}
+.shs-tip .shs-r{padding:8px 0;border-top:1px solid rgba(201,169,110,.28);margin-top:2px}
+.shs-tip .shs-r span{color:var(--text);font-weight:600}
+.shs-tip .shs-r b{color:var(--gold);font-size:17px}
+.shs-none,.shs-note{padding:9px 0;font-size:12.5px;color:var(--muted)}
+.shs-note{color:var(--warn)}
+.shs-ok{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;margin-bottom:10px;border-radius:15px;
+  border:1px solid var(--border2);background:var(--card2);color:var(--text);cursor:pointer;text-align:left;font-family:inherit}
+.shs-ok:active{transform:scale(.99)}
+.shs-ok.on{border-color:rgba(201,169,110,.6)}
+.shs-box{flex:0 0 auto;width:26px;height:26px;border-radius:8px;border:1.5px solid var(--border3);display:flex;
+  align-items:center;justify-content:center;color:transparent;background:var(--card)}
+.shs-ok.on .shs-box{background:var(--gold);border-color:var(--gold);color:#000}
+.shs-ok-t b{display:block;font-size:14.5px;font-weight:700}
+.shs-ok-t i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:1px}
 /* ── Машина на мойке ──────────────────────────────────────────────────────
    Камера во весь экран, поверх неё маска: снаружи контура темнее, внутри —
    живой кадр. Контур один — машина спереди — и одна кнопка спуска. После
@@ -3509,6 +3544,23 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   </div>
   <div class="sup-mid" id="supMid"></div>
   <div class="sup-bot" id="supBot"></div>
+</div>
+
+<!-- Итоги смены перед закрытием: наличные на руках, чай операторов, заказы и
+     расходы дня. Тот же каркас, что у приёмки; кнопка внизу ждёт галочку. -->
+<div class="sup-scr" id="shsScr">
+  <div class="sup-top">
+    <button class="sup-back" onclick="shsBack()" aria-label="Назад">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="sup-top-b">
+      <div class="sup-top-t">Итоги смены</div>
+      <div class="sup-top-s" id="shsS"></div>
+    </div>
+  </div>
+  <div class="sup-mid" id="shsMid"></div>
+  <div class="sup-bot" id="shsBot"></div>
 </div>
 
 <!-- Окно связи. Одно на все состояния: список, исходящий, входящий и сам
@@ -4553,6 +4605,7 @@ async function load(){
   supBadge();
   render();
   if(TAB === 'profile') profPoll();
+  shsRefresh();
 }
 
 // Зарплата меняется не по расписанию: старший удержал за бой — водитель должен
@@ -5740,10 +5793,115 @@ async function shClose(){
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     return;
   }
-  ASK = {t:'Закрыть смену?', s:'Заказы больше не придут, и отметить по ним ничего '
-        + 'будет нельзя. Если закрыли по ошибке — откройте снова, пока идёт трансляция.',
-        btn:'Закрыть смену', fn: shCloseGo};
-  renderAsk();
+  shsOpen();
+}
+
+// ── Итоги смены перед закрытием ────────────────────────────────────────────
+// Владелец, 14 сен 2026: «нажал закрыть смену — вылезает страница с итогами
+// сегодняшнего дня: сколько денег должно быть на руках, отдельно и заметно —
+// чай операторов; галочка «всё совпадает» — и только тогда кнопка активна».
+// Страница поверх всего, как приёмка; кнопка внизу не пропадает — ждёт галочку.
+let SHS = null, SHS_OK = false, SHS_AT = 0, SHS_BUSY = false;
+function shsShown(){ return document.getElementById('shsScr').classList.contains('show'); }
+function shsOpen(){
+  SHS = null; SHS_OK = false;
+  document.getElementById('shsScr').classList.add('show');
+  shsPaint();
+  shsLoad();
+  _tap('light');
+}
+function shsBack(){ document.getElementById('shsScr').classList.remove('show'); }
+async function shsLoad(){
+  if(SHS_BUSY) return;
+  SHS_BUSY = true;
+  try{
+    const d = await drvApi.drvFetch('/api/driver/shift/summary');
+    SHS = d; SHS_AT = Date.now();
+    if(shsShown()) shsPaint();
+  }catch(e){
+    if(shsShown()) document.getElementById('shsMid').innerHTML = loadFail('shsLoad()', 'Итоги не загрузились');
+  }
+  SHS_BUSY = false;
+}
+// Пока страница открыта, цифры живые: оператор мог согласовать расход, мог
+// дойти последний заказ. Перерисовываем только при изменении — галочка и
+// прокрутка остаются на месте.
+async function shsRefresh(){
+  if(!shsShown() || SHS_BUSY || !SHS || Date.now() - SHS_AT < 10000) return;
+  SHS_BUSY = true;
+  try{
+    const d = await drvApi.drvFetch('/api/driver/shift/summary');
+    SHS_AT = Date.now();
+    if(JSON.stringify(d) !== JSON.stringify(SHS)){ SHS = d; if(shsShown()) shsPaintMid(); }
+  }catch(e){}
+  SHS_BUSY = false;
+}
+function shsPaint(){
+  const m = SHS, s = document.getElementById('shsS');
+  if(s) s.textContent = m ? `${profDayT(m.day)}${m.opened_at ? ' · смена с ' + hhmm(m.opened_at) : ''}` : '';
+  shsPaintMid();
+  document.getElementById('shsBot').innerHTML = `
+    <button class="shs-ok${SHS_OK ? ' on' : ''}" id="shsOk" onclick="shsAgree()">
+      <span class="shs-box">${svg(ICO.ok, 14)}</span>
+      <span class="shs-ok-t"><b>Всё совпадает</b><i>со всем согласен</i></span>
+    </button>
+    <button class="st-go" id="shsGo" ${SHS_OK && m ? '' : 'disabled'} onclick="shsGo()">Закрыть смену</button>`;
+}
+function shsPaintMid(){
+  const m = SHS, aed = v => `${fmt(v)}<u>AED</u>`, sk = w => skb(w, 14);
+  const row = (t, v, cls) => `<div class="shs-r${cls ? ' ' + cls : ''}"><span>${t}</span><b>${v}</b></div>`;
+  // Чай операторов — первым и золотом: владелец просил акцент именно на нём.
+  let html = `<div class="shs-tip">
+      <div class="shs-l">Чай операторов</div>
+      <div class="shs-v">${m ? aed(m.tips) : sk(100)}</div>
+      ${m ? (m.tips_by || []).map(x => row(esc(x.who), aed(x.aed))).join('') : ''}
+      <div class="shs-s">${m ? (m.tips
+          ? `наличными ${fmt(m.tips_cash)}${m.tips_other ? ' · по безналу ' + fmt(m.tips_other) : ''} · отдать операторам`
+          : 'чая сегодня не было') : sk(150)}</div>
+    </div>
+    <div class="shs-hero dcard">
+      <div class="shs-l">Наличные на руках</div>
+      <div class="shs-v">${m ? aed(m.on_hand) : sk(120)}</div>
+      <div class="shs-s">${m ? `взято наличными ${fmt(m.cash_taken)} − расходы ${fmt(m.spent)}${
+          m.got ? ' + приход ' + fmt(m.got) : ''}` : sk(180)}</div>
+    </div>`;
+  if(m){
+    const p = m.pay || {};
+    const pr = (k, t) => p[k] && p[k].n ? row(`${t} · ${p[k].n}`, aed(p[k].aed)) : '';
+    const net = (m.spent || 0) - (m.got || 0);
+    html += `<div class="dcard shs-card"><div class="shs-h">Заказы за смену</div>
+      ${m.orders ? row(`Доставлено · ${m.orders}`, aed(m.gross), 'sum') : '<div class="shs-none">Заказов сегодня не было</div>'}
+      ${pr('cash', 'Наличными')}${pr('app', 'Оплачено в приложении')}${pr('crypto', 'Крипта')}${pr('debt', 'В долг')}${pr('free', 'Без оплаты')}
+    </div>
+    <div class="dcard shs-card"><div class="shs-h">Расходы</div>
+      ${m.exp_n ? row('Итого', (net < 0 ? '+' : '−') + aed(Math.abs(net)), 'sum') : '<div class="shs-none">Расходов не было</div>'}
+      ${(m.expenses || []).map(x => row(`${esc(x.t)}${x.n > 1 ? ' · ' + x.n : ''}`,
+          (x.plus ? '+' : '−') + aed(x.aed), x.plus ? 'plus' : '')).join('')}
+      ${m.exp_pending ? `<div class="shs-note">${m.exp_pending} ${plural(m.exp_pending, 'запись', 'записи', 'записей')} ещё на согласовании</div>` : ''}
+    </div>
+    <div class="dcard shs-card"><div class="shs-h">Ещё за смену</div>
+      ${row('Смена открыта', m.opened_at ? hhmm(m.opened_at) : '—')}
+      ${row('Списания', m.writeoffs ? `${m.writeoff_qty} ${plural(m.writeoff_qty, 'бутылка', 'бутылки', 'бутылок')}` : 'нет')}
+    </div>`;
+  }else{
+    html += `<div class="dcard shs-card"><div class="shs-h">Заказы за смену</div>${row(sk(90), sk(60))}${row(sk(120), sk(50))}</div>
+      <div class="dcard shs-card"><div class="shs-h">Расходы</div>${row(sk(80), sk(50))}${row(sk(110), sk(50))}</div>`;
+  }
+  document.getElementById('shsMid').innerHTML = `<div class="shs">${html}</div>`;
+}
+function shsAgree(){
+  if(!SHS) return;
+  SHS_OK = !SHS_OK;
+  const ok = document.getElementById('shsOk'), go = document.getElementById('shsGo');
+  if(ok) ok.classList.toggle('on', SHS_OK);
+  if(go) go.disabled = !SHS_OK;
+  _tap('light');
+}
+async function shsGo(){
+  if(!SHS_OK || !SHS) return;
+  const go = document.getElementById('shsGo'); if(go) go.disabled = true;
+  await shCloseGo();
+  if(SH && SH.closed) shsBack(); else if(go) go.disabled = !SHS_OK;
 }
 
 async function shCloseGo(){

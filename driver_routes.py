@@ -443,6 +443,93 @@ async def handle_shift(request):
     return web.json_response(await _shift_view(request["driver"]), headers=CORS_HEADERS)
 
 
+async def _shift_summary(me: dict) -> dict:
+    """Итоги смены перед закрытием (владелец, 14 сен 2026): сколько наличных
+    должно быть на руках, отдельно и заметно — чай, который операторы
+    заработали с заказов, и остальное по смене одной страницей. Считается с
+    тех же заказов и записей, что и другие экраны: второй арифметики рядом с
+    первой быть не должно.
+
+    Наличные на руках = взято наличными за заказы (по расчёту, если
+    рассчитывались не ровно) − расходы дня + приход (вернули/должны)."""
+    day = _biz_day()
+    d = await db.get_driver_day(day, me["name"]) or {}
+    since, until = bizday.window_utc(day, day)
+    try:
+        orders = await db.get_orders_in_range(since, until, test=_tq(me))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] итоги смены {me['name']}: заказы не прочитаны: {e}")
+        orders = []
+    mine = [o for o in orders if (o.get("driver") or "").strip() == me["name"]
+            and o.get("status") == "delivered" and bizday.order_day(o) == day]
+    pay = {k: {"n": 0, "aed": 0} for k in ("cash", "app", "crypto", "debt", "free")}
+    cash_taken = 0.0
+    tips = tips_cash = 0
+    by_op: dict = {}
+    for o in mine:
+        total = int(o.get("total") or 0)
+        tip = int(o.get("tip") or 0)
+        m = str(o.get("payment_method") or "").lower()
+        if m == "free":
+            pay["free"]["n"] += 1; pay["free"]["aed"] += total
+            continue
+        if m == "debt":
+            k = "debt"
+        elif m == "crypto" or o.get("crypto_paid"):
+            k = "crypto"
+        elif _is_prepaid(o):
+            k = "app"
+        else:
+            k = "cash"
+            s = o.get("settle") or {}
+            try:
+                taken = float(s["taken"]) if s.get("taken") is not None else float(total)
+            except (TypeError, ValueError):
+                taken = float(total)
+            cash_taken += taken
+            tips_cash += tip
+        pay[k]["n"] += 1; pay[k]["aed"] += total
+        tips += tip
+        who = staff.base_operator(o.get("office_id") or "") or "Оператор"
+        by_op[who] = by_op.get(who, 0) + tip
+    extras = [x for x in (d.get("extras") or []) if (x.get("status") or "approved") != "rejected"]
+    for x in extras:
+        x["kind"] = _kind_of(x)
+    spent = sum(int(x.get("amount") or 0) for x in extras if not EXTRA_KINDS.get(x["kind"], {}).get("plus"))
+    got = sum(int(x.get("amount") or 0) for x in extras if EXTRA_KINDS.get(x["kind"], {}).get("plus"))
+    by_kind = [{"id": k, "t": v["t"], "plus": bool(v.get("plus")),
+                "aed": sum(int(x.get("amount") or 0) for x in extras if x["kind"] == k),
+                "n": sum(1 for x in extras if x["kind"] == k)}
+               for k, v in EXTRA_KINDS.items()]
+    by_kind = [r for r in by_kind if r["n"]]
+    try:
+        start = datetime.strptime(day, "%Y-%m-%d").replace(
+            hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ).astimezone(timezone.utc)
+        wos = await db.writeoff_list(since=start, by=me["name"], limit=60)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] итоги смены {me['name']}: списания не прочитаны: {e}")
+        wos = []
+    wos = [w for w in wos if (w.get("state") or "ok") != "no"]
+    gross = sum(v["aed"] for k, v in pay.items() if k != "free")
+    return {
+        "day": day, "opened_at": _iso_at(d.get("shift_open_at")),
+        "on_hand": int(round(cash_taken - spent + got)),
+        "cash_taken": int(round(cash_taken)), "spent": spent, "got": got,
+        "tips": tips, "tips_cash": tips_cash, "tips_other": tips - tips_cash,
+        "tips_by": [{"who": w, "aed": a} for w, a in sorted(by_op.items(), key=lambda x: -x[1]) if a],
+        "orders": sum(v["n"] for k, v in pay.items() if k != "free"), "gross": gross,
+        "pay": pay,
+        "expenses": by_kind, "exp_n": len(extras),
+        "exp_pending": sum(1 for x in extras if (x.get("status") or "approved") == "pending"),
+        "writeoffs": len(wos), "writeoff_qty": sum(int(w.get("qty") or 0) for w in wos),
+    }
+
+
+@require_driver
+async def handle_shift_summary(request):
+    return web.json_response(await _shift_summary(request["driver"]), headers=CORS_HEADERS)
+
+
 @require_driver
 async def handle_shift_open(request):
     """Открыть смену: отметка оператора плюс живая трансляция."""
@@ -2452,6 +2539,7 @@ def setup(app):
         ("/api/driver/stock/move/{tid}",        handle_move_del,    "DELETE"),
         ("/api/driver/profile",                 handle_profile,     "GET"),
         ("/api/driver/shift",                   handle_shift,       "GET"),
+        ("/api/driver/shift/summary",           handle_shift_summary, "GET"),
         ("/api/driver/shift/open",              handle_shift_open,  "POST"),
         ("/api/driver/shift/close",             handle_shift_close, "POST"),
         ("/api/driver/panic",                   handle_panic,       "POST"),

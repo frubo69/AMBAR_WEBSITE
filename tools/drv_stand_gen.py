@@ -28,6 +28,12 @@ src = src.replace("""<script>if(!window.Telegram||!window.Telegram.WebApp){docum
 
 API = r"""<script>
 const ST_Q = new URLSearchParams(location.search);
+const ST_SUM = {day:'2026-09-14', opened_at:'2026-09-14T08:12:00+04:00', on_hand:1834, cash_taken:2050, spent:246, got:30,
+  tips:120, tips_cash:100, tips_other:20, tips_by:[{who:'Али', aed:80}, {who:'Фарух', aed:40}],
+  orders:9, gross:3155, pay:{cash:{n:6, aed:2050}, app:{n:2, aed:705}, crypto:{n:1, aed:400}, debt:{n:0, aed:0}, free:{n:1, aed:95}},
+  expenses:[{id:'fuel', t:'Заправка', plus:false, aed:150, n:1}, {id:'parking', t:'Парковка', plus:false, aed:36, n:2},
+            {id:'guard', t:'Охрана', plus:false, aed:60, n:1}, {id:'we_got', t:'Нам вернули', plus:true, aed:30, n:1}],
+  exp_n:5, exp_pending:2, writeoffs:1, writeoff_qty:1};
 const ST_LOG = []; function stLog(m){ ST_LOG.push(m); const e = document.getElementById('sterr'); if(e) e.textContent = ST_LOG.join('\n'); }
 window.onerror = (m, s, l, c) => stLog('ERROR ' + m + ' @' + l + ':' + c);
 const ST_NOW = new Date();
@@ -140,6 +146,8 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     return taken ? {mine: [], free: [], extra: [], taken: [{...t, driver: 'Фарух'}]} : {mine: [], free: [t], extra: [], taken: []};
   }
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
+  if(path === '/api/driver/shift/summary') return ST_SUM;
+  if(path === '/api/driver/shift/close' && m === 'POST'){ stLog('API POST ' + path); return {...ST_SHIFT, closed: true, closed_at: new Date().toISOString(), can_close: false, in_route: [], must: []}; }
   if(path === '/api/driver/shift') return ST_SHIFT;
   if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;
   if(path === '/api/driver/rates') return ST_FX;
@@ -237,6 +245,7 @@ async function standBoot(){
   if(ST_Q.get('open') && ST_Q.get('open').indexOf('exp:') === 0){ await new Promise(r => setTimeout(r, 150)); expGo(ST_Q.get('open').slice(4)); }
   if(ST_Q.get('open') === 'orders'){ await new Promise(r => setTimeout(r, 150)); profOrders(); }
   if(ST_Q.get('open') === 'ordhist'){ await new Promise(r => setTimeout(r, 150)); ordHist(); }   // история из ленты заказов
+  if(ST_Q.get('open') === 'shs'){ await new Promise(r => setTimeout(r, 150)); shsOpen(); }        // итоги смены перед закрытием
   if(ST_Q.get('open') === 'supx'){ await new Promise(r => setTimeout(r, 300)); supOpen('s2', 'jvc'); }   // задача доп. заявки
   if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); }
   if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }

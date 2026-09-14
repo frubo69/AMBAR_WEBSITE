@@ -1341,6 +1341,12 @@ body.xp-on{background:#070A12}
 .gs-n{flex:0 0 26px;align-self:flex-start;width:26px;height:26px;margin-top:2.5px;border-radius:50%;border:1.5px solid #FFE394;
   box-sizing:border-box;display:flex;align-items:center;justify-content:center;
   font-size:13px;font-weight:600;line-height:1;color:#FFDC95}
+.gs-r.tall{align-items:flex-start}
+.gs-r.tall .gs-ic{margin-top:2px}
+.gs-r.ok .gs-n{border-color:#3ddc84;color:#3ddc84;background:rgba(61,220,132,.12)}
+.gs-n svg{width:13px;height:13px}
+.gs-r.ok .gs-b b,.gs-r.ok .gs-b i{opacity:.6}
+.gs-b .shc-way{margin-top:9px}
 .gs-r:not(:last-child)::after{content:'';position:absolute;left:12.5px;top:36px;bottom:-8px;width:1px;background:#35353D}
 .gs-ic{flex:0 0 50px;width:50px;height:50px;margin-left:23px;border-radius:12px;box-sizing:border-box;
   background:#0E111D;border:1px solid #302C26;display:flex;align-items:center;justify-content:center;color:#FDDB8F}
@@ -5696,29 +5702,35 @@ function shPaint(){
     ? `Закрыли в ${hhmm(SH.closed_at)}. Заказы больше не придут — если это ошибка, откройте снова.`
     : 'Пока смена закрыта, заказы не приходят и отметить ничего нельзя';
 
-  const marked = SH.working === true;
-  list.innerHTML = `
-    <div class="shc ${marked ? 'on' : ''}">
-      <span class="shc-i">${svg(marked ? SH_ICO.tick : SH_ICO.dot, 14)}</span>
-      <span class="shc-b">
-        <span class="shc-t">Оператор отметил вас на смене</span>
-        <span class="shc-s">${marked ? 'Отмечено — питание за рабочий день.'
-          : (SH.working === false
-             ? 'Сегодня вы отмечены как выходной. Если это ошибка — напишите оператору.'
-             : 'Оператор отмечает бригаду в начале смены. Опаздывает — напишите ему.')}</span>
-      </span>
-    </div>
-    <div class="shc ${geo.ok ? 'on' : ''}">
-      <span class="shc-i">${svg(geo.ok ? SH_ICO.tick : SH_ICO.dot, 14)}</span>
-      <span class="shc-b">
-        <span class="shc-t">Геопозиция транслируется</span>
-        <span class="shc-s">${geo.ok
-          ? (geo.endless ? 'Идёт и не кончится сама.'
-                         : `Идёт, хватит ещё на ${_hleft(geo.left_min)}.`)
-          : 'Включить хватит один раз — она не кончится сама.'}</span>
-        ${geo.ok ? '' : _geoWay()}
-      </span>
+  const marked = SH.working === true, geoOn = !!geo.ok;
+  // Та же карточка, что у «геопозиция не транслируется» (макет владельца):
+  // заголовок с «i», нумерованные шаги с плитками, плашка с молнией.
+  // Выполненный шаг — зелёная галочка вместо номера.
+  const step = (n, ok, ic, w, t, sub, extra) => `
+    <div class="gs-r${ok ? ' ok' : ''}${extra ? ' tall' : ''}">
+      <span class="gs-n">${ok ? svg(SH_ICO.tick, 13) : n}</span>
+      <span class="gs-ic">${svgThin(ic, w)}</span>
+      <span class="gs-b"><b>${t}</b><i>${sub}</i>${extra || ''}</span>
     </div>`;
+  list.innerHTML = `
+    <div class="gh">
+      <span class="gh-i">${svgThin(ICO.info, 29)}</span>
+      <span class="gh-b"><b>${shut ? 'Открыть смену снова' : 'Что нужно для смены'}</b>
+        <i>${shut ? 'Условия те же, что утром.' : 'Два шага — и кнопка загорится.'}</i></span>
+    </div>
+    <div class="gs">
+      ${step(1, marked, ICO.user, 30, 'Отметка оператора',
+          marked ? 'Отмечено — питание за рабочий день.'
+          : SH.working === false ? 'Сегодня вы отмечены как выходной.<br>Если это ошибка — напишите оператору.'
+          : 'Оператор отмечает бригаду<br>в начале смены.')}
+      ${step(2, geoOn, TUT_ICO.pin, 32, 'Трансляция геопозиции',
+          geoOn ? (geo.endless ? 'Идёт и не кончится сама.' : `Идёт, хватит ещё на ${_hleft(geo.left_min)}.`)
+                : 'Включить хватит один раз —<br>она не кончится сама.',
+          geoOn ? '' : _geoWay())}
+    </div>
+    <div class="gn">${svgThin(LOCK_ICO.bolt, 28)}<span>${shut
+      ? 'Заказы больше не придут.<br>Ошиблись — откройте снова.'
+      : 'Оба шага выполнены —<br>кнопка «Открыть смену» загорится.'}</span></div>`;
   // Закрытую смену можно открыть заново — условия те же. Прятать кнопку
   // значило бы отправлять человека звонить оператору из-за промаха пальцем.
   go.style.display = '';

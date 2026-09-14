@@ -98,6 +98,13 @@ def _fmt_aed(v) -> str:
 # ── DB lifecycle ──────────────────────────────────────────────────────────────
 async def on_startup(app):
     await db.connect()
+    # Реестр водителей из базы — во все ручки этой службы, и дальше по кругу.
+    try:
+        import config_staff as _staff
+        await _staff.sync(force=True)
+        app["roster"] = asyncio.create_task(_staff.roster_loop(30))
+    except Exception as e:                    # noqa: BLE001
+        log.warning(f"[staff] реестр при старте: {e}")
     # Send welcome messages to any newly-issued premium card holders.
     # Runs once at startup (i.e. right after `git pull` + restart).
     try:

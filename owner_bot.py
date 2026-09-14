@@ -371,6 +371,9 @@ async def post_init(application: Application):
     ставим личную — телеграм умеет и так."""
     try:
         await db.connect()
+        import config_staff as _staff, asyncio as _aio
+        await _staff.sync(force=True)
+        _aio.get_event_loop().create_task(_staff.roster_loop(30))
     except Exception as e:
         log.warning("база недоступна — согласование списаний работать не будет: %s", e)
     try:

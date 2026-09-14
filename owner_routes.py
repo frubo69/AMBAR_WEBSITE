@@ -1052,7 +1052,7 @@ async def handle_where(request):
     import config_staff as staff
     from config_offices import OFFICE_IDS, OFFICE_CODES, OFFICE_NAMES
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:
         log.warning(f"[where] перестановка не прочитана: {e}")
     names, who = [], {}
@@ -1617,7 +1617,7 @@ async def _staff_fresh():
     перезапуске. Запрос крошечный — пять строк, — поэтому берём его каждый раз.
     """
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:
         log.warning(f"[staff] перестановка не прочитана: {e}")
 
@@ -1640,6 +1640,8 @@ async def handle_staff(request):
         # старший в STAR (менеджер, не оператор из расписания) — только имена,
         # «Штрафы/авансы/долги» ставят его отдельной карточкой наверх
         "stars": list(staff.SENIOR_STAR_IDS),
+        # Телефоны водителей: кто привязан, кому выдана ссылка (без id).
+        "links": _links_view(),
         # Водители тоже переставляются: список тем же видом, что и районы, —
         # у кого где стоит и от чего отступили.
         "drivers": [{"name": n,
@@ -1651,6 +1653,128 @@ async def handle_staff(request):
                               != staff.base_district(n)}
                     for n in staff.driver_names()],
     }, headers=CORS_HEADERS)
+
+
+# ── телефоны водителей: заведение, ссылка для входа, отвязка ────────────────
+# Водитель живёт в базе (drivers): имя, район, телефон после привязки. Ссылку
+# для входа выдаёт только STAR, код одноразовый и живёт неделю; сработал —
+# гаснет. Отвязать — одно нажатие. В ответах ни одного telegram id.
+CODE_TTL_DAYS = 7
+_CODE_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"        # без похожих букв и цифр
+_DRIVER_BOT = {"username": ""}
+
+
+def _iso_dt(v) -> str:
+    try:
+        return v.isoformat() if v else ""
+    except Exception:                                    # noqa: BLE001
+        return str(v or "")
+
+
+def _code_until(r: dict):
+    at = r.get("code_at")
+    if not at or not r.get("code") or r.get("telegram_id"):
+        return None
+    if getattr(at, "tzinfo", None) is None:
+        at = at.replace(tzinfo=timezone.utc)
+    until = at + timedelta(days=CODE_TTL_DAYS)
+    return until if until > datetime.now(timezone.utc) else None
+
+
+def _links_view() -> list:
+    out = []
+    for r in staff.roster_rows():
+        until = _code_until(r)
+        out.append({"name": r.get("name", ""), "district": r.get("district", ""),
+                    "district_code": OFFICE_CODES.get(r.get("district", ""), ""),
+                    "test": bool(r.get("test")),
+                    "linked": bool(r.get("telegram_id")),
+                    "tg_name": r.get("tg_name", "") or "", "tg_username": r.get("tg_username", "") or "",
+                    "linked_at": _iso_dt(r.get("linked_at")) if r.get("telegram_id") else "",
+                    "code_active": bool(until), "code_until": _iso_dt(until) if until else ""})
+    return out
+
+
+async def _driver_bot_username() -> str:
+    if _DRIVER_BOT["username"]:
+        return _DRIVER_BOT["username"]
+    u = (os.getenv("DRIVER_BOT_USERNAME") or "").strip().lstrip("@")
+    token = os.getenv("DRIVER_BOT_TOKEN", "")
+    if not u and token:
+        try:
+            import aiohttp as _ah
+            async with _ah.ClientSession() as sess:
+                async with sess.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10) as r:
+                    j = await r.json()
+                    u = ((j.get("result") or {}).get("username") or "").strip()
+        except Exception as e:                           # noqa: BLE001
+            log.warning(f"[staff] бот водителя не назвался: {e}")
+    _DRIVER_BOT["username"] = u
+    return u
+
+
+def _invite_link(username: str, code: str) -> str:
+    return f"https://t.me/{username}?start=drv_{code}" if username else ""
+
+
+@require_owner
+async def handle_drivers_add(request):
+    """POST {name, district, test?} — завести водителя. Телефон появится после
+    привязки по ссылке."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = re.sub(r"\s+", " ", str(body.get("name") or "")).strip()[:40]
+    district = str(body.get("district") or "").strip()
+    if len(name) < 2:
+        return web.json_response({"error": "bad_name"}, status=400, headers=CORS_HEADERS)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    await db.driver_add(name, district, request.get("owner_id") or 0, bool(body.get("test")))
+    await staff.sync(force=True)
+    log.info(f"[staff] заведён водитель {name} · {OFFICE_CODES.get(district)} ({request.get('owner_id')})")
+    return await handle_staff(request)
+
+
+@require_owner
+async def handle_drivers_code(request):
+    """POST {name, force?} — выдать ссылку для входа. Привязанному — только с
+    force: это смена телефона, старый теряет доступ сразу."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = str(body.get("name") or "").strip()
+    row = next((r for r in staff.roster_rows() if r.get("name") == name), None)
+    if not row:
+        return web.json_response({"error": "unknown_driver"}, status=404, headers=CORS_HEADERS)
+    if row.get("telegram_id") and not body.get("force"):
+        return web.json_response({"error": "linked"}, status=409, headers=CORS_HEADERS)
+    code = "".join(secrets.choice(_CODE_ABC) for _ in range(8))
+    await db.set_driver_code(name, code, request.get("owner_id") or 0)
+    await staff.sync(force=True)
+    until = datetime.now(timezone.utc) + timedelta(days=CODE_TTL_DAYS)
+    link = _invite_link(await _driver_bot_username(), code)
+    log.info(f"[staff] ссылка для входа: {name} ({request.get('owner_id')})")
+    return web.json_response({"ok": True, "name": name, "code": code, "link": link,
+                              "until": until.isoformat()}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_drivers_unlink(request):
+    """POST {name} — отвязать телефон. Запись, история и деньги остаются."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = str(body.get("name") or "").strip()
+    if not next((r for r in staff.roster_rows() if r.get("name") == name), None):
+        return web.json_response({"error": "unknown_driver"}, status=404, headers=CORS_HEADERS)
+    await db.unlink_driver(name)
+    await staff.sync(force=True)
+    log.info(f"[staff] телефон отвязан: {name} ({request.get('owner_id')})")
+    return await handle_staff(request)
 
 
 @require_owner
@@ -3461,7 +3585,7 @@ async def _chk_shift(day: str):
         log.warning(f"[chk] дни водителей за {day}: {e}")
         days = {}
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[chk] перестановка не прочитана: {e}")
     total = len(OFFICE_IDS)
@@ -4241,6 +4365,11 @@ def setup(app):
     app.router.add_post(            "/api/owner/staff/set", handle_staff_set)
     app.router.add_route("OPTIONS", "/api/owner/staff/reset", handle_staff_reset)
     app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
+    for _p, _h in (("/api/owner/drivers/add", handle_drivers_add),
+                   ("/api/owner/drivers/code", handle_drivers_code),
+                   ("/api/owner/drivers/unlink", handle_drivers_unlink)):
+        app.router.add_route("OPTIONS", _p, _h)
+        app.router.add_post(_p, _h)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/where", handle_where)

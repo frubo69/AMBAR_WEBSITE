@@ -188,9 +188,15 @@ def operator_by_tg(telegram_id) -> str:
 
 def driver_by_tg(telegram_id) -> dict | None:
     """Кто это, если он вообще водитель. Возвращает запись из drivers()."""
-    name = DRIVER_BY_TG.get(int(telegram_id or 0))
-    if not name:
+    try:
+        tid = int(telegram_id or 0)
+    except (TypeError, ValueError):
         return None
+    name = DRIVER_BY_TG.get(tid)
+    if not name:
+        # Тест-водитель, привязанный через базу, — та же персона, что и по
+        # списку AMBAR_TEST_DRIVER_IDS.
+        return test_driver(tid, force=True) if tid in _ROSTER["test"] else None
     return next((d for d in drivers() if d["name"] == name), None)
 
 
@@ -208,7 +214,7 @@ def test_driver(telegram_id, force: bool = False) -> dict | None:
         tid = int(telegram_id or 0)
     except (TypeError, ValueError):
         return None
-    if tid not in TEST_DRIVER_IDS or (tid in DRIVER_BY_TG and not force):
+    if (tid not in TEST_DRIVER_IDS and tid not in _ROSTER["test"]) or (tid in DRIVER_BY_TG and not force):
         return None
     from config_offices import OFFICE_CODES, OFFICE_NAMES
     st = DISTRICT_STAFF[0]
@@ -239,7 +245,7 @@ def driver_chats(name: str) -> list:
         # Все тест-аккаунты, даже если кто-то из них заодно настоящий
         # водитель: телефон один, и сообщение о тест-заказе должно дойти.
         from config import TEST_DRIVER_IDS
-        return sorted(TEST_DRIVER_IDS)
+        return sorted(set(TEST_DRIVER_IDS) | set(_ROSTER["test"]))
     return []
 
 
@@ -284,9 +290,102 @@ _BASE_OPERATOR = {s["district"]: s["operator"] for s in DISTRICT_STAFF}
 _BASE_DRIVERS = {s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF}
 _BASE_DRIVER_AT = {n: s["district"] for s in DISTRICT_STAFF for n in s["drivers"]}
 
+# ── реестр водителей из базы (15 сен 2026) ──────────────────────────────────
+# Водитель заводится в базе (коллекция drivers): рабочее имя, район и телефон,
+# который появляется после привязки по одноразовой ссылке (driver_bot). Для
+# всех, кто есть в базе, база — единственный источник: и район, и телефон
+# берутся из неё, строка .env для них не читается. Строка .env остаётся
+# запасным путём только для имён, которых в базе нет, — на время перехода.
+# Тест-водитель (test: true) в расписание не попадает: он не возит, а
+# проверяет приложение, и виден как персона test_driver().
+_ENV_DRIVER_IDS = dict(DRIVER_IDS)
+_CODE_DRIVERS = {d: list(v) for d, v in _BASE_DRIVERS.items()}
+_CODE_DRIVER_AT = dict(_BASE_DRIVER_AT)
+_ROSTER = {"rows": [], "test": {}, "at": 0.0}
+_LAST_MOVES = ({}, {})
+
+
+def roster_rows() -> list:
+    """Записи водителей из базы, как прочитаны в последний раз."""
+    return list(_ROSTER["rows"])
+
+
+def apply_roster(rows: list):
+    """Наложить реестр из базы на расписание и на телефоны."""
+    global _BASE_DRIVERS, _BASE_DRIVER_AT
+    from config_offices import OFFICE_IDS
+    rows = [r for r in (rows or []) if str(r.get("name") or "").strip()]
+    _ROSTER["rows"] = rows
+    at = dict(_CODE_DRIVER_AT)
+    ids = dict(_ENV_DRIVER_IDS)
+    test = {}
+    for r in rows:
+        name = str(r["name"]).strip()
+        tid = r.get("telegram_id")
+        try:
+            tid = int(tid) if tid else 0
+        except (TypeError, ValueError):
+            tid = 0
+        if r.get("test"):
+            if tid:
+                test[tid] = name
+            continue
+        if r.get("hidden"):
+            at.pop(name, None); ids.pop(name, None)
+            continue
+        d = str(r.get("district") or "").strip()
+        if d in OFFICE_IDS:
+            at[name] = d
+        elif name not in at:
+            continue                                  # без района — не водитель
+        # База — источник правды для своих: телефон только из неё.
+        if tid:
+            ids[name] = tid
+        else:
+            ids.pop(name, None)
+    _BASE_DRIVER_AT = at
+    _BASE_DRIVERS = {d: [] for d in _CODE_DRIVERS}
+    for n, d in at.items():
+        _BASE_DRIVERS.setdefault(d, []).append(n)
+    DRIVER_IDS.clear(); DRIVER_IDS.update(ids)
+    DRIVER_BY_TG.clear(); DRIVER_BY_TG.update({v: k for k, v in ids.items()})
+    _ROSTER["test"] = test
+    apply_moves(*_LAST_MOVES)
+
+
+async def sync(force: bool = False, min_age: float = 3.0):
+    """Реестр и перестановки из базы — перед тем, как решать по людям.
+
+    Зовётся на каждом запросе водителя и по кругу в каждой службе; чаще раза
+    в несколько секунд ходить в базу незачем, поэтому есть выдержка."""
+    import time as _t
+    if not force and _t.monotonic() - _ROSTER["at"] < min_age:
+        return
+    import db
+    rows = await db.get_driver_links()
+    moves, dm = await db.staff_map_get(), await db.driver_map_get()
+    apply_moves(moves, dm)
+    apply_roster(rows)
+    _ROSTER["at"] = _t.monotonic()
+
+
+async def roster_loop(interval: float = 30.0):
+    """Фон для служб, где нет запросов водителя: бот операторов, сторож
+    геопозиции, бот владельца. Привязал телефон — узнают за полминуты."""
+    import asyncio as _aio, logging as _lg
+    log = _lg.getLogger("staff")
+    while True:
+        try:
+            await sync(force=True)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[staff] реестр не прочитан: {e}")
+        await _aio.sleep(interval)
+
 
 def apply_moves(moves: dict, driver_moves: dict = None):
     """Наложить перестановку. Пустые словари возвращают всё как в коде."""
+    global _LAST_MOVES
+    _LAST_MOVES = (moves or {}, driver_moves or {})
     moves = moves or {}
     for s in DISTRICT_STAFF:
         s["operator"] = moves.get(s["district"]) or _BASE_OPERATOR[s["district"]]

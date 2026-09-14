@@ -128,7 +128,7 @@ async def tick(now: datetime = None) -> dict:
     op_token = os.getenv("OPERATOR_BOT_TOKEN", "")
     drv_token = os.getenv("DRIVER_BOT_TOKEN", "")
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:
         log.warning(f"[nag] перестановка не прочитана: {e}")
 

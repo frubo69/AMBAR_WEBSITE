@@ -71,7 +71,7 @@ def _districts() -> list:
 
 async def _fresh_districts() -> list:
     try:
-        _staff_mod.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await _staff_mod.sync()
     except Exception as e:
         log.warning(f"[pos] перестановка районов не прочитана: {e}")
     return _districts()

@@ -884,7 +884,7 @@ async def handle_checks(request):
 async def _staff_fresh():
     import config_staff as staff
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:
         log.warning(f"[qr] перестановка не прочитана: {e}")
 

@@ -468,7 +468,7 @@ async def tick(now: datetime = None) -> dict:
     if _STARTED and (utc - _STARTED).total_seconds() < GRACE_MIN * 60:
         return {"day": day, "grace": True}
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:
         log.warning(f"[geo-watch] перестановка не прочитана: {e}")
 

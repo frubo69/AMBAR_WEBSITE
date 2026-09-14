@@ -94,9 +94,9 @@ def require_driver(fn):
         # как отдадим ему заказы: иначе он до перезапуска сервиса возит по
         # старому району.
         try:
-            staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+            await staff.sync()                    # реестр водителей и перестановки из базы
         except Exception as e:
-            log.warning(f"[driver] перестановка не прочитана: {e}")
+            log.warning(f"[driver] реестр не прочитан: {e}")
         # Настоящий водитель — по AMBAR_DRIVER_IDS; иначе тест-водитель
         # (config.TEST_DRIVER_IDS): тот же экран, но только тест-заказы. Кто и
         # то и другое — по умолчанию настоящий, тест включает переключатель

@@ -9,8 +9,10 @@ AMBAR — бот водителя.
 пускать — он только объясняет; пускает сервер, проверяя подпись initData этим же
 токеном. Значит вход в приложение водителя невозможен из операторского бота.
 """
+import asyncio
 import logging
 import os
+import re
 from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
@@ -50,6 +52,13 @@ async def post_init(app):
         await db.connect()
     except Exception as e:
         log.warning(f"база недоступна, чистка чата работать не будет: {e}")
+    # Реестр водителей — из базы, сразу и дальше по кругу: привязал телефон
+    # в другой службе — здесь узнают за полминуты.
+    try:
+        await staff.sync(force=True)
+    except Exception as e:
+        log.warning(f"реестр при старте: {e}")
+    asyncio.get_event_loop().create_task(staff.roster_loop(30))
     try:
         await app.bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(text="Панель", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL)))
@@ -58,16 +67,136 @@ async def post_init(app):
         log.warning(f"set_chat_menu_button: {e}")
 
 
+# ── привязка телефона по одноразовой ссылке (15 сен 2026) ───────────────────
+# Водителя заводит владелец в STAR: имя, район, и STAR выдаёт ссылку вида
+# t.me/бот?start=drv_<код>. Человек открывает её — и его аккаунт становится
+# этим водителем. Код одноразовый, живёт CODE_TTL и гасится первым входом;
+# второй по той же ссылке не войдёт. Перебор кодов текстом отбивается счётчиком
+# попыток. Кто привязался — владельцу приходит сообщение.
+CODE_TTL = timedelta(days=7)
+CODE_RE = re.compile(r"^[A-Z0-9]{8}$")
+_ATTEMPTS: dict = {}                       # uid → времена неудачных попыток
+ATTEMPTS_MAX, ATTEMPTS_WIN = 5, timedelta(hours=1)
+
+
+def _norm_code(s) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(s or "").upper())
+
+
+def _too_many(uid: int) -> bool:
+    now = datetime.now(timezone.utc)
+    hist = [t for t in _ATTEMPTS.get(uid, []) if now - t < ATTEMPTS_WIN]
+    _ATTEMPTS[uid] = hist
+    return len(hist) >= ATTEMPTS_MAX
+
+
+def _failed(uid: int):
+    _ATTEMPTS.setdefault(uid, []).append(datetime.now(timezone.utc))
+
+
+async def bind_code(uid: int, code: str, tg: dict) -> tuple:
+    """('ok', запись) — привязано; ('bad', None) — кода нет, он использован
+    или просрочен; ('rate', None) — слишком много попыток."""
+    code = _norm_code(code)
+    if _too_many(uid):
+        return "rate", None
+    if not CODE_RE.match(code):
+        _failed(uid); return "bad", None
+    row = await db.get_driver_by_code(code)
+    at = (row or {}).get("code_at")
+    if at is not None and getattr(at, "tzinfo", None) is None:
+        at = at.replace(tzinfo=timezone.utc)
+    if not row or not at or datetime.now(timezone.utc) - at > CODE_TTL:
+        _failed(uid); return "bad", None
+    linked = await db.link_driver(code, uid, tg)
+    if not linked:
+        _failed(uid); return "bad", None
+    _ATTEMPTS.pop(uid, None)
+    return "ok", linked
+
+
+async def _tell_owners(text: str):
+    """Владельцам в их бот: кто привязал телефон. Без id."""
+    token = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
+    try:
+        from config import OWNER_IDS
+    except Exception:                          # noqa: BLE001
+        OWNER_IDS = set()
+    if not token or not OWNER_IDS:
+        return
+    from telegram import Bot
+    try:
+        async with Bot(token) as b:
+            for cid in sorted(OWNER_IDS):
+                try:
+                    await b.send_message(cid, text)
+                except Exception as e:         # noqa: BLE001
+                    log.warning(f"владельцу не ушло: {e}")
+    except Exception as e:                     # noqa: BLE001
+        log.warning(f"бот владельца: {e}")
+
+
+async def _bind(update: Update, code: str):
+    u = update.effective_user
+    status, row = await bind_code(u.id, code, {"first_name": u.first_name or "",
+                                               "username": u.username or ""})
+    if status == "rate":
+        await update.message.reply_text("Слишком много попыток. Попробуйте через час.")
+        return
+    if status != "ok":
+        await update.message.reply_text(
+            "Ссылка недействительна или уже использована.\nПопросите у менеджера новую.")
+        log.info(f"привязка отклонена: {u.id} (@{u.username})")
+        return
+    try:
+        await staff.sync(force=True)
+    except Exception as e:                     # noqa: BLE001
+        log.warning(f"реестр после привязки: {e}")
+    me = staff.driver_or_test(u.id) or {}
+    name = row.get("name") or me.get("name") or "водитель"
+    where = "" if me.get("test") else (me.get("district_name") or "")
+    sent = await update.message.reply_text(
+        f"Готово: вы подключены как {name}" + (f" · {where}" if where else "") + ".\n\n"
+        "Откройте панель — там смена, заказы и расходы.",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("Открыть панель", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
+    await _remember(sent)
+    log.info(f"привязан: {name} ← {u.id} (@{u.username})")
+    await _tell_owners(f"🔗 {name}: телефон привязан — {u.first_name or ''}"
+                       + (f" (@{u.username})" if u.username else ""))
+
+
+async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Код, присланный текстом, — тот же вход, что и ссылка. Всё остальное
+    молчит: в скрытом режиме чат прикидывается игрой."""
+    if not update.message or not update.effective_user:
+        return
+    code = _norm_code(update.message.text)
+    if len(code) != 8:
+        return
+    if staff.driver_by_tg(update.effective_user.id):
+        return
+    await _bind(update, code)
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
+    # Ссылка-приглашение: /start drv_<код>.
+    args = ctx.args or []
+    if args and str(args[0]).lower().startswith("drv_"):
+        await _bind(update, str(args[0])[4:])
+        return
+    try:
+        await staff.sync(force=True)
+    except Exception as e:                     # noqa: BLE001
+        log.warning(f"реестр: {e}")
     me = staff.driver_or_test(uid)
     if not me:
-        # Человеку, которого нет в списке, нужен не отказ, а объяснение и id —
-        # менеджеру всё равно придётся его спросить.
+        # Без id в ответе: номер аккаунта чужому ничего не должен говорить, а
+        # доступ теперь выдают ссылкой, а не по id (владелец, 15 сен 2026).
         await update.message.reply_text(
-            "Этот аккаунт пока не в списке водителей.\n\n"
-            f"Ваш ID: {uid}\n"
-            "Передайте его менеджеру — он выдаст доступ.")
+            "Этот аккаунт не подключён.\n\n"
+            "Откройте ссылку-приглашение от менеджера или пришлите сюда код из неё.")
         log.info(f"вход без доступа: {uid} (@{update.effective_user.username})")
         return
 
@@ -236,6 +365,8 @@ def main():
     app.add_handler(MessageHandler(filters.LOCATION, on_location))
     app.add_handler(MessageHandler(
         filters.UpdateType.EDITED_MESSAGE & filters.LOCATION, on_location))
+    # Код привязки текстом — запасной путь к ссылке.
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     log.info(f"бот водителя запущен · доступ у {len(staff.DRIVER_IDS)}")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

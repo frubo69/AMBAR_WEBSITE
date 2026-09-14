@@ -72,6 +72,13 @@ async def post_init(app):
         await db.connect()
     except Exception as e:                   # noqa: BLE001
         log.warning(f"база недоступна: {e}")
+    # Реестр водителей из базы: кто есть кто — по нему.
+    try:
+        await staff.sync(force=True)
+    except Exception as e:                   # noqa: BLE001
+        log.warning(f"реестр при старте: {e}")
+    import asyncio as _aio
+    _aio.get_event_loop().create_task(staff.roster_loop(30))
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

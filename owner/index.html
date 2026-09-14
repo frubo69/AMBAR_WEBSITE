@@ -4356,6 +4356,29 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .crw-p.moved .crw-p-a svg{stroke-width:2}
 /* Откуда пришёл — единственная подпись на экране: обычное состояние молчит. */
 .crw-p-f{font-size:10px;font-weight:700;color:var(--gold2);letter-spacing:.3px}
+/* телефоны водителей: список привязок, ссылка для входа, новый водитель */
+.crw-lc{margin-top:12px}
+.crw-ln-l{display:flex;flex-direction:column;gap:6px;padding:4px 0 2px}
+.crw-ln{display:flex;align-items:center;gap:11px;width:100%;padding:10px;border-radius:14px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);text-align:left;cursor:pointer;font-family:inherit}
+.crw-ln:active{transform:scale(.99)}
+.crw-ln-i{flex:0 0 auto;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:var(--card)}
+.crw-ln-i.ok{color:var(--gold2)}.crw-ln-i.wait{color:var(--warn)}
+.crw-ln-b{flex:1;min-width:0}
+.crw-ln-b b{display:flex;align-items:center;gap:7px;font-size:14.5px;font-weight:700}
+.crw-ln-b b u{text-decoration:none;font-size:10.5px;letter-spacing:1px;color:var(--muted)}
+.crw-ln-t{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--warn);padding:1px 6px;border:1px solid rgba(243,180,74,.4);border-radius:6px}
+.crw-ln-b i{display:block;margin-top:2px;font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crw-ln-b i.ok{color:var(--gold2)}.crw-ln-b i.wait{color:var(--warn)}
+.crw-lk-h{font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);padding:6px 10px 8px}
+.pin-pop.crw-lk{left:14px !important;right:14px;width:auto;top:24vh !important}
+.crw-lk-url{margin:0 10px;padding:12px;border-radius:12px;background:var(--card);border:1px solid var(--border2);font-size:13px;word-break:break-all;color:var(--text);user-select:all;-webkit-user-select:all}
+.crw-lk-s{padding:8px 10px 10px;font-size:12.5px;color:var(--muted);line-height:1.4}
+.pin-pop .crw-lk-in{display:block;width:calc(100% - 20px);margin:0 10px 10px;height:46px;padding:0 12px;border-radius:12px;border:1px solid var(--border2);background:var(--card);color:var(--text);font-size:15px;font-family:inherit}
+.pin-pop .crw-lk-in:focus{outline:none;border-color:var(--gold2)}
+.crw-lk-d{display:flex;gap:6px;padding:0 10px 10px}
+.pin-pop .crw-lk-dd{flex:1;width:auto;height:38px;margin:0;padding:0;border-radius:10px;border:1px solid var(--border2);background:var(--card);color:var(--sub);font-weight:700;font-size:12px;letter-spacing:1px;cursor:pointer;font-family:inherit;text-align:center;justify-content:center}
+.pin-pop .crw-lk-dd.on{border-color:var(--gold);color:var(--gold)}
 .crw-none{font-size:12px;color:var(--muted);padding:4px 2px}
 
 
@@ -31604,7 +31627,128 @@ function crewRender(){
         <span>Переставлено: <b>${moved}</b> — не как обычно</span>
         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
       </div>` : ''}
-    ${per}`;
+    ${per}${crewLinksHtml(S)}`;
+}
+
+// ── телефоны водителей ────────────────────────────────────────────────────
+// Водитель живёт в базе: имя, район, телефон после привязки. Ссылку для входа
+// выдаёт STAR, она одноразовая и живёт неделю. Здесь видно, кто привязан, кому
+// выдана ссылка, и отсюда же — новая ссылка, отвязка и новый водитель.
+let CREW_LINK = null, CREW_ADD_D = '';
+function crewWhen(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'});
+}
+function crewLinksHtml(S){
+  const links = S.links || [];
+  const rows = links.length ? links.map((l, i) => {
+    const st = l.linked ? `привязан${l.tg_name ? ' · ' + escS(l.tg_name) : ''}${l.tg_username ? ' @' + escS(l.tg_username) : ''}`
+             : l.code_active ? `ссылка выдана · до ${crewWhen(l.code_until)}` : 'телефон не привязан';
+    const k = l.linked ? 'ok' : l.code_active ? 'wait' : 'no';
+    return `<button class="crw-ln" id="crwln-${i}" onclick="crewLink(${i})">
+      <span class="crw-ln-i ${k}">${IC('mobile', 16)}</span>
+      <span class="crw-ln-b"><b>${escS(l.name)}${l.test ? '<i class="crw-ln-t">тест</i>' : ''}<u>${escS(l.district_code || '')}</u></b><i class="${k}">${st}</i></span>
+      <em class="fb-chev">${_SC_CHEV}</em></button>`;
+  }).join('') : '<span class="crw-none">в базе никого нет</span>';
+  return `<div class="crw-c crw-lc"><div class="crw-c-h">
+      <span class="crw-c-n wrap">Телефоны водителей</span>
+      <button class="crw-op" onclick="crewLinkAdd()"><span class="crw-op-n">${IC('user', 15)}Добавить</span></button>
+    </div><div class="crw-ln-l">${rows}</div></div>`;
+}
+function crewLink(i){
+  const S = CREW_D || CREW; const l = (S.links || [])[i]; if(!l) return;
+  const n = l.name.replace(/'/g, "\\'");
+  _crewPop(`#crwln-${i}`, l.linked
+    ? `<div class="crw-lk-h">${escS(l.name)} · привязан</div>
+       <button onclick="crewLinkIssue('${n}', true)">${IC('key', 15)}Сменить телефон</button>
+       <button onclick="crewLinkUnlink('${n}')">${IC('xmark', 15)}Отвязать телефон</button>`
+    : `<div class="crw-lk-h">${escS(l.name)} · не привязан</div>
+       <button onclick="crewLinkIssue('${n}', false)">${IC('key', 15)}${l.code_active ? 'Выдать новую ссылку' : 'Выдать ссылку для входа'}</button>`);
+}
+async function crewLinkIssue(name, force, sure){
+  if(force && !sure){
+    _crewPop('.crw-lc .crw-c-n', `<div class="crw-lk-h">${escS(name)}</div>
+      <div class="crw-lk-s">Старый телефон потеряет доступ сразу. Выдать новую ссылку?</div>
+      <button onclick="crewLinkIssue('${name.replace(/'/g, "\\'")}', true, true)">Да, выдать</button>
+      <button onclick="closePinPop()">Отмена</button>`);
+    return;
+  }
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/drivers/code', {method: 'POST', body: {name, force: !!force, as: _meName()}});
+    await crewLoad(); CREW_D = _copy(CREW); crewRender();
+    crewLinkShow(r);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ closePinPop(); _toast('Не удалось выдать ссылку'); }
+}
+function crewLinkShow(r){
+  closePinPop();
+  CREW_LINK = r;
+  const back = document.createElement('div');
+  back.className = 'pin-back'; back.addEventListener('click', closePinPop);
+  const pop = document.createElement('div');
+  pop.className = 'pin-pop crw-lk';
+  const u = crewWhen(r.until);
+  pop.innerHTML = `<div class="crw-lk-h">${escS(r.name)} · ссылка для входа</div>
+    <div class="crw-lk-url">${escS(r.link || r.code)}</div>
+    <div class="crw-lk-s">код ${escS(r.code)}${u ? ' · действует до ' + u : ''} · один вход</div>
+    <button onclick="crewLinkShare()">Отправить в Telegram</button>
+    <button onclick="crewLinkCopy()">Скопировать</button>`;
+  document.body.append(back, pop);
+}
+function crewLinkShare(){
+  if(!CREW_LINK) return;
+  const text = 'Вход в приложение водителя AMBAR. Откройте ссылку и нажмите Start:';
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(CREW_LINK.link || CREW_LINK.code)
+            + '&text=' + encodeURIComponent(text);
+  try{ Telegram.WebApp.openTelegramLink(url); }catch(e){ window.open(url, '_blank'); }
+}
+async function crewLinkCopy(){
+  if(!CREW_LINK) return;
+  const v = CREW_LINK.link || CREW_LINK.code;
+  try{ await navigator.clipboard.writeText(v); _toast('Скопировано'); }
+  catch(e){
+    const el = document.querySelector('.crw-lk-url');
+    if(el){ const rg = document.createRange(); rg.selectNodeContents(el); const s = window.getSelection(); s.removeAllRanges(); s.addRange(rg); }
+    _toast('Выделено — скопируйте');
+  }
+}
+async function crewLinkUnlink(name, sure){
+  if(!sure){
+    _crewPop('.crw-lc .crw-c-n', `<div class="crw-lk-h">${escS(name)}</div>
+      <div class="crw-lk-s">Телефон потеряет доступ сразу. Имя, смены и деньги останутся.</div>
+      <button onclick="crewLinkUnlink('${name.replace(/'/g, "\\'")}', true)">Отвязать</button>
+      <button onclick="closePinPop()">Отмена</button>`);
+    return;
+  }
+  try{
+    CREW = await ownerApi.ownerFetch('/api/owner/drivers/unlink', {method: 'POST', body: {name, as: _meName()}});
+    CREW_D = _copy(CREW); closePinPop(); crewRender();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ closePinPop(); _toast('Не удалось отвязать'); }
+}
+function crewLinkAdd(){
+  const S = CREW_D || CREW; if(!S) return;
+  CREW_ADD_D = '';
+  _crewPop('.crw-lc .crw-op', `<div class="crw-lk-h">Новый водитель</div>
+    <input class="crw-lk-in" id="crwAddName" placeholder="Рабочее имя" autocomplete="off" maxlength="40">
+    <div class="crw-lk-d">${S.districts.map(d => `<button class="crw-lk-dd" id="crwadd-${d.id}" onclick="crewAddPick('${d.id}')">${escS(d.code)}</button>`).join('')}</div>
+    <button onclick="crewLinkAddGo()">Добавить и выдать ссылку</button>`);
+  setTimeout(() => { const i = document.getElementById('crwAddName'); if(i) i.focus(); }, 50);
+}
+function crewAddPick(d){
+  CREW_ADD_D = d;
+  document.querySelectorAll('.crw-lk-dd').forEach(b => b.classList.toggle('on', b.id === 'crwadd-' + d));
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+async function crewLinkAddGo(){
+  const name = String((document.getElementById('crwAddName') || {}).value || '').trim();
+  if(name.length < 2){ _toast('Впишите имя'); return; }
+  if(!CREW_ADD_D){ _toast('Выберите район'); return; }
+  try{
+    CREW = await ownerApi.ownerFetch('/api/owner/drivers/add', {method: 'POST', body: {name, district: CREW_ADD_D, as: _meName()}});
+    CREW_D = _copy(CREW); crewRender();
+    await crewLinkIssue(name, false, true);
+  }catch(e){ closePinPop(); _toast('Не удалось добавить'); }
 }
 
 

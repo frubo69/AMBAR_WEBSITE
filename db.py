@@ -2007,6 +2007,30 @@ async def unlink_driver(name: str) -> bool:
     return bool(r.modified_count)
 
 
+async def driver_add(name: str, district: str, by: int = 0, test: bool = False) -> None:
+    """Завести водителя (или поправить район у заведённого). Телефон и код
+    при этом не трогаются: заведение и привязка — разные действия."""
+    db = _db_or_none()
+    if db is None: return
+    await db.drivers.update_one(
+        {"name": name},
+        {"$setOnInsert": {"name": name, "telegram_id": None, "code": None,
+                          "created_at": datetime.now(timezone.utc), "created_by": int(by or 0)},
+         "$set": {"district": district, "test": bool(test)}},
+        upsert=True)
+
+
+async def driver_adopt(name: str, telegram_id: int, by: int = 0) -> None:
+    """Перенос уже работающего водителя из .env в базу: телефон известен,
+    привязывать заново его не просим."""
+    db = _db_or_none()
+    if db is None: return
+    await db.drivers.update_one(
+        {"name": name},
+        {"$set": {"telegram_id": int(telegram_id), "code": None,
+                  "linked_at": datetime.now(timezone.utc), "linked_by": int(by or 0)}})
+
+
 # ── расходы по водителям ─────────────────────────────────────────────────────
 # Один документ на (день, водитель): отметка о выходе, ставка питания и список
 # разовых трат. Ключ составной, потому что и то и другое правят в течение дня по

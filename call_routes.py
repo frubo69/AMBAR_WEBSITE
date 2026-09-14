@@ -155,7 +155,7 @@ async def refresh_staff(force: bool = False):
     if not force and time.time() - _ROSTER_AT < _ROSTER_TTL:
         return
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
         _ROSTER_AT = time.time()
     except Exception as e:
         log.warning(f"[call] перестановка не прочитана: {e}")

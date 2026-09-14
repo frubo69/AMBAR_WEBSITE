@@ -74,7 +74,7 @@ class Req(dict):
 async def main():
     await db.connect()
     mute()
-    staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+    await staff.sync()
 
     districts = await pos._fresh_districts()
     d = districts[0]

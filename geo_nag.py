@@ -84,7 +84,7 @@ async def tick(now: datetime = None) -> dict:
     if not token:
         return {"skip": "нет токена", "day": day}
     try:
-        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        await staff.sync()
     except Exception as e:
         log.warning(f"[geo] перестановка не прочитана: {e}")
 

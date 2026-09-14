@@ -7923,8 +7923,12 @@ function renderExpenses(){
   const doneK = {meal: !!meal, fuel: ansd('fuel'), wash: ansd('wash'), parking: !!parkSum || !!((EXP.no_expense || {}).parking)};
   const nDone = Object.values(doneK).filter(Boolean).length;
   const nNeed = ['fuel', 'wash', 'parking'].filter(k => !doneK[k]).length;   // питание отмечает оператор — водителю не заполнять
+  // «Нужно заполнить» и подсказка — только когда оператор закрыл смену района
+  // и закрытие стало доступно водителю (владелец, 14 сен 2026): до этого
+  // смена идёт, расходы ещё впереди, и торопить нечем.
+  const late = !!(SH && SH.day_closed);
   const okPill = k => doneK[k] ? `<span class="ex-ok">${svg(OC_ICO.check, 12)}Заполнено</span>`
-    : (k === 'meal' ? '' : `<span class="ex-ok need">${svg(ICO.excl, 12)}Нужно заполнить</span>`);
+    : (late && k !== 'meal' ? `<span class="ex-ok need">${svg(ICO.excl, 12)}Нужно заполнить</span>` : '');
 
   if(EXP_PAGE){
     const back = `<button class="fxh-b" onclick="expBack()" aria-label="Назад">${svg(ICO.back, 16)}</button>`;
@@ -7954,7 +7958,7 @@ function renderExpenses(){
     </button>
     <div class="ex-sec">${svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M15 15h3M16.5 13.5v3"/><circle cx="17" cy="19.5" r="1.2"/>', 20)}<b>Основные расходы</b>
       <span class="ex-cnt${nDone === 4 ? ' ok' : ''}">${nDone}/4${nDone === 4 ? svg(OC_ICO.check, 14) : ''}</span>${
-        nNeed ? `<span class="ex-hint">Заполните ещё ${nNeed} ${plural(nNeed, 'позицию', 'позиции', 'позиций')}</span>` : ''}</div>
+        late && nNeed ? `<span class="ex-hint">Заполните ещё ${nNeed} ${plural(nNeed, 'позицию', 'позиции', 'позиций')}</span>` : ''}</div>
     <div class="ex-grid">
       <button class="ex-tile" onclick="expGo('meal')"><span class="ex-i">${svgThin(ICO.meal, 22)}</span>${okPill('meal')}
         <u>Питание</u>${meal ? `<b>${meal}</b>` : '<b class="dim">Отметит оператор</b>'}<em class="ex-c">${svg(ICO.chevR, 16)}</em></button>

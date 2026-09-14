@@ -470,8 +470,13 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             # Именно JPEG и именно лёгкий: Telegram забирает картинку по ссылке
             # сам, и PNG на два мегабайта он либо не примет, либо будет тянуть
             # на глазах у оператора.
-            photo_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
-            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+            # Адрес с версией: Telegram забирает картинку по ссылке один раз и
+            # хранит у себя; на iPhone его копия показывалась наполовину серой
+            # (15 сен 2026) — новая версия заставляет забрать файл заново.
+            # Превью — отдельный маленький файл, как и просит Bot API, а не та же
+            # большая картинка.
+            photo_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg?v=2",
+            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}_thumb.jpg?v=2",
             photo_width=1280, photo_height=640,
             title=("Приглашение по-русски" if lang == "ru" else "Invite in English") + where,
             description=("Фото, текст и кнопка — без ссылки в тексте"

@@ -94,6 +94,12 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not kind:
         await update.message.reply_text("Нет доступа")
         return
+    if kind == "driver":
+        # Водителю бот ничего не объясняет и имени не называет (владелец,
+        # 15 сен 2026): что делать в этом чате, показывает приложение, а в
+        # самом чате должны остаться только точка и история LEGO с
+        # предупреждением. Чужой глаз не должен увидеть здесь «Худоба · водитель».
+        return
     who = "водитель" if kind == "driver" else "старший"
     sent = await update.message.reply_text(
         f"{name} · {who}\n\n"
@@ -186,12 +192,15 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                                     "не нужно — чат можно убрать в архив.")
     elif stop:
         log.info(f"трансляция выключена: {name}")
-        await _say(update, ctx, f"{name} · трансляция выключена. Чтобы вас снова видели, "
-                                f"включите её заново:\n\n{HOW}")
+        if kind != "driver":
+            await _say(update, ctx, f"{name} · трансляция выключена. Чтобы вас снова видели, "
+                                    f"включите её заново:\n\n{HOW}")
     elif update.message:
         # Разовая точка: дошла, но погаснет через минуты. Нужна трансляция.
-        await _say(update, ctx, f"{name} · точка принята, но это разовая точка, она "
-                                f"погаснет. Нужна трансляция:\n\n{HOW}")
+        # Водителю об этом скажет приложение, здесь молчим.
+        if kind != "driver":
+            await _say(update, ctx, f"{name} · точка принята, но это разовая точка, она "
+                                    f"погаснет. Нужна трансляция:\n\n{HOW}")
 
 
 async def _lego_wall(ctx, chat: int, name: str):

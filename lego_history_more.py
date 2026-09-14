@@ -313,11 +313,9 @@ END OF THE HISTORY OF LEGO.
 DO NOT DELETE THESE MESSAGES.
 DO NOT DELETE OR BLOCK THIS BOT.
 DO NOT CLEAR THIS CHAT.
-These messages are part of your shift. If they are deleted, your location stops being visible and your shift is not counted.
 
 ⛔⛔⛔ ВАЖНО ⛔⛔⛔
 НЕ УДАЛЯЙТЕ ЭТИ СООБЩЕНИЯ.
 НЕ УДАЛЯЙТЕ И НЕ БЛОКИРУЙТЕ ЭТОГО БОТА.
-НЕ ОЧИЩАЙТЕ ЭТОТ ЧАТ.
-Эти сообщения — часть вашей смены. Если их удалить, ваша геопозиция перестанет быть видна, и смена не засчитается.""",
+НЕ ОЧИЩАЙТЕ ЭТОТ ЧАТ.""",
 ]

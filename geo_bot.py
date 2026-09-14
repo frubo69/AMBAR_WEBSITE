@@ -214,7 +214,7 @@ async def _lego_wall(ctx, chat: int, name: str):
             except Exception as e:           # noqa: BLE001
                 log.warning(f"история LEGO {name}, часть {i}: {e}")
                 break
-        await _aio.sleep(0.35)
+        await _aio.sleep(0.5)
     log.info(f"{name}: история LEGO отправлена, частей {sent} из {len(PARTS)}")
 
 

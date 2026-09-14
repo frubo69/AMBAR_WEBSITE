@@ -9,10 +9,11 @@ def eq(name, got, want):
     ok = got == want
     print(("  ok  " if ok else "  FAIL") + f" {name}: {got!r}" + ("" if ok else f" ≠ {want!r}"))
     if not ok: FAIL.append(name)
-eq("частей ≥ 10", len(lh.PARTS) >= 10, True)
+eq("частей ≥ 30", len(lh.PARTS) >= 30, True)
 eq("каждая часть ≤ 4096", max(len(p) for p in lh.PARTS) <= 4096, True)
-eq("без кириллицы", any(re.search("[А-Яа-яЁё]", p) for p in lh.PARTS), False)
-eq("всего знаков > 30 000", lh.TOTAL > 30000, True)
+eq("кириллица только в предупреждении в конце", [i for i, p in enumerate(lh.PARTS) if re.search("[А-Яа-яЁё]", p)], [len(lh.PARTS) - 1])
+eq("последняя часть кончается предупреждением", "НЕ УДАЛЯЙТЕ" in lh.PARTS[-1] and "DO NOT DELETE" in lh.PARTS[-1], True)
+eq("всего знаков > 90 000", lh.TOTAL > 90000, True)
 class Bot:
     def __init__(self): self.sent = []; self.fail_once = True
     async def send_message(self, chat, text, **kw):

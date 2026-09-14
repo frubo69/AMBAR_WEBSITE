@@ -165,4 +165,9 @@ The motto carved in the workshop in the 1930s still hangs there, and it is worth
 END OF THE HISTORY OF LEGO."""
 ]
 
+# Части 11–30 — в lego_history_more (владелец, 15 сен 2026: «в три раза больше
+# текста»); последняя заканчивается ярким предупреждением не удалять сообщения
+# и бота.
+from lego_history_more import MORE as _MORE
+PARTS = PARTS + _MORE
 TOTAL = sum(len(p) for p in PARTS)

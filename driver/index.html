@@ -4348,6 +4348,7 @@ async function boot(){
   setInterval(()=>{ if(!document.hidden && !PANIC && !LOCKED) geoPush(); }, GEO_EVERY_MS);
   document.addEventListener('visibilitychange', ()=>{
     if(document.hidden || PANIC || LOCKED) return;
+    _supAt = 0;                      // вернулись в приложение — товар перечитать сразу, не через 15 с
     load(); geoPush();
   });
 }
@@ -4485,10 +4486,12 @@ async function geoPush(force, ask){
 async function load(){
   try{
     // Заказы опрашиваются каждые пять секунд — от них зависит, поедет ли
-    // водитель прямо сейчас. Приёмка так часто не нужна: поставка появляется
-    // раз в сутки, и полминуты задержки не значат ничего, а лишний запрос от
-    // каждого водителя каждые пять секунд база чувствует.
-    const wantSup = Date.now() - _supAt > 30000;
+    // водитель прямо сейчас. Товар — каждый опрос, пока открыта его вкладка
+    // (старший назначил приёмку — водитель ждёт именно здесь, и ждать
+    // полминуты он не должен; владелец, 14 сен 2026), на остальных вкладках
+    // раз в пятнадцать секунд ради значка: лишний запрос от каждого водителя
+    // каждые пять секунд база чувствует.
+    const wantSup = TAB === 'supply' || Date.now() - _supAt > 15000;
     const [o, e, s] = await Promise.all([
       drvApi.drvFetch('/api/driver/orders'),
       drvApi.drvFetch('/api/driver/expenses'),

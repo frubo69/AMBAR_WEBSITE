@@ -2044,10 +2044,12 @@ async def handle_own_assign(request):
     log.info(f"[supply] {кто} назначил {name} на приёмку {sid}/{oid}")
     sup = await db.supply_get(sid) or {}
     try:
-        from operator_routes import tell_driver
+        # Тем же путём, что штрафы: скрытый режим, реестр сообщений, тест-водитель.
+        import pay_notify as _pn
         base = f" · {sup.get('base')}" if (sup.get("kind") or "main") == "extra" and sup.get("base") else ""
-        await tell_driver(name, f"📦 Вам назначили приёмку: {OFFICE_CODES.get(oid, oid)} "
-                                f"{OFFICE_NAMES.get(oid, '')}{base}. Откройте «Закупку» в приложении.")
+        await _pn.tell_safe(name, f"📦 Вам назначили приёмку: {OFFICE_CODES.get(oid, oid)} "
+                                  f"{OFFICE_NAMES.get(oid, '')}{base}. Откройте «Товар» в приложении.",
+                            parse_mode=None)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[supply] водителю о назначении не ушло: {e}")
     return web.json_response(

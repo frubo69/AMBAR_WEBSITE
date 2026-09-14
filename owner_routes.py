@@ -20,6 +20,7 @@ from owner_auth import require_owner, CORS_HEADERS, install_alerter
 from config import OWNER_IDS, MANAGER_IDS, TEST_OPERATOR_IDS
 import db
 import os, re, logging
+import secrets
 # Premium card lists live in api_server (single source of truth).
 from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS, tg_send, tg_delete, BOT_TOKEN
 

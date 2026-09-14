@@ -401,11 +401,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   letter-spacing:-1px;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(121,245,182,.5)}
 .oc-cd.warn .oc-cd-t{text-shadow:0 0 16px rgba(245,210,90,.5)}
 .oc-cd.dn .oc-cd-t{text-shadow:0 0 16px rgba(255,107,107,.5)}
-/* Просрочка со знаком и часы — уже, чтобы не задевать дугу; top подобран так,
-   чтобы базовая линия цифр осталась на горизонте (строка 72, кегль меньше) */
-.oc-cd-t.neg{font-size:56px;letter-spacing:-.6px;top:76.5px}
+/* Часы — уже, чтобы не задевать дугу; top подобран так, чтобы базовая линия
+   цифр осталась на горизонте (строка 72, кегль меньше) */
 .oc-cd-t.long{font-size:46px;letter-spacing:-.5px;top:80px}
-.oc-cd-t.long.neg{font-size:42px;top:81.5px}
 /* Секции-плашки */
 .oc-sec{position:relative;display:flex;align-items:flex-start;margin-top:8px;padding:9px 8.7px 9px 9px;border-radius:10px;
   background:#10141D;border:1px solid #1A1E29}
@@ -5087,8 +5085,8 @@ function orderCard(o, i){
           stroke-linecap="round" stroke-dasharray="${OC_ARC_L}" stroke-dashoffset="${(OC_ARC_L * (1 - frac)).toFixed(1)}"/>
       </svg>
       <span class="oc-cd-f">${svgThin(OC_ICO.flag, 20)}</span>
-      <span class="oc-cd-l">Времени осталось:</span>
-      <span class="oc-cd-t${ocTCls(cd.left)}">${ocFmt(cd.left)}</span>
+      <span class="oc-cd-l">${ocLabel(cd.left)}</span>
+      <span class="oc-cd-t${Math.abs(cd.left) >= 3600 ? ' long' : ''}">${ocFmt(cd.left)}</span>
     </div>` : `<div class="oc-cd" data-oid="${oid}">
       <svg class="oc-ring" viewBox="0 0 258 140" width="258" height="140">
         <path d="${OC_ARC_TRACK}" fill="none" stroke="#1B1F2A" stroke-width="1.5"/></svg>
@@ -5252,12 +5250,15 @@ function ocCountdown(o){
   const total = start ? Math.max(60, (due.getTime() - start) / 1000) : 3600;
   return {left: (due.getTime() - Date.now()) / 1000, total};
 }
+// После срока знак не рисуем — о просрочке говорит подпись (владелец, 14 сен 2026:
+// «не „времени осталось −04:09“, а „вы опаздываете на 04:09“»).
 function ocFmt(left){
-  const neg = left < 0; let s = Math.abs(Math.floor(left));
+  let s = Math.abs(Math.floor(left));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   const mm = String(m).padStart(2, '0'), ss = String(sec).padStart(2, '0');
-  return (neg ? '−' : '') + (h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`);
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
+function ocLabel(left){ return left < 0 ? 'Вы опаздываете на:' : 'Времени осталось:'; }
 // Зелёный, за десять минут жёлтый, за три минуты и после срока — красный (владелец, 14 сен 2026).
 function ocState(left){ return left <= 180 ? 'dn' : (left <= 600 ? 'warn' : 'ok'); }
 // Полукруг: радиус 122, центр (129,132) в поле 258×140. След — слева направо,
@@ -5265,8 +5266,6 @@ function ocState(left){ return left <= 180 ? 'dn' : (left <= 600 ? 'warn' : 'ok'
 const OC_ARC_TRACK = 'M7 132A122 122 0 0 1 251 132';
 const OC_ARC_PATH  = 'M251 132A122 122 0 0 0 7 132';
 const OC_ARC_L = Math.PI * 122;
-// Класс кегля: просрочка со знаком и часы — уже, чтобы цифры не задевали дугу.
-function ocTCls(left){ return (Math.abs(left) >= 3600 ? ' long' : '') + (left < 0 ? ' neg' : ''); }
 function ocTick(){
   const els = document.querySelectorAll('.oc-cd[data-oid]');
   if(!els.length) return;
@@ -5277,7 +5276,9 @@ function ocTick(){
     const st = ocState(cd.left);
     if(!el.classList.contains(st)){ el.classList.remove('ok', 'warn', 'dn'); el.classList.add(st); }
     const t = el.querySelector('.oc-cd-t');
-    if(t){ t.textContent = ocFmt(cd.left); t.classList.toggle('long', Math.abs(cd.left) >= 3600); t.classList.toggle('neg', cd.left < 0); }
+    if(t){ t.textContent = ocFmt(cd.left); t.classList.toggle('long', Math.abs(cd.left) >= 3600); }
+    const l = el.querySelector('.oc-cd-l');
+    if(l){ const lt = ocLabel(cd.left); if(l.textContent !== lt) l.textContent = lt; }
     const arc = el.querySelector('.oc-arc');
     if(arc){ const f = Math.max(0, Math.min(1, cd.left / cd.total)); arc.style.strokeDashoffset = (C * (1 - f)).toFixed(1); }
   });

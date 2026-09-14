@@ -241,9 +241,10 @@ async def main():
                     "address": "ул", "source": "app", "test": True}
     ORDERS["R1"] = {**copy.deepcopy(ORDERS["T1"]), "order_id": "R1", "test": False, "customer_id": 2}
     del ORDERS["R1"]["test"]
-    def opreq(uid, method="GET", path="/x", body=None, oid=None, query=None):
+    def opreq(uid, method="GET", path="/x", body=None, oid=None, query=None, hdr=None):
         op._validate_operator_init_data = lambda s: {"id": uid, "first_name": "Оп"}
-        req = make_mocked_request(method, path + (("?" + query) if query else ""), headers={"Authorization": "tma x"},
+        req = make_mocked_request(method, path + (("?" + query) if query else ""),
+                                  headers={"Authorization": "tma x", **(hdr or {})},
                                   match_info={"oid": oid} if oid else {})
         if body is not None: req._read_bytes = json.dumps(body).encode()
         return req
@@ -257,6 +258,18 @@ async def main():
     eq("настоящий оператор: test=False, водители настоящие", (r["test"], TD in r["districts"][0]["drivers"]), (False, False))
     st, r = await call(op.handle_ping, opreq(9))
     eq("чужой — 403", st, 403)
+    # тестер, который заодно настоящий оператор: по умолчанию боевая панель,
+    # тест-режим только по заголовку переключателя
+    op.OPERATOR_IDS.append(1)
+    st, r = await call(op.handle_ping, opreq(1))
+    eq("оператор+тестер без переключателя: боевая панель, test_allowed", (st, r["test"], r["test_allowed"]), (200, False, True))
+    st, r = await call(op.handle_ping, opreq(1, hdr={"X-Ambar-Test": "1"}))
+    eq("оператор+тестер с переключателем: тест-режим", (st, r["test"], r["pinned"]), (200, True, config.TEST_PERSON))
+    st, r = await call(op.handle_ping, opreq(7, hdr={"X-Ambar-Test": "1"}))
+    eq("не тестер с заголовком — заголовок не действует", (st, r["test"], r["test_allowed"]), (200, False, False))
+    st, r = await call(op.handle_ping, opreq(9, hdr={"X-Ambar-Test": "1"}))
+    eq("чужой с заголовком — 403", st, 403)
+    op.OPERATOR_IDS.remove(1)
     st, r = await call(op.handle_queue, opreq(1, query="as=" + config.TEST_PERSON))
     eq("очередь тест-оператора: только T1", sorted(x["order_id"] for x in r["new"]), ["T1"])
     op._people = lambda districts: [{"name": "Парвиз", "senior": True, "districts": [d["id"] for d in districts]}]

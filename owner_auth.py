@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  "*",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Ambar-Test",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
 }
 

@@ -42,7 +42,8 @@ async def main():
     print(f"тест-оператор(ы): {len(config.TEST_OPERATOR_IDS)} · тест-водитель(и): {len(config.TEST_DRIVER_IDS)} "
           f"· флажок у {len(config.TEST_ORDER_IDS)} акк.")
     check("тест-роли заданы (пусто = владельцы)", bool(config.TEST_OPERATOR_IDS and config.TEST_DRIVER_IDS))
-    check("тест-оператор не пересекается с OPERATOR_IDS", not (config.TEST_OPERATOR_IDS & set(pos.OPERATOR_IDS)))
+    both = config.TEST_OPERATOR_IDS & set(pos.OPERATOR_IDS)
+    print(f"  · тестер и настоящий оператор в одном лице: {len(both)} акк. — тест-режим включается переключателем в панели")
     check("тест-водитель не пересекается с AMBAR_DRIVER_IDS", not (config.TEST_DRIVER_IDS & set(staff.DRIVER_BY_TG)))
     tid = next(iter(config.TEST_DRIVER_IDS)); me_t = staff.test_driver(tid)
     check("test_driver() узнаёт тест-аккаунт", bool(me_t and me_t.get("test")), me_t and me_t["name"])
@@ -71,7 +72,8 @@ async def main():
         who = next(p["name"] for p in pos._people(districts) if p["senior"])
         q = Req(query={"as": who}); q["op_id"] = 0; q["op_user"] = {"id": 0}; q["op_test"] = False
         lanes = json.loads((await pos.handle_queue.__wrapped__(q)).body.decode())
-        check("настоящий оператор: в очереди нет", not any(x["order_id"] == oid for l in lanes.values() if isinstance(l, list) for x in l))
+        rows = lambda L: [x for k in ("new", "work", "done") for x in L.get(k, [])]
+        check("настоящий оператор: в очереди нет", not any(x.get("order_id") == oid for x in rows(lanes)))
         q = Req(query={"as": config.TEST_PERSON}); q["op_id"] = 0; q["op_user"] = {"id": 0}; q["op_test"] = True
         lanes = json.loads((await pos.handle_queue.__wrapped__(q)).body.decode())
         check("тест-оператор: в очереди «новые»", any(x["order_id"] == oid for x in lanes["new"]))

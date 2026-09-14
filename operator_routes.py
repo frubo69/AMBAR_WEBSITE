@@ -287,19 +287,23 @@ def require_operator(handler):
             return web.json_response({"error": "invalid initData"}, status=401, headers=CORS_HEADERS)
         uid = user.get("id")
         op_test = False
-        if uid not in OPERATOR_IDS:
-            if uid in TEST_OPERATOR_IDS:
-                # Тест-оператор: панель та же, но заказы — только тестовые.
-                op_test = True
-            else:
-                # Кого не пустили — в журнал. Доступ выдаётся вписыванием id в
-                # настройки сервера, а взять этот id было неоткуда: человек видел
-                # отказ, а на сервере не оставалось даже следа, что он приходил.
-                имя = (f"{user.get('first_name','')} {user.get('last_name','')}".strip()
-                       or "без имени")
-                log.warning(f"[pos] не пустили: {uid} · {имя}"
-                            + (f" · @{user['username']}" if user.get("username") else ""))
-                return web.json_response({"error": "not_operator"}, status=403, headers=CORS_HEADERS)
+        if uid in OPERATOR_IDS:
+            # Настоящий оператор. Если он же в списке тестеров, тест-режим
+            # включает переключатель панели (заголовок X-Ambar-Test), а не сам
+            # факт входа: боевая работа важнее, и по умолчанию панель боевая.
+            op_test = uid in TEST_OPERATOR_IDS and request.headers.get("X-Ambar-Test", "") == "1"
+        elif uid in TEST_OPERATOR_IDS:
+            # Только тестер: панель та же, но заказы — только тестовые.
+            op_test = True
+        else:
+            # Кого не пустили — в журнал. Доступ выдаётся вписыванием id в
+            # настройки сервера, а взять этот id было неоткуда: человек видел
+            # отказ, а на сервере не оставалось даже следа, что он приходил.
+            имя = (f"{user.get('first_name','')} {user.get('last_name','')}".strip()
+                   or "без имени")
+            log.warning(f"[pos] не пустили: {uid} · {имя}"
+                        + (f" · @{user['username']}" if user.get("username") else ""))
+            return web.json_response({"error": "not_operator"}, status=403, headers=CORS_HEADERS)
         # Тест и бой не смешиваются: тест-оператор не откроет живой заказ, а
         # настоящий — тестовый. Проверка одна, здесь, для всех ручек с {oid}.
         oid = (request.match_info.get("oid") or "").strip()
@@ -744,6 +748,8 @@ async def handle_ping(request):
         "pinned": TEST_PERSON if _tflag(request) else _staff_mod.operator_by_tg(request["op_user"].get("id")),
         # Тест-оператор: панель показывает пометку, заказы только тестовые.
         "test": _tflag(request),
+        # Тестер, который заодно настоящий оператор, переключает режим сам.
+        "test_allowed": request["op_user"].get("id") in TEST_OPERATOR_IDS,
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 

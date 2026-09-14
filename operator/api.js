@@ -23,6 +23,9 @@
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     const url = AMBAR_API + path + qs;
     const headers = { 'Authorization': 'tma ' + getInitData() };
+    // Тест-режим панели: тестер, который заодно настоящий оператор, включает
+    // его переключателем; сервер верит заголовку только тестерам.
+    try { if (localStorage.getItem('pos_test') === '1') headers['X-Ambar-Test'] = '1'; } catch (_) {}
     const reqOpts = { method, headers, signal };
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';
@@ -33,6 +36,13 @@
       const err = new Error('operator api ' + res.status);
       err.status = res.status;
       try { err.payload = await res.json(); } catch (_) {}
+      // Открыли заказ не того режима (карточка тест-заказа из бота при боевой
+      // панели или наоборот) — переключаем режим один раз и перезагружаемся.
+      if (err.payload && err.payload.error === 'test_mismatch' && window.TEST_ALLOWED && !window.__testFlip) {
+        window.__testFlip = true;
+        try { localStorage.setItem('pos_test', localStorage.getItem('pos_test') === '1' ? '0' : '1'); } catch (_) {}
+        setTimeout(() => location.reload(), 150);
+      }
       throw err;
     }
     return res.json();

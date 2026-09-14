@@ -100,6 +100,8 @@ for n, f in dict(geo_watch_get=geo_watch_get, geo_watch_set=geo_watch_set, get_d
 geo_watch._owners = _owners
 geo_watch._driver = _driver
 staff.apply_moves = lambda *a, **k: None
+async def _nosync(*a, **k): return None      # реестр из базы здесь не нужен: водитель задан руками
+staff.sync = _nosync
 staff.SENIOR_STAR_IDS = {"Старший": 1}
 staff.DRIVER_IDS = {"Али": 2}
 geo_watch._STARTED = None

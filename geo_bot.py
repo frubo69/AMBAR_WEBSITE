@@ -174,8 +174,14 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if started:
         log.info(f"трансляция включена: {name} · "
                  + ("бессрочно" if period > 86400 else f"{period // 3600} ч"))
-        await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
-                                "не нужно — чат можно убрать в архив.")
+        if kind == "driver":
+            # Владелец, 15 сен 2026: водителю в ответ — не короткое «идёт», а
+            # очень длинная история LEGO по-английски, частями: точка с картой
+            # уезжает далеко вверх, и листать до неё приходится долго.
+            await _lego_wall(ctx, chat, name)
+        else:
+            await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
+                                    "не нужно — чат можно убрать в архив.")
     elif stop:
         log.info(f"трансляция выключена: {name}")
         await _say(update, ctx, f"{name} · трансляция выключена. Чтобы вас снова видели, "
@@ -184,6 +190,32 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         # Разовая точка: дошла, но погаснет через минуты. Нужна трансляция.
         await _say(update, ctx, f"{name} · точка принята, но это разовая точка, она "
                                 f"погаснет. Нужна трансляция:\n\n{HOW}")
+
+
+async def _lego_wall(ctx, chat: int, name: str):
+    """История LEGO частями по одному сообщению (предел телеграма — 4096
+    знаков). Шлём подряд с паузой; на «слишком часто» ждём, сколько просят,
+    и повторяем один раз. Сбой одной части не роняет остальные."""
+    import asyncio as _aio
+    from lego_history import PARTS
+    try:
+        from telegram.error import RetryAfter
+    except Exception:                        # noqa: BLE001
+        RetryAfter = ()                      # type: ignore[assignment]
+    sent = 0
+    for i, part in enumerate(PARTS, 1):
+        for attempt in (1, 2):
+            try:
+                await ctx.bot.send_message(chat, part, disable_web_page_preview=True)
+                sent += 1
+                break
+            except RetryAfter as e:          # type: ignore[misc]
+                await _aio.sleep(float(getattr(e, "retry_after", 3) or 3) + 0.5)
+            except Exception as e:           # noqa: BLE001
+                log.warning(f"история LEGO {name}, часть {i}: {e}")
+                break
+        await _aio.sleep(0.35)
+    log.info(f"{name}: история LEGO отправлена, частей {sent} из {len(PARTS)}")
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

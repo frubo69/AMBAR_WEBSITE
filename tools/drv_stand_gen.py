@@ -83,6 +83,17 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
       : ST_Q.get('expfull') ? [{id:'x1', kind:'fuel', amount:120, status:'approved', photo:'p', comment:''}, {id:'x2', kind:'parking', kind_t:'Парковка', amount:25, status:'pending', comment:'Marina Mall'}] : [],
     by_kind: (ST_Q.get('expdone') || ST_Q.get('exp2')) ? {fuel:{sum:2,count:1}} : ST_Q.get('expfull') ? {fuel:{sum:120,count:1}, parking:{sum:25,count:1}} : {},
     no_expense: (ST_Q.get('must') || ST_Q.get('exp2')) ? {} : (ST_Q.get('expdone') ? {wash: true, parking: true} : ST_Q.get('expfull') ? {wash: true} : {fuel: true, wash: true, parking: true}), pending_answer: ST_Q.get('must') ? ['fuel', 'wash', 'parking'] : ST_Q.get('exp2') ? ['wash', 'parking'] : []};
+  // &supdyn=1 — район B1 свободен, на 3–4 опросе его берёт другой, потом отдаёт:
+  // проверка, что вкладка «Товар» перерисовывается сама, без перезапуска
+  if(path === '/api/driver/supply' && ST_Q.get('supdyn')){
+    window.__supN = (window.__supN || 0) + 1;
+    const t = {supply_id: 's1', district: 'jvc', district_code: 'B1', district_name: 'JVC', need: 24, got: 0,
+               lines: [{id: 'absolut', name: 'Absolut 1 ltr', need: 24, got: 0, left: 24}], mine: false, extra: false,
+               base: '', hold: {who: '', kind: '', live: false, mine: false}, noscan_at: null, stale: false, at: _agoIso(3)};
+    const taken = window.__supN >= 3 && window.__supN <= 4;
+    stLog('SUP poll ' + window.__supN + (taken ? ' taken' : ' free'));
+    return taken ? {mine: [], free: [], extra: [], taken: [{...t, driver: 'Фарух'}]} : {mine: [], free: [t], extra: [], taken: []};
+  }
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift') return ST_SHIFT;
   if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;
@@ -165,6 +176,9 @@ async function standBoot(){
   await load();
   setTab(ST_Q.get('tab') || 'orders');
   shPaint();   // как в бою: boot() → shLoad() → shPaint() — замок смены/гео
+  // Опрос раз в 5 с — как в бою (boot), но без проверки document.hidden:
+  // панель браузера бывает скрыта, а опрос проверять надо
+  setInterval(() => { if(!PANIC && !LOCKED) load(); }, 5000);
   await new Promise(r => setTimeout(r, 80));
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
   // ?open=mv — сканер перемещения; &code=1 — как будто код прочитан (камеры на стенде нет); &badcode=1 — списанная; &pick=1 — район выбран

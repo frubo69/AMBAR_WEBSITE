@@ -16071,8 +16071,8 @@ async function stkMovePick(){
   const seg = document.getElementById('stkSeg'); if(seg) seg.style.display = 'none';
   document.getElementById('stkMid').innerHTML = `
     <div class="stk-note"><b>Одна бутылка — один скан.</b> Позицию выбирать не нужно:
-      код на крышке сам скажет, что это за товар и где он сейчас числится.
-      Скажите, куда везёте, — и сканируйте крышки подряд.</div>`
+      QR-код сам скажет, что это за товар и где он сейчас числится.
+      Скажите, куда везёте, — и сканируйте QR-коды подряд.</div>`
     + (STK.districts || []).map(d => `
       <button class="stk-mv-pick ${d.id === MOV.to ? 'on' : ''}" onclick="stkMoveCam('${d.id}')">
         <span class="stk-mv-code">${escS(d.code || '')}</span>
@@ -16113,7 +16113,7 @@ async function stkMoveCam(){
                 <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
           </div>
         </div>
-        <div class="scan-tip" id="qrHint">Наведите на код крышки</div>
+        <div class="scan-tip" id="qrHint">Наведите на QR-код</div>
         <div class="scan-hud-bot">
           <div class="scan-strip" id="movFeed"></div>
           <div class="scan-dockbar">
@@ -22822,7 +22822,7 @@ function scanDeny(retry, cancel){
       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4 8h3l1.8-2.5h6.4L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg></span>
     <div class="sd-t">Нужен доступ к камере</div>
-    <div class="sd-s">Код с крышки читает камера телефона. Разрешите доступ, и сканирование начнётся сразу.</div>
+    <div class="sd-s">QR-код читает камера телефона. Разрешите доступ, и сканирование начнётся сразу.</div>
     <div class="sd-btns">
       <button class="sd-b pri" onclick="scanDenyRetry()">Разрешить доступ</button>
       <button class="sd-b" onclick="scanDenyCancel()">Отмена</button>
@@ -30611,9 +30611,7 @@ function woAddPaint(){
            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
            stroke-linejoin="round"><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg></span>
          <b>Снимок обязателен</b>
-         <span>одна фотография на всё, что списываете сейчас</span>
-         <button class="wo-add-gal" onclick="event.stopPropagation();
-                 document.getElementById('woGal').click()">Выбрать из галереи</button>
+         <span>видно товар и что с ним случилось</span>
        </div>`;
 
   // Бутылку в руках не надо описывать словами: код с крышки знает и позицию,
@@ -30648,16 +30646,15 @@ function woAddPaint(){
     <input class="wo-c-note" style="margin-top:14px" placeholder="Комментарий — что произошло"
            value="${escS(w.note||'')}" oninput="WOA.note=this.value">
     ` : `
+    <div class="wo-c-l">Фотография</div>
     ${снимок}
     <input class="wo-c-note" style="margin-top:12px" placeholder="Комментарий — что произошло"
-           value="${escS(w.note||'')}" oninput="WOA.note=this.value">
-    <div class="wo-add-tip">Дальше камера: одна крышка — одна бутылка, позиция и
-      точка возьмутся из кода.</div>`);
+           value="${escS(w.note||'')}" oninput="WOA.note=this.value">`);
 
   const g = document.getElementById('woKinds'); if(g) movePill(g);
   const go = document.getElementById('woAddGo');
   if(go){
-    go.textContent = утеря ? 'Списать' : 'Сканировать крышки';
+    go.textContent = утеря ? 'Списать' : 'Сканировать QR-код';
     go.disabled = утеря ? !(w.item && w.qty > 0 && w.district) : !w.photo;
   }
 }
@@ -30719,7 +30716,7 @@ async function woScanStart(){
          photo: w.photo, thumb: w.thumb};
   woAddClose();
   _setText('accTitle', 'Списание · ' + WOS.kind);
-  _setText('accSub', 'сканируйте крышки');
+  _setText('accSub', 'сканируйте QR-коды');
   _setRail('accRail', '');
   ACC_BACK = woScanDone;
   document.getElementById('accFoot').innerHTML = '';
@@ -30741,7 +30738,7 @@ async function woScanStart(){
                 <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
           </div>
         </div>
-        <div class="scan-tip" id="qrHint">Наведите на код крышки</div>
+        <div class="scan-tip" id="qrHint">Наведите на QR-код</div>
         <div class="scan-hud-bot">
           <div class="scan-strip" id="wosFeed"></div>
           <div class="scan-dockbar">
@@ -34151,7 +34148,6 @@ function renderHours(h){
     <div class="wo-add-hd">
       <div>
         <div class="wo-c-t">Списать самому</div>
-        <div class="wo-add-s">учитывается сразу, согласовывать не у кого</div>
       </div>
       <button class="wo-add-x" onclick="woAddClose()" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"

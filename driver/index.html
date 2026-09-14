@@ -3669,7 +3669,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     <div class="wo-add-hd">
       <div>
         <div class="sheet-t">Списать сканом</div>
-        <div class="wo-add-s" id="woScanS">одна крышка — одна бутылка</div>
+        <div class="wo-add-s" id="woScanS">один QR-код — одна бутылка</div>
       </div>
       <button class="wo-add-x" onclick="woScanDone()" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
@@ -3683,7 +3683,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
         <div class="cam-badge" id="woB"></div>
       </div>
     </div>
-    <div class="wo-why" id="woSay" style="margin:0 2px">Наведите на код крышки</div>
+    <div class="wo-why" id="woSay" style="margin:0 2px">Наведите на QR-код</div>
     <div class="wo-feed" id="woFeed"></div>
     <div class="wo-add-foot">
       <button class="wo-go" onclick="woScanDone()">Готово</button>
@@ -3701,7 +3701,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     </button>
     <div class="sup-top-b">
       <div class="sup-top-t" id="mvT">Переместить</div>
-      <div class="sup-top-s" id="mvS">Наведите камеру на код крышки</div>
+      <div class="sup-top-s" id="mvS">Наведите камеру на QR-код</div>
     </div>
     <div class="sup-top-v" id="mvN"></div>
   </div>
@@ -3716,7 +3716,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     <div class="wo-add-hd">
       <div>
         <div class="sheet-t">Бутылка охране</div>
-        <div class="wo-add-s">Наведите на код с крышки</div>
+        <div class="wo-add-s">Наведите на QR-код</div>
       </div>
       <button class="wo-add-x" onclick="guardClose()" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
@@ -5886,7 +5886,7 @@ function woPaint(){
   woSegPill();
   const go = document.getElementById('woGo');
   if(go){
-    go.textContent = утеря ? 'Списать' : 'Сканировать крышки';
+    go.textContent = утеря ? 'Списать' : 'Сканировать QR-код';
     go.disabled = утеря ? !(WO.item && WO.qty > 0) : !WO.photo;
   }
 }
@@ -5952,7 +5952,7 @@ async function woScanStart(){
   if(!WO) return;
   WOS = {rows: [], total: 0, busy: false};
   document.getElementById('woScanSheet').classList.add('show');
-  _woSay('Наведите на код крышки', '');
+  _woSay('Наведите на QR-код', '');
   woFeedPaint();
   try{
     await SCAN.start(document.getElementById('woV'), woScanCode, null,
@@ -6010,7 +6010,7 @@ function woFeedPaint(){
   if(s) s.textContent = WOS.total
     ? `${WOS.total} ${plural(WOS.total, 'бутылка', 'бутылки', 'бутылок')} — ${
         WOS.total === 1 ? 'ждёт' : 'ждут'} решения`
-    : 'одна крышка — одна бутылка';
+    : 'один QR-код — одна бутылка';
   box.innerHTML = WOS.rows.slice(0, 40).map(r => {
     const cls = r.state === 'ok' ? 'wait' : r.state === 'sending' ? '' : 'no';
     return `<div class="wo-done ${cls}">
@@ -6066,7 +6066,7 @@ async function mvOpen(){
 function _mvHead(t, sub){ _setText('mvT', t); _setText('mvS', sub); }
 async function mvScan(){
   MV.mode = 'scan'; MV.item = null; MV.code = ''; MV.to = '';
-  _mvHead('Переместить', 'Наведите камеру на код крышки');
+  _mvHead('Переместить', 'Наведите камеру на QR-код');
   document.getElementById('mvN').innerHTML = MV.total
     ? `${MV.total}<u> ${MV.total === 1 ? 'переехала' : 'переехали'}</u>` : '';
   const mid = document.getElementById('mvMid');
@@ -6077,7 +6077,7 @@ async function mvScan(){
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="cam-badge" id="mvB"></div>
       </div>
-      <div class="cam-left"><span class="cam-hint" id="mvHint">Одна крышка — одна бутылка</span></div>
+      <div class="cam-left"><span class="cam-hint" id="mvHint">Один QR-код — одна бутылка</span></div>
     </div>`;
   document.getElementById('mvBot').innerHTML = '';
   try{ await SCAN.start(document.getElementById('mvV'), mvCode, null, null, null); }   // start сам сбрасывает уже виденные коды
@@ -6105,7 +6105,7 @@ async function mvCode(code){
 
 function mvItemPaint(){
   const it = MV.item || {}, d = it.district || {}, ok = !!it.ok;
-  _mvHead(ok ? 'Переместить' : 'Бутылка', it.label ? `Код ${it.label}` : 'Код с крышки');
+  _mvHead(ok ? 'Переместить' : 'Бутылка', it.label ? `Код ${it.label}` : 'QR-код');
   document.getElementById('mvN').innerHTML = '';
   const mid = document.getElementById('mvMid');
   mid.className = 'sup-mid mv-mid';

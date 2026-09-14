@@ -25,6 +25,7 @@ OPERATOR_WEBAPP_URL  = os.getenv("OPERATOR_WEBAPP_URL", "https://ambar-delivery.
 SUPPORT_BOT_USERNAME = "ambar_support_bot"
 # Привилегированные id — только из .env (репозиторий публичный)
 from config import FOUNDER_ID as _FOUNDER_ID, PREMIUM_IDS as _PREMIUM_IDS, TEST_ACCOUNT_IDS as _TEST_ACCOUNTS
+from config import TEST_OPERATOR_IDS as _TEST_OPERATORS   # тест-оператор: кнопки под тест-карточками
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
@@ -188,7 +189,7 @@ CATEGORY_ORDER = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def is_operator(uid):
-    return not OPERATOR_IDS or uid in OPERATOR_IDS
+    return not OPERATOR_IDS or uid in OPERATOR_IDS or uid in _TEST_OPERATORS
 
 def get_operator_offices(uid):
     """Return ALL offices an operator belongs to.
@@ -1259,7 +1260,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await notify_owners_force(
                     "orders.edited",
                     f"✏️ *Заказ изменён #{oid}* — по правке водителя {drv}\n"
-                    f"Одобрил: {op}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}")
+                    f"Одобрил: {op}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}",
+                    test=bool(order.get("test")))
             except Exception as e:
                 log.error(f"[drvreq] уведомление владельцу: {e}")
             log.info(f"[drvreq] правка #{oid} применена оператором {op}")
@@ -1672,7 +1674,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 except: pass
                 return
             await db.update_order(oid, status="declined", updated_at=datetime.now(timezone.utc).isoformat())
-            await db._increment_user(cid, orders_declined=1)
+            if not (order_chk or {}).get("test"):
+                await db._increment_user(cid, orders_declined=1)
             await update_customer_card(oid)
             order = await db.get_order(oid)
             if order:
@@ -1684,7 +1687,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     await notify_owners("orders.declined",
                         f"❌ *Заказ отклонён #{oid}*\n"
                         f"Клиент: {order.get('customer_name','—')}\n"
-                        f"Сумма: {order.get('total',0)} AED")
+                        f"Сумма: {order.get('total',0)} AED", test=bool(order.get("test")))
                 except Exception as e:
                     log.error(f"[owner-notif] orders.declined failed: {e}")
 
@@ -1721,12 +1724,13 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat())
             order = await db.get_order(oid)
             total = (order or {}).get("total", 0)
+            _tst = bool((order or {}).get("test"))     # тест-заказ: без счётчиков и долгов
             # Ровно один плюс на заказ — та же отметка, что у приложения оператора.
-            if await db.claim_order_flag(oid, "stats_counted"):
+            if not _tst and await db.claim_order_flag(oid, "stats_counted"):
                 await db._increment_user(cid, orders_done=1, total_spent=total)
             # В ДОЛГ: goods handed over → the order amount lands on the customer's
             # debt balance. claim_* makes it exactly-once even on a double-tap.
-            if (order or {}).get("payment_method") == "debt" and total:
+            if not _tst and (order or {}).get("payment_method") == "debt" and total:
                 try:
                     if await db.claim_debt_delivery(oid):
                         await db.add_debt(cid, total, order_id=oid, note="delivered")
@@ -1745,7 +1749,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     sent = await notify_owners("orders.delivered",
                         f"✅ *Заказ доставлен #{oid}*\n"
                         f"Клиент: {order.get('customer_name','—')}\n"
-                        f"Сумма: {order.get('total',0)} AED")
+                        f"Сумма: {order.get('total',0)} AED", test=_tst)
                     if sent:
                         await db.update_order(oid, _delivered_notif_msgs=sent)
                 except Exception as e:

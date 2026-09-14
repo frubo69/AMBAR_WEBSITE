@@ -60,7 +60,7 @@ async def post_init(app):
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    me = staff.driver_by_tg(uid)
+    me = staff.driver_or_test(uid)
     if not me:
         # Человеку, которого нет в списке, нужен не отказ, а объяснение и id —
         # менеджеру всё равно придётся его спросить.
@@ -127,7 +127,7 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     loc = getattr(msg, "location", None) if msg else None
     if not loc or not update.effective_user:
         return
-    me = staff.driver_by_tg(update.effective_user.id)
+    me = staff.driver_or_test(update.effective_user.id)
     if not me:
         return                       # чужие координаты нам не нужны и не хранятся
     now = datetime.now(timezone.utc)
@@ -182,7 +182,7 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Напоминание, как включить трансляцию: словами и один раз."""
-    if not staff.driver_by_tg(update.effective_user.id):
+    if not staff.driver_or_test(update.effective_user.id):
         return
     await _remember(update.message)
     import geo_watch
@@ -200,10 +200,10 @@ async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    if staff.driver_by_tg(update.effective_user.id):
+    if staff.driver_or_test(update.effective_user.id):
         await _remember(update.message)
     sent = await update.message.reply_text(f"Ваш ID: {update.effective_user.id}")
-    if staff.driver_by_tg(update.effective_user.id):
+    if staff.driver_or_test(update.effective_user.id):
         await _remember(sent)
 
 

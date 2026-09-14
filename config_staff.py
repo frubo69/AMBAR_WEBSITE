@@ -194,6 +194,50 @@ def driver_by_tg(telegram_id) -> dict | None:
     return next((d for d in drivers() if d["name"] == name), None)
 
 
+# ── тест-водитель ────────────────────────────────────────────────────────────
+# Аккаунт из AMBAR_TEST_DRIVER_IDS, которого нет среди настоящих водителей,
+# входит в приложение как «Тест-водитель»: видит только тест-заказы, его смены
+# и точки не идут ни в деньги, ни сторожу. Район — первый из расписания, он
+# нужен только для подписи в карточке.
+def test_driver(telegram_id) -> dict | None:
+    from config import TEST_DRIVER_IDS, TEST_DRIVER_NAME
+    try:
+        tid = int(telegram_id or 0)
+    except (TypeError, ValueError):
+        return None
+    if tid not in TEST_DRIVER_IDS or tid in DRIVER_BY_TG:
+        return None
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    st = DISTRICT_STAFF[0]
+    return {"id": "test", "name": TEST_DRIVER_NAME,
+            "district": st["district"],
+            "district_code": OFFICE_CODES.get(st["district"], ""),
+            "district_name": OFFICE_NAMES.get(st["district"], st["district"]),
+            "operator": st["operator"], "telegram_id": tid, "test": True}
+
+
+def driver_or_test(telegram_id) -> dict | None:
+    """Настоящий водитель, а если такого нет — тест-водитель (для бота)."""
+    return driver_by_tg(telegram_id) or test_driver(telegram_id)
+
+
+def is_test_driver(name: str) -> bool:
+    from config import TEST_DRIVER_NAME
+    return (name or "").strip() == TEST_DRIVER_NAME
+
+
+def driver_chats(name: str) -> list:
+    """Куда писать водителю по имени: настоящему — его аккаунт, тест-водителю —
+    тест-аккаунты (без тех, что заняты настоящими водителями). Пусто — некому."""
+    tid = DRIVER_IDS.get((name or "").strip())
+    if tid:
+        return [tid]
+    if is_test_driver(name):
+        from config import TEST_DRIVER_IDS
+        return sorted(TEST_DRIVER_IDS - set(DRIVER_BY_TG))
+    return []
+
+
 # ── расходы на питание ───────────────────────────────────────────────────────
 # Платят каждый день и всем, но по-разному: вышел на смену — одна ставка,
 # не вышел — другая. Поэтому «кто сегодня работает» приходится отмечать

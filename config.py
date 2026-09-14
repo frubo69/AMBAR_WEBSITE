@@ -42,6 +42,24 @@ PREMIUM_IDS = _id_list("AMBAR_PREMIUM_IDS")        # ÉLITE, до 10 карто�
 WORLDWIDE_IDS = _id_list("AMBAR_WORLDWIDE_IDS")    # WORLDWIDE, до 100 карточек
 TEST_ACCOUNT_IDS = set(_id_list("AMBAR_TEST_IDS"))  # заказы этих в статистику не идут
 
+# ── Тест-режим владельца (14 сен 2026) ──────────────────────────────────────
+# Заказ с меткой test: True живёт в базе как обычный, но уходит только тест-
+# аккаунтам и не считается ни в деньгах, ни на складе, ни в статистике: все
+# выборки в db.py по умолчанию его не видят. Так владелец проверяет приложение
+# насквозь — клиент → оператор → водитель → доставка, — не отвлекая операторов.
+# Списки — в .env; пустой список = владельцы (AMBAR_OWNER_IDS).
+#   AMBAR_TEST_ORDER_IDS     — у кого в клиентском приложении флажок «Тестовый заказ»
+#   AMBAR_TEST_OPERATOR_IDS  — кто входит в панель оператора как тест-оператор
+#   AMBAR_TEST_DRIVER_IDS    — кто входит в приложение водителя как тест-водитель
+#   AMBAR_TEST_DRIVER_NAME   — имя тест-водителя в учёте (по умолчанию «Тест-водитель»)
+# Аккаунт, который есть и в боевом списке, и в тестовом, остаётся боевым:
+# тест-роль никогда не отбирает настоящую работу.
+TEST_ORDER_IDS = set(_id_list("AMBAR_TEST_ORDER_IDS")) or set(OWNER_IDS)
+TEST_OPERATOR_IDS = set(_id_list("AMBAR_TEST_OPERATOR_IDS")) or set(OWNER_IDS)
+TEST_DRIVER_IDS = set(_id_list("AMBAR_TEST_DRIVER_IDS")) or set(OWNER_IDS)
+TEST_DRIVER_NAME = (os.getenv("AMBAR_TEST_DRIVER_NAME") or "Тест-водитель").strip() or "Тест-водитель"
+TEST_PERSON = "Тест"        # «кто за планшетом» у тест-оператора
+
 # Token for @ambar_manage_bot — the bot that launches the owner miniapp.
 # Separate from the customer BOT_TOKEN because initData is HMAC'd per-bot:
 # a miniapp launched from @ambar_manage_bot produces initData signed with

@@ -97,7 +97,7 @@ async def chats(district: str = "") -> list:
 
 
 async def send(text: str, district: str = "", parse_mode: str = "HTML",
-               reply_markup=None, register: bool = True) -> dict:
+               reply_markup=None, register: bool = True, test: bool = False) -> dict:
     """Разослать по маршруту. Возвращает {chat_id: message_id} — по ним заказ
     потом правят и по ним же чистят чат, если человек уйдёт в скрытый режим.
 
@@ -109,7 +109,13 @@ async def send(text: str, district: str = "", parse_mode: str = "HTML",
     out = {}
     if not OPERATOR_BOT_TOKEN:
         return out
-    for цель in await chats(district):
+    if test:
+        # Тест-заказ — только тест-операторам, минуя районы и старших.
+        from config import TEST_OPERATOR_IDS
+        targets = [{"chat_id": c, "prefix": ""} for c in sorted(TEST_OPERATOR_IDS)]
+    else:
+        targets = await chats(district)
+    for цель in targets:
         try:
             разметка = (reply_markup(цель["chat_id"]) if callable(reply_markup)
                         else reply_markup)

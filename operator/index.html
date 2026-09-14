@@ -90,6 +90,8 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .hdr{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--border2);background:var(--bg2);flex-shrink:0}
 .hdr-logo{font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:6px;color:var(--gold2)}
 .hdr-sub{font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:1px}
+/* Тест-оператор: подпись под логотипом золотом — видно и на планшете, и на телефоне */
+.hdr-sub.test{color:var(--gold2);font-weight:700}
 .hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px}
 /* Кнопки собраны в группы: внутри группы плотно, между группами — воздух.
    Одинаковый рост и одна форма, иначе ряд выглядит случайным. */
@@ -2495,7 +2497,7 @@ html.kb body{padding-bottom:40vh}
 
 <div id="app">
   <div class="hdr">
-    <div><div class="hdr-logo" onclick="pncTap()" style="cursor:default;-webkit-user-select:none;user-select:none">AMBAR</div><div class="hdr-sub">Панель оператора</div></div>
+    <div><div class="hdr-logo" onclick="pncTap()" style="cursor:default;-webkit-user-select:none;user-select:none">AMBAR</div><div class="hdr-sub" id="hdrSub">Панель оператора</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <!-- Шапка сгруппирована по смыслу: сначала то, что зовёт (события и
          поддержка), потом контекст смены (кто за планшетом и за какой день),
@@ -3213,6 +3215,7 @@ let PEOPLE=[];
 // требующим решения, телефонный рождается принятым. После принятия разницы
 // нет, и разводить их по экранам значит заставлять смотреть в два места.
 let Q={new:[],work:[],done:[],counts:{app:0,manual:0},districts:[]};
+let TEST_MODE = false;   // панель открыта тест-оператором (/api/operator/ping → test)
 let qLane='new', qFilter='all', acceptOid='', acceptDrv='', acceptEta=0;
 let accOrd=null;
 
@@ -3242,6 +3245,10 @@ async function boot(){
     const r = await opApi.opFetch('/api/operator/ping');
     // Аккаунт телеграма показываем в листе выбора оператора, а не в шапке.
     const acc = $('opAcc'); if(acc) acc.textContent = r.operator || '—';
+    // Тест-оператор: сервер отдаёт только тест-заказы и одного водителя;
+    // в шапке — пометка, чтобы не спутать с боевой панелью.
+    TEST_MODE = !!r.test;
+    const sub = $('hdrSub'); if(sub){ sub.textContent = TEST_MODE ? 'Тест-режим' : 'Панель оператора'; sub.classList.toggle('test', TEST_MODE); }
     OFFICES = r.offices || [];
     curOffice = (OFFICES[0]||{}).id || '';
     renderOffices();

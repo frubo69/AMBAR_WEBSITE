@@ -206,6 +206,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .hdr-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
   color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Тест-водитель: имя золотом, кнопки склада и списаний спрятаны */
+body.test-drv .hdr-n{color:var(--gold2)}
+body.test-drv .wo-fix{display:none}
 .hdr-n{font-size:14.5px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
 
@@ -4290,6 +4293,13 @@ async function boot(){
   catch(e){ if(!PANIC) lockOut(e); return; }
   document.getElementById('dAv').textContent = ME.name.slice(0,2).toUpperCase();
   document.getElementById('dName').textContent = ME.name;
+  // Тест-водитель: пометка в шапке, «Закупка» спрятана — склад и приёмка
+  // тест-аккаунту закрыты (сервер отвечает test_account), а видеть вкладку,
+  // которая не работает, хуже, чем не видеть её.
+  if(ME.test){
+    document.body.classList.add('test-drv');
+    const t = document.querySelector('.tb[data-tab="supply"]'); if(t) t.hidden = true;
+  }
   // Связь поднимаем сразу и держим всю смену: входящий должен доходить,
   // пока приложение открыто, а не только когда открыто окно звонка.
   try{ callInit(); }catch(e){}
@@ -7839,6 +7849,9 @@ function expPage(kind){
 }
 function renderExpenses(){
   const box = document.getElementById('body');
+  // Тест-водитель расходы не подаёт: настоящие деньги старшему на согласование
+  // из теста идти не должны (сервер отвечает test_account).
+  if(ME && ME.test){ hdrPage(''); box.innerHTML = '<div class="empty">В тестовом аккаунте расходы не подаются</div>'; return; }
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   // Всего за смену — то, что водитель потратил сам и что не отклонили.
   // Отклонённое не идёт: это не деньги, а отказ. Питание не идёт тоже — его

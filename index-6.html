@@ -580,6 +580,18 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pm-hint b{color:var(--gold2);font-weight:600}
 @keyframes pmHintIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .pm-hint.pm-anim{animation:pmHintIn var(--dur-base) var(--ease-standard)}
+/* Тестовый заказ — строка-флажок под подсказкой, только у тестеров */
+.pm-test{display:flex;align-items:center;gap:12px;margin-top:12px;padding:11px 13px;border-radius:var(--r2);background:var(--bg3);border:1px solid var(--border2);cursor:pointer;-webkit-user-select:none;user-select:none}
+.pm-test[hidden]{display:none}
+.pm-test input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.pm-test-box{flex:0 0 auto;width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border2);background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;color:#0B0D14;transition:background var(--dur-base),border-color var(--dur-base)}
+.pm-test-box svg{width:14px;height:14px;opacity:0;transition:opacity var(--dur-base)}
+.pm-test input:checked~.pm-test-box{background:var(--gold);border-color:var(--gold)}
+.pm-test input:checked~.pm-test-box svg{opacity:1}
+.pm-test-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pm-test-t b{font-size:13px;font-weight:600;color:var(--text)}
+.pm-test-t i{font-style:normal;font-size:11px;line-height:1.4;color:var(--sub)}
+.pm-test.on{border-color:rgba(201,169,110,.45)}
 /* ── Crypto payments: invoice page ──────────────────────────────────────── */
 #pg-pay{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
 #pg-pay::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:150%;height:340px;background:radial-gradient(58% 100% at 50% 0,rgba(201,169,110,.11),rgba(201,169,110,.04) 45%,transparent 72%);pointer-events:none;z-index:0}
@@ -2375,6 +2387,14 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
           </button>
         </div>
         <div class="pm-hint" id="pm-hint"></div>
+        <!-- Тест-заказ: виден только аккаунтам из списка тестеров (/api/me →
+             test_orders). Не запоминается между запусками и сбрасывается после
+             каждого заказа — чтобы настоящий заказ случайно не ушёл в тест. -->
+        <label class="pm-test" id="pm-test" hidden>
+          <input type="checkbox" id="pm-test-cb" onchange="toggleTestOrder(this.checked)">
+          <span class="pm-test-box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+          <span class="pm-test-t"><b>Тестовый заказ</b><i>Операторы его не увидят, в деньги и склад не идёт</i></span>
+        </label>
       </div>
     </div>
   </div>
@@ -3387,6 +3407,17 @@ const CRYPTO_WALLETS = [
   {name:'imToken', cat:'wallet', url:'https://token.im', bg:'#FFFFFF', tile:'lt', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="url(#imtoken__a)" d="M20.953 6.132c.594 7.966-4.574 11.731-9.207 12.133-4.308.373-8.362-2.25-8.718-6.279C2.735 8.657 4.811 7.24 6.442 7.1c1.678-.146 3.088 1 3.21 2.389.119 1.335-.722 1.942-1.307 1.993-.462.04-1.043-.238-1.096-.835-.045-.513.152-.583.104-1.128-.086-.97-.94-1.084-1.407-1.043-.566.049-1.593.703-1.449 2.333.145 1.644 1.736 2.943 3.821 2.762 2.25-.195 3.818-1.931 3.936-4.366a.9.9 0 0 1 .08-.374v-.003q.037-.076.085-.147.071-.106.19-.236 0-.003.002-.002.087-.097.206-.21c.983-.919 4.524-3.086 7.872-2.4a.34.34 0 0 1 .264.3"/><defs><linearGradient id="imtoken__a" x1="19.143" x2="5.727" y1="8.706" y2="16.386" gradientUnits="userSpaceOnUse"><stop stop-color="#0CC5FF"/><stop offset="1" stop-color="#007FFF"/></linearGradient></defs></svg>'},
 ];
 let payMethod = localStorage.getItem('ambar_pay_method')||'cash';
+// Тест-режим владельца: флажок под способами оплаты. Право даёт сервер
+// (/api/me → test_orders), состояние живёт только до следующего заказа.
+let TEST_ORDERS=false, testOrder=false;
+function toggleTestOrder(on){
+  testOrder=!!on && TEST_ORDERS;
+  const row=el('pm-test'); if(row) row.classList.toggle('on', testOrder);
+  const cb=el('pm-test-cb'); if(cb && cb.checked!==testOrder) cb.checked=testOrder;
+  if(testOrder && payMethod==='crypto'){ selectPayMethod('cash'); }
+  try{ haptic.select(); }catch(e){}
+}
+function resetTestOrder(){ if(testOrder||el('pm-test-cb')?.checked) toggleTestOrder(false); }
 let cryptoInvoice = null;               // active invoice object (see cryptoCreateInvoice)
 let _cpTimer=null,_cpPoll=null,_cpSim=null,_cpClimb=null,_cpbTick=null;
 
@@ -3495,6 +3526,10 @@ async function checkBanStatus(){
       else{localStorage.removeItem('ambar_free_enabled');FREE_ENABLED=false;}
       DEBT_BALANCE=+d.debt||0;
       localStorage.setItem('ambar_debt_balance',String(DEBT_BALANCE));
+      // Флажок «Тестовый заказ» — только тем, кому сервер его открыл.
+      TEST_ORDERS=!!d.test_orders;
+      const _pt=el('pm-test'); if(_pt) _pt.hidden=!TEST_ORDERS;
+      if(!TEST_ORDERS) resetTestOrder();
       // Real on-chain flow once the server has a wallet+watcher; demo otherwise.
       // (undefined on an older backend ⇒ stays demo — safe default.)
       CRYPTO_SIM = !d.crypto_real_mode;
@@ -6904,6 +6939,11 @@ function placeOrder(){
   // Crypto prepay: branch off into the on-chain invoice flow. The order is
   // created locally in AWAITING_PAYMENT and is NOT sent to the operator until
   // payment confirms (see _cpOnConfirmed). Gated to enabled accounts only.
+  if(testOrder){
+    // Тест-заказ: метку ставит сервер по списку тестеров, флажок — просьба.
+    payload.test=true;
+    if(payMethod==='crypto'){ showToast('Тестовый заказ криптой не оформляется','err'); return; }
+  }
   if(payMethod==='crypto' && CRYPTO_ENABLED){
     payload.payment_method='crypto';
     const _ctx={payload,oid,items,sub,total,addr};
@@ -6939,6 +6979,10 @@ function placeOrder(){
   }).then(r=>r.json()).then(res=>{
     if(res.ok){
       console.log('Order sent via API:', res.order_id);
+      // Флажок теста снимаем после каждого заказа: следующий — настоящий,
+      // пока его не поставят снова.
+      if(res.test) showToast('Тест-заказ оформлен — операторы его не видят');
+      resetTestOrder();
       // Номер заказа выдаёт сервер, наш был временным. Переписываем его в
       // своей записи — иначе в истории полторы минуты висят ДВА заказа: наш
       // и серверный (sync держит свежие «pending», которых не знает API).
@@ -7024,6 +7068,11 @@ function selectPayMethod(m){
   if(m==='crypto' && !CRYPTO_ENABLED){
     haptic.light();
     showToast(lang==='ru'?'Оплата криптой скоро будет доступна':'Crypto payment is coming soon','err');
+    return;
+  }
+  if(m==='crypto' && testOrder){
+    haptic.light();
+    showToast('Тестовый заказ криптой не оформляется','err');
     return;
   }
   if(m==='debt' && !DEBT_ENABLED)return; // hidden unless whitelisted — safety net

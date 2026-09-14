@@ -199,6 +199,25 @@ def _orders_dirty():
     _ORDERS_WIN.clear()
 
 
+# ── Тест-режим ───────────────────────────────────────────────────────────────
+# Тестовые заказы (test: True) и смены тест-водителя лежат в тех же коллекциях,
+# но выборки по умолчанию их не видят: деньги, склад, статистика, очереди
+# операторов и водителей считаются без них. Кому нужны именно они — тест-
+# оператор и тест-водитель — просят test=True явно. Фильтр один на все
+# выборки, чтобы тест не просочился в отчёт через забытый экран.
+def _test_filt(test) -> dict:
+    if test is None:
+        return {}
+    return {"test": True} if test else {"test": {"$ne": True}}
+
+
+def _test_driver_filt(test) -> dict:
+    from config import TEST_DRIVER_NAME
+    if test is None:
+        return {}
+    return {"driver": TEST_DRIVER_NAME} if test else {"driver": {"$ne": TEST_DRIVER_NAME}}
+
+
 async def save_order(oid: str, data: dict):
     db = _db_or_none()
     if db is None: return
@@ -309,7 +328,7 @@ async def get_active_orders(telegram_id: int) -> list:
     return await cursor.to_list(length=10)
 
 
-async def get_all_orders(office_id=None) -> dict:
+async def get_all_orders(office_id=None, *, test=False) -> dict:
     """Returns {order_id: order_doc, ...}.
 
     office_id can be:
@@ -323,7 +342,7 @@ async def get_all_orders(office_id=None) -> dict:
     db = _db_or_none()
     if db is None: return {}
     if office_id is None:
-        if _ORDERS_CACHE["docs"] is not None and \
+        if test is False and _ORDERS_CACHE["docs"] is not None and \
            _t.monotonic() - _ORDERS_CACHE["at"] < _ORDERS_TTL:
             return _ORDERS_CACHE["docs"]
         filt = {}
@@ -333,16 +352,17 @@ async def get_all_orders(office_id=None) -> dict:
         filt = {"office_id": {"$in": list(office_id)}}
     else:
         filt = {"office_id": office_id}
+    filt.update(_test_filt(test))
     cursor = db.orders.find(filt, {"_id": 0})
     docs = await cursor.to_list(length=2000)
     out = {o["order_id"]: o for o in docs}
-    if office_id is None:
+    if office_id is None and test is False:
         _ORDERS_CACHE["docs"] = out
         _ORDERS_CACHE["at"] = _t.monotonic()
     return out
 
 
-async def orders_from(since_iso: str) -> dict:
+async def orders_from(since_iso: str, *, test=False) -> dict:
     """Заказы с указанного момента плюс все незакрытые — их возраст не важен.
 
     Экраны считают деньги за окно, а не за всю историю. Читать ради «сегодня»
@@ -354,7 +374,8 @@ async def orders_from(since_iso: str) -> dict:
     import time as _t
     db = _db_or_none()
     if db is None: return {}
-    hit = _ORDERS_WIN.get(since_iso)
+    key = (since_iso, test)
+    hit = _ORDERS_WIN.get(key)
     if hit and _t.monotonic() - hit[0] < _ORDERS_TTL:
         return hit[1]
     # Не тащим то, чем экран денег не пользуется: готовые строки чека и номера
@@ -362,14 +383,14 @@ async def orders_from(since_iso: str) -> dict:
     cur = db.orders.find({"$or": [
         {"timestamp": {"$gte": since_iso}},
         {"status": {"$in": ["pending", "approved"]}},
-    ]}, {"_id": 0, "item_lines": 0, "op_msg_ids": 0, "customer_msg_ids": 0,
+    ], **_test_filt(test)}, {"_id": 0, "item_lines": 0, "op_msg_ids": 0, "customer_msg_ids": 0,
          "_delivered_notif_msgs": 0})
     docs = await cur.to_list(length=2000)
     out = {o["order_id"]: o for o in docs}
     # Панель открывает несколько экранов сразу, и все спрашивают одно окно.
     # Держим его те же две секунды, что и полный список.
     if len(_ORDERS_WIN) > 8: _ORDERS_WIN.clear()
-    _ORDERS_WIN[since_iso] = (_t.monotonic(), out)
+    _ORDERS_WIN[key] = (_t.monotonic(), out)
     return out
 
 
@@ -763,7 +784,8 @@ async def get_active_shift(operator_id: int) -> dict | None:
 
 
 async def get_orders_in_range(start_iso: str, end_iso: str, office_id: str = None,
-                              limit: int | None = 500, fields: list = None) -> list:
+                              limit: int | None = 500, fields: list = None, *,
+                              test=False) -> list:
     """Заказы за период.
 
     limit обрезает по убыванию времени, то есть отрезает всегда самое старое.
@@ -776,7 +798,7 @@ async def get_orders_in_range(start_iso: str, end_iso: str, office_id: str = Non
     адреса с перепиской. Меньше байтов по сети — быстрее и дешевле."""
     db = _db_or_none()
     if db is None: return []
-    filt = {"timestamp": {"$gte": start_iso, "$lte": end_iso}}
+    filt = {"timestamp": {"$gte": start_iso, "$lte": end_iso}, **_test_filt(test)}
     if office_id:
         filt["office_id"] = office_id
     proj = {"_id": 0}
@@ -2868,7 +2890,8 @@ async def sold_since(since_iso: str) -> list:
     заявка считает, что всё проданное с того дня по-прежнему стоит на полке."""
     db = _db_or_none()
     if db is None: return []
-    cur = db.orders.find({"timestamp": {"$gte": since_iso}, "status": "delivered"},
+    cur = db.orders.find({"timestamp": {"$gte": since_iso}, "status": "delivered",
+                          "test": {"$ne": True}},
                          {"_id": 0, "timestamp": 1, "office_id": 1, "items": 1})
     return await cur.to_list(length=None)
 
@@ -3571,7 +3594,8 @@ async def qr_consumed(since: dict) -> dict:
         return out
     lo = min(since.values())
     lo_iso = lo.isoformat() if hasattr(lo, "isoformat") else str(lo)
-    cur = db.orders.find({"timestamp": {"$gte": lo_iso}, "status": "delivered"},
+    cur = db.orders.find({"timestamp": {"$gte": lo_iso}, "status": "delivered",
+                          "test": {"$ne": True}},
                          {"_id": 0, "timestamp": 1, "office_id": 1, "items": 1})
     for o in await cur.to_list(length=None):
         oid = o.get("office_id") or ""
@@ -4103,17 +4127,19 @@ async def get_driver_day(day: str, driver: str) -> dict | None:
     return await db.driver_days.find_one({"day": day, "driver": driver}, {"_id": 0})
 
 
-async def get_driver_days(day: str) -> list:
+async def get_driver_days(day: str, *, test=False) -> list:
     db = _db_or_none()
     if db is None: return []
-    return await db.driver_days.find({"day": day}, {"_id": 0}).to_list(length=200)
+    return await db.driver_days.find({"day": day, **_test_driver_filt(test)},
+                                     {"_id": 0}).to_list(length=200)
 
 
-async def get_driver_days_range(day_from: str, day_to: str) -> list:
+async def get_driver_days_range(day_from: str, day_to: str, *, test=False) -> list:
     """Расходы за отрезок — для сводки по неделе или месяцу."""
     db = _db_or_none()
     if db is None: return []
-    cur = db.driver_days.find({"day": {"$gte": day_from, "$lte": day_to}}, {"_id": 0})
+    cur = db.driver_days.find({"day": {"$gte": day_from, "$lte": day_to},
+                               **_test_driver_filt(test)}, {"_id": 0})
     return await cur.to_list(length=5000)
 
 
@@ -4928,7 +4954,8 @@ async def orders_between(since_iso: str, until_iso: str) -> list:
     d = _db_or_none()
     if d is None: return []
     cur = d.orders.find(
-        {"timestamp": {"$gte": since_iso, "$lt": until_iso}, "status": "delivered"},
+        {"timestamp": {"$gte": since_iso, "$lt": until_iso}, "status": "delivered",
+         "test": {"$ne": True}},
         # confirmed_at и day обязательны: по ним bizday.order_day относит заказ
         # к смене; без них утренний заказ снова уезжал бы во вчера
         {"_id": 0, "order_id": 1, "timestamp": 1, "confirmed_at": 1, "day": 1,

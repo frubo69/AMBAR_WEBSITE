@@ -42,6 +42,8 @@ HOST               = os.getenv("WEBAPP_HOST", "127.0.0.1")
 STATIC_DIR         = Path(__file__).parent
 UPLOAD_DIR         = STATIC_DIR / "uploads" / "support"
 _TEST_ACCOUNTS     = TEST_ACCOUNT_IDS       # из .env: AMBAR_TEST_IDS
+# Тест-режим: у кого флажок «Тестовый заказ» и кому уходят тест-заказы (config.py)
+from config import TEST_ORDER_IDS as _TEST_ORDER_IDS, TEST_OPERATOR_IDS as _TEST_OPERATOR_IDS
 
 # ── Crypto payments: staged rollout gate ──────────────────────────────────────
 # While CRYPTO_PAYMENTS_FOR_ALL is off, only "admin" accounts see a working
@@ -589,9 +591,18 @@ async def handle_create_order(request: web.Request) -> web.Response:
     except Exception as e:
         log.error(f"[tobacco] проверка не выполнена: {e}")
 
-    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt, free=free)
+    # Тест-заказ (владелец, 14 сен 2026): флажок в приложении есть только у
+    # аккаунтов из TEST_ORDER_IDS, и сервер верит списку, а не флажку. Такой
+    # заказ уходит тест-оператору и тест-водителю и не считается нигде.
+    # Криптой тест не оформляют: счёт ждал бы настоящих денег.
+    test = bool(data.get("test")) and uid in _TEST_ORDER_IDS
+    if test and (prepaid or data.get("payment_method") == "crypto"):
+        return web.json_response({"error": "test_no_crypto"}, status=400, headers=CORS_HEADERS)
+    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt, free=free,
+                                            test=test)
     return web.json_response(
-        {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"]},
+        {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"],
+         "test": test},
         headers=CORS_HEADERS,
     )
 
@@ -616,7 +627,8 @@ def _is_vetted(user_doc: dict | None) -> bool:
 async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                                    prepaid: dict | None = None,
                                    debt: bool = False,
-                                   free: bool = False) -> dict:
+                                   free: bool = False,
+                                   test: bool = False) -> dict:
     """Persist an accepted order and run the full notification fan-out: customer
     card, first-order verification gate, operator + owner notifications, and
     referral points. Shared by the live POST /api/order path and the crypto
@@ -742,7 +754,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     # up, and it closes the place-a-second-order bypass. Prepaid crypto is auto-verified
     # just above, so it passes straight through. One condition, reused for the customer
     # warning and the operator hold so the two never disagree.
-    _needs_verification = (not _user_verified) and uid not in _TEST_ACCOUNTS and not prepaid
+    _needs_verification = (not _user_verified) and uid not in _TEST_ACCOUNTS and not prepaid \
+        and not test
 
     # Save order + upsert user profile in parallel
     order_doc = {
@@ -783,7 +796,12 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         # а пришли ли деньги — знает тот, кто смотрит счёт. Водителю важно
         # другое, и это сказано прямо в карточке: наличные не брать.
         order_doc["payment_method"] = "transfer"
-    if uid not in _TEST_ACCOUNTS:
+    if test:
+        # Метка, по которой db.py прячет заказ от всех выборок, кроме тестовых.
+        order_doc["test"] = True
+    # Тест-заказ пишем всегда: он должен дойти до панели и водителя. Старый
+    # механизм AMBAR_TEST_IDS (заказ только в сообщениях) тест-режима не касается.
+    if test or uid not in _TEST_ACCOUNTS:
         await db.save_order(oid, order_doc)
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
                            last_name=user.get("last_name",""), username=username,
@@ -792,13 +810,16 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         if phone != "—":
             user_fields["phone"] = phone
         await db.upsert_user(uid, **user_fields)
-        await db._increment_user(uid, orders_total=1)
+        if not test:
+            await db._increment_user(uid, orders_total=1)
         # Адрес заказа — в книгу адресов клиента. Раньше он жил только в памяти
         # его телефона: сменил устройство — и адресов будто не было никогда.
         # Фаундер — мимо книги: он возит по чужим адресам, они разовые и в его
         # истории им делать нечего (в самом заказе адрес, конечно, остаётся —
-        # по нему едет водитель).
-        if uid == _FOUNDER_ID:
+        # по нему едет водитель). Тест-заказ — тоже мимо книги и счётчиков.
+        if test:
+            log.info(f"[order] #{oid}: тест-заказ — книга адресов и счётчики не трогаются")
+        elif uid == _FOUNDER_ID:
             log.info(f"[order] #{oid}: адрес фаундера разовый — в книгу не пишем")
         else:
             try:
@@ -917,6 +938,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         first_order_banner = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴{_src_info}</blockquote>\n\n"
     else:
         first_order_banner = ""
+    if test:
+        first_order_banner = ("<blockquote>🧪 <b>ТЕСТ-ЗАКАЗ</b> — проверка приложения: "
+                              "в деньги и склад не идёт</blockquote>\n\n" + first_order_banner)
     # Prepaid (crypto) orders are already settled — flag it so the operator does
     # NOT collect cash on delivery.
     if prepaid and prepaid.get("test"):
@@ -990,10 +1014,10 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         # выданы telegram-id, маршрут вырождается в прежнее «всем сразу».
         import op_route
         op_msg_ids = await op_route.send(op_text, district=office_id,
-                                         parse_mode="HTML", reply_markup=op_kb)
+                                         parse_mode="HTML", reply_markup=op_kb, test=test)
         if op_msg_ids:
             await db.update_order(oid, op_msg_ids=op_msg_ids)
-        elif OPERATOR_IDS:
+        elif OPERATOR_IDS and not test:
             # Not a single operator got the order — that's an outage, not a log line.
             log.error(f"[order] #{oid} reached NO operator — check OPERATOR_BOT_TOKEN / OPERATOR_IDS")
             try:
@@ -1008,7 +1032,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                 log.error(f"[owner-notif] opFail alert failed: {e}")
 
     # Award referral points (+5) to the referrer on first order
-    if is_first_order and referred_by:
+    if is_first_order and referred_by and not test:
         try:
             await db.award_referral_points(referred_by, uid, 5)
             # Notify referrer about the bonus
@@ -1033,11 +1057,12 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         from owner_routes import notify_new_order
         await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
                                uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
-                               items=items, prepaid=prepaid, held=_needs_verification)
+                               items=items, prepaid=prepaid, held=_needs_verification,
+                               test=test)
     except Exception as e:
         log.error(f"[owner-notif] orders.new failed: {e}")
 
-    if is_first_order:
+    if is_first_order and not test:
         try:
             from owner_routes import notify_owners
             await notify_owners(
@@ -1682,7 +1707,7 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
             f"📋 *Причина:* {reason or '—'}"
             + (f"\n💬 *Комментарий:* {comment}" if comment else "")
         )
-        for op_id in OPERATOR_IDS:
+        for op_id in (sorted(_TEST_OPERATOR_IDS) if order.get("test") else OPERATOR_IDS):
             try:
                 await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=dismiss_kb)
             except Exception as e:
@@ -1709,7 +1734,8 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
             f"🙅 *Клиент отменил заказ #{order_id}*\n"
             f"Клиент: {user_name}\n"
             f"Причина: {reason or '—'}"
-            + (f"\nКомментарий: {comment}" if comment else "")
+            + (f"\nКомментарий: {comment}" if comment else ""),
+            test=bool(order.get("test")),
         )
     except Exception as e:
         log.error(f"[owner-notif] orders.cancelled failed: {e}")
@@ -1822,6 +1848,9 @@ async def handle_me(request: web.Request) -> web.Response:
         # разовый. Приложение по этому флагу открывает поле и кнопку заказа.
         "founder": uid == _FOUNDER_ID,
         "debt": round(float(user_doc.get("debt") or 0), 2) if user_doc else 0,
+        # Флажок «Тестовый заказ» — только тем, кто проверяет приложение
+        # (config.TEST_ORDER_IDS). Сервер верит списку, а не флажку.
+        "test_orders": uid in _TEST_ORDER_IDS,
     }, headers=CORS_HEADERS)
 
 
@@ -1981,7 +2010,7 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         except Exception as e:
             log.error(f"[verify-request] message build failed for #{oid} — sending fallback: {e}")
         op_msg_ids = {}
-        for op_id in OPERATOR_IDS:
+        for op_id in (sorted(_TEST_OPERATOR_IDS) if order.get("test") else OPERATOR_IDS):
             try:
                 resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, parse_mode="HTML", reply_markup=op_kb)
                 if resp and resp.get("ok") and resp.get("result"):

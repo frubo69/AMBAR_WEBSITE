@@ -38,6 +38,9 @@ log = logging.getLogger("operator_pos")
 
 OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
 OPERATOR_IDS = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
+# Тест-режим (config.py): тест-оператор входит в панель, видит и трогает только
+# тест-заказы; тест-водитель — единственный, кому их можно назначить.
+from config import TEST_OPERATOR_IDS, TEST_DRIVER_NAME, TEST_PERSON
 
 from config_offices import OFFICE_NAMES, OFFICE_CODES   # офис ≡ район, единый источник правды
 
@@ -111,6 +114,39 @@ def _scope(people: list, who: str, districts: list) -> set:
         return set()
     return {d["id"] for d in districts} if p["senior"] else set(p["districts"])
 
+
+# ── тест-режим ───────────────────────────────────────────────────────────────
+def _tflag(request) -> bool:
+    """Запрос от тест-оператора: выборки заказов берутся с test=True."""
+    return bool(request.get("op_test"))
+
+
+def _people_for(request, districts: list) -> list:
+    """Кого можно выбрать за планшетом. У тест-оператора выбора нет: один
+    человек «Тест» со всеми районами — тест-заказ может прийти из любого."""
+    if _tflag(request):
+        return [{"name": TEST_PERSON, "senior": True,
+                 "districts": [d["id"] for d in districts]}]
+    return _people(districts)
+
+
+def _districts_for(request, districts: list) -> list:
+    """Районы для панели: тест-оператору в каждом только тест-водитель."""
+    if _tflag(request):
+        return [{**d, "drivers": [TEST_DRIVER_NAME]} for d in districts]
+    return districts
+
+
+def _drivers_of(order_or_test, dist: dict | None = None, districts: list | None = None) -> set:
+    """Кому можно отдать заказ: тестовый — только тест-водителю, настоящий —
+    водителям района (или всех районов, если район не задан)."""
+    test = order_or_test if isinstance(order_or_test, bool) else bool((order_or_test or {}).get("test"))
+    if test:
+        return {TEST_DRIVER_NAME}
+    if dist is not None:
+        return set(dist.get("drivers") or [])
+    return {n for d in (districts or []) for n in d["drivers"]}
+
 DUBAI_TZ = timezone(timedelta(hours=4))
 
 # Смена идёт с 12:00 до 06:00, поэтому рабочие сутки считаем от полудня до
@@ -147,6 +183,10 @@ def needs_open(handler):
     """Не пускать к действию, пока смена района не открыта."""
     @wraps(handler)
     async def wrapped(request):
+        if request.get("op_test"):
+            # Тест-заказы не привязаны к смене района: владелец проверяет
+            # приложение и днём, когда смены закрыты.
+            return await handler(request)
         try:
             district = await _district_of(request)
         except Exception as e:
@@ -175,7 +215,7 @@ async def _district_of(request) -> str:
     if d:
         return d
     districts = await _fresh_districts()
-    scope = _scope(_people(districts), str(body.get("as") or "").strip(), districts)
+    scope = _scope(_people_for(request, districts), str(body.get("as") or "").strip(), districts)
     return next(iter(scope)) if len(scope) == 1 else ""
 
 
@@ -246,17 +286,34 @@ def require_operator(handler):
         if not user:
             return web.json_response({"error": "invalid initData"}, status=401, headers=CORS_HEADERS)
         uid = user.get("id")
+        op_test = False
         if uid not in OPERATOR_IDS:
-            # Кого не пустили — в журнал. Доступ выдаётся вписыванием id в
-            # настройки сервера, а взять этот id было неоткуда: человек видел
-            # отказ, а на сервере не оставалось даже следа, что он приходил.
-            имя = (f"{user.get('first_name','')} {user.get('last_name','')}".strip()
-                   or "без имени")
-            log.warning(f"[pos] не пустили: {uid} · {имя}"
-                        + (f" · @{user['username']}" if user.get("username") else ""))
-            return web.json_response({"error": "not_operator"}, status=403, headers=CORS_HEADERS)
+            if uid in TEST_OPERATOR_IDS:
+                # Тест-оператор: панель та же, но заказы — только тестовые.
+                op_test = True
+            else:
+                # Кого не пустили — в журнал. Доступ выдаётся вписыванием id в
+                # настройки сервера, а взять этот id было неоткуда: человек видел
+                # отказ, а на сервере не оставалось даже следа, что он приходил.
+                имя = (f"{user.get('first_name','')} {user.get('last_name','')}".strip()
+                       or "без имени")
+                log.warning(f"[pos] не пустили: {uid} · {имя}"
+                            + (f" · @{user['username']}" if user.get("username") else ""))
+                return web.json_response({"error": "not_operator"}, status=403, headers=CORS_HEADERS)
+        # Тест и бой не смешиваются: тест-оператор не откроет живой заказ, а
+        # настоящий — тестовый. Проверка одна, здесь, для всех ручек с {oid}.
+        oid = (request.match_info.get("oid") or "").strip()
+        if oid:
+            try:
+                o = await db.get_order(oid)
+            except Exception as e:                           # noqa: BLE001
+                log.warning(f"[pos] заказ {oid} для проверки теста не прочитан: {e}")
+                o = None
+            if o and bool(o.get("test")) != op_test:
+                return web.json_response({"error": "test_mismatch"}, status=403, headers=CORS_HEADERS)
         request["op_id"] = uid
         request["op_user"] = user
+        request["op_test"] = op_test
         return await handler(request)
     return wrapped
 
@@ -462,10 +519,11 @@ def _card_kb(order: dict) -> dict | None:
 async def _fanout_new(order: dict) -> dict:
     """Send the manual-order card to every operator; returns op_msg_ids."""
     from api_server import tg_send   # lazy: avoid circular import at load
-    text = _card_html(order)
+    test = bool(order.get("test"))
+    text = ("🧪 <b>ТЕСТ-ЗАКАЗ</b> — в деньги и склад не идёт\n\n" if test else "") + _card_html(order)
     kb = _card_kb(order)
     op_msg_ids = {}
-    for op_id in OPERATOR_IDS:
+    for op_id in (sorted(TEST_OPERATOR_IDS) if test else OPERATOR_IDS):
         try:
             resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, text,
                                  parse_mode="HTML", reply_markup=kb)
@@ -496,7 +554,7 @@ async def notify_driver(order: dict, kind: str = "new"):
     import config_staff as _staff
 
     name = (order.get("driver") or "").strip()
-    tid = _staff.DRIVER_IDS.get(name)
+    tid = (_staff.driver_chats(name) or [0])[0]     # тест-водителю — его тест-аккаунт
     token = _os.getenv("DRIVER_BOT_TOKEN", "")
     if not (tid and token):
         return
@@ -533,6 +591,8 @@ async def notify_driver(order: dict, kind: str = "new"):
         txt += "\n🎁 БЕЗ ОПЛАТЫ — денег не брать"
     if order.get("comment"):
         txt += f"\n\n💬 {_h.escape(order['comment'])}"
+    if order.get("test"):
+        txt = "🧪 <b>ТЕСТ-ЗАКАЗ</b>\n" + txt
 
     # Правим то же сообщение, а не шлём новое. Иначе после трёх правок у
     # водителя в чате три версии одного заказа, и какая из них верная — видно
@@ -674,14 +734,16 @@ async def handle_ping(request):
         # Офис ≡ район, отдельного переключателя офиса в POS больше нет —
         # пустой список прячет его в интерфейсе.
         "offices": [],
-        "districts": (_d := await _fresh_districts()),
+        "districts": (_d := _districts_for(request, await _fresh_districts())),
         # Кто может встать за планшет. Список решает и то, что человек увидит:
         # выбрал себя — видишь свои районы, выбрал старшего — все.
-        "people": _people(_d),
+        "people": _people_for(request, _d),
         # А если устройство принадлежит конкретному оператору — выбирать нечего:
         # телефон у человека один и всегда его. Список остаётся для планшета,
         # за который садятся по очереди.
-        "pinned": _staff_mod.operator_by_tg(request["op_user"].get("id")),
+        "pinned": TEST_PERSON if _tflag(request) else _staff_mod.operator_by_tg(request["op_user"].get("id")),
+        # Тест-оператор: панель показывает пометку, заказы только тестовые.
+        "test": _tflag(request),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 
@@ -730,7 +792,7 @@ async def handle_create(request):
     driver = str(body.get("driver", "")).strip()
     if not dist:
         return web.json_response({"error": "district_required"}, status=400, headers=CORS_HEADERS)
-    if driver not in dist["drivers"]:
+    if driver not in _drivers_of(_tflag(request), dist):
         return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
 
     items, err = _build_items(body.get("items"))
@@ -812,6 +874,8 @@ async def handle_create(request):
         "created_by": uid,
         "created_by_name": op_display,
         "timestamp": now,
+        # Тест-оператор заводит только тест-заказы (db.py прячет их от всех).
+        **({"test": True} if _tflag(request) else {}),
         **({"delivered_at": now, "delivered_by": op_display,
             # След того, что заказ внесён позже: деньги, попавшие в отчёт задним
             # числом, обязаны быть отличимы от обычных.
@@ -833,7 +897,7 @@ async def handle_create(request):
                 f"За {d_h}.{d_m} · #{order['order_id']}\n"
                 f"Внёс: {op_display} · район {dist['name']} · водитель {driver}\n"
                 f"💰 *{total} AED* — уже числится доставленным\n"
-                f"🛒 Позиции:\n{_it}")
+                f"🛒 Позиции:\n{_it}", test=_tflag(request))
         except Exception as e:
             log.error(f"[pos] backfill notify failed: {e}")
         log.info(f"[pos] заказ задним числом #{order['order_id']} за {back} "
@@ -858,7 +922,8 @@ async def handle_create(request):
                                manual={"operator": op_display,
                                        "district": dist["name"],
                                        "dispatch_operator": dist["operator"],
-                                       "driver": driver})
+                                       "driver": driver},
+                               test=_tflag(request))
     except Exception as e:
         log.error(f"[pos] owner notify failed: {e}")
 
@@ -902,7 +967,7 @@ async def handle_list(request):
     # заказ, принятый в 02:00, всё ещё относится к текущей смене.
     today = _biz_date(datetime.now(DUBAI_TZ))
     out = []
-    all_orders = await db.get_all_orders()
+    all_orders = await db.get_all_orders(test=_tflag(request))
     for o in all_orders.values():
         if o.get("source") != "manual":
             continue
@@ -965,7 +1030,7 @@ async def handle_queue(request):
     оператора приходит в запросе. Планшет общий, аккаунт у него один, и по
     аккаунту отличить Умара от Джанабиля нельзя."""
     districts = await _fresh_districts()
-    people = _people(districts)
+    people = _people_for(request, districts)
     who = (request.query.get("as") or "").strip()
     scope = _scope(people, who, districts)
     if not scope:
@@ -986,7 +1051,7 @@ async def handle_queue(request):
             day = today
     lanes = {"new": [], "work": [], "done": []}
     counts = {"app": 0, "manual": 0}
-    for o in (await db.get_all_orders()).values():
+    for o in (await db.get_all_orders(test=_tflag(request))).values():
         lane = _lane(o)
         if not lane:
             continue
@@ -1036,7 +1101,7 @@ async def handle_accept(request):
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
 
     districts = await _fresh_districts()
-    people = _people(districts)
+    people = _people_for(request, districts)
     who = (body.get("as") or "").strip()
     if not _scope(people, who, districts):
         return web.json_response({"error": "unknown_operator"}, status=400, headers=CORS_HEADERS)
@@ -1057,8 +1122,7 @@ async def handle_accept(request):
                                  status=409, headers=CORS_HEADERS)
 
     driver = str(body.get("driver", "")).strip()
-    known = {n for d in districts for n in d["drivers"]}
-    if driver not in known:
+    if driver not in _drivers_of(order, districts=districts):
         return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
     try:
         eta = int(body.get("eta") or 0)
@@ -1109,7 +1173,7 @@ async def handle_customer(request):
     except (TypeError, ValueError):
         return web.json_response({"error": "bad_id"}, status=400, headers=CORS_HEADERS)
     u = await db.get_user(cid) or {}
-    orders = [o for o in (await db.get_all_orders()).values()
+    orders = [o for o in (await db.get_all_orders(test=_tflag(request))).values()
               if int(o.get("customer_id") or 0) == cid]
     orders.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return web.json_response({
@@ -1260,11 +1324,11 @@ async def handle_driver_chats(request):
     на вопрос, и вопрос ждёт. Разница в том, что клиент ждёт у телефона, а
     водитель — у чужой двери, поэтому его непрочитанное всегда сверху."""
     districts = await _fresh_districts()
-    people = _people(districts)
+    people = _people_for(request, districts)
     who = (request.query.get("as") or "").strip()
     scope = _scope(people, who, districts)
     rows = []
-    for o in (await db.get_all_orders()).values():
+    for o in (await db.get_all_orders(test=_tflag(request))).values():
         chat = o.get("chat") or []
         if not chat:
             continue
@@ -1366,7 +1430,7 @@ async def handle_patch(request):
         driver = str(body.get("driver", order.get("driver", ""))).strip()
         if not dist:
             return web.json_response({"error": "district_required"}, status=400, headers=CORS_HEADERS)
-        if driver not in dist["drivers"]:
+        if driver not in _drivers_of(order, dist):
             return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
         upd.update(district_id=dist["id"], district=dist["name"],
                    dispatch_operator=dist["operator"], driver=driver)
@@ -1405,13 +1469,14 @@ async def handle_patch(request):
                                   "phone", "district_id", "driver")) or "—"
                 await notify_owners_force(
                     "orders.edited",
-                    f"{head}\n{money}\n📝 Поправили: {what}\n🛒 Позиции:\n{_items_txt}")
+                    f"{head}\n{money}\n📝 Поправили: {what}\n🛒 Позиции:\n{_items_txt}",
+                    test=bool(order.get("test")))
             else:
                 await notify_owners_force(
                     "orders.edited",
                     f"✏️ *Заказ изменён #{oid}* — оператором {who} (📞 ручной)\n"
                     f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
-                    f"🛒 Позиции:\n{_items_txt}")
+                    f"🛒 Позиции:\n{_items_txt}", test=bool(order.get("test")))
         except Exception as e:
             log.error(f"[pos] edited notify failed: {e}")
     return web.json_response({"ok": True, "order": _summary(order)}, headers=CORS_HEADERS)
@@ -1451,7 +1516,7 @@ async def tell_driver(name: str, text: str):
     import os as _os
     from api_server import tg_send
     import config_staff as _staff
-    tid = _staff.DRIVER_IDS.get((name or "").strip())
+    tid = (_staff.driver_chats((name or "").strip()) or [0])[0]
     token = _os.getenv("DRIVER_BOT_TOKEN", "")
     if not (tid and token):
         return
@@ -1487,7 +1552,8 @@ async def _close_delivered(oid: str, order: dict, who: str, by_driver: str = "")
             "orders.delivered",
             f"✅ *Заказ доставлен #{oid}*\n"
             f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}"
-            + (f"\nОтметил водитель {by_driver}, подтвердил {who}" if by_driver else ""))
+            + (f"\nОтметил водитель {by_driver}, подтвердил {who}" if by_driver else ""),
+            test=bool(order.get("test")))
         # Сохраняем id уведомлений: возврат из доставленных их снимает.
         if sent:
             await db.update_order(oid, _delivered_notif_msgs=sent)
@@ -1546,7 +1612,8 @@ async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
             f"🚫 *Заказ отменён #{oid}*\n"
             f"Оператор: {who}\n"
             + (f"Причина: {reason}\n" if reason else "")
-            + f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}")
+            + f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}",
+            test=bool(order.get("test")))
     except Exception as e:
         log.error(f"[pos] cancel notify failed: {e}")
 
@@ -1612,7 +1679,8 @@ async def handle_undeliver(request):
                 "orders.reverted",
                 f"🔄 *Отменённый заказ вернули в доставку #{oid}*\n"
                 f"Оператор: {_op_name(request['op_user'])}\n"
-                f"💰 {total} AED · {order.get('customer_name','—')}")
+                f"💰 {total} AED · {order.get('customer_name','—')}",
+                test=bool(order.get("test")))
         except Exception as e:
             log.error(f"[pos] uncancel notify failed for #{oid}: {e}")
         return web.json_response({"ok": True, "status": "approved"}, headers=CORS_HEADERS)
@@ -1714,7 +1782,7 @@ DRV_REQ_TITLE = {
 @require_operator
 async def handle_feed(request):
     districts = await _fresh_districts()
-    people = _people(districts)
+    people = _people_for(request, districts)
     who = (request.query.get("as") or "").strip()
     scope = _scope(people, who, districts)
     if not scope:
@@ -1723,7 +1791,7 @@ async def handle_feed(request):
     today = _biz_date(datetime.now(DUBAI_TZ))
     need, recent = [], []
 
-    for o in (await db.get_all_orders()).values():
+    for o in (await db.get_all_orders(test=_tflag(request))).values():
         oid = o.get("order_id") or ""
         dist = o.get("office_id") or ""
         if dist not in scope and not (dist == "" and len(scope) == len(districts)):
@@ -1898,7 +1966,8 @@ async def handle_driver_req(request):
             await notify_owners_force(
                 "orders.edited",
                 f"✏️ *Заказ изменён #{oid}* — по просьбе водителя {drv}\n"
-                f"Одобрил: {who}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}")
+                f"Одобрил: {who}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}",
+                test=bool(order.get("test")))
         except Exception as e:
             log.error(f"[pos] edited notify failed: {e}")
         log.info(f"[pos] правка по #{oid} применена ({who})")
@@ -2469,7 +2538,7 @@ async def handle_where(request):
 @require_operator
 async def handle_shift(request):
     districts = await _fresh_districts()
-    people = _people(districts)
+    people = _people_for(request, districts)
     who = (request.query.get("as") or "").strip()
     scope = _scope(people, who, districts)
     if not scope:
@@ -2499,7 +2568,7 @@ async def handle_shift_open(request):
         body = {}
     districts = await _fresh_districts()
     who = str(body.get("as") or "").strip()
-    scope = _scope(_people(districts), who, districts)
+    scope = _scope(_people_for(request, districts), who, districts)
     oid = str(body.get("district") or "").strip()
     if oid not in scope:
         return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
@@ -2607,7 +2676,7 @@ async def handle_shift_close(request):
     except Exception:
         body = {}
     districts = await _fresh_districts()
-    people = _people(districts)
+    people = _people_for(request, districts)
     who = str(body.get("as") or "").strip()
     scope = _scope(people, who, districts)
     oid = str(body.get("district") or "").strip()
@@ -2679,7 +2748,7 @@ async def handle_shift_reopen(request):
     except Exception:
         body = {}
     districts = await _fresh_districts()
-    scope = _scope(_people(districts), str(body.get("as") or "").strip(), districts)
+    scope = _scope(_people_for(request, districts), str(body.get("as") or "").strip(), districts)
     oid = str(body.get("district") or "").strip()
     if oid not in scope:
         return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)

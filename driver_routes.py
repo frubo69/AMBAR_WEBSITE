@@ -97,16 +97,18 @@ def require_driver(fn):
             staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
         except Exception as e:
             log.warning(f"[driver] перестановка не прочитана: {e}")
-        me = staff.driver_by_tg(user.get("id"))
+        # Настоящий водитель — по AMBAR_DRIVER_IDS; иначе тест-водитель
+        # (config.TEST_DRIVER_IDS): тот же экран, но только тест-заказы.
+        me = staff.driver_by_tg(user.get("id")) or staff.test_driver(user.get("id"))
         if not me:
             log.warning(f"[driver] отказ: tg={user.get('id')} ({user.get('username')}) не в списке")
             return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
         # Вход закрыт сторожем геопозиции (geo_watch): пропала на смене и не
         # вернулась до её конца. Открывает старший, кнопкой под сообщением
         # бота. Проверяем на каждом запросе, а не при запуске: приложение
-        # могло быть открыто всю ночь.
+        # могло быть открыто всю ночь. Тест-водителя сторож не ведёт.
         try:
-            lock = await db.geo_lock_get(me["name"])
+            lock = None if me.get("test") else await db.geo_lock_get(me["name"])
         except Exception as e:
             log.warning(f"[driver] замок не прочитан: {e}")
             lock = None
@@ -119,6 +121,22 @@ def require_driver(fn):
         return await fn(request)
     wrapper.__wrapped__ = fn
     return wrapper
+
+
+def _tq(me: dict) -> bool:
+    """Тест-водитель: заказы берутся с test=True (db.py), настоящие ему не видны."""
+    return bool((me or {}).get("test"))
+
+
+def _no_test(handler):
+    """Склад, приёмка и расходы тест-водителю закрыты: там настоящие бутылки
+    и настоящие деньги, а тест-режим — про ход заказа."""
+    @wraps(handler)
+    async def wrapped(request):
+        if _tq(request.get("driver")):
+            return web.json_response({"error": "test_account"}, status=403, headers=CORS_HEADERS)
+        return await handler(request)
+    return wrapped
 
 
 def _is_prepaid(o: dict) -> bool:
@@ -331,7 +349,7 @@ async def _in_route(me: dict) -> list:
     start = datetime.strptime(day, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
     f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
     try:
-        orders = await db.get_orders_in_range(f(start), f(start + timedelta(days=1)))
+        orders = await db.get_orders_in_range(f(start), f(start + timedelta(days=1)), test=_tq(me))
     except Exception as e:
         log.warning(f"[driver] заказы в пути не прочитаны: {e}")
         return []
@@ -340,11 +358,22 @@ async def _in_route(me: dict) -> list:
             and o.get("status") == "approved"]
 
 
+async def _geo_for(me: dict, since=None) -> dict:
+    """Геопозиция для смены. Тест-водителю трансляция из LOCATOR не положена
+    (его аккаунт там числится владельцем), поэтому «на связи» для него —
+    свежая точка из самого приложения; сторож его не ведёт."""
+    geo = await _geo_state(me["name"], since=since)
+    if _tq(me):
+        geo.update(ok=geo["fresh"], stream=geo["fresh"], watch_ok=geo["fresh"],
+                   lost=False, endless=True, until="", left_min=0)
+    return geo
+
+
 async def _shift_view(me: dict) -> dict:
     day = _biz_day()
     d = await db.get_driver_day(day, me["name"]) or {}
-    geo = await _geo_state(me["name"])
-    must = _must_left(d)
+    geo = await _geo_for(me)
+    must = [] if _tq(me) else _must_left(d)
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
     route = await _in_route(me) if opened and not closed else []
     # День района закрыт оператором — значит заказов сегодня больше не будет, и
@@ -358,7 +387,7 @@ async def _shift_view(me: dict) -> dict:
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] закрытие дня не прочиталось: {e}")
     return {
-        "day": day, "working": d.get("working"), "day_closed": закрыт,
+        "day": day, "working": True if _tq(me) else d.get("working"), "day_closed": закрыт,
         "day_closed_at": _iso_at(закрыт_в) if закрыт_в else "",
         "opened": bool(opened), "opened_at": _iso_at(opened),
         "closed": bool(closed), "closed_at": _iso_at(closed),
@@ -367,7 +396,7 @@ async def _shift_view(me: dict) -> dict:
         "geo_bot": await __import__("geo_watch").geo_bot_link(),
         "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
         "in_route": route,
-        "can_open": d.get("working") is True and geo["ok"] and not opened,
+        "can_open": (d.get("working") is True or _tq(me)) and geo["ok"] and not opened,
         # Смену закрывает сам водитель, когда отдал последний заказ и ответил
         # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
         # висела бы до утра, а «закрыть» упиралось в чужое действие.
@@ -416,14 +445,17 @@ async def handle_shift_open(request):
     d = await db.get_driver_day(day, me["name"]) or {}
     if d.get("shift_open_at") and not d.get("shift_close_at"):
         return web.json_response({"error": "already_open"}, status=409, headers=CORS_HEADERS)
-    if d.get("working") is not True:
+    if d.get("working") is not True and not _tq(me):
         return web.json_response({"error": "not_marked"}, status=409, headers=CORS_HEADERS)
-    geo = await _geo_state(me["name"])
+    geo = await _geo_for(me)
     if not geo["ok"]:
         return web.json_response({"error": "no_geo", "geo": geo},
                                  status=409, headers=CORS_HEADERS)
     await db.save_driver_day(day, me["name"], {
-        "shift_open_at": datetime.now(timezone.utc), "shift_close_at": None})
+        "shift_open_at": datetime.now(timezone.utc), "shift_close_at": None,
+        # Тест-водителя на смену никто не отмечает — отмечается сам; метка test
+        # держит его день подальше от отчётов.
+        **({"working": True, "test": True} if _tq(me) else {})})
     log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин")
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)
 
@@ -441,7 +473,7 @@ async def handle_shift_close(request):
         return web.json_response({"error": "not_open"}, status=409, headers=CORS_HEADERS)
     if d.get("shift_close_at"):
         return web.json_response({"error": "already_closed"}, status=409, headers=CORS_HEADERS)
-    must = _must_left(d)
+    must = [] if _tq(me) else _must_left(d)
     if must:
         return web.json_response({"error": "expenses_left", "must": must},
                                  status=409, headers=CORS_HEADERS)
@@ -457,7 +489,7 @@ async def handle_shift_close(request):
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] закрытие дня не прочиталось: {e}")
         день_закрыт = False
-    if not день_закрыт:
+    if not день_закрыт and not _tq(me):
         return web.json_response({"error": "day_open"}, status=409, headers=CORS_HEADERS)
     await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
     log.info(f"[driver] {me['name']}: смена закрыта")
@@ -502,8 +534,9 @@ async def handle_ping(request):
     # приложение из памяти, чтобы маскировка слетела в самый неподходящий момент.
     return web.json_response({
         "ok": True,
-        "driver": {k: me[k] for k in ("id", "name", "district", "district_code",
-                                      "district_name", "operator")},
+        "driver": {**{k: me[k] for k in ("id", "name", "district", "district_code",
+                                         "district_name", "operator")},
+                   "test": _tq(me)},
         "day": _biz_day(),
         "panic": bool(await db.panic_get(me["name"])),
     }, headers=CORS_HEADERS)
@@ -575,8 +608,9 @@ async def handle_settle(request):
         **({"fx": fx_rec} if fx_rec else {})})
 
     cid = int(o.get("customer_id") or 0)
-    if cid and diff != prev:
+    if cid and diff != prev and not o.get("test"):
         # Знак: взяли больше — уходим в минус, это наш долг клиенту.
+        # По тест-заказу долг не пишем: деньги в нём не настоящие.
         await db.add_debt(cid, -(diff - prev), order_id=oid,
                           note=f"расчёт наличными · {me['name']}")
     log.info(f"[driver] {me['name']}: заказ {oid} — взято {taken} из {total} "
@@ -598,6 +632,8 @@ async def handle_debt_settle(request):
     o = await db.get_order(oid)
     if not o or (o.get("driver") or "").strip() != me["name"]:
         return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    if o.get("test"):
+        return web.json_response({"error": "test_account"}, status=403, headers=CORS_HEADERS)
     cid = int(o.get("customer_id") or 0)
     if not cid:
         return web.json_response({"error": "no_customer"}, status=400, headers=CORS_HEADERS)
@@ -629,6 +665,7 @@ WO_MAX_QTY = 240                # ящик пива это 24; больше по
 
 
 @require_driver
+@_no_test
 @needs_shift
 async def handle_writeoff_add(request):
     """Списать товар: бой, брак, просрочка, потеря.
@@ -710,6 +747,7 @@ async def handle_writeoff_add(request):
 
 
 @require_driver
+@_no_test
 async def handle_writeoff_scan(request):
     """Списать бутылку по коду с крышки — как у старшего, но в ожидании
     решения. body: {code, kind, note?, photo, thumb?}
@@ -843,6 +881,7 @@ async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
 # stock_transfers). Отменить может только свой переезд; старший — любой.
 
 @require_driver
+@_no_test
 async def handle_move_scan(request):
     """{code, to} → вердикт как у старшего (ok / same / unknown / …)."""
     import stock_routes
@@ -864,6 +903,7 @@ async def handle_move_scan(request):
 
 
 @require_driver
+@_no_test
 async def handle_code_info(request):
     """?code= → что за бутылка, до переезда: название и фото товара из каталога,
     где числится, когда записана, сколько раз ездила. Водитель сначала видит,
@@ -905,6 +945,7 @@ async def handle_code_info(request):
 
 
 @require_driver
+@_no_test
 async def handle_move_undo(request):
     """{code} — вернуть бутылку: только если последний переезд — мой."""
     import stock_routes
@@ -921,6 +962,7 @@ async def handle_move_undo(request):
 
 
 @require_driver
+@_no_test
 async def handle_move_del(request):
     """Убрать строку своей истории: бутылка едет обратно в обе книги."""
     me = request["driver"]
@@ -941,6 +983,7 @@ async def handle_move_del(request):
 
 
 @require_driver
+@_no_test
 async def handle_moves(request):
     """Мои переезды за неделю, сгруппированные как у старшего, плюс районы —
     их список водителю нужен, чтобы выбрать, куда везёт."""
@@ -1208,7 +1251,7 @@ async def handle_orders(request):
     # Окно с запасом назад: заказ, созданный до полудня и принятый после
     # открытия смены, относится к этой смене (bizday.order_day).
     since, until = bizday.window_utc(day, day)
-    orders = await db.get_orders_in_range(since, until)
+    orders = await db.get_orders_in_range(since, until, test=_tq(me))
     mine = [o for o in orders if (o.get("driver") or "").strip() == me["name"]
             and (o.get("status") != "delivered" or bizday.order_day(o) == day)]
     active = [_order_view(o) for o in mine if o.get("status") == "approved"]
@@ -1253,7 +1296,7 @@ async def handle_history(request):
     # История берётся за месяц и больше. С предельными пятьюстами заказами по
     # всем районам ранние дни просто исчезали бы из его истории — а водитель
     # смотрит её как раз затем, чтобы сверить свои деньги за период.
-    orders = await db.get_orders_in_range(since, until, limit=None)
+    orders = await db.get_orders_in_range(since, until, limit=None, test=_tq(me))
     mine = [o for o in orders
             if (o.get("driver") or "").strip() == me["name"] and o.get("status") == "delivered"
             and bizday.in_days(o, first, last)]
@@ -1479,7 +1522,10 @@ async def _notify_operators(oid: str, me: dict, req: dict, order: dict):
             {"text": ok,           "callback_data": f"drvreq_ok_{oid}"},
             {"text": "🚫 Отклонить", "callback_data": f"drvreq_no_{oid}"},
         ]]}
-        for op_id in OPERATOR_IDS:
+        if order.get("test"):
+            from config import TEST_OPERATOR_IDS
+            msg = "🧪 <b>ТЕСТ</b> · " + msg
+        for op_id in (sorted(TEST_OPERATOR_IDS) if order.get("test") else OPERATOR_IDS):
             try:
                 await tg_send(_tok, op_id, msg, parse_mode="HTML", reply_markup=kb)
             except Exception as e:
@@ -1536,7 +1582,7 @@ async def handle_delivered(request):
         await notify_owners("orders.driver_done",
             f"📦 *Водитель отметил доставку #{oid}*\n"
             f"{me['name']} ({me['district_code']}) · {o.get('total',0)} AED\n"
-            f"_Ждёт подтверждения оператора._")
+            f"_Ждёт подтверждения оператора._", test=bool(o.get("test")))
     except Exception as e:
         log.warning(f"[driver] уведомление о доставке #{oid}: {e}")
     return web.json_response({"ok": True, "order_id": oid, "driver_req": req},
@@ -1807,6 +1853,7 @@ async def handle_bottle_look(request):
 
 
 @require_driver
+@_no_test
 async def handle_expense_add(request):
     """Расход на согласование. Сразу в расходы дня он не попадает: иначе водитель
     сам себе назначал бы траты. Менеджер утверждает в панели «Учёт»."""
@@ -2055,7 +2102,10 @@ async def _notify_chat(oid: str, me: dict, msg: dict, o: dict):
     text = (head + f"#{oid} · {me['district_code']} · {me['name']}\n"
             f"{o.get('address', '')}\n\n_{msg['text']}_\n\n"
             "Ответить — в панели, карточка заказа.")
-    for uid in OPERATOR_IDS:
+    if o.get("test"):
+        from config import TEST_OPERATOR_IDS
+        text = "🧪 *ТЕСТ* · " + text
+    for uid in (sorted(TEST_OPERATOR_IDS) if o.get("test") else OPERATOR_IDS):
         try:
             await tg_send(OPERATOR_BOT_TOKEN, uid, text)
         except Exception as e:
@@ -2111,12 +2161,16 @@ async def handle_supply_list(request):
     """Что можно забрать: мои задачи, свободные, взятые другими."""
     import supply_routes
     me = request["driver"]
+    if _tq(me):
+        return web.json_response({"mine": [], "free": [], "extra": [], "taken": []},
+                                 headers=CORS_HEADERS)
     return web.json_response(
         await supply_routes.tasks_for_driver(me["name"], me.get("district") or ""),
         headers=CORS_HEADERS)
 
 
 @require_driver
+@_no_test
 async def handle_supply_claim(request):
     """Взять задачу. Достаётся одному — кто нажал первым."""
     import supply_routes
@@ -2143,6 +2197,7 @@ async def handle_supply_claim(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_release(request):
     """Отдать задачу обратно: не еду."""
     me = request["driver"]
@@ -2157,6 +2212,7 @@ async def handle_supply_release(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_task(request):
     """Одна задача целиком — экран приёмки."""
     import supply_routes
@@ -2173,6 +2229,7 @@ async def handle_supply_task(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_scan(request):
     """Одна бутылка в приёмку."""
     import supply_routes
@@ -2196,6 +2253,7 @@ async def handle_supply_scan(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_undo(request):
     import supply_routes
     me = request["driver"]
@@ -2211,6 +2269,7 @@ async def handle_supply_undo(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_finish(request):
     import supply_routes
     me = request["driver"]
@@ -2244,6 +2303,7 @@ async def handle_expense_photo(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_hold(request):
     """Занять задачу под сканирование (камера открыта) или отпустить."""
     import supply_routes
@@ -2261,6 +2321,7 @@ async def handle_supply_hold(request):
 
 
 @require_driver
+@_no_test
 async def handle_supply_noscan(request):
     """Товар забрали, коды не читали. Задача остаётся открытой — досканировать."""
     import supply_routes

@@ -17,7 +17,7 @@ from pathlib import Path
 from aiohttp import web
 
 from owner_auth import require_owner, CORS_HEADERS, install_alerter
-from config import OWNER_IDS, MANAGER_IDS
+from config import OWNER_IDS, MANAGER_IDS, TEST_OPERATOR_IDS
 import db
 import os, re, logging
 # Premium card lists live in api_server (single source of truth).
@@ -1453,7 +1453,7 @@ async def handle_customer_detail(request):
     if not user:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
 
-    orders = await db.get_user_orders(tg_id)
+    orders = [o for o in await db.get_user_orders(tg_id) if not o.get("test")]
     safe_orders = []
     for o in orders[:20]:
         safe_orders.append({
@@ -2105,12 +2105,32 @@ async def handle_support_thread(request):
 
 # Public helper used by api_server (and operator_bot in future) to push an
 # event to all owners subscribed to it. Best-effort; logs failures.
+async def _notify_testers(event_key: str, text: str, parse_mode: str = "Markdown") -> list:
+    """Событие по тест-заказу: только тестерам (config.TEST_OPERATOR_IDS), с
+    пометкой и без записи в архив уведомлений — там ему делать нечего."""
+    sent = []
+    if not OWNER_BOT_TOKEN:
+        return sent
+    text = "🧪 ТЕСТ · " + text
+    for oid in sorted(TEST_OPERATOR_IDS):
+        try:
+            result = await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            if result and result.get("ok"):
+                sent.append({"chat_id": oid, "message_id": result["result"]["message_id"]})
+        except Exception as e:
+            log.error(f"[owner-notif] test {event_key} → {oid} failed: {e}")
+    return sent
+
+
 async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown",
-                        meta: dict | None = None) -> list:
+                        meta: dict | None = None, test: bool = False) -> list:
     """Send notification to subscribed owners/managers. Returns list of
     {"chat_id": int, "message_id": int} for each successfully sent message
     so callers can delete them later if needed. `meta` is persisted with the
-    notification for the owner app (e.g. support conv_key routing)."""
+    notification for the owner app (e.g. support conv_key routing).
+    test=True — событие по тест-заказу: только тестерам, мимо архива."""
+    if test:
+        return await _notify_testers(event_key, text, parse_mode)
     try:
         await db.insert_notification(event_key, text, meta=meta)
     except Exception as e:
@@ -2223,9 +2243,14 @@ async def tg_edit_caption(token, chat_id, message_id, caption: str,
         return None
 
 
-async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Markdown") -> None:
+async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Markdown",
+                              test: bool = False) -> None:
     """Send to EVERY owner/manager, bypassing prefs + quiet hours — for critical
-    alerts (crypto-paid orders, order edits) that must always be seen."""
+    alerts (crypto-paid orders, order edits) that must always be seen.
+    test=True — событие по тест-заказу: только тестерам, мимо архива."""
+    if test:
+        await _notify_testers(event_key, text, parse_mode)
+        return
     try:
         await db.insert_notification(event_key, text)
     except Exception as e:
@@ -2273,7 +2298,7 @@ async def _send_md(token, chat_id, text, parse_mode="Markdown"):
 
 async def notify_new_order(oid, total, user_name, phone, address, office,
                            uid, founder_id, premium_ids, worldwide_ids,
-                           items=None, prepaid=None, held=False, manual=None):
+                           items=None, prepaid=None, held=False, manual=None, test=False):
     """Send exactly one new-order message per user at their highest matching tier
     (orders.new1000 → orders.new500 → orders.new). VIP notification is independent.
     Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
@@ -2304,6 +2329,11 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         if manual.get("driver"):
             head += f"🚗 Водитель: *{_md(manual['driver'])}*\n"
         base = head + "\n" + base
+
+    if test:
+        # Тест-заказ: одно сообщение тестерам, без ярусов, VIP и архива.
+        await _notify_testers("orders.new", f"🆕 *Заказ #{oid}*\n{base}")
+        return
 
     tiers = []
     if total >= 1000:

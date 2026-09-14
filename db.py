@@ -2861,6 +2861,19 @@ async def writeoff_list(since=None, district: str = "", by: str = "",
     return await cur.to_list(length=int(limit))
 
 
+async def writeoff_comps(who: str = "", limit: int = 2000) -> list:
+    """Согласованные списания с удержанием, без картинок — для зарплат и
+    профиля водителя. who — только те, где этот человек виновный (один или в
+    раскладке по людям)."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"comp.amount": {"$gt": 0}, **WRITEOFF_COUNTED}
+    if who:
+        q["$or"] = [{"comp.who": who}, {"comp.split.who": who}]
+    cur = db.writeoffs.find(q, {"img": 0, "thumb": 0}).sort("at", -1).limit(int(limit))
+    return await cur.to_list(length=int(limit))
+
+
 async def writeoff_since(since: dict, skip_coded: bool = False,
                          skip_audit: bool = True) -> dict:
     """Сколько бутылок списано после пересчёта: {район: {позиция: шт}}.

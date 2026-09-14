@@ -91,7 +91,7 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
                          amount=_i(_n(it.get('amount'))), per_month=_i(_n(it.get('per_month'))),
                          start=str(it.get('from') or '')[:7], day=it.get('day') or '',
                          note=it.get('note') or '', reason=it.get('reason') or '',
-                         entry=it.get('entry') or '', **s))
+                         entry=it.get('entry') or '', src=it.get('src') or '', **s))
     to_pay = accrued + plus - minus
     paid = sum(_n(e.get('amount')) for e in payouts)
     return dict(

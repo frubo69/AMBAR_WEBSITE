@@ -596,7 +596,9 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     try:
         docs = await db.fin_people_get()
         mdocs = await db.fin_pay_months_upto(month)
-        items = await db.fin_pay_items_get()
+        # Удержания по списаниям — в ту же ведомость, что штрафы: иначе «к
+        # выплате» у старшего и у водителя врало бы на сумму боя.
+        items = list(await db.fin_pay_items_get()) + await writeoff_holds()
         shifts = await db.shift_days_worked(days[0], min(days[-1], today))
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] зарплаты не прочитаны: {e}")
@@ -635,6 +637,40 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     return res
 
 
+async def writeoff_holds(name: str = "") -> list:
+    """Удержания по списаниям — теми же записями, что штрафы и удержания из
+    «Финансов», но считаются с самих списаний (writeoffs.comp), а не хранятся
+    второй раз: одно событие — одно место (владелец, 14 сен 2026: «удержания
+    тоже минусуй водителям зарплату»). Снял удержание в списании — запись
+    исчезает и отсюда. Всё сразу в месяц списания, без графика."""
+    try:
+        rows = await db.writeoff_comps(name)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] удержания по списаниям не прочитаны: {e}")
+        return []
+    out = []
+    for r in rows:
+        c = r.get("comp") or {}
+        if not int(c.get("amount") or 0):
+            continue
+        day = str(r.get("day") or "")[:10] or str(r.get("at") or "")[:10]
+        kind = str(r.get("kind") or "списание").strip()
+        what = (f"{kind[:1].upper()}{kind[1:]} · {r.get('name') or r.get('item') or 'товар'}"
+                f" × {int(r.get('qty') or 0)}")
+        parts = c.get("split") or [{"who": c.get("who") or "", "amount": c.get("amount")}]
+        for i, part in enumerate(parts):
+            who = str(part.get("who") or "").strip()
+            amount = int(part.get("amount") or 0)
+            if not who or amount <= 0 or (name and who != name):
+                continue
+            out.append({"_id": f"wo:{r.get('_id')}:{i}", "name": who, "kind": "hold",
+                        "amount": amount, "per_month": 0, "from": day[:7], "day": day,
+                        "note": c.get("note") or "", "reason": what,
+                        "by": c.get("by_name") or "", "at": c.get("at") or r.get("at"),
+                        "src": "writeoff", "wid": r.get("_id")})
+    return out
+
+
 async def person_card(name: str, month: str) -> dict:
     """Зарплата и списания одного человека за месяц — для профиля в приложении
     водителя. Отдаём только его: чужие суммы туда не попадают."""
@@ -646,6 +682,7 @@ async def person_card(name: str, month: str) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] удержания {name} не прочитаны: {e}")
         raw = []
+    raw += await writeoff_holds(name)              # удержания по бою, браку, утере
     items, fines, holds, cnt = [], 0.0, 0.0, 0
     for it in sorted(raw, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
         if it.get("kind") == "bonus":
@@ -665,7 +702,7 @@ async def person_card(name: str, month: str) -> dict:
                           start=str(it.get("from") or "")[:7],
                           reason=it.get("reason") or "", note=it.get("note") or "",
                           due=pay._i(due), left=0 if gone else sch["after"], done=False if gone else sch["done"],
-                          cancelled=gone))
+                          cancelled=gone, src=it.get("src") or "", wid=it.get("wid") or ""))
     out = dict(month=month, name=name, fines=pay._i(fines), holds=pay._i(holds),
                month_total=pay._i(fines + holds), month_count=cnt, items=items,
                usd=pay_.get("usd"), found=bool(p))
@@ -694,6 +731,7 @@ def _penalty_history(items: list, month: str, limit: int = 60) -> list:
                         by=it.get("by") or "", cancelled=gone, cancelled_by=it.get("cancelled_by") or "",
                         cancelled_day=str(it.get("cancelled_at") or "")[:10],
                         revised=bool(it.get("revised_at")), revised_by=it.get("revised_by") or "",
+                        src=it.get("src") or "", wid=it.get("wid") or "",
                         was=None if it.get("was") is None else pay._i(pay._n(it.get("was"))),
                         left=0 if gone else s["after"], done=False if gone else s["done"]))
         if len(out) >= limit:

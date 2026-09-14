@@ -4552,6 +4552,26 @@ async function load(){
   expPulse();
   supBadge();
   render();
+  if(TAB === 'profile') profPoll();
+}
+
+// Зарплата меняется не по расписанию: старший удержал за бой — водитель должен
+// увидеть это сразу, не перезапуская приложение (владелец, 14 сен 2026).
+// Раз в десять секунд, пока открыт профиль; перерисовываем, только если
+// цифры и правда изменились — иначе список дёргался бы под пальцем.
+let _profPollAt = 0;
+async function profPoll(){
+  if(TAB !== 'profile' || PROF_PAGE === 'orders' || PROF_BUSY || !PROF) return;
+  if(Date.now() - _profPollAt < 10000) return;
+  _profPollAt = Date.now();
+  const m = PROF_MONTH || profMonthNow();
+  try{
+    const d = await drvApi.drvFetch('/api/driver/profile', {params: {month: m}});
+    if(PROF_MONTH !== m || TAB !== 'profile' || PROF_BUSY) return;
+    if(JSON.stringify(d) === JSON.stringify(PROF)) return;
+    PROF = d; PROF_ERR = '';
+    profPaint();
+  }catch(e){}
 }
 
 // Оператор закрыл день района, а водитель не ответил по бензину и мойке.
@@ -4943,6 +4963,7 @@ function hsIco(it){
   if(/пдд|светофор|красн|правил|знак/.test(t)) return ICO.note;
   if(/топлив|бензин|аванс|заправ/.test(t)) return ICO.fuel;
   if(/мойк/.test(t)) return ICO.wash;
+  if(/^(бой|брак|просрочк|потер|недостач)/.test(t)) return ICO.warn;   // удержание по списанию
   return it.kind === 'hold' ? ICO.wallet : ICO.car;
 }
 function hsWhen(it){

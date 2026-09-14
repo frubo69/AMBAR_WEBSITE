@@ -20049,12 +20049,15 @@ function fbItems(p, month){
 function fbItemRows(rows, month, del){
   return rows.map(it => {
     const later = it.start > month;
-    const sub = [`${fbFmt(it.amount)} всего`, it.per_month ? `по ${fbFmt(it.per_month)} в месяц` : '',
+    // Удержание по списанию (бой, брак, утеря) живёт на самом списании:
+    // здесь оно только показывается, снять или поменять его — в «Списаниях».
+    const wo = it.src === 'writeoff';
+    const sub = [wo ? 'по списанию' : '', `${fbFmt(it.amount)} всего`, it.per_month ? `по ${fbFmt(it.per_month)} в месяц` : '',
                  later ? `с ${fbMonthGen(it.start)}` : it.done ? 'закрыто' : it.after ? `останется ${fbFmt(it.after)}` : ''].filter(Boolean).join(' · ');
     return `<div class="fb-e">
       <span class="fb-e-b"><b>${it.t}${it.reason ? ' · ' + escS(it.reason) : ''}${it.note ? ' · ' + escS(it.note) : ''}</b><i>${sub}</i></span>
       <b class="fb-e-v${it.kind === 'bonus' ? ' ok' : later ? ' dim' : ''}">${it.kind === 'bonus' ? '+' : '−'}${fbFmt(later ? it.amount : it.due)}<u>AED</u></b>
-      ${del ? `<button class="fb-e-x" onclick="fbItemDel('${it.id}')" aria-label="Убрать">${IC('xmark', 15)}</button>` : ''}
+      ${del && !wo ? `<button class="fb-e-x" onclick="fbItemDel('${it.id}')" aria-label="Убрать">${IC('xmark', 15)}</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -20373,6 +20376,7 @@ function fbPenCatOf(h){
 function fbPenEdit(id){
   const b = fbBook(FB.month); if(!b) return;
   const h = (fbCur(b).history || []).find(x => x.id === id); if(!h) return;
+  if(h.src === 'writeoff'){ _toast('Удержание по списанию — меняется в «Списаниях»'); return; }
   const parts = h.per_month > 0 && h.per_month < h.amount;
   FB.pen = {mode: 'edit', item: h, how: parts ? 'parts' : 'once', months: parts ? Math.max(2, Math.ceil(h.amount / h.per_month)) : 2,
             who: {name: h.name, sub: fbPenSubOf(h.name) || (h.kind === 'hold' ? 'Удержание' : 'Штраф')}};

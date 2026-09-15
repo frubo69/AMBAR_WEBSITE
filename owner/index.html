@@ -20129,7 +20129,8 @@ function fbItemsHtml(b){
 const FB_PH_F = {all: 'Все', live: 'Снимаются', paid: 'Оплаченные', wait: 'Ждут', off: 'Отменённые'};
 const FB_PH_ST = {live: 'Снимается', paid: 'Оплачен', wait: 'Ждёт', off: 'Отменён'};
 // Штраф в истории: пока снимается с зарплаты — «Снимается», снялся весь —
-// «Оплачен», начнётся со следующего месяца — «Ждёт», отменили — «Отменён».
+// «Оплачен», начнётся со следующего месяца — «Ждёт», сняли — «Амнистия»
+// (удержание — «Отменено»).
 function fbPenHistSt(h){
   return h.cancelled ? 'off' : (h.start && h.start > FB.month) ? 'wait' : h.done ? 'paid' : 'live';
 }
@@ -20161,7 +20162,7 @@ function fbPenHistRow(h, hide){
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
       <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${fbFmt(h.amount)} AED</b>
-        <i class="fb-ph-st ${st}">${FB_PH_ST[st]}</i></span>
+        <i class="fb-ph-st ${st}">${st === 'off' ? (h.kind === 'hold' ? 'Отменено' : 'Амнистия') : FB_PH_ST[st]}</i></span>
       <em class="fb-chev">${_SC_CHEV}</em></button>`;
 }
 function fbPenHistDay(day){ return day ? `${fbDayT(day)} ${String(day).slice(0, 4)}` : ''; }
@@ -20250,7 +20251,7 @@ function fbPenGo(step, anim){
   else if(step === 'hold'){ title = 'Удержание'; html = fbPenHoldHtml(); back = () => fbPenGo('who', 'back'); }
   else if(step === 'edit'){
     const it = P.item, чего = it.kind === 'hold' ? 'удержание' : 'штраф';
-    title = it.cancelled ? (it.kind === 'hold' ? 'Отменённое удержание' : 'Отменённый штраф')
+    title = it.cancelled ? (it.kind === 'hold' ? 'Отменённое удержание' : 'Амнистия на штраф')
                          : 'Пересмотреть ' + чего;
     html = fbPenEditHtml(it); back = fbPenExit;
   }
@@ -20390,7 +20391,7 @@ function fbPenHowCard(){
 }
 // ── Пересмотреть штраф: из истории ────────────────────────────────────────
 // Та же страница, что «Назначить штраф»: итог с датой и кто записал, человек,
-// способ, сумма и комментарий уже заполнены. «Сохранить» и «Отменить штраф»
+// способ, сумма и комментарий уже заполнены. «Сохранить» и «Амнистия на штраф»
 // возвращают к главной; отмена спрашивает — штраф уйдёт из расчёта зарплаты.
 function fbPenCatOf(h){
   const first = String(h.reason || '').split(' · ')[0];
@@ -20423,8 +20424,8 @@ function fbPenEditHtml(h){
     ${h.cancelled ? `<div class="fb-pen-card fb-pen-form fb-pen-last">
         <div class="fb-pen-sec"><div class="fb-pen-cap">Сумма</div><div class="fb-pen-val">${fbFmt(h.amount)} AED</div></div>
         ${h.note ? `<div class="fb-pen-sec"><div class="fb-pen-cap">Комментарий</div><div class="fb-pen-val sub">${escS(h.note)}</div></div>` : ''}
-        <div class="fb-pen-sec"><div class="fb-pen-cap">Отменён</div><div class="fb-pen-val sub">${
-          escS([fbPenHistDay(h.cancelled_day), h.cancelled_by].filter(Boolean).join(' · ') || 'отменён')}</div></div>
+        <div class="fb-pen-sec"><div class="fb-pen-cap">${h.kind === 'hold' ? 'Отменено' : 'Амнистия'}</div><div class="fb-pen-val sub">${
+          escS([fbPenHistDay(h.cancelled_day), h.cancelled_by].filter(Boolean).join(' · ') || (h.kind === 'hold' ? 'отменено' : 'амнистия'))}</div></div>
       </div>`
     : `${fbPenHowCard()}
       <div class="fb-pen-card fb-pen-form fb-pen-last">${fbPenAmtSec(h.amount)}${fbPenCmtSec(h.note)}</div>`}`;
@@ -20464,7 +20465,7 @@ function fbPenFoot(){
   foot.innerHTML = `<div class="fb-pen-foot">${h.cancelled
     ? `<button class="fb-pen-go" onclick="fbPenRestore()">Вернуть ${what}</button>`
     : P.dirty ? `<button class="fb-pen-go" onclick="fbPenSave()">Сохранить изменения</button>`
-              : `<button class="fb-pen-go dn" onclick="fbPenCancel()">Отменить ${what}</button>`}</div>`;
+              : `<button class="fb-pen-go dn" onclick="fbPenCancel()">${what === 'штраф' ? 'Амнистия на штраф' : 'Отменить удержание'}</button>`}</div>`;
 }
 function fbPenDirty(){
   const P = FB.pen; if(!P || P.step !== 'edit' || !P.item || P.item.cancelled) return;
@@ -20490,8 +20491,11 @@ async function fbPenRestore(){
 async function fbPenCancel(){
   if(!fbPenOn() || FB.pen.busy || FB.pen.mode !== 'edit') return;
   const P = FB.pen, h = P.item, what = h.kind === 'hold' ? 'удержание' : 'штраф';
-  if(!await askDialog(`Отменить ${what}?`, `${h.name} · ${fbFmt(h.amount)} AED. С зарплаты сниматься не будет, в истории останется отменённым.`,
-                      `Отменить ${what}`, 'Вернуться назад', 'bad')) return;
+  // Для штрафа это амнистия (владелец, 15 сен 2026), для удержания — отмена.
+  const amn = what === 'штраф';
+  if(!await askDialog(amn ? 'Амнистия на штраф?' : 'Отменить удержание?',
+                      `${h.name} · ${fbFmt(h.amount)} AED. С зарплаты сниматься не будет, в истории останется ${amn ? 'как амнистия' : 'отменённым'}.`,
+                      amn ? 'Амнистия' : 'Отменить удержание', 'Вернуться назад', 'bad')) return;
   if(!fbPenOn()) return;
   P.busy = true;
   try{
@@ -20499,7 +20503,7 @@ async function fbPenCancel(){
     if(res.book) fbApply(res.book);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     fbPenExit();
-    _toast(`${h.kind === 'hold' ? 'Удержание отменено' : 'Штраф отменён'} · ${h.name}`);
+    _toast(`${h.kind === 'hold' ? 'Удержание отменено' : 'Амнистия'} · ${h.name}`);
   }catch(e){
     P.busy = false;
     _toast('Не удалось отменить');

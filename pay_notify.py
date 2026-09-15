@@ -105,6 +105,11 @@ def added(item: dict, who: str) -> str:
 def cancelled(item: dict, who: str) -> str:
     kind = item.get("kind") or ""
     t = pay.KINDS.get(kind, "Запись")
+    if kind == "fine":
+        # Штраф не «отменяют», а дают амнистию (владелец, 15 сен 2026).
+        return (f"🕊 <b>Амнистия: штраф {_aed(item.get('amount'))} снят</b>"
+                + (f"\n{_e(item['reason'])}" if item.get("reason") else "")
+                + (f"\nАмнистию дал: {_e(who)}" if who else ""))
     return (f"✅ <b>{t} {_aed(item.get('amount'))} {_ending(kind, 'отменён')}</b>"
             + (f"\n{_e(item['reason'])}" if item.get("reason") else "")
             + (f"\nОтменил: {_e(who)}" if who else ""))

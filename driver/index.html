@@ -5056,7 +5056,7 @@ function hsRows(){
     return `<button class="hs-r ${k}${it.cancelled ? ' off' : ''}" onclick="hsOpen('${esc(it.id)}')">
       <span class="hs-i">${svg(hsIco(it), 17)}</span>
       <span class="hs-b"><b>${esc(c.head)}</b>${c.tail ? `<i>${esc(c.tail)}</i>` : ''}<u>${esc(hsWhen(it))}</u></span>
-      <span class="hs-tag ${k}">${it.cancelled ? 'Отменён' : (k === 'hold' ? 'Удержание' : 'Штраф')}</span>
+      <span class="hs-tag ${k}">${it.cancelled ? (k === 'hold' ? 'Отменено' : 'Амнистия') : (k === 'hold' ? 'Удержание' : 'Штраф')}</span>
       <span class="hs-am">−${profSum(it.amount, 'down')}</span>
       <em class="hs-c">${svg(ICO.chevR, 12)}</em>
     </button>`;
@@ -5108,13 +5108,13 @@ function profItemHtml(){
     ['Когда', hsWhen(it) || '—'],
     it.note && it.note !== c.tail ? ['Примечание', it.note] : null,
     it.per_month ? ['Списывают', `по ${fmt(it.per_month)} AED в месяц`] : null,
-    ['Состояние', it.cancelled ? 'Отменён — из зарплаты не вычитается'
+    ['Состояние', it.cancelled ? `${k === 'hold' ? 'Отменено' : 'Амнистия'} — из зарплаты не вычитается`
       : (it.done ? 'Списано полностью' : (it.left ? `Осталось ${profSum(it.left, 'down')}` : 'В этом месяце'))],
   ].filter(Boolean);
   return `<div class="hs-one">
       <div class="hs-one-h hs-r ${k}"><span class="hs-i">${svg(hsIco(it), 22)}</span>
         <div><b>${esc(c.tail || c.head)}</b><i>${esc(hsWhen(it))}</i></div></div>
-      <div class="hs-one-am ${k}${it.cancelled ? ' off' : ''}"><u>${it.cancelled ? 'Штраф отменён' : 'Списано из зарплаты'}</u>
+      <div class="hs-one-am ${k}${it.cancelled ? ' off' : ''}"><u>${it.cancelled ? (k === 'hold' ? 'Удержание отменено' : 'Амнистия на штраф') : 'Списано из зарплаты'}</u>
         <b>${profSum(it.amount, 'down')}</b></div>
       <div class="hs-one-l">${rows.map(([u, b]) => `<div><u>${esc(u)}</u><b>${esc(b)}</b></div>`).join('')}</div>
     </div>

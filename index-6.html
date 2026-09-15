@@ -851,14 +851,19 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pdm-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:14px auto 0}
 .pdm-close{position:absolute;top:14px;right:16px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid var(--border2);color:var(--sub);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2}
 .pdm-close:active{transform:scale(.85)}
-.pdm-img-box{height:300px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden;touch-action:none}
+/* Фото в карточке товара: само фото квадратное и не режется, а поля по бокам
+   закрывает его же размытая копия во всю ширину (владелец, 15 сен 2026) */
+.pdm-img-box{height:300px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:0;position:relative;overflow:hidden;touch-action:none}
+.pdm-bg{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(26px) brightness(.7) saturate(1.1);z-index:0;pointer-events:none}
+.pdm-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(9,9,22,.10),rgba(9,9,22,.45))}
+.pdm-img-box.noimg .pdm-bg{display:none}
 .pdm-img-box::after{content:'';position:absolute;width:28px;height:28px;border:2px solid rgba(201,169,110,.15);border-top-color:rgba(201,169,110,.5);border-radius:50%;animation:spin .7s linear infinite;z-index:0;pointer-events:none}
 .pdm-img-box.loaded::after{display:none}
 .pdm-img-box.noimg::before{content:attr(data-nm);position:relative;z-index:1;
   font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;
   line-height:1.35;text-align:center;color:var(--gold);opacity:.85;
   letter-spacing:.4px;padding:0 24px}
-.pdm-img{max-height:260px;max-width:85%;object-fit:contain;filter:drop-shadow(0 12px 32px rgba(0,0,0,.8));transform-origin:center center;will-change:transform;user-select:none;pointer-events:none;position:relative;z-index:1}
+.pdm-img{max-height:100%;max-width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 12px 32px rgba(0,0,0,.8));transform-origin:center center;will-change:transform;user-select:none;pointer-events:none;position:relative;z-index:1}
 .pdm-zoom-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.3);pointer-events:none;white-space:nowrap}
 .pdm-body{padding:20px 18px 0}
 .pdm-cat{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:6px}
@@ -2562,6 +2567,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
     <div class="pdm-handle"></div>
     <button class="pdm-close" onclick="closePDMDirect()">✕</button>
     <div class="pdm-img-box" id="pdm-img-box">
+      <div class="pdm-bg" id="pdm-bg"></div>
       <img class="pdm-img" id="pdm-img" src="" alt="" draggable="false">
       <div class="pdm-zoom-hint" id="pdm-zoom-hint">👌 Pinch to zoom</div>
     </div>
@@ -9118,6 +9124,7 @@ function openPDM(id){
   img.style.display='';
   img.onerror=function(){this.style.display='none';imgBox.classList.add('loaded','noimg');};
   img.src=p.img||'';
+  const bg=el('pdm-bg');if(bg)bg.style.backgroundImage=p.img?`url("${p.img}")`:'';
   if(!p.img){img.onerror();}
   img.style.transform='translate(0px,0px) scale(1)';img.style.transition='';
   el('pdm-cat').textContent=lang==='ru'?p.cat:p.catE;

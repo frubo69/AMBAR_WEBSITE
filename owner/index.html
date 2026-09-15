@@ -31659,10 +31659,12 @@ function crewWhen(iso){
   return isNaN(d) ? '' : d.toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'});
 }
 function crewLinksHtml(S){
-  const links = S.links || [];
+  const links = S.links || [], trk = S.trackers || {};
   const rows = links.length ? links.map((l, i) => {
-    const st = l.linked ? `привязан${l.tg_name ? ' · ' + escS(l.tg_name) : ''}${l.tg_username ? ' @' + escS(l.tg_username) : ''}`
-             : l.code_active ? `ссылка выдана · до ${crewWhen(l.code_until)}` : 'телефон не привязан';
+    const t = trk[l.name];
+    const st = (l.linked ? `привязан${l.tg_name ? ' · ' + escS(l.tg_name) : ''}${l.tg_username ? ' @' + escS(l.tg_username) : ''}`
+             : l.code_active ? `ссылка выдана · до ${crewWhen(l.code_until)}` : 'телефон не привязан')
+             + (t ? ` · трекер${t.last_at ? ' ' + crewWhen(t.last_at) : ' выдан'}` : '');
     const k = l.linked ? 'ok' : l.code_active ? 'wait' : 'no';
     return `<button class="crw-ln" id="crwln-${i}" onclick="crewLink(${i})">
       <span class="crw-ln-i ${k}">${IC('mobile', 16)}</span>
@@ -31671,8 +31673,42 @@ function crewLinksHtml(S){
   }).join('') : '<span class="crw-none">в базе никого нет</span>';
   return `<div class="crw-c crw-lc"><div class="crw-c-h">
       <span class="crw-c-n wrap">Телефоны водителей</span>
+      ${(S.stars || []).length ? `<button class="crw-op" onclick="crewTracker('${(S.stars[0] || '').replace(/'/g, "\\'")}')"><span class="crw-op-n">${IC('mobile', 15)}Трекер STAR</span></button>` : ''}
       <button class="crw-op" onclick="crewLinkAdd()"><span class="crw-op-n">${IC('user', 15)}Добавить</span></button>
     </div><div class="crw-ln-l">${rows}</div></div>`;
+}
+// Трекер-приложение на телефоне (15 сен 2026): телеграм в фоне точек не шлёт,
+// Traccar Client шлёт сам. STAR выдаёт личный ключ и текст с настройками —
+// его отправляют человеку в телеграм прямо отсюда.
+let CREW_TRK = null;
+async function crewTracker(name){
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/drivers/tracker', {method: 'POST', body: {name, as: _meName()}});
+    await crewLoad(); CREW_D = _copy(CREW); crewRender();
+    closePinPop();
+    CREW_TRK = r;
+    const back = document.createElement('div');
+    back.className = 'pin-back'; back.addEventListener('click', closePinPop);
+    const pop = document.createElement('div');
+    pop.className = 'pin-pop crw-lk';
+    pop.innerHTML = `<div class="crw-lk-h">${escS(r.name)} · трекер на телефон</div>
+      <div class="crw-lk-url">ID: ${escS(r.id)}<br>URL: ${escS(r.url)}</div>
+      <div class="crw-lk-s">Приложение Traccar Client (бесплатное, Android и iPhone). В настройках: этот ID, этот URL, частота 30 с, точность высокая; включить службу; геопозиция «Всегда» / «В любом режиме». Текст с шагами уходит кнопкой ниже.</div>
+      <button onclick="crewTrackerShare()">Отправить в Telegram</button>
+      <button onclick="crewTrackerCopy()">Скопировать текст</button>`;
+    document.body.append(back, pop);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ closePinPop(); _toast('Не удалось выдать ключ трекера'); }
+}
+function crewTrackerShare(){
+  if(!CREW_TRK) return;
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(CREW_TRK.url) + '&text=' + encodeURIComponent(CREW_TRK.text);
+  try{ Telegram.WebApp.openTelegramLink(url); }catch(e){ window.open(url, '_blank'); }
+}
+async function crewTrackerCopy(){
+  if(!CREW_TRK) return;
+  try{ await navigator.clipboard.writeText(CREW_TRK.text); _toast('Скопировано'); }
+  catch(e){ _toast('Не скопировалось — выделите ID вручную'); }
 }
 function crewLink(i){
   const S = CREW_D || CREW; const l = (S.links || [])[i]; if(!l) return;
@@ -31680,9 +31716,11 @@ function crewLink(i){
   _crewPop(`#crwln-${i}`, l.linked
     ? `<div class="crw-lk-h">${escS(l.name)} · привязан</div>
        <button onclick="crewLinkIssue('${n}', true)">${IC('key', 15)}Сменить телефон</button>
+       <button onclick="crewTracker('${n}')">${IC('mobile', 15)}Трекер на телефон</button>
        <button onclick="crewLinkUnlink('${n}')">${IC('xmark', 15)}Отвязать телефон</button>`
     : `<div class="crw-lk-h">${escS(l.name)} · не привязан</div>
-       <button onclick="crewLinkIssue('${n}', false)">${IC('key', 15)}${l.code_active ? 'Выдать новую ссылку' : 'Выдать ссылку для входа'}</button>`);
+       <button onclick="crewLinkIssue('${n}', false)">${IC('key', 15)}${l.code_active ? 'Выдать новую ссылку' : 'Выдать ссылку для входа'}</button>
+       <button onclick="crewTracker('${n}')">${IC('mobile', 15)}Трекер на телефон</button>`);
 }
 async function crewLinkIssue(name, force, sure){
   if(force && !sure){

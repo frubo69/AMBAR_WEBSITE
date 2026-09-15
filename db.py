@@ -3084,7 +3084,7 @@ def geo_moved(prev: dict | None, lat: float, lon: float, acc, day: str) -> bool:
 
 async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
                          until=None, acc=None, stop_live: bool = False,
-                         live=None) -> None:
+                         live=None, keepalive=None) -> None:
     """Точка водителя. until — до какого времени идёт трансляция.
 
     stop_live гасит признак трансляции. Раньше его не было, потому что срок
@@ -3100,11 +3100,21 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
            "$push": {"track": {"$each": [pt], "$slice": -TRACK_MAX}}}
     try:
         prev = await db.driver_pos.find_one({"_id": name}, {"mv_lat": 1, "mv_lon": 1,
-                                                            "mv_at": 1, "day": 1})
+                                                            "mv_at": 1, "day": 1, "until": 1})
     except Exception:                            # noqa: BLE001
         prev = None
     if geo_moved(prev, pt["lat"], pt["lon"], acc, day):
         doc["$set"].update({"mv_lat": pt["lat"], "mv_lon": pt["lon"], "mv_at": at})
+    if keepalive and not stop_live and until is None:
+        # Точка от трекер-приложения (Traccar Client / OwnTracks, 15 сен 2026):
+        # срока трансляции у неё нет, но она идёт сама и каждые полминуты.
+        # Считаем «трансляцией», которая гаснет через keepalive после
+        # последней точки; бессрочный срок телеграма при этом не укорачиваем.
+        pu = (prev or {}).get("until")
+        if pu is not None and getattr(pu, "tzinfo", None) is None:
+            pu = pu.replace(tzinfo=timezone.utc)
+        cand = at + timedelta(seconds=int(keepalive))
+        until = cand if (pu is None or pu < cand) else pu
     if stop_live:
         doc["$unset"] = {"until": ""}
         doc["$set"]["stopped_at"] = at
@@ -3132,6 +3142,60 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
     except Exception as e:                       # noqa: BLE001
         import logging as _lg
         _lg.getLogger("db").warning(f"маршрут дня не записан ({name}): {e}")
+
+
+# ── трекер-приложения (15 сен 2026) ──────────────────────────────────────────
+# Телеграм в фоне точек не шлёт; Traccar Client / OwnTracks на телефоне — шлют
+# сами. Каждому человеку свой ключ; по нему ручка /api/track находит, чью
+# точку приняла. Ключ — единственный секрет, никаких id телеграма.
+TRACK_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+async def tracker_issue(key: str, label: str = "", by: int = 0) -> str:
+    """Ключ трекера для точки key (имя водителя или op:Старший): существующий
+    или новый. Один ключ на человека: старое приложение продолжает слать."""
+    db = _db_or_none()
+    if db is None or not key: return ""
+    doc = await db.trackers.find_one({"key": key})
+    if doc:
+        return doc["_id"]
+    import secrets as _sec
+    token = "".join(_sec.choice(TRACK_ABC) for _ in range(10))
+    await db.trackers.insert_one({"_id": token, "key": key, "label": label or key,
+                                  "created_at": datetime.now(timezone.utc), "by": int(by or 0)})
+    return token
+
+
+async def tracker_revoke(key: str) -> bool:
+    db = _db_or_none()
+    if db is None or not key: return False
+    r = await db.trackers.delete_many({"key": key})
+    return r.deleted_count > 0
+
+
+async def tracker_by_token(token: str) -> dict | None:
+    db = _db_or_none()
+    if db is None or not token: return None
+    return await db.trackers.find_one({"_id": str(token)})
+
+
+async def tracker_seen(token: str, at, batt=None) -> None:
+    db = _db_or_none()
+    if db is None or not token: return
+    fields = {"last_at": at}
+    if batt is not None:
+        fields["batt"] = batt
+    await db.trackers.update_one({"_id": str(token)}, {"$set": fields})
+
+
+async def trackers_all() -> dict:
+    """key → {token, last_at, batt}: для штатной страницы STAR."""
+    db = _db_or_none()
+    if db is None: return {}
+    out = {}
+    async for d in db.trackers.find({}):
+        out[d["key"]] = {"token": d["_id"], "last_at": d.get("last_at"), "batt": d.get("batt")}
+    return out
 
 
 async def driver_pos_live(name: str) -> dict | None:

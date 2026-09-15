@@ -21,6 +21,7 @@ from config import OWNER_IDS, MANAGER_IDS, TEST_OPERATOR_IDS
 import db
 import os, re, logging
 import secrets
+import geo_watch                 # ключи трекеров: префикс старшего
 # Premium card lists live in api_server (single source of truth).
 from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS, tg_send, tg_delete, BOT_TOKEN
 
@@ -1650,6 +1651,8 @@ async def _staff_payload() -> dict:
         "stars": list(staff.SENIOR_STAR_IDS),
         # Телефоны водителей: кто привязан, кому выдана ссылка (без id).
         "links": _links_view(),
+        # Трекер-приложения: у кого ключ выдан и когда была точка.
+        "trackers": await _trackers_view(),
         # Водители тоже переставляются: список тем же видом, что и районы, —
         # у кого где стоит и от чего отступили.
         "drivers": [{"name": n,
@@ -1767,6 +1770,73 @@ async def handle_drivers_code(request):
     log.info(f"[staff] ссылка для входа: {name} ({request.get('owner_id')})")
     return web.json_response({"ok": True, "name": name, "code": code, "link": link,
                               "until": until.isoformat()}, headers=CORS_HEADERS)
+
+
+# ── трекер-приложение на телефоне (15 сен 2026) ─────────────────────────────
+# Телеграм в фоне точек не шлёт. Traccar Client / OwnTracks — шлют сами, по
+# личному ключу, на /api/track (track_routes). Ключ выдаёт STAR — водителю или
+# старшему; текст с настройками уходит человеку в телеграм из панели.
+TRACK_HOST = (os.getenv("AMBAR_TRACK_HOST") or "ambar-delivery.com").strip()
+
+
+def _track_url() -> str:
+    return f"https://{TRACK_HOST}/api/track"
+
+
+def _track_text(name: str, token: str, url: str) -> str:
+    return (f"Трекер геопозиции AMBAR — {name}\n\n"
+            "1. Установите бесплатное приложение Traccar Client: Android — Play Market, iPhone — App Store.\n"
+            "2. В его настройках впишите:\n"
+            f"   Device identifier (Идентификатор устройства): {token}\n"
+            f"   Server URL (Адрес сервера): {url}\n"
+            "   Frequency (Частота): 30\n"
+            "   Distance (Расстояние): 0, Angle (Угол): 0\n"
+            "   Accuracy (Точность): High (Высокая)\n"
+            "3. Включите переключатель Service status (Служба) вверху.\n"
+            "4. Разрешения: Android — местоположение «Разрешить в любом режиме» и «Точное», батарея — «Без ограничений». "
+            "iPhone — геопозиция «Всегда» и «Точная геопозиция».\n"
+            "5. Приложение не закрывайте свайпом — просто сверните. Оно работает само.")
+
+
+async def _trackers_view() -> dict:
+    """Имя → {issued, last_at, batt}: у кого ключ выдан и когда была точка."""
+    out = {}
+    try:
+        for key, t in (await db.trackers_all()).items():
+            name = key[len(geo_watch.SENIOR_PREFIX):] if key.startswith(geo_watch.SENIOR_PREFIX) else key
+            out[name] = {"issued": True, "last_at": _iso_dt(t.get("last_at")) if t.get("last_at") else "",
+                         "batt": t.get("batt")}
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[staff] трекеры не прочитаны: {e}")
+    return out
+
+
+@require_owner
+async def handle_drivers_tracker(request):
+    """POST {name, revoke?} — ключ трекер-приложения для водителя или старшего
+    STAR: существующий или новый, с адресом и текстом настройки."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = str(body.get("name") or "").strip()
+    if name in staff.SENIOR_STAR_IDS:
+        key, label = geo_watch.SENIOR_PREFIX + name, f"{name} (STAR)"
+    elif next((r for r in staff.roster_rows() if r.get("name") == name), None):
+        key, label = name, name
+    else:
+        return web.json_response({"error": "unknown_driver"}, status=404, headers=CORS_HEADERS)
+    if body.get("revoke"):
+        await db.tracker_revoke(key)
+        log.info(f"[staff] ключ трекера снят: {name} ({request.get('owner_id')})")
+        return web.json_response({"ok": True, "revoked": True, "name": name}, headers=CORS_HEADERS)
+    token = await db.tracker_issue(key, label, request.get("owner_id") or 0)
+    if not token:
+        return web.json_response({"error": "db"}, status=503, headers=CORS_HEADERS)
+    url = _track_url()
+    log.info(f"[staff] ключ трекера выдан: {name} ({request.get('owner_id')})")
+    return web.json_response({"ok": True, "name": name, "id": token, "url": url,
+                              "text": _track_text(name, token, url)}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -4375,7 +4445,8 @@ def setup(app):
     app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
     for _p, _h in (("/api/owner/drivers/add", handle_drivers_add),
                    ("/api/owner/drivers/code", handle_drivers_code),
-                   ("/api/owner/drivers/unlink", handle_drivers_unlink)):
+                   ("/api/owner/drivers/unlink", handle_drivers_unlink),
+                   ("/api/owner/drivers/tracker", handle_drivers_tracker)):
         app.router.add_route("OPTIONS", _p, _h)
         app.router.add_post(_p, _h)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)

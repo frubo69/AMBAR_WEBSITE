@@ -2943,6 +2943,13 @@ def main():
         driver_routes.setup(app)
     except Exception as e:
         log.error(f"driver routes setup failed: {e}")
+    # Точки от трекер-приложений на телефонах (Traccar Client, OwnTracks):
+    # без initData, по личному ключу.
+    try:
+        import track_routes
+        track_routes.setup(app)
+    except Exception as e:
+        log.error(f"track routes setup failed: {e}")
     # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
     try:
         import operator_routes

@@ -271,6 +271,50 @@ def text_senior_on(name: str, gone_sec: float = 0, why: str = "") -> str:
             + (f"\nНе было {_dur(gone_sec)}." if gone_sec else ""))
 
 
+QUIET_SEC = 10 * 60            # телефон молчит: трансляция идёт, а точки нет десять минут
+NAG_EVERY_SEC = 20 * 60        # напоминать водителю не чаще раза в двадцать минут
+
+
+def text_quiet_driver(age_sec: int) -> str:
+    m = int(age_sec // 60)
+    return (f"📍 Телефон {m} мин не присылает геопозицию, а у вас заказ в пути — "
+            "оператор не видит, где вы.\n\n"
+            "Откройте Telegram и сверните его, не закрывая: не смахивайте из списка приложений.\n\n"
+            "Чтобы точки шли сами, когда Telegram свёрнут:\n"
+            "iPhone: Настройки → Telegram → Геопозиция → «Всегда» и «Точная геопозиция» вкл; "
+            "«Обновление контента» вкл; режим энергосбережения выкл.\n"
+            "Android: Настройки → Приложения → Telegram → Разрешения → Местоположение → "
+            "«Разрешить в любом режиме» и «Точное» вкл; Батарея → «Без ограничений».")
+
+
+async def _quiet_nag(name: str, g: dict, utc: datetime, st: dict) -> bool:
+    """Телефон молчит, а у водителя заказ в пути — сказать ему самому.
+
+    Айфон с телеграмом в фоне без движения точек не шлёт вовсе, открытый —
+    шлёт (15 сен 2026). Сообщение в бот водителя заставляет открыть телеграм
+    (точка приходит тут же) и говорит, что настроить, чтобы шли сами. Не
+    чаще раза в двадцать минут и только с заказом на руках: сидящему на базе
+    без заказов напоминать не о чем."""
+    age = g.get("age_sec")
+    if not g.get("stream") or age is None or age < QUIET_SEC:
+        return False
+    last = _dt(st.get("nag_at"))
+    if last and (utc - last).total_seconds() < NAG_EVERY_SEC:
+        return False
+    from driver_routes import _in_route
+    try:
+        route = await _in_route({"name": name})
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[geo-watch] заказы в пути {name} не прочитаны: {e}")
+        return False
+    if not route:
+        return False
+    await db.geo_watch_set(name, {"nag_at": utc})
+    await _driver(name, text_quiet_driver(age))
+    log.info(f"[geo-watch] {name}: телефон молчит {age // 60} мин с заказом в пути — напомнили")
+    return True
+
+
 def unlock_keyboard(key: str) -> dict:
     return {"inline_keyboard": [[{"text": "Открыть доступ",
                                   "callback_data": f"geo:un:{key}"}]]}
@@ -542,6 +586,10 @@ async def tick(now: datetime = None) -> dict:
         ended = bool(d.get("shift_close_at")) or by_clock
 
         if not ended:
+            try:
+                await _quiet_nag(name, g, utc, st)
+            except Exception as e:               # noqa: BLE001
+                log.warning(f"[geo-watch] напоминание {name}: {e}")
             if not g["watch_ok"] and not off_since:
                 # Выключение трансляции обычно уже ушло мгновенным путём
                 # (on_stream); здесь оно ловится, только если бот водителя

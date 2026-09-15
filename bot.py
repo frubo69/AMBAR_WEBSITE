@@ -132,6 +132,18 @@ def _lang_of(user) -> str:
     return "ru" if (getattr(user, "language_code", "") or "").strip().lower().startswith("ru") else "en"
 
 
+def _app_kb(lang: str) -> InlineKeyboardMarkup | None:
+    """Кнопка, открывающая приложение прямо из сообщения. Кнопка меню слева от
+    поля ввода остаётся, но её многие не находят и пишут в чат (владелец,
+    15 сен 2026): кнопка под приветствием и под ответом на любой текст —
+    в одно касание, там, куда человек смотрит."""
+    if not WEBAPP_URL:
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        "🍾 Открыть AMBAR" if lang == "ru" else "🍾 Open AMBAR",
+        web_app=WebAppInfo(url=WEBAPP_URL))]])
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_user.id
     lang = _lang_of(update.effective_user)
@@ -187,7 +199,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"⚡️ Быстрая доставка — привезём в кратчайшие сроки\n"
         f"🥃 Тщательно подобранный ассортимент — только проверенные бренды и редкие позиции\n"
         f"💎 Честные цены — premium качество без лишних наценок\n\n"
-        f"Нажмите *🍾 Заказать* слева от поля ввода 👇"
+        f"Открыть приложение — кнопка ниже 👇"
         if lang == "ru" else
         f"👋 Hey, {name}!\n\n"
         f"Welcome to *AMBAR* — premium spirits delivery, right to your door.\n\n"
@@ -195,10 +207,18 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"⚡️ Fast delivery — we'll be there in no time\n"
         f"🥃 Curated selection — trusted brands and rare finds\n"
         f"💎 Fair pricing — premium quality, no unnecessary markups\n\n"
-        f"Tap *🍾 Order* to the left of the input field 👇"
+        f"Open the app — tap the button below 👇"
     )
-    # Send welcome message
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
+    # Приветствие с кнопкой приложения; его же закрепляем наверху чата, чтобы
+    # кнопка была под рукой всегда, а не только в первом сообщении.
+    welcome = await update.message.reply_text(text, parse_mode="Markdown",
+                                              reply_markup=_app_kb(lang))
+    try:
+        await ctx.bot.unpin_all_chat_messages(chat_id=uid)
+        await ctx.bot.pin_chat_message(chat_id=uid, message_id=welcome.message_id,
+                                       disable_notification=True)
+    except Exception as e:
+        log.debug(f"pin welcome: {e}")
 
     # Upsert user profile in background (doesn't affect UX if it fails)
     try:
@@ -326,9 +346,13 @@ async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await support_inbox.notify_operators(
                 uid, u, body, support_inbox.CHANNEL_MAIN, key)
             lang = _lang_of(update.effective_user)
+            # Часто пишут в чат те, кто не нашёл, как открыть приложение:
+            # обращение принимаем, но тут же даём кнопку.
             await update.message.reply_text(
-                "✅ Приняли! Ответим здесь же."
-                if lang == "ru" else "✅ Got it! We'll reply right here.")
+                ("✅ Приняли! Ответим здесь же.\n\nЗаказать можно в приложении — кнопка ниже 👇"
+                 if lang == "ru" else
+                 "✅ Got it! We'll reply right here.\n\nTo order, open the app — button below 👇"),
+                reply_markup=_app_kb(lang))
             log.info(f"[support] main-bot user={uid}")
             return
         except Exception as e:

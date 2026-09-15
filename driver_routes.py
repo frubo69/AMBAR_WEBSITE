@@ -161,7 +161,22 @@ def _is_prepaid(o: dict) -> bool:
 
 FX_SYM = {"USD": "$", "EUR": "€", "GBP": "£", "RUB": "₽", "TRY": "₺", "CNY": "¥",
           "KZT": "₸", "UAH": "₴", "INR": "₹", "JPY": "¥", "KRW": "₩", "GEL": "₾",
-          "PLN": "zł", "CHF": "₣"}
+          "PLN": "zł", "CHF": "₣", "SAR": "SAR"}
+
+# Валюты, которыми берут оплату с клиента, и курс приёма — дирхамов за единицу.
+# Фиксированные, не рыночные (владелец, 15 сен 2026: «это те цены, по которым
+# мы принимаем от клиентов»). Курс в профиле, что идёт в зарплаты, — свой,
+# рыночный, и здесь не участвует.
+FX_TAKE = [
+    {"code": "USD", "name": "Доллар США", "rate": 3.5},
+    {"code": "EUR", "name": "Евро", "rate": 4.0},
+    {"code": "GBP", "name": "Фунт стерлингов", "rate": 4.5},
+    {"code": "SAR", "name": "Риал", "rate": 1.0},
+]
+
+
+def fx_take_list() -> list:
+    return [{**r, "sym": FX_SYM.get(r["code"], r["code"])} for r in FX_TAKE]
 
 
 def _fx_view(o: dict) -> dict | None:
@@ -1376,6 +1391,8 @@ async def handle_orders(request):
     return web.json_response({
         "day": day, "active": active, "done": done,
         "total_aed": sum(x["total"] for x in done),
+        # Чем берут с клиента и по какому курсу — для меню «Валютой» на карточке.
+        "fx_take": fx_take_list(),
         # Скрытый режим едет вместе с заказами, а не только при запуске: его
         # может включить старший с планшета, и ждать перезапуска приложения в
         # такой момент нельзя. Опрос идёт каждые пять секунд — этого хватает.
@@ -1554,17 +1571,13 @@ async def handle_fx(request):
         await db.update_order(oid, pay_fx=None)
         log.info(f"[driver] {me['name']} #{oid}: расчёт снова в дирхамах")
         return web.json_response({"ok": True, "pay_fx": None}, headers=CORS_HEADERS)
-    import rates as _rates
-    try:
-        d = await _rates.get_rates()
-    except Exception as e:                       # noqa: BLE001
-        log.warning(f"[driver] курсы не прочитаны: {e}")
-        d = {"rates": []}
-    row = next((r for r in (d.get("rates") or []) if r.get("code") == code), None)
-    rate = row and (row.get("cash_aed") or row.get("aed"))
-    if not rate:
-        return web.json_response({"error": "no_rate"}, status=503, headers=CORS_HEADERS)
-    fx = {"code": code, "name": row.get("name") or code, "rate": float(rate),
+    # Курс приёма — фиксированный из FX_TAKE, а не рыночный: клиенту называют
+    # ровно то число, по которому у нас берут.
+    row = next((r for r in FX_TAKE if r["code"] == code), None)
+    if not row:
+        return web.json_response({"error": "no_rate"}, status=400, headers=CORS_HEADERS)
+    rate = row["rate"]
+    fx = {"code": code, "name": row["name"], "rate": float(rate),
           "at": datetime.now(timezone.utc).isoformat(), "by": me["name"]}
     await db.update_order(oid, pay_fx=fx)
     o["pay_fx"] = fx

@@ -6615,10 +6615,32 @@ let FX_PICK = null;
 function fxOpen(oid){
   const o = _ordById(oid); if(!o) return;
   FX_PICK = oid; FX.oid = oid;
-  FXD_Q = ''; FXD_F = 'all'; FXD_OPEN = '';
   renderOrders(); window.scrollTo({top: 0});
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
-  fxdLoad();
+}
+// Страница выбора валюты для заказа: только те валюты, которыми берут с
+// клиента, и курс приёма — фиксированный, с сервера (владелец, 15 сен 2026).
+// Рыночный курс из профиля здесь не показываем: он для зарплат.
+function fxTakeHtml(){
+  const o = _ordById(FX_PICK) || {}, sel = (o.pay_fx || {}).code || '';
+  const rows = (ORDERS && ORDERS.fx_take) || [];
+  const total = +o.total || 0;
+  return `<div class="fxh">
+      <button class="fxh-b" onclick="fxClose()" aria-label="Назад">${svg(ICO.back, 16)}</button>
+      <b class="fxh-t">Оплата валютой</b>
+      <span class="fxh-d">${fmt(total)} AED</span>
+      <i class="fxh-s">Курс приёма — дирхамов за единицу</i>
+    </div>
+    <div id="pfFxList">${rows.length ? rows.map(r => `
+      <div class="fxr${sel === r.code ? ' sel' : ''}">
+        <button class="fxr-h" onclick="fxPick('${esc(r.code)}')">
+          ${fxdFlag(r)}
+          <span class="fxr-b"><b>${esc(r.code)}</b><i>${esc(r.name || r.code)}</i></span>
+          <span class="fxr-v"><b>${String(r.rate).replace('.', ',')} AED</b><i>${total ? 'к оплате ' + fxFmt(Math.round(total / r.rate * 100) / 100, r.sym) : ''}</i></span>
+          <em class="fxr-c">${svg(ICO.chevR, 13)}</em>
+        </button>
+      </div>`).join('') : '<div class="pf-none">Список валют не загрузился</div>'}</div>
+    ${sel ? `<div class="dv-sp"></div><div class="dv-foot"><button class="btn btn-sec" onclick="fxPick('')">Считать в дирхамах</button></div>` : ''}`;
 }
 function fxClose(){ FX_PICK = null; FX.oid = null; if(TAB === 'orders') renderOrders(); }
 // «Считать в дирхамах» из меню оплаты — снять валюту с заказа.
@@ -6667,7 +6689,7 @@ function renderOrders(){
   const box = document.getElementById('body');
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
-  if(FX_PICK){ box.innerHTML = profRatesHtml(); return; }
+  if(FX_PICK){ box.innerHTML = fxTakeHtml(); return; }
   if(ORD_HIST){ renderHistory(); return; }   // история над заказами — как в профиле
   if(!active.length){
     box.innerHTML = `<div class="oe">

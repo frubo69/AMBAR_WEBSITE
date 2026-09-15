@@ -292,7 +292,8 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .fav-notify-btn svg{width:13px;height:13px;opacity:.7;flex-shrink:0}
 .pcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
 .pcard:active{transform:scale(.97)}
-.pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
+/* Фото во всю ширину карточки, квадрат (владелец, 15 сен 2026): картинки 900×900, поля по бокам и мелкий контейнер делали их разными и «обрезанными» */
+.pimg-box{aspect-ratio:1/1;min-height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:0;position:relative;overflow:hidden}
 .pimg-box::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(201,169,110,.11),transparent);transform:translateX(-100%);animation:skSweep 2s linear infinite;z-index:0;pointer-events:none}
 .pimg-box.loaded::after{display:none}
 /* Снимка ещё нет. Раньше на его месте стояла эмодзи-бутылка: она рендерится
@@ -313,7 +314,7 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .sk-block{position:relative;overflow:hidden;background:rgba(255,255,255,.05);border-radius:7px}
 .sk-block::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(201,169,110,.14),transparent);transform:translateX(-100%);animation:skSweep 2s linear infinite}
 .pts-row.sk{pointer-events:none}
-.pimg{max-height:128px;max-width:90%;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(0,0,0,.7));position:relative;z-index:1}
+.pimg{width:100%;height:100%;object-fit:cover;position:relative;z-index:1}
 .pbadge{position:absolute;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:6px;font-weight:700;z-index:2}
 .pbadge.oos{left:8px;top:8px;background:rgba(0,0,0,.7);border:1px solid var(--border2);color:var(--muted)}
 .pimg-box.oos .pimg{filter:grayscale(1) opacity(.55) drop-shadow(0 6px 20px rgba(0,0,0,.7))}

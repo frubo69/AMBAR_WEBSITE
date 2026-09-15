@@ -3411,6 +3411,18 @@ async def shift_opens_for_day(day: str) -> dict:
     return {d["district"]: d async for d in cur}
 
 
+async def shift_opened_after(at, district: str = "") -> bool:
+    """Открывал ли оператор смену после момента at (района, если задан).
+
+    Нужно водителю после закрытия смены: пока новую никто не открыл, ему
+    показывают итоги закрытой, а «открыть снова» нет (владелец, 15 сен 2026)."""
+    db = _db_or_none()
+    if db is None or not at: return False
+    q = {"district": {"$ne": "*"}, "opened_at": {"$gt": at}}
+    if district: q["district"] = district
+    return bool(await db.shift_opens.find_one(q, {"_id": 1}))
+
+
 async def shift_open_drop(day: str, district: str) -> bool:
     """Убрать отметку об открытии — на случай ошибки старшего."""
     db = _db_or_none()
@@ -4233,6 +4245,18 @@ async def get_driver_days_range(day_from: str, day_to: str, *, test=False) -> li
     cur = db.driver_days.find({"day": {"$gte": day_from, "$lte": day_to},
                                **_test_driver_filt(test)}, {"_id": 0})
     return await cur.to_list(length=5000)
+
+
+async def driver_last_closed(driver: str, before: str, days: int = 14) -> dict | None:
+    """Последняя закрытая смена водителя до дня before (не включая), не
+    старше days суток: {day, closed_at} или None."""
+    db = _db_or_none()
+    if db is None: return None
+    since = (datetime.strptime(before, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
+    d = await db.driver_days.find_one(
+        {"driver": driver, "day": {"$lt": before, "$gte": since}, "shift_close_at": {"$ne": None}},
+        {"_id": 0, "day": 1, "shift_close_at": 1}, sort=[("day", -1)])
+    return {"day": d["day"], "closed_at": d["shift_close_at"]} if d else None
 
 
 async def save_driver_day(day: str, driver: str, fields: dict):

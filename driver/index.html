@@ -1925,6 +1925,9 @@ body.xp-on{background:#070A12}
 
 /* Экран задачи: список позиций поверх всего, со своей шапкой и своим подвалом */
 .sup-scr{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;background:var(--bg)}
+/* Итоги закрытой смены открываются с экрана замка (тот же z-index, но позже
+   в DOM) — страница должна лечь поверх него. */
+#shsScr{z-index:96}
 /* ── Связь ──────────────────────────────────────────────────────────────────
    Отдельное окно, а не вкладка: звонок случается посреди любого дела, и
    уходить ради него из заказа никуда не надо — окно ложится поверх и снимается
@@ -2665,6 +2668,13 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .shs-ok.on .shs-box{background:var(--gold);border-color:var(--gold);color:#000}
 .shs-ok-t b{display:block;font-size:14.5px;font-weight:700}
 .shs-ok-t i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:1px}
+/* итоги после закрытия: вместо галочки — «смена закрыта», ниже «Назад» */
+.shs-done{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border-radius:15px;
+  border:1px solid rgba(61,220,132,.35);background:rgba(61,220,132,.07);color:var(--text);text-align:left}
+.shs-done-i{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1.5px solid #3ddc84;display:flex;
+  align-items:center;justify-content:center;color:#3ddc84;background:rgba(61,220,132,.12)}
+.shs-done-t b{display:block;font-size:14.5px;font-weight:700}
+.shs-done-t i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:1px}
 /* ── Машина на мойке ──────────────────────────────────────────────────────
    Камера во весь экран, поверх неё маска: снаружи контура темнее, внутри —
    живой кадр. Контур один — машина спереди — и одна кнопка спуска. После
@@ -5700,15 +5710,6 @@ function shPaint(){
   }
   more.hidden = true;
 
-  const shut = SH.closed;
-  // Иллюстрация в том же стиле, что у «геопозиция не транслируется»: старый
-  // значок в квадрате выбивался из экрана (владелец, 15 сен 2026).
-  ico.innerHTML = `<img class="shscr-img" src="img/${shut ? 'shift-done' : 'shift-off'}.png?v=1" alt="">`;
-  document.getElementById('shT').textContent = shut ? 'Смена закрыта' : 'Смена не открыта';
-  document.getElementById('shS').textContent = shut
-    ? `Закрыли в ${hhmm(SH.closed_at)}. Заказы больше не придут — если это ошибка, откройте снова.`
-    : 'Пока смена закрыта, заказы не приходят и отметить ничего нельзя';
-
   const marked = SH.working === true, geoOn = !!geo.ok;
   // Та же карточка, что у «геопозиция не транслируется» (макет владельца):
   // заголовок с «i», нумерованные шаги с плитками, плашка с молнией.
@@ -5719,6 +5720,39 @@ function shPaint(){
       <span class="gs-ic">${svgThin(ic, w)}</span>
       <span class="gs-b"><b>${t}</b><i>${sub}</i>${extra || ''}</span>
     </div>`;
+  const shut = !!SH.after_close;
+  // Иллюстрация в том же стиле, что у «геопозиция не транслируется»: старый
+  // значок в квадрате выбивался из экрана (владелец, 15 сен 2026).
+  ico.innerHTML = `<img class="shscr-img" src="img/${shut ? 'shift-done' : 'shift-off'}.png?v=1" alt="">`;
+  document.getElementById('shT').textContent = shut ? 'Смена закрыта' : 'Смена не открыта';
+  document.getElementById('shAlt').classList.remove('solo');
+  go.style.display = '';
+  if(shut){
+    // Закрытую смену заново не открыть (владелец, 15 сен 2026: «не давай
+    // водителю переоткрыть смену»). До открытия следующей оператором — только
+    // итоги; кнопка внизу ведёт на них. Сутки к утру могли смениться —
+    // тогда в подписи день закрытия.
+    const at = SH.report_closed_at || SH.closed_at;
+    const when = SH.report_day && SH.report_day !== SH.day
+      ? `${profDayT(SH.report_day)} в ${hhmm(at)}` : `в ${hhmm(at)}`;
+    document.getElementById('shS').textContent =
+      `Закрыли ${when}. Заказы больше не придут — следующую смену откроет оператор.`;
+    list.innerHTML = `
+      <div class="gh">
+        <span class="gh-i">${svgThin(ICO.info, 29)}</span>
+        <span class="gh-b"><b>Пока смена закрыта</b><i>Итоги можно смотреть до открытия следующей.</i></span>
+      </div>
+      <div class="gs">
+        ${step(1, true, ICO.clock, 30, 'Смена закрыта', `${when[0].toUpperCase()}${when.slice(1)} — заказов больше не будет.`)}
+        ${step(2, false, ICO.user, 30, 'Оператор откроет новую смену', 'Тогда снова появится<br>кнопка «Открыть смену».')}
+      </div>
+      <div class="gn">${svgThin(LOCK_ICO.bolt, 28)}<span>Открыть смену заново нельзя —<br>только посмотреть итоги.</span></div>`;
+    go.onclick = () => shsOpen(true);
+    go.disabled = false;
+    go.textContent = 'Итоги смены';
+    return;
+  }
+  document.getElementById('shS').textContent = 'Пока смена закрыта, заказы не приходят и отметить ничего нельзя';
   // Шаг про геопозицию — только когда трансляции нет (владелец, 15 сен 2026):
   // если она идёт и приложение это видит, требовать нечего, и шага нет.
   const ready = marked && geoOn;
@@ -5728,26 +5762,20 @@ function shPaint(){
           : 'Оператор отмечает бригаду<br>в начале смены.')];
   if(!geoOn) steps.push(step(2, false, TUT_ICO.pin, 32, 'Трансляция геопозиции',
           'Включить хватит один раз —<br>она не кончится сама.', _geoWay()));
-  const sub = shut ? 'Условия те же, что утром.'
-            : geoOn ? 'Нужна отметка оператора.' : 'Два шага — и кнопка загорится.';
-  const note = shut ? 'Заказы больше не придут.<br>Ошиблись — откройте снова.'
-             : ready ? 'Всё готово —<br>нажмите «Открыть смену».'
+  const sub = geoOn ? 'Нужна отметка оператора.' : 'Два шага — и кнопка загорится.';
+  const note = ready ? 'Всё готово —<br>нажмите «Открыть смену».'
              : geoOn ? 'Оператор отметит —<br>кнопка «Открыть смену» загорится.'
              : 'Оба шага выполнены —<br>кнопка «Открыть смену» загорится.';
   list.innerHTML = `
     <div class="gh">
       <span class="gh-i">${svgThin(ICO.info, 29)}</span>
-      <span class="gh-b"><b>${shut ? 'Открыть смену снова' : 'Что нужно для смены'}</b><i>${sub}</i></span>
+      <span class="gh-b"><b>Что нужно для смены</b><i>${sub}</i></span>
     </div>
     <div class="gs">${steps.join('')}</div>
     <div class="gn">${svgThin(LOCK_ICO.bolt, 28)}<span>${note}</span></div>`;
-  // Закрытую смену можно открыть заново — условия те же. Прятать кнопку
-  // значило бы отправлять человека звонить оператору из-за промаха пальцем.
-  go.style.display = '';
   go.onclick = shOpen;
-  document.getElementById('shAlt').classList.remove('solo');
   go.disabled = !(marked && geo.ok);
-  go.textContent = shut ? 'Открыть смену снова' : 'Открыть смену';
+  go.textContent = 'Открыть смену';
 }
 
 function _hleft(m){
@@ -5769,6 +5797,7 @@ async function shOpen(){
     const err = (e.payload || {}).error;
     if(e.payload) SH = {...SH, ...(e.payload.geo ? {geo: e.payload.geo} : {})};
     toast(err === 'no_geo' ? 'Сначала включите трансляцию геопозиции'
+        : err === 'after_close' ? 'Смена закрыта — следующую откроет оператор'
         : err === 'not_marked' ? 'Оператор ещё не отметил вас на смене'
         : 'Не получилось — повторите', 'err');
     await shLoad();
@@ -5827,10 +5856,13 @@ async function shClose(){
 // сегодняшнего дня: сколько денег должно быть на руках, отдельно и заметно —
 // чай операторов; галочка «всё совпадает» — и только тогда кнопка активна».
 // Страница поверх всего, как приёмка; кнопка внизу не пропадает — ждёт галочку.
-let SHS = null, SHS_OK = false, SHS_AT = 0, SHS_BUSY = false;
+// SHS_VIEW — просмотр после закрытия (владелец, 15 сен 2026): те же итоги,
+// но без галочки и кнопки; за какой день — report_day из состояния смены.
+let SHS = null, SHS_OK = false, SHS_AT = 0, SHS_BUSY = false, SHS_VIEW = false;
 function shsShown(){ return document.getElementById('shsScr').classList.contains('show'); }
-function shsOpen(){
-  SHS = null; SHS_OK = false;
+function shsQ(){ return SHS_VIEW && SH && SH.report_day ? `?day=${encodeURIComponent(SH.report_day)}` : ''; }
+function shsOpen(view){
+  SHS = null; SHS_OK = false; SHS_VIEW = !!view;
   document.getElementById('shsScr').classList.add('show');
   shsPaint();
   shsLoad();
@@ -5841,7 +5873,7 @@ async function shsLoad(){
   if(SHS_BUSY) return;
   SHS_BUSY = true;
   try{
-    const d = await drvApi.drvFetch('/api/driver/shift/summary');
+    const d = await drvApi.drvFetch('/api/driver/shift/summary' + shsQ());
     SHS = d; SHS_AT = Date.now();
     if(shsShown()) shsPaint();
   }catch(e){
@@ -5856,7 +5888,7 @@ async function shsRefresh(){
   if(!shsShown() || SHS_BUSY || !SHS || Date.now() - SHS_AT < 10000) return;
   SHS_BUSY = true;
   try{
-    const d = await drvApi.drvFetch('/api/driver/shift/summary');
+    const d = await drvApi.drvFetch('/api/driver/shift/summary' + shsQ());
     SHS_AT = Date.now();
     if(JSON.stringify(d) !== JSON.stringify(SHS)){ SHS = d; if(shsShown()) shsPaintMid(); }
   }catch(e){}
@@ -5866,6 +5898,16 @@ function shsPaint(){
   const m = SHS, s = document.getElementById('shsS');
   if(s) s.textContent = m ? `${profDayT(m.day)}${m.opened_at ? ' · смена с ' + hhmm(m.opened_at) : ''}` : '';
   shsPaintMid();
+  if(SHS_VIEW){
+    const at = (m && m.closed_at) || (SH && (SH.report_closed_at || SH.closed_at)) || '';
+    document.getElementById('shsBot').innerHTML = `
+      <div class="shs-done">
+        <span class="shs-done-i">${svg(ICO.ok, 14)}</span>
+        <span class="shs-done-t"><b>Смена закрыта${at ? ' в ' + hhmm(at) : ''}</b><i>следующую откроет оператор — тогда появится кнопка «Открыть смену»</i></span>
+      </div>
+      <button class="shscr-alt" onclick="shsBack()">Назад</button>`;
+    return;
+  }
   document.getElementById('shsBot').innerHTML = `
     <button class="shs-ok${SHS_OK ? ' on' : ''}" id="shsOk" onclick="shsAgree()">
       <span class="shs-box">${svg(ICO.ok, 14)}</span>
@@ -5928,7 +5970,10 @@ async function shsGo(){
   if(!SHS_OK || !SHS) return;
   const go = document.getElementById('shsGo'); if(go) go.disabled = true;
   await shCloseGo();
-  if(SH && SH.closed) shsBack(); else if(go) go.disabled = !SHS_OK;
+  // Закрылась — страница остаётся, но уже как отчёт: без галочки и кнопки,
+  // открыть заново нельзя (владелец, 15 сен 2026).
+  if(SH && SH.closed){ SHS_VIEW = true; shsPaint(); }
+  else if(go) go.disabled = !SHS_OK;
 }
 
 async function shCloseGo(){
@@ -7972,6 +8017,22 @@ function renderShift(){
         {ico: ICO.clock, t: 'Ваша смена ещё не закрыта',
          s: ready ? 'Нажмите кнопку ниже — на сегодня всё' : 'Сначала выполните шаги выше'});
     btn = `<button class="st-go" ${ready ? '' : 'disabled'} onclick="shClose()">Закрыть смену</button>`;
+  }else if(SH.after_close){
+    // Закрытую смену заново не открыть (владелец, 15 сен 2026): итоги —
+    // пока оператор не откроет следующую.
+    const at = SH.report_closed_at || SH.closed_at;
+    const when = SH.report_day && SH.report_day !== SH.day
+      ? `${profDayT(SH.report_day)} в ${hhmm(at)}` : `в ${hhmm(at)}`;
+    steps = step(1, 'ok', 'Смена закрыта', 'На сегодня всё — заказы больше не придут',
+        ['ok', 'Закрыта'],
+        {ico: ICO.clock, t: `Закрыли ${when}`, s: 'Открыть заново нельзя'})
+      + step(2, 'now', 'Итоги смены', 'Наличные на руках, чай операторов, заказы и расходы',
+        ['ok', 'Готово'],
+        {ico: ICO.note, t: 'Посмотреть итоги', s: 'Остаются, пока оператор не откроет новую смену', go: 'shsOpen(true)'})
+      + step(3, '', 'Оператор откроет новую смену', 'Следующую смену открывает оператор',
+        ['wait', 'Ожидание'],
+        {ico: ICO.user, t: 'Новая смена ещё не открыта', s: 'Тогда снова появится кнопка «Открыть смену»'});
+    btn = `<button class="st-go" onclick="shsOpen(true)">Итоги смены</button>`;
   }else{
     const marked = SH.working === true, g = !!geo.ok, canOpen = marked && g;
     steps = step(1, marked ? 'ok' : 'now', 'Отметка оператора',
@@ -7988,7 +8049,7 @@ function renderShift(){
       + step(3, canOpen ? 'now' : '', SH.closed ? 'Открыть смену снова' : 'Открыть смену',
         'Когда оператор отметил и трансляция идёт',
         SH.closed ? ['ok', 'Закрыта'] : ['wait', 'Ожидание'],
-        SH.closed ? {ico: ICO.clock, t: `Смена закрыта в ${hhmm(SH.closed_at)}`, s: 'Заказы больше не придут. Ошиблись — откройте снова'}
+        SH.closed ? {ico: ICO.clock, t: `Смена закрыта в ${hhmm(SH.closed_at)}`, s: 'Оператор открыл новую смену — можно открыть'}
                   : {ico: ICO.clock, t: 'Смена не открыта', s: 'Пока закрыта, заказы не приходят и отметить ничего нельзя'});
     btn = `<button class="st-go" ${canOpen ? '' : 'disabled'} onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`;
   }

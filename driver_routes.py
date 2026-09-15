@@ -395,6 +395,45 @@ async def _geo_for(me: dict, since=None) -> dict:
     return geo
 
 
+def _as_dt(v):
+    """Момент из базы: datetime как есть, строка ISO — в datetime (старые записи)."""
+    if hasattr(v, "isoformat"):
+        return v
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+async def _after_close(me: dict, day: str, d: dict) -> dict | None:
+    """Смена закрыта, а новую оператор ещё не открыл — водителю только итоги.
+
+    Владелец, 15 сен 2026: «не давай водителю переоткрыть смену, можно только
+    просматривать отчёт, пока оператор не откроет новую смену». Считается по
+    событиям, а не по суткам: закрыл вечером, а утром смену района ещё не
+    открыли — он всё ещё видит вчерашние итоги. Возвращает {day, closed_at}
+    той смены или None, если запрета нет."""
+    if d.get("shift_open_at") and not d.get("shift_close_at"):
+        return None                                   # смена идёт
+    if d.get("shift_close_at"):
+        last = {"day": day, "closed_at": d["shift_close_at"]}
+    else:
+        try:
+            last = await db.driver_last_closed(me["name"], before=day)
+        except Exception as e:                         # noqa: BLE001
+            log.warning(f"[driver] последняя смена {me['name']} не прочиталась: {e}")
+            return None
+    if not last:
+        return None
+    at = _as_dt(last["closed_at"])
+    try:
+        opened = at is None or await db.shift_opened_after(at, me.get("district") or "")
+    except Exception as e:                             # noqa: BLE001
+        log.warning(f"[driver] открытие смены после закрытия не прочиталось: {e}")
+        opened = True                                  # не читается — не запираем
+    return None if opened else last
+
+
 async def _shift_view(me: dict) -> dict:
     day = _biz_day()
     d = await db.get_driver_day(day, me["name"]) or {}
@@ -402,6 +441,7 @@ async def _shift_view(me: dict) -> dict:
     must = [] if _tq(me) else _must_left(d)
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
     route = await _in_route(me) if opened and not closed else []
+    after = await _after_close(me, day, d)
     # День района закрыт оператором — значит заказов сегодня больше не будет, и
     # неотвеченные расходы превращаются из «успею» в «держу всех». Водителю про
     # это надо сказать, а не ждать, пока он сам зайдёт на вкладку.
@@ -417,12 +457,18 @@ async def _shift_view(me: dict) -> dict:
         "day_closed_at": _iso_at(закрыт_в) if закрыт_в else "",
         "opened": bool(opened), "opened_at": _iso_at(opened),
         "closed": bool(closed), "closed_at": _iso_at(closed),
+        # Смена закрыта, новой оператор не открывал: «открыть снова» нет,
+        # итоги закрытой (report_day) смотреть можно.
+        "after_close": bool(after),
+        "report_day": after["day"] if after else "",
+        "report_closed_at": _iso_at(after["closed_at"]) if after else "",
         "geo": geo, "must": must,
         # Куда включать трансляцию: приложение ведёт в бот геопозиции.
         "geo_bot": await __import__("geo_watch").geo_bot_link(),
         "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
         "in_route": route,
-        "can_open": (d.get("working") is True or _tq(me)) and geo["ok"] and not opened,
+        "can_open": (d.get("working") is True or _tq(me)) and geo["ok"]
+                    and not (opened and not closed) and not after,
         # Смену закрывает сам водитель, когда отдал последний заказ и ответил
         # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
         # висела бы до утра, а «закрыть» упиралось в чужое действие.
@@ -463,7 +509,7 @@ async def handle_shift(request):
     return web.json_response(await _shift_view(request["driver"]), headers=CORS_HEADERS)
 
 
-async def _shift_summary(me: dict) -> dict:
+async def _shift_summary(me: dict, day: str | None = None) -> dict:
     """Итоги смены перед закрытием (владелец, 14 сен 2026): сколько наличных
     должно быть на руках, отдельно и заметно — чай, который операторы
     заработали с заказов, и остальное по смене одной страницей. Считается с
@@ -471,8 +517,11 @@ async def _shift_summary(me: dict) -> dict:
     первой быть не должно.
 
     Наличные на руках = взято наличными за заказы (по расчёту, если
-    рассчитывались не ровно) − расходы дня + приход (вернули/должны)."""
-    day = _biz_day()
+    рассчитывались не ровно) − расходы дня + приход (вернули/должны).
+
+    day — за какой день: после закрытия водитель смотрит итоги закрытой смены,
+    пока оператор не открыл новую, а сутки к утру уже могли смениться."""
+    day = day or _biz_day()
     d = await db.get_driver_day(day, me["name"]) or {}
     since, until = bizday.window_utc(day, day)
     try:
@@ -533,6 +582,7 @@ async def _shift_summary(me: dict) -> dict:
     gross = sum(v["aed"] for k, v in pay.items() if k != "free")
     return {
         "day": day, "opened_at": _iso_at(d.get("shift_open_at")),
+        "closed_at": _iso_at(d.get("shift_close_at")),
         "on_hand": int(round(cash_taken - spent + got)),
         "cash_taken": int(round(cash_taken)), "spent": spent, "got": got,
         "tips": tips, "tips_cash": tips_cash, "tips_other": tips - tips_cash,
@@ -547,7 +597,14 @@ async def _shift_summary(me: dict) -> dict:
 
 @require_driver
 async def handle_shift_summary(request):
-    return web.json_response(await _shift_summary(request["driver"]), headers=CORS_HEADERS)
+    """Итоги смены. ?day= — за другой день, но не из будущего: после
+    закрытия смены водитель смотрит её итоги и назавтра, пока оператор не
+    открыл новую. Чужого здесь не бывает — имя из подписи телеграма."""
+    day = str(request.query.get("day") or "")[:10]
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or day > _biz_day():
+        day = ""
+    return web.json_response(await _shift_summary(request["driver"], day or None),
+                             headers=CORS_HEADERS)
 
 
 @require_driver
@@ -558,6 +615,13 @@ async def handle_shift_open(request):
     d = await db.get_driver_day(day, me["name"]) or {}
     if d.get("shift_open_at") and not d.get("shift_close_at"):
         return web.json_response({"error": "already_open"}, status=409, headers=CORS_HEADERS)
+    # Закрытую смену заново не открыть, пока оператор не откроет следующую
+    # (владелец, 15 сен 2026). Проверка на сервере: кнопки в приложении нет,
+    # но старая версия приложения или прямой запрос её бы обошли.
+    after = await _after_close(me, day, d)
+    if after:
+        return web.json_response({"error": "after_close", "day": after["day"]},
+                                 status=409, headers=CORS_HEADERS)
     if d.get("working") is not True and not _tq(me):
         return web.json_response({"error": "not_marked"}, status=409, headers=CORS_HEADERS)
     geo = await _geo_for(me)

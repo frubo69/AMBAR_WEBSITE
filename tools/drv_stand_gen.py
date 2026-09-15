@@ -146,8 +146,8 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     return taken ? {mine: [], free: [], extra: [], taken: [{...t, driver: 'Фарух'}]} : {mine: [], free: [t], extra: [], taken: []};
   }
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
-  if(path === '/api/driver/shift/summary') return ST_SUM;
-  if(path === '/api/driver/shift/close' && m === 'POST'){ stLog('API POST ' + path); return {...ST_SHIFT, closed: true, closed_at: new Date().toISOString(), can_close: false, in_route: [], must: []}; }
+  if(path.split('?')[0] === '/api/driver/shift/summary') return {...ST_SUM, ...(ST_SHIFT.after_close ? {closed_at: ST_SHIFT.report_closed_at} : {})};   // ?day= — просмотр закрытой
+  if(path === '/api/driver/shift/close' && m === 'POST'){ stLog('API POST ' + path); const at = new Date().toISOString(); return {...ST_SHIFT, closed: true, closed_at: at, after_close: true, report_day: ST_SHIFT.day, report_closed_at: at, can_close: false, can_open: false, in_route: [], must: []}; }
   if(path === '/api/driver/shift') return ST_SHIFT;
   if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;
   if(path === '/api/driver/rates') return ST_FX;
@@ -201,7 +201,9 @@ const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _ag
 if(ST_Q.get('route')) ST_SHIFT.in_route = ['AMB82300EB5'];
 if(ST_Q.get('must')){ ST_SHIFT.must = ['fuel', 'wash']; ST_SHIFT.must_names = ['Бензин', 'Мойка']; }
 if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
-if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); }
+if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); ST_SHIFT.after_close = true; ST_SHIFT.report_day = ST_SHIFT.day; ST_SHIFT.report_closed_at = ST_SHIFT.closed_at; ST_SHIFT.can_open = false; }
+// ?prevday=1 — сутки сменились, вчерашняя смена закрыта, оператор новую ещё не открыл
+if(ST_Q.get('prevday')){ ST_SHIFT.opened = false; ST_SHIFT.closed = false; ST_SHIFT.after_close = true; ST_SHIFT.report_day = '2026-09-10'; ST_SHIFT.report_closed_at = '2026-09-10T22:40:00+04:00'; ST_SHIFT.can_open = false; }
 if(ST_Q.get('nogeo')){ ST_SHIFT.geo.ok = false; ST_SHIFT.geo.stream = false; }
 if(ST_Q.get('dayclosed')){ ST_SHIFT.day_closed = true; ST_SHIFT.day_closed_at = _agoIso(12); }
 async function standBoot(){
@@ -245,7 +247,7 @@ async function standBoot(){
   if(ST_Q.get('open') && ST_Q.get('open').indexOf('exp:') === 0){ await new Promise(r => setTimeout(r, 150)); expGo(ST_Q.get('open').slice(4)); }
   if(ST_Q.get('open') === 'orders'){ await new Promise(r => setTimeout(r, 150)); profOrders(); }
   if(ST_Q.get('open') === 'ordhist'){ await new Promise(r => setTimeout(r, 150)); ordHist(); }   // история из ленты заказов
-  if(ST_Q.get('open') === 'shs'){ await new Promise(r => setTimeout(r, 150)); shsOpen(); }        // итоги смены перед закрытием
+  if(ST_Q.get('open') === 'shs'){ await new Promise(r => setTimeout(r, 150)); shsOpen(!!(ST_Q.get('shclosed') || ST_Q.get('prevday'))); }   // итоги смены: перед закрытием или просмотр после
   if(ST_Q.get('open') === 'supx'){ await new Promise(r => setTimeout(r, 300)); supOpen('s2', 'jvc'); }   // задача доп. заявки
   if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); }
   if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }

@@ -19,7 +19,13 @@ PROBES = [{"_id": 11, "name": "Худоба", "mid": 5}, {"_id": 22, "name": "Ф
 GONE, CLEARED, STREAM = [], [], []
 async def probe_all(): return list(PROBES)
 async def probe_clear(chat): CLEARED.append(chat)
-async def pos_all(names): return [dict(POS[n]) for n in names if n in POS]
+async def pos_all(names):
+    # Как в бою (db.driver_pos_all): срок и время — строками, не datetime.
+    out = []
+    for n in names:
+        if n in POS:
+            r = dict(POS[n]); r["at"] = str(r.get("at") or ""); r["until"] = str(r.get("until") or ""); out.append(r)
+    return out
 async def pos_stop(name, at=None): GONE.append(name); POS[name].pop("until", None); POS[name]["stopped_at"] = at or now
 async def on_stream(name, on, now=None): STREAM.append((name, on)); return True
 geo_bot.db.geo_probe_all = probe_all; geo_bot.db.geo_probe_clear = probe_clear

@@ -175,6 +175,24 @@ def _n(name: str) -> str:
     return out
 
 
+async def old_stream_end(key: str, chat, mid) -> bool:
+    """Правка без срока пришла по сообщению, которое трансляцию уже не ведёт.
+
+    Включил заново — телеграм гасит прежнее сообщение той же правкой, что и
+    выключение. Гасить по ней новую трансляцию нельзя: человек только что
+    включил, а его уже «выключили», приложение просит точку снова, он
+    включает опять — и так по кругу (тест-водитель, 15 сен 2026: включил
+    10:33 — «выключил» через 17 секунд, включил 10:36 — то же самое)."""
+    try:
+        cur = await db.driver_pos_live(key)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[geo-watch] текущая трансляция {key} не прочиталась: {e}")
+        return False
+    if not cur:
+        return False                             # старая запись без сообщения — как раньше
+    return int(cur.get("mid") or 0) != int(mid or 0) or int(cur.get("chat") or 0) != int(chat or 0)
+
+
 def text_stream_off(name: str, opened: bool) -> str:
     tail = "Оператор его не видит." if opened else "Смена у него не открыта."
 
@@ -397,24 +415,33 @@ async def _seniors_tick(now: datetime, utc: datetime, day: str, out: dict) -> No
     for name in list(staff.SENIOR_STAR_IDS):
         key = SENIOR_PREFIX + name
         g = await _geo_state(key)
-        # Старший сидит на базе часами — это работа. При живой трансляции он
-        # виден, пока телефон присылает точку хоть раз в два часа; без
-        # трансляции — по свежей точке из панели.
-        silent = g["stream"] and (g["age_sec"] is None or g["age_sec"] >= db.GEO_LOST_SEC)
-        visible = (not silent) if g["stream"] else g["fresh"]
+        # Старший сидит на базе часами — это работа. Правило одно на все
+        # пути (владелец, 11 сен 2026: «только если телефон два часа
+        # молчит»): пропал — это два часа без единой точки, что при живой
+        # трансляции, что без неё. Свежая точка из панели — виден.
+        age = g["age_sec"]
+        quiet = age is None or age >= db.GEO_LOST_SEC
+        # Без трансляции — по свежей точке из панели, как и было.
+        visible = (not quiet) if g["stream"] else g["fresh"]
         st = await db.geo_watch_get(key)
-        off_since = _dt(st.get("off_since")) if st.get("day") == day else None
+        # Молчание не кончается в полдень: о пропаже, про которую сказали
+        # вчера, в новый день второй раз не пишем (раньше в 12:00 шло
+        # «с начала смены ни одной точки», хотя владельцы уже знали).
+        off_since = _dt(st.get("off_since"))
         if not visible and not off_since:
-            seen_today = st.get("day") == day and bool(st.get("seen"))
-            # Сегодня ещё не видели — «с начала смены ни одной точки», а не
-            # «два часа не присылает» по вчерашней точке.
-            why = ("stream" if st.get("stream_off") else "never" if not seen_today
-                   else "silent" if silent else "stale")
+            import bizday
+            last = utc - timedelta(seconds=age) if age is not None else None
+            never = last is None or last < bizday.day_start(day)     # ни одной точки с начала смены
+            why = ("stream" if st.get("stream_off") else "never" if never
+                   else "silent" if g["stream"] else "stale")
             # Молчание считается с последней точки, а не с минуты, когда заметили.
-            since = utc - timedelta(seconds=g["age_sec"]) if why == "silent" and g["age_sec"] else utc
+            since = last if why == "silent" and last else utc
             await db.geo_watch_set(key, {"day": day, "off_since": since, "off_why": why},
                                    unset=["stream_off"])
-            await _owners(text_senior_off(name, why, g, utc), EVENT_SENIOR, exclude=_senior_ids())
+            # О выключенной трансляции владельцам уже сказали в ту же секунду
+            # (on_senior_stream) — здесь только запоминаем, с какой минуты.
+            if why != "stream":
+                await _owners(text_senior_off(name, why, g, utc), EVENT_SENIOR, exclude=_senior_ids())
             log.info(f"[geo-watch] старший {name}: не виден ({why})")
             out.setdefault("senior_off", []).append(name)
         elif visible:

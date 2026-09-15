@@ -163,10 +163,16 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Выключили: телеграм правит то же сообщение, а срока у точки больше нет.
     stop = bool(update.edited_message and not period)
     key = name if kind == "driver" else geo_watch.SENIOR_PREFIX + name
+    mid = getattr(msg, "message_id", 0)
+    # Конец прежнего сообщения после «включил заново» — не выключение.
+    if stop and await geo_watch.old_stream_end(key, chat, mid):
+        log.info(f"прежняя трансляция кончилась, новая идёт: {name}")
+        return
     try:
         await db.driver_pos_set(key, geo_watch._biz_day(), loc.latitude, loc.longitude,
                                 now, until=until, stop_live=stop,
-                                acc=getattr(loc, "horizontal_accuracy", None))
+                                acc=getattr(loc, "horizontal_accuracy", None),
+                                live=(chat, mid) if period else None)
     except Exception as e:                   # noqa: BLE001
         log.warning(f"точка {name} не записана: {e}")
         return
@@ -186,7 +192,9 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             # Владелец, 15 сен 2026: водителю в ответ — не короткое «идёт», а
             # очень длинная история LEGO по-английски, частями: точка с картой
             # уезжает далеко вверх, и листать до неё приходится долго.
-            await _lego_wall(ctx, chat, name)
+            # Фоном: тридцать сообщений — это 17 секунд, а обработчики идут по
+            # очереди, и всё это время точки остальных ждали бы.
+            _spawn(_lego_wall(ctx, chat, name))
         else:
             await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
                                     "не нужно — чат можно убрать в архив.")
@@ -201,6 +209,18 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if kind != "driver":
             await _say(update, ctx, f"{name} · точка принята, но это разовая точка, она "
                                     f"погаснет. Нужна трансляция:\n\n{HOW}")
+
+
+_TASKS: set = set()
+
+
+def _spawn(coro):
+    """Фоновая задача со ссылкой: без неё сборщик может снять её на полпути."""
+    import asyncio as _aio
+    t = _aio.get_event_loop().create_task(coro)
+    _TASKS.add(t)
+    t.add_done_callback(_TASKS.discard)
+    return t
 
 
 async def _lego_wall(ctx, chat: int, name: str):
@@ -287,9 +307,9 @@ async def _probe_once(bot) -> int:
             continue
         rows = await db.driver_pos_all([name])
         r = (rows or [{}])[0] if rows else {}
-        until = r.get("until")
-        if until is not None and getattr(until, "tzinfo", None) is None:
-            until = until.replace(tzinfo=timezone.utc)
+        # driver_pos_all отдаёт срок строкой — разбираем, а не правим tzinfo
+        # (на строке это падало, и круг проб не доходил до конца ни разу).
+        until = geo_watch._dt(r.get("until"))
         if not until or until <= now:
             continue                             # трансляции и так нет — трогать нечего
         gone = False

@@ -3083,7 +3083,8 @@ def geo_moved(prev: dict | None, lat: float, lon: float, acc, day: str) -> bool:
 
 
 async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
-                         until=None, acc=None, stop_live: bool = False) -> None:
+                         until=None, acc=None, stop_live: bool = False,
+                         live=None) -> None:
     """Точка водителя. until — до какого времени идёт трансляция.
 
     stop_live гасит признак трансляции. Раньше его не было, потому что срок
@@ -3109,6 +3110,10 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
         doc["$set"]["stopped_at"] = at
     elif until is not None:
         doc["$set"]["until"] = until
+    if live:
+        # Каким сообщением телеграма идёт трансляция (chat, message_id):
+        # конец прежнего сообщения — включил заново — не должен гасить новую.
+        doc["$set"].update({"live_chat": int(live[0]), "live_mid": int(live[1])})
     if acc is not None:
         doc["$set"]["acc"] = round(float(acc), 1)
     await db.driver_pos.update_one({"_id": name}, doc, upsert=True)
@@ -3127,6 +3132,14 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
     except Exception as e:                       # noqa: BLE001
         import logging as _lg
         _lg.getLogger("db").warning(f"маршрут дня не записан ({name}): {e}")
+
+
+async def driver_pos_live(name: str) -> dict | None:
+    """Сообщение, которым сейчас идёт трансляция: {chat, mid} или None."""
+    db = _db_or_none()
+    if db is None or not name: return None
+    d = await db.driver_pos.find_one({"_id": name}, {"live_chat": 1, "live_mid": 1}) or {}
+    return {"chat": d.get("live_chat"), "mid": d["live_mid"]} if d.get("live_mid") else None
 
 
 async def driver_pos_stop(name: str, at=None) -> None:

@@ -268,10 +268,18 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # точка приходит, а срока у неё больше нет. Разовая точка отдельным
     # сообщением — не то же самое, её шлют и поверх идущей трансляции.
     stop = bool(update.edited_message and not period)
+    chat, mid = update.effective_chat.id, getattr(msg, "message_id", 0)
+    if stop:
+        # Конец прежнего сообщения после «включил заново» — не выключение.
+        import geo_watch
+        if await geo_watch.old_stream_end(me["name"], chat, mid):
+            log.info(f"прежняя трансляция кончилась, новая идёт: {me['name']}")
+            return
     try:
         await db.driver_pos_set(me["name"], _biz_day(), loc.latitude, loc.longitude,
                                 now, until=until, stop_live=stop,
-                                acc=getattr(loc, "horizontal_accuracy", None))
+                                acc=getattr(loc, "horizontal_accuracy", None),
+                                live=(chat, mid) if period else None)
     except Exception as e:
         log.warning(f"точка {me['name']} не записана: {e}")
         return

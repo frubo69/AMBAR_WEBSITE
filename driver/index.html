@@ -1314,8 +1314,10 @@ body.xp-on{background:#070A12}
    и две кнопки; картинка единственная умеет ужиматься, если экран ниже
    макета. Отступ сверху — с учётом строки состояния: в полноэкранном режиме
    телеграма содержимое иначе лезет под часы. */
-.shscr{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;
-  padding:calc(14px + var(--safe-top,0px)) 18px calc(16px + var(--safe-bottom,0px));background:#070912;overflow-y:auto}
+.shscr{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;padding:0;background:#070912;overflow:hidden}
+.shscr-mid{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:calc(14px + var(--safe-top,0px)) 18px 12px}
+.shscr-bot{flex:0 0 auto;display:flex;flex-direction:column;padding:10px 18px calc(16px + var(--safe-bottom,0px));background:#070912}
 .shscr.show{display:flex}
 .shscr-top{align-self:flex-start;flex:0 0 auto;display:flex;align-items:center;gap:10.5px;height:34px;
   padding:0 14px 0 10.5px;border-radius:17px;border:1px solid #24242F;background:#12141E;color:#fff;
@@ -3947,13 +3949,18 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
      нельзя, и показывать список заказов значило бы предлагать то, что не
      сработает. Два условия видно сразу, оба с ответом «что сделать». -->
 <div class="shscr" id="shScr">
-  <div class="shscr-art" id="shIco"></div>
-  <div class="shscr-t" id="shT">Смена не открыта</div>
-  <div class="shscr-s" id="shS">Пока смена закрыта, заказы не приходят</div>
-  <div id="shList"></div>
-  <button class="shscr-go" id="shGo" onclick="shOpen()">Открыть смену</button>
-  <button class="shscr-alt" id="shAlt" onclick="shLoad(true)">Обновить</button>
-  <button class="shscr-more" id="shMore" onclick="tutOpen()" hidden>Показать по шагам</button>
+  <div class="shscr-mid">
+    <div class="shscr-art" id="shIco"></div>
+    <div class="shscr-t" id="shT">Смена не открыта</div>
+    <div class="shscr-s" id="shS">Пока смена закрыта, заказы не приходят</div>
+    <div id="shList"></div>
+  </div>
+  <!-- Кнопки прибиты к низу экрана (владелец, 15 сен 2026); середина листается. -->
+  <div class="shscr-bot">
+    <button class="shscr-go" id="shGo" onclick="shOpen()">Открыть смену</button>
+    <button class="shscr-alt" id="shAlt" onclick="shLoad(true)">Обновить</button>
+    <button class="shscr-more" id="shMore" onclick="tutOpen()" hidden>Показать по шагам</button>
+  </div>
 </div>
 
 <div class="pnc" id="pncOv">

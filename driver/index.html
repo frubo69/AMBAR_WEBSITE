@@ -5804,11 +5804,6 @@ async function shClose(){
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     return;
   }
-  if(!SH.day_closed){
-    toast('Оператор ещё не закрыл смену района', 'err');
-    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    return;
-  }
   shsOpen();
 }
 
@@ -7934,7 +7929,9 @@ function renderShift(){
 
   let steps, btn;
   if(on){
-    const s1 = !route.length, s2 = !must.length, s3 = !!SH.day_closed, ready = s1 && s2 && s3;
+    // Ждать закрытия дня оператором не нужно (владелец, 15 сен 2026):
+    // заполнил расходы — можно закрывать, решение старшего по ним не требуется.
+    const s1 = !route.length, s2 = !must.length, ready = s1 && s2;
     steps = step(1, s1 ? 'ok' : 'now', 'Завершить все заказы',
         s1 ? 'Все активные заказы выполнены' : 'Отметьте доставку по каждому заказу',
         s1 ? ['ok', 'Готово'] : ['wait', 'В пути'],
@@ -7949,15 +7946,8 @@ function renderShift(){
         s2 ? {ico: ICO.note, t: 'Расходы заполнены', s: esc(shExpLine()), go: "setTab('expenses')"}
            : {ico: ICO.note, t: `Не отвечено: ${esc(mustNames.join(', '))}`,
               s: 'Сумма или «не было» — в расходах', go: "setTab('expenses')"})
-      + step(3, s3 ? 'ok' : (s1 && s2 ? 'now' : ''), 'Оператор закрыл смену',
-        'Смену района закрывает оператор',
-        s3 ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
-        s3 ? {ico: ICO.user, t: 'Оператор закрыл смену',
-              s: SH.day_closed_at ? `Закрыта в ${hhmm(SH.day_closed_at)} — заказов больше не будет` : 'Заказов сегодня больше не будет'}
-           : {ico: ICO.user, t: 'Смена ещё не закрыта',
-              s: 'Оператор подтвердит после проверки'})
-      + step(4, ready ? 'now' : '', 'Закрыть смену',
-        'Когда первые три шага выполнены',
+      + step(3, ready ? 'now' : '', 'Закрыть смену',
+        'Когда первые два шага выполнены',
         ['wait', 'Ожидание'],
         {ico: ICO.clock, t: 'Ваша смена ещё не закрыта',
          s: ready ? 'Нажмите кнопку ниже — на сегодня всё' : 'Сначала выполните шаги выше'});

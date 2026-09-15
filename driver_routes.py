@@ -594,16 +594,9 @@ async def handle_shift_close(request):
     if route:
         return web.json_response({"error": "orders_in_route", "ids": route},
                                  status=409, headers=CORS_HEADERS)
-    # Сначала смену района закрывает оператор, и только потом — водитель свою
-    # (владелец, 13 сен 2026: «третьим шагом должно быть оператор закрыл смену,
-    # и уже четвёртым — водитель закрывает»). До этого ждать не требовали.
-    try:
-        день_закрыт = bool((await db.shifts_for_day(day)).get(me.get("district") or ""))
-    except Exception as e:                                   # noqa: BLE001
-        log.warning(f"[driver] закрытие дня не прочиталось: {e}")
-        день_закрыт = False
-    if not день_закрыт and not _tq(me):
-        return web.json_response({"error": "day_open"}, status=409, headers=CORS_HEADERS)
+    # Ждать закрытия дня оператором больше не нужно (владелец, 15 сен 2026:
+    # «главное, чтобы водитель расходы заполнил, этого достаточно»). Решение
+    # старшего по расходам тоже не требуется: заполненные — значит ответил.
     await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
     log.info(f"[driver] {me['name']}: смена закрыта")
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)

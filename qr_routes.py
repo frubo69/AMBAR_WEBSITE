@@ -183,9 +183,8 @@ async def unscanned_by_district(by_pd: dict = None, detail: dict = None) -> tupl
         cat = SR._catalog()
         for oid in SR.OFFICE_IDS:
             have = (base.get(oid) or {}).get("have_exact") or (base.get(oid) or {}).get("have") or {}
-            got = by_pd.get(oid) or {}
-            bottles = sum(round(float(q) * SR._unit(cat.get(pid) or {}))
-                          for pid, q in have.items() if pid in cat and q)
+            got = by_pd.get(oid) or {}                    # коды по qty — уже единицы
+            bottles = sum(float(q) for pid, q in have.items() if pid in cat and q)
             coded = sum(got.values())
             if not bottles and not coded:
                 no_count.append(oid)
@@ -198,15 +197,16 @@ async def unscanned_by_district(by_pd: dict = None, detail: dict = None) -> tupl
             # «им же надо будет вбить этот товар, который мы добавили с
             # таблиц»). Разбор по позициям (detail) — в бутылках: сканируют
             # по одной, и список говорит, сколько ещё поднести к камере.
+            # Всё в единицах склада: у пива коробки — код на коробке несёт 1,
+            # на полкоробки 0.5, банки никто не сканирует.
             per, units = {}, 0.0
             for pid, q in have.items():
                 if pid not in cat or not q:
                     continue
-                u = SR._unit(cat.get(pid) or {})
-                n = round(float(q) * u) - int(got.get(pid) or 0)
+                n = round((float(q) - float(got.get(pid) or 0)) * 2) / 2
                 if n > 0:
-                    per[pid] = n
-                    units += n / u
+                    per[pid] = int(n) if n == int(n) else n
+                    units += n
             unscanned[oid] = round(units, 2)
             if detail is not None:
                 detail[oid] = per
@@ -393,8 +393,13 @@ async def handle_scan(request):
     # _district_base); из ревизии по «QR не внесён» — код к бутылке, которая
     # в пересчёте уже есть (src=cover), приходом не считается.
     src = "cover" if str(body.get("mode") or "") == "cover" else "new"
+    # Сколько единиц за кодом: бутылка 1; у пива QR клеится на коробку — 1,
+    # или на полкоробки — 0.5 (владелец, 16 сен 2026: банки не сканируют).
+    import stock_routes as _sr
+    half = str(body.get("qty") or "").replace(",", ".") in ("0.5", ".5")
+    qty = 0.5 if (half and _sr._unit(p) > 1) else 1
     added = await db.qr_add(code, product_id, p.get("name", ""), district, me, now, label,
-                            extra={"src": src})
+                            extra={"src": src, "qty": qty})
     if added and src == "new":
         try:
             import stock_routes

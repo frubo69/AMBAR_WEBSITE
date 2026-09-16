@@ -29,13 +29,13 @@ async def main():
     lines, counted = await SR._audit_lines("jvc", DAY)
     r = {l["id"]: l for l in lines}
     eq("Absolut: числится 16, кодовых 2, без кодов 14", (r["p1"]["expected"], r["p1"]["coded"], r["p1"]["noqr"]), (16, 2, 14))
-    eq("Heineken: числится 48 банок (2 коробки), кодовых 0", (r["p31"]["expected"], r["p31"]["coded"], r["p31"]["noqr"]), (48, 0, 48))
+    eq("Heineken: числится 2 коробки, кодовых 0, без кодов 2", (r["p31"]["expected"], r["p31"]["coded"], r["p31"]["noqr"]), (2, 0, 2))
     eq("до сканов «не хватает» ровно кодовых (их ещё не увидели), без кодов пропавшими не считаются", (r["p1"]["diff"], r["p31"]["diff"]), (2, 0))
     SCANS.update({"p1": 1})
     lines, _ = await SR._audit_lines("jvc", DAY); r = {l["id"]: l for l in lines}
     eq("камера увидела 1 из 2 кодовых → недостача 1", (r["p1"]["actual"], r["p1"]["diff"]), (1, 1))
     t = SR._audit_totals(lines)
-    eq("итоги: числится 64 бут, кодовых 2, недостача 1", (t["expected"], t["coded"], t["short_qty"]), (64, 2, 1))
+    eq("итоги: числится 18 единиц, кодовых 2, недостача 1", (t["expected"], t["coded"], t["short_qty"]), (18, 2, 1))
     snap = {l["id"]: l for l in SR._audit_snapshot_lines(lines)}
     eq("снимок по завершении: Absolut 15 (14 без кодов + 1 увиденная), не 1", snap["p1"]["actual"], 15)
     eq("снимок: Heineken 2 коробки остаются, не 0", snap["p31"]["actual"], 2)

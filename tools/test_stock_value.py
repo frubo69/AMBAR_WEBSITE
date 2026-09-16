@@ -20,7 +20,7 @@ async def base(day): return BASE
 SR._district_base = base
 async def cost_map(): return {"p1": 60.0}
 SV.cost_map = cost_map
-CODES = {"jvc": {"p1": 4, "p31": 10}, "bbay": {}}
+CODES = {"jvc": {"p1": 4, "p31": 1.5}, "bbay": {}}     # коды в единицах: коробки и полкоробки
 ADDED = {"jvc": 2}                      # после пересчёта коды заводили только в JVC
 async def by_pd(): return CODES
 async def last_count(oid, before_day=None): return {"counted_at": "2026-09-14T07:59:00+00:00"} if oid != "silicon" else None
@@ -34,10 +34,10 @@ async def main():
     eq("прайс от количества: 25×100 + 3,5×250", v["totals"]["list"], 25 * 100 + 3.5 * 250)
     d = {}
     u, no = await QR.unscanned_by_district(None, d)
-    eq("JVC: без кодов в единицах — 16 бутылок + (84 − 10 банок)/24 = 19.08", u.get("jvc"), 19.08)
+    eq("JVC: без кодов в единицах — 20 − 4 бутылки + 3,5 − 1,5 коробки = 18", u.get("jvc"), 18)
     eq("BBay без единого кода — долг всё равно виден: 5", u.get("bbay"), 5)
     eq("Силикон без пересчёта и кодов → «не считали»", no, ["silicon"])
-    eq("разбор по позициям — в бутылках, у пива в банках", (d["jvc"], d["bbay"]), ({"p1": 16, "p31": 74}, {"p1": 5}))
+    eq("разбор по позициям — в единицах, у пива коробки", (d["jvc"], d["bbay"]), ({"p1": 16, "p31": 2}, {"p1": 5}))
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 asyncio.run(main())

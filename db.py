@@ -2455,8 +2455,10 @@ async def supply_task_release(sid: str, district: str, driver: str = None) -> bo
     return r.modified_count > 0
 
 
-async def supply_take(sid: str, district: str, product_id: str, limit: int, now):
-    """Принять одну бутылку по строке задачи. None — строка уже добрана.
+async def supply_take(sid: str, district: str, product_id: str, room, now, qty=1):
+    """Принять один код по строке задачи: коробку (1) или полкоробки (0.5).
+    None — строка уже добрана. room = план − qty: принимаем, пока принятое не
+    больше room, чтобы коробка не перелезла через план.
 
     Условие «принято меньше подтверждённого» стоит в самом запросе, а не в
     коде над ним: между «посмотрел» и «прибавил» помещается ещё один скан, и
@@ -2467,21 +2469,21 @@ async def supply_take(sid: str, district: str, product_id: str, limit: int, now)
     from pymongo import ReturnDocument
     return await db.supplies.find_one_and_update(
         {"_id": sid, "status": "open",
-         "items": {"$elemMatch": {"id": product_id, f"got.{district}": {"$lt": limit}}}},
-        {"$inc": {f"items.$.got.{district}": 1, "items.$.scanned": 1,
+         "items": {"$elemMatch": {"id": product_id, f"got.{district}": {"$lte": room}}}},
+        {"$inc": {f"items.$.got.{district}": qty, "items.$.scanned": 1,
                   f"tasks.{district}.scanned": 1},
          "$set": {f"tasks.{district}.last_at": now}},
         return_document=ReturnDocument.AFTER)
 
 
-async def supply_untake(sid: str, district: str, product_id: str) -> bool:
-    """Снять одну бутылку — водитель отменил последний скан."""
+async def supply_untake(sid: str, district: str, product_id: str, qty=1) -> bool:
+    """Снять один код — водитель отменил последний скан (коробку или полкоробки)."""
     db = _db_or_none()
     if db is None: return False
     r = await db.supplies.update_one(
         {"_id": sid, "items": {"$elemMatch": {"id": product_id,
-                                              f"got.{district}": {"$gt": 0}}}},
-        {"$inc": {f"items.$.got.{district}": -1, "items.$.scanned": -1,
+                                              f"got.{district}": {"$gte": qty}}}},
+        {"$inc": {f"items.$.got.{district}": -qty, "items.$.scanned": -1,
                   f"tasks.{district}.scanned": -1, f"tasks.{district}.undo": 1}})
     return r.modified_count > 0
 
@@ -2681,8 +2683,26 @@ async def supplies_since(day_from: str, limit: int = 80) -> list:
     return await cur.to_list(length=limit)
 
 
+# Код несёт количество: бутылка — 1, коробка пива — 1, полкоробки — 0.5.
+# QR клеится на коробку, а не на банку (владелец, 16 сен 2026: «мы вообще не
+# считаем в банках и не сканим каждую бутылку, только ящики»). Поэтому все
+# счётчики реестра складывают qty, а не считают документы; у старых записей
+# без поля — единица.
+QR_QTY = {"$ifNull": ["$qty", 1]}
+
+
+def _qn(v):
+    """Количество единиц: целое целым, половина половиной."""
+    try:
+        v = round(float(v or 0) * 2) / 2
+    except (TypeError, ValueError):
+        return 0
+    return int(v) if v == int(v) else v
+
+
 async def intake_since(district: str, since) -> dict:
-    """Сколько бутылок принято на район после указанного момента: позиция → шт.
+    """Сколько единиц принято на район после указанного момента: позиция →
+    единиц (коды складываются по qty: коробка 1, полкоробки 0.5).
 
     Нужно заявке: пересчёт был вчера, ночью пришла поставка, и без этого
     программа завтра закажет то, что уже стоит на полке."""
@@ -2690,9 +2710,9 @@ async def intake_since(district: str, since) -> dict:
     if db is None or not since: return {}
     cur = db.qr_codes.aggregate([
         {"$match": {"district": district, "src": "intake", "at": {"$gt": since}}},
-        {"$group": {"_id": "$product_id", "n": {"$sum": 1}}},
+        {"$group": {"_id": "$product_id", "n": {"$sum": QR_QTY}}},
     ])
-    return {d["_id"]: d["n"] for d in await cur.to_list(length=500) if d["_id"]}
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=500) if d["_id"]}
 
 
 # ── Списания: бой, брак, просрочка, потеря ─────────────────────────────────
@@ -3691,8 +3711,8 @@ async def qr_marked_since(since, districts: list = None) -> dict:
     if districts:
         q["district"] = {"$in": list(districts)}
     cur = db.qr_codes.aggregate([{"$match": q},
-                                 {"$group": {"_id": "$district", "n": {"$sum": 1}}}])
-    return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=50) if d["_id"]}
+                                 {"$group": {"_id": "$district", "n": {"$sum": QR_QTY}}}])
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=50) if d["_id"]}
 
 
 async def qr_remove(code: str) -> bool:
@@ -3883,8 +3903,8 @@ async def audit_scan_counts(district: str, day: str) -> dict:
     if db is None: return {}
     cur = db.audit_scans.aggregate([
         {"$match": {"district": district, "day": day, "product_id": {"$ne": ""}}},
-        {"$group": {"_id": "$product_id", "n": {"$sum": 1}}}])
-    return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=800) if d["_id"]}
+        {"$group": {"_id": "$product_id", "n": {"$sum": QR_QTY}}}])
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=800) if d["_id"]}
 
 
 async def audit_scan_odd(district: str, day: str, limit: int = 60) -> list:
@@ -4020,9 +4040,9 @@ async def qr_by_product_district(district: str) -> dict:
     if db is None or not district: return {}
     cur = db.qr_codes.aggregate([
         {"$match": {"status": "active", "district": district}},
-        {"$group": {"_id": "$product_id", "n": {"$sum": 1}}},
+        {"$group": {"_id": "$product_id", "n": {"$sum": QR_QTY}}},
     ])
-    return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=500) if d["_id"]}
 
 
 async def qr_by_product_district_all() -> dict:
@@ -4035,13 +4055,13 @@ async def qr_by_product_district_all() -> dict:
     if db is None: return {}
     cur = db.qr_codes.aggregate([
         {"$match": {"status": "active"}},
-        {"$group": {"_id": {"d": "$district", "p": "$product_id"}, "n": {"$sum": 1}}},
+        {"$group": {"_id": {"d": "$district", "p": "$product_id"}, "n": {"$sum": QR_QTY}}},
     ])
     out = {}
     for r in await cur.to_list(length=5000):
         d, pid = (r["_id"] or {}).get("d"), (r["_id"] or {}).get("p")
         if not d or not pid: continue
-        out.setdefault(d, {})[pid] = int(r["n"] or 0)
+        out.setdefault(d, {})[pid] = _qn(r["n"])
     return out
 
 
@@ -4057,9 +4077,9 @@ async def qr_added_since(since) -> dict:
     cur = db.qr_codes.aggregate([
         {"$match": {"status": {"$ne": "deleted"},
                     "$or": [{"at": {"$gte": since}}, {"at": {"$gte": iso}}]}},
-        {"$group": {"_id": "$district", "n": {"$sum": 1}}},
+        {"$group": {"_id": "$district", "n": {"$sum": QR_QTY}}},
     ])
-    return {d["_id"]: d["n"] for d in await cur.to_list(length=50) if d["_id"]}
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=50) if d["_id"]}
 
 
 async def qr_by_district() -> dict:
@@ -4068,9 +4088,9 @@ async def qr_by_district() -> dict:
     if db is None: return {}
     cur = db.qr_codes.aggregate([
         {"$match": {"status": "active"}},
-        {"$group": {"_id": "$district", "n": {"$sum": 1}}},
+        {"$group": {"_id": "$district", "n": {"$sum": QR_QTY}}},
     ])
-    return {d["_id"]: d["n"] for d in await cur.to_list(length=50) if d["_id"]}
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=50) if d["_id"]}
 
 
 async def qr_count_product(product_id: str) -> int:
@@ -4104,10 +4124,11 @@ async def qr_manual_events(district: str, since) -> dict:
     if since is not None:
         q["at"] = {"$gt": since}
     out = {}
-    async for d in db.qr_codes.find(q, {"_id": 0, "product_id": 1, "at": 1}):
+    async for d in db.qr_codes.find(q, {"_id": 0, "product_id": 1, "at": 1, "qty": 1}):
         pid = d.get("product_id") or ""
         if not pid:
             continue
+        qty = _qn(d.get("qty") or 1) or 1
         at = d.get("at")
         if isinstance(at, str):
             try:
@@ -4118,9 +4139,9 @@ async def qr_manual_events(district: str, since) -> dict:
             at = _dt.min.replace(tzinfo=_tz.utc)      # без момента — считаем самой ранней
         elif at.tzinfo is None:
             at = at.replace(tzinfo=_tz.utc)
-        out.setdefault(pid, []).append(at)
+        out.setdefault(pid, []).append((at, qty))
     for ats in out.values():
-        ats.sort()
+        ats.sort(key=lambda e: e[0])
     return out
 
 

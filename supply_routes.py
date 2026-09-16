@@ -528,13 +528,7 @@ async def handle_import(request):
 
 def _task_units_got(sup: dict, oid: str):
     """Сколько единиц уже принято по району: коды строк → единицы позиций."""
-    total = 0.0
-    for it in sup.get("items") or []:
-        codes = int((it.get("got") or {}).get(oid) or 0)
-        if codes:
-            total += codes / max(1, _uof(it.get("id") or ""))
-    v = round(total * 2) / 2
-    return int(v) if v == int(v) else v
+    return _qn(sum(float((it.get("got") or {}).get(oid) or 0) for it in sup.get("items") or []))
 
 
 @require_owner
@@ -675,25 +669,21 @@ def _hold_view(task: dict, me: str, now=None) -> dict:
 # единицах, сканы переводятся в единицы здесь, и строка пива закрывается на
 # 48 банках, а не на двух (раньше «2 коробки» значило «2 скана»).
 def _uof(pid: str) -> int:
-    """Учётная единица позиции: 1 у бутылки, 24 у коробки пива."""
+    """Учётная единица позиции: 1 у бутылки, 24 у коробки пива (для цен)."""
     import stock_routes
     return stock_routes._unit(stock_routes._catalog().get(pid) or {})
 
 
-def _got_units(codes: int, u: int):
-    """Принятые коды → единицы, до полкоробки к ближайшему: 3 банки — ещё 0."""
-    if u <= 1:
-        return int(codes or 0)
-    v = round(int(codes or 0) / u * 2) / 2
+def _qn(v):
+    """Единицы: целое целым, половина половиной."""
+    v = round(float(v or 0) * 2) / 2
     return int(v) if v == int(v) else v
 
 
-def _left_units(need, codes: int, u: int):
-    """Сколько осталось в единицах, до полкоробки ВВЕРХ: 47 банок из 48 — ещё
-    полкоробки, а не ноль."""
+def _left_units(need, got):
+    """Сколько осталось в единицах — до полкоробки вверх."""
     import math
-    rem = float(need or 0) - int(codes or 0) / max(1, u)
-    v = max(0.0, math.ceil(round(rem, 6) * 2) / 2)
+    v = max(0.0, math.ceil(round(float(need or 0) - float(got or 0), 6) * 2) / 2)
     return int(v) if v == int(v) else v
 
 
@@ -763,11 +753,10 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         need = int((it.get("by_district") or {}).get(oid) or 0)
         if not need:
             continue
-        un = _uof(it["id"])
-        codes = int((it.get("got") or {}).get(oid) or 0)
-        line = {"id": it["id"], "name": it.get("name", ""), "unit": un,
-                "need": need, "got": _got_units(codes, un), "got_codes": codes,
-                "left": _left_units(need, codes, un)}
+        # Принятое — сумма qty кодов: коробка 1, полкоробки 0.5 — единицы.
+        got_u = _qn((it.get("got") or {}).get(oid) or 0)
+        line = {"id": it["id"], "name": it.get("name", ""), "unit": _uof(it["id"]),
+                "need": need, "got": got_u, "left": _left_units(need, got_u)}
         if extra:
             # Цена за учётную единицу и сколько таких единиц во всей заявке:
             # экран цен у водителя считает по ним «= N AED» и итог. Количества
@@ -788,9 +777,7 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
     # среди них следующую бутылку он будет каждый раз.
     lines.sort(key=lambda l: (l["left"] == 0, l["name"]))
     need = sum(l["need"] for l in lines)
-    got = _got_units(sum(l["got_codes"] for l in lines), 1) if all(l["unit"] == 1 for l in lines) \
-        else round(sum(l["got"] for l in lines) * 2) / 2
-    got = int(got) if got == int(got) else got
+    got = _qn(sum(l["got"] for l in lines))
     return {
         "supply_id": sid,
         "at": str(sup.get("at") or ""),
@@ -896,7 +883,7 @@ def _can_touch(task: dict, me: str, owner: bool) -> bool:
 
 async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
                     tg_id: int, at_dev: str = "", owner: bool = False,
-                    erev=None) -> dict:
+                    erev=None, qty=None) -> dict:
     """Принять одну бутылку. Возвращает исход, а не «ок» — их несколько.
 
     Порядок важен: сначала занимаем место в задаче, потом пишем бутылку в
@@ -935,11 +922,12 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     if not item:
         return {"ok": False, "verdict": "not_in_supply"}
     need = int((item.get("by_district") or {}).get(oid) or 0)
-    un = _uof(pid)
-    need_codes = need * un                       # план строки — в кодах
-    got = int((item.get("got") or {}).get(oid) or 0)
-    if got >= need_codes:
-        return {"ok": False, "verdict": "full", "need": need, "got": _got_units(got, un),
+    # Код на коробке — 1, на полкоробки — 0.5; строка закрывается, когда
+    # принятые единицы дошли до плана, и коробка через план не перелезает.
+    qty = 0.5 if (str(qty or "").replace(",", ".") in ("0.5", ".5") and _uof(pid) > 1) else 1
+    got = _qn((item.get("got") or {}).get(oid) or 0)
+    if got + qty > need:
+        return {"ok": False, "verdict": "full", "need": need, "got": got,
                 "name": item.get("name", "")}
 
     # Бутылка уже в реестре — её записали раньше. Это не придирка: без такой
@@ -949,13 +937,13 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
         return {"ok": False, "verdict": "known", "name": item.get("name", ""),
                 "label": old.get("label") or "",
                 "district": old.get("district") or "",
-                "at": str(old.get("at") or ""), "need": need, "got": _got_units(got, un)}
+                "at": str(old.get("at") or ""), "need": need, "got": got}
 
     now = datetime.now(timezone.utc)
     await db.supply_task_start(sid, oid, now)
-    upd = await db.supply_take(sid, oid, pid, need_codes, now)
+    upd = await db.supply_take(sid, oid, pid, need - qty, now, qty)
     if not upd:
-        return {"ok": False, "verdict": "full", "need": need, "got": _got_units(got, un),
+        return {"ok": False, "verdict": "full", "need": need, "got": got,
                 "name": item.get("name", "")}
 
     from qr_routes import product_slug
@@ -963,11 +951,11 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     label = f"{product_slug(pid, item.get('name',''))}#{seq:06d}"
     added = await db.qr_add(code, pid, item.get("name", ""), oid, tg_id, now, label,
                             extra={"src": "intake", "supply_id": sid, "driver": me,
-                                   "at_dev": str(at_dev or "")[:32]})
+                                   "qty": qty, "at_dev": str(at_dev or "")[:32]})
     if not added:
         # Код заняли между проверкой и вставкой — место в задаче возвращаем,
         # иначе строка закроется бутылкой, которой у нас нет.
-        await db.supply_untake(sid, oid, pid)
+        await db.supply_untake(sid, oid, pid, qty)
         return {"ok": False, "verdict": "known", "name": item.get("name", "")}
 
     # Бутылка встала на полку — заявка про неё ещё не знает.
@@ -998,7 +986,7 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
                                              "product": item.get("name", ""), "at": now})
 
     line = next((i for i in (upd.get("items") or []) if i["id"] == pid), {})
-    got = int((line.get("got") or {}).get(oid) or got + 1)
+    got = _qn((line.get("got") or {}).get(oid) or got + qty)
     t = (upd.get("tasks") or {}).get(oid) or {}
     # Скан — это присутствие: замок продлевается сам, без отдельного пульса.
     try:
@@ -1011,8 +999,8 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     # недобора здесь быть не может.
     finished, supply_done = False, False
     if task.get("noscan_at"):
-        осталось = sum(max(0, int((i.get("by_district") or {}).get(oid) or 0) * _uof(i["id"])
-                              - int((i.get("got") or {}).get(oid) or 0))
+        осталось = sum(max(0.0, float((i.get("by_district") or {}).get(oid) or 0)
+                                - float((i.get("got") or {}).get(oid) or 0))
                        for i in (upd.get("items") or []))
         if осталось == 0:
             fin = await task_finish(sid, oid, me, "", owner)
@@ -1020,8 +1008,8 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
             if finished:
                 await db.supply_task_unhold(sid, oid, me)
     return {"ok": True, "verdict": "taken", "label": label, "code": code,
-            "name": item.get("name", ""), "need": need, "got": _got_units(got, un),
-            "got_codes": got, "unit": un, "left": _left_units(need, got, un), "flags": flags,
+            "name": item.get("name", ""), "need": need, "got": got, "qty": qty,
+            "unit": _uof(pid), "left": _left_units(need, got), "flags": flags,
             "task_got": int(t.get("scanned") or 0),
             "finished": finished, "supply_done": supply_done}
 
@@ -1053,7 +1041,7 @@ async def task_undo(sid: str, oid: str, code: str, me: str,
     if age > UNDO_SEC:
         return {"ok": False, "verdict": "too_late", "sec": UNDO_SEC}
     await db.qr_remove(code)
-    await db.supply_untake(sid, oid, doc.get("product_id") or "")
+    await db.supply_untake(sid, oid, doc.get("product_id") or "", float(doc.get("qty") or 1))
     await db.supply_task_flag(sid, oid, {"kind": "undo", "code": code[:40],
                                          "product": doc.get("product_name", ""),
                                          "at": datetime.now(timezone.utc)})
@@ -1082,12 +1070,11 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
         need = int((it.get("by_district") or {}).get(oid) or 0)
         if not need:
             continue
-        un = _uof(it["id"])
-        codes = int((it.get("got") or {}).get(oid) or 0)
-        left = _left_units(need, codes, un)
+        got_u = _qn((it.get("got") or {}).get(oid) or 0)
+        left = _left_units(need, got_u)
         if left > 0:
             gaps.append({"id": it["id"], "name": it.get("name", ""),
-                         "need": need, "got": _got_units(codes, un), "gap": left})
+                         "need": need, "got": got_u, "gap": left})
     now = datetime.now(timezone.utc)
     doc = await db.supply_task_finish(sid, oid, gaps, str(note or "")[:300], now)
     if not doc:
@@ -1365,7 +1352,7 @@ def _shortfall(sup: dict) -> dict:
         if t.get("cancelled_at"):
             for it in sup.get("items") or []:
                 need = int((it.get("by_district") or {}).get(oid) or 0)
-                left = _left_units(need, int((it.get("got") or {}).get(oid) or 0), _uof(it["id"]))
+                left = _left_units(need, (it.get("got") or {}).get(oid) or 0)
                 if left > 0:
                     put(it["id"], it.get("name", ""), "cancelled", left, {oid: left})
 
@@ -2221,7 +2208,8 @@ async def handle_own_scan(request):
                           str(body.get("product_id") or "").strip(),
                           code, _owner_name(request, body),
                           int(request.get("owner_id") or 0),
-                          str(body.get("at_dev") or ""), owner=True)
+                          str(body.get("at_dev") or ""), owner=True,
+                          qty=body.get("qty"))
     return web.json_response(res, headers=CORS_HEADERS)
 
 

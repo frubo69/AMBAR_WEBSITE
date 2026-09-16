@@ -192,7 +192,7 @@ async def _registry_was(district: str, day: str) -> dict:
     cat = _catalog()
     start, _ = _day_bounds(day, 1)
     since_iso = since.isoformat() if hasattr(since, "isoformat") else str(since)
-    out = {pid: n / _unit(cat.get(pid) or {}) for pid, n in codes.items()}
+    out = {pid: float(n) for pid, n in codes.items()}       # коды уже в единицах (qty)
     for o in await db.sold_since(min(since_iso, start)):
         if (o.get("office_id") or "") != district:
             continue
@@ -210,7 +210,7 @@ async def _registry_was(district: str, day: str) -> dict:
                                                 skip_audit=False))
                        .get(district) or {}).items():
             if pid in out:
-                out[pid] -= n / _unit(cat.get(pid) or {})
+                out[pid] -= n                            # списания — в единицах
     except Exception as e:
         log.warning(f"[stock] списания в реестре не учтены ({district}): {e}")
     # Переезды сканом реестр показывает сразу: бутылка уже числится на новом
@@ -841,10 +841,9 @@ async def move_by_code(code: str, dst: str, by, by_name: str = "",
     if not p:
         return _move_res("no_item", code=code, name=name, label=label)
 
-    # Количество — в учётных единицах позиции: бутылка крепкого это единица, а
-    # бутылка пива — двадцать четвёртая часть ящика. Не округляем: округлит
-    # лист, сложив все переезды позиции за день.
-    qty = 1 / _unit(p)
+    # Количество — то, что несёт код: бутылка 1, коробка пива 1, полкоробки
+    # 0.5 (QR клеится на коробку, банки не сканируют).
+    qty = float(doc.get("qty") or 1)
     day = str(day or "").strip() or _biz_day()
     at = datetime.now(timezone.utc).isoformat()
     tid = await db.add_stock_transfer(
@@ -1154,9 +1153,9 @@ async def _district_base(day: str) -> dict:
         except Exception as e:
             log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
         for pid, n in came.items():
-            # Приёмка считает бутылки, склад — учётные единицы: ящик пива это
-            # одна единица и двадцать четыре кода.
-            have[pid] = (have.get(pid) or 0) + n / _unit(cat.get(pid) or {})
+            # Приёмка — в единицах: коробка пива это один код с qty 1,
+            # полкоробки — код с qty 0.5.
+            have[pid] = (have.get(pid) or 0) + n
         # «Внести новый товар» — тоже приход: бутылку завели кодом руками,
         # значит она лежит на полке, и склад обязан её показать — даже там,
         # где пересчёта не было. Коды, которыми лишь закрывали долг «QR не
@@ -1183,7 +1182,7 @@ async def _district_base(day: str) -> dict:
         # «перемещение должно происходить мгновенно»).
         for pid in set(sales) | set(manual) | set(moves):
             ev = [(ts, -q) for ts, q in (sales.get(pid) or [])]
-            ev += [(at, 1 / _unit(cat.get(pid) or {})) for at in (manual.get(pid) or [])]
+            ev += [(at, q) for at, q in (manual.get(pid) or [])]
             ev += list(moves.get(pid) or [])
             ev.sort(key=lambda e: e[0])
             bal = have.get(pid) or 0
@@ -1194,7 +1193,7 @@ async def _district_base(day: str) -> dict:
         # этого вычитания заявка возит на полку то, чего на ней уже нет, а
         # недостача каждый раз выглядит ошибкой пересчёта.
         for pid, n in (broken.get(oid) or {}).items():
-            have[pid] = max(0, (have.get(pid) or 0) - n / _unit(cat.get(pid) or {}))
+            have[pid] = max(0, (have.get(pid) or 0) - n)       # списания — в единицах
         out[oid] = {"have": {k: int(v) for k, v in have.items()},
                     # Точный остаток до половины единицы: полящика пива — это
                     # двенадцать банок, и карточке склада их терять нельзя;
@@ -1544,6 +1543,8 @@ async def handle_audit_scan(request):
         "label": (doc or {}).get("label") or "",
         "verdict": verdict,
         "home": (doc or {}).get("district") or "",
+        # Сколько единиц за этим кодом: коробка 1, полкоробки 0.5.
+        "qty": float((doc or {}).get("qty") or 1),
     })
     counts = await db.audit_scan_counts(district, day)
     unit = _unit(p) if p else 1
@@ -1555,11 +1556,11 @@ async def handle_audit_scan(request):
         "label": (doc or {}).get("label") or "",
         "home": (doc or {}).get("district") or "",
         "home_code": OFFICE_CODES.get((doc or {}).get("district") or "", ""),
-        # Счёт по позиции — в бутылках: на экране скана человек считает
-        # бутылки, а не ящики, и делить их пополам там незачем.
-        "count": int(counts.get(pid) or 0),
+        # Счёт по позиции — в единицах склада: коды несут qty, у пива это
+        # коробки и полкоробки.
+        "count": _num(counts.get(pid) or 0),
         "unit": unit,
-        "total": sum(counts.values()),
+        "total": _num(sum(counts.values())),
         "positions": len(counts),
     }, headers=CORS_HEADERS)
 
@@ -1654,7 +1655,7 @@ async def _moves_since_count(district: str, cnt: dict, cat: dict) -> dict:
         pid = m.get("product_id")
         if not pid or pid not in cat:
             continue
-        q = _bottles(m.get("qty") or 0, _unit(cat[pid]))
+        q = float(m.get("qty") or 0)                     # переезды — в единицах
         if not q:
             continue
         if m.get("to") == district:
@@ -1692,16 +1693,16 @@ async def _audit_expected(district: str, day: str) -> tuple:
         cnt = await db.get_last_stock_count(district)
         moved = await _moves_since_count(district, cnt, cat)
         for pid, p in cat.items():
-            n = max(0, _bottles(have.get(pid) or 0, _unit(p)) + int(moved.get(pid) or 0))
-            noqr[pid] = min(n, int(miss.get(pid) or 0))
-            exp[pid] = n
+            n = max(0.0, float(have.get(pid) or 0) + float(moved.get(pid) or 0))
+            noqr[pid] = _num(min(n, float(miss.get(pid) or 0)))
+            exp[pid] = _num(n)
         return exp, noqr, True
     reg = await _registry_was(district, day)
     sold = await _sold(day, district)
     mv = _moves_by_pid(await db.get_stock_transfers(day), district)
     for pid, p in cat.items():
         v = float(reg.get(pid) or 0) + float(mv.get(pid) or 0) - float(sold.get(pid) or 0)
-        exp[pid] = max(0, _bottles(v, _unit(p)))
+        exp[pid] = _num(max(0.0, v))
         noqr[pid] = 0
     return exp, noqr, False
 
@@ -1714,13 +1715,13 @@ async def _audit_lines(district: str, day: str) -> tuple:
     await _loss_load()
     lines = []
     for pid, p in cat.items():
-        e = int(exp.get(pid) or 0)                     # числится всего
-        q = int(noqr.get(pid) or 0)                    # из них без кодов
-        c = max(0, e - q)                              # видимых камере
-        a = int(counts.get(pid) or 0)
+        e = _num(exp.get(pid) or 0)                    # числится всего, единиц
+        q = _num(noqr.get(pid) or 0)                   # из них без кодов
+        c = _num(max(0, e - q))                        # видимых камере
+        a = _num(counts.get(pid) or 0)                 # увидела камера (коды по qty)
         # Разница — только по кодовым бутылкам: те, что без кодов, камера
         # увидеть не может, и в недостачу они не идут — их вносят кодами.
-        d = c - a
+        d = _num(c - a)
         lines.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
             "no": order_key(pid) + 1, "unit": _unit(p),
@@ -1970,7 +1971,7 @@ def _audit_snapshot_lines(lines: list) -> list:
     out = []
     for l in lines:
         u = l["unit"]
-        e, act = _num(l["expected"] / u), _num((l["actual"] + l["noqr"]) / u)
+        e, act = _num(l["expected"]), _num(l["actual"] + l["noqr"])   # уже в единицах
         out.append({"id": l["id"], "name": l["name"], "price": l["price"], "unit": u,
                     "was": e, "income": 0, "moved_qty": 0, "sold": 0,
                     "expected": e, "actual": act, "diff": _num(e - act),
@@ -2195,12 +2196,13 @@ async def handle_audit_over(request):
             if not code:
                 continue
             if v == "other":
-                src = (await db.qr_get(code) or {}).get("district") or ""
+                cdoc = await db.qr_get(code) or {}
+                src = cdoc.get("district") or ""
                 if src == district:
                     continue
                 tid = await db.add_stock_transfer(
                     {"day": day, "from": src, "to": district, "product_id": pid,
-                     "product_name": p.get("name", ""), "qty": 1 / max(1, _unit(p)),
+                     "product_name": p.get("name", ""), "qty": float(cdoc.get("qty") or 1),
                      "src": "qr", "code": code, "by": me, "by_name": by_name,
                      "by_kind": "owner", "audit": day, "at": before})
                 if await db.qr_move(code, src, district, tid, me, before):
@@ -2596,8 +2598,7 @@ def _loss_of(pid: str, qty: int) -> int:
         цена = float(_LOSS_CACHE.get(pid) or 0)
         if not цена:
             return 0
-        unit = max(1, _unit(_catalog().get(pid) or {}))
-        return int(round(цена / unit * max(0, int(qty or 0))))
+        return int(round(цена * max(0.0, float(qty or 0))))     # цена и qty — за единицу
     except Exception:                                        # noqa: BLE001
         return 0
 
@@ -2607,7 +2608,7 @@ def _sale_of(pid: str, qty: int) -> int:
     прайсе — за учётную единицу (у пива ящик), поэтому делим, как и в закупке."""
     try:
         p = _catalog().get(pid) or {}
-        return int(round(_price(p) / max(1, _unit(p)) * max(0, int(qty or 0))))
+        return int(round(_price(p) * max(0.0, float(qty or 0))))   # прайс за единицу × единицы
     except Exception:                                        # noqa: BLE001
         return 0
 

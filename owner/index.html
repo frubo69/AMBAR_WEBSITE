@@ -5235,6 +5235,12 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .scan-pill span{font-size:10px;letter-spacing:.6px;text-transform:uppercase;
   color:rgba(255,255,255,.6)}
 .scan-pill em{font-style:normal;font-size:11px;font-weight:700;color:#FF8A8A}
+/* Коробка или полкоробки: QR у пива клеится на коробку (1) и на половинку
+   (0,5), банки не сканируют (владелец, 16 сен 2026). Показываем только у пива. */
+.scan-half{display:inline-flex;padding:0;overflow:hidden;align-items:stretch;gap:0}
+.scan-half button{background:none;border:0;color:rgba(255,255,255,.55);padding:10px 12px;
+  font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer}
+.scan-half button.on{color:var(--gold2);background:rgba(255,255,255,.12)}
 .scan-tools{display:flex;gap:8px;flex-shrink:0}
 .scan-tool{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;cursor:pointer;color:#fff;
@@ -15262,7 +15268,7 @@ async function audRefresh(){
 // Числа ревизии — в единицах склада: бутылки, у пива коробки (владелец, 16 сен
 // 2026: «у нас 16 бутылок на районе, а не 2» — раньше числились только
 // заведённые кодами). Сервер отдаёт бутылки/банки — делим на unit здесь.
-function _audU(r){ return r && r.unit > 1 ? r.unit : 1; }
+function _audU(r){ return 1; }   // сервер отдаёт единицы: коды несут коробки и полкоробки
 function _audCoded(r){ return r.coded != null ? r.coded : Math.max(0, (r.expected || 0) - (r.noqr || 0)); }
 // Сводка по строкам в единицах: числится, видимых камере, увидела, недостача,
 // излишек, без кодов. Считаем от строк, а не от серверных итогов: те в
@@ -23043,12 +23049,27 @@ function qrRenderList(){
 // любом виде (владелец, 16 сен 2026: «мы вообще не считаем в банках и
 // бутылках, только в ящиках»). Коды заводят по банке, но число здесь — 9, а
 // не 216.
+// Что несёт следующий код: коробку (1) или полкоробки (0,5). Живёт, пока
+// открыт сканер, и сбрасывается на коробку при каждом открытии.
+let SCAN_HALF = false;
+function _halfPill(show){
+  SCAN_HALF = false;
+  if(!show) return '';
+  return `<div class="scan-pill scan-half" id="scanHalf">
+    <button class="on" onclick="halfSet(false)">Коробка</button>
+    <button onclick="halfSet(true)">Полкоробки</button></div>`;
+}
+function halfSet(half){
+  SCAN_HALF = !!half;
+  document.querySelectorAll('#scanHalf button').forEach((b, i) => b.classList.toggle('on', (i === 1) === SCAN_HALF));
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
 function _qrIsBeer(p){
   return !!(p && ((p.cat || '') === 'Пиво' || p.unit > 1 || p.price_24 || p.price_24_full));
 }
 function _qrNeedTag(p, n){
   if(_qrIsBeer(p))
-    return `<span class="pk-n dn">${fmtQty(n / 24)}<i>кор · QR код не внесён</i></span>`;
+    return `<span class="pk-n dn">${fmtQty(n)}<i>кор · QR код не внесён</i></span>`;
   return `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>`;
 }
 
@@ -23142,6 +23163,7 @@ function qrScreen(mode){
       <div class="scan-hud">
         <div class="scan-hud-top">
           <div class="scan-pill"><b id="qrN">0</b><span>${del ? 'убрано' : 'на офисе'}</span></div>
+          ${_halfPill(!del && _qrIsBeer(QR_PROD))}
           <div class="scan-tools">
             <button class="scan-tool" id="qrSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -23273,7 +23295,8 @@ function qrSave(code){
   // Откуда бутылка: новый товар — приход на склад; из ревизии по «QR не
   // внесён» — код к бутылке, которая в пересчёте уже есть.
   SCANQ.push({path:'/api/owner/qr/scan',
-              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new'}, code});
+              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new',
+                    qty: SCAN_HALF ? 0.5 : 1}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {
@@ -25522,7 +25545,8 @@ function rcvCam(){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="rcvN">${fmt(l.left)}</b><span>осталось</span></div>
+          <div class="scan-pill"><b id="rcvN">${fmtQty(l.left)}</b><span>осталось</span></div>
+          ${_halfPill(l.unit > 1)}
           <div class="scan-tools">
             <button class="scan-tool" id="rcvSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -25561,6 +25585,7 @@ function rcvScan(code){
   rcvFeed();
   SCANQ.push({path:`/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/scan`,
               body:{district: RCV.district, product_id: RCV_LINE.id, code,
+                    qty: SCAN_HALF ? 0.5 : 1,
                     at_dev: new Date().toISOString(), as: _rcvMe()}, code, rcv:true});
 }
 

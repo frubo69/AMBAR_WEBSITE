@@ -27114,6 +27114,9 @@ const EXP_KINDS = [
   {id:'owed_us', t:'Нам должны',    who:'кто должен'},
   {id:'we_got',  t:'Нам вернули',   who:'кто вернул', plus:true},
   {id:'we_owe',  t:'Мы должны',     who:'кому должны', plus:true},
+  // Чай за допродажи: 5% от добавленного водителем в пути. Пишется сервером
+  // при одобрении правки; в выборе для ручной записи не показывается.
+  {id:'upsell',  t:'Чай за допродажи', auto:true},
   // «Всё остальное» — последним, как у водителя: сначала то, что зовётся словом.
   {id:'other',   t:'Что-то ещё',    hint:'комментарий'},
 ];
@@ -27146,7 +27149,7 @@ const XE_ICO = {
   cam:  '<path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
 };
-const XE_KIND_ICO = {fuel:'fuel', wash:'wash', parking:'park', kfc:'gift', guard:'guard',
+const XE_KIND_ICO = {fuel:'fuel', wash:'wash', parking:'park', kfc:'gift', guard:'guard', upsell:'gift',
                      we_gave:'out', we_owe:'out', we_got:'into', owed_us:'into'};
 const xsvg = (d, w = 19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
   stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -27163,7 +27166,7 @@ const XE_QR = '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="
             + '<rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M18 18h3v3"/>';
 function expAddList(r){
   const n = escS(r.name);
-  return `<div class="exp-add xe-list">${EXP_KINDS.map(k => {
+  return `<div class="exp-add xe-list">${EXP_KINDS.filter(k => !k.auto).map(k => {
     const ico = XE_ICO[XE_KIND_ICO[k.id]] || XE_ICO.note;
     const бут = k.scan && EXP_GUARD.driver === r.name && EXP_GUARD.code ? EXP_GUARD : null;
     const снят = EXP_SHOT.kind === k.id && !!EXP_SHOT.photo;
@@ -32479,6 +32482,7 @@ function renderOperators(){
     const drvBits = [
       op.districts.length ? null : 'нет в списке',
       op.tips ? `чай ${fmt(op.tips)}` : null,
+      op.upsell ? `допродажи +${fmt(op.upsell)}` : null,
       op.avg_sample ? (op.late ? `${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')}`
                                : 'без опозданий') : null,
     ].filter(Boolean);
@@ -33318,6 +33322,16 @@ const DETAIL = {
               <div class="dt-row-r" style="color:var(--gold2)">${fmt(t.aed)}</div>
             </div>`).join('')
           : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Нет чаевых</div><div class="dt-row-s">за период не продавали позиций со ставкой</div></div></div>'}
+        </div>` : ''}
+
+        ${d.upsell ? `
+        <div class="dt-sect">Чай за допродажи · ${fmt(d.upsell)} AED</div>
+        <div class="dt-card">
+          <div class="dt-row">
+            <div class="dt-row-l"><div class="dt-row-t">5% от добавленного в пути</div>
+            <div class="dt-row-s">позиции, которые водитель добавил к заказу уже после того, как взял его · остаётся у водителя, в расходах дня видом «Чай за допродажи»</div></div>
+            <div class="dt-row-r" style="color:var(--gold2)">${fmt(d.upsell)}</div>
+          </div>
         </div>` : ''}
 
         ${d.drives && d.own_tips ? `

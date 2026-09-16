@@ -2635,7 +2635,9 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .sup-scr.show{display:flex}
 /* ── Итоги смены перед закрытием ── */
 .shs{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
-.shs-hero,.shs-tip{border-radius:18px;padding:16px 16px 14px}
+.shs-hero,.oc-upsell span,.oc-upsell b,.oc-upsell u{color:#E9C98A}
+.shs-upsell .shs-v{color:#E9C98A}
+.shs-tip{border-radius:18px;padding:16px 16px 14px}
 .shs-tip{background:linear-gradient(160deg,rgba(201,169,110,.24),rgba(201,169,110,.05));border:1px solid rgba(201,169,110,.62)}
 .shs-l{font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .shs-tip .shs-l{color:var(--gold2)}
@@ -5243,7 +5245,9 @@ function orderCard(o, i){
   const sq = (ic, w, cls) => `<span class="oc-ic ${cls || ''}">${svgThin(ic, w)}</span>`;
   const items = lines.map(it => `<div class="oc-it${n === 1 ? ' solo' : ''}">
       <span>${esc(it.name)}${it.gift ? ' <i>· подарок</i>' : (it.pcs ? ` <i>· ${it.pcs} шт</i>` : '')}</span>
-      <b>${it.qty}<u>шт</u></b></div>`).join('');
+      <b>${it.qty}<u>шт</u></b></div>`).join('')
+    // Допродажа: добавили позиции уже в пути — 5% от их цены ваш чай.
+    + (o.upsell && o.upsell.bonus ? `<div class="oc-it oc-upsell"><span>Ваш чай за добавленное · 5% от ${fmt(o.upsell.aed)} AED</span><b>+${fmt(o.upsell.bonus)}<u>AED</u></b></div>` : '');
   // Валюта и неровный расчёт — строками под способом оплаты, когда они есть.
   const st = o.settle;
   const fxLine = fx ? `<div class="oc-sub">${fxFmt(fx.amount, fx.sym)} по курсу ${fxFmt(fx.rate)} · ${esc(fx.name)}</div>` : '';
@@ -5946,6 +5950,7 @@ function shsPaintMid(){
   const m = SHS, aed = v => `${fmt(v)}<u>AED</u>`, sk = w => skb(w, 14);
   const row = (t, v, cls) => `<div class="shs-r${cls ? ' ' + cls : ''}"><span>${t}</span><b>${v}</b></div>`;
   // Чай операторов — первым и золотом: владелец просил акцент именно на нём.
+  const up = m && m.upsell && m.upsell.bonus ? m.upsell : null;
   let html = `<div class="shs-tip">
       <div class="shs-l">Чай операторов</div>
       <div class="shs-v">${m ? aed(m.tips) : sk(100)}</div>
@@ -5954,6 +5959,11 @@ function shsPaintMid(){
           ? `отдать операторам из наличных на руках${m.tips_other ? ` · ${fmt(m.tips_other)} из них по безналу` : ''}`
           : 'чая сегодня не было') : sk(150)}</div>
     </div>
+    ${up ? `<div class="shs-tip shs-upsell">
+      <div class="shs-l">Ваш чай за допродажи</div>
+      <div class="shs-v">+${aed(up.bonus)}</div>
+      <div class="shs-s">5% от ${fmt(up.aed)} AED · ${up.n} ${plural(up.n,'позиция','позиции','позиций')} добавили в пути в ${up.orders} ${plural(up.orders,'заказе','заказах','заказах')} · остаётся у вас, из наличных на руках уже вычтено</div>
+    </div>` : ''}
     <div class="shs-hero dcard">
       <div class="shs-l">Наличные на руках</div>
       <div class="shs-v">${m ? aed(m.on_hand) : sk(120)}</div>
@@ -7676,11 +7686,12 @@ const EXP_HINT = {
   we_gave: 'кому вернули', we_got: 'кто вернул',
   we_owe:  'кому должны',  owed_us: 'кто должен'};
 const EXP_KIND_ICO = {
-  parking: 'park', kfc: 'gift', guard: 'guard',
+  parking: 'park', kfc: 'gift', guard: 'guard', upsell: 'gift',
   we_gave: 'out',  we_owe: 'out', we_got: 'into', owed_us: 'into'};
 
 function expKindCards(only){
-  const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash'
+  // Чай за допродажи пишет сервер сам — руками его не заводят.
+  const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash' && k.id !== 'upsell'
     && (!only || only.includes(k.id)));
   if(!виды.length) return '<div class="card exp-card"><div class="exp-none">Загрузка…</div></div>';
   return виды.map(k => {

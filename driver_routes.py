@@ -250,6 +250,8 @@ def _order_view(o: dict) -> dict:
         "eta": o.get("eta", 0),
         "driver_ack_at": o.get("driver_ack_at", ""),
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
+        # Допродажа: что водитель добавил уже в пути и сколько чая за это.
+        "upsell": o.get("upsell") or None,
         # Разговор по заказу: сколько всего и есть ли непрочитанное. Саму
         # переписку кладём только в открытый заказ — в списке она не нужна, а
         # весит больше всего остального вместе взятого.
@@ -622,8 +624,15 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         wos = []
     wos = [w for w in wos if (w.get("state") or "ok") != "no"]
     gross = sum(v["aed"] for k, v in pay.items() if k != "free")
+    # Чай за допродажи: 5% от добавленного водителем в пути (по доставленным).
+    ups = [o.get("upsell") for o in mine if o.get("upsell")]
+    upsell = {"bonus": sum(int(u.get("bonus") or 0) for u in ups),
+              "aed": round(sum(float(u.get("aed") or 0) for u in ups), 2),
+              "n": sum(int(l.get("qty") or 0) for u in ups for l in (u.get("lines") or [])),
+              "orders": len(ups)}
     return {
         "day": day, "opened_at": _iso_at(d.get("shift_open_at")),
+        "upsell": upsell,
         "closed_at": _iso_at(d.get("shift_close_at")),
         "on_hand": int(round(cash_taken - spent + got)),
         "cash_taken": int(round(cash_taken)), "spent": spent, "got": got,
@@ -2104,6 +2113,8 @@ async def handle_expense_add(request):
     if kind not in EXTRA_KINDS:
         kind = "other"
     вид = EXTRA_KINDS[kind]
+    if вид.get("auto"):                    # чай за допродажи пишет сервер, не человек
+        return web.json_response({"error": "auto_only", "kind": kind}, status=400, headers=CORS_HEADERS)
     comment = (str(body.get("comment") or "").strip()[:200]
                or EXPENSE_KINDS.get(kind) or вид["t"])
     day = _biz_day()

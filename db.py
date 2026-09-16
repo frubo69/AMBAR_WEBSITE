@@ -4537,6 +4537,16 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
     return bool(r.matched_count)
 
 
+async def driver_expense_pull_order(day: str, driver: str, oid: str, kind: str) -> int:
+    """Убрать автоматические записи по заказу (чай за допродажу при отмене
+    заказа). Сколько строк ушло."""
+    db = _db_or_none()
+    if db is None or not (day and driver and oid): return 0
+    r = await db.driver_days.update_one({"day": day, "driver": driver},
+                                        {"$pull": {"extras": {"order": oid, "kind": kind}}})
+    return int(r.modified_count)
+
+
 async def driver_expense_car_clear(day: str, driver: str, item_id: str) -> bool:
     """Водитель убрал снимок машины у мойки — новый снимет, когда удобно.
 

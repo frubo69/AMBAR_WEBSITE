@@ -1987,6 +1987,7 @@ async def handle_operators(request):
             "rating": round(sum(revs) / len(revs), 2) if revs else 0,
             "rating_count": len(revs),
             # Чаевые старшему не начисляются: бутылки возят водители районов.
+            "upsell": sum(int((o.get("upsell") or {}).get("bonus") or 0) for _, o in dl),
             "tips": 0 if op["senior"] else tips_total,
             "tips_bottles": 0 if op["senior"] else tips_bottles,
             "tips_by_driver": [] if op["senior"] else sorted(
@@ -2020,8 +2021,11 @@ async def handle_operators(request):
         dv = _delivery_stats(dl)
         revs = [int(o["review_score"]) for _, o in dl if o.get("review_score")]
         tips, bottles, _ = _tips_by_driver(dl)
+        upsell = sum(int((o.get("upsell") or {}).get("bonus") or 0) for _, o in dl)
         drivers.append({
             "id": staff._slug(n), "name": n, "known": info["known"],
+            # Чай за допродажи: 5% от добавленного в пути (по доставленным).
+            "upsell": upsell,
             "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
                            "name": OFFICE_NAMES.get(d, d)} for d in info["districts"]],
             "operator": staff.DISTRICT_OPERATOR.get(

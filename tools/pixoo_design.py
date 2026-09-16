@@ -16,7 +16,7 @@ if len(sys.argv) < 4:
     print(__doc__); sys.exit(1)
 png, ip, url = sys.argv[1:4]
 x, y, w, h = (int(v) for v in (sys.argv[4:8] or (15, 28, 34, 16)))
-font = int(sys.argv[8]) if len(sys.argv) > 8 else 2
+font = int(sys.argv[8]) if len(sys.argv) > 8 else 4   # 4 — самый крупный шрифт с цифрами на этой прошивке (2 — мелкий; 0,1,3,5–11 цифр не рисуют)
 
 im = Image.open(png).convert("RGB"); W, H = im.size
 a = np.array(im)

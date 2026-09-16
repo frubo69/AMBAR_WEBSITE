@@ -15259,16 +15259,38 @@ async function audRefresh(){
 }
 
 // Строка позиции: номер, снимок, название, справа «лежит / числится».
+// Числа ревизии — в единицах склада: бутылки, у пива коробки (владелец, 16 сен
+// 2026: «у нас 16 бутылок на районе, а не 2» — раньше числились только
+// заведённые кодами). Сервер отдаёт бутылки/банки — делим на unit здесь.
+function _audU(r){ return r && r.unit > 1 ? r.unit : 1; }
+function _audCoded(r){ return r.coded != null ? r.coded : Math.max(0, (r.expected || 0) - (r.noqr || 0)); }
+// Сводка по строкам в единицах: числится, видимых камере, увидела, недостача,
+// излишек, без кодов. Считаем от строк, а не от серверных итогов: те в
+// бутылках и у старых ревизий без «видимых».
+function audUnits(rows){
+  const t = {expected: 0, coded: 0, actual: 0, short: 0, over: 0, noqr: 0};
+  (rows || []).forEach(r => {
+    const u = _audU(r), c = _audCoded(r);
+    t.expected += (r.expected || 0) / u; t.coded += c / u; t.actual += (r.actual || 0) / u;
+    t.noqr += (r.noqr || 0) / u;
+    const d = c - (r.actual || 0);
+    if(d > 0) t.short += d / u; else if(d < 0) t.over += -d / u;
+  });
+  return t;
+}
 function audRow(r){
   const dim = !r.expected && !r.actual;
-  const cls = dim ? 'dim' : r.actual === r.expected ? 'ok' : r.actual > r.expected ? 'over' : '';
-  const sub = r.noqr ? `<span class="aud-r-s dn">QR код не внесён · ${fmt(r.noqr)}</span>` : '';
+  const u = _audU(r), c = _audCoded(r);
+  // Зелёное — увидели всё, что числится; «излишек» — больше, чем кодовых;
+  // остальное нейтрально: бутылки без кодов камера увидеть не может.
+  const cls = dim ? 'dim' : r.actual === r.expected ? 'ok' : r.actual > c ? 'over' : '';
+  const sub = r.noqr ? `<span class="aud-r-s dn">QR код не внесён · ${fmtQty(r.noqr / u)}</span>` : '';
   return `<div class="aud-r${dim ? ' dim' : ''}">
     <span class="ord-r-i">${r.no || ''}</span>
     <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
       onerror="this.style.visibility='hidden'"></span>
     <span class="ord-r-n">${escS(r.name)}${sub}</span>
-    <span class="aud-n"><b class="${cls}">${fmt(r.actual || 0)}</b><i>/ ${fmt(r.expected || 0)}</i></span>
+    <span class="aud-n"><b class="${cls}">${fmtQty((r.actual || 0) / u)}</b><i>/ ${fmtQty((r.expected || 0) / u)}</i></span>
   </div>`;
 }
 
@@ -15277,23 +15299,26 @@ function audRow(r){
 function audCard(sh){
   const a = sh.audit || {}, t = sh.totals || {}, st = a.state || 'idle';
   const idle = st === 'idle';
-  const pct = t.expected ? Math.min(100, Math.round((t.actual || 0) / t.expected * 100)) : (t.actual ? 100 : 0);
+  const u = audUnits(sh.rows || []);
+  // Полоса — от видимого камере: бутылки без кодов она увидеть не может, и
+  // мерить ими ход ревизии значило бы никогда не дойти до конца.
+  const pct = u.coded ? Math.min(100, Math.round(u.actual / u.coded * 100)) : (u.actual ? 100 : 0);
   const state = {idle:['не начата',''], running:['идёт','run'],
                  pending:['ждёт решения','dn'], closed:['закрыта','ok']}[st] || ['', ''];
-  const noqr = t.noqr || 0;
-  const full = !idle && t.expected && t.actual === t.expected;
+  const noqr = u.noqr || 0;
+  const full = !idle && u.coded > 0 && Math.abs(u.actual - u.coded) < 0.01;
   return `<div class="aud-card">
     <div class="aud-cap"><span>Ревизия</span><i class="${state[1]}">${state[0]}</i></div>
-    <div class="aud-prog"><b>${fmt(t.actual || 0)} / ${fmt(t.expected || 0)}</b>
+    <div class="aud-prog"><b>${fmtQty(u.actual)} / ${fmtQty(u.expected)}</b>
       <div class="aud-bar"><u class="${full ? 'ok' : ''}" style="width:${idle ? 0 : pct}%"></u></div><i>бут</i></div>
     <div class="aud-g">
-      <div class="aud-t ${idle ? 'dim' : t.short_qty ? 'dn' : 'ok'}"><span class="aud-tl">Недостача</span>
-        <b class="aud-tv">${idle ? '—' : fmt(t.short_qty || 0)}</b>
+      <div class="aud-t ${idle ? 'dim' : u.short ? 'dn' : 'ok'}"><span class="aud-tl">Недостача</span>
+        <b class="aud-tv">${idle ? '—' : fmtQty(u.short)}</b>
         <span class="aud-tu">${!idle && t.short_aed ? fmt(t.short_aed) + ' AED' : 'бут'}</span></div>
-      <div class="aud-t ${idle ? 'dim' : t.over_qty ? 'warn' : ''}"><span class="aud-tl">Излишки</span>
-        <b class="aud-tv">${idle ? '—' : fmt(t.over_qty || 0)}</b><span class="aud-tu">бут</span></div>
+      <div class="aud-t ${idle ? 'dim' : u.over ? 'warn' : ''}"><span class="aud-tl">Излишки</span>
+        <b class="aud-tv">${idle ? '—' : fmtQty(u.over)}</b><span class="aud-tu">бут</span></div>
       <button class="aud-t tap ${noqr ? 'dn' : ''}" onclick="audQrGo()"><span class="aud-tl">QR не внесён</span>
-        <b class="aud-tv">${fmt(noqr)}</b><span class="aud-tu">бут</span></button>
+        <b class="aud-tv">${fmtQty(noqr)}</b><span class="aud-tu">бут</span></button>
     </div>
     <button class="aud-fin" onclick="${st === 'running' ? 'audFinish()' : 'audReportGo()'}"
       ${idle ? 'disabled' : ''}>${st === 'idle' || st === 'running' ? 'Завершить ревизию' : 'Отчёт'}</button>
@@ -15367,17 +15392,19 @@ async function audStart(){
 
 async function audFinish(){
   const sh = STK.sheet; if(!sh) return;
-  const t = sh.totals || {};
-  // Ни одного скана при непустой полке — это не итог, а случайное нажатие:
-  // всё, что числится, ушло бы в недостачу. Спрашиваем красным.
-  const пусто = !(t.actual || 0) && (t.expected || 0) > 0;
+  const t = sh.totals || {}, u = audUnits(sh.rows || []);
+  // Ни одного скана при непустой кодовой полке — это не итог, а случайное
+  // нажатие: всё кодовое ушло бы в недостачу. Спрашиваем красным. Бутылки без
+  // кодов в недостачу не идут — они остаются на складе как были.
+  const пусто = !(u.actual || 0) && (u.coded || 0) > 0;
   const ok = пусто
     ? await askDialog('Камера не увидела ни одной бутылки',
-        `Всё, что числится, уйдёт в недостачу: ${fmt(t.expected)} бут${t.short_aed ? ' · ' + fmt(t.short_aed) + ' AED' : ''}`,
+        `Всё кодовое уйдёт в недостачу: ${fmtQty(u.coded)} бут${t.short_aed ? ' · ' + fmt(t.short_aed) + ' AED' : ''}`,
         'Всё равно завершить', 'Вернуться к сканированию', 'bad')
     : await askDialog('Завершить ревизию?',
-        `${fmt(t.actual || 0)} из ${fmt(t.expected || 0)} бутылок · недостача ${fmt(t.short_qty || 0)}`
-        + ` · излишки ${fmt(t.over_qty || 0)}`, 'Завершить', 'Не сейчас');
+        `${fmtQty(u.actual)} из ${fmtQty(u.expected)} · недостача ${fmtQty(u.short)}`
+        + ` · излишки ${fmtQty(u.over)}${u.noqr ? ` · без QR ${fmtQty(u.noqr)}, остаются на складе` : ''}`,
+        'Завершить', 'Не сейчас');
   if(!ok) return;
   const b = document.querySelector('.aud-fin');
   if(b){ b.disabled = true; b.textContent = 'Закрываю…'; }
@@ -15446,16 +15473,16 @@ function audReport(rep){
       pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmt(t.scan_qty || 0)}</div>
     ${allOk ? '' : `<div class="aud-res-g">
       <div class="aud-t ${t.short_qty ? 'dn' : ''}"><span class="aud-tl">Недостача</span>
-        <b class="aud-tv">${fmt(t.short_qty || 0)}</b>
+        <b class="aud-tv">${fmtQty(audUnits(rep.rows || []).short)}</b>
         <span class="aud-tu">${t.short_aed ? fmt(t.short_aed) + ' AED' : 'бут'}</span></div>
       <div class="aud-t ${t.over_qty ? 'warn' : ''}"><span class="aud-tl">Излишки</span>
-        <b class="aud-tv">${fmt(t.over_qty || 0)}</b><span class="aud-tu">бут</span></div></div>`}
+        <b class="aud-tv">${fmtQty(audUnits(rep.rows || []).over)}</b><span class="aud-tu">бут</span></div></div>`}
   </div>`;
   let secs = '';
   if(short){
     const rows = (short.lines || []).map(l => `<div class="aud-r">${img(l.id)}
       <span class="ord-r-n">${escS(l.name)}</span>
-      <span class="aud-d"><b class="dn">−${fmt(l.qty)}</b>${(l.due || l.loss) ? `<i>${fmt(l.due || l.loss)} AED</i>` : ''}</span></div>`).join('');
+      <span class="aud-d"><b class="dn">−${fmtQty((l.qty || 0) / (l.unit > 1 ? l.unit : 1))}</b>${(l.due || l.loss) ? `<i>${fmt(l.due || l.loss)} AED</i>` : ''}</span></div>`).join('');
     const foot = short.resolved_at
       ? `<div class="aud-done">${_AUD_CHECK}<span>${short.blame
           ? `Удержано <b>${fmt(short.amount)} AED</b> · ${escS(short.who || '')}`
@@ -15479,7 +15506,7 @@ function audReport(rep){
       if(l.sold)    bits.push(`ушла с заказом${l.sold > 1 ? ' · ' + l.sold : ''}`);
       return `<div class="aud-r">${img(l.id)}
         <span class="ord-r-n">${escS(l.name)}${bits.length ? `<span class="aud-r-s">${escS(bits.join(' · '))}</span>` : ''}</span>
-        <span class="aud-d"><b class="warn">+${fmt(l.qty)}</b></span></div>`;
+        <span class="aud-d"><b class="warn">+${fmtQty((l.qty || 0) / (l.unit > 1 ? l.unit : 1))}</b></span></div>`;
     }).join('');
     const foot = over.resolved_at
       ? `<div class="aud-done">${_AUD_CHECK}<span>Внесено на <b>${escS(rep.district_code)}</b>${
@@ -15854,8 +15881,8 @@ function audChipSet(name, n, exp){
   chip.style.width = 'auto';
   _setText('audChipN', name);
   const c = document.getElementById('audChipC');
-  c.innerHTML = `${fmt(n)}<s class="sl">/</s>${fmt(exp)}`;
-  c.className = n === exp ? 'ok' : n > exp ? 'over' : '';
+  c.innerHTML = `${fmtQty(n)}<s class="sl">/</s>${fmtQty(exp)}`;
+  c.className = Math.abs(n - exp) < 0.01 ? 'ok' : n > exp ? 'over' : '';
   const w1 = chip.offsetWidth;
   if(first){ chip.style.width = w1 + 'px'; chip.classList.remove('off'); }
   else { chip.style.width = w0 + 'px'; void chip.offsetWidth; chip.style.width = w1 + 'px'; }
@@ -15904,7 +15931,8 @@ function audDone(err, r, job){
     AUD.counts[r.product_id] = r.count;
     AUD.chipPid = r.product_id;
     const line = ((STK.sheet || {}).rows || []).find(x => x.id === r.product_id);
-    audChipSet(r.name || (line && line.name) || '…', r.count || 0, line ? (line.expected || 0) : 0);
+    const lu = _audU(line);
+    audChipSet(r.name || (line && line.name) || '…', (r.count || 0) / lu, line ? (line.expected || 0) / lu : 0);
   }
   if(!r.new) qrFlash('again', 'уже посчитана');
   else if(r.verdict !== 'ok') qrFlash(flash, r.verdict === 'other' && r.home_code
@@ -15913,11 +15941,13 @@ function audDone(err, r, job){
 }
 
 function audPaint(){
-  const done = Object.values(AUD.counts).reduce((a, b) => a + (b || 0), 0);
-  const exp = ((STK.sheet || {}).totals || {}).expected || 0;
-  _setText('audTotN', fmt(done)); _setText('audTotE', fmt(exp));
+  const rows = (STK.sheet || {}).rows || [];
+  const unitOf = pid => { const l = rows.find(x => x.id === pid); return _audU(l); };
+  const done = Object.entries(AUD.counts).reduce((a, [pid, n]) => a + (n || 0) / unitOf(pid), 0);
+  const u = audUnits(rows);
+  _setText('audTotN', fmtQty(done)); _setText('audTotE', fmtQty(u.expected));
   const tot = document.getElementById('audTot');
-  if(tot) tot.classList.toggle('ok', !!exp && done === exp);
+  if(tot) tot.classList.toggle('ok', u.coded > 0 && Math.abs(done - u.coded) < 0.01);
   const feed = document.getElementById('audFeed'); if(!feed) return;
   feed.innerHTML = AUD.rows.slice(0, 40).map((r, i) => {
     const [, say, color] = AUD_V[r.verdict] || ['', 'отправляю…', 'var(--muted)'];

@@ -1662,12 +1662,14 @@ async def _moves_since_count(district: str, cnt: dict, cat: dict) -> dict:
 
 
 async def _audit_expected(district: str, day: str) -> tuple:
-    """({позиция: ожидается бутылок}, {позиция: бутылок без кодов}, был ли пересчёт).
+    """({позиция: числится бутылок}, {позиция: из них без кодов}, был ли пересчёт).
 
     Пересчёт был — от него, как основа заявки и стоимость склада: снимок +
-    приход − продажи − списания, плюс переезды после снимка, минус бутылки без
-    кодов. Так число в ревизии совпадает с тем, что показывает карточка склада.
-    Пересчёта не было — от реестра, как лист."""
+    приход − продажи − списания, плюс переезды после снимка. Числится ВСЁ, что
+    лежит, включая бутылки без кодов: владелец (16 сен 2026) — «у нас 16
+    бутылок на районе, а не 2». Камера видит только заведённые кодами, поэтому
+    рядом — сколько из числящегося без кодов; недостача считается от кодовых
+    (см. _audit_lines). Пересчёта не было — от реестра, как лист."""
     cat = _catalog()
     base = await _district_base(day)
     b = base.get(district) or {}
@@ -1685,9 +1687,9 @@ async def _audit_expected(district: str, day: str) -> tuple:
         cnt = await db.get_last_stock_count(district)
         moved = await _moves_since_count(district, cnt, cat)
         for pid, p in cat.items():
-            n = _bottles(have.get(pid) or 0, _unit(p)) + int(moved.get(pid) or 0)
-            noqr[pid] = int(miss.get(pid) or 0)
-            exp[pid] = max(0, n - noqr[pid])
+            n = max(0, _bottles(have.get(pid) or 0, _unit(p)) + int(moved.get(pid) or 0))
+            noqr[pid] = min(n, int(miss.get(pid) or 0))
+            exp[pid] = n
         return exp, noqr, True
     reg = await _registry_was(district, day)
     sold = await _sold(day, district)
@@ -1707,15 +1709,19 @@ async def _audit_lines(district: str, day: str) -> tuple:
     await _loss_load()
     lines = []
     for pid, p in cat.items():
-        e = int(exp.get(pid) or 0)
+        e = int(exp.get(pid) or 0)                     # числится всего
+        q = int(noqr.get(pid) or 0)                    # из них без кодов
+        c = max(0, e - q)                              # видимых камере
         a = int(counts.get(pid) or 0)
-        d = e - a
+        # Разница — только по кодовым бутылкам: те, что без кодов, камера
+        # увидеть не может, и в недостачу они не идут — их вносят кодами.
+        d = c - a
         lines.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
             "no": order_key(pid) + 1, "unit": _unit(p),
             "price": _price(p),                        # прайс за учётную единицу
-            "expected": e, "actual": a, "diff": d,     # >0 — не хватает бутылок
-            "noqr": int(noqr.get(pid) or 0),
+            "expected": e, "coded": c, "actual": a, "diff": d,   # diff>0 — не хватает кодовых
+            "noqr": q,
             "loss": _loss_of(pid, d) if d > 0 else 0,  # закупка за пропавшие
             # Недостача удерживается по прайсу (правило владельца): это и
             # есть сумма в отчёте и в окне «Удержать за недостачу».
@@ -1731,6 +1737,7 @@ def _audit_totals(lines: list) -> dict:
     live = [l for l in lines if l["expected"] or l["actual"]]
     return {
         "expected": sum(l["expected"] for l in lines),
+        "coded": sum(l.get("coded", max(0, l["expected"] - l.get("noqr", 0))) for l in lines),
         "actual": sum(l["actual"] for l in lines),
         "short_qty": sum(l["diff"] for l in short),
         "short_aed": sum(l["due"] for l in short),      # по прайсу
@@ -1766,7 +1773,8 @@ def _audit_rows_saved(a: dict) -> list:
     rows = []
     for l in (a or {}).get("lines") or []:
         p = cat.get(l.get("id")) or {}
-        rows.append({**l, "name": p.get("name", ""), "cat": p.get("cat", ""),
+        rows.append({**l, "coded": l.get("coded", max(0, int(l.get("expected") or 0) - int(l.get("noqr") or 0))),
+                     "name": p.get("name", ""), "cat": p.get("cat", ""),
                      "no": order_key(l.get("id") or "") + 1, "unit": _unit(p),
                      "price": _price(p)})
     rows.sort(key=lambda r: r["no"])
@@ -1911,14 +1919,7 @@ async def handle_audit_finish(request):
     who = str(body.get("as") or "").strip()[:60]
     # Пересчёт — обычным документом, в учётных единицах: с него дальше живут
     # заявка и стоимость склада, и ревизия для них — просто свежий снимок.
-    doc_lines = []
-    for l in lines:
-        u = l["unit"]
-        e, act = _num(l["expected"] / u), _num(l["actual"] / u)
-        doc_lines.append({"id": l["id"], "name": l["name"], "price": l["price"], "unit": u,
-                          "was": e, "income": 0, "moved_qty": 0, "sold": 0,
-                          "expected": e, "actual": act, "diff": _num(e - act),
-                          "counted": True, "mark": "ok" if not l["diff"] else "diff"})
+    doc_lines = _audit_snapshot_lines(lines)
     doc = {"district": district, "district_name": OFFICE_NAMES.get(district, district),
            "day": day, "first_time": False,
            "counted_by": request["owner_id"], "counted_at": now_iso,
@@ -1937,7 +1938,7 @@ async def handle_audit_finish(request):
         "finished_at": now_iso, "finished_by": int(request["owner_id"] or 0),
         "finished_by_name": who, "short": short, "over": over, "alien": alien,
         "result": {**tot, "scan_qty": int(stats.get("total") or 0), "counted": counted},
-        "lines": [{"id": l["id"], "expected": l["expected"], "actual": l["actual"],
+        "lines": [{"id": l["id"], "expected": l["expected"], "coded": l["coded"], "actual": l["actual"],
                    "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"]} for l in lines],
     }
     # Сошлось и чужих кодов нет — закрыта сразу. Чужие коды — это бутылки без
@@ -1952,6 +1953,24 @@ async def handle_audit_finish(request):
                           f"{OFFICE_CODES.get(district, district)} — сканом {stats.get('total', 0)}"
                           + (f", недостача {tot['short_aed']} AED" if tot["short_aed"] else ""))
     return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+
+
+def _audit_snapshot_lines(lines: list) -> list:
+    """Строки снимка склада по итогам ревизии — в учётных единицах.
+
+    Бутылки без кодов камера увидеть не могла — они остаются в снимке как
+    были: ревизия судит только о кодовых. Иначе завершённая ревизия района,
+    заведённого по листу количеством, обнулила бы его (владелец, 16 сен
+    2026: «у нас 16 бутылок на районе, а не 2»)."""
+    out = []
+    for l in lines:
+        u = l["unit"]
+        e, act = _num(l["expected"] / u), _num((l["actual"] + l["noqr"]) / u)
+        out.append({"id": l["id"], "name": l["name"], "price": l["price"], "unit": u,
+                    "was": e, "income": 0, "moved_qty": 0, "sold": 0,
+                    "expected": e, "actual": act, "diff": _num(e - act),
+                    "counted": True, "mark": "ok" if not l["diff"] else "diff"})
+    return out
 
 
 def _audit_close_if_done(a: dict, fields: dict, now_iso: str, alien_left: int = 0) -> None:

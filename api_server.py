@@ -2950,6 +2950,12 @@ def main():
         track_routes.setup(app)
     except Exception as e:
         log.error(f"track routes setup failed: {e}")
+    # Цифры для рамки Divoom: голый текст по ключу, без initData.
+    try:
+        import pixoo_routes
+        pixoo_routes.setup(app)
+    except Exception as e:
+        log.error(f"pixoo routes setup failed: {e}")
     # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
     try:
         import operator_routes

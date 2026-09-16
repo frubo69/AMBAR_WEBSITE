@@ -1,3 +1,4 @@
+import math
 """
 AMBAR — склад: пересчёт, перемещения, заявка и норма.
 
@@ -1199,9 +1200,19 @@ async def _district_base(day: str) -> dict:
 async def order_rows(day: str = "") -> dict:
     """Заявка на закупку: сколько довезти в каждый район, чтобы вернуться к норме.
 
-    заявка = норма − остаток на руках. Норма берётся сохранённая, а если её не
-    задавали — рассчитанная по продажам. Отдаём и то и другое, чтобы владелец
-    видел, где норма расходится с реальным спросом.
+    заявка = норма − остаток на руках. Норма берётся сохранённая (ноль — тоже
+    норма), а если её не задавали — рассчитанная по продажам. Отдаём и то и
+    другое, чтобы владелец видел, где норма расходится с реальным спросом.
+
+    С 16 сен 2026 нормой назначен склад на начало смены того дня (владелец:
+    «берём сегодняшнее состояние склада за условную норму, к которой нужно
+    стремиться из любого положения»): продали за смену тридцать — заявка
+    просит тридцать; не поехали за ними — назавтра она просит за два дня.
+    Правка заявки руками живёт один день и норму не трогает: программа всё
+    равно смотрит на остаток и тянет его к норме. Остаток и норма — точные,
+    до полкоробки пива; сама заявка — в целых единицах, полкоробки округляются
+    вверх до коробки: магазин отгружает коробками, и поставка с приёмкой
+    считают их целыми.
 
     Отдельной функцией, потому что этим же расчётом выгружается Excel для
     магазина: держать вторую копию формулы нельзя — разойдутся молча.
@@ -1209,6 +1220,11 @@ async def order_rows(day: str = "") -> dict:
     day = (day or "").strip() or _biz_day()
     cat = _catalog()
     saved_norms = await db.get_stock_norms()
+    try:
+        norm_rule = await db.stock_norm_rule_get()
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] правило норм не прочитано: {e}")
+        norm_rule = {}
     edits = await db.zayavka_edits(day)      # ручные правки поверх расчёта
     rows, total_aed, total_qty = [], 0, 0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
@@ -1221,24 +1237,29 @@ async def order_rows(day: str = "") -> dict:
         row_edited = False
         for oid in OFFICE_IDS:
             d = per_district[oid]
-            have = int(d["have"].get(pid) or 0)
+            # Остаток точный: полкоробки пива — это 12 банок, и заявка обязана
+            # их просить, а не ждать, пока уйдёт целая коробка.
+            have = _num((d.get("have_exact") or {}).get(pid, d["have"].get(pid)) or 0)
             sug = int(d["sug"].get(pid) or 0)
-            norm = int((saved_norms.get(f"{oid}:{pid}") or sug or 0))
-            calc = max(0, norm - have)
+            saved = saved_norms.get(f"{oid}:{pid}")
+            norm = _num(saved if saved is not None else sug)
+            # Полкоробки недостачи — это коробка в заявке: меньше коробки
+            # магазин не отгружает, а приёмка считает коробки целыми.
+            calc = int(math.ceil(round(max(0.0, norm - have), 6)))
             # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
             # которое предлагала программа, иначе непонятно, от чего отступили.
             fix = (edits.get(pid) or {}).get(oid)
-            need = max(0, int(fix)) if fix is not None else calc
-            if fix is not None and int(fix) != calc:
+            need = max(0, int(round(float(fix)))) if fix is not None else calc
+            if fix is not None and need != calc:
                 row_edited = True
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc,
                           # Сколько из «есть» приехало уже после пересчёта и
                           # сколько с тех пор продали: владелец должен видеть,
                           # что число не с полки, а посчитанное.
-                          "came": int(d["came"].get(pid) or 0),
-                          "gone": int(d["gone"].get(pid) or 0),
-                          "edited": fix is not None and int(fix) != calc}
+                          "came": _num(d["came"].get(pid) or 0),
+                          "gone": _num(d["gone"].get(pid) or 0),
+                          "edited": fix is not None and need != calc}
             item_total += need
             if sug and norm > sug:
                 frozen_aed += (norm - sug) * price
@@ -1250,7 +1271,7 @@ async def order_rows(day: str = "") -> dict:
                      # нём бутылок, приложение само не знает, поэтому единицу
                      # отдаём рядом с ценой: иначе «цена за бутылку» на экране
                      # оказывается ценой за двадцать четыре.
-                     "price": price, "unit": _unit(p), "unit_name": "ящик" if _unit(p) > 1 else "бутылка",
+                     "price": price, "unit": _unit(p), "unit_name": "коробка" if _unit(p) > 1 else "бутылка",
                      "need_total": item_total, "cells": cells,
                      "calc_total": sum(c["calc"] for c in cells.values()),
                      "edited": row_edited})
@@ -1275,6 +1296,9 @@ async def order_rows(day: str = "") -> dict:
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_HIST_DAYS,
+        # Откуда нормы: снимок склада на начало смены такого-то дня — или
+        # расчёт по продажам, если снимка нет. Экран пишет это словами.
+        "norm_rule": norm_rule,
         "rows": [r for r in rows if r["need_total"] > 0],
         # Весь каталог, включая позиции без потребности: в Excel для
         # магазина едут все, чтобы он мог дописать то, чего мы не заказали.
@@ -1300,10 +1324,7 @@ async def handle_set_norm(request):
     except Exception:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     d, pid = str(body.get("district") or ""), str(body.get("product_id") or "")
-    try:
-        norm = max(0, int(body.get("norm") or 0))
-    except (TypeError, ValueError):
-        norm = 0
+    norm = _num(max(0, min(9999, _round_step(body.get("norm") or 0))))   # полкоробки пива — норма
     if d not in OFFICE_IDS or pid not in _catalog():
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
     await db.set_stock_norm(d, pid, norm, request["owner_id"])
@@ -1327,16 +1348,20 @@ async def handle_norms(request):
     cat = _catalog()
     base = await _district_base(day)
     saved = await db.get_stock_norms()
+    try:
+        norm_rule = await db.stock_norm_rule_get()
+    except Exception:                                # noqa: BLE001
+        norm_rule = {}
     det = await _suggested_norms(d, day, detail=True)
-    have = (base.get(d) or {}).get("have") or {}
+    have = (base.get(d) or {}).get("have_exact") or (base.get(d) or {}).get("have") or {}
 
     rows, frozen, manual = [], 0, 0
     for pid, p in cat.items():
         info = det.get(pid) or {}
         sug = int(info.get("norm") or 0)
         fix = saved.get(f"{d}:{pid}")
-        norm = int(fix if fix is not None else sug)
-        if fix is not None and int(fix) != sug:
+        norm = _num(fix if fix is not None else sug)
+        if fix is not None and norm != sug:
             manual += 1
         price = _price(p) / max(1, _unit(p))
         # Замороженное — только то, что стоит сверх расчёта: норма как таковая
@@ -1348,8 +1373,8 @@ async def handle_norms(request):
             continue
         rows.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
-            "price": round(price, 2), "norm": norm, "suggested": sug,
-            "manual": fix is not None, "have": int(have.get(pid) or 0),
+            "price": round(price, 2), "norm": norm, "suggested": sug, "unit": _unit(p),
+            "manual": fix is not None, "have": _num(have.get(pid) or 0),
             "expect": info.get("expect", 0), "safety": info.get("safety", 0),
             "per_day": info.get("base", 0), "cls": info.get("cls", ""),
         })
@@ -1361,8 +1386,9 @@ async def handle_norms(request):
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
                        "name": OFFICE_NAMES.get(o, o)} for o in OFFICE_IDS],
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_HIST_DAYS,
+        "norm_rule": norm_rule,
         "manual": manual, "frozen_aed": round(frozen, 2),
-        "norm_qty": sum(r["norm"] for r in rows),
+        "norm_qty": _num(sum(r["norm"] for r in rows)),
         "norm_aed": round(sum(r["norm"] * r["price"] for r in rows), 2),
         "rows": rows,
     }, headers=CORS_HEADERS)
@@ -2412,7 +2438,7 @@ async def handle_order_edit(request):
         await db.zayavka_edit_set(day, pid, district, None)
     else:
         try:
-            qty = max(0, min(9999, int(qty)))
+            qty = max(0, min(9999, int(round(float(str(qty).replace(",", "."))))))
         except (TypeError, ValueError):
             return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
         await db.zayavka_edit_set(day, pid, district, qty)

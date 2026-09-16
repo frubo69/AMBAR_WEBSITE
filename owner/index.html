@@ -21539,10 +21539,22 @@ function ordList(){
 function ordSumInner(){
   const d = ORD.d || {};
   const pos = (d.rows || []).length;
-  return `<span class="ord-sum-c"><b>${fmt(d.total_qty || 0)}</b><i>бутылок</i></span>
+  return `<span class="ord-sum-c"><b>${fmtQty(d.total_qty || 0)}</b><i>бутылок</i></span>
     <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
           aria-label="Цена по позициям"><b>${fmt(d.total_aed || 0)}<u>AED</u></b><i>прайс</i></span>
     <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
+}
+
+// Откуда нормы, словами: снимок склада на утро такого-то дня (владелец, 16 сен
+// 2026: «берём сегодняшнее состояние склада за условную норму») или расчёт по
+// продажам, как раньше.
+function _normRuleDay(rule){
+  const d = String((rule || {}).day || '');
+  return d.length === 10 ? `${d.slice(8, 10)}.${d.slice(5, 7)}` : d;
+}
+function _normRuleText(rule, coverDays){
+  if(rule && rule.kind === 'snapshot') return `норма — склад на утро ${_normRuleDay(rule)}`;
+  return `норма на ${coverDays} ${pluralize(coverDays, 'день', 'дня', 'дней')}`;
 }
 
 function ordRender(){
@@ -21551,8 +21563,7 @@ function ordRender(){
   const list = ordList();
   const ed = d.edited_count || 0;
   const q = ORD.q.trim();
-  _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${
-    pluralize(d.cover_days,'день','дня','дней')}`);
+  _setText('accSub', `${_dayName(d.day)} · ${_normRuleText(d.norm_rule, d.cover_days)}`);
 
   // Два вида одной заявки. По районам — карточки, как везде в панели. Общий
   // список — старый вид: каждая позиция строкой с кодами всех районов, и
@@ -21666,22 +21677,22 @@ function ordRow(r, x, num){
       <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
         onerror="this.style.visibility='hidden'"></span>
       <span class="ord-r-n">${escS(r.name)}</span>
-      <span class="ord-r-d">${c.edited ? `расчёт ${c.calc}` : ''}</span>
-      <span class="ord-r-v${c.edited ? ' gold' : ''}">${c.need || 0}</span>
+      <span class="ord-r-d">${c.edited ? `расчёт ${fmtQty(c.calc)}` : ''}</span>
+      <span class="ord-r-v${c.edited ? ' gold' : ''}">${fmtQty(c.need || 0)}</span>
       <span class="ord-r-go">${open ? '⌄' : '›'}</span>
     </button>
     ${open ? `<div class="ord-r-b">
       <div class="ord-c ord-c-big" data-d="${x.id}">
         <span class="ord-st">
           <button onclick="ordStep('${r.id}','${x.id}',-1)" aria-label="Меньше">−</button>
-          <input inputmode="numeric" value="${c.need||0}"
+          <input inputmode="numeric" value="${fmtQty(c.need||0)}"
                  onchange="ordSet('${r.id}','${x.id}',this.value)"
                  class="${c.edited ? 'fixed' : ''}">
           <button onclick="ordStep('${r.id}','${x.id}',1)" aria-label="Больше">+</button>
         </span>
       </div>
       ${c.edited ? `<button class="ord-reset" onclick="ordSet('${r.id}','${x.id}','${c.calc||0}')">
-        Вернуть расчёт · <b>${c.calc||0}</b></button>` : ''}
+        Вернуть расчёт · <b>${fmtQty(c.calc||0)}</b></button>` : ''}
     </div>` : ''}
   </div>`;
 }
@@ -21712,16 +21723,16 @@ function ordRowAll(r, dist, num){
       <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
         onerror="this.style.visibility='hidden'"></span>
       <span class="ord-r-n">${escS(r.name)}</span>
-      <span class="ord-r-v${r.edited ? ' gold' : ''}">${r.need_total}</span>
+      <span class="ord-r-v${r.edited ? ' gold' : ''}">${fmtQty(r.need_total)}</span>
       <span class="ord-r-go">${open ? '⌄' : '›'}</span>
     </button>
     ${open ? `<div class="ord-r-b">
       ${cells.map(o => `<div class="ord-c" data-d="${o.x.id}">
         <span class="ord-c-n"><b>${o.x.code}</b> ${escS(o.x.name)}</span>
-        <span class="ord-c-calc">${o.c.edited ? `расчёт ${o.c.calc}` : `на полке ${o.c.have||0}`}</span>
+        <span class="ord-c-calc">${o.c.edited ? `расчёт ${fmtQty(o.c.calc)}` : `на полке ${fmtQty(o.c.have||0)}`}</span>
         <span class="ord-st">
           <button onclick="ordStep('${r.id}','${o.x.id}',-1)" aria-label="Меньше">−</button>
-          <input inputmode="numeric" value="${o.c.need||0}"
+          <input inputmode="numeric" value="${fmtQty(o.c.need||0)}"
                  onchange="ordSet('${r.id}','${o.x.id}',this.value)"
                  class="${o.c.edited ? 'fixed' : ''}">
           <button onclick="ordStep('${r.id}','${o.x.id}',1)" aria-label="Больше">+</button>
@@ -21993,6 +22004,7 @@ function _ordRow(id){ return (ORD.d.all_rows || []).find(r => r.id === id); }
 function ordStep(id, district, delta){
   const r = _ordRow(id); if(!r) return;
   const c = r.cells[district] || {};
+  // Заявка — в целых единицах: полкоробки пива магазин не отгружает.
   ordPut(id, district, Math.max(0, (c.need || 0) + delta));
 }
 
@@ -22016,7 +22028,8 @@ const ORD_SAVE_MS = 400;
 function ordPut(id, district, qty){
   const r = _ordRow(id); if(!r) return;
   const c = r.cells[district] || (r.cells[district] = {});
-  qty = Math.max(0, Math.min(9999, parseInt(qty, 10) || 0));
+  // Целые единицы: коробка пива в заявке не делится.
+  qty = Math.max(0, Math.min(9999, Math.round(parseFloat(String(qty).replace(',', '.')) || 0)));
   c.need = qty;
   c.edited = qty !== (c.calc || 0);
   r.need_total = Object.values(r.cells).reduce((a, x) => a + (x.need || 0), 0);
@@ -30398,15 +30411,18 @@ async function accNorms(district){
 function nmPaint(){
   const w = NM; if(!w) return;
   const dist = (w.districts || []).find(d => d.id === w.district) || {};
-  _setText('accSub', `${dist.code || ''} · ${fmt(w.norm_qty)} ${
+  _setText('accSub', `${dist.code || ''} · ${fmtQty(w.norm_qty)} ${
     pluralize(w.norm_qty,'бутылка','бутылки','бутылок')} на полке`);
   document.getElementById('accMid').innerHTML = `
     <div class="nm-head">
       <div class="nm-head-l">
         <div class="nm-head-n" id="nmAed">${fmt(w.norm_aed)}<i>AED</i></div>
         <div class="nm-head-s">столько стоит полка целиком, если стоит по норме.
-          Расчёт держит запас на ${w.cover_days} ${
-          pluralize(w.cover_days,'день','дня','дней')} по продажам за ${w.window_days} дней</div>
+          ${(w.norm_rule && w.norm_rule.kind === 'snapshot')
+            ? `Норма — склад на утро ${_normRuleDay(w.norm_rule)}: заявка просит ровно то,
+               что продали с тех пор, и тянет полку обратно к этому состоянию`
+            : `Расчёт держит запас на ${w.cover_days} ${
+              pluralize(w.cover_days,'день','дня','дней')} по продажам за ${w.window_days} дней`}</div>
       </div>
       ${w.manual ? `<div class="nm-head-r"><b id="nmFix">${fmt(w.manual)}</b>
         <span>вручную</span></div>` : ''}
@@ -30425,7 +30441,7 @@ function nmRow(r){
     </div>
     <div class="nm-st">
       <button class="nm-qb" onclick="nmSet('${escS(r.id)}',-1)" aria-label="Меньше">−</button>
-      <span class="nm-v">${fmt(r.norm)}</span>
+      <span class="nm-v">${fmtQty(r.norm)}</span>
       <button class="nm-qb" onclick="nmSet('${escS(r.id)}',1)" aria-label="Больше">+</button>
     </div>
   </div>`;
@@ -30437,7 +30453,7 @@ function nmMeta(r){
   const bits = [];
   if(r.per_day) bits.push(`≈${(+r.per_day).toFixed(1).replace('.0','')}/дн`);
   bits.push(r.suggested ? `расчёт <b>${fmt(r.suggested)}</b>` : 'расчёта нет');
-  bits.push(`сейчас <b>${fmt(r.have)}</b>`);
+  bits.push(`сейчас <b>${fmtQty(r.have)}</b>`);
   return bits.join(' · ') + (r.manual
     ? `<br><span class="nm-back" onclick="nmReset('${escS(r.id)}')">вернуть расчёт</span>` : '');
 }
@@ -30446,7 +30462,8 @@ function nmMeta(r){
 // нажимают сериями, и ждать ответа на каждое нажатие нельзя.
 function nmSet(pid, d){
   const r = (NM.rows || []).find(x => x.id === pid); if(!r) return;
-  r.norm = Math.max(0, Math.min(9999, (r.norm || 0) + d));
+  const step = r.unit > 1 ? 0.5 : 1;         // пиво — полукоробками
+  r.norm = Math.max(0, Math.min(9999, Math.round(((r.norm || 0) + d * step) * 2) / 2));
   r.manual = true;
   nmPatch(r);
   NM_PEND[NM_D + '|' + pid] = r.norm;
@@ -30475,7 +30492,7 @@ function nmTotals(){
   const f = document.getElementById('nmFix');
   if(f) f.textContent = fmt(NM.manual);
   const dist = (NM.districts || []).find(d => d.id === NM.district) || {};
-  _setText('accSub', `${dist.code || ''} · ${fmt(NM.norm_qty)} ${
+  _setText('accSub', `${dist.code || ''} · ${fmtQty(NM.norm_qty)} ${
     pluralize(NM.norm_qty,'бутылка','бутылки','бутылок')} на полке`);
 }
 

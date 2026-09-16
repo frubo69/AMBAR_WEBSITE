@@ -2303,7 +2303,7 @@ async def zayavka_edit_set(day: str, pid: str, district: str, qty):
         await db.zayavka_edits.update_one({"_id": day}, {"$unset": {key: ""}}, upsert=True)
     else:
         await db.zayavka_edits.update_one(
-            {"_id": day}, {"$set": {key: int(qty), "at": datetime.now(timezone.utc)}},
+            {"_id": day}, {"$set": {key: _half(qty), "at": datetime.now(timezone.utc)}},
             upsert=True)
 
 
@@ -4694,12 +4694,40 @@ async def get_stock_transfer(tid: str) -> dict | None:
         return None
 
 
+def _half(v):
+    """Количество до половины учётной единицы: полкоробки пива — 0,5; целое
+    отдаём целым, чтобы в ответах не было «10.0»."""
+    try:
+        v = round(float(v or 0) * 2) / 2
+    except (TypeError, ValueError):
+        v = 0.0
+    return int(v) if v == int(v) else v
+
+
 async def get_stock_norms() -> dict:
-    """{"district:product_id": норма} — только заданные вручную."""
+    """{"district:product_id": норма} — только заданные вручную. Ноль — тоже
+    норма («не держим»), он отдаётся как 0, а не пропускается; половина
+    единицы (полкоробки пива) сохраняется."""
     db = _db_or_none()
     if db is None: return {}
     rows = await db.stock_norms.find({}, {"_id": 0}).to_list(length=2000)
-    return {f'{r["district"]}:{r["product_id"]}': int(r.get("norm") or 0) for r in rows}
+    return {f'{r["district"]}:{r["product_id"]}': _half(r.get("norm")) for r in rows}
+
+
+async def stock_norm_rule_get() -> dict:
+    """Откуда взяты нормы: {"kind": "snapshot", "day": …, "at": …} — «нормой
+    назначен склад на начало смены такого-то дня» (владелец, 16 сен 2026);
+    пусто — нормы считаются по продажам, как раньше."""
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.stock_norm_rule.find_one({"_id": "rule"}, {"_id": 0})
+    return doc or {}
+
+
+async def stock_norm_rule_set(doc: dict):
+    db = _db_or_none()
+    if db is None: return
+    await db.stock_norm_rule.replace_one({"_id": "rule"}, {"_id": "rule", **doc}, upsert=True)
 
 
 async def del_stock_norm(district: str, product_id: str):
@@ -4709,12 +4737,12 @@ async def del_stock_norm(district: str, product_id: str):
     await db.stock_norms.delete_one({"district": district, "product_id": product_id})
 
 
-async def set_stock_norm(district: str, product_id: str, norm: int, by: int = 0):
+async def set_stock_norm(district: str, product_id: str, norm, by: int = 0):
     db = _db_or_none()
     if db is None: return
     await db.stock_norms.update_one(
         {"district": district, "product_id": product_id},
-        {"$set": {"district": district, "product_id": product_id, "norm": int(norm),
+        {"$set": {"district": district, "product_id": product_id, "norm": _half(norm),
                   "by": by, "at": datetime.now(timezone.utc).isoformat()}},
         upsert=True)
 

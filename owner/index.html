@@ -21198,7 +21198,7 @@ const PATH_STEPS = ['Заявка', 'Магазин дал', 'Приняли'];
 // раньше «поставка идёт» писалось в трёх местах по трём разным правилам.
 function supStage(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
-  const sup = (ACC_SUP && ACC_SUP.open) || list.find(x => x.kind !== 'extra') || null;
+  const sup = (ACC_SUP && ACC_SUP.open) || _supCur(list);
   if(!sup) return {k:'none', sup:null, all:0, done:0, took:0,
                    t:'Магазин ещё не ответил', s:'загрузите ответ — появятся задачи'};
   const tasks = Object.values(sup.tasks || {}).filter(t => !t.cancelled_at);
@@ -21239,21 +21239,24 @@ function pathInner(){
   const st = supStage(), sup = st.sup;
   // Отменённая заявка возвращает путь на первый шаг: везти сегодня нечего,
   // и следующий разумный ход — собрать новую.
-  const step = !sup ? 1 : (sup.status === 'cancelled' ? 1
-                        : (sup.status === 'open' ? 2 : 3));
+  // Числа пути — только у живой поставки. Отменённая или уже принятая на
+  // первом шаге показывает сегодняшнюю заявку: то, что просим сейчас, а не
+  // то, что просили в прошлый раз.
+  const live = !!(sup && sup.status === 'open');
+  const step = live ? 2 : (sup && sup.status !== 'cancelled' ? 3 : 1);
   const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
   // Третий шаг меряется в процентах, а не в бутылках: «179» рядом с «469» надо
   // делить в уме, а «38%» отвечает сразу. Сами бутылки — на экране приёмки.
   const vals = [
-    fmt(sup ? (sup.asked_qty || 0) : (d.total_qty || 0)),
-    sup ? fmt(sup.total_qty || 0) : '—',
-    sup ? pct + '%' : '—',
+    fmt(live ? (sup.asked_qty || 0) : (d.total_qty || 0)),
+    live ? fmt(sup.total_qty || 0) : '—',
+    live ? pct + '%' : '—',
   ];
-  const m = (sup && sup.money) || null;
+  const m = (live && sup.money) || null;
   // Под «приняли» — бутылки, а не деньги: пока идёт приём, там всегда был
   // ноль дирхамов, и он отвечал не на тот вопрос.
   const money = m ? [m.asked, m.confirmed,
-                     sup ? `${fmt(st.took)} из ${fmt(sup.total_qty || 0)}` : null]
+                     `${fmt(st.took)} из ${fmt(sup.total_qty || 0)}`]
                   : [d.total_aed, null, null];
   return pathSteps(vals, money, step);
 }
@@ -21265,7 +21268,9 @@ function pathNav(){
   const d = ORD.d || {};
   const st = supStage();
   const pos = (d.rows || []).length;
-  const qty = st.sup ? (st.sup.asked_qty || 0) : (d.total_qty || 0);
+  // На карточке «Заявка» — живая поставка, пока она идёт; иначе то, что
+  // просим сегодня.
+  const qty = (st.sup && st.sup.status === 'open') ? (st.sup.asked_qty || 0) : (d.total_qty || 0);
   const ed = d.edited_count || 0;
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
@@ -21592,7 +21597,8 @@ function ordRender(){
       </span>
     </button>`}
 
-    ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
+    ${(d.frozen_aed && !(d.norm_rule && d.norm_rule.kind === 'snapshot'))
+      ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
     <div id="ordRows">${общий
@@ -23736,6 +23742,19 @@ let SUP_ID = null, SUP_D = null, SUP_BUSY = false;
 // четыре штуки с августа. Собрали новую — она и есть основная.
 function _supMain(list){
   return (list || []).find(x => x.status === 'open' && x.kind !== 'extra') || null;
+}
+// Что считать текущей основной поставкой на хабе. Открытая — всегда. Закрытая
+// или отменённая — только сегодняшняя: это новость дня («отменили», «приняли»).
+// Вчерашняя и старше — уже история, и её числа на карточке «Заявка» путали:
+// хаб показывал 781 бутылку отменённой поставки от 14-го, а внутри заявка на
+// сегодня была на 4 (владелец, 16 сен 2026: «этой же заявки нет уже»).
+function _supCur(list){
+  const open = _supMain(list);
+  if(open) return open;
+  let today = '';
+  try{ today = accDay(); }catch(e){}
+  return (list || []).find(x => x.kind !== 'extra'
+    && (x.day === today || String(x.at || '').slice(0, 10) === today)) || null;
 }
 
 async function accSupply(goto, district, sid){

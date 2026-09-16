@@ -1096,6 +1096,11 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
     doc = await db.supply_task_finish(sid, oid, gaps, str(note or "")[:300], now)
     if not doc:
         return {"ok": False, "verdict": "closed"}
+    try:
+        import stock_routes
+        stock_routes.base_drop()            # задача закрыта — остаток без кодов пересчитать
+    except Exception:                       # noqa: BLE001
+        pass
     log.info(f"[supply] {sid}/{oid}: приёмка закрыта · {me} · "
              f"{(doc.get('tasks') or {}).get(oid, {}).get('scanned', 0)} шт · "
              f"недобор {sum(g['gap'] for g in gaps)}")
@@ -1980,6 +1985,11 @@ async def handle_cancel(request):
     if not targets:
         return web.json_response({"error": "nothing_to_cancel"}, status=409,
                                  headers=CORS_HEADERS)
+    try:
+        import stock_routes
+        stock_routes.base_drop()            # отменённый район — его товар со склада уходит сразу
+    except Exception:                       # noqa: BLE001
+        pass
     sup = await db.supply_get(sid) or sup
     tasks = sup.get("tasks") or {}
     left = [o for o, t in tasks.items() if not t.get("done_at") and not t.get("cancelled_at")]

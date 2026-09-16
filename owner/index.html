@@ -22774,9 +22774,19 @@ function qrCover(district){
 // водитель мог начать или закончить сканирование, и это видно без перезахода.
 function qrPollStart(){ qrPollStop(); QR_POLL = setInterval(qrPollTick, 5000); }
 function qrPollStop(){ if(QR_POLL){ clearInterval(QR_POLL); QR_POLL = null; } }
+let _qrPollN = 0;
 async function qrPollTick(){
   if(document.hidden) return;
-  if(document.getElementById('qrIn')) return qrHome(true);
+  if(document.getElementById('qrIn')){
+    // Долг по пересчёту (реестр) — каждый третий опрос: он тяжелее приёмки,
+    // а меняется реже — когда кто-то вносит коды или продаёт.
+    if(++_qrPollN % 3 === 0){
+      ownerApi.ownerFetch('/api/owner/qr').then(d => { ACC_QR = d;
+        const box = document.getElementById('qrIn'); if(box) box.innerHTML = qrInRows();
+        _qrHomeSub(); }).catch(() => {});
+    }
+    return qrHome(true);
+  }
   if(QR_IN && !RCV_LINE) return qrIntake(QR_IN.district, true);
   qrPollStop();
 }
@@ -22979,6 +22989,10 @@ function qrPick(district){
   document.getElementById('accFoot').innerHTML = QR_SESS.length
     ? `<div class="qb-wrap"><button class="qb" onclick="qrCommit()">Сохранить и добавить на склад</button></div>` : '';
   qrLoadCatalog();
+  // Долг по позициям — свежий: со сканера сюда возвращаются с новыми кодами,
+  // и красные числа обязаны уменьшиться без перезахода.
+  ownerApi.ownerFetch('/api/owner/qr').then(d => { ACC_QR = d;
+    if(document.getElementById('qrList') && QR_DIST === district) qrRenderList(); }).catch(() => {});
 }
 
 async function qrLoadCatalog(){
@@ -28028,9 +28042,13 @@ async function stkValueTick(){
   const card = document.getElementById('stkValCard');
   if(!card || document.hidden || _stkTickBusy || !window.ownerApi) return;
   if(!card.getClientRects().length) return;         // раздел не на экране
-  if(!STK || STK.view !== 'pick' || DAY_OFFSET) return;   // только «сегодня» и только обзор
+  if(!STK || DAY_OFFSET) return;                     // только «сегодня»
+  if(STK.view !== 'pick' && STK.view !== 'bydist') return;
   _stkTickBusy = true;
-  try{ await stkPicker(true); }catch(e){}
+  try{
+    if(STK.view === 'pick') await stkPicker(true);
+    else { STK.val = null; const y = window.scrollY; await stkByDistrict(true); window.scrollTo(0, y); }
+  }catch(e){}
   finally{ _stkTickBusy = false; }
 }
 setInterval(stkValueTick, 30000);

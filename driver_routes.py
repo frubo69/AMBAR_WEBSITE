@@ -1203,6 +1203,9 @@ async def handle_move_del(request):
             # возвращать её «ко мне» значило бы перечеркнуть чужой.
             return web.json_response({"error": "moved_on"}, status=409, headers=CORS_HEADERS)
     ok = await db.delete_stock_transfer(tid)
+    if ok:
+        import stock_routes
+        stock_routes.base_drop()         # бутылка вернулась — склад видит сразу
     return web.json_response({"ok": ok}, status=200 if ok else 404, headers=CORS_HEADERS)
 
 

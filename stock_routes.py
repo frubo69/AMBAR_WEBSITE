@@ -768,6 +768,7 @@ async def handle_transfer(request):
            "by": request["owner_id"],
            "at": datetime.now(timezone.utc).isoformat()}
     await db.add_stock_transfer(doc)
+    base_drop()                      # остаток обоих районов изменился сейчас
     log.info(f"[stock] перемещение {qty}×{pid}: {src} → {dst} ({day})")
     await backdate.notify(day, str(body.get("as") or ""), "перемещение между офисами",
                           f"{_catalog()[pid].get('name','')} · {qty} шт · "
@@ -854,6 +855,7 @@ async def move_by_code(code: str, dst: str, by, by_name: str = "",
         # оставлять нельзя, иначе она уедет дважды.
         await db.delete_stock_transfer(tid)
         return _move_res("busy", code=code, name=name, label=label)
+    base_drop()                      # склад видит переезд сразу, не через пересчёт
     log.info(f"[stock] переезд по коду {code}: {src} → {dst} ({pid}) — {by_kind} {by_name}")
     return _move_res("ok", code=code, name=p.get("name", "") or name, label=label,
                      transfer_id=tid, bottles=1, to=dst,
@@ -880,6 +882,7 @@ async def move_undo_by_code(code: str, only_driver: str = None) -> tuple:
         return 404, {"error": "not_moved"}
     if last.get("transfer"):
         await db.delete_stock_transfer(str(last["transfer"]))
+    base_drop()
     log.info(f"[stock] переезд отменён {code}: назад на {last.get('from')}")
     return 200, {"ok": True, "code": code, "to": last.get("from") or ""}
 
@@ -975,6 +978,8 @@ async def handle_transfer_delete(request):
     if (doc.get("src") or "") == "qr" and doc.get("code"):
         await db.qr_move_undo(str(doc["code"]), tid)
     ok = await db.delete_stock_transfer(tid)
+    if ok:
+        base_drop()
     return web.json_response({"ok": ok}, status=200 if ok else 404, headers=CORS_HEADERS)
 
 
@@ -1011,6 +1016,45 @@ BASE_TTL = 60          # секунд
 def base_drop():
     """Забыть основу заявки: пересчитали склад или приняли товар."""
     _BASE["key"] = None
+
+
+async def _moved_after(counts: dict, since: dict) -> dict:
+    """{район: {позиция: [(момент, ±единиц), …]}} — переезды после пересчёта.
+
+    Переезд после пересчёта района двигает его остаток: минус у отдающего,
+    плюс у принимающего, ровно в момент переезда. Переезд до пересчёта в
+    остатке уже есть — его не трогаем. Отдельно — задним числом: переезд,
+    записанный сегодня за день раньше пересчёта, тоже уже в остатке (район
+    считали позже, чем он случился), и по дню он отсеивается.
+
+    Район без пересчёта: принять может (бутылка приехала — её видно, как и
+    внесённую руками), отдать — нечего, у него нет остатка."""
+    live = [s for s in since.values() if s]
+    if not live:
+        return {}
+    first = min(live).astimezone(timezone.utc).isoformat()
+    out = {}
+    for m in await db.stock_transfers_after(first):
+        pid = m.get("product_id")
+        try:
+            q = float(m.get("qty") or 0)
+        except (TypeError, ValueError):
+            continue
+        at = _dt_of(m.get("at") or "")
+        if not pid or not q or not at:
+            continue
+        day = str(m.get("day") or "")
+        for oid, sign in ((m.get("from"), -1.0), (m.get("to"), 1.0)):
+            if oid not in OFFICE_IDS:
+                continue
+            edge = since.get(oid)
+            if edge:
+                if at <= edge or (day and day < str((counts.get(oid) or {}).get("day") or "")):
+                    continue
+            elif sign < 0:
+                continue
+            out.setdefault(oid, {}).setdefault(pid, []).append((at, sign * q))
+    return out
 
 
 async def _sold_after(since: dict) -> dict:
@@ -1076,6 +1120,11 @@ async def _district_base(day: str) -> dict:
     except Exception as e:
         log.warning(f"[stock] списания не учтены: {e}")
         broken = {}
+    try:
+        moved = await _moved_after(counts, since)
+    except Exception as e:
+        log.warning(f"[stock] переезды не учтены: {e}")
+        moved = {}
 
     out = {}
     for oid in OFFICE_IDS:
@@ -1083,6 +1132,7 @@ async def _district_base(day: str) -> dict:
         have = {l["id"]: float(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
         came, sales = {}, sold.get(oid) or {}
         gone = {pid: sum(q for _, q in ev) for pid, ev in sales.items()}
+        moves = moved.get(oid) or {}
         try:
             if since[oid]:
                 came = await db.intake_since(oid, since[oid])
@@ -1111,9 +1161,15 @@ async def _district_base(day: str) -> dict:
         # три продажи, потом одна внесённая бутылка — 0 + 1 − 3 = 0, и владелец
         # искал на складе бутылку, которую только что завёл. Внёс — видно,
         # при любом раскладе; исчезнуть она может только продажей после.
-        for pid in set(sales) | set(manual):
+        # Переезд между районами — такое же событие по времени: у отдающего
+        # минус, у принимающего плюс, в тот момент, когда бутылку перевезли.
+        # Раньше основа переезды не читала, и коробка, уехавшая из B1 в B3,
+        # до следующего пересчёта числилась в B1 (владелец, 16 сен 2026:
+        # «перемещение должно происходить мгновенно»).
+        for pid in set(sales) | set(manual) | set(moves):
             ev = [(ts, -q) for ts, q in (sales.get(pid) or [])]
             ev += [(at, 1 / _unit(cat.get(pid) or {})) for at in (manual.get(pid) or [])]
+            ev += list(moves.get(pid) or [])
             ev.sort(key=lambda e: e[0])
             bal = have.get(pid) or 0
             for _, dq in ev:
@@ -1131,6 +1187,10 @@ async def _district_base(day: str) -> dict:
                     "have_exact": {k: round(float(v) * 2) / 2 for k, v in have.items()},
                     "sug": await _suggested_norms(oid, day), "came": came,
                     "gone": gone, "lost": broken.get(oid) or {},
+                    # Чистый итог переездов по позиции: приехало минус уехало.
+                    "moved": {pid: _round_step(sum(q for _, q in ev))
+                              for pid, ev in moves.items()
+                              if _round_step(sum(q for _, q in ev))},
                     "counted": (cnt or {}).get("day", "")}
     _BASE.update(key=day, at=_t.monotonic(), data=out)
     return out

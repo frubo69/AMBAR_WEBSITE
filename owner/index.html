@@ -14856,6 +14856,7 @@ async function stkMoveDel(i){
     try{ await ownerApi.ownerFetch('/api/owner/stock/transfer/'+id, {method:'DELETE'}); }
     catch(e){}
   }
+  STK.val = null;                     // бутылки вернулись — склад перечитать
   // Перерисовываем то, откуда удаляли: своя страница перемещений, страница
   // истории или — если экран старый — прежний блок на панели.
   if(STK.view === 'moves') stkMovesPage();
@@ -16349,7 +16350,7 @@ function movDone(err, r, job){
     row.from_code = r.from_code || ''; row.to_code = r.to_code || '';
     row.tid = r.transfer_id || ''; row.color = color;
   }
-  if(r.ok) MOV.total++;
+  if(r.ok){ MOV.total++; STK.val = null; }   // остаток обоих районов уже другой
   else qrFlash(flash, r.say || say);
   movPaint();
 }
@@ -16407,6 +16408,7 @@ async function movDrop(i){
   SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
   MOV.rows.splice(i, 1);
   MOV.total = Math.max(0, MOV.total - 1);
+  STK.val = null;
   movPaint();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }

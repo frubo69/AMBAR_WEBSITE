@@ -4662,6 +4662,19 @@ async def get_stock_transfers_since(day_from: str) -> list:
         .sort([("day", -1), ("at", -1)]).to_list(length=5000)
 
 
+async def stock_transfers_after(at_iso: str) -> list:
+    """Переезды с указанного момента (поле at, ISO в UTC) — для основы склада.
+
+    Основа считает по времени, а не по дню: переезд после пересчёта района
+    двигает его остаток, переезд до пересчёта в остатке уже учтён. Потолок
+    большой по той же причине, что и у дневной выборки: скан пишет строку на
+    каждую бутылку."""
+    db = _db_or_none()
+    if db is None or not at_iso: return []
+    return await db.stock_transfers.find({"at": {"$gte": str(at_iso)}}) \
+        .sort([("at", 1)]).to_list(length=20000)
+
+
 async def get_stock_transfers_by_driver(name: str, day_from: str) -> list:
     """Переезды одного водителя с этого дня — для его истории и отмены."""
     db = _db_or_none()

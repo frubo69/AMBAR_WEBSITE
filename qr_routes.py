@@ -182,29 +182,33 @@ async def unscanned_by_district(by_pd: dict = None, detail: dict = None) -> tupl
         base = await SR._district_base(SR._biz_day())
         cat = SR._catalog()
         for oid in SR.OFFICE_IDS:
-            have = (base.get(oid) or {}).get("have") or {}
+            have = (base.get(oid) or {}).get("have_exact") or (base.get(oid) or {}).get("have") or {}
+            got = by_pd.get(oid) or {}
             bottles = sum(round(float(q) * SR._unit(cat.get(pid) or {}))
                           for pid, q in have.items() if pid in cat and q)
-            coded = sum((by_pd.get(oid) or {}).values())
+            coded = sum(got.values())
             if not bottles and not coded:
                 no_count.append(oid)
                 continue
-            # «QR код не внесён» — это работа, которая осталась, и напоминать
-            # о ней есть смысл только там, где её делают: где после последнего
-            # пересчёта завели хоть один код. Точке, которая живёт по листу и
-            # камерой не пользуется, красные восемь тысяч бутылок не нужны
-            # (владелец, 16 сен 2026). Разбор по позициям (detail) остаётся:
-            # экран «Внести / удалить товар» — как раз для этой работы.
-            unscanned[oid] = max(0, bottles - coded) if await _scanning(oid) else 0
+            # Долг считаем по позициям и в учётных единицах — как карточку
+            # склада: у крепкого бутылка, у пива коробка (коды — по банке, 24
+            # на коробку). Всегда, а не только там, где уже сканируют: после
+            # пересчёта по листу 14.09 склад заведён количеством, и эти
+            # бутылки ещё предстоит внести кодами (владелец, 16 сен 2026:
+            # «им же надо будет вбить этот товар, который мы добавили с
+            # таблиц»). Разбор по позициям (detail) — в бутылках: сканируют
+            # по одной, и список говорит, сколько ещё поднести к камере.
+            per, units = {}, 0.0
+            for pid, q in have.items():
+                if pid not in cat or not q:
+                    continue
+                u = SR._unit(cat.get(pid) or {})
+                n = round(float(q) * u) - int(got.get(pid) or 0)
+                if n > 0:
+                    per[pid] = n
+                    units += n / u
+            unscanned[oid] = round(units, 2)
             if detail is not None:
-                got = by_pd.get(oid) or {}
-                per = {}
-                for pid, q in have.items():
-                    if pid not in cat or not q:
-                        continue
-                    n = round(float(q) * SR._unit(cat.get(pid) or {})) - int(got.get(pid) or 0)
-                    if n > 0:
-                        per[pid] = n
                 detail[oid] = per
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[qr] не посчитано, сколько без кодов: {e}")

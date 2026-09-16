@@ -21874,13 +21874,13 @@ function oprRow(r){
   </div>`;
 }
 
-// Откуда цена приложения: считана от прайса (−5%, вверх до дирхама) или
-// поставлена рукой. Расхождение с расчётом видно сразу — золотым «вручную».
-const APP_OFF = 0.05;
+// Откуда цена приложения: равна прайсу (скидки приложения нет с 16 сен 2026)
+// или поставлена рукой. Расхождение с прайсом видно сразу — золотым «вручную».
+const APP_OFF = 0;
 function _appFromList(list){ return Math.ceil(Math.round(list * (1 - APP_OFF) * 1e6) / 1e6); }
 function _oprAppSrc(r){
   if(!r.price_list || !r.price_app) return ['', ''];
-  return r.price_app === _appFromList(r.price_list) ? ['−5% от прайса', ''] : ['вручную', 'hand'];
+  return r.price_app === _appFromList(r.price_list) ? ['как прайс', ''] : ['вручную', 'hand'];
 }
 
 // Прайс и цена приложения — той же механикой, что закупка: сохраняем на уходе

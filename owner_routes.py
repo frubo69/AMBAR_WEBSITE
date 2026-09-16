@@ -2744,7 +2744,10 @@ PRICE_FIELDS = ("price", "price_full", "price_12", "price_12_full", "price_24", 
 PRICE_MIRROR = {"price_full": ("price", "oldPrice"),
                 "price_12_full": ("price_12", "oldPrice_12"),
                 "price_24_full": ("price_24", "oldPrice_24")}
-APP_DISCOUNT = 0.05
+# Скидки приложения больше нет (владелец, 16 сен 2026: «эра скидок
+# закончилась»): цена приложения равна прайсу, зачёркнутой цены у клиента нет.
+# Заказы хранят свои цены, поэтому сделанные до этого считаются как были.
+APP_DISCOUNT = 0.0
 
 
 def app_price_from_full(full: int) -> int:
@@ -2946,7 +2949,10 @@ async def handle_catalog_update(request):
             target[f] = v
         for full, (app, old) in PRICE_MIRROR.items():
             if full in prices:
-                target[old] = prices[full]
+                if APP_DISCOUNT > 0:
+                    target[old] = prices[full]
+                else:
+                    target.pop(old, None)          # без скидки зачёркивать нечего
                 if app not in prices:
                     target[app] = app_price_from_full(prices[full])
         await asyncio.to_thread(_write_catalog, catalog)

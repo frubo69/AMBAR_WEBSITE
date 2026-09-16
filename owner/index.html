@@ -7639,12 +7639,12 @@ button.exp-wait:active{transform:scale(.99)}
        переключателей «звук / оповещения / тихие часы»: они ничего не
        включали, только писали в память браузера, и никто их не читал. -->
   <div class="cmd-sheet set-sheet">
+    <!-- Стрелка назад слева, как у всех страниц на весь экран. Крестик здесь
+         стоял absolute от верха листа и на телефоне уходил под шапку самого
+         телеграма (Close · ⌄ · •••): страница без выхода (владелец, 16 сен 2026). -->
     <div class="set-hd">
+      <button class="stk-x" onclick="closeSet()" aria-label="Назад"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       <div class="set-ttl">Настройки</div>
-      <button class="dp-x" onclick="closeSet()" aria-label="Закрыть">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
     </div>
     <div class="set-body">
       <button class="set-tile" onclick="openNotif()">
@@ -7733,7 +7733,7 @@ button.exp-wait:active{transform:scale(.99)}
 .set-sheet{max-width:420px;position:relative}
 .set-sheet::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;z-index:2;
   background:linear-gradient(90deg,transparent,rgba(201,169,110,.55),transparent)}
-.set-hd{position:relative;padding:18px 54px 16px 18px;border-bottom:1px solid var(--border2);
+.set-hd{position:relative;display:flex;align-items:center;gap:12px;padding:16px 18px 14px 14px;border-bottom:1px solid var(--border2);
   background:linear-gradient(160deg,rgba(201,169,110,.09),transparent 70%),var(--card)}
 .set-ttl{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
   letter-spacing:.8px;text-transform:uppercase;line-height:1.2;color:var(--text)}
@@ -7768,7 +7768,7 @@ button.exp-wait:active{transform:scale(.99)}
 @media (max-width:520px){
   #setOverlay{padding:0}
   #setOverlay .set-sheet{max-width:none;max-height:none;height:100%;border-radius:0;border:0}
-  .set-hd{padding-top:calc(18px + var(--safe-top))}
+  .set-hd{padding-top:calc(16px + var(--safe-top))}
   .set-body{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 }
 .tg{position:relative;width:34px;height:20px;flex-shrink:0;cursor:pointer}

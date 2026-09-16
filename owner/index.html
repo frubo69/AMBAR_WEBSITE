@@ -27842,6 +27842,22 @@ async function custCountTick(){
 }
 setInterval(custCountTick, 5000);
 
+// Карточка «Остатки всего» перечитывает себя, пока раздел на экране: продали
+// — цифра меняется без перезахода (владелец, 16 сен 2026: «после каждого
+// проданного заказа в складе должна быть только актуальная цифра»). Тем же
+// тихим путём, что и листание дня: плитки на месте, меняется содержимое.
+let _stkTickBusy = false;
+async function stkValueTick(){
+  const card = document.getElementById('stkValCard');
+  if(!card || document.hidden || _stkTickBusy || !window.ownerApi) return;
+  if(!card.getClientRects().length) return;         // раздел не на экране
+  if(!STK || STK.view !== 'pick' || DAY_OFFSET) return;   // только «сегодня» и только обзор
+  _stkTickBusy = true;
+  try{ await stkPicker(true); }catch(e){}
+  finally{ _stkTickBusy = false; }
+}
+setInterval(stkValueTick, 30000);
+
 // ===== Customer data (loaded from API) =====
 let _customersCache = null;
 const CUST_PHONES = {};

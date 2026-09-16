@@ -1104,7 +1104,18 @@ async def _district_base(day: str) -> dict:
     пересчитывало всю заявку с нуля. Держим минуту: пересчёт склада и приёмка
     сбрасывают кэш сами, а больше основе меняться неоткуда."""
     import time as _t
-    if _BASE["key"] == day and _t.monotonic() - _BASE["at"] < BASE_TTL:
+    # Метка доставок: продали — цифра склада меняется сразу, а не через
+    # минуту (владелец, 16 сен 2026: «после каждого проданного заказа в
+    # складе должна быть только актуальная цифра»). Один дешёвый запрос
+    # вместо пересчёта; ловит и доставки из бота оператора — другого процесса.
+    try:
+        stamp = await db.delivered_stamp(
+            (datetime.now(timezone.utc) - timedelta(days=3)).isoformat().replace("+00:00", ""))
+    except Exception as e:                           # noqa: BLE001
+        log.debug(f"[stock] метка доставок: {e}")
+        stamp = None
+    if (_BASE["key"] == day and _t.monotonic() - _BASE["at"] < BASE_TTL
+            and (stamp is None or stamp == _BASE.get("stamp"))):
         return _BASE["data"]
     cat = _catalog()
     # Пересчёт — снимок на момент времени. Пока его не повторили, честный
@@ -1193,7 +1204,7 @@ async def _district_base(day: str) -> dict:
                               for pid, ev in moves.items()
                               if _round_step(sum(q for _, q in ev))},
                     "counted": (cnt or {}).get("day", "")}
-    _BASE.update(key=day, at=_t.monotonic(), data=out)
+    _BASE.update(key=day, at=_t.monotonic(), data=out, stamp=stamp)
     return out
 
 

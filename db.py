@@ -2946,6 +2946,23 @@ async def writeoff_since(since: dict, skip_coded: bool = False,
     return out
 
 
+async def delivered_stamp(since_iso: str) -> tuple:
+    """(сколько доставленных с момента, самая поздняя отметка) — дешёвая метка
+    для кэша основы склада. Заказ доставили или отменили доставленный —
+    метка другая, и основа считается заново, в каком бы процессе заказ ни
+    закрыли (бот оператора живёт отдельно от API и сбросить его кэш не может)."""
+    db = _db_or_none()
+    if db is None: return (0, "")
+    cur = db.orders.aggregate([
+        {"$match": {"timestamp": {"$gte": since_iso}, "status": "delivered", "test": {"$ne": True}}},
+        {"$group": {"_id": None, "n": {"$sum": 1},
+                    "last": {"$max": {"$ifNull": ["$delivered_at", "$updated_at"]}}}},
+    ])
+    rows = await cur.to_list(length=1)
+    if not rows: return (0, "")
+    return (int(rows[0].get("n") or 0), str(rows[0].get("last") or ""))
+
+
 async def sold_since(since_iso: str) -> list:
     """Доставленные заказы с указанного момента — для отката остатка вперёд.
 

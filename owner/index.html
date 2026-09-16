@@ -13478,7 +13478,10 @@ function _dayLabel(w){
   const diff = Math.round((t - d) / 86400000);
   if(diff === 0) return {top:'Сегодня', sub:num};
   if(diff === 1) return {top:'Вчера',   sub:num};
-  return {top:num, sub:''};
+  if(diff === 2) return {top:'Позавчера', sub:num};
+  // Дальше — день недели тем же словом сверху, число под ним (владелец,
+  // 16 сен 2026): «14.09» само по себе не говорит, будни это или выходной.
+  return {top:ACC_WDF[d.getDay()][0].toUpperCase() + ACC_WDF[d.getDay()].slice(1), sub:num};
 }
 
 // Пока смотрим прошлый день, ни один период не подсвечен: «Сегодня» горящее

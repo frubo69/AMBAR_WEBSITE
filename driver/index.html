@@ -4367,6 +4367,10 @@ const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fi
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+// Количество в единицах склада: бутылки, у пива коробки — полкоробки это «,5».
+// fmt для этого не годится: запятую дроби он превращает в пробел.
+const fmtQty = n => { const v = Math.round((+n || 0) * 2) / 2, i = Math.trunc(v);
+  return i.toLocaleString('ru-RU') + (v !== i ? ',5' : ''); };
 const _d = iso => { if(!iso) return null;
   const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z'); return isNaN(d) ? null : d; };
 const hhmm = iso => { const d = _d(iso); return d
@@ -8025,7 +8029,7 @@ function renderShift(){
     const intakeStep = inl.map(x => step(++n, 'now', 'Завершить приёмку',
         'Взятую приёмку нельзя оставить на закрытой смене',
         ['wait', x.started ? 'Сканируют' : 'Взята'],
-        {ico: ICO.box, t: `${esc(x.code)} · ${x.left ? `осталось ${fmt(x.left)} из ${fmt(x.need)}` : 'всё отсканировано'}`,
+        {ico: ICO.box, t: `${esc(x.code)} · ${x.left ? `осталось ${fmtQty(x.left)} из ${fmtQty(x.need)}` : 'всё отсканировано'}`,
          s: 'Завершить приёмку или отдать задачу — в самой задаче',
          go: `supOpen('${esc(x.sid)}','${esc(x.district)}')`})).join('');
     steps = ordersStep + intakeStep
@@ -9219,14 +9223,16 @@ function supCard(t){
     ? `незакончено <span class="sup-old">с ${esc(supWhen(t).split(' · ')[0])}</span>`
     : t.mine ? (started ? 'ваша приёмка идёт' : 'ваша приёмка')
     : 'свободна';
+  // Числа — в единицах склада: бутылки, у пива коробки (сканы по банке
+  // сервер уже перевёл в коробки).
   const число = started
-    ? `${fmt(t.got)}<i>/ ${fmt(t.need)}</i>`
-    : `${fmt(t.need)}<i>бут.</i>`;
+    ? `${fmtQty(t.got)}<i>/ ${fmtQty(t.need)}</i>`
+    : `${fmtQty(t.need)}<i>бут.</i>`;
   const list = lines.map(l => `<div class="dpl ${l.left ? '' : 'ok'}">
       <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
            onerror="this.style.visibility='hidden'">
       <span class="dpl-n">${esc(l.name)}</span>
-      <span class="dpl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
+      <span class="dpl-q">${l.got ? `${fmtQty(l.got)}<u>/${fmtQty(l.need)}</u>` : fmtQty(l.need)}</span>
     </div>`).join('');
   return `<div class="dcard ${t.mine ? 'mine' : ''} ${t.stale ? 'stale' : ''} ${ns ? 'noscan' : ''}">
     <div class="dcard-h">
@@ -9238,7 +9244,7 @@ function supCard(t){
     ${started ? `<span class="sup-bar dbar"><i style="width:${pct}%"></i></span>` : ''}
     <button class="dfold ${open ? 'on' : ''}" onclick="supFold('${esc(key)}')">
       <span>${lines.length} ${plural(lines.length,'позиция','позиции','позиций')}${
-        started && t.left ? ` · ${ns ? 'не отсканировано' : 'осталось'} ${fmt(t.left)}` : ''}</span>
+        started && t.left ? ` · ${ns ? 'не отсканировано' : 'осталось'} ${fmtQty(t.left)}` : ''}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     ${open ? `<div class="dfold-b">${list}</div>` : ''}
@@ -9336,7 +9342,7 @@ function woFoot(){
       <span class="sect-v">${SUP_HIST.length}</span></div>
     <div class="dcard dlist">${SUP_HIST.map(r => `<button class="dpl dli" onclick="supOpen('${esc(r.supply_id)}','${esc(r.district)}')">
       <span class="sup-code">${esc(r.district_code)}</span>
-      <span class="dpl-n">${esc(r.extra ? (r.base || 'Другая база') : 'Основная заявка')}<i>${supHistWhen(r.done_at)} · ${fmt(r.got)} ${plural(r.got,'бутылка','бутылки','бутылок')}${
+      <span class="dpl-n">${esc(r.extra ? (r.base || 'Другая база') : 'Основная заявка')}<i>${supHistWhen(r.done_at)} · принято ${fmtQty(r.got)}${
         r.noscan_at && r.got < r.need ? ' · без сканирования' : ''}</i></span>
       <em class="ex-c">${svg(ICO.chevR, 16)}</em></button>`).join('')}</div>` : ''}
     <div class="wo-sp"></div>

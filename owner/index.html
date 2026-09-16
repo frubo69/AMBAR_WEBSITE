@@ -21234,7 +21234,9 @@ function supStage(){
   const all = tasks.length;
   const done = tasks.filter(t => t.done_at).length;
   const busy = tasks.filter(t => t.driver && !t.done_at).length;
-  const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
+  // Принято — в единицах склада (сервер перевёл коды в коробки), иначе две
+  // коробки пива давали бы «48 из 2».
+  const took = tasks.reduce((a, t) => a + (t.got_units != null ? t.got_units : (t.scanned || 0)), 0);
   const base = {sup, all, done, took, free: all - done - busy};
   // Отменённая заявка — не «приём закончен». Это разные новости: одна значит
   // «всё привезли», другая «сегодня не везём», и путать их нельзя.
@@ -22735,7 +22737,7 @@ function qrInRows(){
     const лист = +долг[d.id] || 0;
     const h = x.hold || {};
     let sub = лист ? 'по пересчёту · внести кодами' : 'нет незавершённого приёма', cls = '';
-    if(есть && h.live){ sub = `${h.who} вносит · ${fmt(x.got)} из ${fmt(x.need)}`; cls = 'warn'; }
+    if(есть && h.live){ sub = `${h.who} вносит · ${fmtQty(x.got)} из ${fmtQty(x.need)}`; cls = 'warn'; }
     else if(есть){
       const кто = [...new Set((x.tasks || []).map(t => t.noscan_by || t.driver).filter(Boolean))].join(', ');
       sub = `без сканирования${кто ? ' · ' + кто : ''}`;
@@ -22746,7 +22748,7 @@ function qrInRows(){
       <button class="shl-h ord-dh" ${go}>
         <span class="shl-code">${escS(d.code || '')}</span>
         <span class="shl-b"><b>${escS(d.name || '')}</b><i class="${cls}">${escS(sub)}</i></span>
-        ${есть ? `<span class="qd-bad"><b>${fmt(x.left)}</b><i>QR код не внесён</i></span>
+        ${есть ? `<span class="qd-bad"><b>${fmtQty(x.left)}</b><i>QR код не внесён</i></span>
         <span class="ord-dh-go">${ICO_CHEV}</span>`
         : лист ? `<span class="qd-bad"><b>${fmtQty(лист)}</b><i>QR код не внесён</i></span>
         <span class="ord-dh-go">${ICO_CHEV}</span>` : ''}
@@ -22918,8 +22920,8 @@ async function qrIntake(district, тихо){
     <div class="sc">${(t.lines || []).map(l => `<button class="pk-row need${h.live ? ' off' : ''}"
         ${h.live ? 'disabled' : ''} onclick="qrInLine(${ti}, '${escS(l.id)}')">
         <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
-          <span class="pk-slug">внесено ${fmt(l.got)} из ${fmt(l.need)}</span></span>
-        <span class="pk-n dn">${fmt(l.left)}<i>QR код не внесён</i></span></button>`).join('')}</div>`).join('');
+          <span class="pk-slug">внесено ${fmtQty(l.got)} из ${fmtQty(l.need)}</span></span>
+        <span class="pk-n dn">${fmtQty(l.left)}<i>QR код не внесён</i></span></button>`).join('')}</div>`).join('');
   document.getElementById('accMid').innerHTML = банер + body;
   document.getElementById('accFoot').innerHTML = h.live ? ''
     : `<div class="qb-wrap"><button class="qb" onclick="qrInNext()">Сканировать</button></div>`;
@@ -24195,7 +24197,7 @@ function xSupRender(d){
             <b>${l.need}</b>
             <button onclick="xsDraft('${escS(t.district)}','${escS(l.id)}',${l.need + 1})" aria-label="больше">+</button>
           </span>`
-        : `<span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>`}
+        : `<span class="xs-pl-q">${l.got ? `${fmtQty(l.got)}<u>/${fmtQty(l.need)}</u>` : fmtQty(l.need)}</span>`}
       </div>`).join('') + (edit ? xsAddRow(t.district) : '');
     // Водитель открыл камеру — район закрыт для правок (владелец, 16 сен
     // 2026): замок в подписи с причиной, рамка карточки, степперов нет.
@@ -25407,9 +25409,9 @@ function rcvRender(){
       onclick="rcvLine('${escS(l.id)}')">
       <span class="rl-b">
         <span class="rl-n">${escS(l.name)}</span>
-        <span class="rl-s">${l.left ? 'осталось ' + fmt(l.left) : 'взято полностью'}</span>
+        <span class="rl-s">${l.left ? 'осталось ' + fmtQty(l.left) : 'взято полностью'}</span>
       </span>
-      <span class="rl-v"><b>${fmt(l.got)}</b><i>/${fmt(l.need)}</i></span>
+      <span class="rl-v"><b>${fmtQty(l.got)}</b><i>/${fmtQty(l.need)}</i></span>
     </button>`).join('');
 
   document.getElementById('accMid').innerHTML = head +

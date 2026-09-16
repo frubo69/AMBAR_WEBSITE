@@ -456,13 +456,20 @@ async def _intake_left(me: dict) -> list:
                 continue
             if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
                 continue
-            need = got = 0
+            # В единицах склада: план в коробках, сканы по банке — переводим.
+            import supply_routes as _sr
+            need = got = left = 0.0
             for it in sup.get("items") or []:
-                need += int((it.get("by_district") or {}).get(oid) or 0)
-                got += int((it.get("got") or {}).get(oid) or 0)
+                n = int((it.get("by_district") or {}).get(oid) or 0)
+                if not n:
+                    continue
+                un = _sr._uof(it.get("id") or "")
+                codes = int((it.get("got") or {}).get(oid) or 0)
+                need += n; got += _sr._got_units(codes, un); left += _sr._left_units(n, codes, un)
+            fix = lambda v: int(v) if v == int(v) else round(v * 2) / 2
             out.append({"sid": sup.get("_id") or sup.get("supply_id") or "", "district": oid,
                         "code": OFFICE_CODES.get(oid, oid), "name": OFFICE_NAMES.get(oid, oid),
-                        "need": need, "got": got, "left": max(0, need - got),
+                        "need": fix(need), "got": fix(got), "left": fix(left),
                         "started": bool(t.get("started_at"))})
     return out
 

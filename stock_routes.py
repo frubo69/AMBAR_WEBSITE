@@ -1676,7 +1676,9 @@ async def _audit_expected(district: str, day: str) -> tuple:
     exp: dict = {}
     noqr: dict = {}
     if b.get("counted"):
-        have = b.get("have") or {}
+        # Точный остаток, до полкоробки: `have` режется до целого, и у пива
+        # полкоробки (12 банок) пропадали из «числится» — 1333 вместо 1393.
+        have = b.get("have_exact") or b.get("have") or {}
         detail: dict = {}
         try:
             import qr_routes

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Переставить всем кнопку мини-приложения на текущий адрес.
+"""Сбросить всем кнопку меню на штатную.
 
-Бот ставит кнопку каждому персонально (set_chat_menu_button с chat_id), и она
-живёт в чате вечно — со старым адресом внутри. Поэтому смена адреса приложения
-обязана сопровождаться этим проходом, иначе у людей в телеграме продолжает
-открываться то, чего больше нет.
+Раньше бот ставил каждому персональную web_app-кнопку «Заказать»
+(set_chat_menu_button с chat_id), и она живёт в чате вечно. С 16 сен 2026
+кнопка меню штатная: у бота включено главное мини-приложение, и телеграм сам
+показывает «Open app» — такие запуски он считает и показывает под именем бота
+число пользователей за месяц; запуски своей кнопкой не считает. Проход нужен
+один раз: у всех, кто нажимал /start раньше, кнопка ещё старая.
 """
 import asyncio, os, sys, aiohttp
 from dotenv import load_dotenv
@@ -14,21 +16,17 @@ import db
 
 BOT = os.getenv("BOT_TOKEN", "")
 URL = os.getenv("WEBAPP_URL", "").rstrip("/") + "/"
-TEXT = {"ru": "🍾 Заказать", "en": "🍾 Order"}
 
 
 async def main():
     await db.connect()
     users = await db.get_all_customers()
     ids = [(int(u["telegram_id"]), (u.get("lang") or "ru")) for u in users if u.get("telegram_id")]
-    print(f"адрес: {URL}\nпользователей: {len(ids)}")
+    print(f"кнопка меню → штатная (главное мини-приложение)\nпользователей: {len(ids)}")
     ok = blocked = err = 0
     async with aiohttp.ClientSession() as s:
         for i, (uid, lang) in enumerate(ids, 1):
-            body = {"chat_id": uid, "menu_button": {
-                "type": "web_app",
-                "text": TEXT.get(lang, TEXT["ru"]),
-                "web_app": {"url": URL}}}
+            body = {"chat_id": uid, "menu_button": {"type": "default"}}
             for attempt in range(3):
                 try:
                     async with s.post(f"https://api.telegram.org/bot{BOT}/setChatMenuButton",

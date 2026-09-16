@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove,
-                      WebAppInfo, MenuButtonWebApp, InlineQueryResultPhoto,
+                      WebAppInfo, MenuButtonWebApp, MenuButtonDefault, InlineQueryResultPhoto,
                       InlineQueryResultsButton)
 from telegram.ext import (Application, CommandHandler, MessageHandler, CallbackQueryHandler,
                           InlineQueryHandler, ContextTypes, filters)
@@ -19,6 +19,9 @@ BOT_TOKEN            = os.getenv("BOT_TOKEN", "")
 OPERATOR_BOT_TOKEN   = os.getenv("OPERATOR_BOT_TOKEN", "")
 OPERATOR_IDS         = [int(x.strip()) for x in os.getenv("OPERATOR_IDS","").split(",") if x.strip().isdigit()]
 WEBAPP_URL           = os.getenv("WEBAPP_URL", "")
+# Имя бота — для ссылок на главное мини-приложение (t.me/<бот>?startapp):
+# узнаётся при старте у самого телеграма, чтобы не расходиться с BotFather.
+BOT_USERNAME         = os.getenv("BOT_USERNAME", "").strip().lstrip("@")
 CATALOG_FILE         = "catalog.json"
 STOCK_FILE           = "stock.json"
 SUPPORT_BOT_USERNAME = "ambar_support_bot"
@@ -132,16 +135,26 @@ def _lang_of(user) -> str:
     return "ru" if (getattr(user, "language_code", "") or "").strip().lower().startswith("ru") else "en"
 
 
+def _app_link() -> str:
+    """Ссылка на главное мини-приложение бота. Открывает то же приложение, что
+    и web_app-кнопка, но как главное: такие запуски телеграм считает и
+    показывает под именем бота «N monthly users» (владелец, 16 сен 2026),
+    а запуски web_app-кнопками и своей кнопкой меню в этот счёт не идут."""
+    return f"https://t.me/{BOT_USERNAME}?startapp=home" if BOT_USERNAME else ""
+
+
 def _app_kb(lang: str) -> InlineKeyboardMarkup | None:
     """Кнопка, открывающая приложение прямо из сообщения. Кнопка меню слева от
     поля ввода остаётся, но её многие не находят и пишут в чат (владелец,
     15 сен 2026): кнопка под приветствием и под ответом на любой текст —
-    в одно касание, там, куда человек смотрит."""
+    в одно касание, там, куда человек смотрит. Ссылкой на главное приложение,
+    а не web_app — см. _app_link; без имени бота — как раньше, web_app."""
     if not WEBAPP_URL:
         return None
-    return InlineKeyboardMarkup([[InlineKeyboardButton(
-        "🍾 Открыть AMBAR" if lang == "ru" else "🍾 Open AMBAR",
-        web_app=WebAppInfo(url=WEBAPP_URL))]])
+    label = "🍾 Открыть AMBAR" if lang == "ru" else "🍾 Open AMBAR"
+    link = _app_link()
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, url=link) if link
+                                  else InlineKeyboardButton(label, web_app=WebAppInfo(url=WEBAPP_URL))]])
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -176,21 +189,15 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"ban check failed: {e}")
 
-    # Кнопка ставится персонально каждому и живёт в его чате вечно — вместе с
-    # адресом, который был на момент /start. Поэтому смена адреса приложения
-    # обязана сопровождаться проходом tools/refresh_menu.py по всем, иначе у
-    # людей продолжает открываться то, чего уже нет.
-    if WEBAPP_URL:
-        try:
-            await ctx.bot.set_chat_menu_button(
-                chat_id=uid,
-                menu_button=MenuButtonWebApp(
-                    text="🍾 Заказать" if lang == "ru" else "🍾 Order",
-                    web_app=WebAppInfo(url=WEBAPP_URL),
-                ),
-            )
-        except Exception as e:
-            log.warning(f"set_chat_menu_button FAILED: {e}")
+    # Кнопка меню — штатная. Раньше бот ставил каждому свою web_app-кнопку
+    # «Заказать», и она перекрывала кнопку «Open app» главного мини-приложения
+    # (владелец, 16 сен 2026): запуски своей кнопкой телеграм в счёт
+    # пользователей не берёт, а штатной — берёт. Персональная кнопка живёт в
+    # чате вечно, поэтому сбрасываем её явно; всем прежним — tools/refresh_menu.py.
+    try:
+        await ctx.bot.set_chat_menu_button(chat_id=uid, menu_button=MenuButtonDefault())
+    except Exception as e:
+        log.warning(f"set_chat_menu_button FAILED: {e}")
 
     text = (
         f"👋 Привет, {name}!\n\n"
@@ -401,6 +408,12 @@ async def on_media(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def post_init(app: Application):
     await db.connect()
+    global BOT_USERNAME
+    try:
+        BOT_USERNAME = (await app.bot.get_me()).username or BOT_USERNAME
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"имя бота не узнали: {e}")
+    log.info(f"главное мини-приложение: {_app_link() or 'ссылки нет (имя бота неизвестно)'}")
 
 
 async def on_contact(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

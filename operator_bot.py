@@ -7,7 +7,7 @@ AMBAR Operator Bot — MongoDB edition
 - Ban / unban customers
 - Stats
 """
-import os, re, asyncio, logging, math
+import os, re, asyncio, logging
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
@@ -31,143 +31,48 @@ logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=lo
 logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
 log = logging.getLogger(__name__)
 
-PRODUCTS = [
-    # ── Водка / Vodka ─────────────────────────────────────────────────────────
-    {"id":"p1",  "name":"Absolut 1 ltr",              "price":95, "cat":"Водка"},
-    {"id":"p2",  "name":"Stolichnaya 1 ltr",          "price":95, "cat":"Водка"},
-    {"id":"p5",  "name":"Smirnoff Vodka 1 ltr",       "price":95, "cat":"Водка"},
-    {"id":"p3",  "name":"Russian Standard 1 ltr",     "price":140, "cat":"Водка"},
-    {"id":"p4",  "name":"Skyy Vodka 1 ltr",           "price":140, "cat":"Водка"},
-    {"id":"p6",  "name":"Beluga 0.7 ltr",             "price":240, "cat":"Водка"},
-    {"id":"p7",  "name":"Grey Goose 1 ltr",           "price":190, "cat":"Водка"},
-    {"id":"p8",  "name":"Belvedere 1 ltr",            "price":190, "cat":"Водка"},
-    {"id":"p9",  "name":"Ciroc 1 ltr",                "price":285, "cat":"Водка"},
-    # ── Виски / Whisky ────────────────────────────────────────────────────────
-    {"id":"p10", "name":"Red Label 1 ltr",             "price":95, "cat":"Виски"},
-    {"id":"p15", "name":"Ballantines Finest 1 ltr",    "price":95, "cat":"Виски"},
-    {"id":"p23", "name":"J&B 1 ltr",                   "price":140, "cat":"Виски"},
-    {"id":"p11", "name":"Black Label 1 ltr",           "price":190, "cat":"Виски"},
-    {"id":"p12", "name":"Jack Daniels 1 ltr",          "price":190, "cat":"Виски"},
-    {"id":"p13", "name":"Chivas Regal 12Y 1 ltr",     "price":190, "cat":"Виски"},
-    {"id":"p14", "name":"Jameson 1 ltr",               "price":190, "cat":"Виски"},
-    {"id":"p16", "name":"Double Black 1 ltr",          "price":285, "cat":"Виски"},
-    {"id":"p19", "name":"Jack Daniels Honey 1 ltr",   "price":240, "cat":"Виски"},
-    {"id":"p20", "name":"Gentleman Jack 1 ltr",        "price":240, "cat":"Виски"},
-    {"id":"p25", "name":"Glenfiddich 12Y 1 ltr",      "price":285, "cat":"Виски"},
-    {"id":"p17", "name":"Gold Label 1 ltr",            "price":330, "cat":"Виски"},
-    {"id":"p18", "name":"Chivas Regal 18Y 1 ltr",     "price":380, "cat":"Виски"},
-    {"id":"p26", "name":"Glenfiddich 15Y 1 ltr",      "price":380, "cat":"Виски"},
-    {"id":"p27", "name":"Glenfiddich 18Y 0.75 ltr",   "price":475, "cat":"Виски"},
-    {"id":"p28", "name":"Macallan 12Y 0.7 ltr",       "price":520, "cat":"Виски"},
-    {"id":"p29", "name":"Macallan 15Y 0.7 ltr",       "price":760, "cat":"Виски"},
-    {"id":"p22", "name":"Chivas Royal Salute 21Y 1 ltr","price":1235,"cat":"Виски"},
-    {"id":"p24", "name":"Chivas Regal 25Y 0.7 ltr",   "price":1425, "cat":"Виски"},
-    {"id":"p21", "name":"Blue Label 1 ltr",            "price":1330, "cat":"Виски"},
-    {"id":"p30", "name":"Macallan 18Y 0.75 ltr",      "price":1900, "cat":"Виски"},
-    # ── Пиво / Beer (pack-only: 12 & 24) ─────────────────────────────────────
-    {"id":"p31", "name":"Heineken 0.33 can",           "cat":"Пиво", "p12":95, "p24":190},
-    {"id":"p33", "name":"Budweiser 0.33 can",          "cat":"Пиво", "p12":95, "p24":190},
-    {"id":"p35", "name":"Stella Artois 0.33 can",      "cat":"Пиво", "p12":95, "p24":190},
-    {"id":"p37", "name":"Red Horse 0.5 can",           "cat":"Пиво", "p12":95, "p24":190},
-    {"id":"p38", "name":"Amstel Light 0.33 can",       "cat":"Пиво", "p12":95, "p24":190},
-    {"id":"p40", "name":"XXL Vodka 0.25 can",          "cat":"Пиво", "p12":95, "p24":190},
-    {"id":"p32", "name":"Heineken 0.33 bottle",        "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p34", "name":"Budweiser 0.33 bottle",       "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p36", "name":"Stella Artois 0.33 bottle",   "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p41", "name":"Asahi Super Dry 0.33 bottle", "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p42", "name":"Hoegaarden 0.33 bottle",      "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p43", "name":"Corona Extra 0.355 bottle",   "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p44", "name":"Peroni Nastro 0.33 bottle",   "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p45", "name":"Smirnoff Ice 0.275 bottle",   "cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p46", "name":"Bacardi Breezer 0.275 bottle","cat":"Пиво", "p12":140, "p24":285},
-    {"id":"p39", "name":"Guinness 0.44 can",           "cat":"Пиво", "p12":190, "p24":380},
-    {"id":"p47", "name":"Carlsberg 0.5 can",          "cat":"Пиво", "p12":95, "p24":170},
-    # ── Ром / Rum ─────────────────────────────────────────────────────────────
-    {"id":"p48", "name":"Bacardi White 1 ltr",         "price":95, "cat":"Ром"},
-    {"id":"p49", "name":"Bacardi Black 1 ltr",         "price":95, "cat":"Ром"},
-    {"id":"p50", "name":"Bacardi Gold 1 ltr",          "price":95, "cat":"Ром"},
-    {"id":"p51", "name":"Captain Morgan Black 1 ltr",  "price":140, "cat":"Ром"},
-    {"id":"p52", "name":"Captain Morgan Gold 1 ltr",   "price":140, "cat":"Ром"},
-    {"id":"p53", "name":"Malibu 1 ltr",                "price":140, "cat":"Ром"},
-    # ── Вермут / Vermouth ─────────────────────────────────────────────────────
-    {"id":"p54", "name":"Martini Bianco 1 ltr",        "price":140, "cat":"Вермут"},
-    # ── Джин / Gin ────────────────────────────────────────────────────────────
-    {"id":"p55", "name":"Gordon's 1 ltr",              "price":95, "cat":"Джин"},
-    {"id":"p56", "name":"Bombay Sapphire 1 ltr",       "price":140, "cat":"Джин"},
-    {"id":"p58", "name":"Gordon Pink 0.7 ltr",         "price":140, "cat":"Джин"},
-    {"id":"p59", "name":"Tanqueray 1 ltr",             "price":190, "cat":"Джин"},
-    {"id":"p57", "name":"Hendrick's 1 ltr",            "price":240, "cat":"Джин"},
-    {"id":"p61", "name":"Malfy Con Arancia 0.7 ltr",   "price":240, "cat":"Джин"},
-    {"id":"p62", "name":"Malfy Rosa 0.7 ltr",          "price":240, "cat":"Джин"},
-    {"id":"p63", "name":"Drumshanbo Gunpowder 0.7 ltr","price":285, "cat":"Джин"},
-    {"id":"p60", "name":"Monkey 47 0.5 ltr",           "price":330, "cat":"Джин"},
-    # ── Текила / Tequila ──────────────────────────────────────────────────────
-    {"id":"p64", "name":"Jose Cuervo Silver 1 ltr",    "price":95, "cat":"Текила"},
-    {"id":"p65", "name":"Jose Cuervo Gold 1 ltr",      "price":95, "cat":"Текила"},
-    {"id":"p66", "name":"Patron XO Cafe 0.75 ltr",     "price":240, "cat":"Текила"},
-    {"id":"p67", "name":"Patron Silver 0.75 ltr",      "price":330, "cat":"Текила"},
-    {"id":"p68", "name":"Patron Gold 0.75 ltr",        "price":380, "cat":"Текила"},
-    {"id":"p69", "name":"Don Julio Blanco 70/75cl",    "price":380, "cat":"Текила"},
-    {"id":"p70", "name":"Don Julio Reposado 70/75cl",  "price":430, "cat":"Текила"},
-    {"id":"p71", "name":"Don Julio Anejo 70/75cl",     "price":520, "cat":"Текила"},
-    {"id":"p72", "name":"Don Julio 1942 70/75cl",      "price":1520,"cat":"Текила"},
-    {"id":"p73", "name":"Clase Azul Reposado 70/75cl", "price":1710,"cat":"Текила"},
-    # ── Коньяк / Cognac ──────────────────────────────────────────────────────
-    {"id":"p74", "name":"Hennessy VS 1 ltr",           "price":380, "cat":"Коньяк"},
-    {"id":"p77", "name":"Remy Martin VSOP 1 ltr",      "price":380, "cat":"Коньяк"},
-    {"id":"p75", "name":"Hennessy VSOP 1 ltr",         "price":475, "cat":"Коньяк"},
-    {"id":"p76", "name":"Hennessy XO 1 ltr",           "price":1520,"cat":"Коньяк"},
-    # ── Ликёр / Liqueur ──────────────────────────────────────────────────────
-    {"id":"p78", "name":"Baileys 1 ltr",               "price":140, "cat":"Ликёр"},
-    {"id":"p79", "name":"Amarula 1 ltr",               "price":140, "cat":"Ликёр"},
-    {"id":"p81", "name":"Aperol 1 ltr",                "price":140, "cat":"Ликёр"},
-    {"id":"p80", "name":"Jagermeister 1 ltr",          "price":190, "cat":"Ликёр"},
-    {"id":"p82", "name":"Tequila Rose 0.7 ltr",        "price":240, "cat":"Ликёр"},
-    # ── Арак / Arak ──────────────────────────────────────────────────────────
-    {"id":"p83", "name":"Arak Touma 0.75 ltr",         "price":95, "cat":"Арак"},
-    {"id":"p84", "name":"Efe Raki 1 ltr",              "price":140, "cat":"Арак"},
-    # ── Шампанское / Champagne ────────────────────────────────────────────────
-    {"id":"p85", "name":"Moet Brut 0.75",              "price":285, "cat":"Шампанское"},
-    {"id":"p86", "name":"Moet Rose 0.75",              "price":380, "cat":"Шампанское"},
-    {"id":"p88", "name":"Veuve Clicquot 0.75",         "price":430, "cat":"Шампанское"},
-    {"id":"p87", "name":"Moet Ice 0.75",               "price":475, "cat":"Шампанское"},
-    {"id":"p89", "name":"Ruinart Blanc 0.75",          "price":760, "cat":"Шампанское"},
-    {"id":"p90", "name":"Dom Perignon 0.75",           "price":1520,"cat":"Шампанское"},
-    # ── Просекко / Prosecco ───────────────────────────────────────────────────
-    {"id":"p94", "name":"Martini Asti 0.75",           "price":140, "cat":"Просекко"},
-    {"id":"p91", "name":"Bottega Prosecco 0.75",       "price":140, "cat":"Просекко"},
-    {"id":"p95", "name":"Zonin Prosecco 0.75",         "price":140, "cat":"Просекко"},
-    {"id":"p92", "name":"Bottega Rose 0.75",           "price":190, "cat":"Просекко"},
-    {"id":"p93", "name":"Bottega Gold 0.75",           "price":240, "cat":"Просекко"},
-    # ── Вино / Wine ───────────────────────────────────────────────────────────
-    {"id":"p96",  "name":"Jacob Creek Chardonnay Pinot Noir 0.75", "price":95, "cat":"Просекко"},
-    {"id":"p97",  "name":"Pinot Grigio Cesari 0.75",      "price":95, "cat":"Вино"},
-    {"id":"p98",  "name":"Le Grand Noir SB 0.75",         "price":95, "cat":"Вино"},
-    {"id":"p105", "name":"Jacob Creek Shiraz 0.75",        "price":95, "cat":"Вино"},
-    {"id":"p106", "name":"Le Grand Noir Merlot 0.75",     "price":95, "cat":"Вино"},
-    {"id":"p115", "name":"Mateus Rose 0.75",               "price":95, "cat":"Вино"},
-    {"id":"p117", "name":"Chateau Ksara Rose 0.75",        "price":95, "cat":"Вино"},
-    {"id":"p99",  "name":"Calvet Sancerre 0.75",          "price":140, "cat":"Вино"},
-    {"id":"p109", "name":"Chateau Saint Leon 0.75",        "price":140, "cat":"Вино"},
-    {"id":"p112", "name":"La Celia Malbec 0.75",           "price":140, "cat":"Вино"},
-    {"id":"p120", "name":"MiP Collection Rose 0.75",       "price":140, "cat":"Вино"},
-    {"id":"p100",  "name":"Rimapere SB 0.75",              "price":190, "cat":"Вино"},
-    {"id":"p104", "name":"Oyster Bay SB 0.75",             "price":190, "cat":"Вино"},
-    {"id":"p107", "name":"Castel Barreyres 0.75",          "price":190, "cat":"Вино"},
-    {"id":"p108", "name":"Chateau Perron 0.75",            "price":190, "cat":"Вино"},
-    {"id":"p110", "name":"Campo Viejo Reserva 0.75",       "price":190, "cat":"Вино"},
-    {"id":"p111", "name":"Chateau Des Laurets 0.75",       "price":190, "cat":"Вино"},
-    {"id":"p116", "name":"Minuty Cotes De Provence 0.75",  "price":190, "cat":"Вино"},
-    {"id":"p121", "name":"Drostdy Hof Grand Cru 5 ltr",   "price":190, "cat":"Вино"},
-    {"id":"p122", "name":"Drostdy Hof Claret 5 ltr",      "price":190, "cat":"Вино"},
-    {"id":"p101", "name":"Louis Moreau Chablis 0.75",      "price":240, "cat":"Вино"},
-    {"id":"p102", "name":"Bourgogne Louis Jadot 0.75",     "price":240, "cat":"Вино"},
-    {"id":"p103", "name":"Gavi Di Gavi 0.75",              "price":240, "cat":"Вино"},
-    {"id":"p113", "name":"Campo Viejo Gran Reserva 0.75",  "price":240, "cat":"Вино"},
-    {"id":"p118", "name":"Whispering Angel 0.75",          "price":240, "cat":"Вино"},
-    {"id":"p119", "name":"Saint Maur Rose 0.75",           "price":240, "cat":"Вино"},
-    {"id":"p114", "name":"Chateau Lagrange 0.75",          "price":760, "cat":"Вино"},
-]
+# Каталог — из catalog.json, того же файла, что у приложения, панели оператора
+# и STAR. Раньше здесь лежал свой список с ценами времён скидки (95/140/190,
+# пиво 95/190 и «вдвое минус пять»): владелец правил прайс в STAR, а бот
+# продолжал добавлять в заказы по старым ценам (владелец, 16 сен 2026: «во
+# всех ботах тоже подтяни цены»). Цены — прайс (*_full): бот правит заказы
+# оператора; цена приложения с 16 сен равна прайсу. Пиво — пачками: p12 и p24
+# из каталога, 24 ровно вдвое против 12. Сигареты в бот не идут — они только
+# в паре с алкоголем, это правило живёт в панели оператора.
+from pathlib import Path as _Path
+_CATALOG_FILE = _Path(__file__).parent / "catalog.json"
+_products_cache = {"mtime": 0.0, "items": []}
+
+def _products() -> list:
+    """Список позиций в прежней форме: {id, name, cat, price} у бутылок,
+    {id, name, cat, p12, p24} у пива; перечитывается, когда файл изменился."""
+    import json as _json
+    try:
+        mtime = _CATALOG_FILE.stat().st_mtime
+    except OSError:
+        return _products_cache["items"]
+    if mtime == _products_cache["mtime"] and _products_cache["items"]:
+        return _products_cache["items"]
+    try:
+        raw = _json.loads(_CATALOG_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning(f"[catalog] не прочитался: {e}")
+        return _products_cache["items"]
+    items = []
+    for c in raw:
+        cat = str(c.get("cat") or "")
+        if not c.get("id") or cat == "Сигареты":
+            continue
+        base = {"id": str(c["id"]), "name": str(c.get("name") or c["id"]), "cat": cat,
+                "stock": bool(c.get("stock", True))}
+        if cat == "Пиво" or c.get("price_12_full") or c.get("price_24_full"):
+            p12 = int(c.get("price_12_full") or c.get("price_12") or c.get("price_full") or c.get("price") or 0)
+            p24 = int(c.get("price_24_full") or c.get("price_24") or 2 * p12)
+            items.append({**base, "p12": p12, "p24": p24})
+        else:
+            items.append({**base, "price": int(c.get("price_full") or c.get("price") or 0)})
+    _products_cache.update(mtime=mtime, items=items)
+    return items
 
 # Category order & emoji for the "add product" category picker
 CATEGORY_ORDER = [
@@ -354,31 +259,33 @@ def kb_add_categories(oid):
     """Category picker for adding a product."""
     rows = []
     for cat, emoji in CATEGORY_ORDER:
-        count = sum(1 for p in PRODUCTS if p["cat"] == cat)
+        count = sum(1 for p in _products() if p["cat"] == cat)
         rows.append([InlineKeyboardButton(f"{emoji} {cat}  ({count})", callback_data=f"ei_cat_{oid}_{cat}")])
     rows.append([InlineKeyboardButton("← Назад", callback_data=f"edit_{oid}")])
     return InlineKeyboardMarkup(rows)
 
 def kb_add_product(oid, cat=None):
     """Product list filtered by category, sorted by price."""
-    items = [p for p in PRODUCTS if p["cat"] == cat] if cat else PRODUCTS
+    items = [p for p in _products() if p["cat"] == cat] if cat else _products()
+    нет = lambda p: "" if p.get("stock", True) else "  · нет"
     if cat == "Пиво":
         # Beer: show brand names only, operator picks pack size next
         items = sorted(items, key=lambda p: p["p12"])
-        rows = [[InlineKeyboardButton(f"{p['name']}", callback_data=f"ei_beer_{oid}_{p['id']}")] for p in items]
+        rows = [[InlineKeyboardButton(f"{p['name']}{нет(p)}", callback_data=f"ei_beer_{oid}_{p['id']}")] for p in items]
     else:
         items = sorted(items, key=lambda p: p["price"])
-        rows = [[InlineKeyboardButton(f"{p['name']}  {p['price']} AED", callback_data=f"ei_addp_{oid}_{p['id']}")] for p in items]
+        rows = [[InlineKeyboardButton(f"{p['name']}  {p['price']} AED{нет(p)}", callback_data=f"ei_addp_{oid}_{p['id']}")] for p in items]
     rows.append([InlineKeyboardButton("← Назад", callback_data=f"ei_add_{oid}")])
     return InlineKeyboardMarkup(rows)
 
 def beer_pack_price(p, pack):
-    """12-pack = the listed 12-price; 24-pack = double minus a flat 5, snapped up to a clean
-    0/5 in our favour (95→185, 140→275). Mirrors the customer app's beerPrice."""
+    """12 штук — цена p12 из каталога; 24 — p24 из каталога, а без него ровно
+    вдвое (владелец, 16 сен 2026: «не 100/195, а 100/200»). То же правило у
+    приложения (beerPrice) и сервера (api_server._catalog_unit_price)."""
     twelve = p.get("p12") or p.get("price") or 0
     if str(pack) == "12" or not twelve:
         return twelve
-    return math.ceil((twelve * 2 - 5) / 5) * 5
+    return p.get("p24") or twelve * 2
 
 def _items_sig(order):
     """Storage-stable signature of an order's line items — used to tell a real edit from a
@@ -390,7 +297,7 @@ def _items_sig(order):
 
 def kb_beer_pack(oid, pid):
     """Pack size picker for a specific beer."""
-    pmap = {p["id"]: p for p in PRODUCTS}
+    pmap = {p["id"]: p for p in _products()}
     p = pmap.get(pid)
     if not p:
         return InlineKeyboardMarkup([[InlineKeyboardButton("← Назад", callback_data=f"ei_cat_{oid}_Пиво")]])
@@ -685,7 +592,7 @@ async def customer_card(o):
 
 
 def recalc_order(order):
-    pmap  = {p["id"]: p for p in PRODUCTS}
+    pmap  = {p["id"]: p for p in _products()}
     items = order.get("items", [])
     for item in items:
         if item.get("is_custom"):
@@ -1936,7 +1843,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         pack = parts[4] if len(parts) > 4 else None  # "12" or "24" for beer
         order = await db.get_order(oid)
         if not order: return
-        pmap  = {p["id"]: p for p in PRODUCTS}
+        pmap  = {p["id"]: p for p in _products()}
         p     = pmap.get(pid)
         if not p: return
         # Determine name and price

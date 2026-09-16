@@ -1184,16 +1184,28 @@ def _load_catalog_by_id() -> dict:
     return _catalog_cache["by_id"]
 
 def _catalog_unit_price(p: dict, pcs) -> float:
-    """Unit price mirroring the frontend (index-6.html beerPrice): a 24-pack = double the
-    12-pack minus a flat 5, snapped up to a clean 0/5 in our favour (95→185, 140→275); a
-    12-pack = price. Derived from price — the stale price_12/price_24 fields are ignored."""
+    """Цена единицы в приложении; зеркало beerPrice в index-6.html.
+
+    Пиво продаётся пачками: 12 штук — цена позиции (price_12, она же price),
+    24 штуки — ровно вдвое: price_24 из каталога, а без него 2 × 12. Владелец,
+    16 сен 2026: «цены на пиво 24 шт ровно в 2 раза больше, чем 12 шт — не
+    100/195, а 100/200». Прежняя формула «вдвое минус пять, вверх до пятёрки»
+    (100 → 195) снята, поля price_12/price_24 в каталоге выровнены с прайсом."""
     base = float(p.get("price", 0) or 0)
     try:
         pcs = int(pcs)
     except (TypeError, ValueError):
         pcs = 0
-    if pcs == 24 and base:
-        return float(math.ceil((base * 2 - 5) / 5) * 5)
+    # Пачками идёт только пиво: у крепкого pcs в заказе не бывает, а если
+    # пришёл — цена остаётся ценой бутылки, а не удваивается.
+    pack = bool(p.get("price_24") or p.get("price_24_full") or p.get("price_12")
+                or p.get("price_12_full") or (p.get("cat") or "") == "Пиво")
+    if pack and pcs == 24 and base:
+        p24 = float(p.get("price_24") or 0)
+        return p24 if p24 > 0 else base * 2
+    if pack and pcs == 12 and base:
+        p12 = float(p.get("price_12") or 0)
+        return p12 if p12 > 0 else base
     return base
 
 async def _goods_subtotal_aed(items: list) -> float:

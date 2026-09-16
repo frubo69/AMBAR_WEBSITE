@@ -1,4 +1,7 @@
-"""Сколько склад стоит: в бутылках, в закупке и в продаже.
+"""Сколько склад стоит: в учётных единицах, в закупке и в продаже.
+
+Единица — бутылка, у пива коробка (0,5 — двенадцать банок, 1 — двадцать
+четыре): так ведут лист операторы и так считает владелец, банками — никогда.
 
 Экран склада отвечал на один вопрос — сколько бутылок лежит. Но у владельца
 вопросов три, и два из них про деньги: во сколько эти бутылки обошлись и
@@ -15,9 +18,9 @@
 каталог нужен целиком.
 
 Цены — из каталога, и их там по две на каждую учётную единицу: `price*` берёт
-приложение, `price*_full` стоит по прайсу. У пива единица — ящик, поэтому
-цены за ящик отдельные, и делить их на 24 нельзя: ящик стоит не как 24
-бутылки.
+приложение, `price*_full` стоит по прайсу. У пива единица — коробка, поэтому
+цены за коробку отдельные, и делить их на 24 нельзя: коробка стоит не как 24
+банки.
 
 Закупка — отдельная история. Своей себестоимости у товара в каталоге нет,
 там только продажные цены. Настоящий прайс лежит в двух местах, и берём их
@@ -113,9 +116,16 @@ async def cost_map() -> dict:
     return out
 
 
+def _half(v) -> float | int:
+    """Количество до половины единицы: полкоробки пива — это 0,5, и терять
+    её нельзя; целое отдаём целым, чтобы в ответе не было «530.0»."""
+    v = round(float(v or 0) * 2) / 2
+    return int(v) if v == int(v) else v
+
+
 def _app_unit_price(p: dict, unit: int) -> int:
-    """Цена учётной единицы в приложении. У ящика она своя и не равна цене
-    бутылки, умноженной на 24."""
+    """Цена учётной единицы в приложении. У коробки пива она своя и не равна
+    цене банки, умноженной на 24."""
     if unit > 1:
         return int(p.get("price_24") or p.get("price_24_full")
                    or p.get("price_12") or 0)
@@ -182,20 +192,25 @@ async def build(day: str = "") -> dict:
                 row["have"][oid] = None
                 continue
             row["known"] = True
-            b_ = max(0.0, float(имеет.get(pid) or 0) * unit)
-            have = b_ / unit
+            # Количество — в учётных единицах, как на листе операторов: у
+            # крепкого и вина бутылка, у пива КОРОБКА: 0,5 — двенадцать банок,
+            # 1 — двадцать четыре, продаём только по 12 и 24. В банки не
+            # переводим (владелец, 16 сен 2026: «мы не считаем в банках, мы
+            # считаем в коробках»): карточка говорила «8 710 бутылок», а на
+            # листе тех же полок — 2 880 единиц. Полкоробки остаётся половиной.
+            have = max(0.0, float(имеет.get(pid) or 0))
             row["have"][oid] = have
             if have <= 0:
                 continue
-            row["bottles"] += b_
+            row["bottles"] += have
             slot = per[oid]
             for box in (slot, total):
-                box["bottles"] += b_
+                box["bottles"] += have
                 box["app"] += have * app_u
                 box["list"] += have * list_u
                 if cost_u:
                     box["cost"] += have * cost_u
-                    box["cost_bottles"] += b_
+                    box["cost_bottles"] += have
         items.append(row)
 
     # Порядок как в заявке: ряд на полке идёт как идёт, и «по убыванию
@@ -203,7 +218,7 @@ async def build(day: str = "") -> dict:
     # строкой листа, а строка на листе стоит на своём номере.
     items.sort(key=lambda r: r["no"])
     rnd = lambda x: round(x, 2)
-    fix = lambda s: {k: (round(v) if k in ("bottles", "cost_bottles") else rnd(v))
+    fix = lambda s: {k: (_half(v) if k in ("bottles", "cost_bottles") else rnd(v))
                      for k, v in s.items()}
     covered = (total["cost_bottles"] / total["bottles"] * 100) if total["bottles"] else 0
     с_остатком = sum(1 for r in items if r["bottles"] > 0)
@@ -212,14 +227,14 @@ async def build(day: str = "") -> dict:
         "districts": districts,
         "totals": fix(total),
         "by_district": {k: fix(v) for k, v in per.items()},
-        "items": [{**r, "bottles": round(r["bottles"])} for r in items],
+        "items": [{**r, "bottles": _half(r["bottles"])} for r in items],
         "cost_cover": round(covered),
         "cost_known": sum(1 for r in items if r.get("cost")),
         "items_total": len(items),
         "items_with_stock": с_остатком,
     }
     log.info(f"[value] позиций {len(items)} (с остатком {с_остатком}) · "
-             f"бутылок {out['totals']['bottles']} · "
+             f"единиц {out['totals']['bottles']} (пиво коробками) · "
              f"прайс {out['totals']['list']:.0f} · приложение {out['totals']['app']:.0f} · "
              f"закупка {out['totals']['cost']:.0f} (покрытие {out['cost_cover']}%)")
     return out
@@ -239,7 +254,7 @@ async def handle_prices(request):
         unit = stock_routes._unit(p)
         rows.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
-            "unit": unit, "unit_name": "ящик" if unit > 1 else "бутылка",
+            "unit": unit, "unit_name": "коробка" if unit > 1 else "бутылка",
             "price_app": _app_unit_price(p, unit),
             "price_list": stock_routes._price(p),
             "cost": cost.get(pid) or None,

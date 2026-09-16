@@ -14704,7 +14704,7 @@ function stkValInner(reg){
     </div>
     <div class="aud-g">
       <div class="aud-t"><span class="aud-tl">Количество</span>
-        <b class="aud-tv">${fmt(bottles)}</b><span class="aud-tu">бут</span></div>
+        <b class="aud-tv">${fmtQty(bottles)}</b><span class="aud-tu">бут</span></div>
       <button class="aud-t tap gold" onclick="ordPrices()" aria-label="Закупочные цены">
         <span class="aud-tl">Цена закупки</span>
         <b class="aud-tv">${t ? fmt(Math.round(t.cost)) : '—'}</b><span class="aud-tu">AED</span></button>
@@ -14884,13 +14884,15 @@ async function stkMoveDel(i){
 // Вместо неё переключатель: выбранная величина считается сразу везде — и в
 // полосе районов, и в каждой ячейке каталога, и в итоге в шапке.
 const STK_BY = {
+  // r.bottles и ячейки — в учётных единицах: бутылки, у пива коробки (0,5 —
+  // двенадцать банок, 1 — двадцать четыре); цены в каталоге за ту же единицу.
   qty:  {t:'Количество', тотал: r => r.bottles,
          ячейка: (r, h) => h,
          сумма: r => r.bottles, деньги: false},
-  cost: {t:'Цена закупки', тотал: r => (r.cost || 0) * r.bottles / Math.max(1, r.unit),
+  cost: {t:'Цена закупки', тотал: r => (r.cost || 0) * r.bottles,
          ячейка: (r, h) => r.cost ? h * r.cost : null,
          сумма: r => r.cost ? r.cost * _stkUnits(r) : null, деньги: true},
-  sell: {t:'Цена продажи', тотал: r => (r.price_list || 0) * r.bottles / Math.max(1, r.unit),
+  sell: {t:'Цена продажи', тотал: r => (r.price_list || 0) * r.bottles,
          ячейка: (r, h) => h * (r.price_list || 0),
          сумма: r => (r.price_list || 0) * _stkUnits(r), деньги: true},
 };
@@ -14912,7 +14914,7 @@ function stkByReload(){ STK.val = null; daySkel('stkMid'); stkByDistrict(true); 
 // величины с подписью, что это и чьё. Меняются местами долей --fold, как на
 // плашке расходов.
 function stkByDayL(src, sel){
-  const val = STK.by === 'qty' ? [fmt(src.bottles || 0), 'бут']
+  const val = STK.by === 'qty' ? [fmtQty(src.bottles || 0), 'бут']
     : [fmt(Math.round(STK.by === 'cost' ? (src.cost || 0) : (src.list || 0))), 'AED'];
   const чьё = sel ? `${sel.code || ''} · ${sel.name || ''}` : 'все районы';
   // В развёрнутой шапке рядом с названием только код выбранного района: и
@@ -14938,7 +14940,7 @@ function stkByTiles(src){
       <span class="aud-tl">${STK_BY[k].t}</span>
       <b class="aud-tv">${val}</b><span class="aud-tu">${u}</span></button>`;
   return `<div class="aud-g stk-byg">
-    ${плитка('qty', fmt(src.bottles || 0), 'бут')}
+    ${плитка('qty', fmtQty(src.bottles || 0), 'бут')}
     ${плитка('cost', fmt(Math.round(src.cost || 0)), 'AED')}
     ${плитка('sell', fmt(Math.round(src.list || 0)), 'AED')}
   </div>`;
@@ -14983,7 +14985,7 @@ async function stkByDistrict(тихо){
     pluralize(items.length,'позиция','позиции','позиций')}${
     v.items_with_stock != null ? `, с остатком ${v.items_with_stock}` : ''}`, false);
   const shown = sel ? [sel] : ds;
-  const числоРайона = c => STK.by === 'qty' ? fmt(c.bottles || 0)
+  const числоРайона = c => STK.by === 'qty' ? fmtQty(c.bottles || 0)
     : fmt(Math.round(STK.by === 'cost' ? (c.cost || 0) : (c.list || 0)));
   const body = `
     <div class="stkbd-strip">${ds.map(d => {
@@ -15021,19 +15023,20 @@ async function stkByDistrict(тихо){
             if(!h) return '<td class="nil">0</td>';
             const val = режим.ячейка(r, h);
             return val == null ? '<td class="z">—</td>'
-              : `<td>${режим.деньги ? fmt(Math.round(val)) : fmt(val)}</td>`;
+              : `<td>${режим.деньги ? fmt(Math.round(val)) : fmtQty(val)}</td>`;
           }).join('')}
           ${sel ? '' : `<td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
             !известна ? '—' : (сумма == null ? '—'
-              : (режим.деньги ? fmt(Math.round(сумма)) : fmt(r.bottles)))}</td>`}
+              : (режим.деньги ? fmt(Math.round(сумма)) : fmtQty(r.bottles)))}</td>`}
         </tr>`;
       }).join('')}</tbody>
     </table></div>
     <div class="stk-note" style="margin:12px 2px 0">${
       STK.by === 'qty'
-        ? `Числа в колонках районов — в учётных единицах: у крепкого это бутылки,
-           у пива ящики. «Всего» приведено к бутылкам. Ноль значит «считали, и
-           нет», прочерк — «в этот район ни разу не вносили».`
+        ? `Все числа — в учётных единицах: у крепкого и вина бутылки, у пива
+           коробки (0,5 — 12 банок, 1 — 24). «Всего» и плитки считают так же,
+           коробку за единицу. Ноль значит «считали, и нет», прочерк — «в этот
+           район ни разу не вносили».`
       : STK.by === 'cost'
         ? `Числа — во сколько обошлось то, что лежит в районе. Прочерк там, где
            закупочная цена неизвестна: такие позиции в сумму не входят, оттого
@@ -21837,7 +21840,7 @@ function oprFootPaint(){
 }
 
 function oprRow(r){
-  const ед = r.unit > 1 ? 'за ящик' : 'за бутылку';
+  const ед = r.unit > 1 ? 'за коробку' : 'за бутылку';
   const рука = r.cost_src === 'вручную';
   return `<div class="oprx-r" id="opr-${escS(r.id)}">
     <div class="oprx-h">
@@ -24476,14 +24479,14 @@ function xGrid(){
 
 function xTile(r){
   const n = xQtyAt(r.id);
-  const unit = r.unit > 1 ? `<small>/ ${escS(r.unit_name || 'ящик')}</small>` : '<small>AED</small>';
+  const unit = r.unit > 1 ? `<small>/ ${escS(r.unit_name || 'коробка')}</small>` : '<small>AED</small>';
   return `<div class="xt" data-pid="${escS(r.id)}">
     ${n ? `<span class="xt-q">${n}</span>` : ''}
     <div class="xt-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
          onerror="this.style.visibility='hidden'"></div>
     <div class="xt-nm">${escS(r.name)}</div>
     <div class="xt-bot">${n ? '<span class="xt-b" data-d="-1">−</span>' : ''}
-      <div class="xt-info"><div class="xt-pr">${n ? `<b class="xt-n">${n}</b>` : ''}${r.unit > 1 ? `<small>${escS(r.unit_name || 'ящик')}</small>` : ''}</div></div>
+      <div class="xt-info"><div class="xt-pr">${n ? `<b class="xt-n">${n}</b>` : ''}${r.unit > 1 ? `<small>${escS(r.unit_name || 'коробка')}</small>` : ''}</div></div>
       ${n ? '<span class="xt-b" data-d="1">+</span>' : ''}</div>
   </div>`;
 }
@@ -24923,7 +24926,7 @@ async function xTakeAll(){
 // в ревизии. Каждая цена сохраняется сама, как только её вписали.
 function _xUnit(pid){
   const p = (PRODUCTS || []).find(x => x.id === pid) || ((XS && XS.all) || []).find(x => x.id === pid);
-  return p && p.unit > 1 ? {n: p.unit, name: p.unit_name || 'ящик'} : {n: 1, name: 'бутылку'};
+  return p && p.unit > 1 ? {n: p.unit, name: p.unit_name || 'коробка'} : {n: 1, name: 'бутылку'};
 }
 async function xPrices(sid){
   if(!SUP_D || SUP_D.supply_id !== sid) await supLoad(sid);
@@ -32891,6 +32894,11 @@ function conv(aed){ const n = +aed || 0; return curCur === 'USD' ? Math.round(n/
 // удалось загрузить» вместо одной пустой ячейки. Число, которого нет, — это
 // ноль, а не повод останавливать отрисовку.
 function fmt(aed){ return conv(aed).toLocaleString('ru-RU').replace(/,/g,' '); }
+// Количество в учётных единицах: бутылки, у пива коробки — 0,5 это двенадцать
+// банок, 1 — двадцать четыре. Через fmt нельзя: он валюту переводит и запятую
+// дроби стирает пробелом («9 5» вместо «9,5»).
+function fmtQty(n){ const v = Math.round((+n || 0) * 2) / 2, i = Math.trunc(v);
+  return i.toLocaleString('ru-RU') + (v !== i ? ',5' : ''); }
 // Compact formatter for tight cells (e.g. card-hint «средний чек») where a
 // 7-digit number would wrap and break the fixed-height card layout.
 function fmtCompact(n){

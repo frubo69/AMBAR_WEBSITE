@@ -13,7 +13,7 @@ def eq(name, got, want):
     if not ok: FAIL.append(name)
 CAT = {"p1": {"id": "p1", "name": "Absolut", "price_full": 100, "price": 100},
        "p31": {"id": "p31", "name": "Heineken can", "price_full": 100, "price_24_full": 250, "price": 100}}
-BASE = {"jvc": {"have": {"p1": 20, "p31": 3}}, "bbay": {"have": {"p1": 5}}, "silicon": {"have": {}}}
+BASE = {"jvc": {"have": {"p1": 20, "p31": 3}, "have_exact": {"p1": 20, "p31": 3.5}}, "bbay": {"have": {"p1": 5}}, "silicon": {"have": {}}}
 SR._catalog = lambda: CAT
 SR.OFFICE_IDS = ["jvc", "bbay", "silicon"]; SR.OFFICE_CODES = {"jvc": "B1", "bbay": "B2", "silicon": "B3"}; SR.OFFICE_NAMES = dict(SR.OFFICE_CODES)
 async def base(day): return BASE
@@ -28,9 +28,10 @@ async def added_since(since): return ADDED
 db.qr_by_product_district_all = by_pd; db.get_last_stock_count = last_count; db.qr_added_since = added_since
 async def main():
     v = await SV.build("2026-09-16")
-    eq("количество = пересчёт в бутылках (20 + 3×24 + 5), а не только по кодам", v["totals"]["bottles"], 97)
-    eq("по районам: JVC 92, BBay 5", (v["by_district"]["jvc"]["bottles"], v["by_district"]["bbay"]["bottles"]), (92, 5))
-    eq("прайс от количества: 25×100 + 3×250", v["totals"]["list"], 25 * 100 + 3 * 250)
+    eq("количество в учётных единицах, пиво коробками (20 + 3,5 + 5), а не банками и не по кодам", v["totals"]["bottles"], 28.5)
+    eq("по районам: JVC 23,5, BBay 5 — целое отдаётся целым", (v["by_district"]["jvc"]["bottles"], v["by_district"]["bbay"]["bottles"]), (23.5, 5))
+    eq("полкоробки не теряется: строка пива 3,5 коробки", next(r["bottles"] for r in v["items"] if r["id"] == "p31"), 3.5)
+    eq("прайс от количества: 25×100 + 3,5×250", v["totals"]["list"], 25 * 100 + 3.5 * 250)
     d = {}
     u, no = await QR.unscanned_by_district(None, d)
     eq("JVC сканирует → не внесено 92 − 14 = 78", u.get("jvc"), 78)

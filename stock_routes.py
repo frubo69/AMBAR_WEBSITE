@@ -566,7 +566,7 @@ async def handle_sheet(request):
             # Пиво считают ящиками по CASE бутылок и половинками ящика — фронт
             # должен знать и шаг, и что вообще стоит за единицей.
             "unit": unit, "step": STEP if unit > 1 else 1,
-            "unit_name": "ящик" if unit > 1 else "бутылка",
+            "unit_name": "коробка" if unit > 1 else "бутылка",
             "was": _num(was), "sold": _num(s), "moved_qty": _num(mv),
             # На первом пересчёте сравнивать не с чем — вводим как отправную точку.
             "expected": None if first_time else _num(max(0, was + mv - s)),

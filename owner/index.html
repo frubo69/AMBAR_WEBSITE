@@ -3697,6 +3697,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .xs-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#C9A96E,#E8C98A)}
 .xs-dcard.live{border-color:rgba(201,169,110,.4)}
 .xs-dcard.done{opacity:.7}
+.xs-dcard.lock{border-color:rgba(224,176,76,.55);box-shadow:inset 3px 0 0 rgba(224,176,76,.7)}
 /* Принято без кодов: товар на полке, реестр о нём не знает. Жёлтым — это
    долг, а не состояние; число справа тем же цветом. */
 .xs-dcard.noscan{border-color:rgba(243,180,74,.42)}
@@ -23957,9 +23958,11 @@ function xSupRender(d){
           </span>`
         : `<span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>`}
       </div>`).join('') + (edit ? xsAddRow(t.district) : '');
+    // Водитель открыл камеру — район закрыт для правок (владелец, 16 сен
+    // 2026): замок в подписи с причиной, рамка карточки, степперов нет.
     const lock = t.locked && !t.done_at
-      ? `<span class="xs-lock">${IC('lock', 12)}правки закрыты${t.lock_at ? ' · с ' + _hm(t.lock_at) : ''}</span>` : '';
-    return `<div class="xs-dcard ${t.cancelled_at || t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}"
+      ? `<span class="xs-lock">${IC('lock', 12)}${t.lock_why === 'scan' ? 'сканируют' : t.lock_why === 'noscan' ? 'принято без сканирования' : 'заперт'} · правки закрыты${t.lock_at ? ' с ' + _hm(t.lock_at) : ''}</span>` : '';
+    return `<div class="xs-dcard ${t.cancelled_at || t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}${t.locked && !t.done_at && !t.cancelled_at ? ' lock' : ''}"
       id="xsd-${escS(t.district)}" data-fold="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>

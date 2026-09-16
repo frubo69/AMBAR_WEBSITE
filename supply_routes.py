@@ -763,6 +763,10 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         # каждой правки старшего; водитель шлёт его с каждым сканом.
         "locked": bool(task.get("started_at") or task.get("noscan_at") or task.get("done_at")),
         "lock_at": str(task.get("started_at") or task.get("noscan_at") or task.get("done_at") or ""),
+        # Почему заперт: сканируют (камера открыта / первая бутылка), приняли
+        # без сканирования, закрыли. Старшему это подпись под районом.
+        "lock_why": ("done" if task.get("done_at") else "noscan" if task.get("noscan_at")
+                     else "scan" if task.get("started_at") else ""),
         "erev": int(task.get("erev") or 0),
         # Товар забрали без кодов: задача открыта, но бутылки уже на полке.
         # Пока left > 0, это долг — досканировать.
@@ -1121,6 +1125,17 @@ async def task_hold(sid: str, oid: str, me: str, tg_id: int, on: bool,
     if not ok:
         return {"ok": False, "verdict": "busy", "by": (h or {}).get("who") or "",
                 "kind": (h or {}).get("kind") or ""}
+    # Камера открыта — район начали принимать. С этой секунды состав района
+    # старшему не поправить (владелец, 16 сен 2026: «когда водитель нажал
+    # «Начать сканирование», изменение заявки на его район блокируется»);
+    # раньше замок ставил только первый скан, и правка успевала проскочить
+    # между кнопкой и первой бутылкой. Остальные районы правятся, пока их
+    # не начали. Ставится один раз; отпустить камеру замок не снимает.
+    if not task.get("started_at"):
+        try:
+            await db.supply_task_start(sid, oid, now)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[supply] {sid} {oid}: начало приёмки не записано: {e}")
     return {"ok": True, "sec": HOLD_SEC,
             "hold": {"who": me, "kind": kind, "at": str(now), "live": False, "mine": True}}
 

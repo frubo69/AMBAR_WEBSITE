@@ -2708,8 +2708,12 @@ async def intake_since(district: str, since) -> dict:
     программа завтра закажет то, что уже стоит на полке."""
     db = _db_or_none()
     if db is None or not since: return {}
+    # По району ПРИХОДА (origin), а не по нынешнему: код, уехавший сканом в
+    # другой район, уже учтён переездом, и считать его приходом там второй
+    # раз нельзя. У старых кодов origin нет — там берём district.
     cur = db.qr_codes.aggregate([
-        {"$match": {"district": district, "src": "intake", "at": {"$gt": since}}},
+        {"$match": {"src": "intake", "at": {"$gt": since},
+                    "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]}},
         {"$group": {"_id": "$product_id", "n": {"$sum": QR_QTY}}},
     ])
     return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=500) if d["_id"]}
@@ -2961,7 +2965,7 @@ async def writeoff_since(since: dict, skip_coded: bool = False,
                         **({"src": {"$ne": "audit"}} if skip_audit else {})}},
             {"$group": {"_id": "$item", "n": {"$sum": "$qty"}}},
         ])
-        got = {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
+        got = {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=500) if d["_id"]}
         if got: out[district] = got
     return out
 
@@ -3719,6 +3723,11 @@ async def qr_remove(code: str) -> bool:
     db = _db_or_none()
     if db is None: return False
     r = await db.qr_codes.delete_one({"_id": code})
+    try:
+        import stock_routes as _sr
+        _sr.base_drop()          # код ушёл/вернулся — склад и долг считать заново
+    except Exception:
+        pass
     return r.deleted_count > 0
 
 
@@ -3742,6 +3751,11 @@ async def qr_drop(code: str, by: int, at) -> dict | None:
         return_document=ReturnDocument.BEFORE)
     if d:
         d["code"] = d.pop("_id")
+    try:
+        import stock_routes as _sr
+        _sr.base_drop()          # код ушёл/вернулся — склад и долг считать заново
+    except Exception:
+        pass
     return d
 
 
@@ -3753,6 +3767,11 @@ async def qr_drop_undo(code: str) -> bool:
         {"_id": code, "status": "deleted"},
         [{"$set": {"status": {"$ifNull": ["$was", "active"]}}},
          {"$unset": ["was", "del_at", "del_by"]}])
+    try:
+        import stock_routes as _sr
+        _sr.base_drop()          # код ушёл/вернулся — склад и долг считать заново
+    except Exception:
+        pass
     return bool(r.modified_count)
 
 
@@ -4120,7 +4139,9 @@ async def qr_manual_events(district: str, since) -> dict:
     db = _db_or_none()
     if db is None: return {}
     from datetime import datetime as _dt, timezone as _tz
-    q = {"district": district, "src": "new", "status": {"$ne": "deleted"}}
+    # По району внесения (origin): переехавшая сканом бутылка учтена переездом.
+    q = {"src": "new", "status": {"$ne": "deleted"},
+         "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]}
     if since is not None:
         q["at"] = {"$gt": since}
     out = {}

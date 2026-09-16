@@ -399,7 +399,7 @@ async def handle_scan(request):
     half = str(body.get("qty") or "").replace(",", ".") in ("0.5", ".5")
     qty = 0.5 if (half and _sr._unit(p) > 1) else 1
     added = await db.qr_add(code, product_id, p.get("name", ""), district, me, now, label,
-                            extra={"src": src, "qty": qty})
+                            extra={"src": src, "qty": qty, "origin": district})
     if added and src == "new":
         try:
             import stock_routes

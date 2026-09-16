@@ -1018,6 +1018,31 @@ def base_drop():
     _BASE["key"] = None
 
 
+async def _noscan_after(since: dict) -> dict:
+    """{район: {позиция: единиц}} — принято без сканирования после пересчёта
+    района и ещё не отсканировано: need − got по открытым задачам с noscan_at
+    позже counted_at. Отменённые и закрытые задачи не в счёт."""
+    out: dict = {}
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        for oid, t in (sup.get("tasks") or {}).items():
+            edge = since.get(oid)
+            ns = t.get("noscan_at")
+            if not ns or t.get("done_at") or t.get("cancelled_at") or oid not in OFFICE_IDS:
+                continue
+            ns_dt = ns if hasattr(ns, "tzinfo") else _dt_of(str(ns))
+            if ns_dt is not None and ns_dt.tzinfo is None:
+                ns_dt = ns_dt.replace(tzinfo=timezone.utc)
+            if edge and (ns_dt is None or ns_dt <= edge):
+                continue
+            for it in sup.get("items") or []:
+                need = float((it.get("by_district") or {}).get(oid) or 0)
+                got = float((it.get("got") or {}).get(oid) or 0)
+                rem = max(0.0, need - got)
+                if rem and it.get("id"):
+                    out.setdefault(oid, {})[it["id"]] = out.get(oid, {}).get(it["id"], 0) + rem
+    return out
+
+
 async def _moved_after(counts: dict, since: dict) -> dict:
     """{район: {позиция: [(момент, ±единиц), …]}} — переезды после пересчёта.
 
@@ -1139,6 +1164,11 @@ async def _district_base(day: str) -> dict:
     except Exception as e:
         log.warning(f"[stock] переезды не учтены: {e}")
         moved = {}
+    try:
+        noscan = await _noscan_after(since)
+    except Exception as e:
+        log.warning(f"[stock] принятое без сканирования не учтено: {e}")
+        noscan = {}
 
     out = {}
     for oid in OFFICE_IDS:
@@ -1155,6 +1185,13 @@ async def _district_base(day: str) -> dict:
         for pid, n in came.items():
             # Приёмка — в единицах: коробка пива это один код с qty 1,
             # полкоробки — код с qty 0.5.
+            have[pid] = (have.get(pid) or 0) + n
+        # Принято без сканирования — товар на полке, кодов ещё нет. Он тоже на
+        # складе (владелец: «внёс — видно при любом раскладе»): не отсканированный
+        # остаток задачи прибавляем, а по мере сканирования он сам перетекает в
+        # приход по кодам (need − got + got = need). Задача старше пересчёта —
+        # её товар пересчёт уже видел, и её поздние сканы идут как cover.
+        for pid, n in (noscan.get(oid) or {}).items():
             have[pid] = (have.get(pid) or 0) + n
         # «Внести новый товар» — тоже приход: бутылку завели кодом руками,
         # значит она лежит на полке, и склад обязан её показать — даже там,
@@ -1690,10 +1727,10 @@ async def _audit_expected(district: str, day: str) -> tuple:
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[audit] невнесённые не посчитаны ({district}): {e}")
         miss = detail.get(district) or {}
-        cnt = await db.get_last_stock_count(district)
-        moved = await _moves_since_count(district, cnt, cat)
+        # Переезды после пересчёта основа уже применила (_moved_after) —
+        # прибавлять их здесь второй раз нельзя.
         for pid, p in cat.items():
-            n = max(0.0, float(have.get(pid) or 0) + float(moved.get(pid) or 0))
+            n = max(0.0, float(have.get(pid) or 0))
             noqr[pid] = _num(min(n, float(miss.get(pid) or 0)))
             exp[pid] = _num(n)
         return exp, noqr, True
@@ -2115,7 +2152,7 @@ async def handle_audit_short(request):
             continue
         wid = await db.writeoff_add({
             "at": now, "day": day, "item": pid, "thumb": "",
-            "name": cat[pid].get("name", ""), "qty": int(l["qty"]), "kind": "недостача",
+            "name": cat[pid].get("name", ""), "qty": _num(l["qty"]), "kind": "недостача",
             "note": note, "district": district,
             "district_code": OFFICE_CODES.get(district, ""),
             "by": by_name, "by_id": int(request["owner_id"] or 0),
@@ -2715,10 +2752,10 @@ async def handle_writeoff_add(request):
     if pid not in cat:
         return web.json_response({"error": "no_item"}, status=400, headers=CORS_HEADERS)
     try:
-        qty = int(body.get("qty") or 0)
+        qty = _num(_round_step(float(str(body.get("qty") or 0).replace(",", "."))))
     except (TypeError, ValueError):
         qty = 0
-    if not (1 <= qty <= 240):
+    if not (0.5 <= qty <= 240):
         return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
     kind = str(body.get("kind") or "").strip()
     if kind not in db.WRITEOFF_KINDS:

@@ -633,7 +633,7 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         "pay": pay,
         "expenses": by_kind, "exp_n": len(extras),
         "exp_pending": sum(1 for x in extras if (x.get("status") or "approved") == "pending"),
-        "writeoffs": len(wos), "writeoff_qty": sum(int(w.get("qty") or 0) for w in wos),
+        "writeoffs": len(wos), "writeoff_qty": sum(float(w.get("qty") or 0) for w in wos),
     }
 
 
@@ -915,10 +915,11 @@ async def handle_writeoff_add(request):
     if pid not in cat:
         return web.json_response({"error": "no_item"}, status=400, headers=CORS_HEADERS)
     try:
-        qty = int(body.get("qty") or 0)
+        from stock_routes import _round_step, _num
+        qty = _num(_round_step(float(str(body.get("qty") or 0).replace(",", "."))))
     except (TypeError, ValueError):
         qty = 0
-    if not (1 <= qty <= WO_MAX_QTY):
+    if not (0.5 <= qty <= WO_MAX_QTY):
         return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
     kind = (body.get("kind") or "").strip()
     if kind not in db.WRITEOFF_KINDS:

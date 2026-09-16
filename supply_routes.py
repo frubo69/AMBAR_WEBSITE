@@ -949,8 +949,25 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     from qr_routes import product_slug
     seq = await db.qr_next_seq(pid)
     label = f"{product_slug(pid, item.get('name',''))}#{seq:06d}"
+    # Товар приняли без сканирования раньше, чем район пересчитали, — пересчёт
+    # его уже видел, и код к нему заводится как cover (остаток не растёт).
+    # Иначе — обычный приход.
+    src = "intake"
+    try:
+        ns = task.get("noscan_at")
+        if ns:
+            import stock_routes as _sr
+            cnt = await db.get_last_stock_count(oid, before_day=None)
+            edge = _sr._dt_of((cnt or {}).get("counted_at") or "")
+            ns_dt = ns if hasattr(ns, "tzinfo") else _sr._dt_of(str(ns))
+            if ns_dt is not None and ns_dt.tzinfo is None:
+                ns_dt = ns_dt.replace(tzinfo=timezone.utc)
+            if edge and ns_dt and ns_dt <= edge:
+                src = "cover"
+    except Exception as e:                                       # noqa: BLE001
+        log.warning(f"[supply] не понял, приход это или cover: {e}")
     added = await db.qr_add(code, pid, item.get("name", ""), oid, tg_id, now, label,
-                            extra={"src": "intake", "supply_id": sid, "driver": me,
+                            extra={"src": src, "supply_id": sid, "driver": me, "origin": oid,
                                    "qty": qty, "at_dev": str(at_dev or "")[:32]})
     if not added:
         # Код заняли между проверкой и вставкой — место в задаче возвращаем,
@@ -1121,6 +1138,11 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
     doc = await db.supply_task_noscan(sid, oid, me, now)
     if not doc:
         return {"ok": False, "verdict": "closed"}
+    try:
+        import stock_routes
+        stock_routes.base_drop()            # товар на полке — склад видит сразу
+    except Exception:                       # noqa: BLE001
+        pass
     v = _task_view(sid, doc, oid, (doc.get("tasks") or {}).get(oid) or {}, me)
     log.info(f"[supply] {sid}/{oid}: принято без сканирования · {me} · "
              f"{v['left']} шт не отсканировано")

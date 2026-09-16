@@ -6581,6 +6581,17 @@ button.exp-wait:active{transform:scale(.99)}
 .ch-num{font-family:'Space Grotesk',sans-serif;font-size:31px;font-weight:700;line-height:1;
   color:var(--gold2);letter-spacing:-1px;font-variant-numeric:tabular-nums;
   text-shadow:0 0 20px rgba(201,169,110,.28)}
+/* Барабан цифр (владелец, 16 сен 2026): каждая цифра — колонка 9…0 высотой в
+   строку, видна одна; новая цифра приходит сверху, старая уходит вниз,
+   колонки крутятся по одной. Ширина колонки — 1ch: у табличных цифр все
+   одной ширины с нулём. */
+.od{display:inline-flex;align-items:flex-start;height:1em;line-height:1;overflow:hidden;vertical-align:top;
+  text-shadow:none;filter:drop-shadow(0 0 9px rgba(201,169,110,.32))}   /* свечение — фильтром: text-shadow резался бы по колонкам */
+.od-d{position:relative;width:1ch;height:1em;overflow:hidden}
+.od-r{display:flex;flex-direction:column;will-change:transform;transition:transform .75s cubic-bezier(.22,.85,.25,1)}
+.od-r span{display:block;height:1em;line-height:1;text-align:center}
+.od-s{width:.26em}
+@media (prefers-reduced-motion:reduce){.od-r{transition:none}}
 .ch-go{display:flex;align-items:center;color:var(--gold2);opacity:.5;flex-shrink:0}
 .ch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;
   padding-top:13px;border-top:1px solid rgba(201,169,110,.14)}
@@ -13193,6 +13204,40 @@ function _animCount(el, to){
     el.textContent = fmt(Math.round(from+(to-from)*e));
     if(p<1) requestAnimationFrame(step);
   })(t0);
+}
+
+// Барабан цифр для больших чисел (владелец, 16 сен 2026: «чтобы числа как
+// будто сверху вниз по одному крутились»). Колонка на разряд, лента 9…0;
+// показать цифру d — сдвинуть ленту на (9 − d) строк; рост цифры двигает
+// ленту вниз, и новая цифра въезжает сверху. Колонки стартуют с задержкой
+// по очереди. Первый вызов крутит от нулей — это же и анимация загрузки.
+function _odometer(el, to){
+  if(!el) return;
+  to = Math.max(0, Math.round(to || 0));
+  const s = String(to), n = s.length;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let box = el.querySelector('.od');
+  if(!box || box.querySelectorAll('.od-d').length !== n){
+    // Разрядов стало больше или меньше — строим заново, стартуя с прежнего
+    // числа, чтобы крутились только изменившиеся колонки.
+    const was = String(parseInt(el.dataset.n || '0', 10) || 0).padStart(n, '0').slice(-n);
+    box = document.createElement('span'); box.className = 'od';
+    for(let i = 0; i < n; i++){
+      if(i && (n - i) % 3 === 0){ const sp = document.createElement('span'); sp.className = 'od-s'; box.appendChild(sp); }
+      const d = document.createElement('span'); d.className = 'od-d';
+      const r = document.createElement('span'); r.className = 'od-r';
+      for(let k = 9; k >= 0; k--){ const c = document.createElement('span'); c.textContent = k; r.appendChild(c); }
+      r.style.transform = `translateY(-${9 - (+was[i])}em)`;
+      d.appendChild(r); box.appendChild(d);
+    }
+    el.textContent = ''; el.appendChild(box);
+    void box.offsetWidth;                          // стартовое положение — до перехода
+  }
+  box.querySelectorAll('.od-r').forEach((r, i) => {
+    r.style.transitionDelay = reduce ? '0s' : `${i * 80}ms`;
+    r.style.transform = `translateY(-${9 - (+s[i])}em)`;
+  });
+  el.dataset.n = String(to);
 }
 
 // IDs of finance/KPI placeholders that render skeleton shimmers while the
@@ -27731,6 +27776,28 @@ async function refreshCustomers(){
   if(customers.length) renderCustomerSections(customers);
 }
 
+// Живой размер базы (владелец, 16 сен 2026: «чтобы обновлялось в прямом
+// эфире, без перезагрузки»). Раз в пять секунд, пока число на экране,
+// спрашиваем одну цифру; изменилась — барабан крутится и разделы клиентов
+// перечитываются. Полный список ради одной цифры не гоняем.
+let _custCountBusy = false;
+async function custCountTick(){
+  const el = document.getElementById('acBtnCount');
+  if(!el || document.hidden || _custCountBusy || !window.ownerApi) return;
+  if(!el.getClientRects().length) return;          // раздел не на экране
+  _custCountBusy = true;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/customers/count');
+    const n = +r.total;
+    if(Number.isFinite(n) && el.dataset.n !== undefined && String(n) !== String(el.dataset.n)){
+      _odometer(el, n);
+      refreshCustomers();
+    }
+  }catch(e){}
+  finally{ _custCountBusy = false; }
+}
+setInterval(custCountTick, 5000);
+
 // ===== Customer data (loaded from API) =====
 let _customersCache = null;
 const CUST_PHONES = {};
@@ -28007,7 +28074,7 @@ function renderCustomerSections(customers){
   }
 
   // Шапка раздела: размер базы и три числа под ним.
-  _animCount(document.getElementById('acBtnCount'), customers.length);
+  _odometer(document.getElementById('acBtnCount'), customers.length);
   _animCount(document.getElementById('chVip'), vips.length);
   const _debtN = debtors.length;
   const _chD = document.getElementById('chDebt');

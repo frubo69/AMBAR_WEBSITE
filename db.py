@@ -1330,6 +1330,14 @@ async def upsert_access_block(telegram_id: int, by: int = 0, hint: dict = None) 
     return doc or {}
 
 
+async def customers_count() -> int:
+    """Размер базы одним числом — для живого счётчика в STAR: опрашивать
+    полный список ради одной цифры раз в пять секунд было бы расточительно."""
+    db = _db_or_none()
+    if db is None: return 0
+    return int(await db.users.count_documents({}))
+
+
 async def get_all_customers() -> list:
     """Return all user documents, newest-first."""
     db = _db_or_none()

@@ -1030,6 +1030,14 @@ def _json_default(obj):
 
 
 @require_owner
+async def handle_customers_count(request):
+    """Размер базы одним числом. Живой счётчик в разделе «Люди» (владелец,
+    16 сен 2026) спрашивает его раз в пять секунд, пока раздел на экране, и
+    только при изменении перечитывает полный список."""
+    return web.json_response({"total": await db.customers_count()}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_customers(request):
     """Return all customers with stats, sorted by total_spent desc."""
     users = await db.get_all_customers()
@@ -4459,6 +4467,9 @@ def setup(app):
     app.router.add_get(             "/api/owner/promo",   handle_promo)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)
     app.router.add_get(             "/api/owner/customers",              handle_customers)
+    # «count» раньше «{telegram_id}»: иначе слово ушло бы в карточку клиента.
+    app.router.add_route("OPTIONS", "/api/owner/customers/count",        handle_customers_count)
+    app.router.add_get(             "/api/owner/customers/count",        handle_customers_count)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}", handle_customer_detail)
     app.router.add_get(             "/api/owner/customers/{telegram_id}", handle_customer_detail)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)

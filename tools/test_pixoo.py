@@ -13,13 +13,17 @@ def eq(name, got, want):
 N = {"v": 998}
 async def count(): return N["v"]
 db.customers_count = count
-async def call(key, what=None):
-    r = make_mocked_request("GET", "/pixoo/x", match_info={"key": key, **({"what": what} if what else {})})
-    resp = await px.handle_pixoo(r); return resp.status, resp.text
+import json
+async def call(key, what=None, plain=False):
+    r = make_mocked_request("GET", "/pixoo/x" + ("?plain=1" if plain else ""), match_info={"key": key, **({"what": what} if what else {})})
+    resp = await px.handle_pixoo(r)
+    if resp.status != 200 or plain: return resp.status, resp.text
+    return resp.status, json.loads(resp.text)["DispData"]
 async def main():
     k = px.pixoo_key()
     eq("ключ выведен из секрета, 16 знаков", (len(k), k.isalnum()), (16, True))
-    eq("верный ключ → число текстом", await call(k), (200, "998"))
+    eq("верный ключ → JSON как у Divoom, DispData = число", await call(k), (200, "998"))
+    eq("?plain=1 → голый текст", await call(k, plain=True), (200, "998"))
     eq("чужой ключ → 401", (await call("nope"))[0], 401)
     N["v"] = 1000
     eq("в пределах 10 с — из кэша", await call(k), (200, "998"))

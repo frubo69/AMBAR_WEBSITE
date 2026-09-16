@@ -77,8 +77,15 @@ async def handle_pixoo(request):
     what = request.match_info.get("what") or "customers"
     if what not in ("customers", "online"):
         return web.Response(status=404, text="no")
-    return web.Response(text=await _value(what), content_type="text/plain", charset="utf-8",
-                        headers={"Cache-Control": "no-store"})
+    # Формат — как у эталона Divoom (appin.divoom-gz.com/Device/ReturnCurrentDate):
+    # JSON с полем DispData. Голый текст рамка молча не рисует — проверено на
+    # Pixoo-64 владельца 17 сен 2026. ?plain=1 — голый текст для глаз.
+    value = await _value(what)
+    if request.query.get("plain"):
+        return web.Response(text=value, content_type="text/plain", charset="utf-8",
+                            headers={"Cache-Control": "no-store"})
+    return web.json_response({"ReturnCode": 0, "ReturnMessage": "", "DispData": value},
+                             headers={"Cache-Control": "no-store"})
 
 
 def setup(app):

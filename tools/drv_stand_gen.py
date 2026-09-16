@@ -199,6 +199,8 @@ const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _ag
 // состояния смены для стенда: ?route=1 — заказ в пути, ?must=1 — не отвечено про расходы,
 // ?shoff=1 — смена не открыта, ?shclosed=1 — закрыта, ?nogeo=1 — трансляции нет
 if(ST_Q.get('route')) ST_SHIFT.in_route = ['AMB82300EB5'];
+// ?intake=1 — незавершённая приёмка: смена ждёт её
+if(ST_Q.get('intake')) ST_SHIFT.intake = [{sid: 'S1', district: 'jvc', code: 'JVC', name: 'JVC', need: 12, got: 7, left: 5, started: true}];
 if(ST_Q.get('must')){ ST_SHIFT.must = ['fuel', 'wash']; ST_SHIFT.must_names = ['Бензин', 'Мойка']; }
 if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
 if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); ST_SHIFT.after_close = true; ST_SHIFT.report_day = ST_SHIFT.day; ST_SHIFT.report_closed_at = ST_SHIFT.closed_at; ST_SHIFT.can_open = false; }

@@ -5820,12 +5820,15 @@ function shBar(){
   if(!SH || !SH.opened || SH.closed) return '';
   const left = SH.must || [];
   const route = SH.in_route || [];
-  const stop = left.length || route.length;
+  const inl = SH.intake || [];
+  const stop = left.length || route.length || inl.length;
   return `<div class="shbar">
     <span class="shbar-b">
       <span class="shbar-t">Смена идёт с ${hhmm(SH.opened_at)}</span>
       <span class="shbar-s">${route.length
         ? `<b>${route.length} ${plural(route.length,'заказ','заказа','заказов')} в пути</b> — сначала доставка`
+        : inl.length
+        ? `<b>приёмка по ${esc(inl.map(x => x.code).join(', '))} не завершена</b> — сначала завершите её`
         : (left.length
           ? `<b>ответьте про ${esc(_shAsk(SH.must))}</b> — без этого не закрыть`
           : 'всё заполнено, можно закрывать')}</span>
@@ -5848,6 +5851,13 @@ async function shClose(){
   const left = SH.must || [];
   if(left.length){
     toast(`Сначала ответьте про ${_shAsk(left)}`, 'err');
+    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    return;
+  }
+  // Приёмка взята или начата — смена ждёт её (владелец, 16 сен 2026).
+  const inl = SH.intake || [];
+  if(inl.length){
+    toast(`Сначала завершите приёмку по ${inl.map(x => x.code).join(', ')}`, 'err');
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     return;
   }
@@ -5993,6 +6003,7 @@ async function shCloseGo(){
   }catch(e){
     const p = e.payload || {};
     const msg = p.error === 'expenses_left' ? 'Сначала ответьте по расходам'
+              : p.error === 'intake_open' ? 'Сначала завершите приёмку'
               : p.error === 'day_open' ? 'Оператор ещё не закрыл смену района — подождите'
               : p.error === 'orders_in_route'
                 ? `У вас ${(p.ids||[]).length} ${plural((p.ids||[]).length,'заказ','заказа','заказов')} в пути — сначала отметьте доставку`
@@ -7997,30 +8008,43 @@ function renderShift(){
 
   let steps, btn;
   if(on){
-    const s1 = !route.length, s2 = !must.length, s3 = !!SH.day_closed, ready = s1 && s2 && s3;
-    steps = step(1, s1 ? 'ok' : 'now', 'Завершить все заказы',
+    const inl = SH.intake || [];
+    const s1 = !route.length, s2 = !must.length, s3 = !!SH.day_closed, ready = s1 && s2 && s3 && !inl.length;
+    // Приёмка взята или начата — отдельный шаг со ссылкой в задачу; нет
+    // приёмки — шага нет, нумерация сдвигается (владелец, 16 сен 2026).
+    let n = 0;
+    const ordersStep = step(++n, s1 ? 'ok' : 'now', 'Завершить все заказы',
         s1 ? 'Все активные заказы выполнены' : 'Отметьте доставку по каждому заказу',
         s1 ? ['ok', 'Готово'] : ['wait', 'В пути'],
         s1 ? {ico: ICO.box, t: 'Активных заказов нет',
               s: lastAt ? `Последний заказ завершён в ${hhmm(lastAt)}` : 'Сегодня заказов пока не было', go: "setTab('orders')"}
            : {ico: ICO.box, t: `${route.length} ${plural(route.length,'заказ','заказа','заказов')} в пути`,
               s: 'Отметьте доставку в заказах', go: "setTab('orders')"})
-      + step(2, s2 ? 'ok' : (s1 ? 'now' : ''), 'Заполнить расходы',
+;
+    // Номер шага — по порядку на экране: заказы, приёмка, расходы, оператор, закрытие.
+    const intakeStep = inl.map(x => step(++n, 'now', 'Завершить приёмку',
+        'Взятую приёмку нельзя оставить на закрытой смене',
+        ['wait', x.started ? 'Сканируют' : 'Взята'],
+        {ico: ICO.box, t: `${esc(x.code)} · ${x.left ? `осталось ${fmt(x.left)} из ${fmt(x.need)}` : 'всё отсканировано'}`,
+         s: 'Завершить приёмку или отдать задачу — в самой задаче',
+         go: `supOpen('${esc(x.sid)}','${esc(x.district)}')`})).join('');
+    steps = ordersStep + intakeStep
+      + step(++n, s2 ? 'ok' : (s1 ? 'now' : ''), 'Заполнить расходы',
         s2 ? 'Внесены или отмечены как отсутствующие'
            : `Ответьте про ${esc(_shAsk(must))}: сумма или «не было»`,
         s2 ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
         s2 ? {ico: ICO.note, t: 'Расходы заполнены', s: esc(shExpLine()), go: "setTab('expenses')"}
            : {ico: ICO.note, t: `Не отвечено: ${esc(mustNames.join(', '))}`,
               s: 'Сумма или «не было» — в расходах', go: "setTab('expenses')"})
-      + step(3, s3 ? 'ok' : (s1 && s2 ? 'now' : ''), 'Оператор закрыл смену',
+      + step(++n, s3 ? 'ok' : (s1 && s2 ? 'now' : ''), 'Оператор закрыл смену',
         'Смену района закрывает оператор',
         s3 ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
         s3 ? {ico: ICO.user, t: 'Оператор закрыл смену',
               s: SH.day_closed_at ? `Закрыта в ${hhmm(SH.day_closed_at)} — заказов больше не будет` : 'Заказов сегодня больше не будет'}
            : {ico: ICO.user, t: 'Смена ещё не закрыта',
               s: 'Оператор подтвердит после проверки'})
-      + step(4, ready ? 'now' : '', 'Закрыть смену',
-        'Когда первые три шага выполнены',
+      + step(++n, ready ? 'now' : '', 'Закрыть смену',
+        `Когда первые ${n - 1 === 3 ? 'три' : n - 1 === 4 ? 'четыре' : 'пять'} шага выполнены`,
         ['wait', 'Ожидание'],
         {ico: ICO.clock, t: 'Ваша смена ещё не закрыта',
          s: ready ? 'Нажмите кнопку ниже — на сегодня всё' : 'Сначала выполните шаги выше'});

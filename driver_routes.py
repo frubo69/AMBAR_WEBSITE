@@ -434,6 +434,39 @@ async def _after_close(me: dict, day: str, d: dict) -> dict | None:
     return None if opened else last
 
 
+async def _intake_left(me: dict) -> list:
+    """Незавершённые приёмки водителя: взял или начал, но не завершил.
+
+    Смену с ними не закрыть (владелец, 16 сен 2026): закрытая смена и
+    неприятый товар района — дыра в учёте. Принятое без сканирования сюда
+    не входит: бутылки уже на полке, долг по кодам ведёт чек-лист старшего,
+    а держать смену открытой до последнего кода — значит держать её сутками."""
+    if _tq(me):
+        return []
+    try:
+        sups = await db.supplies_with_open_tasks(limit=12)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] приёмки {me['name']} не прочитаны: {e}")
+        return []
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    out = []
+    for sup in sups:
+        for oid, t in (sup.get("tasks") or {}).items():
+            if (t.get("driver") or "").strip() != me["name"]:
+                continue
+            if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
+                continue
+            need = got = 0
+            for it in sup.get("items") or []:
+                need += int((it.get("by_district") or {}).get(oid) or 0)
+                got += int((it.get("got") or {}).get(oid) or 0)
+            out.append({"sid": sup.get("_id") or sup.get("supply_id") or "", "district": oid,
+                        "code": OFFICE_CODES.get(oid, oid), "name": OFFICE_NAMES.get(oid, oid),
+                        "need": need, "got": got, "left": max(0, need - got),
+                        "started": bool(t.get("started_at"))})
+    return out
+
+
 async def _shift_view(me: dict) -> dict:
     day = _biz_day()
     d = await db.get_driver_day(day, me["name"]) or {}
@@ -441,6 +474,7 @@ async def _shift_view(me: dict) -> dict:
     must = [] if _tq(me) else _must_left(d)
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
     route = await _in_route(me) if opened and not closed else []
+    intake = await _intake_left(me) if opened and not closed else []
     after = await _after_close(me, day, d)
     # День района закрыт оператором — значит заказов сегодня больше не будет, и
     # неотвеченные расходы превращаются из «успею» в «держу всех». Водителю про
@@ -467,12 +501,14 @@ async def _shift_view(me: dict) -> dict:
         "geo_bot": await __import__("geo_watch").geo_bot_link(),
         "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
         "in_route": route,
+        # Незавершённые приёмки: пока есть — «Закрыть смену» не активна.
+        "intake": intake,
         "can_open": (d.get("working") is True or _tq(me)) and geo["ok"]
                     and not (opened and not closed) and not after,
         # Смену закрывает сам водитель, когда отдал последний заказ и ответил
         # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
         # висела бы до утра, а «закрыть» упиралось в чужое действие.
-        "can_close": bool(opened) and not closed and not must and not route,
+        "can_close": bool(opened) and not closed and not must and not route and not intake,
     }
 
 
@@ -657,6 +693,12 @@ async def handle_shift_close(request):
     route = await _in_route(me)
     if route:
         return web.json_response({"error": "orders_in_route", "ids": route},
+                                 status=409, headers=CORS_HEADERS)
+    # Приёмка взята или начата, но не завершена — сначала она (владелец,
+    # 16 сен 2026). Завершить или отдать задачу — в самой задаче.
+    intake = await _intake_left(me)
+    if intake:
+        return web.json_response({"error": "intake_open", "tasks": intake},
                                  status=409, headers=CORS_HEADERS)
     # Сначала смену района закрывает оператор, и только потом — водитель свою
     # (владелец, 13 сен 2026: «третьим шагом должно быть оператор закрыл смену,

@@ -22754,19 +22754,39 @@ function qrGo(id){
   qrLeave(() => { distRemember('qr', id); qrPick(id); });
 }
 
-function qrDistTap(){
-  const box = document.querySelector('#accOv .stk-ttl');
-  if(box && box.classList.contains('open')){ distMenuClose(); return; }
-  const have = (ACC_QR && ACC_QR.by_district) || {};
+// Меню точек в разделе кодов: справа — сколько лежит на складе (единицы, пиво
+// коробками), подписью — сколько из этого ещё без QR. Раньше там стояло число
+// кодов в реестре («7», «714», «ещё не заводили») — владелец (16 сен 2026):
+// «бардак, сделай так, чтобы тут цифры актуальные подтягивались сами».
+// Рисуем сразу из того, что есть, и тут же перечитываем склад: меню
+// открывается на секунду, ждать ответа нельзя, врать старым — тоже.
+function _qrDistInfo(){
+  const val = (STK.val && STK.val.by_district) || {};
+  const без = (ACC_QR && ACC_QR.unscanned) || {};
   const info = {};
   (STK.districts || []).forEach(d => {
-    info[d.id] = have[d.id]
-      ? {sub: 'бутылок в реестре', value: fmt(have[d.id])}
-      : {sub: 'ещё не заводили'};
+    const v = val[d.id];
+    if(!v){ info[d.id] = {sub: 'склад считается…'}; return; }
+    const n = +без[d.id] || 0;
+    info[d.id] = {value: fmtQty(v.bottles || 0), sub: n ? `на складе · без QR ${fmtQty(n)}` : 'на складе'};
   });
-  _setRail('accRail', distMenu(QR_DIST, 'qrGo', info));
+  return info;
+}
+async function qrDistTap(){
+  const box = document.querySelector('#accOv .stk-ttl');
+  if(box && box.classList.contains('open')){ distMenuClose(); return; }
+  _setRail('accRail', distMenu(QR_DIST, 'qrGo', _qrDistInfo()));
   if(box) box.classList.add('open');
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  try{
+    const [v, q] = await Promise.all([
+      ownerApi.ownerFetch('/api/owner/stock/value', {params:{day: accDay()}}),
+      ownerApi.ownerFetch('/api/owner/qr').catch(() => null)]);
+    if(v) STK.val = v;
+    if(q) ACC_QR = q;
+    const still = document.querySelector('#accOv .stk-ttl.open');
+    if(still) _setRail('accRail', distMenu(QR_DIST, 'qrGo', _qrDistInfo()));
+  }catch(e){}
 }
 
 // ── История внесений ───────────────────────────────────────────────────

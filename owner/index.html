@@ -22970,8 +22970,7 @@ function qrRenderList(){
     const n = QR_NEED ? (need[p.id] || 0) : 0;
     const tag = busy ? `<span class="pk-busy">${escS(lock.name)}</span>`
               : lock ? `<span class="pk-mine">вы считаете</span>`
-              : n ? `<span class="pk-n dn">${fmt(n)}<i>${(p.unit > 1 || p.price_24 || p.price_24_full)
-                  ? `банок · ${fmtQty(n / 24)} кор` : 'QR код не внесён'}</i></span>` : '';
+              : n ? _qrNeedTag(p, n) : '';
     return `<button class="pk-row ${busy ? 'off' : ''}${n ? ' need' : ''}" ${busy ? 'disabled' : ''}
         onclick="qrStart('${p.id}')">
         <span class="pk-no">${p.no || ''}</span>
@@ -22982,6 +22981,19 @@ function qrRenderList(){
           <span class="pk-slug">${escS(slugs[p.id] || '')}</span>
         </span>${tag}<span class="pk-go">${_PK_TRI}</span></button>`;
   }).join('') : '<div class="scan-empty">Ничего не нашлось</div>';
+}
+
+// Долг позиции: у крепкого бутылки, у пива — коробки, как считает владелец
+// («мы же пиво считаем ящиками, а не бутылками», 16 сен 2026); банки, которые
+// предстоит поднести к камере, — подписью: 216 банок это 9 коробок, и главное
+// число здесь — 9.
+function _qrIsBeer(p){
+  return !!(p && ((p.cat || '') === 'Пиво' || p.unit > 1 || p.price_24 || p.price_24_full));
+}
+function _qrNeedTag(p, n){
+  if(_qrIsBeer(p))
+    return `<span class="pk-n dn">${fmtQty(n / 24)}<i>кор · ${fmt(n)} ${pluralize(n,'банка','банки','банок')} без QR</i></span>`;
+  return `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>`;
 }
 
 // Сканирование. Telegram держит камеру открытой и отдаёт код за кодом, пока

@@ -1080,7 +1080,10 @@ async def _sold_after(since: dict) -> dict:
         edge = since.get(oid)
         if not edge:
             continue
-        ts = _dt_of(o.get("timestamp") or "")
+        # Момент продажи — доставка: до неё бутылка стоит на полке и в
+        # пересчёт попадает; «вернули в доставку» снимает статус — и она
+        # возвращается на склад сама, «доставлен» снова — снова списывается.
+        ts = _dt_of(o.get("delivered_at") or o.get("timestamp") or "")
         if not ts or ts <= edge:
             continue
         for it in (o.get("items") or []):

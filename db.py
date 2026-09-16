@@ -2952,15 +2952,17 @@ async def delivered_stamp(since_iso: str) -> tuple:
     метка другая, и основа считается заново, в каком бы процессе заказ ни
     закрыли (бот оператора живёт отдельно от API и сбросить его кэш не может)."""
     db = _db_or_none()
-    if db is None: return (0, "")
+    if db is None: return (0, "", "")
+    # Считаем и последнюю правку: «вернули в доставку» и «доставлен» снова
+    # за минуту оставляют то же число заказов, а склад менять обязаны.
     cur = db.orders.aggregate([
         {"$match": {"timestamp": {"$gte": since_iso}, "status": "delivered", "test": {"$ne": True}}},
         {"$group": {"_id": None, "n": {"$sum": 1},
-                    "last": {"$max": {"$ifNull": ["$delivered_at", "$updated_at"]}}}},
+                    "last": {"$max": "$delivered_at"}, "upd": {"$max": "$updated_at"}}},
     ])
     rows = await cur.to_list(length=1)
-    if not rows: return (0, "")
-    return (int(rows[0].get("n") or 0), str(rows[0].get("last") or ""))
+    if not rows: return (0, "", "")
+    return (int(rows[0].get("n") or 0), str(rows[0].get("last") or ""), str(rows[0].get("upd") or ""))
 
 
 async def sold_since(since_iso: str) -> list:
@@ -2971,9 +2973,13 @@ async def sold_since(since_iso: str) -> list:
     заявка считает, что всё проданное с того дня по-прежнему стоит на полке."""
     db = _db_or_none()
     if db is None: return []
-    cur = db.orders.find({"timestamp": {"$gte": since_iso}, "status": "delivered",
-                          "test": {"$ne": True}},
-                         {"_id": 0, "timestamp": 1, "office_id": 1, "items": 1})
+    # Бутылка уходит со склада в момент доставки, а не в момент заказа: заказ,
+    # принятый до пересчёта и довезённый после него, тоже списывается. Где
+    # отметки доставки нет (старые пути), остаётся время заказа.
+    cur = db.orders.find({"status": "delivered", "test": {"$ne": True},
+                          "$or": [{"delivered_at": {"$gte": since_iso}},
+                                  {"timestamp": {"$gte": since_iso}}]},
+                         {"_id": 0, "timestamp": 1, "delivered_at": 1, "office_id": 1, "items": 1})
     return await cur.to_list(length=None)
 
 

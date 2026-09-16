@@ -1745,6 +1745,17 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cust-sect-meta .cur-unit{font-size:9px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.5px;text-transform:uppercase}
 
 .cust-scroll{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:2px 14px 12px;margin:0 -14px;scroll-padding-left:14px;-webkit-overflow-scrolling:touch}
+/* Секции «Люди» карточками (макет владельца, 16 сен 2026): коробка на секцию,
+   шапка как у «Все клиенты» — плитка со значком, название, число, стрелка;
+   ряд карточек внутри коробки. Без золотого фона: цвет только у чисел и значка. */
+.cust-box{margin:10px 0 0;padding:14px 14px 2px;border-radius:16px;background:var(--card);border:1px solid var(--border2)}
+.cb-h{display:flex;align-items:center;gap:12px;padding:0 0 12px;margin-bottom:10px;border-bottom:1px solid var(--border2);cursor:pointer}
+.cb-h:active .ch-go{opacity:.9}
+.cb-h .ch-t{white-space:normal}
+.cb-h .cust-sect-meta{font-size:13px}
+.cust-box .cust-scroll{margin:0 -14px;padding:4px 14px 12px}
+.cust-box .cust-card{background:var(--card2)}
+.cust-box .cust-card.top:first-child{border-color:rgba(201,169,110,.45);box-shadow:0 0 0 1px rgba(201,169,110,.08),0 8px 24px rgba(201,169,110,.10)}
 .cust-scroll::-webkit-scrollbar{display:none}
 
 .cust-card{flex:0 0 190px;scroll-snap-align:start;background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;cursor:pointer;transition-property:var(--tp);transition-duration:.18s;transition-timing-function:var(--e1);position:relative;min-width:0;display:flex;flex-direction:column;gap:6px}
@@ -7305,42 +7316,54 @@ button.exp-wait:active{transform:scale(.99)}
     </div>
   </div>
 
+  <!-- Секции — карточками с шапкой (макет владельца, 16 сен 2026): плитка со
+       значком, название с подписью, число справа, стрелка — в общий список. -->
   <!-- TOP-10 by spending -->
-  <div class="cust-sect" id="custTop">
-    <div><div class="cust-sect-t">Топ-10 клиентов</div><div class="cust-sect-s">по сумме</div></div>
-    <div class="cust-sect-meta"><span>—</span> <span class="cur-unit">AED</span></div>
-  </div>
-  <div class="cust-scroll">
-    <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
+  <div class="cust-box" id="custTop">
+    <div class="cb-h" onclick="openAllClients()">
+      <div class="ch-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v-4M12 17V8M17 13V6"/></svg></div>
+      <div class="ch-lbl"><div class="ch-t">Топ-10 клиентов</div><div class="ch-s">по сумме</div></div>
+      <div class="cust-sect-meta"><span>—</span> <span class="cur-unit">AED</span></div>
+      <span class="ch-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="cust-scroll"><div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div></div>
   </div>
 
   <!-- VIP cardholders (FOUNDER / ÉLITE / WORLDWIDE) -->
-  <div class="cust-sect" id="custVip">
-    <div><div class="cust-sect-t">VIP · держатели карт</div><div class="cust-sect-s">FOUNDER · ÉLITE · WORLDWIDE</div></div>
-    <div class="cust-sect-meta"><span style="color:var(--text)">—</span> активных</div>
-  </div>
-  <div class="cust-scroll">
-    <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
+  <div class="cust-box" id="custVip">
+    <div class="cb-h" onclick="openAllClients()">
+      <div class="ch-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 6-8 14L4 8z"/><path d="M4 8h16M12 2v20"/></svg></div>
+      <div class="ch-lbl"><div class="ch-t">VIP · держатели карт</div><div class="ch-s">FOUNDER · ÉLITE · WORLDWIDE</div></div>
+      <div class="cust-sect-meta"><span style="color:var(--text)">—</span> активных</div>
+      <span class="ch-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="cust-scroll"><div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div></div>
   </div>
 
   <!-- ДОЛЖНИКИ (debt programme: pay-later customers) -->
-  <div class="cust-sect" id="custDebt">
-    <div><div class="cust-sect-t">Должники</div><div class="cust-sect-s">оплата «В долг»</div></div>
-    <div class="cust-sect-meta" id="debtSectMeta"><span style="color:var(--warn)">—</span> <span class="cur-unit">AED</span></div>
-  </div>
-  <div class="cust-scroll" id="debtScroll">
-    <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
+  <div class="cust-box" id="custDebt">
+    <div class="cb-h" onclick="openAllClients()">
+      <div class="ch-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M14.5 9.5c0-1-1.1-1.7-2.5-1.7s-2.5.7-2.5 1.7 1 1.5 2.5 1.8 2.5.8 2.5 1.9-1.1 1.8-2.5 1.8-2.5-.7-2.5-1.6"/></svg></div>
+      <div class="ch-lbl"><div class="ch-t">Должники</div><div class="ch-s">оплата «В долг»</div></div>
+      <div class="cust-sect-meta" id="debtSectMeta"><span style="color:var(--warn)">—</span> <span class="cur-unit">AED</span></div>
+      <span class="ch-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="cust-scroll" id="debtScroll"><div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div></div>
   </div>
 
   <!-- МЫ ДОЛЖНЫ — обратная сторона того же счёта. Долг здесь заводится сам:
        у водителя не нашлось сдачи, он записал это на адресе, и до возврата
        сумма висит здесь. Раздел появляется, только когда есть что возвращать:
        пустой он говорил бы, что мы кому-то должны, каждый день. -->
-  <div class="cust-sect" id="custOwed" style="display:none">
-    <div><div class="cust-sect-t">Мы должны</div><div class="cust-sect-s">не отдали сдачу</div></div>
-    <div class="cust-sect-meta" id="owedSectMeta"><span style="color:var(--dn)">—</span> <span class="cur-unit">AED</span></div>
+  <div class="cust-box" id="custOwed" style="display:none">
+    <div class="cb-h" onclick="openAllClients()">
+      <div class="ch-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v5h5"/></svg></div>
+      <div class="ch-lbl"><div class="ch-t">Мы должны</div><div class="ch-s">не отдали сдачу</div></div>
+      <div class="cust-sect-meta" id="owedSectMeta"><span style="color:var(--dn)">—</span> <span class="cur-unit">AED</span></div>
+      <span class="ch-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="cust-scroll" id="owedScroll"></div>
   </div>
-  <div class="cust-scroll" id="owedScroll" style="display:none"></div>
 
   </div><!-- /peopleCustomers -->
 

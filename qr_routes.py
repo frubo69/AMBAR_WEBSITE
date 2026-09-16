@@ -141,6 +141,21 @@ def _clean(code: str) -> str:
     return re.sub(r"\s+", "", str(code or ""))[:MAX_CODE]
 
 
+async def _scanning(oid: str) -> bool:
+    """Заводят ли на точке коды после последнего пересчёта."""
+    try:
+        cnt = await db.get_last_stock_count(oid, before_day=None)
+        since = (cnt or {}).get("counted_at")
+        if not since:
+            return False
+        if isinstance(since, str):
+            since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        return bool((await db.qr_added_since(since)).get(oid))
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[qr] сканируют ли на {oid} — не понял: {e}")
+        return True                              # не разобрались — не прячем
+
+
 async def unscanned_by_district(by_pd: dict = None, detail: dict = None) -> tuple:
     """Сколько бутылок лежит на полке мимо реестра — по каждой точке.
 
@@ -174,7 +189,13 @@ async def unscanned_by_district(by_pd: dict = None, detail: dict = None) -> tupl
             if not bottles and not coded:
                 no_count.append(oid)
                 continue
-            unscanned[oid] = max(0, bottles - coded)
+            # «QR код не внесён» — это работа, которая осталась, и напоминать
+            # о ней есть смысл только там, где её делают: где после последнего
+            # пересчёта завели хоть один код. Точке, которая живёт по листу и
+            # камерой не пользуется, красные восемь тысяч бутылок не нужны
+            # (владелец, 16 сен 2026). Разбор по позициям (detail) остаётся:
+            # экран «Внести / удалить товар» — как раз для этой работы.
+            unscanned[oid] = max(0, bottles - coded) if await _scanning(oid) else 0
             if detail is not None:
                 got = by_pd.get(oid) or {}
                 per = {}

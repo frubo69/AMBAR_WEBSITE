@@ -145,17 +145,13 @@ async def build(day: str = "") -> dict:
     base = await stock_routes._district_base(day)
     cost = await cost_map()
     src = _COST.get("src") or {}
-    # На складе — только то, что внесено кодами. Количественный пересчёт знает
-    # и бутылки, которые ещё никто не отсканировал; они на полке, но в учёт
-    # не попали. Из каждой позиции вычитаем ровно их — тем же счётом, что и
-    # красное «QR код не внесён», чтобы 296 + 129 сходилось в 425.
-    missing: dict = {}
-    try:
-        import qr_routes
-        await qr_routes.unscanned_by_district(None, missing)
-    except Exception as e:                       # noqa: BLE001
-        log.warning(f"[value] невнесённые не вычтены: {e}")
-        missing = {}
+    # Остаток — количественный: пересчёт + приход − продажи − списания.
+    # С 8 по 16 сен показывалось только внесённое кодами, а всё остальное
+    # уходило в красное «QR код не внесён»: после пересчёта по листу 14.09
+    # карточка сказала «610 бутылок», а на полках было ~8 000 (владелец,
+    # 16 сен 2026: «какого… 610, если у нас по 600 бутылок на район»).
+    # Коды — отдельный учёт, и красная строка живёт только там, где
+    # сканируют (см. qr_routes.unscanned_by_district).
 
     ids = list(stock_routes.OFFICE_IDS)
     districts = [{"id": o, "code": stock_routes.OFFICE_CODES.get(o, ""),
@@ -178,7 +174,7 @@ async def build(day: str = "") -> dict:
                "have": {}, "bottles": 0.0, "known": False}
         for oid in ids:
             b = base.get(oid) or {}
-            имеет = b.get("have") or {}
+            имеет = b.get("have_exact") or b.get("have") or {}
             # Позиции нет ни в пересчёте, ни в приходе — про неё здесь ничего
             # не известно, и это не ноль. Внесённая руками бутылка в приходе
             # есть, и её видно и там, где пересчёта не было.
@@ -186,8 +182,7 @@ async def build(day: str = "") -> dict:
                 row["have"][oid] = None
                 continue
             row["known"] = True
-            b_ = float(имеет.get(pid) or 0) * unit
-            b_ = max(0.0, b_ - float((missing.get(oid) or {}).get(pid) or 0))
+            b_ = max(0.0, float(имеет.get(pid) or 0) * unit)
             have = b_ / unit
             row["have"][oid] = have
             if have <= 0:

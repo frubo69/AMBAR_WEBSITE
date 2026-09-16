@@ -1125,6 +1125,10 @@ async def _district_base(day: str) -> dict:
         for pid, n in (broken.get(oid) or {}).items():
             have[pid] = max(0, (have.get(pid) or 0) - n / _unit(cat.get(pid) or {}))
         out[oid] = {"have": {k: int(v) for k, v in have.items()},
+                    # Точный остаток до половины единицы: полящика пива — это
+                    # двенадцать банок, и карточке склада их терять нельзя;
+                    # заявке хватает целых.
+                    "have_exact": {k: round(float(v) * 2) / 2 for k, v in have.items()},
                     "sug": await _suggested_norms(oid, day), "came": came,
                     "gone": gone, "lost": broken.get(oid) or {},
                     "counted": (cnt or {}).get("day", "")}

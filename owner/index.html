@@ -21516,6 +21516,36 @@ async function _ordEnsure(){
 // Страница заявки: тот самый список, который раньше лежал под карточкой пути
 // и занимал экран целиком. Здесь ему и место — сюда приходят править, а не
 // смотреть, на каком мы шаге.
+// Заявка в прямом эфире. Пока хаб «Закупка» или список заявки на экране,
+// раз в 30 с перечитываем расчёт: продали ещё три — на карточке 7, а не 4,
+// без перезахода и не дожидаясь закрытия смены (владелец, 16 сен 2026).
+// Пока правят клетку или правки ещё едут на сервер — не дёргаем: список
+// перерисовывается целиком, и поле ушло бы из-под пальца.
+let _ordTickBusy = false;
+async function ordLiveTick(){
+  if(document.hidden || _ordTickBusy || !window.ownerApi || !ORD || !ORD.d) return;
+  const hub = document.querySelector('#accMid .ohub');
+  const list = !hub && document.querySelector('#accMid .ord-r');
+  if(!hub && !list) return;
+  if(list && (ORD.open || ORD.timer || Object.keys(ORD.pend || {}).length)) return;
+  _ordTickBusy = true;
+  try{
+    const day = accDay();
+    const d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day}});
+    if(!ORD || !ORD.d || accDay() !== day) return;
+    const sig = x => JSON.stringify([x.total_qty, x.total_aed, x.edited_count,
+      (x.all_rows || []).map(r => [r.id, r.need_total])]);
+    if(sig(d) === sig(ORD.d)) return;          // ничего не продали — не мигаем
+    ORD.d = d; ACC_ORDER = d;
+    if(document.querySelector('#accMid .ohub')) ordHub();
+    else if(document.querySelector('#accMid .ord-r') && !ORD.open){
+      const y = window.scrollY; ordRender(); window.scrollTo(0, y);
+    }
+  }catch(e){}
+  finally{ _ordTickBusy = false; }
+}
+setInterval(ordLiveTick, 30000);
+
 function accOrderList(){
   ACC_BACK = accOrder;
   ORD.view = 'districts'; ORD.q = ''; ORD.open = null;

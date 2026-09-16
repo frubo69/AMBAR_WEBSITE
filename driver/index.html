@@ -9352,6 +9352,7 @@ async function supClaim(sid, oid){
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     await supLoad();
     supOpen(sid, oid, t);
+    shLoad();                                 // смена: взятая приёмка сразу держит закрытие
   }catch(e){
     // Задачу успел взять другой — это не ошибка, а обычный исход: карточка
     // висит у всех водителей района.
@@ -9669,7 +9670,7 @@ async function noscanSend(){
     TASK = null;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Принято без сканирования');
-    supLoad();
+    supLoad(); shLoad();                      // смена: шаг «Завершить приёмку» снимается сразу
   }catch(e){ toast('Не удалось', 'err'); }
   finally{ SUP_BUSY = false; btn.disabled = false; }
 }
@@ -9975,7 +9976,7 @@ async function supGiveBack(){
   catch(e){ return toast('Не удалось вернуть', 'err'); }
   document.getElementById('supScr').classList.remove('show');
   TASK = null; toast('Задача снова свободна');
-  supLoad();
+  supLoad(); shLoad();                        // смена: приёмка больше не держит закрытие
 }
 
 async function finSend(){
@@ -9993,7 +9994,7 @@ async function finSend(){
     TASK = null;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Приёмка закрыта');
-    supLoad();
+    supLoad(); shLoad();                      // смена: шаг «Завершить приёмку» снимается сразу
   }catch(e){ toast('Не удалось закрыть', 'err'); }
   finally{ SUP_BUSY = false; btn.disabled = false; }
 }

@@ -3287,6 +3287,8 @@ async function boot(){
     // Приняли в боте или на другом планшете — лента поправится сама. Две
     // секунды для глаза мгновенно, а спящую вкладку не опрашиваем вовсе.
     _pollT = setInterval(()=>{ if(!document.hidden) loadQueue(); }, 2500);
+    setInterval(refreshCatalog, 30000);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refreshCatalog(); });
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadQueue(); });
     // Тикеты — реже: на закрытом экране нужен только счётчик ждущих ответа.
     loadSup(); loadFeed();
@@ -3405,7 +3407,23 @@ async function loadCatalog(){
   const r = await opApi.opFetch('/api/operator/catalog');
   CATALOG = r.items||[];
   CATS = r.categories||[];
+  _catSig = JSON.stringify(CATALOG);
   renderRail(); renderGrid();
+}
+// Наличие и цены правит STAR, а планшет держал каталог с момента запуска и
+// показывал «НЕТ» на том, что уже в наличии (владелец, 16 сен 2026). Раз в
+// полминуты перечитываем и перерисовываем только если что-то поменялось —
+// иначе сетка дёргалась бы под пальцем на каждом опросе.
+let _catSig = '', _catBusy = false;
+async function refreshCatalog(){
+  if(_catBusy || document.hidden) return;
+  _catBusy = true;
+  try{
+    const r = await opApi.opFetch('/api/operator/catalog');
+    const sig = JSON.stringify(r.items||[]);
+    if(sig !== _catSig){ CATALOG = r.items||[]; CATS = r.categories||[]; _catSig = sig; renderRail(); renderGrid(); }
+  }catch(e){}
+  finally{ _catBusy = false; }
 }
 function renderRail(){
   const total = CATALOG.length;

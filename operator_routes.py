@@ -162,7 +162,7 @@ DUBAI_TZ = timezone(timedelta(hours=4))
 
 # Смена идёт с 12:00 до 06:00, поэтому рабочие сутки считаем от полудня до
 # полудня — см. owner_routes._biz_day_start, правило общее для всей системы.
-SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 
 
 # Пока смена не открыта, заказы не обрабатываются. Смотреть можно всё: запрет

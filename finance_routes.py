@@ -37,7 +37,7 @@ from owner_auth import require_owner, CORS_HEADERS
 log = logging.getLogger(__name__)
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, как во всей системе
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 MAX_AMOUNT = 10_000_000
 MAX_SPAN = 31                  # окно платежа: сколько дней после даты им можно платить
 USD_FALLBACK = 3.67

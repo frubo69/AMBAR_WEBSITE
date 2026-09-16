@@ -223,7 +223,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # Почему не геолокация из мини-аппа: браузер отдаёт координаты, только пока
 # приложение открыто на экране. За рулём оно свёрнуто — то есть работало бы
 # ровно тогда, когда не нужно.
-SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 DUBAI = timezone(timedelta(hours=4))
 
 

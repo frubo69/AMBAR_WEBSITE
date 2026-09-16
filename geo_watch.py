@@ -63,7 +63,7 @@ import config_staff as staff
 log = logging.getLogger("geo")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, как во всей системе
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 WORK_FROM = 12                 # смена идёт с полудня
 WORK_UNTIL = 6                 # и до шести утра
 GRACE_MIN = 15                 # после старта не судим никого

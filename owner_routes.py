@@ -81,7 +81,7 @@ def _parse_ts(ts: str):
 # Смена работает с 12:00 до 06:00 следующего дня, поэтому заказ, принятый в
 # 02:00, относится к вечеру предыдущего дня, а не к новому. Сутки считаем от
 # полудня до полудня: всё, что раньше 12:00, — это ещё вчерашний день.
-SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 
 
 def _biz_day_start(ref: datetime) -> datetime:

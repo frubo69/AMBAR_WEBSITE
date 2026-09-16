@@ -250,7 +250,7 @@ async def handle_stats(request):
     try:
         _tz = timezone(timedelta(hours=4))
         _now = datetime.now(_tz)
-        _start = _now.replace(hour=12, minute=0, second=0, microsecond=0)
+        _start = _now.replace(hour=__import__("bizday").SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
         if _now < _start:
             _start -= timedelta(days=1)
         added_shift = await db.qr_added_since(_start.astimezone(timezone.utc))

@@ -68,9 +68,9 @@ async def states():
     eq("C: едет, still 1 мин", (rows["C"]["lost"], rows["C"]["still"] // 60), (False, 1))
     eq("E: без трансляции lost=False (разовая точка)", (rows["E"]["stream"], rows["E"]["lost"]), (False, False))
     eq("F: 119 мин — не lost", rows["F"]["lost"], False)
-    POS["G"] = pos(1, 16 * 60)     # вчерашний якорь: стояние считается с полудня (12:00 Дубай = 08:00 UTC)
+    POS["G"] = pos(1, 16 * 60)     # вчерашний якорь: стояние считается с начала суток (10:00 Дубай = 06:00 UTC с 16 сен)
     rows = {r["driver"]: r for r in (await operator_routes.drivers_live(list(POS), D))["drivers"]}
-    eq("G: still = 8 ч с полудня, lost", (rows["G"]["still"] // 3600, rows["G"]["lost"]), (8, True))
+    eq("G: still = 10 ч с начала суток, lost", (rows["G"]["still"] // 3600, rows["G"]["lost"]), (10, True))
     g = await driver_routes._geo_state("A")
     eq("сторож A: fresh=True (3 мин < 15), watch_ok", (g["fresh"], g["watch_ok"], g["lost"]), (True, True, False))
     g = await driver_routes._geo_state("B")

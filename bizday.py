@@ -20,7 +20,11 @@ import os
 from datetime import datetime, timedelta, timezone
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+# Владелец, 16 сен 2026: операторы открыли смену в 11:58, и система приняла
+# это за переоткрытие вчерашнего дня. Граница суток — 10:00: ночь кончается
+# к шести, раньше десяти смену никто не открывает, а «за две минуты до
+# полудня» больше не вчера. Одна константа на всю систему — отсюда.
+SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "10"))
 PAD = timedelta(hours=24)
 
 

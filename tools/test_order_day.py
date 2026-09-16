@@ -19,14 +19,16 @@ def eq(name, got, want):
 O = dict(order_id="AMB0831827D", timestamp="2026-09-11T06:31:58.070213+00:00",
          confirmed_at="2026-09-11T08:08:33.391950+00:00", status="delivered", office_id="jvc", total=615)
 print("— bizday")
-eq("сутки: 11:59 Дубай — ещё вчера", bizday.biz_day(datetime(2026, 9, 11, 7, 59, tzinfo=timezone.utc)), "2026-09-10")
-eq("сутки: 12:00 Дубай — уже сегодня", bizday.biz_day(datetime(2026, 9, 11, 8, 0, tzinfo=timezone.utc)), "2026-09-11")
+eq("сутки: 09:59 Дубай — ещё вчера (граница 10:00 с 16 сен)", bizday.biz_day(datetime(2026, 9, 11, 5, 59, tzinfo=timezone.utc)), "2026-09-10")
+eq("сутки: 10:00 Дубай — уже сегодня", bizday.biz_day(datetime(2026, 9, 11, 6, 0, tzinfo=timezone.utc)), "2026-09-11")
+eq("сутки: 11:58 Дубай — сегодня, а не переоткрытие вчера", bizday.biz_day(datetime(2026, 9, 11, 7, 58, tzinfo=timezone.utc)), "2026-09-11")
 eq("день заказа — по принятию, не по созданию", bizday.order_day(O), "2026-09-11")
-eq("без принятия — по созданию", bizday.order_day({"timestamp": O["timestamp"]}), "2026-09-10")
+eq("без принятия — по созданию (10:31 Дубай — уже сегодня)", bizday.order_day({"timestamp": O["timestamp"]}), "2026-09-11")
+eq("без принятия — по созданию, ночью — вчера", bizday.order_day({"timestamp": "2026-09-11T01:31:58+00:00"}), "2026-09-10")
 eq("подписанный день главнее", bizday.order_day({**O, "day": "2026-09-12"}), "2026-09-12")
 eq("наивная строка без Z — UTC", bizday.day_of("2026-09-11T08:08:33"), "2026-09-11")
-eq("окно дня: с запасом сутки назад, до полудня следующего", bizday.window_utc("2026-09-11", "2026-09-11"),
-   ("2026-09-10T08:00:00", "2026-09-12T08:00:00"))
+eq("окно дня: с запасом сутки назад, до 10:00 следующего", bizday.window_utc("2026-09-11", "2026-09-11"),
+   ("2026-09-10T06:00:00", "2026-09-12T06:00:00"))
 eq("in_days", (bizday.in_days(O, "2026-09-11", "2026-09-11"), bizday.in_days(O, "2026-09-10", "2026-09-10")), (True, False))
 
 print("— db.order_day_now: смена закрыта → следующий день")

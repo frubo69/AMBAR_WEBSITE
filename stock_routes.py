@@ -43,7 +43,7 @@ from config_stock_order import order_key      # порядок обхода по
 log = logging.getLogger("stock")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = 12       # рабочие сутки 12:00 → 12:00, как во всей системе
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 NORM_COVER_DAYS = 3         # на сколько дней запаса рассчитана норма по умолчанию
 STALE_DAYS = 7              # через сколько дней позицию пора проверить заново
 HISTORY_DEPTH = 45          # сколько пересчётов смотреть назад в поисках проверки

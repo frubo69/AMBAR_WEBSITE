@@ -43,7 +43,7 @@ from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
 log = logging.getLogger("nag")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, как во всей системе
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 NAG_FROM = 6                   # с этого часа по Дубаю
 NAG_UNTIL = 12                 # и до начала новых суток
 EVERY_MIN = 5

@@ -13372,7 +13372,7 @@ function _dayNavOn(p){ if(RANGE) return false; return p === 'today' || p === 'ye
 // Дата рабочих суток на N дней назад — считаем на клиенте, чтобы подпись
 // менялась в тот же кадр, что и свайп, не дожидаясь ответа сервера. Сервер потом
 // пришлёт свою и перезапишет — расхождений быть не должно, правило одно.
-const SHIFT_START_HOUR = 12;   // смена 12:00 → 12:00, см. owner_routes._biz_day_start
+const SHIFT_START_HOUR = 10;   // сутки с 10:00, как bizday.SHIFT_START_HOUR на сервере (16 сен 2026)
 function _bizToday(){
   const n = new Date();
   if(n.getHours() < SHIFT_START_HOUR) n.setDate(n.getDate() - 1);

@@ -51,7 +51,7 @@ log = logging.getLogger("driver")
 DRIVER_BOT_TOKEN = os.getenv("DRIVER_BOT_TOKEN", "")
 INIT_DATA_MAX_AGE = 24 * 3600
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = 12
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 
 
 def _biz_day(ref: datetime = None) -> str:

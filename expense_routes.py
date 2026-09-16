@@ -37,7 +37,7 @@ from owner_auth import require_owner, CORS_HEADERS
 log = logging.getLogger("expenses")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-SHIFT_START_HOUR = 12          # рабочие сутки 12:00 → 12:00, как во всей системе
+from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 
 
 def _biz_day(ref: datetime = None) -> str:

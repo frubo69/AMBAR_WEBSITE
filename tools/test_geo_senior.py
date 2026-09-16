@@ -59,8 +59,8 @@ async def main():
     SENT2 = []
     async def owners_full(text, event, reply_markup=None, exclude=None): SENT2.append(text); return 1
     gw._owners = owners_full
-    ST.clear(); ST.update({"day": "2026-09-15", "seen": True}); G.update(g(False, 90 * 60))
-    await tick(day="2026-09-16", utc=UTC + timedelta(hours=21))       # 12:50 по Дубаю, точка была в 11:20
+    ST.clear(); ST.update({"day": "2026-09-15", "seen": True}); G.update(g(False, 210 * 60))
+    await tick(day="2026-09-16", utc=UTC + timedelta(hours=21))       # 12:50 по Дубаю, точка была в 09:20 — до начала суток (10:00)
     eq("последняя точка до начала смены — «ни одной точки с начала смены»",
        SENT2, ["📍 *Старший*: геопозиция не видна\nС начала смены не было ни одной точки."])
     ST.clear(); G.update(g(False, None)); await tick(day="2026-09-16", utc=UTC + timedelta(hours=21))

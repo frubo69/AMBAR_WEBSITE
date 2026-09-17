@@ -5235,6 +5235,14 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .scan-pill span{font-size:10px;letter-spacing:.6px;text-transform:uppercase;
   color:rgba(255,255,255,.6)}
 .scan-pill em{font-style:normal;font-size:11px;font-weight:700;color:#FF8A8A}
+/* Внесение по пересчёту: «внесено/долг» и позиция одной плашкой. Катится
+   только внесённое, «/29» стоит; длинное название режется точками, а
+   коробка у пива встаёт под счётчик. */
+.qr-of-col{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
+.scan-pill.qr-of{max-width:100%;min-width:0}
+.scan-pill.qr-of b{flex-shrink:0}
+.scan-pill.qr-of b i{display:inline-block;font-style:normal}
+.scan-pill.qr-of span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Коробка или полкоробки: QR у пива клеится на коробку (1) и на половинку
    (0,5), банки не сканируют (владелец, 16 сен 2026). Показываем только у пива. */
 .scan-half{display:inline-flex;padding:0;overflow:hidden;align-items:stretch;gap:0}
@@ -22570,6 +22578,9 @@ let ACC_IN = null, QR_IN = null, QR_POLL = null;
 // Внесённое за этот заход: с камеры на список и обратно, пока не нажали
 // «Сохранить и добавить на склад». «Выйти» откатывает всё внесённое за заход.
 let QR_SESS = [], QR_NEED = false;
+// Долг позиции, по которой нажали в режиме «по пересчёту», — знаменатель
+// счётчика на камере: «0/29», «1/29»…
+let QR_GOAL = 0;
 // 18 px в квадрате 38: отступ целый, иначе значок мылится на полпикселя вниз-вправо.
 const _QR_ICO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -23084,7 +23095,9 @@ function _qrIsBeer(p){
 function _qrNeedTag(p, n){
   if(_qrIsBeer(p))
     return `<span class="pk-n dn">${fmtQty(n)}<i>кор · QR код не внесён</i></span>`;
-  return `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>`;
+  // fmtQty, не fmt: fmt переводит в доллары, и «29» в строке не сходилось бы
+  // с «0/29» на камере.
+  return `<span class="pk-n dn">${fmtQty(n)}<i>QR код не внесён</i></span>`;
 }
 
 // Сканирование. Telegram держит камеру открытой и отдаёт код за кодом, пока
@@ -23092,7 +23105,12 @@ function _qrNeedTag(p, n){
 // бутылку.
 async function qrStart(pid){
   const p = (QR_CAT || []).find(x => x.id === pid); if(!p) return;
-  QR_PROD = {id: pid, name: p.name || ''}; QR_SESSION = 0; QR_LAST = null; QR_ROWS = [];
+  // Пиво решается по строке каталога: у {id, name} категории нет, и
+  // переключатель коробки не появлялся вовсе.
+  QR_PROD = {id: pid, name: p.name || '', beer: _qrIsBeer(p)}; QR_SESSION = 0; QR_LAST = null; QR_ROWS = [];
+  // По пересчёту камера считает от долга позиции — того числа, что стояло в
+  // строке, когда на неё нажали (владелец, 17 сен 2026).
+  QR_GOAL = QR_NEED ? (((ACC_QR && ACC_QR.unscanned_by_product) || {})[QR_DIST] || {})[pid] || 0 : 0;
   try{
     await ownerApi.ownerFetch('/api/owner/qr/lock',
       {method:'POST', body:{district: QR_DIST, product_id: pid}});
@@ -23163,6 +23181,14 @@ function qrScreen(mode){
   // Кнопка «Удалить товар» осталась бы от прошлого экрана и звала бы туда,
   // где мы уже стоим.
   const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
+  // По пересчёту вместо «на офисе» — сколько внесено из долга и что за
+  // позиция: «0/29 Red Label 1 ltr», дальше «1/29», «2/29» (владелец, 17 сен
+  // 2026). Название длинное, поэтому коробка у пива встаёт под счётчик.
+  const goal = !del && QR_NEED;
+  const pill = goal
+    ? `<div class="scan-pill qr-of"><b><i id="qrN">0</i>/${fmtQty(QR_GOAL)}</b><span>${escS(QR_PROD.name)}</span></div>`
+    : `<div class="scan-pill"><b id="qrN">0</b><span>${del ? 'убрано' : 'на офисе'}</span></div>`;
+  const half = _halfPill(!del && !!(QR_PROD && QR_PROD.beer));
   // Камера — герой экрана, всё служебное лежит на ней стеклом: так остаётся
   // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
@@ -23176,8 +23202,7 @@ function qrScreen(mode){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="qrN">0</b><span>${del ? 'убрано' : 'на офисе'}</span></div>
-          ${_halfPill(!del && _qrIsBeer(QR_PROD))}
+          ${goal ? `<div class="qr-of-col">${pill}${half}</div>` : pill + half}
           <div class="scan-tools">
             <button class="scan-tool" id="qrSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -23301,7 +23326,8 @@ let QR_ROWS = [];
 // Скан не ждёт сервера: очередь отправит сама и повторит, если сеть моргнула.
 function qrSave(code){
   code = String(code || '').trim(); if(!code) return;
-  QR_ROWS.unshift({code, state:'sending', at:'', label:''});
+  const qty = SCAN_HALF ? 0.5 : 1;
+  QR_ROWS.unshift({code, state:'sending', at:'', label:'', qty});
   qrRenderFeed();
   // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
   // бутылке. Если сервер возразит, цвет сменится — но это редкий случай.
@@ -23310,7 +23336,7 @@ function qrSave(code){
   // внесён» — код к бутылке, которая в пересчёте уже есть.
   SCANQ.push({path:'/api/owner/qr/scan',
               body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new',
-                    qty: SCAN_HALF ? 0.5 : 1}, code});
+                    qty}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {
@@ -23351,7 +23377,11 @@ function qrRenderFeed(){
   // «сколько у нас Absolut на B1», ради которого всё считается.
   const total = QR_ROWS.filter(r => ['new','sending','old'].includes(r.state)).length;
   QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
-  scanRoll('qrN', total);
+  // По пересчёту — внесённое за этот заход в единицах долга (полкоробки
+  // пива — 0,5): «уже в реестре» и несохранённое в счёт не идут.
+  scanRoll('qrN', QR_NEED
+    ? fmtQty(QR_ROWS.reduce((s, r) => s + (r.state === 'new' || r.state === 'sending' ? r.qty || 1 : 0), 0))
+    : total);
   const s = document.getElementById('qrAdded');
   if(s) s.innerHTML = QR_SESSION ? `<b>${QR_SESSION}</b> добавлено` : '';
   const feed = document.getElementById('qrFeed'); if(!feed) return;

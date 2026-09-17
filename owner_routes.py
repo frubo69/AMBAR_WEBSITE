@@ -2038,7 +2038,7 @@ async def handle_operators(request):
         upsell = sum(int((o.get("upsell") or {}).get("bonus") or 0) for _, o in dl)
         drivers.append({
             "id": staff._slug(n), "name": n, "known": info["known"],
-            # Чай за допродажи: 5% от добавленного в пути (по доставленным).
+            # Бонус за допродажу: 5% от добавленного в пути (по доставленным).
             "upsell": upsell,
             "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
                            "name": OFFICE_NAMES.get(d, d)} for d in info["districts"]],

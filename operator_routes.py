@@ -1622,14 +1622,14 @@ async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
                           cancelled_at=now, updated_at=now,
                           **({"cancel_reason": reason} if reason else {}))
     order.update(status="cancelled")
-    # Чай за допродажу по отменённому заказу не полагается: снимаем запись из
+    # Бонус за допродажу по отменённому заказу не полагается: снимаем запись из
     # расходов дня водителя (сама допродажа на заказе остаётся историей).
     if (order.get("upsell") or {}).get("bonus") and (order.get("driver") or "").strip():
         try:
             await db.driver_expense_pull_order(_bizday.order_day(order) or _bizday.biz_day(),
                                                (order.get("driver") or "").strip(), oid, "upsell")
         except Exception as e:                                   # noqa: BLE001
-            log.warning(f"[pos] чай за допродажу по #{oid} не снят: {e}")
+            log.warning(f"[pos] бонус за допродажу по #{oid} не снят: {e}")
     await notify_driver(order, "cancel")   # иначе водитель повезёт отменённый заказ
     await _refresh_cards(order)
     await _customer_card(oid)              # у телефонного заказа некому — молча выйдет
@@ -1930,7 +1930,8 @@ def _req_of(order: dict) -> dict:
     return order.get("driver_req") or order.get("edit_request") or {}
 
 
-UPSELL_RATE = 0.05          # доля от цены добавленного — чай водителю
+UPSELL_RATE = 0.05          # доля от цены добавленного — бонус водителю
+UPSELL_STEP = 5             # бонус округляем вверх до пяти дирхамов
 
 
 def _added_lines(old_items: list, new_items: list) -> list:
@@ -1966,17 +1967,20 @@ def _added_lines(old_items: list, new_items: list) -> list:
 
 async def _upsell_credit(oid: str, order: dict, old_items: list, new_items: list,
                          drv: str, who: str, now: str) -> dict | None:
-    """Начислить водителю чай за добавленное к заказу: 5% от цены, целыми
-    дирхамами. На заказе копится `upsell` (что и когда добавили, сколько чая),
-    а сама сумма ложится расходом дня водителя вида «Чай за допродажи» —
-    он остаётся у водителя из наличных, и учёт дня это видит сам. Отмена
-    заказа снимает эти строки (см. _do_cancel)."""
+    """Начислить водителю бонус за добавленное к заказу: 5% от цены, вверх до
+    пяти дирхамов (владелец, 17 сен 2026: «округляй; если 3 дирхама —
+    водителю 5»). На заказе копится `upsell` (что и когда добавили, сколько
+    бонуса), а сама сумма ложится расходом дня водителя вида «Бонус за
+    допродажу» — он остаётся у водителя из наличных, и учёт дня это видит сам.
+    Отмена заказа снимает эти строки (см. _do_cancel)."""
     lines = _added_lines(old_items, new_items)
     if not lines or not drv:
         return None
     import math, secrets
     aed = round(sum(l["aed"] for l in lines), 2)
-    bonus = int(math.floor(aed * UPSELL_RATE + 0.5))
+    # Вверх до пяти: копейки водителю не отдашь, а «три дирхама» звучит как
+    # обида. Ноль остаётся нулём — но сюда без добавленных позиций не заходят.
+    bonus = int(math.ceil(aed * UPSELL_RATE / UPSELL_STEP) * UPSELL_STEP)
     prev = order.get("upsell") or {}
     up = {"by": drv, "lines": list(prev.get("lines") or []) + lines,
           "aed": round(float(prev.get("aed") or 0) + aed, 2),
@@ -1990,9 +1994,9 @@ async def _upsell_credit(oid: str, order: dict, old_items: list, new_items: list
         await db.add_driver_expense(day, drv, {
             "id": secrets.token_hex(6), "amount": bonus,
             "comment": f"#{oid} · добавил {n} {'позицию' if n == 1 else 'позиции' if n < 5 else 'позиций'} на {aed:g} AED",
-            "kind": "upsell", "kind_t": "Чай за допродажи", "plus": False, "auto": True,
+            "kind": "upsell", "kind_t": "Бонус за допродажу", "plus": False, "auto": True,
             "order": oid, "by": 0, "by_name": who, "status": "approved", "at": now})
-    log.info(f"[pos] допродажа #{oid} водителем {drv}: {aed} AED → чай {bonus} AED")
+    log.info(f"[pos] допродажа #{oid} водителем {drv}: {aed} AED → бонус {bonus} AED")
     return {"aed": aed, "bonus": bonus, "n": sum(l["qty"] for l in lines), "lines": lines}
 
 
@@ -2051,15 +2055,17 @@ async def handle_driver_req(request):
                                           "decided_at": now, "applied_total": total})
         order = await db.get_order(oid) or order
         # Допродажа: водитель уже вёз заказ и добавил позиции — 5% от их цены
-        # ему чаем (владелец, 17 сен 2026). Считается от одобренного состава.
+        # ему бонусом, вверх до пяти дирхамов (владелец, 17 сен 2026).
+        # Считается от одобренного состава.
         bonus = await _upsell_credit(oid, order, old_items, items, drv, who, now)
         await _refresh_cards(order)
         await _customer_card(oid)
         await notify_driver(order, "edit")
         await tell_driver(drv, f"✅ Заказ #{oid} изменён оператором · итог {total} AED"
-                          + (f"\n🍾 Ваш чай за допродажу: +{bonus['bonus']} AED "
-                             f"(5% от {bonus['aed']} AED за {bonus['n']} "
-                             f"{'позицию' if bonus['n'] == 1 else 'позиции' if bonus['n'] < 5 else 'позиций'})"
+                          + (f"\n🍾 Ваш бонус за допродажу: +{bonus['bonus']} AED "
+                             f"(добавили {bonus['n']} "
+                             f"{'позицию' if bonus['n'] == 1 else 'позиции' if bonus['n'] < 5 else 'позиций'} "
+                             f"на {bonus['aed']:g} AED)"
                              if bonus else ""))
         try:
             from owner_routes import notify_owners_force
@@ -2069,8 +2075,8 @@ async def handle_driver_req(request):
                 "orders.edited",
                 f"✏️ *Заказ изменён #{oid}* — по просьбе водителя {drv}\n"
                 f"Одобрил: {who}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}"
-                + (f"\n🍾 Чай водителю за допродажу: *{bonus['bonus']} AED* "
-                   f"(5% от {bonus['aed']} AED)" if bonus else ""),
+                + (f"\n🍾 Бонус водителю за допродажу: *{bonus['bonus']} AED* "
+                   f"(добавил на {bonus['aed']:g} AED)" if bonus else ""),
                 test=bool(order.get("test")))
         except Exception as e:
             log.error(f"[pos] edited notify failed: {e}")

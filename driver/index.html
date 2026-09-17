@@ -5957,7 +5957,7 @@ function shsPaintMid(){
           : 'чая сегодня не было') : sk(150)}</div>
     </div>
     ${up ? `<div class="shs-tip shs-upsell">
-      <div class="shs-l">Ваш чай за допродажи</div>
+      <div class="shs-l">Ваш бонус за допродажу</div>
       <div class="shs-v">+${aed(up.bonus)}</div>
       <div class="shs-s">5% от ${fmt(up.aed)} AED · ${up.n} ${plural(up.n,'позиция','позиции','позиций')} добавили в пути в ${up.orders} ${plural(up.orders,'заказе','заказах','заказах')} · остаётся у вас, из наличных на руках уже вычтено</div>
     </div>` : ''}
@@ -7707,7 +7707,7 @@ const EXP_KIND_ICO = {
   we_gave: 'out',  we_owe: 'out', we_got: 'into', owed_us: 'into'};
 
 function expKindCards(only){
-  // Чай за допродажи пишет сервер сам — руками его не заводят.
+  // Бонус за допродажу пишет сервер сам — руками его не заводят.
   const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash' && k.id !== 'upsell'
     && (!only || only.includes(k.id)));
   if(!виды.length) return '<div class="card exp-card"><div class="exp-none">Загрузка…</div></div>';

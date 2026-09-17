@@ -27267,9 +27267,9 @@ const EXP_KINDS = [
   {id:'owed_us', t:'Нам должны',    who:'кто должен'},
   {id:'we_got',  t:'Нам вернули',   who:'кто вернул', plus:true},
   {id:'we_owe',  t:'Мы должны',     who:'кому должны', plus:true},
-  // Чай за допродажи: 5% от добавленного водителем в пути. Пишется сервером
+  // Бонус за допродажу: 5% от добавленного водителем в пути. Пишется сервером
   // при одобрении правки; в выборе для ручной записи не показывается.
-  {id:'upsell',  t:'Чай за допродажи', auto:true},
+  {id:'upsell',  t:'Бонус за допродажу', auto:true},
   // «Всё остальное» — последним, как у водителя: сначала то, что зовётся словом.
   {id:'other',   t:'Что-то ещё',    hint:'комментарий'},
 ];
@@ -32652,7 +32652,7 @@ function renderOperators(){
     const drvBits = [
       op.districts.length ? null : 'нет в списке',
       op.tips ? `чай ${fmt(op.tips)}` : null,
-      op.upsell ? `допродажи +${fmt(op.upsell)}` : null,
+      op.upsell ? `бонус за допродажу +${fmt(op.upsell)}` : null,
       op.avg_sample ? (op.late ? `${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')}`
                                : 'без опозданий') : null,
     ].filter(Boolean);
@@ -33495,11 +33495,11 @@ const DETAIL = {
         </div>` : ''}
 
         ${d.upsell ? `
-        <div class="dt-sect">Чай за допродажи · ${fmt(d.upsell)} AED</div>
+        <div class="dt-sect">Бонус за допродажу · ${fmt(d.upsell)} AED</div>
         <div class="dt-card">
           <div class="dt-row">
             <div class="dt-row-l"><div class="dt-row-t">5% от добавленного в пути</div>
-            <div class="dt-row-s">позиции, которые водитель добавил к заказу уже после того, как взял его · остаётся у водителя, в расходах дня видом «Чай за допродажи»</div></div>
+            <div class="dt-row-s">позиции, которые водитель добавил к заказу уже после того, как взял его · остаётся у водителя, в расходах дня видом «Бонус за допродажу»</div></div>
             <div class="dt-row-r" style="color:var(--gold2)">${fmt(d.upsell)}</div>
           </div>
         </div>` : ''}

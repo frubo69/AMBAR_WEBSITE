@@ -628,7 +628,7 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         wos = []
     wos = [w for w in wos if (w.get("state") or "ok") != "no"]
     gross = sum(v["aed"] for k, v in pay.items() if k != "free")
-    # Чай за допродажи: 5% от добавленного водителем в пути (по доставленным).
+    # Бонус за допродажу: 5% от добавленного водителем в пути (по доставленным).
     ups = [o.get("upsell") for o in mine if o.get("upsell")]
     upsell = {"bonus": sum(int(u.get("bonus") or 0) for u in ups),
               "aed": round(sum(float(u.get("aed") or 0) for u in ups), 2),

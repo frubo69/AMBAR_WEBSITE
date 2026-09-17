@@ -712,6 +712,8 @@ body.test-drv .wo-fix{display:none}
 .wo-done-s{font-size:11.5px;color:var(--muted);margin-top:2px}
 .wo-done-n{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   color:var(--warn);flex-shrink:0}
+/* Единица у переезда: «1,5 кор», «3 бут». */
+.wo-done-n u{text-decoration:none;font-size:12px;font-weight:600;color:var(--muted)}
 /* Удержание видно там же, где решение: узнать о нём в день выплаты значит
    поспорить тогда, когда доказывать уже нечем. */
 .wo-done-v.held{color:var(--warn)}
@@ -6346,7 +6348,17 @@ function woScanDone(){
 // и район назначения. Район выбирается один раз на проход — в машине обычно
 // партия в одно место, — дальше крышки одна за другой. Каждый переезд пишется
 // сразу в обе книги; «✕» на строке возвращает бутылку, но только свою.
-var MV = {item: null, code: '', to: '', total: 0, busy: false, mode: 'scan'};
+var MV = {item: null, code: '', to: '', total: 0, btl: 0, box: 0, busy: false, mode: 'scan'};
+
+// Сколько переехало — словами склада (владелец, 17 сен 2026): у пива коробки
+// (на коробке два кода, каждый — полкоробки), у остального бутылки. qty с
+// сервера уже в единицах склада, unit — 24 у пива; bottles — число кодов.
+function _mvAmt(m){ return +(m && m.qty) || +(m && m.bottles) || 1; }
+function _mvWord(n, beer, acc){
+  if(beer) return n % 1 ? 'коробки' : plural(n, acc ? 'коробку' : 'коробка', 'коробки', 'коробок');
+  return plural(n, acc ? 'бутылку' : 'бутылка', 'бутылки', 'бутылок');
+}
+function _mvSay(m, acc){ const n = _mvAmt(m); return `${fmtQty(n)} ${_mvWord(n, m.unit > 1, acc)}`; }
 var MV_D = [], MV_LOG = [], MV_DAY = '', _mvAt = 0;
 
 async function mvLoad(force){
@@ -6364,7 +6376,7 @@ async function mvLoad(force){
 // 14 сен 2026: «сканирование во весь экран как у нас везде; обнаружил
 // бутылку — страница с фото товара, сведениями и выбором района»).
 async function mvOpen(){
-  MV = {item: null, code: '', to: '', total: 0, busy: false, mode: 'scan'};
+  MV = {item: null, code: '', to: '', total: 0, btl: 0, box: 0, busy: false, mode: 'scan'};
   if(!MV_D.length) mvLoad(true);
   document.getElementById('mvScr').classList.add('show');
   mvScan();
@@ -6373,8 +6385,11 @@ function _mvHead(t, sub){ _setText('mvT', t); _setText('mvS', sub); }
 async function mvScan(){
   MV.mode = 'scan'; MV.item = null; MV.code = ''; MV.to = '';
   _mvHead('Переместить', 'Наведите камеру на QR-код');
-  document.getElementById('mvN').innerHTML = MV.total
-    ? `${MV.total}<u> ${MV.total === 1 ? 'переехала' : 'переехали'}</u>` : '';
+  // Бутылки и пиво — разными числами: одно число на две единицы соврало бы.
+  document.getElementById('mvN').innerHTML = MV.btl && MV.box
+    ? `${fmtQty(MV.btl)}<u> бут</u> ${fmtQty(MV.box)}<u> кор</u>`
+    : MV.btl ? `${fmtQty(MV.btl)}<u> ${_mvWord(MV.btl, false)}</u>`
+    : MV.box ? `${fmtQty(MV.box)}<u> ${_mvWord(MV.box, true)}</u>` : '';
   const mid = document.getElementById('mvMid');
   mid.className = 'sup-mid mv-mid scan';
   mid.innerHTML = `<div class="cam mv-cam">
@@ -6383,7 +6398,7 @@ async function mvScan(){
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="cam-badge" id="mvB"></div>
       </div>
-      <div class="cam-left"><span class="cam-hint" id="mvHint">Один QR-код — одна бутылка</span></div>
+      <div class="cam-left"><span class="cam-hint" id="mvHint">Один QR-код — одна бутылка, у пива полкоробки</span></div>
     </div>`;
   document.getElementById('mvBot').innerHTML = '';
   try{ await SCAN.start(document.getElementById('mvV'), mvCode, null, null, null); }   // start сам сбрасывает уже виденные коды
@@ -6450,6 +6465,7 @@ async function mvConfirm(){
     const r = await drvApi.drvFetch('/api/driver/stock/move', {method: 'POST', body: {code: MV.code, to: MV.to}});
     if(r.ok){
       MV.total++;
+      if(r.unit > 1) MV.box += +r.qty || 0.5; else MV.btl += +r.qty || 1;
       toast(`${r.name || (MV.item || {}).name || 'Бутылка'} → ${r.to_code || ''}`);
       try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
       MV.busy = false; mvScan(); return;
@@ -6465,7 +6481,9 @@ function mvDone(){
   SCAN.stop();
   document.getElementById('mvScr').classList.remove('show');
   if(MV.total){
-    toast(`Перевезли ${MV.total} ${plural(MV.total, 'бутылку', 'бутылки', 'бутылок')}`);
+    const что = [MV.btl ? `${fmtQty(MV.btl)} ${_mvWord(MV.btl, false, true)}` : '',
+                 MV.box ? `${fmtQty(MV.box)} ${_mvWord(MV.box, true, true)}` : ''].filter(Boolean).join(' и ');
+    toast(`Перевезли ${что}`);
     mvLoad(true);
   }
 }
@@ -6474,15 +6492,19 @@ function mvDone(){
 // только пока её не увёз кто-то ещё дальше.
 async function mvDel(i){
   const m = MV_LOG[i]; if(!m) return;
-  const n = m.bottles || 0;
-  if(!confirm(`Вернуть ${n} ${plural(n, 'бутылку', 'бутылки', 'бутылок')} «${m.product_name || ''}» обратно на ${m.from_name}?`)) return;
+  const beer = m.unit > 1;
+  if(!confirm(`Вернуть ${_mvSay(m, true)} «${m.product_name || ''}» обратно на ${m.from_name}?`)) return;
   let bad = 0;
   for(const id of (m.ids || [])){
     try{ await drvApi.drvFetch('/api/driver/stock/move/' + id, {method: 'DELETE'}); }
     catch(e){ bad++; }
   }
-  if(bad) toast(bad === (m.ids || []).length ? 'Не удалось вернуть — бутылки уже увезли дальше' : `${bad} не вернулись — их уже увезли дальше`, 'err');
-  else toast('Бутылки вернулись');
+  // bad — число кодов; у пива код — полкоробки.
+  const badN = bad * (beer ? 0.5 : 1);
+  if(bad) toast(bad === (m.ids || []).length
+    ? `Не удалось вернуть — ${beer ? 'пиво' : 'бутылки'} уже увезли дальше`
+    : `Не всё вернулось — ${fmtQty(badN)} ${_mvWord(badN, beer, true)} уже увезли дальше`, 'err');
+  else toast(beer ? 'Пиво вернулось' : 'Бутылки вернулись');
   await mvLoad(true);
 }
 
@@ -9339,7 +9361,7 @@ function woFoot(){
       <span class="wo-done-s">${esc(m.from_code || m.from_name || '')} → ${esc(m.to_code || m.to_name || '')} · ${hhmm(m.at)}${
         m.day && m.day !== MV_DAY ? ' · ' + esc(m.day.slice(8, 10) + '.' + m.day.slice(5, 7)) : ''}</span>
     </span>
-    <span class="wo-done-n">${m.bottles || m.qty || 0}</span>
+    <span class="wo-done-n">${fmtQty(_mvAmt(m))}<u> ${m.unit > 1 ? 'кор' : 'бут'}</u></span>
     <button class="mv-ret" onclick="mvDel(${i})">Вернуть</button>
   </div>`).join('');
   return `${WO_LOG.length ? `<div class="sect" style="margin-top:26px">

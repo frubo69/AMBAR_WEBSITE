@@ -106,6 +106,16 @@ async def main():
     codes = {c["_id"]: c async for c in d.qr_codes.find({})}
     eq("откат: qty 1 и без intake_extra, склад 11",
        (codes["old1"]["qty"], "intake_extra" in codes["old1"], codes["cov2"]["qty"], await have("bbay", "p31")), (1, False, 1, 11))
+    # ── перемещение сканом: количество и подписи словами склада ─────────────
+    m1 = await SR.move_by_code("hn1", "silicon", 1, "STAR", "owner")
+    m2 = await SR.move_by_code("hn2", "silicon", 1, "STAR", "owner")
+    mv = await SR.move_by_code("va1", "silicon", 1, "STAR", "owner")
+    eq("ответ переезда: пиво qty 0.5 unit 24, водка qty 1 unit 1",
+       (m1["verdict"], m1["qty"], m1["unit"], mv["qty"], mv["unit"]), ("ok", 0.5, 24, 1, 1))
+    g = {x["product_id"]: x for x in SR.group_transfers(await db.get_stock_transfers(D), 0)}
+    eq("книга переездов: пиво 2 кода = 1 коробка (unit 24), водка 1 бутылка (unit 1)",
+       (g["p31"]["bottles"], g["p31"]["qty"], g["p31"]["unit"], g["p1"]["bottles"], g["p1"]["qty"], g["p1"]["unit"]),
+       (2, 1, 24, 1, 1, 1))
     await db.add_stock_transfer({"day": D, "from": "bbay", "to": "jvc", "product_id": "p31", "qty": 1,
                                  "src": "qr", "code": "cov0", "at": T(60).isoformat()})
     res3 = await M.run(db, SR, QR, apply=True, backup_dir=tmp, say=lambda s: None)

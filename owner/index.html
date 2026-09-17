@@ -14658,7 +14658,7 @@ async function stkMovesHist(){
           <span class="stk-dr-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}${
             m.bottles ? ' · сканом' : ''}${_mvWho(m)}</span>
         </span>
-        <span class="stk-dr-v">${m.bottles || m.qty || 0}<i>${m.bottles ? 'бут' : 'шт'}</i></span>
+        <span class="stk-dr-v">${fmtQty(_mvAmt(m))}<i>${m.unit > 1 ? 'кор' : 'бут'}</i></span>
         ${d === today || m.by_kind === 'driver'
           ? `<button class="stk-mvr-x" title="Вернуть" onclick="stkMoveDel(${i})">✕</button>` : ''}
       </div>`; }).join('')}</div>`).join('')
@@ -14794,19 +14794,18 @@ async function stkMovesPage(){
     document.getElementById('stkMid').innerHTML =
       loadFail(); return; }
   STK.moves = res.transfers || [];
-  const бут = STK.moves.reduce((a, m) => a + (m.bottles || 0), 0);
+  const скан = _mvTally(STK.moves.filter(m => m.bottles)).say;
   _stkHead('Перемещения', STK.moves.length
     ? `${STK.moves.length} ${pluralize(STK.moves.length,'строка','строки','строк')}${
-        бут ? ` · ${бут} ${pluralize(бут,'бутылка','бутылки','бутылок')} сканом` : ''}`
+        скан ? ` · ${скан} сканом` : ''}`
     : _dayName(res.day || _dayIsoFor(0)), false);
   document.getElementById('stkMid').innerHTML = STK.moves.length
     ? STK.moves.map((m, i) => `
       <div class="stk-mvr">
         <span class="stk-mvr-b">
           <span class="stk-mvr-n">${escS(m.product_name || m.product_id)}</span>
-          <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
-            ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок') + ' сканом'
-            : m.qty + ' шт'}${_mvWho(m)}</span>
+          <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${_mvSay(m)}${
+            m.bottles ? ' сканом' : ''}${_mvWho(m)}</span>
         </span>
         <button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>
       </div>`).join('')
@@ -14828,9 +14827,7 @@ async function stkLoadMoves(){
     <div class="stk-mvr">
       <span class="stk-mvr-b">
         <span class="stk-mvr-n">${escS(m.product_name || m.product_id)}</span>
-        <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
-          ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок')
-          : m.qty + ' шт'}${_mvWho(m)}</span>
+        <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${_mvSay(m)}${_mvWho(m)}</span>
       </span>
       <button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>
     </div>`).join('')
@@ -14849,14 +14846,31 @@ function _mvWho(m){
   return m && m.by_kind === 'driver' ? ` · водитель ${escS(m.by_name || '')}` : '';
 }
 
+// Сколько переехало — словами склада (владелец, 17 сен 2026): у пива коробки
+// (на коробке два кода, каждый — полкоробки), у остального бутылки. qty с
+// сервера уже в единицах склада, unit — 24 у пива; bottles — число кодов.
+function _mvAmt(m){ return +(m && m.qty) || +(m && m.bottles) || 1; }
+function _mvWord(n, beer, acc){
+  if(beer) return n % 1 ? 'коробки' : pluralize(n, acc ? 'коробку' : 'коробка', 'коробки', 'коробок');
+  return pluralize(n, acc ? 'бутылку' : 'бутылка', 'бутылки', 'бутылок');
+}
+function _mvSay(m, acc){ const n = _mvAmt(m); return `${fmtQty(n)} ${_mvWord(n, m.unit > 1, acc)}`; }
+function _mvTally(list, acc){
+  let btl = 0, box = 0;
+  (list || []).forEach(m => { if(m.unit > 1) box += _mvAmt(m); else btl += _mvAmt(m); });
+  const parts = [];
+  if(btl) parts.push(`${fmtQty(btl)} ${_mvWord(btl, false, acc)}`);
+  if(box) parts.push(`${fmtQty(box)} ${_mvWord(box, true, acc)}`);
+  return {btl, box, say: parts.join(' и ')};
+}
+
 // Убрать переезд сканом — значит вернуть бутылки на прежний офис и в реестре:
 // сервер делает это сам, приложению остаётся снять все строки группы.
 async function stkMoveDel(i){
   const m = (STK.moves || [])[i]; if(!m) return;
   const ids = m.ids && m.ids.length ? m.ids : [m.id];
   if(!confirm(m.bottles
-    ? `Вернуть ${m.bottles} ${pluralize(m.bottles,'бутылку','бутылки','бутылок')} `
-      + `«${m.product_name || m.product_id}» обратно на ${m.from_name}?`
+    ? `Вернуть ${_mvSay(m, true)} «${m.product_name || m.product_id}» обратно на ${m.from_name}?`
     : 'Убрать это перемещение?')) return;
   for(const id of ids){
     try{ await ownerApi.ownerFetch('/api/owner/stock/transfer/'+id, {method:'DELETE'}); }
@@ -15146,7 +15160,7 @@ async function stkHistPaint(){
           <span class="stk-dr-n">${escS(m.product_name || m.product_id || '')}</span>
           <span class="stk-dr-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}</span>
         </span>
-        <span class="stk-dr-v">${m.bottles || m.qty || 0}<i>бут</i></span>
+        <span class="stk-dr-v">${fmtQty(_mvAmt(m))}<i>${m.unit > 1 ? 'кор' : 'бут'}</i></span>
         <span class="stk-dr-go">›</span>
       </button>`).join('') + '</div>'
       : '<div class="stkh-e">Сегодня ничего не перевозили</div>';
@@ -16223,7 +16237,7 @@ async function stkMovePick(){
   _stkHead('Переместить', 'куда везём', false);
   const seg = document.getElementById('stkSeg'); if(seg) seg.style.display = 'none';
   document.getElementById('stkMid').innerHTML = `
-    <div class="stk-note"><b>Одна бутылка — один скан.</b> Позицию выбирать не нужно:
+    <div class="stk-note"><b>Один скан — одна бутылка, у пива полкоробки.</b> Позицию выбирать не нужно:
       QR-код сам скажет, что это за товар и где он сейчас числится.
       Скажите, куда везёте, — и сканируйте QR-коды подряд.</div>`
     + (STK.districts || []).map(d => `
@@ -16235,8 +16249,7 @@ async function stkMovePick(){
             ? 'этот офис · привезли сюда' : 'везём сюда'}</span>
         </span></button>`).join('')
     + (MOV.total ? `<div class="stk-note" style="margin-top:10px">
-        В этом проходе переехало ${MOV.total} ${
-          pluralize(MOV.total,'бутылка','бутылки','бутылок')}.</div>` : '');
+        В этом проходе переехало ${_mvTally(MOV.rows.filter(r => r.state === 'new')).say}.</div>` : '');
 }
 
 // Камера — первый и единственный экран перемещения. Офис назначения
@@ -16258,7 +16271,8 @@ async function stkMoveCam(){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="movN">0</b><span>переехало</span></div>
+          <div class="scan-pill"><b id="movN">0</b><span id="movNu">переехало</span><b id="movN2"
+            style="display:none">0</b><span id="movNu2" style="display:none">кор</span></div>
           <div class="scan-tools">
             <button class="scan-tool" id="qrTorch" onclick="qrTorch(this)" style="display:none">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -16385,6 +16399,7 @@ function movDone(err, r, job){
     row.verdict = r.verdict; row.name = r.name || ''; row.label = r.label || '';
     row.from_code = r.from_code || ''; row.to_code = r.to_code || '';
     row.tid = r.transfer_id || ''; row.color = color;
+    row.qty = r.qty; row.unit = r.unit;
   }
   if(r.ok){ MOV.total++; STK.val = null; }   // остаток обоих районов уже другой
   else qrFlash(flash, r.say || say);
@@ -16392,7 +16407,17 @@ function movDone(err, r, job){
 }
 
 function movPaint(){
-  scanRoll('movN', MOV.total);
+  // Счёт прохода словами склада: бутылки бутылками, пиво коробками; и то и
+  // другое — двумя числами, одно число на две единицы соврало бы.
+  const t = _mvTally(MOV.rows.filter(r => r.state === 'new'));
+  const both = !!(t.btl && t.box);
+  scanRoll('movN', fmtQty(t.btl || t.box));
+  _setText('movNu', both ? 'бут' : t.btl ? _mvWord(t.btl, false) : t.box ? _mvWord(t.box, true) : 'переехало');
+  const n2 = document.getElementById('movN2'), u2 = document.getElementById('movNu2');
+  if(n2 && u2){
+    n2.style.display = u2.style.display = both ? '' : 'none';
+    if(both) scanRoll('movN2', fmtQty(t.box));
+  }
   const feed = document.getElementById('movFeed'); if(!feed) return;
   feed.innerHTML = MOV.rows.slice(0, 40).map((r, i) => {
     const [, say, color] = MOV_V[r.verdict] || ['', 'отправляю…', 'var(--muted)'];

@@ -866,8 +866,10 @@ async def move_by_code(code: str, dst: str, by, by_name: str = "",
         return _move_res("busy", code=code, name=name, label=label)
     base_drop()                      # склад видит переезд сразу, не через пересчёт
     log.info(f"[stock] переезд по коду {code}: {src} → {dst} ({pid}) — {by_kind} {by_name}")
+    # qty и unit — чтобы счётчик на камере шагал словами склада: у пива
+    # полкоробки на код, у бутылки — бутылка.
     return _move_res("ok", code=code, name=p.get("name", "") or name, label=label,
-                     transfer_id=tid, bottles=1, to=dst,
+                     transfer_id=tid, bottles=1, qty=qty, unit=_unit(p), to=dst,
                      to_code=OFFICE_CODES.get(dst, ""),
                      **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
 
@@ -905,8 +907,12 @@ def group_transfers(rows: list, days: int = 0) -> list:
     переезд водителя и переезд старшего той же позиции тем же путём — разные
     строки, у них разные права на отмену."""
     groups, out = {}, []
+    cat = _catalog()
     for r in rows:
         r["id"] = str(r.pop("_id", ""))
+        # Единица позиции — подписи: у пива qty в коробках (код — полкоробки),
+        # у остального в бутылках; bottles — число кодов, не количество.
+        r["unit"] = _unit(cat.get(r.get("product_id")) or {})
         r["from_name"] = OFFICE_NAMES.get(r.get("from"), r.get("from"))
         r["to_name"] = OFFICE_NAMES.get(r.get("to"), r.get("to"))
         r["from_code"] = OFFICE_CODES.get(r.get("from"), "")

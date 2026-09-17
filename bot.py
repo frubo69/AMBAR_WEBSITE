@@ -458,10 +458,12 @@ async def on_contact(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 INLINE_TEXT = {
     "ru": ("<b>AMBAR — премиальная доставка по Дубаю</b>\n\n"
            "Заказ по телефону работает как работал. В приложении — быстрее: "
-           "каталог, адрес и история заказов в одном месте."),
+           "каталог, адрес и история заказов в одном месте.\n\n"
+           "🍷 При заказе от 1000 AED в приложении — вино в подарок."),
     "en": ("<b>AMBAR — premium delivery across Dubai</b>\n\n"
            "Ordering by phone works exactly as before. In the app it is faster: "
-           "catalogue, address and order history in one place."),
+           "catalogue, address and order history in one place.\n\n"
+           "🍷 Orders over 1000 AED in the app come with a bottle of wine as a gift."),
 }
 INLINE_BTN = {"ru": "Открыть AMBAR", "en": "Open AMBAR"}
 

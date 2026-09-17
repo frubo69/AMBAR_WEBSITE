@@ -429,7 +429,11 @@ async def _after_close(me: dict, day: str, d: dict) -> dict | None:
         return None
     at = _as_dt(last["closed_at"])
     try:
-        opened = at is None or await db.shift_opened_after(at, me.get("district") or "")
+        # Тест-водитель в тест-районе: там смену оператор не открывает никогда,
+        # поэтому ему хватает новой смены в любом районе — иначе после первого
+        # закрытия он был бы заперт навсегда.
+        opened = at is None or await db.shift_opened_after(
+            at, "" if _tq(me) else (me.get("district") or ""))
     except Exception as e:                             # noqa: BLE001
         log.warning(f"[driver] открытие смены после закрытия не прочиталось: {e}")
         opened = True                                  # не читается — не запираем

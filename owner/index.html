@@ -4341,6 +4341,8 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .crw-c{margin-bottom:9px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
 .crw-c.moved{border-color:rgba(201,169,110,.4)}
+/* Тест-район: та же карточка, но фишки не нажимаются — переставлять некуда. */
+.crw-test .crw-p{cursor:default}
 /* Шапка района — золотом, на обоих экранах. Список читают сверху вниз и ищут
    в нём точку: золото и есть та засечка, по которой видно, где кончился один
    район и начался следующий. Серая шапка эту работу не делала — карточки
@@ -32127,12 +32129,26 @@ function crewRender(){
     </div>`;
   }).join('');
 
+  // Тест-район — после настоящих: без оператора и без перестановки, только
+  // кто в нём (владелец, 17 сен 2026: «этот район и этого водителя должен
+  // видеть только в AMBAR STAR»).
+  const T = S.test_district;
+  const test = T ? `<div class="crw-c crw-test">
+      <div class="crw-c-h">
+        <span class="crew-code">${escS(T.code || 'T')}</span>
+        <span class="crw-c-n wrap">${escS(T.name || 'Тест-район')}</span>
+      </div>
+      <div class="crw-c-b">${(T.drivers || []).length ? T.drivers.map(n => `<span class="crw-p">
+          <span class="crw-p-a">${IC('car', 15)}</span><span class="crw-p-n">${escS(n)}</span></span>`).join('')
+        : '<span class="crw-none">никого нет</span>'}</div>
+    </div>` : '';
+
   box.innerHTML = `
     ${moved ? `<div class="crw-hint">
         <span>Переставлено: <b>${moved}</b> — не как обычно</span>
         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
       </div>` : ''}
-    ${per}${crewLinksHtml(S)}`;
+    ${per}${test}${crewLinksHtml(S)}`;
 }
 
 // ── телефоны водителей ────────────────────────────────────────────────────

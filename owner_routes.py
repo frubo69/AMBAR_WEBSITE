@@ -1638,6 +1638,11 @@ async def handle_staff(request):
     return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
+def _TEST_OFFICE() -> dict:
+    from config_offices import TEST_OFFICE
+    return dict(TEST_OFFICE)
+
+
 async def _staff_payload() -> dict:
     """Штат целиком: районы, операторы, водители и их телефоны. Одним куском,
     потому что его же отдают ручки перестановок и телефонов после своих
@@ -1652,6 +1657,11 @@ async def _staff_payload() -> dict:
                        "moved": bool(moves.get(d)),
                        "drivers": list(staff.DISTRICT_DRIVERS.get(d, []))}
                       for d in OFFICE_IDS],
+        # Тест-район — отдельно от районов: без оператора и без перестановок,
+        # в нём тест-водители из базы. Операторам и чек-листу он не виден.
+        "test_district": {**_TEST_OFFICE(),
+                          "drivers": [str(r.get("name") or "") for r in staff.roster_rows()
+                                      if r.get("test")]},
         "operators": staff.operator_names(),
         "seniors": [x["name"] for x in staff.SENIOR_OPERATORS],
         # старший в STAR (менеджер, не оператор из расписания) — только имена,
@@ -1701,11 +1711,15 @@ def _code_until(r: dict):
 
 
 def _links_view() -> list:
+    from config_offices import TEST_OFFICE
     out = []
     for r in staff.roster_rows():
         until = _code_until(r)
-        out.append({"name": r.get("name", ""), "district": r.get("district", ""),
-                    "district_code": OFFICE_CODES.get(r.get("district", ""), ""),
+        # Тест-водитель живёт в тест-районе, чей бы район ни стоял в записи.
+        dist = TEST_OFFICE["id"] if r.get("test") else r.get("district", "")
+        out.append({"name": r.get("name", ""), "district": dist,
+                    "district_code": TEST_OFFICE["code"] if r.get("test")
+                                     else OFFICE_CODES.get(dist, ""),
                     "test": bool(r.get("test")),
                     "linked": bool(r.get("telegram_id")),
                     "tg_name": r.get("tg_name", "") or "", "tg_username": r.get("tg_username", "") or "",

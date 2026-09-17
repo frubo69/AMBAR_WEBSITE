@@ -29,6 +29,16 @@ eq("driver_by_tg(3)", (staff.driver_by_tg(3) or {}).get("name"), "Новый")
 eq("тест-водитель не в расписании", "Тест-водитель" in staff.driver_names(), False)
 t = staff.driver_by_tg(9) or {}
 eq("driver_by_tg(9) — тест-персона", (t.get("test"), t.get("name")), (True, "Тест-водитель"))
+eq("тест-водитель — в Тест-районе, не в JVC (17 сен 2026)",
+   (t.get("district"), t.get("district_code"), t.get("district_name")), ("test", "T", "Тест-район"))
+eq("тест-водителя нет ни в одном районе расписания",
+   any("Тест-водитель" in v for v in staff.DISTRICT_DRIVERS.values()), False)
+os.environ.setdefault("MONGO_URI", "")
+import owner_routes as owr
+ln = {r["name"]: r for r in owr._links_view()}
+eq("«Телефоны водителей»: тестовый в районе T, обычный в своём",
+   ((ln["Тест-водитель"]["district"], ln["Тест-водитель"]["district_code"]), (ln["Фарух"]["district"], ln["Фарух"]["district_code"])),
+   (("test", "T"), ("tecom", "B5")))
 eq("чат тест-водителя", 9 in staff.driver_chats("Тест-водитель"), True)
 eq("чужой id — никто", staff.driver_by_tg(777), None)
 eq("driver_chats Фарух", staff.driver_chats("Фарух"), [22])

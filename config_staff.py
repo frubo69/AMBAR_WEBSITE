@@ -203,8 +203,9 @@ def driver_by_tg(telegram_id) -> dict | None:
 # ── тест-водитель ────────────────────────────────────────────────────────────
 # Аккаунт из AMBAR_TEST_DRIVER_IDS, которого нет среди настоящих водителей,
 # входит в приложение как «Тест-водитель»: видит только тест-заказы, его смены
-# и точки не идут ни в деньги, ни сторожу. Район — первый из расписания, он
-# нужен только для подписи в карточке.
+# и точки не идут ни в деньги, ни сторожу. Район — «Тест-район» (с 17 сен 2026;
+# раньше подписывался первым районом расписания); оператор для звонков —
+# прежний, первого района.
 def test_driver(telegram_id, force: bool = False) -> dict | None:
     """force — аккаунт заодно настоящий водитель, но приложение попросило
     тест-режим переключателем (заголовок X-Ambar-Test); без force боевая
@@ -216,12 +217,12 @@ def test_driver(telegram_id, force: bool = False) -> dict | None:
         return None
     if (tid not in TEST_DRIVER_IDS and tid not in _ROSTER["test"]) or (tid in DRIVER_BY_TG and not force):
         return None
-    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    from config_offices import TEST_OFFICE
     st = DISTRICT_STAFF[0]
     return {"id": "test", "name": TEST_DRIVER_NAME,
-            "district": st["district"],
-            "district_code": OFFICE_CODES.get(st["district"], ""),
-            "district_name": OFFICE_NAMES.get(st["district"], st["district"]),
+            "district": TEST_OFFICE["id"],
+            "district_code": TEST_OFFICE["code"],
+            "district_name": TEST_OFFICE["name"],
             "operator": st["operator"], "telegram_id": tid, "test": True}
 
 

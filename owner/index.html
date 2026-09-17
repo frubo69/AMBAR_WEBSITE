@@ -21670,6 +21670,12 @@ function _normRuleDay(rule){
 }
 function _normRuleText(rule, coverDays){
   if(rule && rule.kind === 'snapshot') return `норма — склад на утро ${_normRuleDay(rule)}`;
+  // Норма правилом (владелец, 18 сен 2026): считается из продаж района, а не
+  // из состояния полки и не из головы. Дни запаса приезжают в самом правиле.
+  if(rule && rule.kind === 'rule'){
+    const c = +rule.cover || coverDays;
+    return `норма по продажам · запас на ${c} ${pluralize(c, 'день', 'дня', 'дней')}`;
+  }
   return `норма на ${coverDays} ${pluralize(coverDays, 'день', 'дня', 'дней')}`;
 }
 
@@ -21708,7 +21714,7 @@ function ordRender(){
       </span>
     </button>`}
 
-    ${(d.frozen_aed && !(d.norm_rule && d.norm_rule.kind === 'snapshot'))
+    ${(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
       ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
@@ -30793,6 +30799,10 @@ function nmPaint(){
           ${(w.norm_rule && w.norm_rule.kind === 'snapshot')
             ? `Норма — склад на утро ${_normRuleDay(w.norm_rule)}: заявка просит ровно то,
                что продали с тех пор, и тянет полку обратно к этому состоянию`
+            : (w.norm_rule && w.norm_rule.kind === 'rule')
+            ? `Норма по продажам района с ${_normRuleDay(w.norm_rule)}: запас на ${
+              +w.norm_rule.cover || w.cover_days} ${pluralize(+w.norm_rule.cover || w.cover_days,
+              'день','дня','дней')}, потолок листа операторов, дорогое в район без продаж не ставим`
             : `Расчёт держит запас на ${w.cover_days} ${
               pluralize(w.cover_days,'день','дня','дней')} по продажам за ${w.window_days} дней`}</div>
       </div>

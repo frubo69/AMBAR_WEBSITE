@@ -512,8 +512,8 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             # (15 сен 2026) — новая версия заставляет забрать файл заново.
             # Превью — отдельный маленький файл, как и просит Bot API, а не та же
             # большая картинка.
-            photo_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg?v=2",
-            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}_thumb.jpg?v=3",
+            photo_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg?v=3",
+            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}_thumb.jpg?v=4",
             photo_width=1280, photo_height=640,
             title=("Приглашение по-русски" if lang == "ru" else "Invite in English") + where,
             description=("Фото, текст и кнопка — без ссылки в тексте"
@@ -569,7 +569,7 @@ async def on_business_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await ctx.bot.send_photo(
             chat_id=msg.chat.id,
             business_connection_id=cid,
-            photo=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+            photo=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg?v=3",
             caption=INLINE_TEXT[lang],
             parse_mode="HTML",
             # Именно url, а не web_app: в сообщениях от имени бизнес-аккаунта

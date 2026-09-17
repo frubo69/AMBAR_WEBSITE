@@ -5236,19 +5236,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   color:rgba(255,255,255,.6)}
 .scan-pill em{font-style:normal;font-size:11px;font-weight:700;color:#FF8A8A}
 /* Внесение по пересчёту: «внесено/долг» и позиция одной плашкой. Катится
-   только внесённое, «/29» стоит; длинное название режется точками, а
-   коробка у пива встаёт под счётчик. */
-.qr-of-col{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
-.scan-pill.qr-of{max-width:100%;min-width:0}
+   только внесённое, «/29» стоит; длинное название режется точками. */
+.scan-pill.qr-of{min-width:0}
 .scan-pill.qr-of b{flex-shrink:0}
 .scan-pill.qr-of b i{display:inline-block;font-style:normal}
 .scan-pill.qr-of span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Коробка или полкоробки: QR у пива клеится на коробку (1) и на половинку
-   (0,5), банки не сканируют (владелец, 16 сен 2026). Показываем только у пива. */
-.scan-half{display:inline-flex;padding:0;overflow:hidden;align-items:stretch;gap:0}
-.scan-half button{background:none;border:0;color:rgba(255,255,255,.55);padding:10px 12px;
-  font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer}
-.scan-half button.on{color:var(--gold2);background:rgba(255,255,255,.12)}
 .scan-tools{display:flex;gap:8px;flex-shrink:0}
 .scan-tool{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;cursor:pointer;color:#fff;
@@ -22626,17 +22618,28 @@ async function qrLeave(next){
   // внести товар без QR перекидывает в просто внести товар»).
   next = next || (QR_NEED ? () => qrHome() : () => qrDistrict(true));
   if(!QR_SESS.length){ next(); return; }
-  const n = QR_SESS.length;
   const ans = await askChoice('Сохранить и добавить на склад?',
-    `${fmt(n)} ${pluralize(n,'бутылка внесена','бутылки внесены','бутылок внесено')} · «Выйти» уберёт их из реестра`,
+    `Внесено ${_qrSessSay(QR_SESS)} · «Выйти» уберёт их из реестра`,
     'Сохранить и добавить на склад', 'Выйти', 'go', 'bad');
   if(ans === 'ok'){ await qrCommit(); return; }
   if(ans === 'no'){ await qrDiscard(); return; }
 }
+// Сколько внесено за заход — словами склада: бутылки бутылками, пиво
+// коробками (код пива — полкоробки, на коробке два кода).
+function _qrSessSay(list){
+  let btl = 0, box = 0;
+  (list || []).forEach(x => {
+    if(_qrIsBeer((QR_CAT || []).find(p => p.id === x.pid))) box += 0.5; else btl += 1;
+  });
+  const parts = [];
+  if(btl) parts.push(`${fmtQty(btl)} ${pluralize(btl, 'бутылка', 'бутылки', 'бутылок')}`);
+  if(box) parts.push(`${fmtQty(box)} ${box % 1 ? 'коробки' : pluralize(box, 'коробка', 'коробки', 'коробок')}`);
+  return parts.join(' и ');
+}
 async function qrCommit(){
-  const n = QR_SESS.length; QR_SESS = [];
+  const list = QR_SESS.slice(); QR_SESS = [];
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  if(n) _toast(`Сохранено · ${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')}`);
+  if(list.length) _toast(`Сохранено · ${_qrSessSay(list)}`);
   qrHome();
 }
 async function qrDiscard(){
@@ -22647,7 +22650,7 @@ async function qrDiscard(){
     SCAN.seen.delete(x.code); SCAN.seenAt.delete(x.code);
   }
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-  if(list.length) _toast(`Внесение отменено · ${fmt(list.length)}`);
+  if(list.length) _toast(`Внесение отменено · ${_qrSessSay(list)}`);
   qrHome();
 }
 
@@ -23072,23 +23075,8 @@ function qrRenderList(){
 
 // Долг позиции: у крепкого бутылки, у пива — только коробки, без банок в
 // любом виде (владелец, 16 сен 2026: «мы вообще не считаем в банках и
-// бутылках, только в ящиках»). Коды заводят по банке, но число здесь — 9, а
-// не 216.
-// Что несёт следующий код: коробку (1) или полкоробки (0,5). Живёт, пока
-// открыт сканер, и сбрасывается на коробку при каждом открытии.
-let SCAN_HALF = false;
-function _halfPill(show){
-  SCAN_HALF = false;
-  if(!show) return '';
-  return `<div class="scan-pill scan-half" id="scanHalf">
-    <button class="on" onclick="halfSet(false)">Коробка</button>
-    <button onclick="halfSet(true)">Полкоробки</button></div>`;
-}
-function halfSet(half){
-  SCAN_HALF = !!half;
-  document.querySelectorAll('#scanHalf button').forEach((b, i) => b.classList.toggle('on', (i === 1) === SCAN_HALF));
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-}
+// бутылках, только в ящиках»). На коробке два кода, но число здесь — 9, а
+// не 18.
 function _qrIsBeer(p){
   return !!(p && ((p.cat || '') === 'Пиво' || p.unit > 1 || p.price_24 || p.price_24_full));
 }
@@ -23105,8 +23093,9 @@ function _qrNeedTag(p, n){
 // бутылку.
 async function qrStart(pid){
   const p = (QR_CAT || []).find(x => x.id === pid); if(!p) return;
-  // Пиво решается по строке каталога: у {id, name} категории нет, и
-  // переключатель коробки не появлялся вовсе.
+  // Пиво решается по строке каталога: у {id, name} категории нет. Код пива —
+  // полкоробки (на коробке два кода), бутылки — бутылка; сервер решает сам,
+  // здесь — чтобы счётчик шагал так же.
   QR_PROD = {id: pid, name: p.name || '', beer: _qrIsBeer(p)}; QR_SESSION = 0; QR_LAST = null; QR_ROWS = [];
   // По пересчёту камера считает от долга позиции — того числа, что стояло в
   // строке, когда на неё нажали (владелец, 17 сен 2026).
@@ -23183,12 +23172,11 @@ function qrScreen(mode){
   const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
   // По пересчёту вместо «на офисе» — сколько внесено из долга и что за
   // позиция: «0/29 Red Label 1 ltr», дальше «1/29», «2/29» (владелец, 17 сен
-  // 2026). Название длинное, поэтому коробка у пива встаёт под счётчик.
+  // 2026). Код пива — полкоробки, счёт в коробках: «0,5/9».
   const goal = !del && QR_NEED;
   const pill = goal
     ? `<div class="scan-pill qr-of"><b><i id="qrN">0</i>/${fmtQty(QR_GOAL)}</b><span>${escS(QR_PROD.name)}</span></div>`
     : `<div class="scan-pill"><b id="qrN">0</b><span>${del ? 'убрано' : 'на офисе'}</span></div>`;
-  const half = _halfPill(!del && !!(QR_PROD && QR_PROD.beer));
   // Камера — герой экрана, всё служебное лежит на ней стеклом: так остаётся
   // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
@@ -23202,7 +23190,7 @@ function qrScreen(mode){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          ${goal ? `<div class="qr-of-col">${pill}${half}</div>` : pill + half}
+          ${pill}
           <div class="scan-tools">
             <button class="scan-tool" id="qrSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -23289,7 +23277,7 @@ async function qrLoadExisting(){
     const r = await ownerApi.ownerFetch('/api/owner/qr/list',
       {params:{product_id: QR_PROD.id, district: QR_DIST}});
     const old = (r.items || []).map(x => ({
-      code: x.code, label: x.label || '', state: 'old',
+      code: x.code, label: x.label || '', state: 'old', qty: x.qty,
       at: String(x.at || '').slice(0, 10)}));
     old.forEach(x => { SCAN.seen.add(x.code); SCAN.seenAt.set(x.code, 0); });
     QR_ROWS = QR_ROWS.concat(old);       // новые всегда сверху
@@ -23326,7 +23314,7 @@ let QR_ROWS = [];
 // Скан не ждёт сервера: очередь отправит сама и повторит, если сеть моргнула.
 function qrSave(code){
   code = String(code || '').trim(); if(!code) return;
-  const qty = SCAN_HALF ? 0.5 : 1;
+  const qty = QR_PROD.beer ? 0.5 : 1;
   QR_ROWS.unshift({code, state:'sending', at:'', label:'', qty});
   qrRenderFeed();
   // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
@@ -23335,8 +23323,7 @@ function qrSave(code){
   // Откуда бутылка: новый товар — приход на склад; из ревизии по «QR не
   // внесён» — код к бутылке, которая в пересчёте уже есть.
   SCANQ.push({path:'/api/owner/qr/scan',
-              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new',
-                    qty}, code});
+              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new'}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {
@@ -23347,7 +23334,8 @@ SCANQ.onDone = (err, r, job) => {
   const row = QR_ROWS.find(x => x.code === job.code && x.state === 'sending');
   if(!row) return;                       // строку успели удалить руками
   if(err){ row.state = 'fail'; qrFlash('err'); }
-  else if(r.new){ row.state = 'new'; row.label = r.label || ''; QR_SESS.push({code: job.code, pid: (job.body || {}).product_id}); }
+  else if(r.new){ row.state = 'new'; row.label = r.label || ''; if(r.qty) row.qty = r.qty;
+    QR_SESS.push({code: job.code, pid: (job.body || {}).product_id}); }
   else{
     // Бутылка уже в реестре — её посчитали раньше, и в счётчик сессии она
     // попасть не должна: иначе остаток вырастет на пустом месте.
@@ -23372,21 +23360,22 @@ const QR_STATE = {
 };
 
 function qrRenderFeed(){
-  // Крупное число — сколько бутылок этой позиции стоит на этой точке всего:
-  // и записанные раньше, и добавленные сейчас. Это и есть ответ на вопрос
-  // «сколько у нас Absolut на B1», ради которого всё считается.
-  const total = QR_ROWS.filter(r => ['new','sending','old'].includes(r.state)).length;
+  // Крупное число — сколько этой позиции стоит на этой точке всего: и
+  // записанные раньше, и добавленные сейчас. Это и есть ответ на вопрос
+  // «сколько у нас Absolut на B1», ради которого всё считается. У пива — в
+  // коробках: два кода — коробка.
+  const units = r => r.qty || (QR_PROD && QR_PROD.beer ? 0.5 : 1);
+  const total = fmtQty(QR_ROWS.reduce((s, r) => s + (['new','sending','old'].includes(r.state) ? units(r) : 0), 0));
   QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
-  // По пересчёту — внесённое за этот заход в единицах долга (полкоробки
-  // пива — 0,5): «уже в реестре» и несохранённое в счёт не идут.
-  scanRoll('qrN', QR_NEED
-    ? fmtQty(QR_ROWS.reduce((s, r) => s + (r.state === 'new' || r.state === 'sending' ? r.qty || 1 : 0), 0))
-    : total);
+  // Внесённое за этот заход — в тех же единицах (код пива — 0,5): «уже в
+  // реестре» и несохранённое в счёт не идут. По пересчёту это и есть счётчик.
+  const added = fmtQty(QR_ROWS.reduce((s, r) => s + (r.state === 'new' || r.state === 'sending' ? units(r) : 0), 0));
+  scanRoll('qrN', QR_NEED ? added : total);
   const s = document.getElementById('qrAdded');
-  if(s) s.innerHTML = QR_SESSION ? `<b>${QR_SESSION}</b> добавлено` : '';
+  if(s) s.innerHTML = QR_SESSION ? `<b>${added}</b> добавлено` : '';
   const feed = document.getElementById('qrFeed'); if(!feed) return;
   const cnt = document.getElementById('qrCount');
-  if(cnt) cnt.textContent = total ? total + '' : '';
+  if(cnt) cnt.textContent = total !== '0' ? total : '';
   feed.innerHTML = QR_ROWS.slice(0, 40).map((r, i) => {
     const [txt, color, mark] = QR_STATE[r.state] || QR_STATE.sending;
     // Убрать можно только то, что записали в этой сессии. «Уже была» — это
@@ -25590,7 +25579,6 @@ function rcvCam(){
       <div class="scan-hud">
         <div class="scan-hud-top">
           <div class="scan-pill"><b id="rcvN">${fmtQty(l.left)}</b><span>осталось</span></div>
-          ${_halfPill(l.unit > 1)}
           <div class="scan-tools">
             <button class="scan-tool" id="rcvSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -25629,7 +25617,6 @@ function rcvScan(code){
   rcvFeed();
   SCANQ.push({path:`/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/scan`,
               body:{district: RCV.district, product_id: RCV_LINE.id, code,
-                    qty: SCAN_HALF ? 0.5 : 1,
                     at_dev: new Date().toISOString(), as: _rcvMe()}, code, rcv:true});
 }
 

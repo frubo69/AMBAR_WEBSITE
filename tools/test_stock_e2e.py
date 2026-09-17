@@ -1,6 +1,6 @@
 """Сквозной прогон учёта склада на копии базы (владелец, 17 сен 2026: «от и до
 убедись, что в самых разных сценариях всё работает без противоречий»).
-Пиво — коробками: QR на коробке (1) и на половинке (0.5), заказ 12/24 шт =
+Пиво — коробками: на коробке два QR, каждый код — 0.5, заказ 12/24 шт =
 0.5/1. После каждого шага — инварианты:
   • карточка «Склад» = сумма остатков основы по районам;
   • долг «QR не внесён» района = Σ max(0, остаток − коды) по позициям;
@@ -53,8 +53,8 @@ async def invariants(label):
             want = int(math.ceil(round(max(0.0, float(n) - float(b[oid]["have_exact"].get(r["id"], 0))), 6)))
             if want or c["need"]:
                 eq(f"[{label}] заявка {oid} {r['id']} = ceil(норма − остаток)", c["need"], want)
-async def scan_code(sid, oid, pid, code, qty=None, who="Худоба"):
-    return await sr.task_scan(sid, oid, pid, code, who, 1, "", False, qty=qty)
+async def scan_code(sid, oid, pid, code, who="Худоба"):
+    return await sr.task_scan(sid, oid, pid, code, who, 1, "", False)
 def supply(sid, oid, pid, name, n, when):
     return {"_id": sid, "status": "open", "at": when, "day": D,
             "items": [{"id": pid, "name": name, "qty": n, "by_district": {oid: n}, "got": {oid: 0}}],
@@ -80,13 +80,13 @@ async def main():
     eq("вернули в доставку — на складе снова 10 и 2", (await have("jvc", "p1"), await have("jvc", "p31")), (10, 2))
     await d.orders.update_one({"id": "O1"}, {"$set": {"status": "delivered", "updated_at": iso(T(100))}})
     eq("снова доставлен — снова 7 и 1,5", (await have("jvc", "p1"), await have("jvc", "p31")), (7, 1.5))
-    # ── приёмка сканом: водка 3 кода, пиво коробка + половинка ──────────────
+    # ── приёмка сканом: водка 3 кода, пиво три кода по полкоробки ───────────
     await d.supplies.insert_one(supply("S1", "jvc", "p1", "Absolut", 3, T(120)))
     for i in range(3): r = await scan_code("S1", "jvc", "p1", f"a{i}")
     eq("приёмка водки: 3 кода → +3 на складе, задача полна", (await have("jvc", "p1"), r["left"]), (10, 0))
     await d.supplies.insert_one(supply("S2", "jvc", "p31", "Heineken", 2, T(121)))
-    await scan_code("S2", "jvc", "p31", "box1"); r = await scan_code("S2", "jvc", "p31", "half1", qty="0.5")
-    eq("приёмка пива: коробка + половинка → +1,5, осталось 0,5", (await have("jvc", "p31"), r["left"]), (3, 0.5))
+    for code in ("b1", "b2", "b3"): r = await scan_code("S2", "jvc", "p31", code)
+    eq("приёмка пива: три кода по 0,5 → +1,5, осталось 0,5", (await have("jvc", "p31"), r["left"]), (3, 0.5))
     await invariants("после приёмки сканом")
     # ── приём без сканирования: товар на складе сразу, кодов нет ────────────
     await d.supplies.insert_one(supply("S3", "silicon", "p1", "Absolut", 4, T(130)))
@@ -123,7 +123,7 @@ async def main():
     lines, _ = await SR._audit_lines("jvc", D); r1 = {l["id"]: l for l in lines}
     eq("ревизия: Absolut числится 7, кодовых 3 (a2, c0, c1), без кодов 4", (r1["p1"]["expected"], r1["p1"]["coded"], r1["p1"]["noqr"]), (7, 3, 4))
     eq("ревизия: Heineken числится 2,5, кодовых 1,5, без кодов 1", (r1["p31"]["expected"], r1["p31"]["coded"], r1["p31"]["noqr"]), (2.5, 1.5, 1))
-    for code, pid, q in (("a2", "p1", 1), ("c0", "p1", 1), ("box1", "p31", 1), ("half1", "p31", 0.5)):
+    for code, pid, q in (("a2", "p1", 1), ("c0", "p1", 1), ("b1", "p31", 0.5), ("b2", "p31", 0.5), ("b3", "p31", 0.5)):
         await db.audit_scan_add("jvc", D, code, {"at": T(170), "by": 1, "product_id": pid, "verdict": "ok", "qty": q})
     lines, _ = await SR._audit_lines("jvc", D); r1 = {l["id"]: l for l in lines}
     eq("камера увидела 2 из 3 кодовых Absolut → недостача 1; пиво сошлось", (r1["p1"]["actual"], r1["p1"]["diff"], r1["p31"]["actual"], r1["p31"]["diff"]), (2, 1, 1.5, 0))

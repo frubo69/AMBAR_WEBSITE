@@ -753,7 +753,7 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         need = int((it.get("by_district") or {}).get(oid) or 0)
         if not need:
             continue
-        # Принятое — сумма qty кодов: коробка 1, полкоробки 0.5 — единицы.
+        # Принятое — сумма qty кодов: бутылка 1, код пива 0.5 — единицы.
         got_u = _qn((it.get("got") or {}).get(oid) or 0)
         line = {"id": it["id"], "name": it.get("name", ""), "unit": _uof(it["id"]),
                 "need": need, "got": got_u, "left": _left_units(need, got_u)}
@@ -883,7 +883,7 @@ def _can_touch(task: dict, me: str, owner: bool) -> bool:
 
 async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
                     tg_id: int, at_dev: str = "", owner: bool = False,
-                    erev=None, qty=None) -> dict:
+                    erev=None) -> dict:
     """Принять одну бутылку. Возвращает исход, а не «ок» — их несколько.
 
     Порядок важен: сначала занимаем место в задаче, потом пишем бутылку в
@@ -922,9 +922,11 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     if not item:
         return {"ok": False, "verdict": "not_in_supply"}
     need = int((item.get("by_district") or {}).get(oid) or 0)
-    # Код на коробке — 1, на полкоробки — 0.5; строка закрывается, когда
-    # принятые единицы дошли до плана, и коробка через план не перелезает.
-    qty = 0.5 if (str(qty or "").replace(",", ".") in ("0.5", ".5") and _uof(pid) > 1) else 1
+    # Код бутылки — 1, код пива — полкоробки (на коробке два кода; qty из
+    # приложения не слушаем); строка закрывается, когда принятые единицы
+    # дошли до плана.
+    import stock_routes as _sr
+    qty = _sr.code_qty(_sr._catalog().get(pid) or {})
     got = _qn((item.get("got") or {}).get(oid) or 0)
     if got + qty > need:
         return {"ok": False, "verdict": "full", "need": need, "got": got,
@@ -2240,8 +2242,7 @@ async def handle_own_scan(request):
                           str(body.get("product_id") or "").strip(),
                           code, _owner_name(request, body),
                           int(request.get("owner_id") or 0),
-                          str(body.get("at_dev") or ""), owner=True,
-                          qty=body.get("qty"))
+                          str(body.get("at_dev") or ""), owner=True)
     return web.json_response(res, headers=CORS_HEADERS)
 
 

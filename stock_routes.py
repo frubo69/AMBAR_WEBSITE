@@ -141,6 +141,15 @@ def _unit(p: dict) -> int:
     return CASE if (p.get("price_24_full") or p.get("price_12_full")) else 1
 
 
+def code_qty(p: dict) -> float:
+    """Сколько единиц склада несёт один QR-код позиции. У пива на каждой
+    коробке два кода, поэтому любой скан — полкоробки (владелец, 17 сен 2026:
+    «каждое сканирование пива это шаг +0.5»); у бутылки код — бутылка.
+    Решает сервер, а не приложение: выбирать нечего, и старая версия
+    приложения на телефоне не запишет коробку вместо половины."""
+    return STEP if _unit(p or {}) > 1 else 1
+
+
 def _round_step(v) -> float:
     """К ближайшей половине. Считают глазами, дробей мельче не бывает.
 
@@ -841,8 +850,8 @@ async def move_by_code(code: str, dst: str, by, by_name: str = "",
     if not p:
         return _move_res("no_item", code=code, name=name, label=label)
 
-    # Количество — то, что несёт код: бутылка 1, коробка пива 1, полкоробки
-    # 0.5 (QR клеится на коробку, банки не сканируют).
+    # Количество — то, что несёт код: бутылка 1, код пива 0.5 (на коробке
+    # два кода, банки не сканируют).
     qty = float(doc.get("qty") or 1)
     day = str(day or "").strip() or _biz_day()
     at = datetime.now(timezone.utc).isoformat()
@@ -1183,8 +1192,7 @@ async def _district_base(day: str) -> dict:
         except Exception as e:
             log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
         for pid, n in came.items():
-            # Приёмка — в единицах: коробка пива это один код с qty 1,
-            # полкоробки — код с qty 0.5.
+            # Приёмка — в единицах: коробка пива — два кода по 0.5.
             have[pid] = (have.get(pid) or 0) + n
         # Принято без сканирования — товар на полке, кодов ещё нет. Он тоже на
         # складе (владелец: «внёс — видно при любом раскладе»): не отсканированный
@@ -1580,7 +1588,7 @@ async def handle_audit_scan(request):
         "label": (doc or {}).get("label") or "",
         "verdict": verdict,
         "home": (doc or {}).get("district") or "",
-        # Сколько единиц за этим кодом: коробка 1, полкоробки 0.5.
+        # Сколько единиц за этим кодом: бутылка 1, код пива 0.5.
         "qty": float((doc or {}).get("qty") or 1),
     })
     counts = await db.audit_scan_counts(district, day)

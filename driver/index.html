@@ -2867,11 +2867,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .cam-t.muted .s-off{display:block}
 /* Крупно — сколько ОСТАЛОСЬ. Именно это число водитель держит в голове, пока
    достаёт бутылки: «сколько уже» ему считать незачем. */
-.cam-half{display:inline-flex;margin:8px 0 2px;border-radius:12px;overflow:hidden;
-  background:rgba(14,14,22,.55);border:1px solid rgba(255,255,255,.14)}
-.cam-half button{background:none;border:0;color:rgba(255,255,255,.55);padding:9px 12px;
-  font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px}
-.cam-half button.on{color:#E9C98A;background:rgba(255,255,255,.12)}
 .cam-left{position:absolute;left:0;right:0;bottom:0;padding:14px;
   background:linear-gradient(transparent,rgba(0,0,0,.72));display:flex;align-items:flex-end;gap:10px}
 .cam-left b{font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;line-height:.9;
@@ -9762,9 +9757,6 @@ function supRenderCam(){
       </div>
       <div class="cam-left">
         <b id="camLeft">${fmtQty(l.left)}</b><span>осталось</span>
-        ${(SCAN_HALF = false, l.unit > 1) ? `<div class="cam-half" id="camHalf">
-          <button class="on" onclick="halfSet(false)">Коробка</button>
-          <button onclick="halfSet(true)">Полкоробки</button></div>` : ''}
         <span class="cam-hint" id="camHint">Наведите на код</span>
       </div>
     </div>
@@ -9826,22 +9818,15 @@ function supIdle(sinceMs, frames, fps){
 
 // Скан не ждёт сервера: рука уже тянется к следующей бутылке. Зелёная вспышка
 // сразу, а если сервер возразит — цвет сменится.
-// Что несёт следующий код: коробку (1) или полкоробки (0,5). QR у пива клеится
-// на коробку, банки не сканируют (владелец, 16 сен 2026). Сбрасывается на
-// коробку при каждом открытии камеры.
-let SCAN_HALF = false;
-function halfSet(half){
-  SCAN_HALF = !!half;
-  document.querySelectorAll('#camHalf button').forEach((b, i) => b.classList.toggle('on', (i === 1) === SCAN_HALF));
-  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-}
+// Сколько несёт код, решает сервер: у пива полкоробки (на коробке два кода),
+// у бутылки — бутылка; «осталось» приходит в ответе.
 function supScan(code){
   if(!LINE) return;
   SCAN_ROWS.unshift({code, state:'sending', label:''});
   camFlash('ok');
   camFeed();
   SCANQ.push({path:`/api/driver/supply/${TASK.supply_id}/scan`,
-              body:{district: TASK.district, product_id: LINE.id, code, qty: SCAN_HALF ? 0.5 : 1,
+              body:{district: TASK.district, product_id: LINE.id, code,
                     at_dev: new Date().toISOString(), erev: TASK.erev}, code});
 }
 

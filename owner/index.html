@@ -2681,6 +2681,19 @@ button.path:active{transform:scale(.995)}
 .rcv-f{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--muted)}
 .rcv-aed{margin-left:auto;font-weight:600;color:var(--sub);
   font-variant-numeric:tabular-nums}
+/* Статус приёмки «без сканирования» — карточка на «Обзоре» и страница статуса.
+   Анатомия приёмки: плашка состояния, крупное число, полоса. */
+.il-home{display:block;width:100%;text-align:left;font-family:inherit;color:var(--text);
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+.il-home:active{transform:scale(.99)}
+.il-home .rcv-v{font-size:28px;letter-spacing:-1px}
+.il-home .rcv-bar{margin:10px 0 8px}
+.il-t{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.il-row{cursor:default}
+.il-row:active{transform:none;background:var(--card)}
+.il-row .pk-n u{text-decoration:none;font-size:12px;font-weight:600;color:var(--muted)}
+.il-row.done .pk-n{color:var(--up)}
 
 /* Задача района. Водитель — главное, что здесь ищут, поэтому он и стоит
    первым; свободные районы подняты наверх: это единственные строки, по
@@ -6958,6 +6971,9 @@ button.exp-wait:active{transform:scale(.99)}
     </div>
   </div>
 
+  <!-- Приёмка «без сканирования», которую досканируют сейчас: видна, пока идёт
+       и до конца суток после (см. ilLoad). Пусто — места не занимает. -->
+  <div id="ilHome"></div>
   <!-- Bento KPIs -->
   <div class="bento">
     <div class="card" data-detail="kpi:orders">
@@ -21055,6 +21071,7 @@ function accOpen(id){
   if(id === 'writeoff') accWriteoffs();
   if(id === 'norms')    accNorms();
   if(id === 'shifts')   accShifts();
+  if(id === 'intake')   accIntake();
   if(id === 'checklist') accChecklist();
   if(id === 'cashround') accCashRound();
   if(id === 'supcancel') accSupCancel();
@@ -21103,7 +21120,7 @@ function _accClose(){
   CKL_RETURN = false;
   SCAN.stop();
   supPollStop();
-  qrPollStop(); rcvPollStop();
+  qrPollStop(); rcvPollStop(); ilPollStop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
   // Под разделом могла остаться открытая страница ревизии: вносили коды —
@@ -22995,6 +23012,98 @@ function qrInLine(ti, pid){
   qrPollStop();
   rcvLine(pid);
 }
+
+// ── Статус приёмки «без сканирования» ───────────────────────────────────────
+// Владелец (17 сен 2026): «чтобы я видел статус именно этой конкретной заявки,
+// которую он сейчас будет выполнять». Карточка на «Обзоре» — пока приёмка идёт
+// и до конца суток после; по нажатию — страница, опрос раз в пять секунд.
+// Счёт двойной: коробки — это склад, коды — это сканы (у пива на коробке два
+// кода); одним числом «9 не внесено» и «38 сканов» не сходились.
+let IL = {tasks: [], sel: '', poll: null};
+const IL_ST = {wait: ['ждёт начала', ''], live: ['сканирует сейчас', 'live'],
+               pause: ['пауза', 'warn'], done: ['завершено', 'ok']};
+const _ilKey = t => `${t.supply_id}|${t.district}`;
+function _ilSum(t){
+  const L = t.lines || [];
+  let need = 0, got = 0, cn = 0, cg = 0, beer = 0;
+  L.forEach(l => {
+    const k = l.unit > 1 ? 2 : 1;
+    need += +l.need || 0; got += +l.got || 0;
+    cn += Math.round((+l.need || 0) * k); cg += Math.round((+l.got || 0) * k);
+    if(l.unit > 1) beer++;
+  });
+  return {need, got, cn, cg, pct: need ? Math.min(100, Math.round(got / need * 100)) : 0,
+          u: beer === L.length ? 'кор' : beer ? 'ед.' : 'бут'};
+}
+function _ilWhen(t){
+  if(t.status === 'done') return t.done_at ? `в ${_hmDubai(t.done_at)}` : '';
+  if(t.last_at) return `скан ${_hmDubai(t.last_at)}`;
+  return t.noscan_at ? `с ${_hmDubai(t.noscan_at)}` : '';
+}
+async function ilLoad(){
+  if(HIDE) return;
+  try{ IL.tasks = (await ownerApi.ownerFetch('/api/owner/supply/intake/live')).tasks || []; }
+  catch(e){ return; }
+  ilHomePaint();
+  if(ACC_VIEW === 'intake') ilPaint();
+}
+function ilHomePaint(){
+  const box = document.getElementById('ilHome'); if(!box) return;
+  box.innerHTML = IL.tasks.map(t => {
+    const s = _ilSum(t), [st, cls] = IL_ST[t.status] || IL_ST.wait;
+    return `<button class="rcv il-home" onclick="ilOpen('${escS(_ilKey(t))}')">
+      <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
+        <span class="il-t">${escS(`${t.district_code} ${t.district_name}`)}</span></div>
+      <div class="rcv-n"><span class="rcv-v">${fmtQty(s.got)}</span>
+        <span class="rcv-of">из ${fmtQty(s.need)} ${s.u} · ${s.cg} из ${s.cn} кодов</span>
+        <span class="rcv-pct">${s.pct}%</span></div>
+      <div class="rcv-bar"><i style="width:${s.pct}%"></i></div>
+      <div class="rcv-f"><span>${escS(t.driver || '—')}</span>
+        <span class="rcv-aed">${escS(_ilWhen(t))}</span></div>
+    </button>`;
+  }).join('');
+}
+function ilOpen(key){ IL.sel = key; accOpen('intake'); }
+function accIntake(){ ilPaint(); ilLoad(); ilPollStart(); }
+function ilPollStart(){
+  ilPollStop();
+  IL.poll = setInterval(() => {
+    if(ACC_VIEW !== 'intake'){ ilPollStop(); return; }
+    if(!document.hidden) ilLoad();
+  }, 5000);
+}
+function ilPollStop(){ if(IL.poll){ clearInterval(IL.poll); IL.poll = null; } }
+function ilPaint(){
+  const t = IL.tasks.find(x => _ilKey(x) === IL.sel) || IL.tasks[0];
+  if(!t){
+    _setText('accTitle', 'Приёмка'); _setText('accSub', '');
+    document.getElementById('accMid').innerHTML = '<div class="scan-empty">Сейчас ничего не досканируют</div>';
+    return;
+  }
+  IL.sel = _ilKey(t);
+  const s = _ilSum(t), [st, cls] = IL_ST[t.status] || IL_ST.wait;
+  _setText('accTitle', `${t.district_code} ${t.district_name}`);
+  _setText('accSub', `приёмка · ${t.driver || '—'}`);
+  const rows = (t.lines || []).map(l => {
+    const k = l.unit > 1 ? 2 : 1;
+    return `<div class="pk-row il-row${l.got >= l.need ? ' done' : ''}">
+      <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
+        <span class="pk-slug">${Math.round(l.got * k)} из ${Math.round(l.need * k)} кодов</span></span>
+      <span class="pk-n">${fmtQty(l.got)}<u> / ${fmtQty(l.need)}</u></span></div>`;
+  }).join('');
+  document.getElementById('accMid').innerHTML = `
+    <div class="rcv">
+      <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
+        <span class="rcv-when">${escS(_ilWhen(t))}</span></div>
+      <div class="rcv-n"><span class="rcv-v">${fmtQty(s.got)}</span>
+        <span class="rcv-of">из ${fmtQty(s.need)} ${s.u}</span><span class="rcv-pct">${s.pct}%</span></div>
+      <div class="rcv-bar"><i style="width:${s.pct}%"></i></div>
+      <div class="rcv-f"><span>${s.cg} из ${s.cn} кодов</span>
+        <span class="rcv-aed">${escS(t.driver || '—')}</span></div>
+    </div>${rows}`;
+}
+setTimeout(ilLoad, 1500);
+setInterval(() => { if(!document.hidden) ilLoad(); }, 30000);
 
 let QR_CATF = 'all';
 // Серый треугольник справа у строки: видно, что нажимается и ведёт дальше.

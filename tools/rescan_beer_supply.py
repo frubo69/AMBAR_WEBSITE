@@ -80,8 +80,9 @@ def reopened(sup: dict, oid: str, pids: set, codes: list, now) -> dict:
             it["scanned"] = max(0, int(it.get("scanned") or 0) - per.get(it["id"], 0))
         items.append(it)
     task = dict((sup.get("tasks") or {}).get(oid) or {})
+    # rescan — какие строки открыты заново: статус у старшего показывает только их.
     task.update(done_at=None, gaps=[], note="", noscan_at=now, noscan_by=NOSCAN_BY,
-                scanned=max(0, int(task.get("scanned") or 0) - len(codes)))
+                rescan=sorted(pids), scanned=max(0, int(task.get("scanned") or 0) - len(codes)))
     task.pop("hold", None)
     return {**sup, "status": "open", "done_at": None, "items": items,
             "tasks": {**(sup.get("tasks") or {}), oid: task}}

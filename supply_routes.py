@@ -1233,6 +1233,51 @@ async def intake_by_district(me: str = "") -> dict:
             "now": datetime.now(timezone.utc).isoformat()}
 
 
+async def intake_live() -> list:
+    """Приёмки «без сканирования»: те, что досканируют сейчас, и закрытые с
+    начала учётных суток — карточка статуса у старшего (владелец, 17 сен
+    2026: «чтобы я видел статус именно этой конкретной заявки, которую он
+    сейчас будет выполнять»). Закрытая не пропадает сразу: «завершено» —
+    тоже статус. Если задачу открывали заново под пересканирование (поле
+    rescan), в ней только те строки; иначе — все строки задачи.
+
+    status: wait — сканов ещё нет; live — камера открыта (замок живой);
+    pause — сканы были, сейчас никто не сканирует; done — закрыта."""
+    import bizday
+    start = bizday.day_start(bizday.biz_day())
+    sups = await db.supplies_with_open_tasks(limit=12)
+    sups += await db.supplies_since((start - timedelta(days=3)).strftime("%Y-%m-%d"), limit=40)
+    iso = lambda v: v.isoformat() if v else ""
+    seen, out = set(), []
+    for sup in sups:
+        sid = sup.get("_id")
+        for oid, t in (sup.get("tasks") or {}).items():
+            ns = db._dt_aware(t.get("noscan_at"))
+            if (sid, oid) in seen or oid not in OFFICE_IDS or not ns or t.get("cancelled_at"):
+                continue
+            done = db._dt_aware(t.get("done_at"))
+            if done and done < start:
+                continue
+            seen.add((sid, oid))
+            v = _task_view(sid, sup, oid, t)
+            only = set(t.get("rescan") or [])
+            lines = [l for l in v["lines"] if not only or l["id"] in only]
+            lines.sort(key=lambda l: l["name"])
+            last = db._dt_aware(t.get("last_at"))
+            if last and last < ns:
+                last = None                      # скан из прежней приёмки — не этот
+            got = sum(l["got"] for l in lines)
+            status = ("done" if done else "live" if v["hold"]["live"]
+                      else "pause" if got > 0 else "wait")
+            out.append({"supply_id": sid, "district": oid, "day": v["day"],
+                        "district_code": v["district_code"], "district_name": v["district_name"],
+                        "driver": v["driver"], "who": v["hold"]["who"], "status": status,
+                        "rescan": bool(only), "noscan_at": iso(ns), "last_at": iso(last),
+                        "done_at": iso(done), "lines": lines})
+    out.sort(key=lambda x: (x["status"] == "done", x["noscan_at"]))
+    return out
+
+
 async def noscan_tasks() -> list:
     """Что принято без кодов и ещё не отсканировано — по всем открытым
     поставкам. Этим живут чек-лист и почасовое напоминание."""
@@ -2301,6 +2346,14 @@ async def handle_own_hold(request):
 
 
 @require_owner
+async def handle_own_intake_live(request):
+    """Статус приёмок «без сканирования» — карточка на «Обзоре» и её страница."""
+    return web.json_response({"tasks": await intake_live(),
+                              "now": datetime.now(timezone.utc).isoformat()},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_own_intake(request):
     """Незавершённый приём по районам — для «Внести / удалить товар»."""
     me = str(request.query.get("as") or "").strip()[:60] or "старший"
@@ -2406,6 +2459,7 @@ def setup(app):
         ("/api/owner/supply/send",   handle_send,   "POST"),
         ("/api/owner/supply/import", handle_import, "POST"),
         ("/api/owner/supply/extra",  handle_extra_create, "POST"),
+        ("/api/owner/supply/intake/live", handle_own_intake_live, "GET"),
         ("/api/owner/supply/intake", handle_own_intake, "GET"),
         ("/api/owner/supply",        handle_list,   "GET"),
         ("/api/owner/supply/{sid}",                 handle_one,          "GET"),

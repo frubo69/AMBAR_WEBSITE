@@ -55,14 +55,23 @@ async def main():
     eq("водитель видит у себя: осталось 2 коробки Heineken", mine, [("S1", 2, [("p31", 2)])])
     ib = next(x for x in (await sr.intake_by_district())["districts"] if x["id"] == "bbay")
     eq("STAR «с незавершённого приёма»: Бизнес Бей осталось 2", (ib["left"], len(ib["tasks"])), (2, 1))
+    live = lambda L: [(x["supply_id"], x["status"], x["driver"], [(l["id"], l["got"], l["need"]) for l in x["lines"]]) for x in L]
+    eq("статус у старшего: ждёт, только пиво, 0 из 2", live(await sr.intake_live()), [("S1", "wait", "Парвиз", [("p31", 0, 2)])])
     steps = []
     for i in range(4):
         r = await sr.task_scan("S1", "bbay", "p31", f"n{i}", "Парвиз", 7, "", False)
         steps.append((r["ok"], r["got"], r["left"], r["finished"], await have("p31")))
+        if i == 1:
+            L = await sr.intake_live()
+            eq("статус после двух сканов: сканирует сейчас, 1 из 2, последний скан есть",
+               (live(L), bool(L[0]["last_at"])), ([("S1", "live", "Парвиз", [("p31", 1, 2)])], True))
     eq("4 кода по 0,5: склад всё время 12, на последнем задача закрылась сама", steps,
        [(True, 0.5, 1.5, False, 12), (True, 1, 1, False, 12), (True, 1.5, 0.5, False, 12), (True, 2, 0, True, 12)])
     s = await db.supply_get("S1")
     eq("заявка снова принята", (s["status"], bool(s["tasks"]["bbay"]["done_at"])), ("done", True))
+    L = await sr.intake_live()
+    eq("статус после последнего кода: завершено, 2 из 2, время закрытия есть",
+       (live(L), bool(L[0]["done_at"])), ([("S1", "done", "Парвиз", [("p31", 2, 2)])], True))
     eq("после: склад Heineken 12, Absolut 6", (await have("p31"), await have("p1")), (12, 6))
     reg = (await db.qr_by_product_district_all())["bbay"]
     eq("в реестре Heineken 2 коробки (4 кода), Absolut 1", (reg.get("p31"), reg.get("p1")), (2, 1))

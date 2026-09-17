@@ -30500,7 +30500,10 @@ function shLogCards(rows){
     if(r.kind === 'open'){ if(!c.open) c.open = r; }
     else c.close = r;
   });
-  return order.map(k => by[k]);
+  // По районам B1…B5, а не в порядке открытия (владелец, 17 сен 2026): у
+  // района своё место на экране. Район без кода — в конце.
+  const pos = k => { const m = /\d+$/.exec(by[k].code || ''); return m ? +m[0] : 99; };
+  return order.sort((a, b) => pos(a) - pos(b)).map(k => by[k]);
 }
 
 // Справа — состояние смены словами и временем: «открыта в 12:02» зелёным,

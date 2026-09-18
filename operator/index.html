@@ -235,6 +235,22 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .mvb-sb.on{border-color:rgba(201,169,110,.6);background:var(--gold-soft);color:var(--gold2)}
 .mvb-sb.nocode i{color:var(--warn)}
 .mvb-none{font-size:12px;color:var(--muted);margin:6px 2px}
+.mvb-dr{display:flex;align-items:center;gap:10px;padding:0 18px 8px}
+.mvb-dl{flex:0 0 58px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.mvb-dr .mvb-to{padding:0;flex:1;min-width:0}
+.dchip.off{opacity:.35}
+.mvb-pb{width:100%;cursor:pointer;font-family:inherit;color:var(--text);text-align:left;align-items:center}
+.mvb-pb:active{transform:scale(.99)}
+.mvb-pb.in{border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
+.mvb-pb.dim .mvb-n{color:var(--sub)}
+.mvb-pb .mvb-n,.mvb-pb .mvb-m{display:block}
+.mvb-plus{flex:0 0 auto;display:flex;align-items:center;gap:8px;color:var(--gold2)}
+.mvb-plus i{font-style:normal;font-size:14px;font-weight:800}
+.mvb-plus svg{width:30px;height:30px;padding:6px;border-radius:9px;border:1px solid rgba(201,169,110,.45);
+  fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.mvb-qi{width:52px;height:32px;border-radius:9px;border:1px solid var(--border3);background:var(--bg3);color:var(--text);
+  text-align:center;font-family:inherit;font-size:14px;font-weight:700;outline:none}
+.mvb-qi:focus{border-color:rgba(201,169,110,.55)}
 .mvb-cart{flex:1;min-height:0;overflow-y:auto;padding:0 16px;-webkit-overflow-scrolling:touch}
 .mvb-li{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border2)}
 .mvb-li .nm{flex:1;min-width:0;font-size:13px;font-weight:700;line-height:1.25}
@@ -286,7 +302,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   .mvb-l{overflow:hidden}
   /* Раскрыли заявку — смотрят её: список товара и поиск прячем, а не сжимаем
      в щель, где кнопки наезжают друг на друга. */
-  .mvb.open .mvb-tool,.mvb.open .mvb-list,.mvb.open .mvb-to,.mvb.open .mvb-l .mvb-hd .s{display:none}
+  .mvb.open .mvb-tool,.mvb.open .mvb-list,.mvb.open .mvb-dr,.mvb.open .mvb-l .mvb-hd .s{display:none}
+  .mvb-dr{padding:0 16px 8px}
+  .mvb-dl{flex-basis:58px}
+  /* На телефоне районы — одними кодами в строку: B1…B5 операторы знают
+     наизусть, а полные имена переносили строку на три и съедали пол-экрана. */
+  .mvb-dn{display:none}
+  .mvb-dr .mvb-to{flex-wrap:nowrap;gap:5px}
+  .mvb-dr .dchip{padding:9px 0;flex:1 1 0;min-width:0;text-align:center}
   .mvb.open .mvb-l{flex:0 0 auto}
   .mvb.open .mvb-r{flex:1 1 auto;min-height:0}
   .mvb.open .mvb-cart{display:block;flex:1 1 auto;max-height:none}
@@ -4509,108 +4532,118 @@ function _decline(oid, r){
 
 // ── перемещение между районами: заявка от оператора (18 сен 2026) ────────────
 // Владелец: «сделай так, чтобы операторы могли создавать заявку на перемещение —
-// ровно такую, как сегодня водители видят, и предельно удобно». Заявка та же,
-// что собирает STAR: водители района-получателя видят её в «Товаре», берут и
-// сканируют. Оператор собирает её в свой район: по каждой позиции видно, где
-// она лежит и сколько там кодов (столько сканером и возьмут), чего не хватает
-// до нормы; «Собрать по норме» кладёт в заявку готовый расчёт, как у STAR, и
-// дальше строки правятся руками. Черновик живёт в телефоне — случайно закрыли
-// окно, вернулись, а набранное на месте.
-let MVB = {board:null, live:null, to:'', q:'', busy:false, t:null, sure:'', open:false};
-let MVDS = {};                                   // черновики по районам: {jvc:{lines, note}}
-try{ const x = JSON.parse(localStorage.getItem('op_mv_drafts') || 'null'); if(x && typeof x === 'object') MVDS = x; }catch(e){}
-function _mvdSave(){ try{ localStorage.setItem('op_mv_drafts', JSON.stringify(MVDS)); }catch(e){} }
-function _mvDraft(){ return MVDS[MVB.to] || (MVDS[MVB.to] = {lines:[], note:''}); }
+// ровно такую, как сегодня водители видят», а следом: «это должна быть не умная
+// заявка — операторы должны уметь собирать её вручную». Поэтому здесь ничего не
+// подсказывается и не считается: оператор сам выбирает, откуда и куда, сам
+// находит позицию и сам ставит число. Заявка та же, что собирает STAR: водители
+// района-получателя видят её в «Товаре», берут и сканируют. Строка помнит свой
+// «откуда» — в одной заявке можно забрать из нескольких районов, водитель
+// объедет их за одну ходку. Черновик живёт в телефоне: закрыли окно — набранное
+// на месте.
+let MVB = {board:null, live:null, q:'', busy:false, t:null, sure:'', open:false};
+let MVD = {from:'', to:'', lines:[], note:''};
+try{ const x = JSON.parse(localStorage.getItem('op_mv_draft') || 'null'); if(x && Array.isArray(x.lines)) MVD = {...MVD, ...x}; }catch(e){}
+function _mvdSave(){ try{ localStorage.setItem('op_mv_draft', JSON.stringify(MVD)); }catch(e){} }
 function _mvP(id){ return ((MVB.board||{}).products||[]).find(x=>x.id===id) || {}; }
 function _mvStep(p){ return (p && p.unit > 1) ? 0.5 : 1; }
 function _mvR(v){ return Math.round((+v||0) * 2) / 2; }
-function _mvQ(v, p){
-  const n = _mvR(v), t = n % 1 ? String(n).replace('.', ',') : String(n);
-  return p && p.unit > 1 ? t + ' кор.' : t + ' шт';
-}
-function _mvCode(id){ const d = ((MVB.board||{}).districts||[]).find(x=>x.id===id); return d ? d.code : id; }
-function _mvDName(id){ const d = ((MVB.board||{}).districts||[]).find(x=>x.id===id); return d ? `${d.code} ${d.name}` : id; }
 function _mvN(v){ return String(_mvR(v)).replace('.', ','); }
-function _mvIn(pid){ return _mvDraft().lines.filter(l=>l.id===pid).reduce((a,l)=>a+(+l.qty||0), 0); }
+function _mvQ(v, p){ return _mvN(v) + (p && p.unit > 1 ? ' кор.' : ' шт'); }
+function _mvD(id){ return ((MVB.board||{}).districts||[]).find(x=>x.id===id) || {id, code:id, name:''}; }
+function _mvDName(id){ const d = _mvD(id); return `${d.code} ${d.name}`.trim(); }
+function _mvMine(id){ return ((MVB.board||{}).mine||[]).includes(id); }
 
 async function mvbOpen(){
   if(!curOp){ showOv('opOv'); return; }
   showOv('mvbOv'); haptic('light');
   MVB.q = ''; MVB.sure = '';
-  await mvbLoad(MVB.to || '');
+  await mvbLoad();
   mvbLive();
   if(MVB.t) clearInterval(MVB.t);
   // «Сегодня» живёт: водитель взял, довёз — видно без перезапуска.
   MVB.t = setInterval(()=>{ if(!document.hidden && $('mvbOv').classList.contains('show')) mvbLive(); }, 5000);
 }
 function mvbClose(){ hideOv('mvbOv'); if(MVB.t){ clearInterval(MVB.t); MVB.t = null; } }
-async function mvbLoad(to){
+async function mvbLoad(){
   MVB.board = null; mvbPaint();
-  try{ MVB.board = await opApi.opFetch('/api/operator/move/board', {params:{as:curOp, ...(to ? {to} : {})}}); }
+  try{ MVB.board = await opApi.opFetch('/api/operator/move/board', {params:{as:curOp}}); }
   catch(e){ $('mvb').innerHTML = `<div class="mvb-empty"><b>Не удалось загрузить остатки</b>Проверьте связь и откройте ещё раз</div>`; return; }
-  MVB.to = MVB.board.to;
+  const ds = MVB.board.districts || [], mine = MVB.board.mine || [];
+  // Куда — по умолчанию свой район; откуда — первый другой. Дальше решает оператор.
+  if(!ds.some(d=>d.id===MVD.to)) MVD.to = mine[0] || (ds[0]||{}).id || '';
+  if(!ds.some(d=>d.id===MVD.from) || MVD.from === MVD.to) MVD.from = (ds.find(d=>d.id !== MVD.to)||{}).id || '';
+  _mvdSave();
   mvbPaint();
 }
 async function mvbLive(){
   try{ MVB.live = await opApi.opFetch('/api/operator/move/live', {params:{as:curOp}}); }catch(e){ return; }
   const el = $('mvbLive'); if(el) el.innerHTML = mvbLiveHtml();
 }
-function mvbTo(id){ if(id === MVB.to) return; haptic('sel'); mvbLoad(id); }
-function mvbFind(v){
-  MVB.q = v; const box = $('mvbList'); if(box) box.innerHTML = mvbListHtml();
+// Откуда и куда. Хотя бы один из двух районов — свой: чужие районы между
+// собой оператор не двигает.
+function mvbFrom(id){
+  if(id === MVD.to) return;
+  if(!_mvMine(id) && !_mvMine(MVD.to)){ toast('Хотя бы один из районов должен быть вашим', 'err'); return; }
+  MVD.from = id; _mvdSave(); haptic('sel'); mvbPaint();
+}
+function mvbTo(id){
+  if(id === MVD.to) return;
+  if(!_mvMine(id) && !_mvMine(MVD.from)){ toast('Хотя бы один из районов должен быть вашим', 'err'); return; }
+  const was = MVD.lines.length;
+  MVD.lines = MVD.lines.filter(l=>l.from !== id);          // из района в него же не везут
+  if(MVD.from === id) MVD.from = (((MVB.board||{}).districts||[]).find(d=>d.id !== id)||{}).id || '';
+  MVD.to = id; _mvdSave(); haptic('sel'); mvbPaint();
+  if(MVD.lines.length < was) toast(`Строки из ${_mvD(id).code} убраны — туда же и везём`);
+}
+function mvbFind(v){ MVB.q = v; const box = $('mvbList'); if(box) box.innerHTML = mvbListHtml(); }
+
+function mvbDistRow(kind){
+  const ds = (MVB.board||{}).districts || [];
+  const cur = kind === 'from' ? MVD.from : MVD.to, other = kind === 'from' ? MVD.to : MVD.from;
+  return `<div class="mvb-dr"><span class="mvb-dl">${kind === 'from' ? 'Откуда' : 'Куда'}</span><div class="mvb-to">${ds.map(d=>{
+    const off = d.id === other || (!_mvMine(d.id) && !_mvMine(other));
+    return `<button class="dchip${d.id === cur ? ' on' : ''}${off ? ' off' : ''}" ${off ? 'disabled' : ''}
+      onclick="${kind === 'from' ? 'mvbFrom' : 'mvbTo'}('${_esc(d.id)}')">${_esc(d.code)}<span class="mvb-dn"> ${_esc(d.name)}</span></button>`;
+  }).join('')}</div></div>`;
 }
 
-// Строки товара: сначала то, чего району не хватает до нормы (больше всего
-// нехватки — выше), потом всё остальное, что где-то лежит. Нажатие на район
-// кладёт позицию в заявку сразу нужным числом.
+// Позиции — весь каталог того, что где-то лежит, по разделам и по алфавиту.
+// Рядом — сколько её в районе «откуда»: просто цифра, решает оператор.
 function mvbListHtml(){
   const B = MVB.board; if(!B) return '';
-  const to = MVB.to, q = MVB.q.trim().toLowerCase();
-  const rows = (B.products||[]).filter(p=>!q || String(p.name).toLowerCase().includes(q)).map(p=>{
-    const have = +(p.have||{})[to] || 0, norm = (p.norm||{})[to];
-    const need = norm != null ? Math.max(0, _mvR(norm - have - _mvIn(p.id))) : 0;
-    const srcs = (B.districts||[]).filter(d=>d.id !== to && (+(p.have||{})[d.id] || 0) > 0)
-      .sort((a,b)=>(+(p.have||{})[b.id]||0) - (+(p.have||{})[a.id]||0));
-    return {p, have, norm, need, srcs};
-  }).filter(r=>q || r.srcs.length);
-  const needR = rows.filter(r=>r.need > 0).sort((a,b)=>b.need - a.need);
-  const rest = rows.filter(r=>r.need <= 0).sort((a,b)=>String(a.p.name).localeCompare(String(b.p.name)));
-  const D = _mvDraft();
-  const row = r => {
-    const p = r.p;
-    const src = r.srcs.length ? `<div class="mvb-src">${r.srcs.map(d=>{
-        const h = +(p.have||{})[d.id] || 0, c = +(p.codes||{})[d.id] || 0;
-        const on = D.lines.some(l=>l.id===p.id && l.from===d.id);
-        return `<button class="mvb-sb${on ? ' on' : ''}${c < h ? ' nocode' : ''}" onclick="mvbAdd('${_esc(p.id)}','${_esc(d.id)}')"
-          title="${c < h ? 'Кодов меньше, чем бутылок: сканером возьмут ' + c : ''}">${_esc(d.code)}<i>${_mvQ(h, p)}${c < h ? ' · кодов ' + String(_mvR(c)).replace('.', ',') : ''}</i></button>`;
-      }).join('')}</div>` : `<div class="mvb-none">Ни в одном районе нет</div>`;
-    return `<div class="mvb-p${r.need > 0 ? ' need' : ''}">
+  const q = MVB.q.trim().toLowerCase(), from = MVD.from;
+  const list = (B.products||[]).filter(p=>!q || String(p.name).toLowerCase().includes(q))
+    .sort((a,b)=>String(a.cat).localeCompare(String(b.cat)) || String(a.name).localeCompare(String(b.name)));
+  if(!list.length) return `<div class="mvb-none" style="padding:14px 6px">${q ? 'Ничего не нашли' : 'Каталог пуст'}</div>`;
+  let cat = null, out = '';
+  for(const p of list){
+    if(p.cat !== cat){ cat = p.cat; out += `<div class="mvb-sec">${_esc(cat || 'Без раздела')}</div>`; }
+    const h = +(p.have||{})[from] || 0, c = +(p.codes||{})[from] || 0;
+    const inD = MVD.lines.filter(l=>l.id===p.id && l.from===from).reduce((a,l)=>a+(+l.qty||0), 0);
+    out += `<button class="mvb-p mvb-pb${inD ? ' in' : ''}${h ? '' : ' dim'}" onclick="mvbPlus('${_esc(p.id)}')">
       <img class="mvb-img" src="${_esc(p.img || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
-      <div class="mvb-b">
-        <div class="mvb-n">${_esc(p.name)}</div>
-        <div class="mvb-m">у вас ${_mvQ(r.have, p)}${r.norm != null ? ' · норма ' + _mvR(r.norm) : ''}${
-          r.need > 0 ? ` · <b>не хватает ${_mvQ(r.need, p)}</b>` : ''}</div>
-        ${p.premium && !r.have ? `<div class="mvb-m">дорогое — туда, где его нет, по норме не везём</div>` : ''}
-        ${src}
-      </div></div>`;
-  };
-  if(!needR.length && !rest.length)
-    return `<div class="mvb-none" style="padding:14px 6px">${q ? 'Ничего не нашли' : 'Ни в одном районе нет товара'}</div>`;
-  return (needR.length ? `<div class="mvb-sec">Не хватает до нормы · ${needR.length}</div>` + needR.map(row).join('') : '')
-    + (rest.length ? `<div class="mvb-sec">${q ? 'Нашли' : 'Остальное, что где-то лежит'}</div>` + rest.map(row).join('') : '');
+      <span class="mvb-b"><span class="mvb-n">${_esc(p.name)}</span>
+        <span class="mvb-m">${h ? `в ${_esc(_mvD(from).code)}: ${_mvQ(h, p)}${c < h ? ` · кодов ${_mvN(c)}` : ''}` : `в ${_esc(_mvD(from).code)} нет`}</span></span>
+      <span class="mvb-plus">${inD ? `<i>${_mvN(inD)}</i>` : ''}<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+    </button>`;
+  }
+  return out;
 }
 
 function mvbCartHtml(){
-  const D = _mvDraft();
-  if(!D.lines.length) return `<div class="mvb-empty"><b>Заявка пустая</b>Нажмите на район у позиции слева — она ляжет сюда.<br>Или «Собрать по норме» — всё сразу.</div>`;
-  return D.lines.map((l, i)=>{
+  if(!MVD.lines.length) return `<div class="mvb-empty"><b>Заявка пустая</b>Выберите, откуда и куда, и нажмите на позицию слева.</div>`;
+  const by = {};
+  MVD.lines.forEach((l, i)=>{ (by[l.from] = by[l.from] || []).push([l, i]); });
+  return Object.keys(by).map(f=>`<div class="mvb-sec">Из ${_esc(_mvDName(f))}</div>` + by[f].map(([l, i])=>{
     const p = _mvP(l.id);
     return `<div class="mvb-li">
-      <div class="nm">${_esc(p.name || l.id)}<i>из ${_esc(_mvDName(l.from))}</i></div>
-      <div class="mvb-st"><button onclick="mvbQty(${i},-1)" aria-label="Меньше">−</button><b>${_mvN(l.qty)}</b><button onclick="mvbQty(${i},1)" aria-label="Больше">+</button></div>
+      <div class="nm">${_esc(p.name || l.id)}<i>${p.unit > 1 ? 'коробки' : 'штуки'}</i></div>
+      <div class="mvb-st"><button onclick="mvbQty(${i},-1)" aria-label="Меньше">−</button>
+        <input class="mvb-qi" inputmode="decimal" value="${_mvN(l.qty)}" onchange="mvbSet(${i}, this.value)" onfocus="this.select()">
+        <button onclick="mvbQty(${i},1)" aria-label="Больше">+</button></div>
       <button class="mvb-x" onclick="mvbDel(${i})" aria-label="Убрать"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`;
-  }).join('');
+  }).join('')).join('');
 }
 function mvbLiveHtml(){
   const T = (MVB.live && MVB.live.tasks) || [];
@@ -4619,8 +4652,8 @@ function mvbLiveHtml(){
     const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
     const who = t.driver ? ` · ${_esc(t.driver)}` : '';
     // Снять можно только заявку операторов: собранную владельцем в STAR — нет.
-    const can = t.side === 'in' && (t.status === 'free' || t.status === 'claimed') && !(+t.got)
-      && /· оператор$/.test(String(t.by || ''));
+    const can = (t.status === 'free' || t.status === 'claimed') && !(+t.got) && /· оператор$/.test(String(t.by || ''))
+      && _mvMine(t.district);
     const key = t.move_id + '/' + t.district;
     return `<div class="mvb-t">
       <div class="h"><b>${_esc(from)} → ${_esc(t.district_code)}</b><em class="${t.status}">${ST[t.status] || t.status}${who}</em></div>
@@ -4634,34 +4667,29 @@ function mvbPaint(){
   const box = $('mvb'); if(!box) return;
   const B = MVB.board;
   if(!B){ box.innerHTML = `<div class="mvb-empty"><b>Смотрим остатки по районам…</b></div>`; return; }
-  const D = _mvDraft();
-  const mine = (B.districts||[]).filter(d=>d.mine);
-  const units = D.lines.reduce((a,l)=>a + (+l.qty||0), 0);
-  const sug = (B.suggest||[]).filter(r=>!D.lines.some(l=>l.id===r.id && l.from===r.from)).length;
+  const units = MVD.lines.reduce((a,l)=>a + (+l.qty||0), 0);
+  const froms = [...new Set(MVD.lines.map(l=>_mvD(l.from).code))];
   box.innerHTML = `
     <div class="mvb-l">
-      <div class="mvb-hd"><div><div class="t">Перемещение в ${_esc(_mvDName(MVB.to))}</div>
-        <div class="s">Нажмите на район у позиции — она ляжет в заявку нужным числом</div></div>
+      <div class="mvb-hd"><div><div class="t">Новое перемещение</div>
+        <div class="s">Выберите, откуда и куда, и нажмите на позицию — она ляжет в заявку</div></div>
         <button class="wh-x" style="margin-left:auto" onclick="mvbClose()" aria-label="Закрыть">
           <svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-      ${mine.length > 1 ? `<div class="mvb-to">${mine.map(d=>`<button class="dchip${d.id === MVB.to ? ' on' : ''}" onclick="mvbTo('${_esc(d.id)}')">${_esc(d.code)} ${_esc(d.name)}</button>`).join('')}</div>` : ''}
-      <div class="mvb-tool">
-        <input class="mvb-q" placeholder="Найти позицию" value="${_esc(MVB.q)}" oninput="mvbFind(this.value)" autocomplete="off">
-        <button class="mvb-fill" ${sug ? '' : 'disabled'} onclick="mvbFill()">Собрать по норме${sug ? ' · ' + sug : ''}</button>
-      </div>
+      ${mvbDistRow('from')}${mvbDistRow('to')}
+      <div class="mvb-tool"><input class="mvb-q" placeholder="Найти позицию" value="${_esc(MVB.q)}" oninput="mvbFind(this.value)" autocomplete="off"></div>
       <div class="mvb-list" id="mvbList">${mvbListHtml()}</div>
     </div>
     <div class="mvb-r">
-      <div class="mvb-hd" onclick="mvbToggle(event)"><div><div class="t">Заявка</div>
-        <div class="s">${D.lines.length ? `${D.lines.length} ${plural(D.lines.length,'строка','строки','строк')} · водители ${_esc(_mvCode(MVB.to))} увидят её сразу` : 'Пока пусто'}</div></div>
-        ${D.lines.length ? `<button class="mvb-x" style="margin-left:auto;width:auto;padding:0 8px;font-family:inherit;font-size:12.5px" onclick="event.stopPropagation();mvbClear()">Очистить</button>` : ''}
+      <div class="mvb-hd" onclick="mvbToggle(event)"><div><div class="t">Заявка${MVD.lines.length ? ` · ${_esc(froms.join(', '))} → ${_esc(_mvD(MVD.to).code)}` : ''}</div>
+        <div class="s">${MVD.lines.length ? `${MVD.lines.length} ${plural(MVD.lines.length,'строка','строки','строк')} · водители ${_esc(_mvD(MVD.to).code)} увидят её сразу` : 'Пока пусто'}</div></div>
+        ${MVD.lines.length ? `<button class="mvb-x" style="margin-left:auto;width:auto;padding:0 8px;font-family:inherit;font-size:12.5px" onclick="event.stopPropagation();mvbClear()">Очистить</button>` : ''}
         <span class="mvb-chev"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></span></div>
       <div class="mvb-cart">${mvbCartHtml()}
-        ${D.lines.length ? `<input class="mvb-note" placeholder="Слово водителю (необязательно)" maxlength="200" value="${_esc(D.note || '')}" oninput="mvbNote(this.value)">` : ''}
+        ${MVD.lines.length ? `<input class="mvb-note" placeholder="Слово водителю (необязательно)" maxlength="200" value="${_esc(MVD.note || '')}" oninput="mvbNote(this.value)">` : ''}
       </div>
       <div class="mvb-foot">
         <div class="mvb-tot"><span>Всего</span><b>${_mvN(units)} ед.</b></div>
-        <button class="mvb-go" ${D.lines.length && !MVB.busy ? '' : 'disabled'} onclick="mvbSend()">${MVB.busy ? 'Создаю…' : 'Создать заявку'}</button>
+        <button class="mvb-go" ${MVD.lines.length && !MVB.busy ? '' : 'disabled'} onclick="mvbSend()">${MVB.busy ? 'Создаю…' : 'Создать заявку'}</button>
       </div>
       <div class="mvb-live" id="mvbLive">${mvbLiveHtml()}</div>
     </div>`;
@@ -4672,64 +4700,51 @@ function mvbToggle(e){
   MVB.open = !MVB.open; haptic('light');
   $('mvb').classList.toggle('open', MVB.open);
 }
-function mvbAdd(pid, from){
-  const p = _mvP(pid), D = _mvDraft(), step = _mvStep(p);
-  const have = +(p.have||{})[MVB.to] || 0, norm = (p.norm||{})[MVB.to];
-  const avail = +(p.have||{})[from] || 0;
-  const line = D.lines.find(l=>l.id===pid && l.from===from);
-  if(line){
-    if(line.qty + step > avail){ toast(`В ${_mvCode(from)} больше нет — там ${_mvQ(avail, p)}`, 'err'); return; }
-    line.qty = _mvR(line.qty + step);
-  }else{
-    const need = norm != null ? Math.max(0, _mvR(norm - have - _mvIn(pid))) : 0;
-    D.lines.push({id: pid, from, qty: Math.max(step, Math.min(avail, need > 0 ? need : step))});
-  }
+function mvbPlus(pid){
+  if(!MVD.from || !MVD.to){ toast('Сначала выберите, откуда и куда', 'err'); return; }
+  const p = _mvP(pid), step = _mvStep(p);
+  const line = MVD.lines.find(l=>l.id===pid && l.from===MVD.from);
+  if(line) line.qty = _mvR(line.qty + step);
+  else MVD.lines.push({id: pid, from: MVD.from, qty: step});
   _mvdSave(); haptic('sel'); mvbPaint();
 }
 function mvbQty(i, dir){
-  const D = _mvDraft(), l = D.lines[i]; if(!l) return;
-  const p = _mvP(l.id), step = _mvStep(p), avail = +(p.have||{})[l.from] || 0;
-  const v = _mvR(l.qty + dir * step);
-  if(v <= 0){ D.lines.splice(i, 1); }
-  else if(v > avail){ toast(`В ${_mvCode(l.from)} больше нет — там ${_mvQ(avail, p)}`, 'err'); return; }
-  else l.qty = v;
+  const l = MVD.lines[i]; if(!l) return;
+  const v = _mvR(l.qty + dir * _mvStep(_mvP(l.id)));
+  if(v <= 0) MVD.lines.splice(i, 1); else l.qty = v;
   _mvdSave(); haptic('sel'); mvbPaint();
 }
-function mvbDel(i){ _mvDraft().lines.splice(i, 1); _mvdSave(); haptic('light'); mvbPaint(); }
-function mvbClear(){ MVDS[MVB.to] = {lines:[], note:''}; _mvdSave(); haptic('light'); mvbPaint(); }
-function mvbNote(v){ _mvDraft().note = v; _mvdSave(); }
-function mvbFill(){
-  const D = _mvDraft(); let n = 0;
-  (MVB.board.suggest || []).forEach(r=>{
-    if(D.lines.some(l=>l.id===r.id && l.from===r.from)) return;
-    D.lines.push({id: r.id, from: r.from, qty: r.qty}); n++;
-  });
-  _mvdSave(); haptic('medium'); mvbPaint();
-  toast(n ? `По норме: ${n} ${plural(n,'строка','строки','строк')} в заявке` : 'Всё из нормы уже в заявке');
+function mvbSet(i, raw){
+  const l = MVD.lines[i]; if(!l) return;
+  const v = _mvR(String(raw || '').replace(',', '.'));
+  if(v <= 0) MVD.lines.splice(i, 1); else l.qty = v;
+  _mvdSave(); mvbPaint();
 }
+function mvbDel(i){ MVD.lines.splice(i, 1); _mvdSave(); haptic('light'); mvbPaint(); }
+function mvbClear(){ MVD.lines = []; MVD.note = ''; _mvdSave(); haptic('light'); mvbPaint(); }
+function mvbNote(v){ MVD.note = v; _mvdSave(); }
 async function mvbSend(){
-  const D = _mvDraft(); if(!D.lines.length || MVB.busy) return;
+  if(!MVD.lines.length || MVB.busy) return;
   MVB.busy = true; mvbPaint();
   try{
     const r = await opApi.opFetch('/api/operator/move/create', {method:'POST',
-      body:{as: curOp, to: MVB.to, lines: D.lines.map(l=>({from:l.from, id:l.id, qty:l.qty})), note: D.note || ''}});
-    MVDS[MVB.to] = {lines:[], note:''}; _mvdSave();
-    toast(`Заявка создана · водители ${_mvCode(MVB.to)} уже её видят${r.skipped && r.skipped.length ? ' · ' + r.skipped.length + ' строк не взято' : ''}`, 'ok');
+      body:{as: curOp, to: MVD.to, lines: MVD.lines.map(l=>({from:l.from, id:l.id, qty:l.qty})), note: MVD.note || ''}});
+    const to = _mvD(MVD.to).code;
+    MVD.lines = []; MVD.note = ''; _mvdSave();
+    toast(`Заявка создана · водители ${to} уже её видят${r.skipped && r.skipped.length ? ' · не взято строк: ' + r.skipped.length : ''}`, 'ok');
     haptic('heavy');
-    MVB.busy = false;
-    await mvbLoad(MVB.to); mvbLive();
+    MVB.busy = false; mvbPaint(); mvbLive();
     return;
   }catch(e){
     const d = (e && e.payload) || {};
     toast(d.error === 'test_mode' ? 'В тест-режиме настоящую заявку не создать'
-        : d.error === 'not_yours' ? 'Это не ваш район'
+        : d.error === 'not_yours' ? 'Хотя бы один из районов должен быть вашим'
         : d.error === 'empty' ? 'Ни одной строки нельзя везти — проверьте районы и количество'
         : 'Не получилось — повторите', 'err');
   }
   MVB.busy = false; mvbPaint();
 }
-// Снять — двумя нажатиями: первое спрашивает, второе снимает. Окно поверх окна
-// ради одной кнопки — лишнее.
+// Снять — двумя нажатиями: первое спрашивает, второе снимает.
 async function mvbCancel(mid, district){
   const key = mid + '/' + district;
   if(MVB.sure !== key){

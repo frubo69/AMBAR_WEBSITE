@@ -41,38 +41,23 @@ async def main():
         await d.stock_norms.insert_one({"district": oid, "product_id": pid, "norm": n})
 
     # ── доска ──────────────────────────────────────────────────────────────
-    b = await MV.board("jvc", UMAR)
+    # Ручная заявка (владелец: «не умная — операторы должны собирать её вручную»):
+    # на доске только то, что где лежит, без подсказок и норм.
+    b = await MV.board(UMAR)
     pv = next(p for p in b["products"] if p["id"] == vodka)
     eq("по водке видно, где сколько лежит", (pv["have"]["jvc"], pv["have"]["bbay"]), (1, 9))
     eq("и сколько там кодов — столько сканером и возьмут", (pv["codes"]["bbay"], pv["codes"]["jvc"]), (9, 0))
-    eq("норма получателя", pv["norm"]["jvc"], 6)
-    sug = sorted((r["from"], r["id"], r["qty"]) for r in b["suggest"])
-    eq("по норме: водку из Бизнес Бея (излишек 5), джин из Силикона и Бизнес Бея",
-       sug, sorted([("bbay", gin, 2), ("bbay", vodka, 5), ("silicon", gin, 1)]))
-    eq("предложение — только в выбранный район", {r["to"] for r in b["suggest"]}, {"jvc"})
+    eq("подсказок нет: ни нормы, ни предложения", ("norm" in pv, "suggest" in b), (False, False))
     eq("свои районы отмечены", sorted(x["id"] for x in b["districts"] if x["mine"]), sorted(UMAR))
-    # Дорогое туда, где его сейчас ноль, по норме не предлагается (владелец:
-    # «перемещение дорогого алкоголя мы не принимаем»). Beluga — 250 AED, ниже
-    # порога; Hennessy VS (p74) — 400, выше: её JVC «по норме» не получит.
-    cheap, dear = "p6", "p74"
-    eq("пороги на месте", (float(SR._catalog()[cheap]["price"]) > MV.PREMIUM,
-                           float(SR._catalog()[dear]["price"]) > MV.PREMIUM), (False, True))
-    for pid in (cheap, dear):
-        await d.stock_norms.insert_one({"district": "jvc", "product_id": pid, "norm": 2})
-        await d.stock_norms.insert_one({"district": "bbay", "product_id": pid, "norm": 1})   # излишек у отдающего — 4
-    await db.save_stock_count("bbay", D, {"district": "bbay", "day": D, "counted_at": T0.isoformat(),
-        "first_time": True, "counted_by": 0,
-        "lines": [{"id": p_, "name": p_, "price": 100, "unit": 1, "actual": q, "counted": True}
-                  for p_, q in ((vodka, 9), (gin, 4), (cheap, 5), (dear, 5))]})
-    SR.base_drop()
-    b2 = await MV.board("jvc", UMAR)
-    ids = {r["id"] for r in b2["suggest"]}
-    eq("недорогое в пустой район по норме едет, дорогое — нет", (cheap in ids, dear in ids), (True, False))
-    eq("дорогое помечено", next(p for p in b2["products"] if p["id"] == dear)["premium"], True)
+    eq("позиции, которых нигде нет, в списке не мешают",
+       all(any(v for v in p_["have"].values()) for p_ in b["products"]), True)
 
     # ── создание ───────────────────────────────────────────────────────────
+    r = await MV.create_by_operator("Умар", "bbay", [{"from": "silicon", "id": gin, "qty": 1}], "", UMAR)
+    eq("чужие районы между собой — нельзя", r, {"ok": False, "error": "not_yours"})
     r = await MV.create_by_operator("Умар", "bbay", [{"from": "jvc", "id": vodka, "qty": 1}], "", UMAR)
-    eq("в чужой район — нельзя", r, {"ok": False, "error": "not_yours"})
+    eq("из своего в чужой — можно (отдаёт свой)", (r["ok"], r["lines"]), (True, 1))
+    await MV.cancel_by_operator(r["move_id"], "bbay", {"bbay"})
     r = await MV.create_by_operator("Умар", "jvc", [{"from": "bbay", "id": vodka, "qty": 5},
                                                     {"from": "silicon", "id": gin, "qty": 1},
                                                     {"from": "jvc", "id": gin, "qty": 3}], "", UMAR)
@@ -87,9 +72,12 @@ async def main():
 
     # ── «Сегодня» ──────────────────────────────────────────────────────────
     lv = await MV.live_for(UMAR)
-    eq("Умару видно своё: к нему", [(t["district"], t["side"]) for t in lv["tasks"]], [("jvc", "in")])
+    live_ = lambda L: [(t["district"], t["side"]) for t in L["tasks"] if t["status"] != "cancelled"]
+    eq("Умару видно своё: к нему", live_(lv), [("jvc", "in")])
+    eq("снятая — тоже видна, как «снята»", [(t["district"], t["status"]) for t in lv["tasks"] if t["status"] == "cancelled"],
+       [("bbay", "cancelled")])
     lb = await MV.live_for({"bbay"})
-    eq("Джанабилю — от него", [(t["district"], t["side"]) for t in lb["tasks"]], [("jvc", "out")])
+    eq("Джанабилю — от него", live_(lb), [("jvc", "out")])
     eq("постороннему — ничего", (await MV.live_for({"alguses"}))["tasks"], [])
 
     # ── снятие ─────────────────────────────────────────────────────────────

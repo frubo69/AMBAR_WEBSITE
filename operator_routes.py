@@ -1994,16 +1994,13 @@ def _mv_json(obj, status=200):
 
 @require_operator
 async def handle_move_board(request):
-    """GET ?as=&to= — что лежит по районам и чего не хватает району to."""
+    """GET ?as= — что где лежит: остатки и коды по районам."""
     import move_routes
     who = (request.query.get("as") or "").strip()
     scope, order = await _op_scope(request, who)
     if not scope:
         return _mv_json({"error": "not_yours"}, 403)
-    to = (request.query.get("to") or "").strip()
-    if to not in scope:
-        to = order[0]
-    res = await move_routes.board(to, scope)
+    res = await move_routes.board(scope)
     res["mine"] = order
     return _mv_json(res)
 

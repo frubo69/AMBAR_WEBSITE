@@ -373,33 +373,17 @@ async def plan(day: str = "") -> dict:
 
 # ── Заявка от оператора (владелец, 18 сен 2026) ──────────────────────────────
 # «Сделай так, чтобы операторы могли создавать заявку на перемещение — ровно
-# такую, как сегодня водители видят, и предельно удобно». Заявка та же самая
-# (create), водители видят её так же; меняется только то, кто её собирает.
-# Оператор собирает перемещение В СВОЙ район: ему видно, где чего лежит и чего
-# у него не хватает до нормы, а готовое предложение «по норме» — тот же расчёт,
-# что у STAR, только для одного района.
-# Дорогое — только туда, где его покупают (владелец, 18 сен 2026: «перемещение
-# дорогого алкоголя мы не принимаем — там, где у нас этих позиций ноль, живут
-# работяги, они никогда этого не купят»). Порог тот же, что у правила нормы
-# (tools/norm_rule.py, TEST_MAX): дороже 300 AED.
-PREMIUM = 300
-
-
-def _premium(p: dict) -> bool:
-    try:
-        return float((p or {}).get("price") or 0) > PREMIUM
-    except (TypeError, ValueError):
-        return False
-
-
-async def board(to: str, scope: set) -> dict:
-    """Всё, что нужно, чтобы собрать заявку в район to: по каждой позиции —
-    сколько лежит в каждом районе, сколько там кодов (столько сканером и
-    возьмут), норма; и предложение по норме для этого района."""
+# такую, как сегодня водители видят», и следом: «это должна быть не умная
+# заявка — операторы должны уметь собирать её вручную». Заявка та же самая
+# (create), водители видят её так же; оператор сам выбирает, откуда и куда, что
+# и сколько. Здесь ничего не подсказывается и не считается — только остатки и
+# коды по районам, чтобы было видно, что где лежит.
+async def board(scope: set) -> dict:
+    """Позиции, которые где-то лежат, и по каждой — сколько её в каждом районе
+    и сколько там кодов (столько сканером и возьмут)."""
     day = sr._biz_day()
     cat = sr._catalog()
     base = await sr._district_base(day)
-    norms = await db.get_stock_norms()
     try:
         reg = await db.qr_by_product_district_all()
     except Exception as e:                            # noqa: BLE001
@@ -408,31 +392,26 @@ async def board(to: str, scope: set) -> dict:
     products = []
     for pid, p in cat.items():
         have = {oid: sr._num(((base.get(oid) or {}).get("have_exact") or {}).get(pid) or 0) for oid in OFFICE_IDS}
+        if not any(have.values()):
+            continue                                  # нигде не лежит — везти нечего
         codes = {oid: sr._num((reg.get(oid) or {}).get(pid) or 0) for oid in OFFICE_IDS}
-        norm = {oid: sr._num(norms[f"{oid}:{pid}"]) for oid in OFFICE_IDS if f"{oid}:{pid}" in norms}
-        # Нигде не лежит и нигде не нужна — в списке ей делать нечего.
-        if not any(have.values()) and not any(norm.values()):
-            continue
         products.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
-                         "img": p.get("img", ""), "unit": sr._unit(p), "premium": _premium(p),
-                         "have": have, "codes": codes, "norm": norm})
-    pl = await plan(day)
-    return {"day": day, "to": to,
+                         "img": p.get("img", ""), "unit": sr._unit(p),
+                         "have": have, "codes": codes})
+    return {"day": day,
             "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
                            "mine": o in scope} for o in OFFICE_IDS],
-            "products": products,
-            # «Собрать по норме» дорогое туда, где его сейчас ноль, не кладёт:
-            # руками добавить можно, но само оно туда не поедет.
-            "suggest": [r for r in pl["rows"] if r["to"] == to
-                        and not (_premium(cat.get(r["id"])) and float(r.get("to_have") or 0) <= 0)]}
+            "products": products}
 
 
 async def create_by_operator(who: str, to: str, lines: list, note: str, scope: set) -> dict:
-    """Заявка оператора: всё в один район (свой), откуда — по строкам."""
-    if to not in scope:
-        return {"ok": False, "error": "not_yours"}
+    """Заявка оператора: всё в один район, откуда — по строкам. Хотя бы одна
+    сторона своя: везут к нему — или всё, что везут, забирают у него. Чужие
+    районы между собой оператор не двигает."""
     rows = [{"from": str(l.get("from") or ""), "to": to, "id": str(l.get("id") or ""),
              "qty": l.get("qty")} for l in (lines or []) if isinstance(l, dict)]
+    if to not in scope and not (rows and all(r["from"] in scope for r in rows)):
+        return {"ok": False, "error": "not_yours"}
     r = await create(rows, by=f"{who} · оператор", note=note)
     return r
 

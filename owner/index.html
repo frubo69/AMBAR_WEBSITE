@@ -23290,9 +23290,12 @@ function mvoPaint(){
     : !p.rows.length ? '<div class="scan-empty">Перевозить нечего — у соседей нет излишков</div>'
     : `<div class="ord-hint">Излишек соседа закрывает дыру: <b>${fmtQty(p.qty)} ед</b>
          на <b>${fmt(p.aed)} AED</b> закупки, которые не надо покупать</div>
+       ${p.no_codes ? `<div class="ord-hint warn">Из них <b>${fmtQty(p.no_codes)} ед</b> пока без кодов —
+         эти районы сперва вносят товар, сканером их не взять</div>` : ''}
        ${p.rows.slice(0, 40).map(r => `<div class="pk-row">
          <span class="pk-row-b"><span class="pk-name">${escS(r.name)}</span>
-           <span class="pk-slug">${escS(r.from_code)} → ${escS(r.to_code)} · у отдающего останется ${fmtQty(r.from_left)}</span></span>
+           <span class="pk-slug">${escS(r.from_code)} → ${escS(r.to_code)} · у отдающего останется ${fmtQty(r.from_left)}${
+             r.no_codes ? ` · ${fmtQty(r.no_codes)} без кодов` : ''}</span></span>
          <span class="pk-n">${fmtQty(r.qty)}<u> ${r.unit > 1 ? 'кор' : 'бут'}</u></span></div>`).join('')}
        ${p.rows.length > 40 ? `<div class="scan-empty">…и ещё ${p.rows.length - 40}</div>` : ''}
        <button class="nfoot-btn pri mvo-go" ${MVO.busy ? 'disabled' : ''} onclick="mvoCreate()">

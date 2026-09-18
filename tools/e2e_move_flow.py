@@ -206,7 +206,7 @@ async def main():
             свободных += len((await MV.tasks_for_driver("Х", o))["free"])
         eq("и у водителя её нет", свободных, 0)
 
-    print("\n── 9. товар без кодов не планируем ───────────────────────────────")
+    print("\n── 9. товар без кодов виден пометкой, но планируется ──────────────")
     # У Тикома на полке есть, но в реестре нет — сканировать нечего.
     await db.save_stock_count("tecom", D, {"district": "tecom", "day": D, "counted_at": T0.isoformat(),
         "first_time": True, "counted_by": 0,
@@ -215,13 +215,14 @@ async def main():
     await db.set_stock_norm("alguses", WINE, 3, 0)
     eq("на полке Тикома вино есть", await shelf("tecom", WINE), 5)
     p9 = await MV.plan(D)
-    eq("но в план оно не попало — кодов нет",
-       [r for r in p9["rows"] if r["from"] == "tecom" and r["id"] == WINE], [])
+    строка = next((r for r in p9["rows"] if r["from"] == "tecom" and r["id"] == WINE), None)
+    eq("строку планируем — район досканирует свой долг и повезёт",
+       (строка["qty"] if строка else 0, строка["no_codes"] if строка else 0), (3, 3))
     await code(d, "tw0", WINE, "tecom")
     p9 = await MV.plan(D)
-    eq("внесли один код — ровно одну бутылку и планируем",
-       [(r["from"], r["to"], r["qty"]) for r in p9["rows"] if r["id"] == WINE and r["from"] == "tecom"],
-       [("tecom", "alguses", 1)])
+    строка = next(r for r in p9["rows"] if r["from"] == "tecom" and r["id"] == WINE)
+    eq("внесли один код — без кодов осталось на одну меньше",
+       (строка["qty"], строка["no_codes"]), (3, 2))
 
     print("\n── 10. две заявки разом не путаются ──────────────────────────────")
     # Вино Силикону больше не нужно, Тикому нужно — вторая пара для второй заявки.

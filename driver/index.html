@@ -1112,9 +1112,16 @@ body.xp-on{background:#070A12}
 .xp-ph.one .xp-z i{max-width:280px}
 .xp-z.lock > svg,.xp-z.lock b,.xp-z.lock i{opacity:.4}
 .xp-z.lock .xp-zb{opacity:.55;color:var(--xsub)} .xp-z.lock .xp-zb svg{color:var(--xsub)}
-.xp-z.set{padding:0;border-color:rgba(235,202,135,.55)}
+/* Со снимком карточка обязана остаться карточкой. Кадр лежит слоем поверх
+   (position:absolute) и высоты не даёт — карточка складывалась в золотую
+   полоску, и человек не видел, что чек уже снят (владелец, 18 сен 2026:
+   «почему он сворачивается в эту блядскую полосочку, почему я саму фотку не
+   вижу»). Высоту держим сами, кадр показываем целиком: чек узнают по цифрам,
+   а обрезанный по краю кусок ни о чём не говорит. */
+.xp-z.set{padding:0;border-color:rgba(235,202,135,.55);min-height:208px}
+.xp-ph.one .xp-z.set{min-height:290px}
 .xp-z.set::before{display:none}
-.xp-z.set img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.xp-z.set img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#05070d}
 .xp-z.set .xp-zb{position:absolute;left:10px;right:10px;bottom:10px;width:auto;margin:0;background:rgba(7,10,18,.82)}
 .xp-z.bad{border-color:#E05555}
 .xp-z.bad .xp-zb{color:#F5A3A3}
@@ -7318,9 +7325,49 @@ function expTiles(kind, sent){
 }
 // Перерисовать только плитки: сумму, которую человек уже вписал, терять нельзя.
 function expTilesRefresh(kind){
-  const box = document.getElementById('tiles-' + kind); if(!box) return;
-  const tmp = document.createElement('div'); tmp.innerHTML = expTiles(kind, _expKept(kind));
-  box.replaceWith(tmp.firstElementChild);
+  const box = document.getElementById('tiles-' + kind);
+  if(box){
+    const tmp = document.createElement('div'); tmp.innerHTML = expTiles(kind, _expKept(kind));
+    box.replaceWith(tmp.firstElementChild);
+    return xpSharpen();
+  }
+  // Страница расхода (xp) рисует зоны снимков без этого контейнера — и до
+  // 18 сен 2026 снятый кадр не появлялся вовсе, пока не придёт очередной опрос:
+  // несколько секунд человек смотрел на пустую рамку и успевал решить, что
+  // снимок не взяли (владелец: «уходит вечность, чтобы показать, что я его
+  // загрузил»). Перерисовываем страницу сразу, сохранив набранное: сумму и
+  // комментарий перерисовка стирать не смеет.
+  const inp = document.getElementById('e_' + kind), cm = document.getElementById('c_' + kind);
+  const сумма = inp ? inp.value : null, слова = cm ? cm.value : null;
+  renderExpenses();
+  const inp2 = document.getElementById('e_' + kind), cm2 = document.getElementById('c_' + kind);
+  if(inp2 && сумма && !inp2.readOnly){ inp2.value = сумма; xpTyped(kind); }
+  if(cm2 && слова && !cm2.readOnly) cm2.value = слова;
+  xpSharpen();
+}
+
+// Миниатюра в строке расхода — 200 px: она едет вместе со списком, и крупной ей
+// быть нельзя. Но на карточке её видно во весь размер, и мылом она выглядит
+// поломкой. Поэтому после отрисовки подтягиваем сам снимок и меняем его на
+// месте; раз загруженный остаётся в памяти до перезапуска приложения.
+const XP_FULL = new Map();
+async function xpSharpen(){
+  for(const img of Array.from(document.querySelectorAll('img[data-fid]'))){
+    if(img.dataset.done === '1') continue;
+    img.dataset.done = '1';
+    const id = img.dataset.fid, car = img.dataset.car === '1';
+    const key = id + (car ? ':car' : '');
+    if(XP_FULL.has(key)){ img.src = XP_FULL.get(key); continue; }
+    try{
+      const res = await fetch(drvApi.AMBAR_API + '/api/driver/expenses/photo/'
+        + encodeURIComponent(id) + (car ? '?car=1' : ''),
+        {headers:{'Authorization': 'tma ' + ((tg && tg.initData) || '')}});
+      if(!res.ok) continue;
+      const url = URL.createObjectURL(await res.blob());
+      XP_FULL.set(key, url);
+      img.src = url;
+    }catch(e){ /* сеть не дала — остаётся миниатюра, она уже на экране */ }
+  }
 }
 
 // Слово старшего — в конце карточки, синим окошком, человеческой фразой:
@@ -7608,6 +7655,9 @@ async function carAccept(){
   const переснял = sent && EXP_ST(sent) === 'rejected'
     && (rcp ? sent.photo_ok === 'no' : sent.car_ok === 'no');
   if(sent && (EXP_ST(sent) !== 'rejected' || переснял)){
+    // Показываем кадр до отправки, а не после: он уже снят и лежит в телефоне,
+    // а отправка по мобильной сети занимает секунды. Не вышло — скажем словами.
+    expTilesRefresh(kind);
     try{
       await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
         body:{kind, amount: sent.amount, comment: sent.comment || '',
@@ -8128,7 +8178,10 @@ function renderShift(){
 let EXP_PAGE = '';
 const EXP_PAGE_T = {meal: 'Питание', fuel: 'Бензин', wash: 'Мойка', parking: 'Парковка', other: 'Прочее', all: 'Итого за смену'};
 function expGo(page){ EXP_PAGE = page; EXP_MORE = false; render(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
-function expBack(){ EXP_PAGE = ''; render(); window.scrollTo({top: 0}); }
+function expBack(){
+  if(EXP_PAGE) delete XP_DRAFT[EXP_PAGE];          // ушли со страницы — черновик не нужен
+  EXP_PAGE = ''; render(); window.scrollTo({top: 0});
+}
 // Что написать на плитке: сумма, «Не было», «Не заполнено» или прочерк.
 function expTileVal(kind){
   const sent = _expSent(kind);
@@ -8176,11 +8229,30 @@ function xpPick(kind, ch){
   renderExpenses();                                     // не render(): тот молчит, пока в поле курсор
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
 }
+// Черновик страницы расхода: набранные сумма и комментарий живут, пока их не
+// сохранили. Иначе любой перерисовки хватало, чтобы стереть вписанное — а
+// перерисовка случается сама: пришёл заказ, вернулись из камеры, сработал опрос
+// раз в пять секунд (владелец, 18 сен 2026, по следам снимка чека).
+const XP_DRAFT = {};
+function xpDraftSet(kind, what, v){
+  const d = XP_DRAFT[kind] || (XP_DRAFT[kind] = {});
+  if(v === '' || v == null) delete d[what]; else d[what] = v;
+  if(!Object.keys(d).length) delete XP_DRAFT[kind];
+}
+function xpDraftGet(kind, what){
+  const d = XP_DRAFT[kind];
+  return d && d[what] != null ? d[what] : null;
+}
 function xpTyped(kind){
   const inp = document.getElementById('e_' + kind), x = document.getElementById('x_' + kind), b = document.getElementById('xb_' + kind);
   const has = !!String((inp || {}).value || '').replace(/\D/g, '');
+  xpDraftSet(kind, 'sum', inp ? inp.value : '');
   if(x) x.hidden = !has;
   if(b && !b.dataset.mode) b.disabled = !has;
+}
+function xpCm(kind){
+  const cm = document.getElementById('c_' + kind);
+  xpDraftSet(kind, 'cm', cm ? cm.value : '');
 }
 function xpClear(kind){ const inp = document.getElementById('e_' + kind); if(inp){ inp.value = ''; xpTyped(kind); inp.focus(); } }
 // Зона снимка: пустая — пунктирная рамка, номер шага, значок, подсказка и
@@ -8199,7 +8271,7 @@ function xpZone(kind, what, sent, n){
   const bico = ICO_CAM;
   return `<button class="xp-z${src ? ' set' : ''}${плохо ? ' bad' : ''}${lock ? ' lock' : ''}" onclick="${go}">
     ${n ? `<span class="xp-zn">${n}</span>` : ''}
-    ${src ? `<img src="${src}" alt=""><span class="xp-zb">${svgThin(bico, 21)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
+    ${src ? `<img src="${src}" alt=""${!свой && sent ? ` data-fid="${sent.id}"${rcp ? '' : ' data-car="1"'}` : ''}><span class="xp-zb">${svgThin(bico, 21)}${плохо ? 'Старший не принял — переснять' : 'Переснять'}</span>`
           : `${svgThin(rcp ? ICO_RCP2 : ICO_CARF, 36)}<b>${t[0]}</b><i>${t[1]}</i><span class="xp-zb">${svgThin(bico, 21)}${t[2]}</span>`}
   </button>`;
 }
@@ -8257,12 +8329,13 @@ function expParkPage(){
     <div class="xp-l">Сумма расхода</div>
     <div class="xp-amt"><span>AED</span>
       <input id="e_${fid}" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
-        value="${cur ? cur.amount : ''}" oninput="xpTyped('${fid}')">
+        value="${esc(xpDraftGet(fid, 'sum') != null ? xpDraftGet(fid, 'sum') : (cur ? cur.amount : ''))}" oninput="xpTyped('${fid}')">
       <button class="xp-x" id="x_${fid}" ${cur ? '' : 'hidden'} onclick="xpClear('${fid}')" aria-label="Очистить">${svg(ICO.close, 13)}</button>
     </div>
     ${zone ? `<div class="xp-l">Фото для подтверждения</div>${zone}` : ''}
     <div class="xp-l">Где парковались</div>
-    <textarea class="xp-cm" id="c_${fid}" maxlength="200" placeholder="Название места или адрес">${esc(cur ? cur.comment || '' : '')}</textarea>
+    <textarea class="xp-cm" id="c_${fid}" maxlength="200" placeholder="Название места или адрес"
+      oninput="xpCm('${fid}')">${esc(xpDraftGet(fid, 'cm') != null ? xpDraftGet(fid, 'cm') : (cur ? cur.comment || '' : ''))}</textarea>
     ${cur ? `<button class="xp-cancel" onclick="xpParkEdit('')">Отменить правку — новая запись</button>` : ''}
     <div class="dv-sp"></div>
     <div class="dv-foot"><button class="xp-go" id="xb_${fid}" data-mode="" ${cur ? '' : 'disabled'} onclick="xpSave(this,'${fid}')">Сохранить</button></div>
@@ -8301,12 +8374,13 @@ function expPage(kind){
     <div class="xp-l">Сумма расхода</div>
     <div class="xp-amt${locked ? ' sent' : ''}"><span>AED</span>
       <input id="e_${kind}" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
-        value="${sent ? sent.amount : ''}"${locked ? ' readonly' : ''} oninput="xpTyped('${kind}')">
+        value="${esc(xpDraftGet(kind, 'sum') != null ? xpDraftGet(kind, 'sum') : (sent ? sent.amount : ''))}"${locked ? ' readonly' : ''} oninput="xpTyped('${kind}')">
       ${locked ? expMark(sent) : `<button class="xp-x" id="x_${kind}" ${sent ? '' : 'hidden'} onclick="xpClear('${kind}')" aria-label="Очистить">${svg(ICO.close, 13)}</button>`}
     </div>
     ${zones}
     <div class="xp-l">Комментарий (необязательно)</div>
-    <textarea class="xp-cm" id="c_${kind}" maxlength="200" placeholder="Добавьте комментарий"${locked ? ' readonly' : ''}>${esc(comment)}</textarea>
+    <textarea class="xp-cm" id="c_${kind}" maxlength="200" placeholder="Добавьте комментарий"${locked ? ' readonly' : ''}
+      oninput="xpCm('${kind}')">${esc(xpDraftGet(kind, 'cm') != null ? xpDraftGet(kind, 'cm') : comment)}</textarea>
     ${отклонён ? expWhy(sent) : ''}` : ''}
     <div class="dv-sp"></div>
     <div class="dv-foot"><button class="xp-go${btn.cls ? ' ' + btn.cls : ''}" id="xb_${kind}" data-mode="${btn.mode}"${btn.what ? ` data-what="${btn.what}"` : ''}
@@ -8359,6 +8433,7 @@ function renderExpenses(){
       + (other.length ? '' : `<div class="pf-fxnote">Других расходов за смену пока нет.</div>`);
     box.innerHTML = html;
     if(own) fitAll();
+    xpSharpen();
     return;
   }
   hdrPage('');
@@ -11031,7 +11106,7 @@ async function sendExpense(btn, kind){
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
-    EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind]; XP_PARK_EDIT = '';
+    EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind]; delete XP_DRAFT[kind]; XP_PARK_EDIT = '';
     EXP_MORE = false; EXP_EDIT = null; EXP_SHOT = {kind:'', photo:'', thumb:''};
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}
     await shLoad();

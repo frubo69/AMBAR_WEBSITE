@@ -844,6 +844,9 @@ window.demoBoot = async function(){
   patchScan();
   patchGeo();
   try{ window.AmbarCall = null; }catch(e){}        // звонок без сервера не поднять
+  // Подтягивать снимок чека с сервера демо незачем: свой кадр у него и так под
+  // рукой, а ручки за окном вкладки нет.
+  window.xpSharpen = function(){};
   patchProfile();
   patchShift();
   try{ await boot(); }catch(e){ console.error('[демо] boot:', e); }

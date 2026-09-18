@@ -34,6 +34,18 @@ BOOT = "\nboot();"
 _CACHE = {"mtime": 0.0, "html": ""}
 
 
+# Демо ставят на телефон кнопкой «На экран Домой»: иконка, имя и полноэкранный
+# запуск — чтобы с домашнего экрана оно открывалось как приложение, а не как
+# страница в браузере.
+HOME = ("""<link rel="apple-touch-icon" href="/driver/img/demo-icon.png">
+<link rel="manifest" href="/driver/demo-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AMBAR Демо">
+""")
+TITLE = ("<title>AMBAR · Водитель</title>", "<title>AMBAR · Демо</title>")
+
 # Приложение зовёт свои картинки относительным путём («img/empty-orders.png»),
 # а демо отдаётся с /demo — там этот путь упирается в корень сайта и приходит
 # 404: экран без картинки. Правим на корневой; их всего несколько.
@@ -51,7 +63,9 @@ def build(src: str, ver: str = "") -> str:
         src = src.replace(need, rep, 1)
     for a, b in REL:
         src = src.replace(a, b)
-    return src
+    if src.count(TITLE[0]) == 1:
+        src = src.replace(*TITLE)
+    return src.replace("<head>", "<head>\n" + HOME, 1)
 
 
 async def handle(request: web.Request) -> web.Response:

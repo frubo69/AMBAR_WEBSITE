@@ -5480,8 +5480,11 @@ async def move_pair_senior_drop(mid: str, district: str, src: str, name: str) ->
     d = _db_or_none()
     if d is None: return False
     g = f"tasks.{district}.give.{src}"
+    # Вместе со старшим уходит и «кто отдаёт сейчас» — дальше никто не отдаёт,
+    # пока водитель района не продолжит: у начатой передачи это «пауза»,
+    # отданное остаётся у получателя.
     r = await d.move_orders.update_one({"_id": mid, f"{g}.senior.name": name},
-                                       {"$set": {f"{g}.senior": None}})
+                                       {"$set": {f"{g}.senior": None, f"{g}.driver": ""}})
     return r.modified_count > 0
 
 

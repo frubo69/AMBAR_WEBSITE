@@ -117,6 +117,61 @@ async def main():
     eq("в книге переездов — отдавал старший", sorted((x["by_name"], x["from"], x["to"]) for x in tr),
        [("STAR", "bbay", "jvc"), ("STAR", "bbay", "jvc"), ("STAR", "bbay", "tecom")])
 
+    print("── старший начал, вернул на середине — доделали водители ──────────")
+    # Владелец, 18 сен 2026: «сможет старший взять на себя JVC, отсканировать и
+    # переместить товар на определённые районы, а потом полувыполненную заявку
+    # вернуть, чтобы кто-то другой её закончил из водителей?»
+    for i in range(6): await code(d, f"j{i}", gin, "jvc")
+    await db.save_stock_count("jvc", D, {"district": "jvc", "day": D, "counted_at": T0.isoformat(),
+        "first_time": True, "counted_by": 0,
+        "lines": [{"id": gin, "name": gin, "price": 100, "unit": 1, "actual": 6, "counted": True}]})
+    r3 = await MV.create([{"from": "jvc", "to": "bbay", "id": gin, "qty": 2},
+                          {"from": "jvc", "to": "tecom", "id": gin, "qty": 2},
+                          {"from": "jvc", "to": "silicon", "id": gin, "qty": 2}], by="STAR")
+    m3 = r3["move_id"]
+    eq("старший взял JVC — три передачи", (await MV.senior_take("jvc", "STAR", 7))["took"], 3)
+    await MV.scan(m3, "bbay", "j0", "STAR", 7, "jvc", senior=True)
+    x = await MV.scan(m3, "bbay", "j1", "STAR", 7, "jvc", senior=True)
+    eq("в Бизнес Бей отдал всё", x["finished"], True)
+    x = await MV.scan(m3, "tecom", "j2", "STAR", 7, "jvc", senior=True)
+    eq("в Тиком — одну из двух", (x["ok"], x["task"]["got"], x["finished"]), (True, 1, False))
+    dr = await MV.senior_drop("jvc", "STAR")
+    eq("вернул водителям: Тиком (начатая) и Силикон (не начатая)", (dr["ok"], dr["dropped"]), (True, 2))
+    g = await MV.tasks_for_driver("Худоба", "jvc")
+    eq("у водителя JVC: Тиком — пауза, отдано 1 из 2; Силикон — ждёт",
+       sorted((x["to_code"], x["status"], x["got"], x["need"], x["giver"], x["senior"]) for x in g["give"]),
+       [("B3", "wait", 0, 2, "", ""), ("B5", "pause", 1, 2, "", "")])
+    v = await MV.tasks_for_driver("Бахадыр", "bbay")
+    eq("Бизнес Бей видит: старший отдал всё — можно «Принял»",
+       [(t["from_code"], t["status"], t["giver"], t["senior"]) for t in v["take"]], [("B1", "given", "STAR", "STAR")])
+    eq("Тиком видит: отдали 1 из 2, ждёт водителя JVC",
+       [(t["from_code"], t["status"], t["got"]) for t in (await MV.tasks_for_driver("Алишер", "tecom"))["take"]
+        if t["move_id"] == m3], [("B1", "pause", 1)])
+    eq("старший больше не сканирует в вернутое", (await MV.scan(m3, "tecom", "j3", "STAR", 7, "jvc", senior=True))["verdict"],
+       "not_taken")
+    eq("JVC снова держит смену своими передачами этой заявки",
+       sorted((x["side"], x["to_code"]) for x in await MV.pending_for_district("jvc") if x["move_id"] == m3),
+       [("give", "B3"), ("give", "B5")])
+    await MV.give_start(m3, "tecom", "Худоба", 21, "jvc")
+    x = await MV.scan(m3, "tecom", "j3", "Худоба", 21, "jvc")
+    eq("водитель JVC доотдал в Тиком", (x["ok"], x["task"]["got"], x["finished"], x["task"]["giver"]), (True, 2, True, "Худоба"))
+    await MV.give_start(m3, "silicon", "Фарух", 22, "jvc")
+    for c in ("j4", "j5"):
+        x = await MV.scan(m3, "silicon", c, "Фарух", 22, "jvc")
+    eq("другой водитель JVC отдал в Силикон", x["finished"], True)
+    for to, who in (("bbay", "Бахадыр"), ("tecom", "Алишер"), ("silicon", "Азиз")):
+        await MV.accept(m3, to, "jvc", who, 5, to)
+    doc = await db.move_order_get(m3)
+    eq("все приняли — заявка закрыта", doc["status"], "done")
+    eq("склад: из JVC ушло 6, в каждый район пришло по 2",
+       (await shelf("jvc", gin), await shelf("bbay", gin), await shelf("tecom", gin), await shelf("silicon", gin)),
+       (0, 2, 2, 2))
+    tr = await d.stock_transfers.find({"by_kind": "move", "from": "jvc"}).to_list(length=20)
+    eq("в книге переездов видно, кто что отдал",
+       sorted((x_["by_name"], x_["to"]) for x_ in tr),
+       [("STAR", "bbay"), ("STAR", "bbay"), ("STAR", "tecom"), ("Фарух", "silicon"), ("Фарух", "silicon"),
+        ("Худоба", "tecom")])
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 

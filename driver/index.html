@@ -9650,7 +9650,10 @@ function mvqGiveCard(g){
   const open = MVQ_FOLD.has(key);
   const pct = g.need ? Math.round(g.got / g.need * 100) : 0;
   const started = g.status === 'live' || g.got > 0;
+  // «Пауза» — начали и бросили (например, старший отдал часть и вернул
+  // передачу району): отданное остаётся, продолжает любой водитель района.
   const sub = !started ? `начните, когда водитель ${esc(g.to_code)} приедет`
+    : g.status === 'pause' ? `отдано ${fmtQty(g.got)} из ${fmtQty(g.need)} — продолжите, когда водитель ${esc(g.to_code)} приедет`
     : `${g.giver && !g.mine ? 'отдаёт ' + esc(g.giver) : 'отдаёте'} · ${fmtQty(g.got)} из ${fmtQty(g.need)}`;
   return `<div class="dcard ${started ? 'mine' : ''}">
     <div class="dcard-h">
@@ -9684,6 +9687,7 @@ function mvqTakeCard(t){
   // он — «старший», без имени.
   const who = t.senior && t.giver === t.senior ? 'старший' : esc(t.giver || '');
   const sub = ready ? `${who ? who + ' отдал' : 'отдали'} всё — проверьте и примите`
+    : t.status === 'pause' ? `отдали ${fmtQty(t.got)} из ${fmtQty(t.need)} · ждёт водителя ${esc(t.from_code)}`
     : t.got ? `отдаёт ${who || 'водитель ' + esc(t.from_code)} · ${fmtQty(t.got)} из ${fmtQty(t.need)}`
     : t.senior ? 'везёт старший'
     : t.giver ? `${who} начал отдавать`

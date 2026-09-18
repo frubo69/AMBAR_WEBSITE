@@ -34,6 +34,12 @@ BOOT = "\nboot();"
 _CACHE = {"mtime": 0.0, "html": ""}
 
 
+# Приложение зовёт свои картинки относительным путём («img/empty-orders.png»),
+# а демо отдаётся с /demo — там этот путь упирается в корень сайта и приходит
+# 404: экран без картинки. Правим на корневой; их всего несколько.
+REL = (('"img/', '"/driver/img/'), ("'jsQR.js", "'/driver/jsQR.js"))
+
+
 def build(src: str, ver: str = "") -> str:
     """Три подмены. Если разметка изменилась так, что подменять нечего —
     честно падаем: молча отданное демо без заглушек ушло бы в боевой сервер
@@ -43,6 +49,8 @@ def build(src: str, ver: str = "") -> str:
         if src.count(need) != 1:
             raise RuntimeError(f"демо: в driver/index.html не найден кусок {need[:40]!r}")
         src = src.replace(need, rep, 1)
+    for a, b in REL:
+        src = src.replace(a, b)
     return src
 
 

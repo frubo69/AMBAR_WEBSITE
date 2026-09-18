@@ -250,6 +250,10 @@ def _order_view(o: dict) -> dict:
         # них уложиться, и знать их он должен раньше всех.
         "eta": o.get("eta", 0),
         "driver_ack_at": o.get("driver_ack_at", ""),
+        # «На месте» нажата — в карточке вместо неё «Доставил». Отметка того,
+        # кто везёт сейчас: после переназначения новый водитель жмёт заново.
+        "arrived_at": (o.get("driver_arrived_at", "")
+                       if o.get("driver_arrived_by") and o.get("driver_arrived_by") == o.get("driver") else ""),
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
         # Допродажа: что водитель добавил уже в пути и сколько чая за это.
         "upsell": o.get("upsell") or None,
@@ -1886,6 +1890,87 @@ async def handle_delivered(request):
                              headers=CORS_HEADERS)
 
 
+# «На месте» (владелец, 18 сен 2026): «добавь кнопку „на месте“ у водителя,
+# чтобы, когда он подъезжал, его оператору приходило сообщение с текстом
+# „Идемте выходите пожалуйста, <марка и номер машины>“ — чтобы оператор мог
+# этот текст взять и скопировать». Кнопка — в карточке активного заказа
+# вместо «Доставил»; нажал — та же кнопка становится «Доставил».
+ARRIVED_TEXT = "Идемте выходите пожалуйста"
+
+
+async def _driver_car(name: str) -> dict | None:
+    """Машина водителя из общего списка («Кто на каком районе» в STAR)."""
+    mine = [c for c in await db.cars_fleet() if str(c.get("driver") or "") == name]
+    return max(mine, key=lambda c: str(c.get("at") or "")) if mine else None
+
+
+def arrived_phrase(car: dict | None) -> str:
+    """Что оператор отправит клиенту: «…, Hyundai Elantra 97448» — марка и
+    номер. Машина не закреплена — фраза без неё."""
+    what = " ".join(x for x in (str((car or {}).get("model") or "").strip(),
+                                str((car or {}).get("plate") or "").strip()) if x)
+    return f"{ARRIVED_TEXT}, {what}" if what else ARRIVED_TEXT
+
+
+async def _tell_arrived(oid: str, me: dict, order: dict, phrase: str, has_car: bool) -> int:
+    """Оператору района заказа — тем же маршрутом, что и сам заказ (op_route:
+    свой оператор, ушёл в скрытый режим — ближайший; старшие и планшет — как
+    всегда). Фраза — моноширинным текстом: в телеграме он копируется
+    нажатием; в личке к нему ещё кнопка «Скопировать текст». Сколько чатов
+    получили."""
+    import html as _h
+    import op_route
+    msg = (f"📍 <b>Водитель на месте</b> · заказ #{_h.escape(oid)}\n"
+           f"{_h.escape(me['name'])} ({_h.escape(me.get('district_code') or '')})"
+           + (f" · {_h.escape(order.get('address') or '')}" if order.get("address") else "") + "\n\n"
+           f"<code>{_h.escape(phrase)}</code>\n"
+           + ("Нажмите на текст — он скопируется." if has_car
+              else "Машина за водителем не закреплена — марку и номер уточните у водителя."))
+    if order.get("test"):
+        msg = "🧪 <b>ТЕСТ</b> · " + msg
+    # Кнопка копирования — только в личке: в общем чате её не на всех
+    # телефонах покажет, а текст и так копируется нажатием.
+    kb = lambda chat: ({"inline_keyboard": [[{"text": "Скопировать текст", "copy_text": {"text": phrase[:256]}}]]}
+                       if int(chat) > 0 else None)
+    try:
+        ids = await op_route.send(msg, district=order.get("office_id") or order.get("district_id") or "",
+                                  parse_mode="HTML", reply_markup=kb, test=bool(order.get("test")),
+                                  retry_plain=True)
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[driver] «на месте» #{oid}: операторам не ушло: {e}")
+        return 0
+    return len(ids or {})
+
+
+@require_driver
+@needs_shift
+async def handle_arrived(request):
+    """«На месте»: водитель подъехал — оператору уходит фраза для клиента.
+    Отметка одна на водителя: второе нажатие ничего не шлёт повторно."""
+    oid = (request.match_info.get("oid") or "").strip()
+    me = request["driver"]
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
+    if o.get("status") != "approved":
+        return web.json_response({"error": "wrong_status", "status": o.get("status")},
+                                 status=409, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc).isoformat()
+    if not await db.order_mark_arrived(oid, me["name"], now):
+        cur = await db.get_order(oid) or {}
+        if cur.get("status") != "approved":
+            return web.json_response({"error": "wrong_status", "status": cur.get("status")},
+                                     status=409, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "again": True, "arrived_at": cur.get("driver_arrived_at", "")},
+                                 headers=CORS_HEADERS)
+    car = await _driver_car(me["name"])
+    phrase = arrived_phrase(car)
+    sent = await _tell_arrived(oid, me, o, phrase, bool(car))
+    log.info(f"[driver] {me['name']} на месте #{oid}: «{phrase}» → чатов {sent}")
+    return web.json_response({"ok": True, "arrived_at": now, "phrase": phrase, "sent": sent},
+                             headers=CORS_HEADERS)
+
+
 @require_driver
 @needs_shift
 async def handle_ack(request):
@@ -2831,6 +2916,7 @@ def setup(app):
         ("/api/driver/orders/{oid}/settle",     handle_settle,      "POST"),
         ("/api/driver/orders/{oid}/debt-back",  handle_debt_settle, "POST"),
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
+        ("/api/driver/orders/{oid}/arrived",    handle_arrived,     "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),
         ("/api/driver/orders/{oid}/edit/withdraw", handle_req_withdraw, "POST"),

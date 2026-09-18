@@ -1648,12 +1648,8 @@ def _TEST_OFFICE() -> dict:
 # следом: «надо же уметь и между водителями перезакреплять машины». Машины —
 # общим списком (db.cars), у каждой свой водитель или никто.
 async def _fleet() -> list:
-    """Машины из базы. Пусто — сначала переносим заведённые полем в записи
-    водителя (так было первые часы)."""
-    cars = await db.cars_all()
-    if not cars and await db.cars_import_from_drivers():
-        cars = await db.cars_all()
-    return cars
+    """Машины из базы (пусто — сначала перенос из записей водителей)."""
+    return await db.cars_fleet()
 
 
 def _car_view(c: dict, names: set) -> dict:

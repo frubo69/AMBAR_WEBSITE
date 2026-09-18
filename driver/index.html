@@ -481,7 +481,7 @@ body.test-drv .wo-fix{display:none}
 .oc-op b{display:block;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--gold2);
   margin-bottom:2px}
 .oc .ord-owe{margin-top:9px;border-radius:10px}
-/* Низ: «Чат» и «Доставил» */
+/* Низ: «Чат» и «На месте» → «Доставил» */
 .oc-ft{display:flex;gap:9.9px;margin-top:12px}
 .oc-chat{position:relative;flex:0 0 163.2px;height:51px;box-sizing:border-box;border-radius:12px;background:#131723;
   border:1px solid #1D212D;display:flex;align-items:center;justify-content:center;gap:13.6px;color:#F0F2F7;
@@ -5404,7 +5404,9 @@ function orderCard(o, i){
         ${svg(ICO.chat, 20)}<span>Чат</span>${o.chat_new ? `<span class="oc-chat-b">${o.chat_new}</span>` : ''}</button>
       ${waiting
         ? `<button class="oc-go wait" disabled>${svg(ICO.clock, 17)}<span>Ждём оператора</span></button>`
-        : `<button class="oc-go" onclick="askDeliver('${oid}')">${svg(OC_ICO.check, 18)}<span>Доставил</span></button>`}
+        : o.arrived_at
+        ? `<button class="oc-go" onclick="askDeliver('${oid}')">${svg(OC_ICO.check, 18)}<span>Доставил</span></button>`
+        : `<button class="oc-go" id="ocHere-${oid}" onclick="sendArrived('${oid}')">${svg(ICO.pin, 18)}<span>На месте</span></button>`}
     </div>
   </div>`;
 }
@@ -9222,6 +9224,31 @@ function askTick(){
   if(c){ c.classList.toggle('on', ASK.ticked); c.setAttribute('aria-pressed', ASK.ticked); }
   document.getElementById('askGo').disabled = !ASK.ticked;
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+// «На месте» (владелец, 18 сен 2026): подъехал — нажал, и оператору района
+// уходит «Идемте выходите пожалуйста, <марка и номер машины>», чтобы тот
+// скопировал и отправил клиенту. Та же кнопка сразу становится «Доставил».
+let ARRIVE_BUSY = '';
+async function sendArrived(oid){
+  if(ARRIVE_BUSY === oid) return;
+  ARRIVE_BUSY = oid;
+  const b = document.getElementById('ocHere-' + oid);
+  if(b) b.disabled = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/arrived`, {method:'POST', body:{}});
+    const o = _ordById(oid);
+    if(o) o.arrived_at = r.arrived_at || new Date().toISOString();
+    geoPush(true);              // у адреса — точка обновилась там же
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast(r.sent === 0 ? 'Оператору не ушло — напишите в чат' : 'Оператор знает, что вы на месте');
+    render();
+    load();
+  }catch(e){
+    if(b) b.disabled = false;
+    if(shBlocked(e)) return;
+    toast(e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — повторите');
+  }finally{ ARRIVE_BUSY = ''; }
 }
 
 async function sendDeliver(oid){

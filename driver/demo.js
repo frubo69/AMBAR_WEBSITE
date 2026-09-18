@@ -468,6 +468,12 @@ function route(path, opts){
       o.owed = 0; o.settle = null; save();
       return {ok: true, returned: back};
     }
+    // «На месте»: настоящий сервер шлёт оператору района фразу для клиента,
+    // здесь — только отметка, и кнопка становится «Доставил».
+    if(tail === '/arrived'){
+      if(!o.arrived_at){ o.arrived_at = iso(now()); save(); }
+      return {ok: true, arrived_at: o.arrived_at, sent: 1};
+    }
     if(tail === '/delivered'){
       o.delivered_at = iso(now()); o.status = 'delivered'; save();
       return {ok: true};

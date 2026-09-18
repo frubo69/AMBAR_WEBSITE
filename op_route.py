@@ -97,13 +97,17 @@ async def chats(district: str = "") -> list:
 
 
 async def send(text: str, district: str = "", parse_mode: str = "HTML",
-               reply_markup=None, register: bool = True, test: bool = False) -> dict:
+               reply_markup=None, register: bool = True, test: bool = False,
+               retry_plain: bool = False) -> dict:
     """Разослать по маршруту. Возвращает {chat_id: message_id} — по ним заказ
     потом правят и по ним же чистят чат, если человек уйдёт в скрытый режим.
 
     reply_markup — словарь на всех или функция от chat_id: кнопка мини-аппа
     живёт только в личке, и в групповом чате её надо заменить, а не потерять
-    вместе со всем сообщением."""
+    вместе со всем сообщением.
+
+    retry_plain — чат не принял сообщение с кнопками: отправить ещё раз без
+    них. Для сообщений, где кнопка — удобство, а главное — текст."""
     from api_server import tg_send, OPERATOR_BOT_TOKEN
     from datetime import datetime, timezone
     out = {}
@@ -122,6 +126,11 @@ async def send(text: str, district: str = "", parse_mode: str = "HTML",
             res = await tg_send(OPERATOR_BOT_TOKEN, цель["chat_id"],
                                 (цель["prefix"] or "") + text,
                                 parse_mode=parse_mode, reply_markup=разметка)
+            if retry_plain and разметка and not (res or {}).get("ok"):
+                log.warning(f"[route] {цель['chat_id']}: с кнопками не принял "
+                            f"({(res or {}).get('description')}) — шлём без них")
+                res = await tg_send(OPERATOR_BOT_TOKEN, цель["chat_id"],
+                                    (цель["prefix"] or "") + text, parse_mode=parse_mode)
         except Exception as e:                   # noqa: BLE001
             log.error(f"[route] {цель['chat_id']}: {e}")
             continue

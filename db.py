@@ -235,6 +235,19 @@ async def update_order(oid: str, **kw):
     _orders_dirty()
 
 
+async def order_mark_arrived(oid: str, name: str, at: str) -> bool:
+    """«На месте» — один раз на водителя: второе нажатие (или два разом) не
+    отправит оператору то же самое ещё раз. Переназначили заказ другому —
+    тот отмечается заново."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.orders.update_one(
+        {"order_id": oid, "status": "approved", "driver_arrived_by": {"$ne": name}},
+        {"$set": {"driver_arrived_at": at, "driver_arrived_by": name}})
+    _orders_dirty()
+    return r.modified_count > 0
+
+
 # ── Экстренная ситуация ─────────────────────────────────────────────────────
 # Водитель может оказаться там, где в его телефон смотрит кто-то ещё. Тогда он
 # переводит приложение в скрытый режим, и оно перестаёт быть приложением
@@ -2055,6 +2068,15 @@ async def cars_all() -> list:
     db = _db_or_none()
     if db is None: return []
     return await db.cars.find({}).to_list(length=500)
+
+
+async def cars_fleet() -> list:
+    """Все машины. Пусто — сначала переносим заведённые полем в записи водителя
+    (так было первые часы 18 сен)."""
+    cars = await cars_all()
+    if not cars and await cars_import_from_drivers():
+        cars = await cars_all()
+    return cars
 
 
 async def car_add(model: str, color: str, plate: str, by: int = 0) -> str:

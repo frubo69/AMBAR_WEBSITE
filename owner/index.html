@@ -23469,7 +23469,7 @@ function mvoHomePaint(){
     <div class="rcv-h"><span class="rcv-st ${got ? 'live' : ''}">перемещение</span>
       <span class="il-t">${live.length} ${pluralize(live.length,'район','района','районов')}</span></div>
     <div class="rcv-n"><span class="rcv-v">${fmtQty(got)}</span>
-      <span class="rcv-of">из ${fmtQty(need)} ед отдали${ждут ? ` · ${ждут} ждут «Принял»` : ''}</span>
+      <span class="rcv-of">из ${fmtQty(need)} ед приняли${ждут ? ` · ${ждут} ждут «Принял»` : ''}</span>
       <span class="rcv-pct">${need ? Math.round(got / need * 100) : 0}%</span></div>
     <div class="rcv-bar"><i style="width:${need ? Math.round(got / need * 100) : 0}%"></i></div>
     <div class="rcv-f"><span>${escS(live.map(t => t.district_code).join(', '))}</span>
@@ -23569,7 +23569,7 @@ function mvoPaint(){
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
         <span class="rcv-when">${escS(x.status === 'done' || x.status === 'cancelled' ? (x.by || '') : кто)}</span></div>
       <div class="rcv-n"><span class="rcv-v">${escS(x.district_code)}</span>
-        <span class="rcv-of">${escS(x.district_name)} · отдали ${fmtQty(x.got)} из ${fmtQty(x.need)} ед</span>
+        <span class="rcv-of">${escS(x.district_name)} · приняли ${fmtQty(x.got)} из ${fmtQty(x.need)} ед</span>
         <span class="rcv-pct">${pct}%</span></div>
       <div class="rcv-bar"><i style="width:${pct}%"></i></div>
       ${src}

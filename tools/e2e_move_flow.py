@@ -171,6 +171,17 @@ async def main():
     eq("у водителя чисто", (len(v["mine"]), len(v["free"]), len(v["give"])), (0, 0, 0))
     l = await MV.live(D)
     eq("у старшего задача помечена выполненной", [t["status"] for t in l["tasks"]], ["done"])
+    # Сутки сменились — незакрытая заявка обязана остаться видимой старшему.
+    r7 = await MV.create([{"from": "bbay", "to": "tecom", "id": VODKA, "qty": 1}], by="STAR")
+    l7 = await MV.live("2026-09-19")
+    живые = [t["move_id"] for t in l7["tasks"] if t["status"] not in ("done", "cancelled")]
+    eq("вчерашняя открытая заявка видна и назавтра", r7["move_id"] in живые, True)
+    eq("и водитель её по-прежнему видит",
+       len((await MV.tasks_for_driver("Алишер", "tecom"))["free"]), 1)
+    await db.move_order_cancel(r7["move_id"], "tecom", datetime.now(timezone.utc))
+    eq("снятая назавтра уже не живая",
+       [t["move_id"] for t in (await MV.live("2026-09-19"))["tasks"]
+        if t["status"] not in ("done", "cancelled")], [])
 
     print("\n── 8. отмена задачи старшим на середине ──────────────────────────")
     # Тикому нужна водка, а Бизнес Бею столько больше не надо — появился излишек.

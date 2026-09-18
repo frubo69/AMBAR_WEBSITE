@@ -260,7 +260,14 @@ async def live(day: str = "") -> dict:
     """Статус по каждому району — для STAR: кто взял, сколько увёз, когда."""
     day = str(day or "").strip() or sr._biz_day()
     out = []
-    for doc in await db.move_orders_since(day):
+    # Открытые заявки берём все, а не только сегодняшние: учётные сутки
+    # сменяются в десять утра, а незакрытое перемещение живёт, пока его не
+    # довезут. Иначе вчерашняя заявка исчезает у старшего, оставаясь у
+    # водителей, — и он думает, что её сняли.
+    docs = {d["_id"]: d for d in await db.move_orders_since(day)}
+    for d0 in await db.move_orders_open():
+        docs.setdefault(d0["_id"], d0)
+    for doc in sorted(docs.values(), key=lambda x: str(x.get("at") or "")):
         mid = doc["_id"]
         for oid, t in (doc.get("tasks") or {}).items():
             v = task_view(mid, doc, oid, t)

@@ -42,9 +42,16 @@ def _iso(v) -> str:
     return "" if not v else (v if isinstance(v, str) else v.isoformat())
 
 
-def _mid() -> str:
-    """MV260918-020134 — по дате, как у заявки магазину."""
-    return "MV" + _now().astimezone(sr.DUBAI_TZ).strftime("%y%m%d-%H%M%S")
+async def _mid() -> str:
+    """MV260918-020134 — по дате, как у заявки магазину. Две заявки в одну
+    секунду получили бы один номер: добавляем букву, пока номер занят."""
+    base = "MV" + _now().astimezone(sr.DUBAI_TZ).strftime("%y%m%d-%H%M%S")
+    mid = base
+    for suffix in "abcdefghij":
+        if not await db.move_order_get(mid):
+            return mid
+        mid = base + suffix
+    return base + _now().strftime("%f")[:3]
 
 
 def _line_view(l: dict) -> dict:
@@ -118,7 +125,7 @@ async def create(rows: list, by: str = "STAR", note: str = "") -> dict:
                                "unit": sr._unit(p), "qty": sr._num(qty), "got": 0})
     if not tasks:
         return {"ok": False, "error": "empty", "skipped": skipped}
-    mid = _mid()
+    mid = await _mid()
     doc = {"_id": mid, "at": _now(), "day": sr._biz_day(), "by": str(by or "")[:60],
            "note": str(note or "")[:200], "status": "open", "tasks": tasks}
     await db.move_order_add(doc)

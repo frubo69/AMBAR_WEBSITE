@@ -21669,9 +21669,12 @@ function ordList(){
 function ordSumInner(){
   const d = ORD.d || {};
   const pos = (d.rows || []).length;
+  // Первым числом — то, что платим магазину. Прайс продажи тут ни при чём:
+  // заявка — это счёт, а не витрина (владелец, 18 сен 2026).
   return `<span class="ord-sum-c"><b>${fmtQty(d.total_qty || 0)}</b><i>бутылок</i></span>
     <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
-          aria-label="Цена по позициям"><b>${fmt(d.total_aed || 0)}<u>AED</u></b><i>прайс</i></span>
+          aria-label="Цена по позициям"><b>${fmt(d.total_cost != null ? d.total_cost : d.total_aed || 0)
+          }<u>AED</u></b><i>закупка</i></span>
     <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
 }
 
@@ -21729,6 +21732,8 @@ function ordRender(){
       </span>
     </button>`}
 
+    ${d.moving_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.moving_qty)} ед</b> —
+      их сегодня везут между районами</div>` : ''}
     ${(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
       ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
@@ -22184,11 +22189,14 @@ function ordPut(id, district, qty){
 // из тех же чисел, что уже на экране.
 function ordTotals(){
   const d = ORD.d; if(!d) return;
-  let q = 0, aed = 0, ed = 0;
+  let q = 0, aed = 0, ed = 0, cost = 0;
+  // Закупку считаем той же петлёй: иначе после правки число в шапке остаётся
+  // от прошлого ответа сервера и расходится со строками.
   (d.all_rows || []).forEach(r => {
-    q += r.need_total; aed += r.need_total * (r.price || 0); if(r.edited) ed++;
+    q += r.need_total; aed += r.need_total * (r.price || 0);
+    cost += r.need_total * (r.cost || 0); if(r.edited) ed++;
   });
-  d.total_qty = q; d.total_aed = aed; d.edited_count = ed;
+  d.total_qty = q; d.total_aed = aed; d.edited_count = ed; d.total_cost = Math.round(cost);
   d.rows = (d.all_rows || []).filter(r => r.need_total > 0);
   ACC_ORDER = d;
 }

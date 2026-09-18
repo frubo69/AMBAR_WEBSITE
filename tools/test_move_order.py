@@ -116,6 +116,27 @@ async def main():
     eq("закрытая задача ушла из списка", (len(v["mine"]), len(v["free"])), (0, 0))
     r = await MV.scan(mid, "jvc", "v3", "Авазбек", 12)
     eq("в закрытую заявку не досканировать", r["verdict"], "gone")
+    # ── заявка вычитает то, что едет ───────────────────────────────────────
+    await db.set_stock_norm("jvc", vodka, 5, 0)
+    await db.set_stock_norm("bbay", vodka, 0, 0)
+    SR.base_drop()
+    o = await SR.order_rows(D)
+    row = next(r for r in o["all_rows"] if r["id"] == vodka)
+    eq("после переезда заявка просит норму минус привезённое",
+       (row["cells"]["jvc"]["have"], row["cells"]["jvc"]["calc"]), (3, 2))
+    r2 = await MV.create([{"from": "bbay", "to": "jvc", "id": vodka, "qty": 1}])
+    SR.base_drop()
+    o = await SR.order_rows(D)
+    row = next(r for r in o["all_rows"] if r["id"] == vodka)
+    eq("бутылка в пути вычитается из заявки и видна в клетке",
+       (row["cells"]["jvc"]["moving"], row["cells"]["jvc"]["calc"], o["moving_qty"]), (1, 1, 1))
+    eq("в итогах есть закупочная сумма", isinstance(o.get("total_cost"), (int, float)), True)
+    await db.move_order_cancel(r2["move_id"], "jvc", T0)
+    SR.base_drop()
+    o = await SR.order_rows(D)
+    row = next(r for r in o["all_rows"] if r["id"] == vodka)
+    eq("сняли перемещение — заявка просит снова", row["cells"]["jvc"]["calc"], 2)
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 

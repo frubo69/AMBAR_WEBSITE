@@ -1290,7 +1290,30 @@ async def order_rows(day: str = "") -> dict:
         log.warning(f"[stock] правило норм не прочитано: {e}")
         norm_rule = {}
     edits = await db.zayavka_edits(day)      # ручные правки поверх расчёта
-    rows, total_aed, total_qty = [], 0, 0
+    # Что уже едет к району по открытой заявке на перемещение. Это такой же
+    # приход, как товар от магазина, только бесплатный: просить его купить —
+    # значит купить дважды (владелец, 18 сен 2026). Считаем неувезённый остаток
+    # строки: по мере сканирования он тает, а бутылки появляются в have_exact.
+    moving = {}
+    try:
+        import move_routes
+        for doc in await db.move_orders_open():
+            for oid, t in (doc.get("tasks") or {}).items():
+                if t.get("done_at") or t.get("cancelled_at"):
+                    continue
+                for l in t.get("lines") or []:
+                    left = float(l.get("qty") or 0) - float(l.get("got") or 0)
+                    if left > 0:
+                        moving[(oid, l.get("id"))] = moving.get((oid, l.get("id")), 0.0) + left
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] перемещения к заявке не прочитаны: {e}")
+    try:
+        import stock_value
+        costs = await stock_value.cost_map()
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] закупочные цены не прочитаны: {e}")
+        costs = {}
+    rows, total_aed, total_qty, total_cost, moving_qty = [], 0, 0, 0.0, 0.0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
     per_district = await _district_base(day)
@@ -1309,15 +1332,20 @@ async def order_rows(day: str = "") -> dict:
             norm = _num(saved if saved is not None else sug)
             # Полкоробки недостачи — это коробка в заявке: меньше коробки
             # магазин не отгружает, а приёмка считает коробки целыми.
-            calc = int(math.ceil(round(max(0.0, norm - have), 6)))
+            везут = _num(moving.get((oid, pid), 0))
+            calc = int(math.ceil(round(max(0.0, norm - have - везут), 6)))
             # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
             # которое предлагала программа, иначе непонятно, от чего отступили.
             fix = (edits.get(pid) or {}).get(oid)
             need = max(0, int(round(float(fix)))) if fix is not None else calc
             if fix is not None and need != calc:
                 row_edited = True
+            moving_qty += везут
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc,
+                          # Сколько едет к району от соседа по заявке на
+                          # перемещение: заявка это уже вычла, и видно почему.
+                          "moving": везут,
                           # Сколько из «есть» приехало уже после пересчёта и
                           # сколько с тех пор продали: владелец должен видеть,
                           # что число не с полки, а посчитанное.
@@ -1330,7 +1358,11 @@ async def order_rows(day: str = "") -> dict:
         if item_total:
             total_qty += item_total
             total_aed += item_total * price
+            total_cost += item_total * float(costs.get(pid) or 0)
         rows.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
+                     # Закупочная цена рядом с прайсом: заявка — это счёт
+                     # магазину, и первым числом должно стоять то, что платим.
+                     "cost": float(costs.get(pid) or 0),
                      # Цена — за учётную единицу, а у пива это ящик. Сколько в
                      # нём бутылок, приложение само не знает, поэтому единицу
                      # отдаём рядом с ценой: иначе «цена за бутылку» на экране
@@ -1350,6 +1382,7 @@ async def order_rows(day: str = "") -> dict:
     rows = [r for r in rows if r["cat"] not in tobacco.NON_ALCOHOL]
     total_qty = sum(r["need_total"] for r in rows)
     total_aed = sum(r["need_total"] * r["price"] for r in rows)
+    total_cost = sum(r["need_total"] * r["cost"] for r in rows)
     return {
         "day": day,
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
@@ -1357,6 +1390,7 @@ async def order_rows(day: str = "") -> dict:
                        "counted": per_district[o]["counted"],
                        "came": sum(per_district[o]["came"].values())} for o in OFFICE_IDS],
         "total_qty": total_qty, "total_aed": total_aed,
+        "total_cost": round(total_cost), "moving_qty": _num(moving_qty),
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_HIST_DAYS,

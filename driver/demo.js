@@ -49,10 +49,9 @@ const LM = {
 // телеграма, пишет туда 'unknown'.
 const TGW = (window.Telegram || {}).WebApp;
 const INSIDE = !!(TGW && TGW.platform && TGW.platform !== 'unknown');
-if(INSIDE){
-  try{ TGW.LocationManager = LM; }
-  catch(e){ try{ Object.defineProperty(TGW, 'LocationManager', {value: LM, configurable: true}); }catch(e2){} }
-}
+// Внутри телеграма LocationManager подменить нельзя — он прибит к объекту
+// намертво (неперезаписываемое свойство). Поэтому геопозицию демо подставляет
+// выше: в самом приложении, в geoReady/geoRead (см. patchGeo).
 if(!INSIDE) window.Telegram = {WebApp: new Proxy({
   initData: 'demo', initDataUnsafe: {user: {id: 0, first_name: 'Демо'}},
   version: '8.0', platform: 'ios', colorScheme: 'dark', themeParams: {},
@@ -702,6 +701,16 @@ function nextCode(id){
   }
   return one('p1');                                   // бой и бутылка охране
 }
+// Геопозиция в демо своя: у телефона её не спрашиваем (разрешение ради
+// показа — лишнее), а без ответа не открыть смену. Подменяем две функции
+// приложения, а не телеграм: в телеграме его LocationManager не перезаписать.
+function patchGeo(){
+  window.geoReady = async function(){ return LM; };
+  window.geoRead = async function(){
+    return {lat: DEMO_POINT.latitude, lon: DEMO_POINT.longitude,
+            acc: DEMO_POINT.horizontal_accuracy};
+  };
+}
 function patchScan(){
   if(typeof SCAN === 'undefined' || !SCAN) return;
   SCAN.start = async function(videoEl, onCode, onIdle, onRepeat, onHold){
@@ -833,6 +842,7 @@ function intro(){
 fakeCam();
 window.demoBoot = async function(){
   patchScan();
+  patchGeo();
   try{ window.AmbarCall = null; }catch(e){}        // звонок без сервера не поднять
   patchProfile();
   patchShift();

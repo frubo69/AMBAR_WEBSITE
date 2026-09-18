@@ -21770,7 +21770,10 @@ function ordDistricts(list, dist, q){
   const cards = dist.map(x => {
     const rows = list.filter(r => q ? true : ((r.cells[x.id] || {}).need > 0));
     const qty = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0), 0);
-    const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0) * (r.price || 0), 0);
+    // Деньги района — закупочные, как и в шапке «Закупаем». Прайс продажи тут
+    // сбивал: сверху 46 631 «закупка», а под ней районы по 20 850 «прайс» —
+    // читается как ошибка (владелец, 18 сен 2026).
+    const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0) * (r.cost || 0), 0);
     const pos = rows.filter(r => (r.cells[x.id] || {}).need > 0).length;
     if(!rows.length) return '';
     // Свёрнутая карточка отвечает на главный вопрос — сколько и на сколько —
@@ -21782,7 +21785,7 @@ function ordDistricts(list, dist, q){
         <span class="shl-code">${escS(x.code || '')}</span>
         <span class="shl-b"><b>${escS(x.name || x.id)}</b>
           <i>${pos} ${pluralize(pos,'позиция','позиции','позиций')} / ${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}</i></span>
-        <span class="shl-v"><b>${fmt(Math.round(aed))}<u>AED</u></b><i>прайс</i></span>
+        <span class="shl-v"><b>${fmt(Math.round(aed))}<u>AED</u></b><i>закупка</i></span>
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button>
       ${open ? `<div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${

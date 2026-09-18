@@ -726,7 +726,7 @@ const CSS = `
   font:600 14px/1 -apple-system,Helvetica,Arial,sans-serif}
 .dmo-w{position:fixed;inset:0;z-index:300;display:flex;align-items:flex-end;justify-content:center;
   background:rgba(4,4,10,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.dmo-c{width:100%;max-width:520px;margin:0 12px calc(14px + env(safe-area-inset-bottom));
+.dmo-c{width:calc(100% - 24px);max-width:520px;margin:0 12px calc(14px + env(safe-area-inset-bottom));
   background:#0e0e18;border:1px solid rgba(201,169,110,.28);border-radius:22px;padding:22px 20px 18px;
   color:#fff;font-family:-apple-system,Helvetica,Arial,sans-serif}
 .dmo-c h4{margin:0 0 4px;font:700 19px/1.2 -apple-system,Helvetica,Arial,sans-serif;color:#c9a96e;

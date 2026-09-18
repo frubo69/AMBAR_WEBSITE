@@ -394,19 +394,22 @@ async def main():
     P = "Тест-Водитель(Парвиз)"
     staff.apply_roster([{"name": "Фарух", "district": "jvc", "telegram_id": 22},
                         {"name": TD, "district": "jvc", "telegram_id": 1, "test": True},
-                        {"name": P, "district": "jvc", "telegram_id": 77, "test": True}])
+                        {"name": P, "district": "jvc", "telegram_id": 77, "test": True},
+                        {"name": "Тест-Ещё", "district": "jvc", "test": True}])
     t2 = staff.test_driver(77)
     eq("второй тест-аккаунт — со своим именем", (t2["name"], t2["test"]), (P, True))
     eq("второй в тест-районе, как и первый", t2["district"], staff.test_driver(1)["district"])
     eq("первый остался прежним", staff.test_driver(1)["name"], TD)
-    eq("имена тест-водителей", sorted(staff.test_driver_names()), sorted([TD, P]))
+    eq("имена тест-водителей", sorted(staff.test_driver_names()), sorted([TD, P, "Тест-Ещё"]))
+    eq("заведённый, но не привязавшийся — тоже тестовое имя",
+       (staff.is_test_driver("Тест-Ещё"), staff.driver_chats("Тест-Ещё")), (True, []))
     eq("оба — тестовые по имени", (staff.is_test_driver(P), staff.is_test_driver("Фарух")), (True, False))
     eq("второму пишем только в его аккаунт", staff.driver_chats(P), [77])
     eq("первому — его аккаунт, не чужой", staff.driver_chats(TD), [1])
     eq("тест-записи не водители района", [d["name"] for d in staff.drivers() if d["name"] in (TD, P)], [])
-    eq("дни считаются без обоих", db._test_driver_filt(False), {"driver": {"$nin": sorted([TD, P])}})
-    eq("тест-дни — оба", db._test_driver_filt(True), {"driver": {"$in": sorted([TD, P])}})
-    eq("оператору тест-заказ отдаётся любому из двух", sorted(op._drivers_of(True)), sorted([TD, P]))
+    eq("дни считаются без тестовых", db._test_driver_filt(False), {"driver": {"$nin": sorted([TD, P, "Тест-Ещё"])}})
+    eq("тест-дни — все тестовые", db._test_driver_filt(True), {"driver": {"$in": sorted([TD, P, "Тест-Ещё"])}})
+    eq("оператору тест-заказ отдаётся любому из тестовых", sorted(op._drivers_of(True)), sorted([TD, P, "Тест-Ещё"]))
 
     print()
     print("FAILED:", fails) if fails else print("ALL OK — тест-режим: клиент, оператор, водитель, база, рассылки")

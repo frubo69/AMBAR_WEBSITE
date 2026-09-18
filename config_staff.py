@@ -237,9 +237,14 @@ def driver_or_test(telegram_id) -> dict | None:
 def test_driver_names() -> set:
     """Имена всех тест-водителей: общее из .env и все тест-записи реестра.
     Спрашивать надо набор, а не одно имя: второй тест-аккаунт заведён
-    18 сен 2026 старшему оператору, и его смены — тоже тестовые."""
+    18 сен 2026 старшему оператору, и его смены — тоже тестовые.
+
+    Считаем по записям, а не по привязанным телефонам: заведённый, но ещё не
+    привязавшийся тест-водитель — уже тестовое имя, и в боевые списки оно
+    попасть не должно ни на минуту."""
     from config import TEST_DRIVER_NAME
-    return {TEST_DRIVER_NAME} | {n for n in _ROSTER["test"].values() if n}
+    names = {str(r.get("name") or "").strip() for r in _ROSTER["rows"] if r.get("test")}
+    return {TEST_DRIVER_NAME} | {n for n in names if n}
 
 
 def is_test_driver(name: str) -> bool:

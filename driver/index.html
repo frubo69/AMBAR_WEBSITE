@@ -642,7 +642,9 @@ body.test-drv .wo-fix{display:none}
 .wo-shot span{font-size:11.5px;color:var(--muted)}
 .wo-snap{position:relative;border-radius:16px;overflow:hidden;
   border:1px solid rgba(76,175,125,.35);background:var(--card)}
-.wo-snap img{display:block;width:100%;height:132px;object-fit:cover}
+/* Снимок боя — не полоска и не кусок: человек должен видеть, что снял, не
+   открывая его отдельно (владелец, 18 сен 2026). Показываем целиком. */
+.wo-snap img{display:block;width:100%;height:220px;object-fit:contain;background:#05070d}
 .wo-snap .lbl{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;
   gap:8px;padding:9px 12px;font-size:12px;font-weight:700;color:#dff3e6;
   background:linear-gradient(rgba(0,0,6,0),rgba(0,0,6,.85))}
@@ -6176,7 +6178,7 @@ function woPaint(){
 
   const снимок = WO.thumb || WO.photo
     ? `<div class="wo-snap">
-         <img src="${WO.thumb || WO.photo}" alt="">
+         <img src="${WO.photo || WO.thumb}" alt="">
          <span class="lbl"><b>Снимок готов</b>
            <u onclick="WO.photo='';WO.thumb='';woPaint()">заменить</u></span>
        </div>`

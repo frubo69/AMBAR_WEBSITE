@@ -9413,18 +9413,18 @@ function mvqCard(t){
     <div class="dcard-h">
       <span class="dcode">${esc(t.district_code)}</span>
       <span class="dcard-b"><b>Забрать из ${where || '—'}</b><i>${sub}</i></span>
-      <span class="dcard-n">${t.got ? `${fmtQty(t.got)}<i>/ ${fmtQty(t.need)}</i>`
+      <span class="dcard-n">${t.got ? `${fmtQty(t.got)}<i>/ ${fmtQty(t.need)} ед.</i>`
                                      : `${fmtQty(t.need)}<i>ед.</i>`}</span>
     </div>
     ${t.got ? `<span class="sup-bar dbar"><i style="width:${pct}%"></i></span>` : ''}
     <button class="dfold ${open ? 'on' : ''}" onclick="mvqFold('${esc(key)}')">
       <span>${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}${
-        t.left ? ` · осталось ${fmtQty(t.left)}` : ''}</span>
+        t.left ? ` · осталось ${fmtQty(t.left)} ед.` : ''}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     ${open ? `<div class="dfold-b">${(t.sources || []).map(s => `
         <div class="sect mvq-src"><span class="sect-t">из ${esc(s.code)} ${esc(s.name)}</span>
-          <span class="sect-v">${fmtQty(s.got)}/${fmtQty(s.qty)}</span></div>
+          <span class="sect-v">${fmtQty(s.got)}/${fmtQty(s.qty)} ед.</span></div>
         ${mvqLines(t, s.district)}`).join('')}</div>` : ''}
     ${t.mine
       ? `<button class="dc-btn" onclick="mvqScanOpen('${t.move_id}','${t.district}')">

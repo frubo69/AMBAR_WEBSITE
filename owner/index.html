@@ -23220,10 +23220,20 @@ function mvoPaint(){
   const карточки = t.map(x => {
     const [st, cls] = MVO_ST[x.status] || MVO_ST.free;
     const pct = x.need ? Math.round(x.got / x.need * 100) : 0;
+    // «13 позиций» и «0 / 23» — про разное: первое наименования, второе штуки.
+    // Молчание об этом читается как ошибка, поэтому состав пишем словами склада.
+    const состав = ls => {
+      const бут = ls.filter(l => l.unit <= 1).reduce((a, l) => a + l.qty, 0);
+      const кор = ls.filter(l => l.unit > 1).reduce((a, l) => a + l.qty, 0);
+      return [бут ? `${fmtQty(бут)} ${pluralize(бут,'бутылка','бутылки','бутылок')}` : '',
+              кор ? `${fmtQty(кор)} ${pluralize(кор,'коробка','коробки','коробок')}` : '']
+             .filter(Boolean).join(' и ');
+    };
     const src = (x.sources || []).map(s =>
       `<div class="pk-row il-row${s.done ? ' done' : ''}">
          <span class="pk-row-b"><span class="pk-name">из ${escS(s.code)} ${escS(s.name)}</span>
-           <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')}</span></span>
+           <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
+             состав(s.lines)}</span></span>
          <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span></div>`).join('');
     return `<div class="rcv mvo-card">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>

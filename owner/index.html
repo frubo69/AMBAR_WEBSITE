@@ -10433,6 +10433,16 @@ body.safe-open .cvo-hdr{opacity:0}
 /* Перемещения между районами: карточка района в работе, кнопка «Снять» тише
    всего, кнопка создания заявки — главной внизу списка. */
 .mvo-card{margin-bottom:10px}
+/* Район в карточке — кнопка: по нажатию раскрывается, что именно у него берут.
+   Стрелка поворачивается, строки позиций уходят вглубь отступом. */
+.mvo-src{width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;gap:10px}
+.mvo-src .mvo-chev{margin-left:auto;display:flex;opacity:.45;transition:transform .18s var(--e1)}
+.mvo-src.on .mvo-chev{transform:rotate(90deg);opacity:.8}
+.mvo-src:active{transform:scale(.995)}
+.mvo-lines{padding-left:14px;border-left:1px solid rgba(255,255,255,.07);margin:2px 0 8px 6px}
+.mvo-line .pk-name{font-weight:600}
+.mvo-line.done{opacity:.55}
 .mvo-x{margin-top:8px}
 .mvo-go{width:100%;margin-top:14px;padding:14px;border-radius:14px;border:0;cursor:pointer;
   font-family:inherit;font-size:14px;font-weight:700}
@@ -23153,7 +23163,7 @@ setInterval(() => { if(!document.hidden) ilLoad(); }, 30000);
 // смогу следить за этой заявкой по каждому району отдельно». Задача висит на
 // районе-ПОЛУЧАТЕЛЕ: его водитель едет к соседу и забирает бутылки. Поэтому в
 // карточке главное — куда везут и откуда осталось забрать.
-let MVO = {tasks: [], open: 0, plan: null, poll: null, busy: false};
+let MVO = {tasks: [], open: 0, plan: null, poll: null, busy: false, fold: new Set()};
 const MVO_ST = {free: ['свободна', ''], claimed: ['взял водитель', ''],
                 live: ['забирает сейчас', 'live'], done: ['выполнено', 'ok'],
                 cancelled: ['снято', 'warn']};
@@ -23183,6 +23193,12 @@ function mvoHomePaint(){
     <div class="rcv-f"><span>${escS(live.map(t => t.district_code).join(', '))}</span>
       <span class="rcv-aed">забрать по районам</span></div>
   </button>`;
+}
+
+function mvoFold(key){
+  MVO.fold.has(key) ? MVO.fold.delete(key) : MVO.fold.add(key);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  mvoPaint();
 }
 
 function accMoves(){ mvoPaint(); mvoLoad(); mvoPlan(); mvoPollStart(); }
@@ -23239,12 +23255,24 @@ function mvoPaint(){
               кор ? `${fmtQty(кор)} ${pluralize(кор,'коробка','коробки','коробок')}` : '']
              .filter(Boolean).join(' и ');
     };
-    const src = (x.sources || []).map(s =>
-      `<div class="pk-row il-row${s.done ? ' done' : ''}">
+    const src = (x.sources || []).map(s => {
+      // По нажатию — что именно берут у этого района (владелец, 18 сен 2026:
+      // «чтобы я мог нажимать на каждый из районов и видел какие там позиции»).
+      const key = `${x.move_id}|${x.district}|${s.district}`;
+      const open = MVO.fold.has(key);
+      return `<button class="pk-row il-row mvo-src${s.done ? ' done' : ''}${open ? ' on' : ''}"
+           onclick="mvoFold('${escS(key)}')">
          <span class="pk-row-b"><span class="pk-name">из ${escS(s.code)} ${escS(s.name)}</span>
            <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
              состав(s.lines)}</span></span>
-         <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span></div>`).join('');
+         <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
+         <span class="mvo-chev">${ICO_CHEV}</span></button>`
+        + (open ? `<div class="mvo-lines">${s.lines.map(l => `
+            <div class="pk-row mvo-line${l.done ? ' done' : ''}">
+              <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
+                <span class="pk-slug">${l.unit > 1 ? 'коробки' : 'бутылки'}</span></span>
+              <span class="pk-n">${fmtQty(l.got)}<u> / ${fmtQty(l.qty)}</u></span></div>`).join('')}</div>` : '');
+    }).join('');
     return `<div class="rcv mvo-card">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
         <span class="rcv-when">${escS(x.driver || 'никто не взял')}</span></div>

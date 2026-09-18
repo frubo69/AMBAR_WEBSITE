@@ -212,10 +212,13 @@ def _test_filt(test) -> dict:
 
 
 def _test_driver_filt(test) -> dict:
-    from config import TEST_DRIVER_NAME
+    # Имён у тест-водителей столько, сколько тест-аккаунтов (18 сен 2026 их
+    # два), поэтому фильтр по набору: иначе смена второго уехала бы в деньги.
+    import config_staff as _staff
     if test is None:
         return {}
-    return {"driver": TEST_DRIVER_NAME} if test else {"driver": {"$ne": TEST_DRIVER_NAME}}
+    names = sorted(_staff.test_driver_names())
+    return {"driver": {"$in": names}} if test else {"driver": {"$nin": names}}
 
 
 async def save_order(oid: str, data: dict):

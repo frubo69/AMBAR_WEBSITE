@@ -183,8 +183,8 @@ async def main():
     has("sold_since (склад) прячет тест", 7, "test", {"$ne": True})
     has("qr_consumed (реестр) прячет тест", 8, "test", {"$ne": True})
     has("orders_between (финансы) прячет тест", 9, "test", {"$ne": True})
-    has("get_driver_days без тест-водителя", 10, "driver", {"$ne": TD}); has("get_driver_days(test=True)", 11, "driver", TD)
-    has("get_driver_days_range без тест-водителя", 12, "driver", {"$ne": TD})
+    has("get_driver_days без тест-водителей", 10, "driver", {"$nin": [TD]}); has("get_driver_days(test=True)", 11, "driver", {"$in": [TD]})
+    has("get_driver_days_range без тест-водителей", 12, "driver", {"$nin": [TD]})
     eq("op_route.send(test=True) → только тестерам", await op_route.send("t", "alguses", test=True), {"1": 1})
     SENT.clear()
 
@@ -385,6 +385,28 @@ async def main():
     eq("notify_new_order(test) → одно сообщение тестерам с пометкой",
        (sorted({c for c, t in SENT}), len(SENT), all("ТЕСТ" in t for c, t in SENT)), ([1], 1, True))
     eq("архив уведомлений пуст", LOG.get("insert_notification"), None)
+
+    # ══ 7. второй тест-аккаунт ════════════════════════════════════════════
+    # 18 сен 2026: тест-водитель больше не один. Имя берётся из записи реестра,
+    # и всё, что считается по имени — дни, рассылки, фильтры — должно знать
+    # оба, иначе смена второго уедет в настоящие деньги.
+    print("— два тест-водителя: у каждого своё имя")
+    P = "Тест-Водитель(Парвиз)"
+    staff.apply_roster([{"name": "Фарух", "district": "jvc", "telegram_id": 22},
+                        {"name": TD, "district": "jvc", "telegram_id": 1, "test": True},
+                        {"name": P, "district": "jvc", "telegram_id": 77, "test": True}])
+    t2 = staff.test_driver(77)
+    eq("второй тест-аккаунт — со своим именем", (t2["name"], t2["test"]), (P, True))
+    eq("второй в тест-районе, как и первый", t2["district"], staff.test_driver(1)["district"])
+    eq("первый остался прежним", staff.test_driver(1)["name"], TD)
+    eq("имена тест-водителей", sorted(staff.test_driver_names()), sorted([TD, P]))
+    eq("оба — тестовые по имени", (staff.is_test_driver(P), staff.is_test_driver("Фарух")), (True, False))
+    eq("второму пишем только в его аккаунт", staff.driver_chats(P), [77])
+    eq("первому — его аккаунт, не чужой", staff.driver_chats(TD), [1])
+    eq("тест-записи не водители района", [d["name"] for d in staff.drivers() if d["name"] in (TD, P)], [])
+    eq("дни считаются без обоих", db._test_driver_filt(False), {"driver": {"$nin": sorted([TD, P])}})
+    eq("тест-дни — оба", db._test_driver_filt(True), {"driver": {"$in": sorted([TD, P])}})
+    eq("оператору тест-заказ отдаётся любому из двух", sorted(op._drivers_of(True)), sorted([TD, P]))
 
     print()
     print("FAILED:", fails) if fails else print("ALL OK — тест-режим: клиент, оператор, водитель, база, рассылки")

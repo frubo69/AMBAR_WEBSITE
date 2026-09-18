@@ -219,7 +219,10 @@ def test_driver(telegram_id, force: bool = False) -> dict | None:
         return None
     from config_offices import TEST_OFFICE
     st = DISTRICT_STAFF[0]
-    return {"id": "test", "name": TEST_DRIVER_NAME,
+    # Имя берём из записи реестра: тест-аккаунтов бывает несколько, и у каждого
+    # своё имя (18 сен 2026 — второй, старшему оператору). Смены, дни и задачи
+    # пишутся по имени, поэтому одно имя на двоих склеило бы их в одного.
+    return {"id": "test", "name": _ROSTER["test"].get(tid) or TEST_DRIVER_NAME,
             "district": TEST_OFFICE["id"],
             "district_code": TEST_OFFICE["code"],
             "district_name": TEST_OFFICE["name"],
@@ -231,22 +234,35 @@ def driver_or_test(telegram_id) -> dict | None:
     return driver_by_tg(telegram_id) or test_driver(telegram_id)
 
 
-def is_test_driver(name: str) -> bool:
+def test_driver_names() -> set:
+    """Имена всех тест-водителей: общее из .env и все тест-записи реестра.
+    Спрашивать надо набор, а не одно имя: второй тест-аккаунт заведён
+    18 сен 2026 старшему оператору, и его смены — тоже тестовые."""
     from config import TEST_DRIVER_NAME
-    return (name or "").strip() == TEST_DRIVER_NAME
+    return {TEST_DRIVER_NAME} | {n for n in _ROSTER["test"].values() if n}
+
+
+def is_test_driver(name: str) -> bool:
+    return (name or "").strip() in test_driver_names()
 
 
 def driver_chats(name: str) -> list:
     """Куда писать водителю по имени: настоящему — его аккаунт, тест-водителю —
     тест-аккаунты (без тех, что заняты настоящими водителями). Пусто — некому."""
-    tid = DRIVER_IDS.get((name or "").strip())
+    name = (name or "").strip()
+    tid = DRIVER_IDS.get(name)
     if tid:
         return [tid]
     if is_test_driver(name):
-        # Все тест-аккаунты, даже если кто-то из них заодно настоящий
-        # водитель: телефон один, и сообщение о тест-заказе должно дойти.
-        from config import TEST_DRIVER_IDS
-        return sorted(set(TEST_DRIVER_IDS) | set(_ROSTER["test"]))
+        # Аккаунты, привязанные именно к этому имени: у каждого тест-водителя
+        # своя переписка, чужое тест-сообщение ему не нужно. Общему имени из
+        # .env — ещё и AMBAR_TEST_DRIVER_IDS: по этому списку входят без записи
+        # в реестре, даже если аккаунт заодно настоящий водитель.
+        from config import TEST_DRIVER_IDS, TEST_DRIVER_NAME
+        ids = {t for t, n in _ROSTER["test"].items() if n == name}
+        if name == TEST_DRIVER_NAME:
+            ids |= set(TEST_DRIVER_IDS)
+        return sorted(ids)
     return []
 
 

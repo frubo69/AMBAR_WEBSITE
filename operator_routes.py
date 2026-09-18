@@ -40,7 +40,7 @@ OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
 OPERATOR_IDS = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 # Тест-режим (config.py): тест-оператор входит в панель, видит и трогает только
 # тест-заказы; тест-водитель — единственный, кому их можно назначить.
-from config import TEST_OPERATOR_IDS, TEST_DRIVER_NAME, TEST_PERSON
+from config import TEST_OPERATOR_IDS, TEST_PERSON
 
 from config_offices import OFFICE_NAMES, OFFICE_CODES   # офис ≡ район, единый источник правды
 
@@ -133,7 +133,7 @@ def _people_for(request, districts: list) -> list:
 def _districts_for(request, districts: list) -> list:
     """Районы для панели: тест-оператору в каждом только тест-водитель."""
     if _tflag(request):
-        return [{**d, "drivers": [TEST_DRIVER_NAME]} for d in districts]
+        return [{**d, "drivers": sorted(_staff_mod.test_driver_names())} for d in districts]
     return districts
 
 
@@ -153,7 +153,7 @@ def _drivers_of(order_or_test, dist: dict | None = None, districts: list | None 
     водителям района (или всех районов, если район не задан)."""
     test = order_or_test if isinstance(order_or_test, bool) else bool((order_or_test or {}).get("test"))
     if test:
-        return {TEST_DRIVER_NAME}
+        return set(_staff_mod.test_driver_names())
     if dist is not None:
         return set(dist.get("drivers") or [])
     return {n for d in (districts or []) for n in d["drivers"]}

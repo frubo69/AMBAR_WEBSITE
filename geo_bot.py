@@ -54,7 +54,11 @@ _INSTR: dict = {}
 def _role(uid) -> tuple:
     """(вид, имя): driver / senior / owner / '' — по спискам из .env."""
     me = staff.driver_by_tg(uid)
-    if me:
+    # Тест-водитель — не водитель: его точки никуда не идут, а роль у аккаунта
+    # своя. Иначе старший, у которого есть тест-аккаунт водителя (18 сен 2026,
+    # Парвиз), перестал бы быть в локаторе старшим — и сторож искал бы его
+    # телефон под чужим именем.
+    if me and not me.get("test"):
         return "driver", me["name"]
     name = staff.senior_star_by_tg(uid)
     if name:

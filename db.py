@@ -3777,31 +3777,198 @@ async def qr_next_seq(product_id: str) -> int:
 
 async def qr_add(code: str, product_id: str, product_name: str, district,
                  by: int, at, label: str = "", extra: dict = None) -> bool:
-    """Записать бутылку. True — записали, False — этот код уже есть.
+    """Записать бутылку. True — записали (или вернули убранную), False — этот
+    код уже есть. Подробный ответ — qr_register."""
+    return bool((await qr_register(code, product_id, product_name, district,
+                                   by, at, label, extra)).get("ok"))
+
+
+async def qr_register(code: str, product_id: str, product_name: str, district,
+                      by: int, at, label: str = "", extra: dict = None) -> dict:
+    """Записать бутылку: новую — вставкой, убранную из реестра — вернуть
+    (qr_readd). {"ok": True, "readd": False} — новая запись; {"ok": True,
+    "readd": True, …} — вернули убранную; {"ok": False, "why": "exists" |
+    "elsewhere" | "busy", "doc": …} — не записали.
 
     Код лежит в _id, поэтому вторая запись с тем же номером невозможна на
     уровне базы, а не «проверяется кодом»: между проверкой и вставкой два
     человека успевают отсканировать одну полку."""
     db = _db_or_none()
-    if db is None: return False
+    if db is None: return {"ok": False, "why": "nodb"}
     from pymongo.errors import DuplicateKeyError
-    try:
-        await db.qr_codes.insert_one({
-            "_id": code, "status": "active", "product_id": product_id,
-            "product_name": product_name, "district": district,
-            "label": label, "by": by, "at": at, **(extra or {})})
-        return True
-    except DuplicateKeyError:
-        # Убранная из реестра бутылка вернулась на полку: запись цела, но
-        # реестр её не считает. Заводим заново поверх старой — иначе камера
-        # отвечает «уже есть» на бутылку, которой в остатке нет.
+    for _ in range(3):
+        try:
+            await db.qr_codes.insert_one({
+                "_id": code, "status": "active", "product_id": product_id,
+                "product_name": product_name, "district": district,
+                "label": label, "by": by, "at": at, **(extra or {})})
+            return {"ok": True, "readd": False}
+        except DuplicateKeyError:
+            r = await qr_readd(code, product_id, product_name, district, by, at, label, extra)
+            if r.get("why") != "gone":
+                return r
+            # Запись стёрли между вставкой и возвратом — вставляем заново.
+    return {"ok": False, "why": "busy"}
+
+
+async def qr_readd(code: str, product_id: str, product_name: str, district,
+                   by: int, at, label: str = "", extra: dict = None) -> dict:
+    """Вернуть в реестр убранную бутылку — под тем названием, которое выбрали
+    сейчас. Так чинят путаницу: на приёмке бутылку записали не той позицией,
+    её убирают из реестра и вносят заново правильной.
+
+    Бутылка с поставки (src intake) пришла на склад приёмкой, и это факт
+    поставки, а не записи в реестре: убранная из реестра, она по-прежнему
+    числится пришедшей (intake_since статус не смотрит). Поэтому при возврате у
+    неё остаются отметка прихода, время прихода, кто принял, район прихода,
+    поставка и водитель — меняются только название, метка и статус. Иначе
+    (18 сен 2026) четыре перепутанные на приёмке бутылки, внесённые заново
+    строкой «QR код не внесён», перестали быть приходом, и склад показал по
+    каждой на одну меньше. Какой кнопкой вносят — «Внести новый товар» или по
+    пересчёту, — для такой бутылки неважно: приход уже был.
+
+    Вернуть бутылку с поставки можно только на тот район, где она числится
+    (why="elsewhere"): на другой её переносят перемещением. Иначе приход
+    остался бы на одном районе, а бутылка — на другом.
+
+    Внесённые руками (new) и кодом к посчитанной бутылке (cover) — как прежде:
+    их удаление само снимает то, что они давали складу, и возврат решает
+    заново, по выбранной кнопке.
+
+    Сменилось название — у переездов этой бутылки тоже: переезд вёз её, а не
+    ту позицию, под которой она по ошибке числилась.
+
+    Что было до возврата — отдельной записью (qr_readds, по коду и моменту
+    возврата): отмена скана возвращает бутылку туда, откуда взяли, а не
+    стирает её запись вместе с приходом (qr_scan_undo)."""
+    db = _db_or_none()
+    if db is None: return {"ok": False, "why": "nodb"}
+    extra = dict(extra or {})
+    for _ in range(3):
+        old = await db.qr_codes.find_one({"_id": code})
+        if not old:
+            return {"ok": False, "why": "gone"}
+        if old.get("status") != "deleted":
+            return {"ok": False, "why": "exists", "doc": old}
+        intake = old.get("src") == "intake"
+        home = old.get("district") or ""
+        if intake and home and district != home:
+            return {"ok": False, "why": "elsewhere", "doc": old}
+        renamed = (old.get("product_id") or "") != product_id
+        qty = extra.get("qty")
+        re_at = at.isoformat() if hasattr(at, "isoformat") else str(at)
+        s = {"status": "active", "product_id": product_id, "product_name": product_name,
+             "district": district, "label": label,
+             "re_at": re_at, "re_by": by, "re_src": str(extra.get("src") or ""),
+             "re_from": (old.get("product_name") or "") if renamed else ""}
+        unset = {"was": "", "del_at": "", "del_by": ""}
+        if intake:
+            if qty is not None:
+                s["qty"] = qty
+            # Вторая половина коробки (intake_extra — коды пива, принятые до
+            # 17 сен) бывает только у пива: переименовали в бутылку — её нет.
+            if renamed and float(qty if qty is not None else old.get("qty") or 1) >= 1:
+                unset["intake_extra"] = ""
+        else:
+            s.update({"by": by, "at": at, **extra})
+        # Как было — до правки: упади она на полпути, лишняя запись ничего не
+        # значит (отмена сверяет момент возврата), а пропавшая — отнимет отмену.
+        moved = []
+        if renamed:
+            moved = [{"id": t["_id"], "product_id": t.get("product_id"),
+                      "product_name": t.get("product_name"), "qty": t.get("qty")}
+                     for t in await db.stock_transfers.find(
+                         {"code": code}, {"product_id": 1, "product_name": 1, "qty": 1}).to_list(length=500)]
+        await db.qr_readds.replace_one(
+            {"_id": f"{code}|{re_at}"},
+            {"_id": f"{code}|{re_at}", "code": code, "re_at": re_at, "district": district,
+             "moves": len(old.get("moves") or []), "transfers": moved,
+             "prev": {k: v for k, v in old.items() if k != "_id"}},
+            upsert=True)
+        # Условие — та самая убранная запись: её могли вернуть или убрать
+        # заново, пока мы читали, и тогда пробуем ещё раз с тем, что есть.
         r = await db.qr_codes.update_one(
-            {"_id": code, "status": "deleted"},
-            {"$set": {"status": "active", "product_id": product_id,
-                      "product_name": product_name, "district": district,
-                      "label": label, "by": by, "at": at, **(extra or {})},
-             "$unset": {"was": "", "del_at": "", "del_by": ""}})
-        return bool(r.modified_count)
+            {"_id": code, "status": "deleted", "del_at": old.get("del_at")},
+            {"$set": s, "$unset": unset})
+        if not r.modified_count:
+            continue
+        if renamed and moved:
+            fix = {"product_id": product_id, "product_name": product_name}
+            if qty is not None:
+                fix["qty"] = qty
+            await db.stock_transfers.update_many({"code": code}, {"$set": fix})
+        try:
+            import stock_routes as _sr
+            _sr.base_drop()      # приход и переезды могли сменить позицию
+        except Exception:
+            pass
+        return {"ok": True, "readd": True, "intake": intake, "renamed": renamed,
+                "was": old.get("product_name") or ""}
+    return {"ok": False, "why": "busy"}
+
+
+async def qr_scan_undo(code: str, max_age_h: float = 24) -> dict:
+    """Отменить скан «Внести товар» — вернуть как было до него.
+
+    Новую запись стираем, как раньше. Возвращённую из убранных (qr_readd) —
+    не стираем: у неё история (приход с поставки, переезды), а скан лишь вернул
+    её в реестр. Восстанавливаем запись, какой она была до скана (убранной, с
+    прежним названием), и названия её переездов. Раньше отмена стирала и такую
+    запись — вместе с приходом, и бутылка с поставки пропадала со склада.
+
+    Не трогаем: бутылку с тех пор увезли, списали или продали (why="touched");
+    скан старше суток (отменяют только что сделанное); бутылку с поставки,
+    которую не возвращали, — её приёмку отменяет водитель у своей задачи."""
+    db = _db_or_none()
+    if db is None: return {"ok": False, "why": "nodb"}
+    doc = await db.qr_codes.find_one({"_id": code})
+    if not doc:
+        return {"ok": False, "why": "unknown"}
+    now = datetime.now(timezone.utc)
+
+    def fresh(v) -> bool:
+        if isinstance(v, str):
+            try:
+                v = datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                return False
+        if not isinstance(v, datetime):
+            return False
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return now - v <= timedelta(hours=max_age_h)
+
+    if doc.get("re_at"):
+        snap = await db.qr_readds.find_one({"_id": f"{code}|{doc['re_at']}"})
+        if not snap:
+            return {"ok": False, "why": "no_snapshot"}
+        if not fresh(doc.get("re_at")):
+            return {"ok": False, "why": "too_late"}
+        if (doc.get("status") != "active" or doc.get("district") != snap.get("district")
+                or len(doc.get("moves") or []) != int(snap.get("moves") or 0)):
+            return {"ok": False, "why": "touched"}
+        r = await db.qr_codes.replace_one(
+            {"_id": code, "status": "active", "re_at": doc["re_at"]},
+            {"_id": code, **(snap.get("prev") or {})})
+        if not r.modified_count:
+            return {"ok": False, "why": "busy"}
+        for t in snap.get("transfers") or []:
+            await db.stock_transfers.update_one(
+                {"_id": t.get("id")},
+                {"$set": {"product_id": t.get("product_id"), "product_name": t.get("product_name"),
+                          "qty": t.get("qty")}})
+        await db.qr_readds.delete_one({"_id": snap["_id"]})
+        try:
+            import stock_routes as _sr
+            _sr.base_drop()
+        except Exception:
+            pass
+        return {"ok": True, "restored": True}
+    if doc.get("src") == "intake" or doc.get("supply_id"):
+        return {"ok": False, "why": "supply"}
+    if not fresh(doc.get("at")):
+        return {"ok": False, "why": "too_late"}
+    return {"ok": await qr_remove(code), "restored": False}
 
 
 async def qr_write_off(code: str, wid: str) -> bool:
@@ -4308,6 +4475,18 @@ async def qr_history(since) -> tuple:
     added = await db.qr_codes.find({"at": {"$gte": since}}, f).to_list(length=50000)
     removed = await db.qr_codes.find({"del_at": {"$gte": since}}, f).to_list(length=50000)
     return added, removed
+
+
+async def qr_readded_since(since) -> list:
+    """Возвращённые в реестр после since (qr_readd) — для истории внесений:
+    у бутылки с поставки время записи — время прихода, и сам возврат иначе
+    нигде бы не показался. Момент возврата — строкой ISO (re_at)."""
+    db = _db_or_none()
+    if db is None: return []
+    iso = since.isoformat() if hasattr(since, "isoformat") else str(since)
+    f = {"_id": 0, "product_id": 1, "product_name": 1, "district": 1,
+         "re_at": 1, "re_by": 1, "re_from": 1, "src": 1}
+    return await db.qr_codes.find({"re_at": {"$gte": iso}}, f).to_list(length=50000)
 
 
 async def qr_lock_take(key: str, by: int, name: str, now, until):

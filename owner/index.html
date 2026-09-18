@@ -23131,13 +23131,19 @@ async function qrCommit(){
 }
 async function qrDiscard(){
   const list = QR_SESS.slice(); QR_SESS = [];
+  const stuck = [];
   for(const x of list){
-    try{ await ownerApi.ownerFetch('/api/owner/qr/undo', {method:'POST', body:{code: x.code}}); }
-    catch(e){}
+    let r = null;
+    try{ r = await ownerApi.ownerFetch('/api/owner/qr/undo', {method:'POST', body:{code: x.code}}); }
+    catch(e){ stuck.push(x); }
+    if(r && r.ok === false && r.why !== 'unknown') stuck.push(x);
     SCAN.seen.delete(x.code); SCAN.seenAt.delete(x.code);
   }
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-  if(list.length) _toast(`Внесение отменено · ${_qrSessSay(list)}`);
+  const done = list.filter(x => !stuck.includes(x));
+  if(done.length) _toast(`Внесение отменено · ${_qrSessSay(done)}`
+    + (stuck.length ? ` · не убрано ${_qrSessSay(stuck)}` : ''));
+  else if(stuck.length) _toast(`Не удалось убрать · ${_qrSessSay(stuck)}`);
   qrHome();
 }
 
@@ -23346,7 +23352,9 @@ async function qrDistTap(){
 // По рабочим дням: карточка на день, внутри — позиция на точке, кто и как
 // внёс (приёмка заявки или вручную) и сколько; убранное — тем же списком со
 // знаком минус. Коды в истории не нужны — ими живёт «Проверка бутылки».
-const _QR_KIND = {intake: 'приёмка заявки', manual: 'вручную', removed: 'удалено'};
+// «внесена заново» — убрали и вернули (часто под верным названием): новой
+// бутылки нет, поэтому без плюса и не в счёт внесённых за день.
+const _QR_KIND = {intake: 'приёмка заявки', manual: 'вручную', removed: 'удалено', readd: 'внесена заново'};
 async function qrHistory(){
   QR_IN = null;
   _qrHead('История внесений/удалений', 'загрузка…', () => qrHome());
@@ -23366,7 +23374,7 @@ async function qrHistory(){
         <span class="hst-b"><b>${escS(x.name || x.product_id)}</b>
           <i>${escS([x.code, x.who, _QR_KIND[x.kind] || x.kind].filter(Boolean).join(' · '))}${
             x.at ? ' · ' + escS(_hm(x.at)) : ''}</i></span>
-        <span class="hst-v"><b class="${x.kind === 'removed' ? 'dn' : ''}">${x.kind === 'removed' ? '−' : '+'}${fmt(x.n)}<u>бут</u></b></span>
+        <span class="hst-v"><b class="${x.kind === 'removed' ? 'dn' : ''}">${x.kind === 'removed' ? '−' : x.kind === 'readd' ? '' : '+'}${fmt(x.n)}<u>бут</u></b></span>
       </div>`).join('')}
     </div>`).join('')
     : '<div class="scan-empty">За 30 дней в реестр ничего не вносили</div>';
@@ -24329,6 +24337,13 @@ SCANQ.onDone = (err, r, job) => {
   if(err){ row.state = 'fail'; qrFlash('err'); }
   else if(r.new){ row.state = 'new'; row.label = r.label || ''; if(r.qty) row.qty = r.qty;
     QR_SESS.push({code: job.code, pid: (job.body || {}).product_id}); }
+  else if(r.error === 'elsewhere'){
+    // Убранная бутылка с поставки числится на другом районе: вернуть её можно
+    // только туда, сюда — перемещением (иначе приход остался бы там).
+    const где = r.district_code || r.district_name || 'другом районе';
+    row.state = 'fail'; row.label = r.label || ''; row.say = `числится на ${где}`;
+    qrFlash('err', `с поставки · числится на ${где}`);
+  }
   else{
     // Бутылка уже в реестре — её посчитали раньше, и в счётчик сессии она
     // попасть не должна: иначе остаток вырастет на пустом месте.
@@ -24385,7 +24400,7 @@ function qrRenderFeed(){
         <span class="scan-code">${escS(r.label || '…')}</span>
         <span class="scan-raw">${escS(raw)}</span>
       </span>
-      <span class="scan-state" style="color:${color}">${escS(txt)}${
+      <span class="scan-state" style="color:${color}">${escS(r.say || txt)}${
         r.at ? ' · ' + escS(r.at) : ''}</span>${del}</div>`;
   }).join('');
   // Одна кнопка внизу: ничего не внесли — «Вернуться к списку», внесли —
@@ -24400,9 +24415,13 @@ function qrRenderFeed(){
 async function qrDrop(i){
   const row = QR_ROWS[i]; if(!row) return;
   if(row.state === 'new'){
-    try{ await ownerApi.ownerFetch('/api/owner/qr/undo',
+    // Сервер может и отказать: бутылку, возвращённую из убранных, с тех пор
+    // увезли или списали — тогда строка остаётся, как есть в реестре.
+    let r = null;
+    try{ r = await ownerApi.ownerFetch('/api/owner/qr/undo',
       {method:'POST', body:{code: row.code}}); }
     catch(e){ _toast('Не удалось убрать'); return; }
+    if(r && r.ok === false && r.why !== 'unknown'){ _toast('Не удалось убрать'); return; }
   }
   SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
   QR_SESS = QR_SESS.filter(x => x.code !== row.code);

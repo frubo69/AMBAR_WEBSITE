@@ -397,28 +397,50 @@ async def handle_scan(request):
     # кода. qty из приложения не слушаем.
     import stock_routes as _sr
     qty = _sr.code_qty(p)
-    added = await db.qr_add(code, product_id, p.get("name", ""), district, me, now, label,
-                            extra={"src": src, "qty": qty, "origin": district})
-    if added and src == "new":
+    # Убранную из реестра бутылку это вернёт (db.qr_readd): бутылка с поставки
+    # при этом остаётся приходом, какой бы кнопкой её ни вносили.
+    res = await db.qr_register(code, product_id, p.get("name", ""), district, me, now, label,
+                               extra={"src": src, "qty": qty, "origin": district})
+    if res.get("ok") and src == "new":
         try:
             import stock_routes
             stock_routes.base_drop()             # склад должен увидеть бутылку сразу
         except Exception:                        # noqa: BLE001
             pass
-    if not added:
-        old = await db.qr_get(code)
+    if not res.get("ok"):
+        old = res.get("doc") or await db.qr_get(code) or {}
+        if res.get("why") == "elsewhere":
+            # Бутылка с поставки числится на другом районе: вернуть её можно
+            # только туда, сюда — перемещением. Отвечаем 200: очередь сканов
+            # повторяет только то, что не дошло, а это дошло и решено.
+            from config_offices import OFFICE_CODES, OFFICE_NAMES
+            home = old.get("district") or ""
+            log.info(f"[qr] {code[:40]}: бутылка с поставки числится на {home} — на {district} не вношу")
+            return web.json_response({
+                "ok": False, "new": False, "error": "elsewhere", "code": code,
+                "label": old.get("label") or "", "product_name": old.get("product_name") or "",
+                "district": home, "district_code": OFFICE_CODES.get(home, ""),
+                "district_name": OFFICE_NAMES.get(home, home),
+            }, headers=CORS_HEADERS)
         return web.json_response({
             "ok": True, "new": False,
             "code": code,
-            "label": (old or {}).get("label") or "",
-            "product_name": (old or {}).get("product_name", ""),
-            "district": (old or {}).get("district") or "",
-            "at": str((old or {}).get("at") or ""),
+            "label": old.get("label") or "",
+            "product_name": old.get("product_name", ""),
+            "district": old.get("district") or "",
+            "at": str(old.get("at") or ""),
         }, headers=CORS_HEADERS)
 
     total = await db.qr_count_product(product_id)
+    back = ""
+    if res.get("readd"):
+        back = " · возвращена в реестр"
+        if res.get("renamed"):
+            back += f" (была {res.get('was') or '—'})"
+        if res.get("intake"):
+            back += " · приход с поставки сохранён"
     log.info(f"[qr] {label} · {p.get('name','')} · {code[:40]}"
-             + (f" · {district}" if district else ""))
+             + (f" · {district}" if district else "") + back)
     return web.json_response({"ok": True, "new": True, "code": code,
                               "label": label, "seq": seq, "qty": qty,
                               "product_id": product_id,
@@ -440,10 +462,17 @@ async def handle_undo(request):
     code = _clean(body.get("code"))
     if not code:
         return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
-    ok = await db.qr_remove(code)
-    if ok:
-        log.info(f"[qr] отменён скан {code}")
-    return web.json_response({"ok": ok, "code": code}, headers=CORS_HEADERS)
+    # Новую запись отмена стирает; бутылку, которую скан вернул из убранных, —
+    # возвращает в убранные, с прежним названием и приходом (db.qr_scan_undo).
+    res = await db.qr_scan_undo(code)
+    if res.get("ok"):
+        log.info(f"[qr] отменён скан {code}"
+                 + (" — бутылка снова убрана, как до скана" if res.get("restored") else ""))
+    elif res.get("why") not in (None, "unknown"):
+        log.warning(f"[qr] скан {code[:40]} не отменён: {res.get('why')}")
+    return web.json_response({"ok": bool(res.get("ok")), "code": code,
+                              "restored": bool(res.get("restored")),
+                              "why": res.get("why") or ""}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -492,11 +521,19 @@ async def handle_history(request):
         await put(d, kind, d.get("at"), name)
     for d in removed:
         await put(d, "removed", d.get("del_at"), await who(d.get("del_by")))
+    # Возвращённые в реестр — отдельной строкой и не в счёт внесённых: новой
+    # бутылки не прибавилось, её убрали и вернули (часто — под верным названием).
+    for d in await db.qr_readded_since(since):
+        try:
+            when = datetime.fromisoformat(str(d.get("re_at") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        await put(d, "readd", when, await who(d.get("re_by")))
     out = []
     for day in sorted(groups, reverse=True):
         rows = sorted(groups[day].values(), key=lambda r: r["at"], reverse=True)
         for r in rows: r["at"] = r["at"].isoformat()
-        out.append({"day": day, "n": sum(r["n"] for r in rows if r["kind"] != "removed"),
+        out.append({"day": day, "n": sum(r["n"] for r in rows if r["kind"] not in ("removed", "readd")),
                     "removed": sum(r["n"] for r in rows if r["kind"] == "removed"), "rows": rows})
     return web.json_response({"days": days, "groups": out}, headers=CORS_HEADERS)
 
@@ -526,6 +563,13 @@ async def _story(doc: dict) -> list:
     if doc.get("at"):
         out.append({"at": str(doc.get("at")), "what": "заведена",
                     "who": await _who(doc.get("by")),
+                    "where": doc.get("district") or ""})
+    if doc.get("re_at"):
+        # Убрали и внесли заново (db.qr_readd): у бутылки с поставки «заведена»
+        # остаётся приходом, а возврат — отдельной строкой.
+        out.append({"at": str(doc.get("re_at")),
+                    "what": "внесена заново" + (f" · была {doc['re_from']}" if doc.get("re_from") else ""),
+                    "who": await _who(doc.get("re_by")),
                     "where": doc.get("district") or ""})
     for m in (doc.get("moves") or []):
         out.append({"at": str(m.get("at") or ""), "what": "переезд",

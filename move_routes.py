@@ -287,7 +287,13 @@ async def plan(day: str = "") -> dict:
     до неё: сначала смотрим, нет ли нужного у соседа, и лишь потом покупаем.
 
     Берём только излишек НАД собственной нормой отдающего — район отдаёт то,
-    что ему самому не нужно, и его полка не проседает."""
+    что ему самому не нужно, и его полка не проседает.
+
+    И только то, что можно отсканировать. Бутылка может лежать на полке, но не
+    числиться в реестре кодов («QR код не внесён») — такую водитель физически не
+    заберёт: сканировать нечего, задача не закроется, а смену она ему запрёт.
+    Поэтому каждая строка режется по числу живых кодов у отдающего; остальное
+    честно уходит в закупку, пока район не внесёт товар."""
     import math
     import stock_value as sv
     day = str(day or "").strip() or sr._biz_day()
@@ -295,6 +301,12 @@ async def plan(day: str = "") -> dict:
     cost = await sv.cost_map()
     base = await sr._district_base(day)
     norms = await db.get_stock_norms()
+    # {район: {позиция: сколько числится кодами} } — это и есть потолок скана.
+    try:
+        reg = await db.qr_by_product_district_all()
+    except Exception as e:                            # noqa: BLE001
+        log.warning(f"[move] реестр кодов не прочитан: {e}")
+        reg = {}
     stock, norm = {}, {}
     for oid in OFFICE_IDS:
         have = (base.get(oid) or {}).get("have_exact") or {}
@@ -315,10 +327,13 @@ async def plan(day: str = "") -> dict:
             for s in surp:
                 if n[1] <= 0 or s[1] <= 0:
                     continue
-                x = math.floor(min(n[1], s[1]) / step) * step
+                # Потолок скана: больше, чем есть кодов у отдающего, не увезти.
+                можно = float((reg.get(s[0]) or {}).get(pid) or 0)
+                x = math.floor(min(n[1], s[1], можно) / step) * step
                 if x <= 0:
                     continue
                 n[1] -= x; s[1] -= x
+                reg.setdefault(s[0], {})[pid] = можно - x     # коды не уедут дважды
                 rows.append({"from": s[0], "from_code": OFFICE_CODES.get(s[0], ""),
                              "to": n[0], "to_code": OFFICE_CODES.get(n[0], ""),
                              "id": pid, "name": (cat.get(pid) or {}).get("name", ""),

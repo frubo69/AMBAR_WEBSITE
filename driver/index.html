@@ -7986,7 +7986,7 @@ async function expNone(kind, none){
       {method:'POST', body:{kind, none}});
     try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
     if(none) toast('Записано: расхода не было');
-    if(none) delete EXP_CH[kind];
+    if(none){ delete EXP_CH[kind]; xpDraftDrop(kind); }   // ответили «не было» — черновик ни к чему
     await shLoad();
     await load();
   }catch(e){ toast('Не отправилось', 'err'); }
@@ -8185,10 +8185,7 @@ function renderShift(){
 let EXP_PAGE = '';
 const EXP_PAGE_T = {meal: 'Питание', fuel: 'Бензин', wash: 'Мойка', parking: 'Парковка', other: 'Прочее', all: 'Итого за смену'};
 function expGo(page){ EXP_PAGE = page; EXP_MORE = false; render(); window.scrollTo({top: 0}); try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
-function expBack(){
-  if(EXP_PAGE) delete XP_DRAFT[EXP_PAGE];          // ушли со страницы — черновик не нужен
-  EXP_PAGE = ''; render(); window.scrollTo({top: 0});
-}
+function expBack(){ EXP_PAGE = ''; render(); window.scrollTo({top: 0}); }
 // Что написать на плитке: сумма, «Не было», «Не заполнено» или прочерк.
 function expTileVal(kind){
   const sent = _expSent(kind);
@@ -8240,12 +8237,45 @@ function xpPick(kind, ch){
 // сохранили. Иначе любой перерисовки хватало, чтобы стереть вписанное — а
 // перерисовка случается сама: пришёл заказ, вернулись из камеры, сработал опрос
 // раз в пять секунд (владелец, 18 сен 2026, по следам снимка чека).
-const XP_DRAFT = {};
+// Черновик лежит в телефоне, а не в памяти вкладки: набранное не пропадает,
+// даже если выйти из раздела, свернуть приложение или случайно нажать «назад»
+// (владелец, 18 сен 2026: «иногда случайно выхожу без сохранения, а она
+// исчезает»). Стирается сам: когда расход сохранён, когда ответили «не было»,
+// когда очистили поле крестиком и когда сменились рабочие сутки.
+const XP_DRAFT_KEY = 'drv_xp_draft';
+let XP_DRAFT = {}, XP_DRAFT_DAY = '';
+try{
+  const raw = JSON.parse(localStorage.getItem(XP_DRAFT_KEY) || 'null');
+  if(raw && raw.v && typeof raw.v === 'object'){ XP_DRAFT = raw.v; XP_DRAFT_DAY = String(raw.day || ''); }
+}catch(e){}
+function xpDraftSave(){
+  try{
+    if(!Object.keys(XP_DRAFT).length){ localStorage.removeItem(XP_DRAFT_KEY); return; }
+    const day = (SH && SH.day) || (ORDERS && ORDERS.day) || XP_DRAFT_DAY || '';
+    XP_DRAFT_DAY = day;
+    localStorage.setItem(XP_DRAFT_KEY, JSON.stringify({day, v: XP_DRAFT}));
+  }catch(e){}
+}
+// Перед отрисовкой расходов: вчерашнее не подставляем, и записанное — тоже.
+function xpDraftFresh(){
+  let менялось = false;
+  const day = (SH && SH.day) || (ORDERS && ORDERS.day) || '';
+  if(day && XP_DRAFT_DAY && day !== XP_DRAFT_DAY){ XP_DRAFT = {}; XP_DRAFT_DAY = day; менялось = true; }
+  // Парковку не трогаем: там записей за день много, и новая набирается поверх.
+  Object.keys(XP_DRAFT).forEach(k => {
+    if(k === 'parking' || k.indexOf('o_') === 0) return;
+    const было = _expSent(k);
+    if(было && EXP_ST(было) !== 'rejected'){ delete XP_DRAFT[k]; менялось = true; }
+  });
+  if(менялось) xpDraftSave();
+}
 function xpDraftSet(kind, what, v){
   const d = XP_DRAFT[kind] || (XP_DRAFT[kind] = {});
   if(v === '' || v == null) delete d[what]; else d[what] = v;
   if(!Object.keys(d).length) delete XP_DRAFT[kind];
+  xpDraftSave();
 }
+function xpDraftDrop(kind){ delete XP_DRAFT[kind]; xpDraftSave(); }
 function xpDraftGet(kind, what){
   const d = XP_DRAFT[kind];
   return d && d[what] != null ? d[what] : null;
@@ -8381,13 +8411,13 @@ function expPage(kind){
     <div class="xp-l">Сумма расхода</div>
     <div class="xp-amt${locked ? ' sent' : ''}"><span>AED</span>
       <input id="e_${kind}" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
-        value="${esc(xpDraftGet(kind, 'sum') != null ? xpDraftGet(kind, 'sum') : (sent ? sent.amount : ''))}"${locked ? ' readonly' : ''} oninput="xpTyped('${kind}')">
+        value="${esc(!locked && xpDraftGet(kind, 'sum') != null ? xpDraftGet(kind, 'sum') : (sent ? sent.amount : ''))}"${locked ? ' readonly' : ''} oninput="xpTyped('${kind}')">
       ${locked ? expMark(sent) : `<button class="xp-x" id="x_${kind}" ${sent ? '' : 'hidden'} onclick="xpClear('${kind}')" aria-label="Очистить">${svg(ICO.close, 13)}</button>`}
     </div>
     ${zones}
     <div class="xp-l">Комментарий (необязательно)</div>
     <textarea class="xp-cm" id="c_${kind}" maxlength="200" placeholder="Добавьте комментарий"${locked ? ' readonly' : ''}
-      oninput="xpCm('${kind}')">${esc(xpDraftGet(kind, 'cm') != null ? xpDraftGet(kind, 'cm') : comment)}</textarea>
+      oninput="xpCm('${kind}')">${esc(!locked && xpDraftGet(kind, 'cm') != null ? xpDraftGet(kind, 'cm') : comment)}</textarea>
     ${отклонён ? expWhy(sent) : ''}` : ''}
     <div class="dv-sp"></div>
     <div class="dv-foot"><button class="xp-go${btn.cls ? ' ' + btn.cls : ''}" id="xb_${kind}" data-mode="${btn.mode}"${btn.what ? ` data-what="${btn.what}"` : ''}
@@ -8395,6 +8425,7 @@ function expPage(kind){
   </div>`;
 }
 function renderExpenses(){
+  xpDraftFresh();
   const box = document.getElementById('body');
   // Тест-водитель расходы не подаёт: настоящие деньги старшему на согласование
   // из теста идти не должны (сервер отвечает test_account).
@@ -11113,7 +11144,7 @@ async function sendExpense(btn, kind){
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
-    EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind]; delete XP_DRAFT[kind]; XP_PARK_EDIT = '';
+    EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind]; xpDraftDrop(kind); XP_PARK_EDIT = '';
     EXP_MORE = false; EXP_EDIT = null; EXP_SHOT = {kind:'', photo:'', thumb:''};
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}
     await shLoad();

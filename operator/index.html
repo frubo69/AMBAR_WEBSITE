@@ -198,6 +198,38 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .dchip.alien i{display:block;font-style:normal;font-size:9px;font-weight:600;opacity:.75;
   letter-spacing:.2px;margin-top:1px}
 .dchip.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--gold2)}
+/* Отпущенный раньше водитель (18 сен 2026): виден, но не выбирается — новый
+   заказ ему назначать нельзя, он уже закрывает смену. */
+.dchip.off{opacity:.5;cursor:default;border-style:dashed}
+.dchip.off i{display:block;font-style:normal;font-size:9px;font-weight:600;opacity:.85;margin-top:1px}
+/* Просьба водителя закрыть смену раньше: полоса над очередью и окно решения.
+   Причина и питание выбираются строками, как в бюджете, а не чипами. */
+.crq-l{display:flex;flex-direction:column;gap:7px;margin:0 0 10px}
+.crq{display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;border-radius:13px;cursor:pointer;
+  font-family:inherit;text-align:left;color:var(--text);background:rgba(243,180,74,.07);border:1px solid rgba(243,180,74,.45)}
+.crq:active{transform:scale(.99)}
+.crq-i{flex:0 0 32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:rgba(243,180,74,.14);color:var(--warn)}
+.crq-i svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.crq-b{flex:1;min-width:0}
+.crq-b b{display:block;font-size:13.5px;font-weight:700}
+.crq-b i{display:block;font-style:normal;font-size:12px;color:var(--sub);margin-top:2px}
+.crq em{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:700;color:var(--warn)}
+.crq-kv{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);
+  font-size:13px;color:var(--sub)}
+.crq-kv b{color:var(--text);font-weight:600;text-align:right}
+.crq-h{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.crq-r{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;margin:0 0 7px;border-radius:12px;cursor:pointer;
+  font-family:inherit;text-align:left;color:var(--text);background:var(--card2);border:1px solid var(--border2);
+  font-size:13.5px;font-weight:600}
+.crq-r:active{transform:scale(.99)}
+.crq-r .rd{flex:0 0 16px;height:16px;border-radius:50%;border:1.5px solid var(--muted)}
+.crq-r.on{border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
+.crq-r.on .rd{border-color:var(--gold2);background:var(--gold2);box-shadow:inset 0 0 0 3px var(--bg3)}
+.crq-r i{margin-left:auto;font-style:normal;font-size:12px;font-weight:500;color:var(--sub)}
+.crq-note{width:100%;margin:4px 0 0;padding:11px 12px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);font-family:inherit;font-size:13.5px;outline:none}
+.crq-note:focus{border-color:rgba(201,169,110,.5)}
 .dchip:active{transform:scale(.94)}
 .dchips .hint{font-size:12px;color:var(--muted);padding:8px 2px}
 
@@ -2691,6 +2723,11 @@ html.kb body{padding-bottom:40vh}
   </div>
 </div>
 
+<!-- Просьба водителя закрыть смену раньше: контекст и решение (18 сен 2026). -->
+<div class="ov" id="crqOv" onclick="if(event.target===this)crqClose()">
+  <div class="sheet" id="crqSheet"></div>
+</div>
+
 <div class="ov" id="askOv">
   <div class="sheet">
     <div class="t" id="askT">—</div>
@@ -3373,7 +3410,10 @@ function renderDrivers(){
   // Водитель заказа не из этого района — показываем его отдельной пометкой, а
   // не прячем: оператор должен видеть, кто везёт, и менять это осознанно.
   const alien = curDriver && !list.includes(curDriver) ? curDriver : '';
-  dv.innerHTML = list.map(n=>`<button class="dchip ${n===curDriver?'on':''}"
+  const rel = _crqRel();
+  dv.innerHTML = list.map(n=>rel.has(n)
+      ? `<button class="dchip off" disabled title="Отпущен раньше — заказы ему не назначаются">${_esc(n)}<i>отпущен</i></button>`
+      : `<button class="dchip ${n===curDriver?'on':''}"
       onclick="pickDriver('${_esc(n)}')">${_esc(n)}</button>`).join('')
     + (alien ? `<button class="dchip on alien" onclick="pickDriver('${_esc(alien)}')"
         title="Водитель не с этого района">${_esc(alien)}<i>не с этого района</i></button>` : '');
@@ -3737,7 +3777,8 @@ async function doCreate(){
     }
   }catch(e){
     const err=(e.payload&&e.payload.error)||('код '+(e.status||'сеть'));
-    if(!shiftBlocked(e)) toast('Ошибка: '+err,'err');
+    if(!shiftBlocked(e)) toast(err==='driver_released'
+      ? `${(e.payload||{}).driver||'Водитель'} отпущен — выберите другого` : 'Ошибка: '+err,'err');
   }
   btn.disabled=false; renderTicket();
 }
@@ -3824,7 +3865,14 @@ async function loadQueue(){
     ...(r.new||[]).map(o=>'new:'+o.order_id),
     ...[].concat(r.new||[], r.work||[]).filter(o=>_openReq(o))
          .map(o=>'req:'+o.order_id+':'+(o.driver_req.at||'')),
+    // Водитель просит закрыть смену раньше — тоже решение оператора (18 сен 2026).
+    ...(r.close_reqs||[]).map(c=>'close:'+c.driver+':'+c.at),
   ]);
+  // Окно решения открыто, а запрос уже решили (другой оператор, старший) —
+  // закрываем его, иначе нажатие ушло бы в пустоту.
+  if(CRQ.driver && $('crqOv').classList.contains('show')){
+    if(!(r.close_reqs||[]).some(c=>c.driver===CRQ.driver)){ crqClose(); toast('Запрос уже решён'); }
+  }
   _attention = ids.size;
   _attNew = (r.new||[]).length;
   _attReq = [].concat(r.new||[], r.work||[]).filter(o=>_openReq(o)).length;
@@ -3885,7 +3933,7 @@ function renderQueue(){
   if(qLane!=='new' && qFilter!=='all') list = list.filter(o=>(o.source||'app')===qFilter);
 
   const c=Q.counts||{app:0,manual:0};
-  wrap.innerHTML = `
+  wrap.innerHTML = `${crqBanner()}
     <div class="q-tabs">${lanes.map(([k,t,n])=>
       `<button class="q-tab${qLane===k?' on':''}" onclick="qLaneSet('${k}')">${t}
          ${n?`<i${k==='new'&&n?' class="hot"':''}>${n}</i>`:''}</button>`).join('')}</div>
@@ -4355,6 +4403,94 @@ function _decline(oid, r){
   })();
 }
 
+// ── просьба водителя закрыть смену раньше (18 сен 2026) ──────────────────────
+// Водитель доставил все заказы и просит отпустить. Решает оператор его района
+// и старший: «Отпустить» — с выбором питания за день, 80 или 40; «Не сейчас» —
+// с причиной, водитель её увидит. Кто нажал первым, тот и решил.
+const CRQ_ICO='<svg viewBox="0 0 24 24"><path d="M14 4h5v16h-5"/><path d="M10 12h9"/><path d="M6.5 8.5L3 12l3.5 3.5"/></svg>';
+const CRQ_NO=[['queue','Есть заказы в очереди'],['partner','Дождись напарника'],['hour','Через час'],['other','Другое']];
+let CRQ={driver:'', mode:'', meal:0, reason:'', busy:false};
+function _crqOf(name){ return (Q.close_reqs||[]).find(c=>c.driver===name); }
+function _crqRel(){ const s=new Set(); (Q.districts||[]).forEach(d=>(d.released||[]).forEach(n=>s.add(n))); return s; }
+function _crqHm(m){ m=+m||0; return m<60 ? m+' мин' : Math.floor(m/60)+' ч '+(m%60)+' мин'; }
+function crqBanner(){
+  const L=Q.close_reqs||[]; if(!L.length) return '';
+  return `<div class="crq-l">${L.map(c=>`<button class="crq" onclick="crqOpen('${_esc(c.driver)}')">
+      <span class="crq-i">${CRQ_ICO}</span>
+      <span class="crq-b"><b>${_esc(c.driver)} просит закрыть смену</b>
+        <i>${_esc([c.code, c.reason_t, c.mins ? c.mins+' мин' : 'только что'].filter(Boolean).join(' · '))}${c.escalated?' · передано старшему':''}</i></span>
+      <em>Решить</em></button>`).join('')}</div>`;
+}
+function crqOpen(name){
+  if(!_crqOf(name)){ toast('Запрос уже решён'); return; }
+  CRQ={driver:name, mode:'', meal:0, reason:'', busy:false};
+  crqPaint(); showOv('crqOv'); haptic('medium');
+}
+function crqClose(){ hideOv('crqOv'); CRQ.driver=''; }
+function crqPaint(){
+  const c=_crqOf(CRQ.driver);
+  if(!c){ crqClose(); return; }
+  const kv=(k,v)=>`<div class="crq-kv"><span>${k}</span><b>${v}</b></div>`;
+  let h = `<div class="t">${_esc(c.driver)} просит закрыть смену</div>
+    <div class="s">${_esc([[c.code, c.district_name].filter(Boolean).join(' '), c.reason_t].filter(Boolean).join(' · '))}</div>`
+    + kv('Заказов у него в пути', c.in_route ? c.in_route : 'нет')
+    + kv('Ещё на смене в районе', c.mates && c.mates.length ? _esc(c.mates.join(', ')) : 'никого')
+    + kv('Новых заказов в районе', c.waiting ? c.waiting : 'нет')
+    + kv('Смена идёт', _crqHm(c.shift_min))
+    + (c.escalated ? kv('Старшему', 'уже передано') : '');
+  if(CRQ.mode==='ok'){
+    h += `<div class="crq-h">Питание за день</div>`
+      + [[80,'80 AED','полный день'],[40,'40 AED','ушёл раньше']].map(([m,t,s])=>
+        `<button class="crq-r${CRQ.meal===m?' on':''}" onclick="crqMeal(${m})"><span class="rd"></span>${t}<i>${s}</i></button>`).join('')
+      + `<div class="btns"><button class="sbtn" onclick="crqMode('')">Назад</button>
+         <button class="sbtn go" ${CRQ.meal && !CRQ.busy ? '' : 'disabled'} onclick="crqSend(true)">Отпустить</button></div>`;
+  }else if(CRQ.mode==='no'){
+    h += `<div class="crq-h">Почему не сейчас</div>`
+      + CRQ_NO.map(([k,t])=>`<button class="crq-r${CRQ.reason===k?' on':''}" onclick="crqReason('${k}')"><span class="rd"></span>${t}</button>`).join('')
+      + `<input class="crq-note" id="crqNote" maxlength="200" autocomplete="off"
+           placeholder="${CRQ.reason==='other' ? 'Что сказать водителю' : 'Слово водителю (необязательно)'}" oninput="crqSync()">`
+      + `<div class="btns"><button class="sbtn" onclick="crqMode('')">Назад</button>
+         <button class="sbtn go" id="crqNo" disabled onclick="crqSend(false)">Отказать</button></div>`;
+  }else{
+    h += `<div class="btns"><button class="sbtn" onclick="crqMode('no')">Не сейчас</button>
+       <button class="sbtn go" onclick="crqMode('ok')">Отпустить</button></div>`;
+  }
+  $('crqSheet').innerHTML = h;
+  if(CRQ.mode==='no') crqSync();
+}
+function crqMode(m){ CRQ.mode=m; CRQ.meal=0; CRQ.reason=''; haptic('sel'); crqPaint(); }
+function crqMeal(m){ CRQ.meal=m; haptic('sel'); crqPaint(); }
+function crqReason(k){
+  const v=(($('crqNote')||{}).value)||'';
+  CRQ.reason=k; haptic('sel'); crqPaint();
+  const n=$('crqNote'); if(n) n.value=v;
+  crqSync();
+}
+function crqSync(){
+  const b=$('crqNo'); if(!b) return;
+  const v=((($('crqNote')||{}).value)||'').trim();
+  b.disabled = CRQ.busy || !CRQ.reason || (CRQ.reason==='other' && !v);
+}
+async function crqSend(ok){
+  const c=_crqOf(CRQ.driver); if(!c || CRQ.busy) return;
+  CRQ.busy=true;
+  const note = ok ? '' : (((($('crqNote')||{}).value)||'').trim());
+  const meal = CRQ.meal, reason = CRQ.reason;
+  try{
+    await opApi.opFetch('/api/operator/close-request', {method:'POST',
+      body:{as:curOp, driver:c.driver, id:c.id, ok, meal: ok ? meal : null, no_reason: ok ? '' : reason, note}});
+    toast(ok ? `${c.driver} отпущен · питание ${meal} AED` : `${c.driver}: не сейчас — водителю ушёл ответ`, ok ? 'ok' : '');
+    haptic('heavy');
+  }catch(e){
+    const d=(e && e.payload) || {};
+    toast(d.error==='decided' ? `Уже решил ${d.by||'другой оператор'}`
+        : d.error==='not_yours' ? 'Этот водитель не из ваших районов'
+        : 'Не получилось — повторите', 'err');
+  }
+  CRQ.busy=false; crqClose();
+  await loadQueue(); try{ loadFeed(); }catch(e){}
+}
+
 // ── приём: водитель и время одним действием ──
 function askAccept(oid){
   const o=(Q.new||[]).find(x=>x.order_id===oid); if(!o) return;
@@ -4375,7 +4511,9 @@ function _accDrv(){
     .slice().sort((a,b)=>String(a.code||'').localeCompare(String(b.code||'')));
   $('accDrv').innerHTML = ds.map(d=>`<div class="acc-row ${d.id===o.office_id?'own':''}">
       <div class="cd">${_esc(_distCode(d.id))}</div>
-      <div class="dchips">${d.drivers.map(n=>`<button class="dchip${n===acceptDrv?' on':''}"
+      <div class="dchips">${d.drivers.map(n=>(d.released||[]).includes(n)
+        ? `<button class="dchip off" disabled title="Отпущен раньше — заказы ему не назначаются">${_esc(n)}<i>отпущен</i></button>`
+        : `<button class="dchip${n===acceptDrv?' on':''}"
         data-n="${_esc(n)}"
         onclick="accPickDrv('${_esc(n)}')">${_esc(n)}</button>`).join('')}</div></div>`).join('');
 }
@@ -4406,6 +4544,7 @@ async function doAccept(){
     if(shiftBlocked(e)){ b.disabled=false; b.textContent='Принять'; return; }
     toast(d.error==='already_taken'
       ? `Заказ уже принял ${d.by||'кто-то'}${d.driver?' · везёт '+d.driver:''}`
+      : d.error==='driver_released' ? `${d.driver||'Водитель'} отпущен — выберите другого`
       : 'Не удалось принять — попробуйте ещё раз', 'err');
     haptic('medium');
   }
@@ -6074,6 +6213,7 @@ let FEED={need:[],recent:[],count:0}, _fdT=null;
 
 const FD_ICO={
   driver_req:'<path d="M3 16V7h11v9M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+  close_req:'<path d="M14 4h5v16h-5"/><path d="M10 12h9"/><path d="M6.5 8.5L3 12l3.5 3.5"/>',
   pending:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   late:'<path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16.2v.1"/>',
   support:'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
@@ -6109,7 +6249,8 @@ function fdClose(){ $('fdOv').classList.remove('show'); if(_fdT){ clearInterval(
 
 function _fdRow(x, hot){
   const mins = x.mins ? (x.mins<60 ? x.mins+' мин' : Math.floor(x.mins/60)+' ч') : '';
-  const go = x.type==='support' ? `fdClose();supOpen();supThread('${_esc(x.key||'')}')`
+  const go = x.type==='close_req' ? `fdClose();crqOpen('${_esc(x.driver||'')}')`
+           : x.type==='support' ? `fdClose();supOpen();supThread('${_esc(x.key||'')}')`
            : (x.order_id ? `fdClose();fdGo('${_esc(x.order_id)}')` : '');
   const sub = [x.sub, x.text, x.address].filter(Boolean).join(' · ');
   return `<button class="fd-i ${hot||''}" ${go?`onclick="${go}"`:''}>

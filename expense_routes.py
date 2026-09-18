@@ -117,9 +117,7 @@ def _day_row(d: dict, saved: dict) -> dict:
     расход, которого никто не одобрял."""
     working = (saved or {}).get("working")
     extras = list((saved or {}).get("extras") or [])
-    meal = 0
-    if working is True:    meal = staff.MEAL_WORKING
-    elif working is False: meal = staff.MEAL_OFF
+    meal = staff.meal_of(saved)
     extra_sum = sum(_signed(e) for e in extras if _status(e) == "approved")
     pending = sum(_signed(e) for e in extras if _status(e) == "pending")
     return {
@@ -574,7 +572,7 @@ async def handle_period(request):
     by_day, by_driver = {}, {}
     for r in rows:
         working = r.get("working")
-        meal = staff.MEAL_WORKING if working is True else (staff.MEAL_OFF if working is False else 0)
+        meal = staff.meal_of(r)
         extra = sum(_amount(e.get("amount")) for e in (r.get("extras") or [])
                     if _status(e) == "approved")
         d = by_day.setdefault(r.get("day", ""), {"day": r.get("day", ""), "meal": 0, "extra": 0, "working": 0})

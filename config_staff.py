@@ -279,6 +279,20 @@ MEAL_WORKING = 80
 MEAL_OFF = 40
 
 
+def meal_of(day_doc: dict | None) -> int:
+    """Питание за день по записи дня водителя. Обычно — по отметке оператора:
+    вышел (80) или нет (40). Но если водителя отпустили раньше конца смены,
+    оператор, отпуская, решает сам — 80 или 40 (владелец, 18 сен 2026), и это
+    решение лежит в meal_rate и главнее отметки. Формула одна на всю систему:
+    экран водителя, «Финансы», расходы дня и отчёты считают одинаково."""
+    d = day_doc or {}
+    r = d.get("meal_rate")
+    if r in (MEAL_WORKING, MEAL_OFF):
+        return int(r)
+    w = d.get("working")
+    return MEAL_WORKING if w is True else (MEAL_OFF if w is False else 0)
+
+
 def drivers() -> list:
     """Все водители с их районом и оператором, в порядке районов B1…B5."""
     from config_offices import OFFICE_CODES, OFFICE_NAMES

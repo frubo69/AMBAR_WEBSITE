@@ -50,6 +50,7 @@ from config_offices import OFFICE_NAMES, OFFICE_CODES   # офис ≡ райо�
 # work out whose orders, tips and delivery times these are.
 from config_staff import DISTRICT_STAFF
 import config_staff as _staff_mod
+import close_req
 import bizday as _bizday        # день заказа = смена, в которой его приняли
 
 
@@ -146,6 +147,17 @@ def no_test_mode(handler):
             return web.json_response({"error": "test_mode"}, status=403, headers=CORS_HEADERS)
         return await handler(request)
     return wrapped
+
+
+async def _released_now(name: str) -> bool:
+    """Отпустил ли оператор этого водителя сегодня раньше конца смены. Такому
+    новый заказ не назначаем: он уже едет домой, и заказ повис бы на нём."""
+    try:
+        day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+        return (name or "").strip() in close_req.released_names(await close_req.day_rows(day))
+    except Exception as e:
+        log.warning(f"[pos] отпущенные не прочитаны: {e}")
+        return False
 
 
 def _drivers_of(order_or_test, dist: dict | None = None, districts: list | None = None) -> set:
@@ -811,6 +823,9 @@ async def handle_create(request):
         return web.json_response({"error": "district_required"}, status=400, headers=CORS_HEADERS)
     if driver not in _drivers_of(_tflag(request), dist):
         return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
+    if await _released_now(driver):
+        return web.json_response({"error": "driver_released", "driver": driver},
+                                 status=409, headers=CORS_HEADERS)
 
     items, err = _build_items(body.get("items"))
     if err:
@@ -1068,10 +1083,15 @@ async def handle_queue(request):
             day = today
     lanes = {"new": [], "work": [], "done": []}
     counts = {"app": 0, "manual": 0}
+    route_by, wait_by = {}, {}          # для просьб закрыть смену: у кого в пути, где новые
     for o in (await db.get_all_orders(test=_tflag(request))).values():
         lane = _lane(o)
         if not lane:
             continue
+        if lane == "work" and (o.get("driver") or "").strip() and _biz_date_of(o) == today:
+            route_by[o["driver"].strip()] = route_by.get(o["driver"].strip(), 0) + 1
+        if lane == "new":
+            wait_by[o.get("office_id") or ""] = wait_by.get(o.get("office_id") or "", 0) + 1
         # Район заказа определяется адресом ещё при создании; заказы без
         # района видит только старший — иначе они не видны вообще никому.
         oid_dist = o.get("office_id") or ""
@@ -1095,12 +1115,26 @@ async def handle_queue(request):
     lanes["new"].sort(key=lambda x: x.get("timestamp", ""))          # старые сверху
     lanes["work"].sort(key=lambda x: x.get("deliver_by", "") or "~")
     lanes["done"].sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    # Просьбы водителей закрыть смену раньше (18 сен 2026): едут с каждым опросом
+    # очереди, чтобы панель звенела на них сразу, как на новый заказ. И кого уже
+    # отпустили — их панель не даёт выбрать для нового заказа.
+    creqs, rel = [], set()
+    if not _tflag(request):
+        try:
+            rows_c = await close_req.day_rows(today.isoformat())
+            rel = close_req.released_names(rows_c)
+            creqs = await close_req.open_for(today.isoformat(), set(scope), rows=rows_c,
+                                             route_by_driver=route_by, waiting_by_district=wait_by)
+        except Exception as e:
+            log.warning(f"[pos] просьбы закрыть смену не прочитаны: {e}")
     return web.json_response({
         "as": who, "senior": next(x["senior"] for x in people if x["name"] == who),
         # Панель берёт водителей для назначения отсюда: тест-оператору — только
         # тест-водитель, иначе лист назначения показывает настоящих, а сервер
         # их для тест-заказа не принимает.
-        "districts": [d for d in _districts_for(request, districts) if d["id"] in scope],
+        "districts": [{**d, "released": sorted(n for n in (d.get("drivers") or []) if n in rel)}
+                      for d in _districts_for(request, districts) if d["id"] in scope],
+        "close_reqs": creqs,
         "new": lanes["new"], "work": lanes["work"], "done": lanes["done"],
         "counts": counts, "day": day.isoformat(),
         "now": datetime.now(timezone.utc).isoformat(),
@@ -1144,6 +1178,9 @@ async def handle_accept(request):
     driver = str(body.get("driver", "")).strip()
     if driver not in _drivers_of(order, districts=districts):
         return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
+    if await _released_now(driver):
+        return web.json_response({"error": "driver_released", "driver": driver},
+                                 status=409, headers=CORS_HEADERS)
     try:
         eta = int(body.get("eta") or 0)
     except (TypeError, ValueError):
@@ -1452,6 +1489,10 @@ async def handle_patch(request):
             return web.json_response({"error": "district_required"}, status=400, headers=CORS_HEADERS)
         if driver not in _drivers_of(order, dist):
             return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
+        # Переназначить на отпущенного нельзя; править заказ, который уже на нём, — можно.
+        if driver != (order.get("driver") or "").strip() and await _released_now(driver):
+            return web.json_response({"error": "driver_released", "driver": driver},
+                                     status=409, headers=CORS_HEADERS)
         upd.update(district_id=dist["id"], district=dist["name"],
                    dispatch_operator=dist["operator"], driver=driver)
     for f in ("customer_name", "phone", "address", "comment"):
@@ -1896,6 +1937,20 @@ async def handle_feed(request):
                                    or o.get("operator_name") or ""),
                            "at": d.isoformat(), "mins": _mins_since(d.isoformat())})
 
+    # Водитель просит закрыть смену раньше (18 сен 2026) — решение оператора
+    # района, как и просьба по заказу; пока ждёт — стоит первым.
+    if not _tflag(request):
+        try:
+            for c in await close_req.open_for(today.isoformat(), set(scope)):
+                need.append({"type": "close_req", "kind": "close_req", "order_id": "",
+                             "title": f"{c['driver']} просит закрыть смену",
+                             "sub": " ".join(x for x in (c["code"], c["district_name"]) if x),
+                             "text": c["reason_t"], "key": c["driver"],
+                             "at": c["at"], "mins": c["mins"], "total": 0, "address": "",
+                             "driver": c["driver"], "district": c["code"], "weight": 0})
+        except Exception as e:
+            log.error(f"[pos] лента: просьбы закрыть смену не собрались: {e}")
+
     # Поддержка: вопрос без ответа — та же незакрытая задача, что и заказ.
     try:
         for t in await _support_rows():
@@ -1918,6 +1973,30 @@ async def handle_feed(request):
         "recent": recent[:40],
         "count": sum(1 for x in need if x["weight"] <= 2),
     }, headers=CORS_HEADERS)
+
+
+# ── просьба закрыть смену раньше (18 сен 2026) ────────────────────────────────
+@require_operator
+async def handle_close_decide(request):
+    """POST {as, driver, id, ok, meal, no_reason, note} — решение оператора
+    района по просьбе водителя закрыть смену раньше. Отпуская, оператор решает,
+    питание за день 80 или 40; отказывая — говорит почему."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    districts = await _fresh_districts()
+    people = _people_for(request, districts)
+    who = str(body.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    if not scope:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    code, res = await close_req.decide(
+        day, str(body.get("driver") or "").strip(), str(body.get("id") or "").strip(),
+        bool(body.get("ok")), body.get("meal"), str(body.get("no_reason") or "").strip(),
+        str(body.get("note") or ""), who, set(scope))
+    return web.json_response(res, status=code, headers=CORS_HEADERS)
 
 
 # ── просьбы водителя ─────────────────────────────────────────────────────────
@@ -3241,6 +3320,8 @@ def setup(app):
     r.add_post("/api/operator/customer/{cid}/act", handle_customer_act)
     r.add_route("OPTIONS", "/api/operator/orders", _opt)
     r.add_get("/api/operator/orders", handle_list)
+    r.add_route("OPTIONS", "/api/operator/close-request", _opt)
+    r.add_post("/api/operator/close-request", handle_close_decide)
     r.add_post("/api/operator/orders", handle_create)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}", _opt)
     r.add_patch("/api/operator/orders/{oid}", handle_patch)

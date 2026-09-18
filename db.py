@@ -5424,3 +5424,48 @@ async def move_order_cancel(mid: str, district: str, now) -> bool:
     r = await d.move_orders.update_one({"_id": mid, "status": "open"},
                                        {"$set": {"status": "cancelled", "done_at": now}})
     return r.modified_count > 0
+
+# ── досрочное закрытие смены (18 сен 2026) ─────────────────────────────────
+# Запрос водителя живёт в его записи дня (driver_days): close_req — текущий,
+# close_hist — прошлые за этот день. Решает оператор района ровно один раз:
+# условие «запрос ещё открыт» стоит в самом фильтре обновления.
+async def close_req_put(day: str, driver: str, req: dict, prev: dict | None = None) -> bool:
+    """Новый запрос. Прошлый (отказ, отзыв) уходит в историю. Поверх открытого
+    второй не ложится — фильтр это и проверяет."""
+    db = _db_or_none()
+    if db is None: return False
+    upd = {"$set": {"close_req": req}}
+    if prev:
+        upd["$push"] = {"close_hist": prev}
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver, "close_req.status": {"$ne": "open"}}, upd)
+    return bool(r.matched_count)
+
+
+async def close_req_set(day: str, driver: str, rid: str, fields: dict,
+                        extra: dict | None = None, only_open: bool = True) -> dict | None:
+    """Поменять запрос (решение, отзыв, эскалация). None — запрос уже не тот:
+    решён другим, отозван или заменён новым."""
+    db = _db_or_none()
+    if db is None: return None
+    q = {"day": day, "driver": driver, "close_req.id": rid}
+    if only_open:
+        q["close_req.status"] = "open"
+    sets = {f"close_req.{k}": v for k, v in fields.items()}
+    sets.update(extra or {})
+    # Без проекции и с ручным pop: так же, как link_driver, — проекция в
+    # find_one_and_update у тестовой базы возвращает пусто.
+    r = await db.driver_days.find_one_and_update(q, {"$set": sets}, return_document=True)
+    if r:
+        r.pop("_id", None)
+    return r
+
+
+async def close_reqs_of_day(day: str) -> list:
+    """Все записи дня, где водитель хоть раз просил закрыть смену раньше."""
+    db = _db_or_none()
+    if db is None: return []
+    return await db.driver_days.find(
+        {"day": day, "close_req": {"$exists": True}},
+        {"_id": 0, "driver": 1, "day": 1, "close_req": 1, "shift_open_at": 1,
+         "shift_close_at": 1, "meal_rate": 1}).to_list(length=200)

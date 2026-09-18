@@ -167,7 +167,7 @@ async def _spend(days: list[str]) -> dict:
         w = r.get("working")
         if w is True and r.get("driver"):
             work[r["driver"]] = work.get(r["driver"], 0) + 1
-        meal = _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+        meal = _staff.meal_of(r)
         amt = meal
         for e in (r.get("extras") or []):
             st = str(e.get("status") or "approved")

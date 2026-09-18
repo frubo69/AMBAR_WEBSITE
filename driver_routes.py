@@ -44,6 +44,7 @@ import db
 import bizday                 # день заказа = смена, в которой его приняли
 import photos
 import config_staff as staff
+import close_req
 from owner_auth import CORS_HEADERS
 
 log = logging.getLogger("driver")
@@ -543,6 +544,12 @@ async def _shift_view(me: dict) -> dict:
         # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
         # висела бы до утра, а «закрыть» упиралось в чужое действие.
         "can_close": bool(opened) and not closed and not must and not route and not intake,
+        # Просьба закрыть смену раньше оператора (18 сен 2026): текущий запрос,
+        # кто его решает и когда можно просить снова. Отпустили — шаг «оператор
+        # закрыл смену» пройден так же, как если бы закрыли весь район.
+        "close_req": None if _tq(me) else close_req.view(d),
+        "released": (d.get("close_req") or {}).get("status") == "ok",
+        "operator": (close_req.driver_card(me["name"]).get("operator") or me.get("operator") or ""),
     }
 
 
@@ -755,7 +762,10 @@ async def handle_shift_close(request):
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] закрытие дня не прочиталось: {e}")
         день_закрыт = False
-    if not день_закрыт and not _tq(me):
+    # Или оператор района отпустил этого водителя раньше (18 сен 2026) — тогда
+    # смена района идёт дальше, а он свою закрывает.
+    отпущен = (d.get("close_req") or {}).get("status") == "ok"
+    if not день_закрыт and not отпущен and not _tq(me):
         return web.json_response({"error": "day_open"}, status=409, headers=CORS_HEADERS)
     await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
     log.info(f"[driver] {me['name']}: смена закрыта")
@@ -2419,8 +2429,7 @@ async def handle_expenses(request):
         "pending_answer": [k for k in MUST_ANSWER
                            if not no.get(k)
                            and not any(_kind_of(x) == k for x in extras)],
-        "meal": staff.MEAL_WORKING if d.get("working") is True
-                else (staff.MEAL_OFF if d.get("working") is False else 0),
+        "meal": staff.meal_of(d),
         # Ставки — на экран водителю: он должен видеть правило, а не только
         # итог, иначе каждый раз спрашивает, почему сегодня 40, а не 80.
         "meal_rates": {"working": staff.MEAL_WORKING, "off": staff.MEAL_OFF},
@@ -2695,6 +2704,43 @@ async def _opt(request):
 
 # ── Перемещение между районами ───────────────────────────────────────────────
 # Ручки живут в move_routes, здесь только права: водитель, не тестовый.
+# ── просьба закрыть смену раньше оператора (18 сен 2026) ─────────────────────
+# Решает оператор района в своей панели; логика — в close_req.py.
+@require_driver
+@_no_test
+async def handle_close_request(request):
+    """POST {reason, text} — попросить оператора района отпустить раньше."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    day = _biz_day()
+    d = await db.get_driver_day(day, me["name"]) or {}
+    try:
+        закрыт = bool((await db.shifts_for_day(day)).get(me.get("district") or ""))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] закрытие дня не прочиталось: {e}")
+        закрыт = False
+    code, res = await close_req.ask(day, me, d, str(body.get("reason") or ""),
+                                    str(body.get("text") or ""), await _in_route(me), закрыт)
+    if code == 200:
+        res["shift"] = await _shift_view(me)
+    return web.json_response(res, status=code, headers=CORS_HEADERS)
+
+
+@require_driver
+@_no_test
+async def handle_close_withdraw(request):
+    """POST — передумал: отозвать запрос, пока оператор не ответил."""
+    me = request["driver"]
+    day = _biz_day()
+    code, res = await close_req.withdraw(day, me["name"], await db.get_driver_day(day, me["name"]))
+    if code == 200:
+        res["shift"] = await _shift_view(me)
+    return web.json_response(res, status=code, headers=CORS_HEADERS)
+
+
 @require_driver
 @_no_test
 async def handle_move_list(request):
@@ -2749,6 +2795,8 @@ def setup(app):
         ("/api/driver/shift/summary",           handle_shift_summary, "GET"),
         ("/api/driver/shift/open",              handle_shift_open,  "POST"),
         ("/api/driver/shift/close",             handle_shift_close, "POST"),
+        ("/api/driver/shift/close-request",     handle_close_request, "POST"),
+        ("/api/driver/shift/close-request/withdraw", handle_close_withdraw, "POST"),
         ("/api/driver/panic",                   handle_panic,       "POST"),
         ("/api/driver/pos",                     handle_pos,         "POST"),
         ("/api/driver/geo/help",                handle_geo_help,    "POST"),

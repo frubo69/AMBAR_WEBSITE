@@ -996,6 +996,23 @@ body.test-drv .wo-fix{display:none}
 .st-r b{display:block;font-size:13.5px;font-weight:600;color:var(--text);line-height:1.25}
 .st-r i{display:block;margin-top:1px;font-style:normal;font-size:12px;line-height:1.3;color:var(--muted)}
 .st-r em{flex:0 0 auto;display:flex;color:var(--muted)}
+/* Просьба закрыть смену раньше (18 сен 2026): кнопка внутри шага «оператор
+   закрыл смену» и лист, где причина выбирается строками, как в бюджете. */
+.st-ask{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:40px;margin:7px 0 0;
+  border-radius:12px;border:1px solid rgba(201,169,110,.45);background:none;color:var(--gold2);
+  font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.st-ask:active{transform:scale(.99)}
+.st-ask.dim{border-color:var(--border3);color:var(--sub)}
+.st-ask[disabled]{opacity:.5;cursor:default;transform:none}
+.cr-rows{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}
+.cr-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border-radius:14px;
+  border:1px solid var(--border3);background:var(--card2);color:var(--text);font-family:inherit;
+  font-size:14px;font-weight:600;text-align:left;cursor:pointer}
+.cr-row:active{transform:scale(.99)}
+.cr-row .rd{flex:0 0 18px;height:18px;border-radius:50%;border:1.5px solid var(--dim)}
+.cr-row.on{border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
+.cr-row.on .rd{border-color:var(--gold2);background:var(--gold2);box-shadow:inset 0 0 0 3.5px #16140f}
+.cr-note{font-size:12px;color:var(--muted);line-height:1.5;margin:10px 2px 14px}
 .st-go{width:100%;height:52px;margin:0;border-radius:16px;border:0;font-family:inherit;font-size:17px;font-weight:700;
   color:#000;-webkit-text-fill-color:#000;background:linear-gradient(135deg,var(--gold),var(--gold2));cursor:pointer;
   box-shadow:0 10px 26px rgba(201,169,110,.22)}
@@ -4222,6 +4239,22 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   </div>
   </div>
 </div>
+</div>
+
+<!-- Просьба закрыть смену раньше: причина строками, слово — оператору района
+     (владелец, 18 сен 2026). -->
+<div class="sheet" id="crSheet" onclick="if(event.target===this)crClose()">
+  <div class="sheet-in">
+    <div class="sheet-t">Закрыть смену раньше</div>
+    <div class="sheet-s">Почему</div>
+    <div class="cr-rows" id="crRows"></div>
+    <textarea id="crText" maxlength="200" placeholder="Комментарий (необязательно)" oninput="crGoState()"></textarea>
+    <div class="cr-note" id="crNote"></div>
+    <div class="sheet-acts">
+      <button class="btn btn-ico" style="width:auto;padding:13px 16px" onclick="crClose()">Отмена</button>
+      <button class="btn btn-pri" id="crGo" onclick="crSend()">Отправить</button>
+    </div>
+  </div>
 </div>
 
 <div class="sheet" id="askSheet" onclick="if(event.target===this)askClose()">
@@ -8072,6 +8105,125 @@ function shExpLine(){
   const allNone = parts.every(x => x.endsWith('не было'));
   return allNone && parts.length > 1 ? 'Бензин и мойка: не было' : parts.join(' · ');
 }
+// ── Просьба закрыть смену раньше (владелец, 18 сен 2026) ─────────────────────
+// Смену района закрывает оператор, и до этого водитель свою не закрывал. Теперь
+// он может попросить раньше: только когда все заказы доставлены. Запрос уходит
+// оператору района в панель; тот отпускает (и решает, питание 80 или 40) или
+// отвечает «не сейчас» с причиной. Молчит десять минут — запрос уходит старшему.
+const CR_REASONS = [['shift_end', 'Моя смена закончилась'], ['sick', 'Плохо себя чувствую'],
+                    ['car', 'Проблема с машиной'], ['other', 'Другое']];
+let CR = {reason: '', busy: false};
+function crOpName(){ return (SH && SH.operator) || (ME && ME.operator) || ''; }
+// «Отправить Умару»: дательный падеж — только там, где он точно правильный.
+function crTo(name){
+  const n = String(name || '').trim();
+  if(!n) return 'оператору';
+  if(/[ьй]$/i.test(n)) return n.slice(0, -1) + 'ю';
+  if(/[бвгджзклмнпрстфхцчшщ]$/i.test(n)) return n + 'у';
+  return 'оператору';
+}
+function crStep(step, n, cr, rel, s1, s2){
+  const op = crOpName() || 'Оператор';
+  if(SH.day_closed){
+    return step(n, 'ok', 'Оператор закрыл смену', 'Смену района закрывает оператор', ['ok', 'Готово'],
+      {ico: ICO.user, t: 'Оператор закрыл смену',
+       s: SH.day_closed_at ? `Закрыта в ${hhmm(SH.day_closed_at)} — заказов больше не будет` : 'Заказов сегодня больше не будет'});
+  }
+  if(rel && cr){
+    return step(n, 'ok', `${esc(cr.by || op)} отпустил вас`, 'Смена района идёт, ваша — к закрытию', ['ok', 'Отпустил'],
+      {ico: ICO.user, t: `Отпустил в ${hhmm(cr.decided_at)}`,
+       s: `Питание за день — ${cr.meal} AED · новых заказов не будет`});
+  }
+  if(cr && cr.status === 'open'){
+    return step(n, 'now', `Ждём ответа: ${esc(cr.to || op)}`, 'Вы попросили закрыть смену раньше', ['wait', 'Ждём'],
+      {ico: ICO.clock, t: `Отправлено в ${hhmm(cr.at)}`,
+       s: esc(cr.reason_t) + (cr.escalated ? ' · передано старшему' : '')},
+      `<button class="st-ask dim" onclick="crWithdraw()">Отозвать запрос</button>`);
+  }
+  if(cr && cr.status === 'no'){
+    const wait = !!cr.next_at && new Date(cr.next_at) > new Date();
+    const why = cr.no_reason_t === 'Другое' && cr.note ? cr.note
+              : cr.no_reason_t + (cr.note ? ' — ' + cr.note : '');
+    return step(n, s1 && s2 ? 'now' : '', `${esc(cr.by || op)}: не сейчас`,
+      'Смену района закроет оператор — или отпустит вас позже', ['no', 'Не сейчас'],
+      {ico: ICO.user, t: esc(why), s: wait ? `Попросить снова можно в ${hhmm(cr.next_at)}` : 'Можно попросить снова'},
+      `<button class="st-ask" ${wait || !s1 ? 'disabled' : ''} onclick="crOpen()">Попросить снова</button>`);
+  }
+  const can = !(ME && ME.test);
+  return step(n, s1 && s2 ? 'now' : '', 'Оператор закрыл смену', 'Смену района закрывает оператор', ['wait', 'Ожидание'],
+    {ico: ICO.user, t: 'Смена района ещё идёт', s: 'Оператор закроет её — или отпустит вас раньше'},
+    !can ? '' : s1 ? `<button class="st-ask" onclick="crOpen()">Попросить закрыть раньше</button>`
+                   : `<button class="st-ask dim" disabled>Попросить раньше — когда заказы доставлены</button>`);
+}
+function crOpen(){
+  CR = {reason: '', busy: false};
+  const op = crOpName();
+  document.getElementById('crRows').innerHTML = CR_REASONS.map(([k, t]) =>
+    `<button class="cr-row" data-k="${k}" onclick="crPick('${k}')"><span class="rd"></span>${t}</button>`).join('');
+  const tx = document.getElementById('crText');
+  tx.value = ''; tx.placeholder = 'Комментарий (необязательно)';
+  document.getElementById('crNote').textContent =
+    `Запрос уйдёт оператору вашего района${op ? ' — ' + op : ''}. Пока он не ответил, заказы вам ещё могут назначать. `
+    + 'Не ответит за десять минут — запрос уйдёт старшему.';
+  document.getElementById('crGo').textContent = 'Отправить ' + crTo(op);
+  crGoState();
+  document.getElementById('crSheet').classList.add('show');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function crPick(k){
+  CR.reason = k;
+  document.querySelectorAll('#crRows .cr-row').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  document.getElementById('crText').placeholder = k === 'other' ? 'Что случилось — одной фразой' : 'Комментарий (необязательно)';
+  crGoState();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function crGoState(){
+  const t = (document.getElementById('crText').value || '').trim();
+  document.getElementById('crGo').disabled = CR.busy || !CR.reason || (CR.reason === 'other' && !t);
+}
+function crClose(){ document.getElementById('crSheet').classList.remove('show'); }
+const CR_ERR = {
+  orders_in_route: () => 'Сначала доставьте все заказы',
+  exists: () => 'Запрос уже отправлен — ждём ответа',
+  too_soon: p => `Попросить снова можно в ${hhmm(p.next_at)}`,
+  released: () => 'Вас уже отпустили — закройте смену',
+  day_closed: () => 'Смену района уже закрыли — закрывайте свою',
+  not_open: () => 'Смена не открыта',
+  text_required: () => 'Напишите, что случилось',
+};
+async function crSend(){
+  if(CR.busy || !CR.reason) return;
+  const text = (document.getElementById('crText').value || '').trim();
+  CR.busy = true; crGoState();
+  try{
+    const r = await drvApi.drvFetch('/api/driver/shift/close-request',
+      {method: 'POST', body: {reason: CR.reason, text}});
+    if(r.shift) SH = r.shift;
+    crClose();
+    toast('Запрос отправлен');
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){
+    const p = e.payload || {};
+    toast(CR_ERR[p.error] ? CR_ERR[p.error](p) : 'Не отправилось — повторите', 'err');
+    await shLoad();
+  }
+  CR.busy = false; crGoState();
+  if(TAB === 'shift') render();
+}
+function crWithdraw(){
+  ASK = {t: 'Отозвать запрос?', s: 'Оператор перестанет его видеть. Попросить снова можно сразу.',
+         btn: 'Отозвать', fn: crWithdrawGo};
+  renderAsk();
+}
+async function crWithdrawGo(){
+  try{
+    const r = await drvApi.drvFetch('/api/driver/shift/close-request/withdraw', {method: 'POST'});
+    if(r.shift) SH = r.shift;
+    toast('Запрос отозван');
+  }catch(e){ toast('Не получилось — повторите', 'err'); await shLoad(); }
+  if(TAB === 'shift') render();
+}
+
 function renderShift(){
   const box = document.getElementById('body');
   if(!SH){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
@@ -8085,7 +8237,7 @@ function renderShift(){
 
   // Шаг ленты: номер, состояние (ok / now / wait), заголовок, подпись, плашка,
   // вложенная строка со значком и переходом.
-  const step = (n, state, title, sub, chip, row) => `<div class="st ${state}">
+  const step = (n, state, title, sub, chip, row, extra) => `<div class="st ${state}">
       <div class="st-l"><span class="st-c">${state === 'ok' ? svg(ICO.ok, 15) : n}</span></div>
       <div class="st-b">
         <div class="st-h"><div><b class="st-t">${n}. ${title}</b><i class="st-s">${sub}</i></div>
@@ -8094,14 +8246,17 @@ function renderShift(){
           <span class="i">${svg(row.ico, 16)}</span>
           <span class="b"><b>${row.t}</b><i>${row.s}</i></span>
           ${row.go ? `<em>${svg(ICO.chevR, 14)}</em>` : ''}
-        </${row.go ? 'button' : 'div'}>
+        </${row.go ? 'button' : 'div'}>${extra || ''}
       </div>
     </div>`;
 
   let steps, btn;
   if(on){
     const inl = SH.intake || [];
-    const s1 = !route.length, s2 = !must.length, s3 = !!SH.day_closed, ready = s1 && s2 && s3 && !inl.length;
+    // Третий шаг проходят двумя путями: оператор закрыл смену района или
+    // отпустил этого водителя раньше по его просьбе (18 сен 2026).
+    const cr = SH.close_req || null, rel = !!SH.released;
+    const s1 = !route.length, s2 = !must.length, s3 = !!SH.day_closed || rel, ready = s1 && s2 && s3 && !inl.length;
     // Приёмка взята или начата — отдельный шаг со ссылкой в задачу; нет
     // приёмки — шага нет, нумерация сдвигается (владелец, 16 сен 2026).
     let n = 0;
@@ -8128,13 +8283,7 @@ function renderShift(){
         s2 ? {ico: ICO.note, t: 'Расходы заполнены', s: esc(shExpLine()), go: "setTab('expenses')"}
            : {ico: ICO.note, t: `Не отвечено: ${esc(mustNames.join(', '))}`,
               s: 'Сумма или «не было» — в расходах', go: "setTab('expenses')"})
-      + step(++n, s3 ? 'ok' : (s1 && s2 ? 'now' : ''), 'Оператор закрыл смену',
-        'Смену района закрывает оператор',
-        s3 ? ['ok', 'Готово'] : ['wait', 'Ожидание'],
-        s3 ? {ico: ICO.user, t: 'Оператор закрыл смену',
-              s: SH.day_closed_at ? `Закрыта в ${hhmm(SH.day_closed_at)} — заказов больше не будет` : 'Заказов сегодня больше не будет'}
-           : {ico: ICO.user, t: 'Смена ещё не закрыта',
-              s: 'Оператор подтвердит после проверки'})
+      + crStep(step, ++n, cr, rel, s1, s2)
       + step(++n, ready ? 'now' : '', 'Закрыть смену',
         `Когда первые ${n - 1 === 3 ? 'три' : n - 1 === 4 ? 'четыре' : 'пять'} шага выполнены`,
         ['wait', 'Ожидание'],

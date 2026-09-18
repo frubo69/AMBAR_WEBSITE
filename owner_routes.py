@@ -502,7 +502,7 @@ async def _drivers_spend(start, end) -> dict:
     for r in rows:
         name = (r.get("driver") or "").strip() or "—"
         w = r.get("working")
-        m = _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+        m = _staff.meal_of(r)
         if w is True:
             days_working += 1
         elif w is False:
@@ -3787,7 +3787,7 @@ async def cash_round(day: str) -> dict:
         for d in team:
             r = saved.get(d["name"]) or {}
             w = r.get("working")
-            meal = _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+            meal = _staff.meal_of(r)
             if w is not None:
                 spend += meal
                 items.append({"id": "", "kind": "meal", "kind_t": "Питание", "who": d["name"],

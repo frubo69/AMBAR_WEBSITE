@@ -140,6 +140,7 @@ function fresh(){
       lines: [mvLine('p6', 'jvc', 2)],
     },
     exp: [], noexp: {}, asked: [], wo: [], seq: 0, scans: 0,
+    cr: null,               // просьба закрыть смену раньше
   };
 }
 let S = (function(){
@@ -176,9 +177,17 @@ function tick(){
     o1.chat_n = (o1.chat_n || 0) + 1; o1.chat_new = 1;
     o1.chat_last = {text: msg.text, at: msg.at, name: 'Умар'};
   }
+  // Просьба закрыть смену раньше: в демо оператор отвечает сам через
+  // пятнадцать секунд — отпускает, питание оставляет 80.
+  if(S.cr && S.cr.status === 'open' && now() - S.cr.at_ms > 15000){
+    Object.assign(S.cr, {status: 'ok', by: 'Умар', decided_at: iso(now()), meal: 80});
+  }
   // Смену района закрывает оператор, и только после этого водитель закрывает
-  // свою. В демо оператор «просыпается», когда все заказы доставлены.
-  if(!S.ev.dayclose && S.ord.length >= 2 && S.ord.every(o => o.delivered_at)) S.ev.dayclose = now() + 20000;
+  // свою. В демо оператор «просыпается» через полторы минуты после последней
+  // доставки — чтобы успеть попробовать и «попросить закрыть раньше»; пока
+  // такая просьба ждёт ответа, район он не закрывает.
+  if(!S.ev.dayclose && S.ord.length >= 2 && S.ord.every(o => o.delivered_at)
+     && !(S.cr && S.cr.status === 'open')) S.ev.dayclose = now() + 90000;
   // Расход старший смотрит не мгновенно: полминуты «на согласовании» — это то,
   // что водитель видит в жизни, и в демо это видно тоже.
   S.exp.forEach(function(e){
@@ -299,6 +308,10 @@ function shiftView(){
     ...(S.ev.dayclose && now() > S.ev.dayclose
         ? {day_closed: true, day_closed_at: iso(S.ev.dayclose)} : {}),
     geo_bot: '', ...(sh.closed ? {after_close: true, report_day: S.day, report_closed_at: iso(sh.closed_at)} : {}),
+    close_req: S.cr ? {id: S.cr.id, status: S.cr.status, at: iso(S.cr.at_ms), reason: S.cr.reason,
+                       reason_t: S.cr.reason_t, to: 'Умар', by: S.cr.by || '', decided_at: S.cr.decided_at || '',
+                       meal: S.cr.meal || null, note: '', no_reason_t: '', escalated: false, next_at: ''} : null,
+    released: !!(S.cr && S.cr.status === 'ok'), operator: 'Умар',
   };
 }
 function summary(){
@@ -359,13 +372,29 @@ function route(path, opts){
     return shiftView();
   }
   if(p === '/api/driver/shift/summary') return summary();
+  if(p === '/api/driver/shift/close-request'){
+    const v = shiftView();
+    if(v.in_route.length) err(409, {error: 'orders_in_route', ids: v.in_route});
+    if(S.cr && S.cr.status === 'open') err(409, {error: 'exists'});
+    const R = {shift_end: 'Моя смена закончилась', sick: 'Плохо себя чувствую', car: 'Проблема с машиной', other: 'Другое'};
+    const t = String(body.text || '').trim();
+    S.cr = {id: 'c' + (++S.seq), status: 'open', at_ms: now(), reason: body.reason,
+            reason_t: body.reason === 'other' && t ? t : (R[body.reason] || '') + (t && body.reason !== 'other' ? ' · ' + t : '')};
+    save();
+    return {ok: true, shift: shiftView()};
+  }
+  if(p === '/api/driver/shift/close-request/withdraw'){
+    if(S.cr && S.cr.status === 'open') S.cr.status = 'withdrawn';
+    save();
+    return {ok: true, shift: shiftView()};
+  }
   if(p === '/api/driver/shift/close'){
     const v = shiftView();
     if(v.in_route.length) err(409, {error: 'orders_in_route', ids: v.in_route});
     if(v.intake.length) err(409, {error: 'intake_open'});
     if(!S.mv.done_at && S.mv.driver === ME.name) err(409, {error: 'moves_open'});
     if(v.must.length) err(409, {error: 'expenses_left'});
-    if(!v.day_closed) err(409, {error: 'day_open'});
+    if(!v.day_closed && !v.released) err(409, {error: 'day_open'});
     S.sh.closed = true; S.sh.closed_at = now(); save();
     return shiftView();
   }

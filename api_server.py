@@ -152,6 +152,13 @@ async def on_startup(app):
         app["owner_sweep"] = asyncio.create_task(owner_sweep.loop(app))
     except Exception as e:
         log.warning(f"[owner-sweep] не запустился: {e}")
+    # Водитель просит закрыть смену раньше, а оператор района молчит десять
+    # минут — запрос уходит старшему в бот (18 сен 2026).
+    try:
+        import close_req
+        app["close_req"] = asyncio.create_task(close_req.loop(app))
+    except Exception as e:
+        log.warning(f"[close] не запустился: {e}")
 
 
 async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):

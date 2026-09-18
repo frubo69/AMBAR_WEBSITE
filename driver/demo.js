@@ -348,10 +348,40 @@ function summary(){
           app: {n: app.length, aed: app.reduce((a, o) => a + o.total, 0)},
           crypto: {n: 0, aed: 0}, debt: {n: 0, aed: 0}, free: {n: 0, aed: 0}},
     expenses: Object.values(byKind), exp_n: S.exp.length,
+    hand: demoHand(done),
     exp_pending: S.exp.filter(e => e.status === 'pending').length,
     writeoffs: S.wo.length, writeoff_qty: S.wo.length,
     ...(S.sh.closed ? {closed_at: iso(S.sh.closed_at)} : {}),
   };
+}
+// Две пачки — как на боевом сервере (cash_math.piles): выручка (валюта как
+// есть + дирхамы) и чай операторов; питание и бонус остаются водителю.
+function demoHand(done){
+  const fx = {}; let aed = 0, n = 0;
+  done.filter(o => !o.prepaid).forEach(function(o){
+    n++;
+    const s = o.settle || null;
+    if(s && s.fx){ const x = fx[s.fx.code] || (fx[s.fx.code] = {code: s.fx.code, sym: s.fx.sym || s.fx.code, amount: 0, aed: 0});
+                   x.amount = num(x.amount + (+s.fx.amount || 0)); x.aed = num(x.aed + (+s.taken || 0)); return; }
+    if(!s && o.pay_fx){ const f = o.pay_fx, x = fx[f.code] || (fx[f.code] = {code: f.code, sym: f.sym || f.code, amount: 0, aed: 0});
+                        x.amount = num(x.amount + num(o.total / f.rate)); x.aed = num(x.aed + o.total); return; }
+    aed += s ? (+s.taken || 0) : o.total;
+  });
+  const live = S.exp.filter(e => e.status !== 'rejected');
+  const spent = {}; let got = 0, bonus = 0, cs = 0, cg = 0, pend = 0;
+  live.forEach(function(e){
+    if(e.kind === 'upsell'){ bonus += e.amount; return; }
+    if(e.pay === 'card'){ if(e.plus) cg += e.amount; else cs += e.amount; return; }
+    if(e.plus) got += e.amount; else spent[KIND_T[e.kind] || 'Расход'] = (spent[KIND_T[e.kind] || 'Расход'] || 0) + e.amount;
+    if(e.status === 'pending') pend++;
+  });
+  const fxs = Object.values(fx), fxAed = fxs.reduce((a, x) => a + x.aed, 0);
+  const sp = Object.values(spent).reduce((a, v) => a + v, 0), meal = S.sh.opened ? 80 : 0, tea = 0;
+  const taken = num(aed + fxAed), revenue = num(taken - tea - sp - meal - bonus + got);
+  return {taken: taken, taken_aed: num(aed), orders_cash: n, fx: fxs, tea: tea, tea_other: 0, tea_by: [],
+          spent: Object.keys(spent).map(k => ({t: k, aed: spent[k]})), spent_sum: sp, got: got, meal: meal,
+          bonus: bonus, card_spent: cs, card_got: cg, pending: pend, revenue: revenue,
+          revenue_aed: num(revenue - fxAed), keep: meal + bonus, in_hand: num(revenue + tea + meal + bonus)};
 }
 const KIND_T = {fuel: 'Заправка', wash: 'Мойка', parking: 'Парковка', guard: 'Охрана', kfc: 'KFC · премия',
                 we_gave: 'Мы вернули', owed_us: 'Нам должны', we_got: 'Нам вернули', we_owe: 'Мы должны',

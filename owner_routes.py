@@ -3957,10 +3957,11 @@ async def _chk_orders(day_start, day_end):
 async def cash_round(day: str) -> dict:
     """Сбор денег по районам за учётный день.
 
-    На каждый район — что водители везут в кассу наличными, чаевые его людей
-    и расход за смену (питание и согласованные разовые), отсюда «к сдаче» =
-    наличные − расход. Разовые, оплаченные безналом (18 сен 2026), наличных не
-    тронули и из «к сдаче» не вычитаются — они отдельно, spend_card. Отметка «собрано» стоит на районе, а не на дне: деньги
+    На каждый район — что водители везут в кассу наличными, чай операторов и
+    расход за смену (питание и согласованные разовые). Старший забирает две
+    пачки: выручку = наличные − чай − расход и чай (19 сен 2026, как в
+    «Обзоре»: чай сидит в цене бутылки). Разовые, оплаченные безналом (18 сен
+    2026), наличных не тронули и не вычитаются — они отдельно, spend_card. Отметка «собрано» стоит на районе, а не на дне: деньги
     сдают по одному, и старший заходит сюда несколько раз за смену. Задача в
     чек-листе выполнена, когда собраны все районы, где было что собирать."""
     import expense_routes as _exp
@@ -3987,11 +3988,25 @@ async def cash_round(day: str) -> dict:
     marks = await db.checklist_get(day)
     legacy = bool((marks.get("cash") or {}).get("done"))     # старая отметка на весь день
     out, done_n, need_n, net_total = [], 0, 0, 0
+    import cash_math
     for oid in OFFICE_IDS:
         dl = by_o.get(oid, [])
-        cash = sum(int(o.get("total") or 0) for o in dl
-                   if o.get("payment_method") != "debt" and not _is_prepaid_order(o))
-        tips = _tips_for(dl)["total"]
+        # Наличные — что водители физически держат (по расчёту, валюта — по
+        # курсу заказа), без «без оплаты»; чай — как в «Обзоре», со всех
+        # доставленных заказов района (19 сен 2026, та же арифметика, что в
+        # итогах смены водителя: cash_math).
+        cash_orders = [o for o in dl if cash_math.pays_cash(o)]
+        cash = int(round(sum(cash_math.order_money(o)["aed"] for o in cash_orders)))
+        tips = sum(cash_math.order_tea(o) for o in dl)
+        fx: dict = {}
+        for o in cash_orders:
+            m_ = cash_math.order_money(o)
+            if m_["fx"]:
+                code, amount = m_["fx"]
+                x = fx.setdefault(code, {"code": code, "sym": cash_math.FX_SYM.get(code, code),
+                                         "amount": 0.0, "aed": 0.0})
+                x["amount"] = round(x["amount"] + amount, 2)
+                x["aed"] = round(x["aed"] + m_["aed"], 2)
         team = [d for d in _staff.drivers() if d.get("district") == oid]
         operator = (team[0].get("operator") if team else "") or ""
         items, spend, pending, spend_card = [], 0, 0, 0
@@ -4033,12 +4048,14 @@ async def cash_round(day: str) -> dict:
             need_n += 1
             if done:
                 done_n += 1
-        net = cash - spend
+        # Выручка — без чая: чай сидит в цене бутылки и сдаётся отдельной
+        # пачкой (владелец, 19 сен 2026: «две пачки — выручка и чай»).
+        net = cash - tips - spend
         net_total += net
         out.append({"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
                     "operator": operator, "drivers": [d["name"] for d in team],
                     "orders": len(dl), "cash": cash, "tips": tips, "spend": spend,
-                    "spend_card": spend_card,
+                    "spend_card": spend_card, "fx": sorted(fx.values(), key=lambda v: v["code"]),
                     "spend_pending": pending, "net": net, "items": items,
                     "empty": empty, "done": done, "done_at": str(m.get("at") or "")})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,

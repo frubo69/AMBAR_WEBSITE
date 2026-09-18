@@ -681,6 +681,19 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         wos = []
     wos = [w for w in wos if (w.get("state") or "ok") != "no"]
     gross = sum(v["aed"] for k, v in pay.items() if k != "free")
+    # Две пачки (владелец, 19 сен 2026): сдать выручку и чай операторов
+    # порознь, валюту — как есть; своё (питание, бонус за допродажу) — у
+    # водителя. Та же арифметика, что в «Сборе выручки» у старшего.
+    import cash_math
+    hand = cash_math.piles(mine, extras, staff.meal_of(d) if d.get("working") is not None else 0)
+    tea_by: dict = {}
+    for o in mine:
+        if not cash_math.pays_cash(o):
+            continue
+        t = cash_math.order_tea(o)
+        if t:
+            who = (o.get("created_by_name") if o.get("source") == "manual" else "") or "из приложения"
+            tea_by[who] = tea_by.get(who, 0) + t
     # Бонус за допродажу: 5% от добавленного водителем в пути (по доставленным).
     ups = [o.get("upsell") for o in mine if o.get("upsell")]
     upsell = {"bonus": sum(int(u.get("bonus") or 0) for u in ups),
@@ -694,6 +707,7 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         "on_hand": int(round(cash_taken - spent + got)),
         "cash_taken": int(round(cash_taken)), "spent": spent, "got": got,
         "spent_card": spent_card, "got_card": got_card,
+        "hand": {**hand, "tea_by": [{"who": w, "aed": a} for w, a in sorted(tea_by.items(), key=lambda x: -x[1])]},
         "tips": tips, "tips_cash": tips_cash, "tips_other": tips - tips_cash,
         "tips_by": [{"who": w, "aed": a} for w, a in sorted(by_op.items(), key=lambda x: -x[1]) if a],
         "orders": sum(v["n"] for k, v in pay.items() if k != "free"), "gross": gross,

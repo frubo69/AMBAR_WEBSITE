@@ -49,6 +49,10 @@ async def main():
        [("fuel", 150, False), ("parking", 36, False), ("we_got", 30, True)])
     eq("на согласовании", (m["exp_n"], m["exp_pending"]), (3, 1))
     eq("списания (отклонённое не в счёт)", (m["writeoffs"], m["writeoff_qty"]), (1, 2))
+    h = m["hand"]
+    eq("две пачки: взято 360, чай со всех заказов 60 (из них не наличными 40)", (h["taken"], h["tea"], h["tea_other"]), (360, 60, 40))
+    eq("выручка = 360 − чай 60 − расход 186 + приход 30", (h["revenue"], h["spent_sum"], h["got"]), (144, 186, 30))
+    eq("в руках = выручка + чай (питания нет — не отмечен)", (h["in_hand"], h["keep"]), (204, 0))
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 asyncio.run(main())

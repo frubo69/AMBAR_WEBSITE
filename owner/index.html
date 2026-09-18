@@ -6041,6 +6041,13 @@ button.shl-p:active{transform:scale(.96)}
   line-height:1;color:var(--warn);font-variant-numeric:tabular-nums}
 .exp-pend-a u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;
   color:var(--muted);margin-left:4px;letter-spacing:.6px}
+/* Как платил водитель — меткой у суммы (19 сен 2026: «покажи, где старший
+   видит безналичный расчёт»): безнал — синим, наличные — тихо. */
+.exp-pay{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:999px;font-family:'DM Sans',sans-serif;font-style:normal;
+  font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.2;
+  color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border2)}
+.exp-pay.card{color:var(--info);background:rgba(91,141,239,.14);border-color:rgba(91,141,239,.5)}
+.exp-pend-a .exp-pay{display:block;width:max-content;margin-left:auto}
 .exp-pend-ph{display:flex;gap:8px;margin-top:11px}
 .exp-ph{flex:0 0 auto;width:96px;padding:0;border:0;background:none;cursor:pointer;
   font-family:inherit;text-align:left;color:var(--muted)}
@@ -17934,7 +17941,8 @@ function crCard(x){
       <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${net < 0 ? '−' : ''}${fmt(Math.abs(net))}<u>AED</u></b></span>
       <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(x.tips)}<u>AED</u></b></span>
     </div>
-    <div class="cr-sub">наличные <b>${fmt(x.cash)}</b> · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · расход <b>${fmt(x.spend)}</b> за смену${
+    <div class="cr-sub">наличные <b>${fmt(x.cash)}</b>${(x.fx || []).length ? ` (из них ${
+      x.fx.map(f => `<b>${escS(f.sym)}${fmt(f.amount)}</b>`).join(', ')} валютой)` : ''} · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · чаевые <b>${fmt(x.tips)}</b> · расход <b>${fmt(x.spend)}</b> за смену${
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}</div>
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
@@ -27455,18 +27463,20 @@ function expPhotos(e){
 }
 
 // Как платил водитель (владелец, 18 сен 2026): безналом — наличных водителя
-// трата не тронула, и из «к сдаче» и выручки дня она не вычитается.
+// трата не тронула, и из «к сдаче» она не вычитается. Меткой у суммы —
+// заметно с первого взгляда (19 сен 2026).
 const EXP_PAY_W = {cash: 'наличными', card: 'безналом'};
+const expPayTag = e => EXP_PAY_W[e.pay] ? `<i class="exp-pay${e.pay === 'card' ? ' card' : ''}">${EXP_PAY_W[e.pay]}</i>` : '';
 // Ожидающий расход — карточкой: вид и сумма, снимки крупно, под ними решение.
 function expPendCard(r, e){
   const ph = expPhotos(e);
   const кто = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', EXP_PAY_W[e.pay] || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
+               e.bottle || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
   return `<div class="exp-pend" id="pend-${escS(e.id)}">
     <div class="exp-pend-h">
       <span class="exp-pend-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
         кто ? `<i>${escS(кто)}</i>` : ''}</span>
-      <span class="exp-pend-a">${fmt(e.amount)}<u>AED</u></span>
+      <span class="exp-pend-a">${fmt(e.amount)}<u>AED</u>${expPayTag(e)}</span>
     </div>
     ${ph.length ? `<div class="exp-pend-ph">${ph.map((p, i) => `
       <button class="exp-ph" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})">
@@ -27502,7 +27512,7 @@ function expDoneRow(r, e){
   const st = e.status || 'approved';
   const ph = expPhotos(e);
   const что = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', EXP_PAY_W[e.pay] || '', e.by_driver ? 'от водителя' : '',
+               e.bottle || '', e.by_driver ? 'от водителя' : '',
                e.no_receipt ? 'без чека' : ''].filter(Boolean).join(' · ');
   return `<div class="exp-done ${st}">
     ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `
@@ -27512,7 +27522,7 @@ function expDoneRow(r, e){
       что ? `<i>${escS(что)}</i>` : ''}</span>
     <span class="exp-done-r">
       <b>${fmt(e.amount)}<u>AED</u></b>
-      <i>${st === 'rejected' ? 'отклонён' : 'принят'}</i>
+      <i>${st === 'rejected' ? 'отклонён' : 'принят'}</i>${expPayTag(e)}
     </span>
     ${st === 'approved' ? `<button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
         aria-label="Убрать">✕</button>` : ''}

@@ -2716,6 +2716,18 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .shs-tip .shs-r{padding:8px 0;border-top:1px solid rgba(201,169,110,.28);margin-top:2px}
 .shs-tip .shs-r span{color:var(--text);font-weight:600}
 .shs-tip .shs-r b{color:var(--gold);font-size:17px}
+/* Две пачки: выручка и чай — рядом, крупно; валюта — своей строкой над дирхамами. */
+.shs-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.shs-pile{display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;border-radius:14px;
+  background:rgba(8,10,16,.35);border:1px solid rgba(201,169,110,.35)}
+.shs-pile i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--gold2)}
+.shs-pile b{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1.1;color:var(--gold);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shs-pile b.fx{font-size:24px;color:#F2E3C2}
+.shs-pile b u{text-decoration:none;font-size:13px;color:var(--gold2);margin-left:4px}
+.shs-pile s{text-decoration:none;font-size:11px;color:var(--sub);margin-top:3px}
+.shs-i{font-style:normal;font-size:11.5px;color:var(--muted);margin-left:6px}
+.shs-r.sub span{padding-left:10px}
 .shs-none,.shs-note{padding:9px 0;font-size:12.5px;color:var(--muted)}
 .shs-note{color:var(--warn)}
 .shs-ok{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;margin-bottom:10px;border-radius:15px;
@@ -6054,30 +6066,56 @@ function shsPaint(){
 function shsPaintMid(){
   const m = SHS, aed = v => `${fmt(v)}<u>AED</u>`, sk = w => skb(w, 14);
   const row = (t, v, cls) => `<div class="shs-r${cls ? ' ' + cls : ''}"><span>${t}</span><b>${v}</b></div>`;
-  // Чай операторов — первым и золотом: владелец просил акцент именно на нём.
+  // Сдать старшему — две пачки, первым и золотом (владелец, 19 сен 2026:
+  // «заработал 1000, заправился на 100, помылся на 50, и ещё 50 — чай
+  // операторов; он сдаёт две пачки: выручку и чай. А если есть валюта —
+  // сколько в валюте, сколько в дирхамах и сколько чай»). Та же арифметика,
+  // что у старшего в «Сборе выручки» (cash_math на сервере).
+  const h = m && m.hand;
   const up = m && m.upsell && m.upsell.bonus ? m.upsell : null;
-  let html = `<div class="shs-tip">
-      <div class="shs-l">Чай операторов</div>
-      <div class="shs-v">${m ? aed(m.tips) : sk(100)}</div>
-      ${m ? (m.tips_by || []).map(x => row(esc(x.who), aed(x.aed))).join('') : ''}
-      <div class="shs-s">${m ? (m.tips
-          ? `отдать операторам из наличных на руках${m.tips_other ? ` · ${fmt(m.tips_other)} из них по безналу` : ''}`
-          : 'чая сегодня не было') : sk(150)}</div>
-    </div>
-    ${up ? `<div class="shs-tip shs-upsell">
-      <div class="shs-l">Ваш бонус за допродажу</div>
-      <div class="shs-v">+${aed(up.bonus)}</div>
-      <div class="shs-s">5% от ${fmt(up.aed)} AED · ${up.n} ${plural(up.n,'позиция','позиции','позиций')} добавили в пути в ${up.orders} ${plural(up.orders,'заказе','заказах','заказах')} · остаётся у вас, из наличных на руках уже вычтено</div>
-    </div>` : ''}
-    <div class="shs-hero dcard">
-      <div class="shs-l">Наличные на руках</div>
-      <div class="shs-v">${m ? aed(m.on_hand) : sk(120)}</div>
-      <div class="shs-s">${m ? `взято наличными ${fmt(m.cash_taken)} − расходы ${fmt(m.spent)}${
-          m.got ? ' + приход ' + fmt(m.got) : ''}${m.spent_card || m.got_card ? ` · безналом ${
-          [m.spent_card ? 'расход ' + fmt(m.spent_card) : '', m.got_card ? 'приход ' + fmt(m.got_card) : ''].filter(Boolean).join(', ')
-          } — в наличные не входит` : ''}` : sk(180)}</div>
-      ${m && m.tips ? `<div class="shs-r sum"><span>После чая операторам</span><b>${aed(Math.max(0, m.on_hand - m.tips))}</b></div>` : ''}
+  const cur = x => `${esc(x.sym)}${fmt(x.amount)}`;
+  const minus = v => '−' + aed(Math.abs(v));
+  let html = `<div class="shs-tip shs-give">
+      <div class="shs-l">Сдать старшему · две пачки</div>
+      <div class="shs-two">
+        <div class="shs-pile">
+          <i>Выручка</i>
+          ${h ? (h.fx || []).map(x => `<b class="fx">${cur(x)}</b>`).join('') : ''}
+          <b>${h ? (h.revenue_aed < 0 ? minus(h.revenue_aed) : aed(h.revenue_aed)) : sk(90)}</b>
+          ${h && (h.fx || []).length ? `<s>всего ${fmt(h.revenue)} AED по курсу</s>` : ''}
+        </div>
+        <div class="shs-pile tea">
+          <i>Чай операторов</i>
+          <b>${h ? aed(h.tea) : sk(70)}</b>
+          ${h && h.tea_other ? `<s>${fmt(h.tea_other)} из них — с оплаченных онлайн</s>` : ''}
+        </div>
+      </div>
+      ${h && (h.tea_by || []).length ? `<div class="shs-s">чай: ${(h.tea_by || []).map(x => `${esc(x.who)} ${fmt(x.aed)}`).join(' · ')}</div>` : ''}
     </div>`;
+  if(h){
+    // Своё — то, что водитель оставляет себе: питание за день и бонус.
+    html += `<div class="dcard shs-card"><div class="shs-h">Остаётся у вас</div>
+      ${h.meal ? row('Питание за день', aed(h.meal)) : ''}
+      ${h.bonus ? row(`Бонус за допродажу${up ? ` <i class="shs-i">5% от ${fmt(up.aed)} AED · ${up.n} ${plural(up.n,'позиция','позиции','позиций')}</i>` : ''}`, aed(h.bonus)) : ''}
+      ${h.keep ? row('Всего', aed(h.keep), 'sum') : '<div class="shs-none">Питание отметит оператор</div>'}
+    </div>`;
+    // Как считали — строками, в том порядке, в каком водитель считает сам.
+    html += `<div class="dcard shs-card"><div class="shs-h">Как считали</div>
+      ${row(`Взято наличными за заказы · ${h.orders_cash}`, aed(h.taken))}
+      ${(h.fx || []).map(x => row(`<i class="shs-i">из них ${cur(x)} по курсу</i>`, aed(x.aed), 'sub')).join('')}
+      ${h.tea ? row('Чай операторов', minus(h.tea)) : ''}
+      ${(h.spent || []).map(x => row(esc(x.t), minus(x.aed))).join('')}
+      ${h.meal ? row('Питание — у вас', minus(h.meal)) : ''}
+      ${h.bonus ? row('Бонус за допродажу — у вас', minus(h.bonus)) : ''}
+      ${h.got ? row('Приход наличными', '+' + aed(h.got), 'plus') : ''}
+      ${row('Выручка', h.revenue < 0 ? minus(h.revenue) : aed(h.revenue), 'sum')}
+      ${h.card_spent || h.card_got ? `<div class="shs-note">Безналом — наличных не трогали: ${
+        [h.card_spent ? 'расход ' + fmt(h.card_spent) + ' AED' : '', h.card_got ? 'приход ' + fmt(h.card_got) + ' AED' : '']
+          .filter(Boolean).join(', ')}</div>` : ''}
+      ${h.pending ? `<div class="shs-note">${h.pending} ${plural(h.pending, 'расход', 'расхода', 'расходов')} ещё на согласовании — посчитаны, как будто приняты</div>` : ''}
+      <div class="shs-note">Всего наличных у вас: ${fmt(h.in_hand)} AED${(h.fx || []).length ? ' по курсу' : ''} — выручка, чай и своё</div>
+    </div>`;
+  }
   if(m){
     const p = m.pay || {};
     const pr = (k, t) => p[k] && p[k].n ? row(`${t} · ${p[k].n}`, aed(p[k].aed)) : '';

@@ -1643,6 +1643,16 @@ def _TEST_OFFICE() -> dict:
     return dict(TEST_OFFICE)
 
 
+def _car_of(name: str) -> dict | None:
+    """Машина водителя из реестра — {model, color, plate} или None."""
+    row = next((r for r in staff.roster_rows() if r.get("name") == name), None)
+    car = (row or {}).get("car") or None
+    if not car:
+        return None
+    return {"model": str(car.get("model") or ""), "color": str(car.get("color") or ""),
+            "plate": str(car.get("plate") or "")}
+
+
 async def _staff_payload() -> dict:
     """Штат целиком: районы, операторы, водители и их телефоны. Одним куском,
     потому что его же отдают ручки перестановок и телефонов после своих
@@ -1679,7 +1689,9 @@ async def _staff_payload() -> dict:
                      "base": staff.base_district(n),
                      "moved": next((d for d in OFFICE_IDS
                                     if n in staff.DISTRICT_DRIVERS.get(d, [])), "")
-                              != staff.base_district(n)}
+                              != staff.base_district(n),
+                     # Машина водителя — видна под именем (18 сен 2026).
+                     "car": _car_of(n)}
                     for n in staff.driver_names()],
     }
 
@@ -1724,7 +1736,8 @@ def _links_view() -> list:
                     "linked": bool(r.get("telegram_id")),
                     "tg_name": r.get("tg_name", "") or "", "tg_username": r.get("tg_username", "") or "",
                     "linked_at": _iso_dt(r.get("linked_at")) if r.get("telegram_id") else "",
-                    "code_active": bool(until), "code_until": _iso_dt(until) if until else ""})
+                    "code_active": bool(until), "code_until": _iso_dt(until) if until else "",
+                    "car": _car_of(r.get("name", ""))})
     return out
 
 
@@ -1767,6 +1780,29 @@ async def handle_drivers_add(request):
     await db.driver_add(name, district, request.get("owner_id") or 0, bool(body.get("test")))
     await staff.sync(force=True)
     log.info(f"[staff] заведён водитель {name} · {OFFICE_CODES.get(district)} ({request.get('owner_id')})")
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_drivers_car(request):
+    """POST {name, model, color, plate} — машина водителя (владелец, 18 сен
+    2026: «за каждым водителем закрепить его автомобиль»). Все три поля
+    пустые — машину снять."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = str(body.get("name") or "").strip()
+    if not any(r.get("name") == name for r in staff.roster_rows()):
+        return web.json_response({"error": "unknown_driver"}, status=404, headers=CORS_HEADERS)
+    clean = lambda v, n: re.sub(r"\s+", " ", str(v or "")).strip()[:n]
+    car = {"model": clean(body.get("model"), 40), "color": clean(body.get("color"), 24),
+           "plate": clean(body.get("plate"), 16)}
+    if not any(car.values()):
+        car = None
+    await db.driver_car_set(name, car, request.get("owner_id") or 0)
+    await staff.sync(force=True)
+    log.info(f"[staff] машина {name}: {car or 'снята'} ({request.get('owner_id')})")
     return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
@@ -4478,7 +4514,8 @@ def setup(app):
     for _p, _h in (("/api/owner/drivers/add", handle_drivers_add),
                    ("/api/owner/drivers/code", handle_drivers_code),
                    ("/api/owner/drivers/unlink", handle_drivers_unlink),
-                   ("/api/owner/drivers/tracker", handle_drivers_tracker)):
+                   ("/api/owner/drivers/tracker", handle_drivers_tracker),
+                   ("/api/owner/drivers/car", handle_drivers_car)):
         app.router.add_route("OPTIONS", _p, _h)
         app.router.add_post(_p, _h)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)

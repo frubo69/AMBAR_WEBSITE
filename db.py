@@ -2038,6 +2038,19 @@ async def driver_add(name: str, district: str, by: int = 0, test: bool = False) 
         upsert=True)
 
 
+async def driver_car_set(name: str, car: dict | None, by: int = 0) -> bool:
+    """Машина водителя (владелец, 18 сен 2026: «за каждым водителем закрепить
+    его автомобиль»): {model, color, plate}. Пусто — машину снять. False —
+    такого водителя в реестре нет."""
+    db = _db_or_none()
+    if db is None: return False
+    now = datetime.now(timezone.utc)
+    upd = ({"$set": {"car": car, "car_at": now, "car_by": int(by or 0)}} if car else
+           {"$unset": {"car": ""}, "$set": {"car_at": now, "car_by": int(by or 0)}})
+    r = await db.drivers.update_one({"name": name}, upd)
+    return r.matched_count > 0
+
+
 async def driver_adopt(name: str, telegram_id: int, by: int = 0) -> None:
     """Перенос уже работающего водителя из .env в базу: телефон известен,
     привязывать заново его не просим."""

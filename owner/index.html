@@ -4410,6 +4410,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .crw-p.moved .crw-p-a svg{stroke-width:2}
 /* Откуда пришёл — единственная подпись на экране: обычное состояние молчит. */
 .crw-p-f{font-size:10px;font-weight:700;color:var(--gold2);letter-spacing:.3px}
+/* Машина водителя — второй строкой под именем (владелец, 18 сен 2026: «за
+   каждым водителем закрепить его автомобиль»). */
+.crw-p-t{display:flex;flex-direction:column;min-width:0;text-align:left;line-height:1.2}
+.crw-p-car{font-size:10.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.crw-p.has-car{border-radius:16px;padding-top:5px;padding-bottom:5px}
 /* телефоны водителей: список привязок, ссылка для входа, новый водитель */
 .crw-lc{margin-top:12px}
 .crw-ln-l{display:flex;flex-direction:column;gap:6px;padding:4px 0 2px}
@@ -32603,10 +32608,12 @@ function crewRender(){
     const chips = d.drivers.length ? d.drivers.map(n => {
       const v = drvOf(n);
       const home = dOf(v.base);
-      return `<button class="crw-p${v.moved ? ' moved' : ''}"
+      const car = crewCarLine(v.car);
+      return `<button class="crw-p${v.moved ? ' moved' : ''}${car ? ' has-car' : ''}"
                       onclick="crewPickD('${escS(n)}')">
         <span class="crw-p-a">${IC('car', 15)}</span>
-        <span class="crw-p-n">${escS(n)}</span>
+        <span class="crw-p-t"><span class="crw-p-n">${escS(n)}</span>${
+          car ? `<span class="crw-p-car">${escS(car)}</span>` : ''}</span>
         ${v.moved ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
       </button>`;
     }).join('') : '<span class="crw-none">никого нет</span>';
@@ -32709,15 +32716,58 @@ async function crewTrackerCopy(){
 function crewLink(i){
   const S = CREW_D || CREW; const l = (S.links || [])[i]; if(!l) return;
   const n = l.name.replace(/'/g, "\\'");
+  const car = `<button onclick="crewCar(${i})">${IC('car', 15)}<span>Машина${
+      l.car ? `<span class="pin-s">${escS(crewCarLine(l.car))}</span>` : '<span class="pin-s">не указана</span>'}</span></button>`;
   _crewPop(`#crwln-${i}`, l.linked
     ? `<div class="crw-lk-h">${escS(l.name)} · привязан</div>
        <button onclick="crewLinkIssue('${n}', true)">${IC('key', 15)}Сменить телефон</button>
        <button onclick="crewTracker('${n}')">${IC('mobile', 15)}Трекер на телефон</button>
+       ${car}
        <button onclick="crewLinkUnlink('${n}')">${IC('xmark', 15)}Отвязать телефон</button>`
     : `<div class="crw-lk-h">${escS(l.name)} · не привязан</div>
        <button onclick="crewLinkIssue('${n}', false)">${IC('key', 15)}${l.code_active ? 'Выдать новую ссылку' : 'Выдать ссылку для входа'}</button>
-       <button onclick="crewTracker('${n}')">${IC('mobile', 15)}Трекер на телефон</button>`);
+       <button onclick="crewTracker('${n}')">${IC('mobile', 15)}Трекер на телефон</button>
+       ${car}`);
 }
+// Машина водителя одной строкой: «Hyundai Elantra · серый · 97448».
+function crewCarLine(c){
+  if(!c) return '';
+  return [c.model, c.color, c.plate].map(x => String(x || '').trim()).filter(Boolean).join(' · ');
+}
+// Правка машины — в том же окне, что телефон и трекер: всё про одного
+// водителя в одном месте. Три поля; все пустые — машину снять.
+function crewCar(i){
+  const S = CREW_D || CREW; const l = (S.links || [])[i]; if(!l) return;
+  const c = l.car || {};
+  _crewPop(`#crwln-${i}`, `<div class="crw-lk-h">${escS(l.name)} · машина</div>
+    <input class="crw-lk-in" id="crwCarM" placeholder="Модель — например, Toyota Fortuner" value="${escS(c.model || '')}" autocomplete="off" maxlength="40">
+    <input class="crw-lk-in" id="crwCarC" placeholder="Цвет" value="${escS(c.color || '')}" autocomplete="off" maxlength="24">
+    <input class="crw-lk-in" id="crwCarP" placeholder="Номер" value="${escS(c.plate || '')}" autocomplete="off" maxlength="16">
+    <button onclick="crewCarSave(${i})">${IC('check', 15)}Сохранить</button>
+    ${l.car ? `<button onclick="crewCarSave(${i}, true)">${IC('xmark', 15)}Убрать машину</button>` : ''}`);
+  setTimeout(() => { const x = document.getElementById('crwCarM'); if(x) x.focus(); }, 50);
+}
+async function crewCarSave(i, clear){
+  const S = CREW_D || CREW; const l = (S.links || [])[i]; if(!l) return;
+  const val = id => clear ? '' : String((document.getElementById(id) || {}).value || '').trim();
+  const body = {name: l.name, model: val('crwCarM'), color: val('crwCarC'), plate: val('crwCarP'), as: _meName()};
+  try{
+    CREW = await ownerApi.ownerFetch('/api/owner/drivers/car', {method: 'POST', body});
+    // Черновик перестановок не трогаем: машина уходит сразу, а перенос
+    // водителей между районами ждёт своей кнопки «Сохранить».
+    const keep = CREW_D && crewDirty() ? CREW_D : null;
+    CREW_D = keep || _copy(CREW);
+    if(keep){
+      const car = {}; (CREW.links || []).forEach(x => { car[x.name] = x.car || null; });
+      (CREW_D.links || []).forEach(x => { x.car = car[x.name] || null; });
+      (CREW_D.drivers || []).forEach(x => { x.car = car[x.name] || null; });
+    }
+    closePinPop(); crewRender();
+    _toast(clear ? 'Машина убрана' : 'Машина сохранена');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ _toast('Не удалось сохранить'); }
+}
+
 async function crewLinkIssue(name, force, sure){
   if(force && !sure){
     _crewPop('.crw-lc .crw-c-n', `<div class="crw-lk-h">${escS(name)}</div>

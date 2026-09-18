@@ -277,9 +277,10 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .mvb-t .h{display:flex;justify-content:space-between;gap:8px}
 .mvb-t .h b{font-size:13px}
 .mvb-t .h em{font-style:normal;font-size:11.5px;font-weight:700;white-space:nowrap}
-.mvb-t .h em.free{color:var(--warn)} .mvb-t .h em.claimed,.mvb-t .h em.live{color:var(--info)}
-.mvb-t .h em.done{color:var(--up)} .mvb-t .h em.cancelled{color:var(--muted)}
+.mvb-t .h em.free{color:var(--warn)} .mvb-t .h em.claimed,.mvb-t .h em.live,.mvb-t .h em.given{color:var(--info)}
+.mvb-t .h em.done{color:var(--up)} .mvb-t .h em.cancelled{color:var(--muted)} .mvb-t .h em.diff{color:var(--warn)}
 .mvb-t .sub{color:var(--sub);margin-top:2px}
+.mvb-t .sub.diff{color:var(--warn)}
 .mvb-t button{margin-top:7px;height:30px;padding:0 12px;border-radius:9px;border:1px solid var(--border3);background:none;
   color:var(--sub);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .mvb-t button.sure{border-color:rgba(224,85,85,.5);color:var(--dn)}
@@ -4535,11 +4536,11 @@ function _decline(oid, r){
 // ровно такую, как сегодня водители видят», а следом: «это должна быть не умная
 // заявка — операторы должны уметь собирать её вручную». Поэтому здесь ничего не
 // подсказывается и не считается: оператор сам выбирает, откуда и куда, сам
-// находит позицию и сам ставит число. Заявка та же, что собирает STAR: водители
-// района-получателя видят её в «Товаре», берут и сканируют. Строка помнит свой
-// «откуда» — в одной заявке можно забрать из нескольких районов, водитель
-// объедет их за одну ходку. Черновик живёт в телефоне: закрыли окно — набранное
-// на месте.
+// находит позицию и сам ставит число. Заявка та же, что собирает STAR, и видна
+// обеим сторонам: водитель района, который отдаёт, начинает и сканирует,
+// водитель района-получателя, когда ему отдали всё, нажимает «Принял». Строка
+// помнит свой «откуда» — в одной заявке можно забрать из нескольких районов.
+// Черновик живёт в телефоне: закрыли окно — набранное на месте.
 let MVB = {board:null, live:null, q:'', busy:false, t:null, sure:'', open:false};
 let MVD = {from:'', to:'', lines:[], note:''};
 try{ const x = JSON.parse(localStorage.getItem('op_mv_draft') || 'null'); if(x && Array.isArray(x.lines)) MVD = {...MVD, ...x}; }catch(e){}
@@ -4618,12 +4619,12 @@ function mvbListHtml(){
   let cat = null, out = '';
   for(const p of list){
     if(p.cat !== cat){ cat = p.cat; out += `<div class="mvb-sec">${_esc(cat || 'Без раздела')}</div>`; }
-    const h = +(p.have||{})[from] || 0, c = +(p.codes||{})[from] || 0;
+    const h = +(p.have||{})[from] || 0, c = +(p.codes||{})[from] || 0, gone = +(p.out||{})[from] || 0;
     const inD = MVD.lines.filter(l=>l.id===p.id && l.from===from).reduce((a,l)=>a+(+l.qty||0), 0);
     out += `<button class="mvb-p mvb-pb${inD ? ' in' : ''}${h ? '' : ' dim'}" onclick="mvbPlus('${_esc(p.id)}')">
       <img class="mvb-img" src="${_esc(p.img || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
       <span class="mvb-b"><span class="mvb-n">${_esc(p.name)}</span>
-        <span class="mvb-m">${h ? `в ${_esc(_mvD(from).code)}: ${_mvQ(h, p)}${c < h ? ` · кодов ${_mvN(c)}` : ''}` : `в ${_esc(_mvD(from).code)} нет`}</span></span>
+        <span class="mvb-m">${h ? `в ${_esc(_mvD(from).code)}: ${_mvQ(h, p)}${c < h ? ` · кодов ${_mvN(c)}` : ''}${gone ? ` · ${_mvN(gone)} уже в заявке` : ''}` : `в ${_esc(_mvD(from).code)} нет`}</span></span>
       <span class="mvb-plus">${inD ? `<i>${_mvN(inD)}</i>` : ''}<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
     </button>`;
   }
@@ -4645,19 +4646,23 @@ function mvbCartHtml(){
     </div>`;
   }).join('')).join('');
 }
+// Сканирует тот, кто отдаёт; получатель, когда ему отдали всё, нажимает
+// «Принял» или «Принял неровно» (владелец, 18 сен 2026). Статус — словами.
 function mvbLiveHtml(){
   const T = (MVB.live && MVB.live.tasks) || [];
-  const ST = {free:'свободна', claimed:'взяли', live:'везут', done:'довезено', cancelled:'снята'};
+  const ST = {free:'ждёт отдающих', live:'отдают', given:'ждёт «Принял»', done:'принято', cancelled:'снята'};
   return `<div class="mvb-sec">Сегодня${T.length ? ' · ' + T.length : ''}</div>` + (T.length ? T.map(t=>{
     const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
-    const who = t.driver ? ` · ${_esc(t.driver)}` : '';
+    const who = t.status === 'live' && (t.givers||[]).length ? ` · ${_esc(t.givers.join(', '))}` : '';
+    const diff = (t.sources||[]).filter(x=>x.status === 'diff');
     // Снять можно только заявку операторов: собранную владельцем в STAR — нет.
     const can = (t.status === 'free' || t.status === 'claimed') && !(+t.got) && /· оператор$/.test(String(t.by || ''))
       && _mvMine(t.district);
     const key = t.move_id + '/' + t.district;
     return `<div class="mvb-t">
-      <div class="h"><b>${_esc(from)} → ${_esc(t.district_code)}</b><em class="${t.status}">${ST[t.status] || t.status}${who}</em></div>
-      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · ${_mvN(t.got)} из ${_mvN(t.need)} ед.${t.by ? ' · ' + _esc(t.by) : ''}</div>
+      <div class="h"><b>${_esc(from)} → ${_esc(t.district_code)}</b><em class="${t.diff ? 'diff' : t.status}">${t.diff && t.status === 'done' ? 'принято неровно' : (ST[t.status] || t.status)}${who}</em></div>
+      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · отдали ${_mvN(t.got)} из ${_mvN(t.need)} ед.${t.by ? ' · ' + _esc(t.by) : ''}</div>
+      ${diff.map(x=>`<div class="sub diff">из ${_esc(x.code)}: ${(x.accept_lines||[]).map(d=>`${_esc(d.name)} ${_mvN(d.got)} из ${_mvN(d.sent)}`).join(', ')}${x.accept_note ? ` · «${_esc(x.accept_note)}»` : ''}</div>`).join('')}
       ${can ? `<button class="${MVB.sure === key ? 'sure' : ''}" onclick="mvbCancel('${_esc(t.move_id)}','${_esc(t.district)}')">${
           MVB.sure === key ? 'Точно снять?' : 'Снять'}</button>` : ''}
     </div>`;
@@ -4681,7 +4686,7 @@ function mvbPaint(){
     </div>
     <div class="mvb-r">
       <div class="mvb-hd" onclick="mvbToggle(event)"><div><div class="t">Заявка${MVD.lines.length ? ` · ${_esc(froms.join(', '))} → ${_esc(_mvD(MVD.to).code)}` : ''}</div>
-        <div class="s">${MVD.lines.length ? `${MVD.lines.length} ${plural(MVD.lines.length,'строка','строки','строк')} · водители ${_esc(_mvD(MVD.to).code)} увидят её сразу` : 'Пока пусто'}</div></div>
+        <div class="s">${MVD.lines.length ? `${MVD.lines.length} ${plural(MVD.lines.length,'строка','строки','строк')} · отдаёт ${_esc(froms.join(', '))}, принимает ${_esc(_mvD(MVD.to).code)}` : 'Пока пусто'}</div></div>
         ${MVD.lines.length ? `<button class="mvb-x" style="margin-left:auto;width:auto;padding:0 8px;font-family:inherit;font-size:12.5px" onclick="event.stopPropagation();mvbClear()">Очистить</button>` : ''}
         <span class="mvb-chev"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></span></div>
       <div class="mvb-cart">${mvbCartHtml()}
@@ -4729,9 +4734,8 @@ async function mvbSend(){
   try{
     const r = await opApi.opFetch('/api/operator/move/create', {method:'POST',
       body:{as: curOp, to: MVD.to, lines: MVD.lines.map(l=>({from:l.from, id:l.id, qty:l.qty})), note: MVD.note || ''}});
-    const to = _mvD(MVD.to).code;
     MVD.lines = []; MVD.note = ''; _mvdSave();
-    toast(`Заявка создана · водители ${to} уже её видят${r.skipped && r.skipped.length ? ' · не взято строк: ' + r.skipped.length : ''}`, 'ok');
+    toast(`Заявка создана · отдающие её уже видят${r.skipped && r.skipped.length ? ' · не взято строк: ' + r.skipped.length : ''}`, 'ok');
     haptic('heavy');
     MVB.busy = false; mvbPaint(); mvbLive();
     return;

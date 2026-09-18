@@ -1,27 +1,45 @@
 """Заявка на перемещение между районами (владелец, 18 сен 2026).
 
-Она обратная приёмке. В приёмке водитель района принимает то, что ему привезли;
-здесь — наоборот: если товар едет «из Бизнес Бея в JVC», это работа водителя
-JVC. Он приезжает в Бизнес Бей, сканирует бутылки, которые должен увезти, и они
-тем же сканом переезжают на его район. Поэтому задача висит на районе-ПОЛУЧАТЕЛЕ,
-а не на том, откуда везут.
+Сканирует тот, кто ОТДАЁТ, а принимает — кому везут (владелец, 18 сен 2026,
+вечером: «водитель Алгусеса сканирует товар, который надо переместить с его
+района, и отдаёт водителю, который приехал с Тикома»; и следом: «заявка
+отобразится у двух сторон; у отдающей она активная — нажать „Начать
+перемещение“, потом сканировать; после того как всё отсканировал водитель
+отдающей стороны, у принимающего заявка из серой становится активной, и
+появляется кнопка „Принял“ / „Принял неровно“ — заметнее „Принял“»).
 
-Взять задачу может любой водитель района-получателя, но достаётся она одному:
-захват атомарный (db.move_task_claim), и второй водитель получает отказ, даже
-если нажал в ту же секунду.
+  • Работа — передача: пара «откуда → куда». Хранится заявка по району-
+    ПОЛУЧАТЕЛЮ (tasks.<куда>), строки — с районом «откуда», а у каждой пары
+    своя передача: tasks.<куда>.give.<откуда>.
+  • Отдающий: «Начать перемещение», потом сканирует каждую бутылку, пока
+    передаёт её приехавшему водителю. Скан и есть передача: тем же сканом
+    бутылка уходит с остатка отдающего на остаток получателя. Отдавать может
+    любой водитель района — кто сканировал последним, тот и видится отдающим.
+  • Получатель: пока отдают, карточка серая — смотреть, не нажимать. Всё
+    отсканировали — «Принял» (главная) или «Принял неровно»: сколько пришло
+    на самом деле и что не так. Расхождение склад сам не двигает — какой именно
+    бутылки нет, неизвестно; его видят старший и оператор и решают.
+  • Задача района закрывается, когда он принял передачи от всех, заявка —
+    когда закрыты все задачи.
 
 Недобора не бывает. Владелец: «водитель приезжает прямо на билдинг и забирает
 эти бутылки, ничего на следующий раз не должно оставаться, прям в тот же день».
-Поэтому задача закрывается САМА, когда увезено всё до последней строки, кнопки
-«завершить с недобором» нет, а закрыть смену район не может, пока его
-перемещения не отработаны (см. pending_for_district).
+Поэтому кнопки «отдать не всё» нет, а смену не закрывает ни район, который
+отдаёт (пока не отсканировал всё), ни район, который забирает (пока не принял),
+см. pending_for_district. Застряло — бутылки на полке нет — снимает старший.
 
-Склад двигается в момент скана, а не в конце: бутылку физически забрали, и
-остаток обоих районов обязан это показывать сразу. Поэтому ядро переезда —
-общий stock_routes.move_by_code, тот же, что у старшего и у ручного переезда.
+Склад двигается в момент скана, а не в конце: бутылку физически передали, и
+остаток обоих районов обязан это показывать сразу. Ядро переезда — общий
+stock_routes.move_by_code, тот же, что у старшего.
+
+Счёт строки не уходит за заявку даже при двух сканах в одну секунду (у района
+два-три водителя, и отдавать могут двое сразу): место в строке занимается
+атомарно ДО переезда (db.move_line_reserve), а если бутылка не переехала —
+возвращается.
 """
 import json
 import logging
+import math
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -64,23 +82,63 @@ def _line_view(l: dict) -> dict:
             "done": got >= need - 1e-9}
 
 
-def task_view(mid: str, doc: dict, oid: str, task: dict, me: str = "") -> dict:
-    """Карточка задачи: куда везём, откуда и что осталось."""
-    lines = [_line_view(l) for l in (task.get("lines") or [])]
-    need = sum(l["qty"] for l in lines)
-    got = sum(l["got"] for l in lines)
+def _pair_status(task: dict, g: dict, need: float, got: float) -> str:
+    """Где передача пары «откуда → куда»:
+      wait — никто не начал; pause — начали и бросили (отдано не всё, никто не
+      отдаёт); live — отдают; given — отсканировано всё, ждёт «Принял»;
+      done — принято; diff — принято неровно; cancelled — задачу сняли."""
+    if task.get("cancelled_at"):
+        return "cancelled"
+    if g.get("accepted_at"):
+        return "done" if g.get("accept_ok", True) else "diff"
+    if got >= need - 1e-9:
+        return "given"
+    if g.get("driver"):
+        return "live"
+    return "pause" if got > 0 else "wait"
+
+
+def _accept_view(g: dict) -> dict:
+    return {"accepted_at": _iso(g.get("accepted_at")), "accepted_by": g.get("accepted_by") or "",
+            "accept_ok": bool(g.get("accept_ok", True)) if g.get("accepted_at") else None,
+            "accept_lines": g.get("accept_lines") or [], "accept_note": g.get("accept_note") or ""}
+
+
+def _sources(lines: list, task: dict) -> list:
+    """Строки задачи по районам, откуда их отдают: передача каждой пары."""
+    give = task.get("give") or {}
     by_src = {}
     for l in lines:
         s = by_src.setdefault(l["from"], {"district": l["from"], "code": l["from_code"],
                                           "name": l["from_name"], "qty": 0.0, "got": 0.0,
                                           "lines": []})
         s["qty"] += l["qty"]; s["got"] += l["got"]; s["lines"].append(l)
-    for s in by_src.values():
+    for src, s in by_src.items():
+        g = give.get(src) or {}
+        s["status"] = _pair_status(task, g, s["qty"], s["got"])
+        s["done"] = s["got"] >= s["qty"] - 1e-9          # отсканировано всё
+        s["left"] = sr._num(max(0.0, s["qty"] - s["got"]))
         s["qty"] = sr._num(s["qty"]); s["got"] = sr._num(s["got"])
-        s["done"] = s["got"] >= s["qty"] - 1e-9
+        s["giver"] = g.get("driver") or ""
+        s["given_at"] = _iso(g.get("done_at"))
+        s.update(_accept_view(g))
+    return sorted(by_src.values(), key=lambda s: s["code"])
+
+
+def task_view(mid: str, doc: dict, oid: str, task: dict, me: str = "") -> dict:
+    """Задача района-получателя — для STAR и оператора: откуда ему отдают,
+    кто отдаёт, что принято."""
+    lines = [_line_view(l) for l in (task.get("lines") or [])]
+    need = sum(l["qty"] for l in lines)
+    got = sum(l["got"] for l in lines)
+    sources = _sources(lines, task)
     driver = task.get("driver") or ""
+    # «Отдают» — только пока кто-то отдаёт (или бросил на середине). Отдали и
+    # приняли у одного, остальные ещё не начинали — это «ждёт отдающих».
+    live_ = any(s["status"] in ("live", "pause") for s in sources)
     return {
         "move_id": mid, "day": doc.get("day", ""), "at": _iso(doc.get("at")),
+        "by": doc.get("by", ""), "note": doc.get("note", ""),
         "district": oid, "district_code": OFFICE_CODES.get(oid, ""),
         "district_name": OFFICE_NAMES.get(oid, oid),
         "driver": driver, "mine": bool(me) and driver == me,
@@ -88,33 +146,95 @@ def task_view(mid: str, doc: dict, oid: str, task: dict, me: str = "") -> dict:
         "done_at": _iso(task.get("done_at")), "cancelled_at": _iso(task.get("cancelled_at")),
         "need": sr._num(need), "got": sr._num(got), "left": sr._num(max(0.0, need - got)),
         "positions": len(lines), "left_positions": sum(1 for l in lines if not l["done"]),
-        "sources": sorted(by_src.values(), key=lambda s: s["code"]),
+        "sources": sources,
+        "givers": sorted({s["giver"] for s in sources if s["giver"]}),
+        # Приняли неровно хотя бы у одного отдающего — старшему решать.
+        "diff": any(s["status"] == "diff" for s in sources),
         "lines": lines,
         "status": ("cancelled" if task.get("cancelled_at") else
                    "done" if task.get("done_at") else
-                   "live" if got > 0 else
-                   "claimed" if driver else "free"),
+                   "given" if lines and got >= need - 1e-9 else
+                   "live" if live_ else "free"),
     }
 
 
-async def create(rows: list, by: str = "STAR", note: str = "") -> dict:
-    """Собрать заявку из строк расчёта: [{from, to, id, qty}].
+def give_view(mid: str, doc: dict, oid: str, task: dict, src: str, me: str = "") -> dict:
+    """Передача одной пары «src → oid» — карточка у обеих сторон: у отдающего
+    («Отдать в …») и у получателя («Забрать из …»)."""
+    lines = [_line_view(l) for l in (task.get("lines") or []) if l.get("from") == src]
+    need = sum(l["qty"] for l in lines)
+    got = sum(l["got"] for l in lines)
+    left = max(0.0, need - got)
+    g = (task.get("give") or {}).get(src) or {}
+    giver = g.get("driver") or ""
+    return {
+        "move_id": mid, "day": doc.get("day", ""), "at": _iso(doc.get("at")),
+        "by": doc.get("by", ""), "note": doc.get("note", ""),
+        # district — ключ задачи (район-получатель): им зовут ручки.
+        "district": oid, "district_code": OFFICE_CODES.get(oid, ""),
+        "district_name": OFFICE_NAMES.get(oid, oid),
+        "to_code": OFFICE_CODES.get(oid, ""), "to_name": OFFICE_NAMES.get(oid, oid),
+        "from": src, "from_code": OFFICE_CODES.get(src, ""), "from_name": OFFICE_NAMES.get(src, src),
+        "giver": giver, "mine": bool(me) and giver == me,
+        # driver — у приложения, открытого до обновления, это «кто едет».
+        "driver": task.get("driver") or "",
+        "started_at": _iso(g.get("claimed_at") or g.get("started_at")),
+        "given_at": _iso(g.get("done_at")),
+        **_accept_view(g),
+        "need": sr._num(need), "got": sr._num(got), "left": sr._num(left),
+        "positions": len(lines), "left_positions": sum(1 for l in lines if not l["done"]),
+        "sources": [], "lines": lines,
+        "status": _pair_status(task, g, need, got),
+    }
 
-    Строки одного района-получателя ложатся в одну задачу — водитель объезжает
-    все районы, откуда ему нужно забрать, одной ходкой."""
+
+async def pending_qty() -> tuple:
+    """Неотданный остаток открытых заявок: (к району едет, из района уйдёт),
+    оба — {(район, позиция): количество}.
+
+    Заявка закупки и расчёт перемещений считают полку так, будто открытые
+    перемещения уже сделаны: получателю это приход, отдающему — расход. Иначе
+    отдающий, у которого забирают до нормы, не попросит купить взамен, а
+    расчёт предложит перевезти то же самое второй раз."""
+    inc, out = {}, {}
+    for doc in await db.move_orders_open():
+        for to, t in (doc.get("tasks") or {}).items():
+            if t.get("done_at") or t.get("cancelled_at"):
+                continue
+            for l in t.get("lines") or []:
+                left = float(l.get("qty") or 0) - float(l.get("got") or 0)
+                if left <= 1e-9:
+                    continue
+                pid, src = l.get("id"), l.get("from")
+                inc[(to, pid)] = inc.get((to, pid), 0.0) + left
+                out[(src, pid)] = out.get((src, pid), 0.0) + left
+    return inc, out
+
+
+async def create(rows: list, by: str = "STAR", note: str = "") -> dict:
+    """Собрать заявку из строк: [{from, to, id, qty}].
+
+    Строки одного района-получателя ложатся в одну задачу — его водитель
+    объезжает все районы, откуда ему отдают, одной ходкой."""
     cat = sr._catalog()
     tasks = {}
     skipped = []
     for r in rows:
         src, dst = str(r.get("from") or ""), str(r.get("to") or "")
         pid = str(r.get("id") or "")
-        qty = sr._round_step(r.get("qty") or 0)
         p = cat.get(pid)
+        qty = sr._round_step(r.get("qty") or 0)
+        if p and qty > 0:
+            # Строка — целым числом кодов: у бутылки код — бутылка, у пива —
+            # полкоробки. Половину бутылки отсканировать нечем, и такая строка
+            # не закрылась бы никогда, держа смену обоих районов.
+            step = sr.code_qty(p)
+            qty = max(step, math.floor(qty / step + 0.5) * step)
         if src not in OFFICE_IDS or dst not in OFFICE_IDS or src == dst or not p or qty <= 0:
             skipped.append(r); continue
         t = tasks.setdefault(dst, {"lines": [], "driver": "", "driver_id": 0,
                                    "claimed_at": None, "started_at": None,
-                                   "done_at": None, "cancelled_at": None})
+                                   "done_at": None, "cancelled_at": None, "give": {}})
         # Одна строка на пару «откуда × позиция»: два одинаковых переезда из
         # одного района — это одна работа, и счёт у неё общий.
         same = next((l for l in t["lines"] if l["from"] == src and l["id"] == pid), None)
@@ -138,36 +258,123 @@ async def create(rows: list, by: str = "STAR", note: str = "") -> dict:
 
 
 async def tasks_for_driver(name: str, district: str) -> dict:
-    """Что видит водитель: своя задача, свободные своего района и то, что
-    заберут у него самого (владелец: отдающий должен видеть список, чтобы не
-    удивляться)."""
-    mine, free, taken, give = [], [], [], []
+    """Что видит водитель района — передачи обеих сторон:
+      give — отдать: с его района, пока не отсканировано всё (кнопки: «Начать
+             перемещение», потом сканер);
+      take — забрать: на его район, пока не принято (серые, пока отдают;
+             отдали всё — «Принял» / «Принял неровно»).
+    mine / free / taken — пустые: так приложение, открытое до обновления, не
+    покажет кнопок старого порядка, где сканировал получатель."""
+    give, take = [], []
     for doc in await db.move_orders_open():
         mid = doc["_id"]
         for oid, t in (doc.get("tasks") or {}).items():
             if t.get("done_at") or t.get("cancelled_at"):
                 continue
-            v = task_view(mid, doc, oid, t, name)
+            srcs = sorted({l.get("from") for l in t.get("lines") or []} - {None})
             if oid == district:
-                if v["mine"]:
-                    mine.append(v)
-                elif not v["driver"]:
-                    free.append(v)
-                else:
-                    taken.append(v)
-            elif any(l["from"] == district for l in v["lines"]):
-                # Отдающему — только его строки и куда они уедут.
-                give.append({**v, "lines": [l for l in v["lines"] if l["from"] == district],
-                             "sources": [], "to_code": v["district_code"],
-                             "to_name": v["district_name"]})
-    for g in give:
-        g["need"] = sr._num(sum(l["qty"] for l in g["lines"]))
-        g["got"] = sr._num(sum(l["got"] for l in g["lines"]))
-        g["positions"] = len(g["lines"])
-    return {"mine": mine, "free": free, "taken": taken, "give": give}
+                for src in srcs:
+                    g = give_view(mid, doc, oid, t, src, name)
+                    if g["status"] in ("wait", "pause", "live", "given"):
+                        take.append(g)
+            elif district in srcs:
+                g = give_view(mid, doc, oid, t, district, name)
+                if g["status"] in ("wait", "pause", "live"):
+                    give.append(g)
+    # Своё начатое — первым, потом чужое начатое, потом ждущее. У получателя
+    # первым — то, что уже можно принять.
+    grank = {"live": 0, "pause": 1, "wait": 2}
+    give.sort(key=lambda g: (not g["mine"], grank.get(g["status"], 3), g["at"]))
+    trank = {"given": 0, "live": 1, "pause": 2, "wait": 3}
+    take.sort(key=lambda g: (trank.get(g["status"], 4), g["at"]))
+    return {"give": give, "take": take, "mine": [], "free": [], "taken": []}
 
 
-async def claim(mid: str, oid: str, name: str, tgid: int) -> dict:
+async def give_start(mid: str, oid: str, name: str, tgid: int, district: str) -> dict:
+    """«Начать перемещение» — отдающий берётся передавать: его имя видят
+    получатель, старший и соседи по району. Не замок: продолжить может любой
+    водитель района (кто сканировал последним — тот и отдающий), а лишнего
+    отдать не даст сама строка."""
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid)
+    if not doc or doc.get("status") != "open" or not task or task.get("done_at") \
+            or task.get("cancelled_at"):
+        return {"ok": False, "error": "gone"}
+    if district == oid or not any(l.get("from") == district for l in task.get("lines") or []):
+        return {"ok": False, "error": "not_giver"}
+    g = give_view(mid, doc, oid, task, district, name)
+    if g["status"] not in ("wait", "pause", "live"):
+        return {"ok": False, "error": "given", "task": g}
+    await db.move_give_start(mid, oid, district, name, tgid, _now())
+    doc = await db.move_order_get(mid)
+    task = (doc.get("tasks") or {}).get(oid) or {}
+    log.info(f"[move] {mid}/{oid}: {name} начал отдавать из {district}")
+    return {"ok": True, "task": give_view(mid, doc, oid, task, district, name)}
+
+
+async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: str,
+                 ok: bool = True, lines: list = None, note: str = "") -> dict:
+    """Получатель принял передачу src → oid. «Принял» — всё сошлось; «Принял
+    неровно» — сколько пришло на самом деле по каждой позиции и что не так.
+
+    Принять можно только отданное целиком: пока отдающий сканирует, карточка
+    у получателя серая. Расхождение склад не двигает — какой именно бутылки
+    нет, неизвестно; его видят старший и оператор."""
+    if district != oid:
+        return {"ok": False, "error": "not_your_district"}
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid)
+    if not doc or doc.get("status") != "open" or not task or task.get("cancelled_at"):
+        return {"ok": False, "error": "gone"}
+    g = give_view(mid, doc, oid, task, src, name)
+    if not g["lines"]:
+        return {"ok": False, "error": "gone"}
+    if g["status"] in ("done", "diff"):
+        return {"ok": True, "already": True, "task": g}
+    if g["status"] != "given":
+        return {"ok": False, "error": "not_given", "task": g}
+    note = str(note or "").strip()[:300]
+    diff = []
+    if not ok:
+        got_by = {}
+        for x in lines or []:
+            if isinstance(x, dict) and x.get("id"):
+                try:
+                    got_by[str(x["id"])] = max(0.0, min(9999.0, sr._round_step(x.get("got"))))
+                except Exception:                            # noqa: BLE001
+                    pass
+        for l in g["lines"]:
+            if l["id"] in got_by and abs(got_by[l["id"]] - float(l["got"])) > 1e-9:
+                diff.append({"id": l["id"], "name": l["name"], "unit": l["unit"],
+                             "sent": l["got"], "got": sr._num(got_by[l["id"]])})
+        if not diff and not note:
+            # «Неровно», но ничего не поменяли и ничего не написали — сказать нечего.
+            return {"ok": False, "error": "diff_empty", "task": g}
+    rec = {"accepted_at": _now(), "accepted_by": name, "accepted_by_id": tgid,
+           "accept_ok": bool(ok), "accept_lines": diff, "accept_note": note}
+    if not await db.move_give_accept(mid, oid, src, rec):
+        doc = await db.move_order_get(mid)
+        task = (doc.get("tasks") or {}).get(oid) or {}
+        return {"ok": True, "already": True, "task": give_view(mid, doc, oid, task, src, name)}
+    doc = await db.move_order_get(mid)
+    task = (doc.get("tasks") or {}).get(oid) or {}
+    srcs = {l.get("from") for l in task.get("lines") or []}
+    if all(((task.get("give") or {}).get(x) or {}).get("accepted_at") for x in srcs):
+        await db.move_task_done(mid, oid, _now())
+        await db.move_order_close_if_done(mid, _now())
+        doc = await db.move_order_get(mid)
+        task = (doc.get("tasks") or {}).get(oid) or {}
+    log.info(f"[move] {mid}/{oid}: {name} принял из {src}" + ("" if ok else f" неровно: {diff} «{note}»"))
+    return {"ok": True, "task": give_view(mid, doc, oid, task, src, name),
+            "task_done": bool(task.get("done_at"))}
+
+
+# Старый порядок: «Взять» у получателя. Приложение, открытое до обновления,
+# ещё может нажать — отвечаем, как раньше, но ни сканер, ни приёмка от этой
+# отметки не зависят.
+async def claim(mid: str, oid: str, name: str, tgid: int, district: str = None) -> dict:
+    if district is not None and oid != district:
+        return {"ok": False, "error": "not_your_district"}
     ok, task = await db.move_task_claim(mid, oid, name, tgid, _now())
     doc = await db.move_order_get(mid)
     if not doc or not task:
@@ -175,89 +382,122 @@ async def claim(mid: str, oid: str, name: str, tgid: int) -> dict:
     v = task_view(mid, doc, oid, task, name)
     if not ok:
         return {"ok": False, "error": "taken", "task": v, "driver": task.get("driver") or ""}
-    log.info(f"[move] {mid}/{oid}: взял {name}")
     return {"ok": True, "task": v}
 
 
-async def release(mid: str, oid: str, name: str) -> dict:
+async def release(mid: str, oid: str, name: str, district: str = None) -> dict:
+    if district is not None and oid != district:
+        return {"ok": False, "error": "not_your_district", "task": None}
     ok = await db.move_task_release(mid, oid, name)
     doc = await db.move_order_get(mid)
     task = ((doc or {}).get("tasks") or {}).get(oid) or {}
-    log.info(f"[move] {mid}/{oid}: отпустил {name}" if ok else
-             f"[move] {mid}/{oid}: отпустить не вышло ({name})")
-    return {"ok": ok, "task": task_view(mid, doc or {}, oid, task, name) if doc else None}
+    return {"ok": ok, "task": task_view(mid, doc, oid, task, name) if doc else None}
 
 
 def _res(verdict: str, **kw) -> dict:
     return {"ok": verdict == "ok", "verdict": verdict, **kw}
 
 
-async def scan(mid: str, oid: str, code: str, name: str, tgid: int) -> dict:
-    """Скан кода на чужом районе: бутылка переезжает к сканирующему.
+async def scan(mid: str, oid: str, code: str, name: str, tgid: int, district: str = "") -> dict:
+    """Отдающий сканирует бутылку — она уходит на район-получатель oid.
 
-    Проверяем не только код, но и что он из нужного района и нужной позиции —
-    иначе водитель увезёт не то, а заявка останется незакрытой."""
+    district — район того, кто сканирует: отдают только со своего района и
+    только свои строки. Проверяем и код, и что он лежит у отдающего, и что
+    позиция есть в его строках, — иначе уйдёт не то, а заявка не закроется."""
     code = str(code or "").strip()
+    src = str(district or "")
     doc = await db.move_order_get(mid)
     if not doc or doc.get("status") != "open":
         return _res("gone")
     task = (doc.get("tasks") or {}).get(oid)
     if not task or task.get("done_at") or task.get("cancelled_at"):
         return _res("gone")
-    if (task.get("driver") or "") != name:
-        return _res("not_mine", driver=task.get("driver") or "")
+    lines = task.get("lines") or []
+    if src == oid:
+        # Получатель не сканирует: бутылку сканирует тот, кто её отдаёт.
+        return _res("giver_scans",
+                    from_codes=sorted({OFFICE_CODES.get(l.get("from"), "") for l in lines}))
+    mine = [i for i, l in enumerate(lines) if l.get("from") == src]
+    if not mine:
+        return _res("not_giver")
+    if ((task.get("give") or {}).get(src) or {}).get("accepted_at"):
+        return _res("gone")
 
     qr = await db.qr_get(code)
     if not qr:
         return _res("unknown", code=code)
+    pname = qr.get("product_name") or ""
+    st = (qr.get("status") or "active").strip()
+    if st != "active":
+        return _res(st, code=code, name=pname, say=sr.MOVE_SAY.get(st, ""))
     pid = str(qr.get("product_id") or "")
-    src = (qr.get("district") or "").strip()
-    lines = task.get("lines") or []
-    idx = next((i for i, l in enumerate(lines)
-                if l.get("id") == pid and l.get("from") == src
-                and float(l.get("got") or 0) < float(l.get("qty") or 0) - 1e-9), None)
+    at = (qr.get("district") or "").strip()
+    if at == oid:
+        # Бутылка уже числится у получателя. Если последним переездом она
+        # ушла от этого же отдающего — это второй скан той же бутылки; иначе
+        # это бутылка самого получателя, и отдавать её некому.
+        last = (qr.get("moves") or [])[-1:]
+        if last and (last[0] or {}).get("from") == src:
+            return _res("given", code=code, name=pname, to_code=OFFICE_CODES.get(oid, ""))
+        return _res("other_district", code=code, name=pname, from_code=OFFICE_CODES.get(at, ""))
+    if at != src:
+        return _res("other_district", code=code, name=pname, from_code=OFFICE_CODES.get(at, ""))
+    idx = next((i for i in mine if lines[i].get("id") == pid), None)
     if idx is None:
-        # Сказать словами, что не так: позиции нет в заявке, она уже добрана,
-        # или бутылка лежит не в том районе, откуда её ждут.
-        mine_pid = [l for l in lines if l.get("id") == pid]
-        if not mine_pid:
-            return _res("not_in_task", code=code, name=qr.get("product_name") or "",
-                        from_code=OFFICE_CODES.get(src, ""))
-        if all(float(l.get("got") or 0) >= float(l.get("qty") or 0) - 1e-9 for l in mine_pid):
-            return _res("full", code=code, name=qr.get("product_name") or "")
-        return _res("other_district", code=code, name=qr.get("product_name") or "",
-                    from_code=OFFICE_CODES.get(src, ""),
-                    want=", ".join(sorted({OFFICE_CODES.get(l["from"], "") for l in mine_pid})))
+        return _res("not_in_task", code=code, name=pname)
+    need = float(lines[idx].get("qty") or 0)
+    add = float(qr.get("qty") or 1)
+    if float(lines[idx].get("got") or 0) >= need - 1e-9:
+        return _res("full", code=code, name=pname)
 
-    await db.move_task_started(mid, oid, _now())
-    # Вид переезда «move», а не «driver»: такую строку водитель не вернёт из
-    # истории (там условие by_kind == "driver"), и правильно — отмена одной
-    # бутылки развела бы счёт задачи с полкой.
-    r = await sr.move_by_code(code, oid, tgid, name, "move")
+    # Место в строке — до переезда и атомарно: два отдающих в одну секунду не
+    # передадут по строке больше, чем в ней заказано.
+    if not await db.move_line_reserve(mid, oid, idx, add, need):
+        doc2 = await db.move_order_get(mid)
+        t2 = ((doc2 or {}).get("tasks") or {}).get(oid) or {}
+        if not doc2 or doc2.get("status") != "open" or t2.get("done_at") or t2.get("cancelled_at"):
+            return _res("gone")
+        got2 = float(((t2.get("lines") or [])[idx]).get("got") or 0)
+        if got2 >= need - 1e-9:
+            return _res("full", code=code, name=pname)
+        # Остаток строки меньше кода (дробь в старой заявке) — последний код
+        # закрывает строку; условие — ровно прежнее значение, без гонки.
+        if not await db.move_line_reserve_exact(mid, oid, idx, got2, add):
+            return _res("busy", code=code, name=pname)
+
+    r = await sr.move_by_code(code, oid, tgid, name, "move", expect_from=src)
     if not r.get("ok"):
-        return _res(r.get("verdict") or "no", **{k: v for k, v in r.items()
-                                                 if k not in ("ok", "verdict")})
-    was = float(lines[idx].get("got") or 0)
-    if not await db.move_line_got(mid, oid, idx, was, float(r.get("qty") or 1)):
-        # Строку успели поправить между чтением и записью: переезд уже сделан,
-        # отменять его нельзя — перечитываем и отдаём фактическое состояние.
-        log.warning(f"[move] {mid}/{oid}: строка {idx} изменилась под руками")
+        await db.move_line_unreserve(mid, oid, idx, add)
+        v = r.get("verdict") or "no"
+        if v == "same":
+            v = "given"
+        return _res(v, **{k: x for k, x in r.items() if k not in ("ok", "verdict")})
+
+    now = _now()
+    await db.move_task_started(mid, oid, now)
+    await db.move_give_mark(mid, oid, src, name, tgid, now)
     doc = await db.move_order_get(mid)
     task = (doc.get("tasks") or {}).get(oid) or {}
-    v = task_view(mid, doc, oid, task, name)
-    if v["left"] <= 0 and not task.get("done_at"):
-        await db.move_task_done(mid, oid, _now())
-        await db.move_order_close_if_done(mid, _now())
+    g = give_view(mid, doc, oid, task, src, name)
+    if g["left"] <= 0:
+        # Отдано всё: у получателя карточка становится активной — «Принял».
+        await db.move_give_done(mid, oid, src, now)
         doc = await db.move_order_get(mid)
-        v = task_view(mid, doc, oid, (doc.get("tasks") or {}).get(oid) or {}, name)
-    line = v["lines"][idx]
+        task = (doc.get("tasks") or {}).get(oid) or {}
+        g = give_view(mid, doc, oid, task, src, name)
+    line = next(l for l in g["lines"] if l["id"] == pid)
+    log.info(f"[move] {mid}/{oid}: {name} отдал {code} ({pid}) из {src} · {g['got']}/{g['need']}")
     return _res("ok", code=code, name=r.get("name") or line["name"], qty=r.get("qty"),
                 unit=r.get("unit"), from_code=r.get("from_code"), to_code=r.get("to_code"),
-                line=line, task=v, finished=bool(v["done_at"]))
+                line=line, task=g,
+                # finished — эта передача отсканирована целиком: отдавать больше
+                # нечего, дальше «Принял» у получателя.
+                finished=g["left"] <= 0)
 
 
 async def live(day: str = "") -> dict:
-    """Статус по каждому району — для STAR: кто взял, сколько увёз, когда."""
+    """Статус по каждому району-получателю — для STAR: кто и сколько отдал,
+    что принято, где приняли неровно."""
     day = str(day or "").strip() or sr._biz_day()
     out = []
     # Открытые заявки берём все, а не только сегодняшние: учётные сутки
@@ -284,12 +524,25 @@ async def live(day: str = "") -> dict:
 
 
 async def pending_for_district(oid: str) -> list:
-    """Незакрытые перемещения района — по ним не даём закрыть смену."""
+    """Незакрытые перемещения района — по ним не даём закрыть смену. Обе
+    стороны: отдающий (side=give), пока не отсканировал всё, и получатель
+    (side=take), пока не принял. Отдающий без приехавшего не отдаст, получатель
+    без отдающего не примет — держит обоих."""
     out = []
     for doc in await db.move_orders_open():
-        t = (doc.get("tasks") or {}).get(oid)
-        if t and not t.get("done_at") and not t.get("cancelled_at"):
-            out.append(task_view(doc["_id"], doc, oid, t))
+        for to, t in (doc.get("tasks") or {}).items():
+            if t.get("done_at") or t.get("cancelled_at"):
+                continue
+            srcs = sorted({l.get("from") for l in t.get("lines") or []} - {None})
+            if to == oid:
+                for src in srcs:
+                    g = give_view(doc["_id"], doc, to, t, src)
+                    if g["status"] in ("wait", "pause", "live", "given"):
+                        out.append({**g, "side": "take"})
+            elif oid in srcs:
+                g = give_view(doc["_id"], doc, to, t, oid)
+                if g["status"] in ("wait", "pause", "live"):
+                    out.append({**g, "side": "give"})
     return out
 
 
@@ -306,20 +559,28 @@ async def plan(day: str = "") -> dict:
     у нас обратный — сначала район досканирует свой долг по кодам, и только
     потом едут за перемещением (владелец, 18 сен 2026). Но рядом со строкой
     едет no_codes: сколько из неё пока без кодов, чтобы было видно, где сперва
-    надо внести товар."""
-    import math
+    надо внести товар.
+
+    Открытые заявки на перемещение расчёт считает сделанными: у получателя
+    уже есть то, что к нему едет, у отдающего уже нет того, что он отдаёт, и
+    коды, обещанные заявке, второй раз не обещаются. Иначе, пока бутылки не
+    переехали, расчёт предлагал бы перевезти то же самое второй раз."""
     import stock_value as sv
     day = str(day or "").strip() or sr._biz_day()
     cat = sr._catalog()
     cost = await sv.cost_map()
     base = await sr._district_base(day)
     norms = await db.get_stock_norms()
+    inc, out = await pending_qty()
     # {район: {позиция: сколько числится кодами} } — это и есть потолок скана.
     try:
         reg = await db.qr_by_product_district_all()
     except Exception as e:                            # noqa: BLE001
         log.warning(f"[move] реестр кодов не прочитан: {e}")
         reg = {}
+    for (oid, pid), n in out.items():
+        per = reg.setdefault(oid, {})
+        per[pid] = max(0.0, float(per.get(pid) or 0) - n)
     stock, norm = {}, {}
     for oid in OFFICE_IDS:
         have = (base.get(oid) or {}).get("have_exact") or {}
@@ -327,7 +588,8 @@ async def plan(day: str = "") -> dict:
             key = f"{oid}:{pid}"
             if key not in norms:
                 continue
-            stock[(oid, pid)] = float(have.get(pid) or 0)
+            stock[(oid, pid)] = (float(have.get(pid) or 0) + inc.get((oid, pid), 0.0)
+                                 - out.get((oid, pid), 0.0))
             norm[(oid, pid)] = float(norms[key])
     rows = []
     for pid in {p for (_, p) in norm}:
@@ -379,11 +641,13 @@ async def plan(day: str = "") -> dict:
 # и сколько. Здесь ничего не подсказывается и не считается — только остатки и
 # коды по районам, чтобы было видно, что где лежит.
 async def board(scope: set) -> dict:
-    """Позиции, которые где-то лежат, и по каждой — сколько её в каждом районе
-    и сколько там кодов (столько сканером и возьмут)."""
+    """Позиции, которые где-то лежат, и по каждой — сколько её в каждом районе,
+    сколько там кодов (столько сканером и отдадут) и сколько из этого уже
+    уходит по открытым заявкам."""
     day = sr._biz_day()
     cat = sr._catalog()
     base = await sr._district_base(day)
+    _, out = await pending_qty()
     try:
         reg = await db.qr_by_product_district_all()
     except Exception as e:                            # noqa: BLE001
@@ -395,9 +659,12 @@ async def board(scope: set) -> dict:
         if not any(have.values()):
             continue                                  # нигде не лежит — везти нечего
         codes = {oid: sr._num((reg.get(oid) or {}).get(pid) or 0) for oid in OFFICE_IDS}
+        # Сколько из лежащего уже отдают по открытым заявкам: те же бутылки
+        # второй раз не обещают — оператор видит это рядом с остатком.
+        gone = {oid: sr._num(out[(oid, pid)]) for oid in OFFICE_IDS if out.get((oid, pid), 0) > 1e-9}
         products.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
                          "img": p.get("img", ""), "unit": sr._unit(p),
-                         "have": have, "codes": codes})
+                         "have": have, "codes": codes, "out": gone})
     return {"day": day,
             "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
                            "mine": o in scope} for o in OFFICE_IDS],
@@ -432,7 +699,8 @@ async def live_for(scope: set) -> dict:
 
 async def cancel_by_operator(mid: str, district: str, scope: set) -> dict:
     """Снять неначатую задачу своего района. Начатую — нельзя: часть бутылок
-    уже в машине, и снимать поздно; это решает владелец в STAR."""
+    уже передана и лежит у получателя, снимать поздно; это решает владелец в
+    STAR."""
     if district not in scope:
         return {"ok": False, "error": "not_yours"}
     doc = await db.move_order_get(mid)
@@ -444,7 +712,8 @@ async def cancel_by_operator(mid: str, district: str, scope: set) -> dict:
     if not t or t.get("done_at") or t.get("cancelled_at"):
         return {"ok": False, "error": "gone"}
     if any(float(l.get("got") or 0) > 0 for l in (t.get("lines") or [])):
-        return {"ok": False, "error": "started", "driver": t.get("driver") or ""}
+        givers = sorted({(g or {}).get("driver") or "" for g in (t.get("give") or {}).values()} - {""})
+        return {"ok": False, "error": "started", "driver": ", ".join(givers) or t.get("driver") or ""}
     ok = await db.move_order_cancel(mid, district, _now())
     if ok:
         log.info(f"[move] {mid}/{district}: оператор снял задачу")
@@ -468,20 +737,43 @@ async def _body(request) -> dict:
 async def handle_drv_claim(request):
     me, b = request["driver"], await _body(request)
     r = await claim(request.match_info.get("mid") or "", str(b.get("district") or ""),
-                    me["name"], request["tg"].get("id") or 0)
+                    me["name"], request["tg"].get("id") or 0, me.get("district") or "")
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
 async def handle_drv_release(request):
     me, b = request["driver"], await _body(request)
-    r = await release(request.match_info.get("mid") or "", str(b.get("district") or ""), me["name"])
+    r = await release(request.match_info.get("mid") or "", str(b.get("district") or ""), me["name"],
+                      me.get("district") or "")
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
 async def handle_drv_scan(request):
     me, b = request["driver"], await _body(request)
+    # district в запросе — район-получатель (ключ задачи); отдаёт водитель со
+    # своего района, и его район берём из подписи, а не из запроса.
     r = await scan(request.match_info.get("mid") or "", str(b.get("district") or ""),
-                   str(b.get("code") or ""), me["name"], request["tg"].get("id") or 0)
+                   str(b.get("code") or ""), me["name"], request["tg"].get("id") or 0,
+                   me.get("district") or "")
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+async def handle_drv_start(request):
+    """POST {district} — «Начать перемещение»: district — район-получатель."""
+    me, b = request["driver"], await _body(request)
+    r = await give_start(request.match_info.get("mid") or "", str(b.get("district") or ""),
+                         me["name"], request["tg"].get("id") or 0, me.get("district") or "")
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+async def handle_drv_accept(request):
+    """POST {district, from, ok, lines:[{id, got}], note} — «Принял» / «Принял неровно»."""
+    me, b = request["driver"], await _body(request)
+    r = await accept(request.match_info.get("mid") or "", str(b.get("district") or ""),
+                     str(b.get("from") or ""), me["name"], request["tg"].get("id") or 0,
+                     me.get("district") or "", ok=b.get("ok") is not False,
+                     lines=b.get("lines") if isinstance(b.get("lines"), list) else [],
+                     note=str(b.get("note") or ""))
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 

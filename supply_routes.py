@@ -2464,6 +2464,18 @@ async def handle_move_live(request):
 
 
 @require_owner
+async def handle_move_board(request):
+    """Что где лежит — для ручной заявки на перемещение в STAR (владелец,
+    18 сен 2026: «две опции — свободное перемещение или создать заявку, как у
+    операторов»). Районы все: у STAR своего и чужого нет."""
+    import json
+    import move_routes
+    from config_offices import OFFICE_IDS as _ALL
+    res = await move_routes.board(set(_ALL))
+    return web.json_response(res, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_owner
 async def handle_move_create(request):
     import move_routes
     return await move_routes.handle_own_create(request)
@@ -2509,6 +2521,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),
         # Перемещения между районами: расчёт, создание заявки и живой статус.
         ("/api/owner/move/plan",                    handle_move_plan,    "GET"),
+        ("/api/owner/move/board",                   handle_move_board,   "GET"),
         ("/api/owner/move/live",                    handle_move_live,    "GET"),
         ("/api/owner/move/create",                  handle_move_create,  "POST"),
         ("/api/owner/move/{mid}/cancel",            handle_move_cancel,  "POST"),

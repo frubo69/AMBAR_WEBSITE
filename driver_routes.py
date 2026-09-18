@@ -442,11 +442,12 @@ async def _after_close(me: dict, day: str, d: dict) -> dict | None:
 
 
 async def _moves_left(me: dict) -> list:
-    """Незакрытые перемещения района водителя.
+    """Незакрытые перемещения района водителя — с обеих сторон.
 
     Владелец, 18 сен 2026: «не давай им закрыть смену, пока все перемещения не
-    отработаны». Задача на перемещение висит на районе, а не на человеке: пока
-    её не забрали и не доработали, смену не закрывает никто из района — иначе
+    отработаны». Перемещение висит на районе, а не на человеке, и держит оба
+    района: тот, что отдаёт (side=give — сканирует он), пока не отсканировал
+    всё, и тот, что забирает (side=take), пока не нажал «Принял». Иначе
     бутылки остаются лежать не там, где их ждёт заявка."""
     if _tq(me):
         return []
@@ -456,11 +457,19 @@ async def _moves_left(me: dict) -> list:
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] перемещения {me['name']} не прочитаны: {e}")
         return []
-    return [{"move_id": r["move_id"], "district_code": r["district_code"],
-             "need": r["need"], "got": r["got"], "left": r["left"],
-             "positions": r["left_positions"], "driver": r["driver"],
-             "sources": [s["code"] for s in r["sources"] if not s["done"]]}
-            for r in rows]
+    out = []
+    for r in rows:
+        give = r["side"] == "give"
+        out.append({"move_id": r["move_id"], "side": r["side"],
+                    # district — ключ задачи (район-получатель), как в запросах.
+                    "district": r["district"], "from": r["from"],
+                    # С кем передача: кому отдаём — или от кого принимаем.
+                    "code": r["to_code"] if give else r["from_code"],
+                    "name": r["to_name"] if give else r["from_name"],
+                    "status": r["status"], "giver": r["giver"],
+                    "need": r["need"], "got": r["got"], "left": r["left"],
+                    "positions": r["left_positions"]})
+    return out
 
 
 async def _intake_left(me: dict) -> list:
@@ -510,6 +519,7 @@ async def _shift_view(me: dict) -> dict:
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
     route = await _in_route(me) if opened and not closed else []
     intake = await _intake_left(me) if opened and not closed else []
+    moves = await _moves_left(me) if opened and not closed else []
     after = await _after_close(me, day, d)
     # День района закрыт оператором — значит заказов сегодня больше не будет, и
     # неотвеченные расходы превращаются из «успею» в «держу всех». Водителю про
@@ -538,12 +548,16 @@ async def _shift_view(me: dict) -> dict:
         "in_route": route,
         # Незавершённые приёмки: пока есть — «Закрыть смену» не активна.
         "intake": intake,
+        # Неотработанные перемещения района — отдать или забрать. Держат смену
+        # так же, как приёмка: закрыть её сервер всё равно не даст.
+        "moves": moves,
         "can_open": (d.get("working") is True or _tq(me)) and geo["ok"]
                     and not (opened and not closed) and not after,
         # Смену закрывает сам водитель, когда отдал последний заказ и ответил
         # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
         # висела бы до утра, а «закрыть» упиралось в чужое действие.
-        "can_close": bool(opened) and not closed and not must and not route and not intake,
+        "can_close": bool(opened) and not closed and not must and not route and not intake
+                     and not moves,
         # Просьба закрыть смену раньше оператора (18 сен 2026): текущий запрос,
         # кто его решает и когда можно просить снова. Отпустили — шаг «оператор
         # закрыл смену» пройден так же, как если бы закрыли весь район.
@@ -2769,6 +2783,20 @@ async def handle_move_scan(request):
     return await move_routes.handle_drv_scan(request)
 
 
+@require_driver
+@_no_test
+async def handle_move_start(request):
+    import move_routes
+    return await move_routes.handle_drv_start(request)
+
+
+@require_driver
+@_no_test
+async def handle_move_accept(request):
+    import move_routes
+    return await move_routes.handle_drv_accept(request)
+
+
 def setup(app):
     r = app.router
     routes = (
@@ -2819,12 +2847,15 @@ def setup(app):
         ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
         ("/api/driver/supply/{sid}/hold",       handle_supply_hold,   "POST"),
         ("/api/driver/supply/{sid}/buy",        handle_supply_buy,    "POST"),
-        # Перемещение между районами: задача на районе-получателе, водитель
-        # едет к отдающему и сканирует то, что должен увезти.
+        # Перемещение между районами: отдающий начинает и сканирует, получатель
+        # принимает («Принял» / «Принял неровно»). claim/release — старый
+        # порядок, для приложения, открытого до обновления.
         ("/api/driver/move",                    handle_move_list,     "GET"),
         ("/api/driver/move/{mid}/claim",        handle_move_claim,    "POST"),
         ("/api/driver/move/{mid}/release",      handle_move_release,  "POST"),
         ("/api/driver/move/{mid}/scan",         handle_move_scan,     "POST"),
+        ("/api/driver/move/{mid}/start",        handle_move_start,    "POST"),
+        ("/api/driver/move/{mid}/accept",       handle_move_accept,   "POST"),
     )
     seen = set()
     for path, handler, method in routes:

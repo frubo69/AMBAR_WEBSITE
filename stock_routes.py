@@ -806,6 +806,7 @@ MOVE_SAY = {
     "no_item":  "нет в каталоге",
     "busy":     "её уже перевезли",
     "deleted":  "убрана из реестра",
+    "moved":    "числится на другом районе",
 }
 
 
@@ -819,7 +820,7 @@ def _move_res(verdict: str, **extra) -> dict:
 
 
 async def move_by_code(code: str, dst: str, by, by_name: str = "",
-                       by_kind: str = "owner", day: str = "") -> dict:
+                       by_kind: str = "owner", day: str = "", expect_from: str = "") -> dict:
     """Перевезти одну бутылку по коду с крышки — ядро, общее для старшего и
     водителя. Ответ — словарь с вердиктом, не HTTP: кто спрашивал, тот и
     завернёт. Отказ — не ошибка запроса, а ответ про бутылку: списанную и уже
@@ -827,7 +828,11 @@ async def move_by_code(code: str, dst: str, by, by_name: str = "",
     словами, что с ней не так, а не показать красный сбой.
 
     В книге переездов остаётся, кто вёз: by_kind «driver»/«owner» и имя. По
-    ним водитель отменяет только своё, а старший видит в истории, чей переезд."""
+    ним водитель отменяет только своё, а старший видит в истории, чей переезд.
+
+    expect_from — откуда бутылка обязана уехать (передача по заявке: отдающий
+    отдаёт только со своего района). Код успел числиться на другом — «moved»,
+    и бутылка никуда не едет: иначе она ушла бы из чужого района по чужой строке."""
     doc = await db.qr_get(code)
     if not doc:
         return _move_res("unknown", code=code)
@@ -845,6 +850,9 @@ async def move_by_code(code: str, dst: str, by, by_name: str = "",
                          **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
     if src not in OFFICE_IDS:
         return _move_res("nohome", code=code, name=name, label=label)
+    if expect_from and src != expect_from:
+        return _move_res("moved", code=code, name=name, label=label,
+                         **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
     pid = str(doc.get("product_id") or "")
     p = _catalog().get(pid)
     if not p:
@@ -1292,19 +1300,15 @@ async def order_rows(day: str = "") -> dict:
     edits = await db.zayavka_edits(day)      # ручные правки поверх расчёта
     # Что уже едет к району по открытой заявке на перемещение. Это такой же
     # приход, как товар от магазина, только бесплатный: просить его купить —
-    # значит купить дважды (владелец, 18 сен 2026). Считаем неувезённый остаток
-    # строки: по мере сканирования он тает, а бутылки появляются в have_exact.
-    moving = {}
+    # значит купить дважды (владелец, 18 сен 2026). И обратное: что район
+    # отдаёт соседу, у него уже не лежит — забрали ниже нормы, значит взамен
+    # надо купить. Полка считается так, будто перемещения уже сделаны. Берём
+    # неотданный остаток строк: по мере сканирования он тает, а бутылки
+    # переходят в have_exact получателя.
+    moving, leaving = {}, {}
     try:
         import move_routes
-        for doc in await db.move_orders_open():
-            for oid, t in (doc.get("tasks") or {}).items():
-                if t.get("done_at") or t.get("cancelled_at"):
-                    continue
-                for l in t.get("lines") or []:
-                    left = float(l.get("qty") or 0) - float(l.get("got") or 0)
-                    if left > 0:
-                        moving[(oid, l.get("id"))] = moving.get((oid, l.get("id")), 0.0) + left
+        moving, leaving = await move_routes.pending_qty()
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[stock] перемещения к заявке не прочитаны: {e}")
     try:
@@ -1314,6 +1318,7 @@ async def order_rows(day: str = "") -> dict:
         log.warning(f"[stock] закупочные цены не прочитаны: {e}")
         costs = {}
     rows, total_aed, total_qty, total_cost, moving_qty = [], 0, 0, 0.0, 0.0
+    leaving_qty = 0.0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
     per_district = await _district_base(day)
@@ -1322,6 +1327,7 @@ async def order_rows(day: str = "") -> dict:
         price = _price(p)
         cells, item_total = {}, 0
         row_edited = False
+        row_leave = 0
         for oid in OFFICE_IDS:
             d = per_district[oid]
             # Остаток точный: полкоробки пива — это 12 банок, и заявка обязана
@@ -1333,7 +1339,11 @@ async def order_rows(day: str = "") -> dict:
             # Полкоробки недостачи — это коробка в заявке: меньше коробки
             # магазин не отгружает, а приёмка считает коробки целыми.
             везут = _num(moving.get((oid, pid), 0))
-            calc = int(math.ceil(round(max(0.0, norm - have - везут), 6)))
+            уйдёт = _num(leaving.get((oid, pid), 0))
+            calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут), 6)))
+            # Сколько заявка просит из-за того, что район отдаёт соседу:
+            # без перемещения этих единиц в клетке не было бы.
+            row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут), 6)))
             # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
             # которое предлагала программа, иначе непонятно, от чего отступили.
             fix = (edits.get(pid) or {}).get(oid)
@@ -1341,11 +1351,15 @@ async def order_rows(day: str = "") -> dict:
             if fix is not None and need != calc:
                 row_edited = True
             moving_qty += везут
+            leaving_qty += уйдёт
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc,
                           # Сколько едет к району от соседа по заявке на
                           # перемещение: заявка это уже вычла, и видно почему.
                           "moving": везут,
+                          # Сколько район отдаёт соседу по открытой заявке —
+                          # на полке этого уже как бы нет.
+                          "leaving": уйдёт,
                           # Сколько из «есть» приехало уже после пересчёта и
                           # сколько с тех пор продали: владелец должен видеть,
                           # что число не с полки, а посчитанное.
@@ -1370,6 +1384,7 @@ async def order_rows(day: str = "") -> dict:
                      "price": price, "unit": _unit(p), "unit_name": "коробка" if _unit(p) > 1 else "бутылка",
                      "need_total": item_total, "cells": cells,
                      "calc_total": sum(c["calc"] for c in cells.values()),
+                     "leaving_need": row_leave,
                      "edited": row_edited})
 
     rows.sort(key=lambda r: (-r["need_total"], r["name"]))
@@ -1381,6 +1396,7 @@ async def order_rows(day: str = "") -> dict:
     smokes = [r for r in rows if r["cat"] in tobacco.NON_ALCOHOL]
     rows = [r for r in rows if r["cat"] not in tobacco.NON_ALCOHOL]
     total_qty = sum(r["need_total"] for r in rows)
+    leaving_need = sum(r["leaving_need"] for r in rows)
     total_aed = sum(r["need_total"] * r["price"] for r in rows)
     total_cost = sum(r["need_total"] * r["cost"] for r in rows)
     return {
@@ -1391,6 +1407,7 @@ async def order_rows(day: str = "") -> dict:
                        "came": sum(per_district[o]["came"].values())} for o in OFFICE_IDS],
         "total_qty": total_qty, "total_aed": total_aed,
         "total_cost": round(total_cost), "moving_qty": _num(moving_qty),
+        "leaving_qty": _num(leaving_qty), "leaving_need": leaving_need,
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_HIST_DAYS,

@@ -1254,6 +1254,33 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-mv-pick-b{flex:1;min-width:0}
 .stk-mv-pick-n{display:block;font-size:14px;font-weight:600}
 .stk-mv-pick-s{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+/* Перемещение: «свободно или заявкой» и ручная заявка (18 сен 2026). Строки
+   выбора — те же, что «куда везём»; кружок-шеврон справа — строка ведёт дальше. */
+.mvn-opt{padding:16px 14px}
+.mvn-opt .stk-mv-code{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
+.mvn-opt .stk-mv-pick-s{line-height:1.4}
+.mvn-go{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
+.mvn-live{margin-top:6px;border-radius:14px;background:var(--card);border:1px solid var(--border2)}
+.mvn-dirs{margin-bottom:10px}
+.pk-dist.off{opacity:.4}
+.mvn-p .pk-row-b{min-width:0}
+.mvn-p .pk-slug,.mvn-li .pk-slug{font-family:'DM Sans',sans-serif;font-size:11.5px;letter-spacing:0;color:var(--muted)}
+.mvn-p.dim .pk-name{color:var(--muted)}
+.mvn-p.in{border-color:rgba(201,169,110,.45)}
+.mvn-img{width:36px;height:36px;border-radius:9px;object-fit:cover;flex-shrink:0;background:var(--card2)}
+.mvn-plus{min-width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(201,169,110,.45);font-size:17px}
+.mvn-p.in .mvn-plus{background:var(--gold-soft)}
+.mvn-li{cursor:default}
+.mvn-li:active{transform:none;background:var(--card)}
+.mvn-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+.mvn-note{margin-top:8px}
+.mvn-clear{margin-top:6px}
+.mvn-cart{flex:1.3!important;justify-content:space-between;padding:0 16px!important;font-size:13px}
+.mvn-cart span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mvn-cart b{flex:0 0 auto;color:var(--gold2)}
 /* Куда везём — видно с камеры всё время: без этого через десять бутылок уже
    не помнишь, какой офис выбрал, а исправить нечем. */
 .scan-dest{display:inline-flex;align-items:center;gap:7px;margin:0 14px 8px;
@@ -10444,6 +10471,12 @@ body.safe-open .cvo-hdr{opacity:0}
 .mvo-line .pk-name{font-weight:600}
 .mvo-line.done{opacity:.55}
 .mvo-x{margin-top:8px}
+/* Принято неровно — жёлтым: что отдали, что пришло, слово получателя. */
+.mvo-card.warn{border-color:rgba(243,180,74,.45)}
+.mvo-src.warn .pk-slug{color:var(--warn)}
+.mvo-diff{display:flex;flex-direction:column;gap:3px;margin:0 0 8px 6px;padding:8px 12px;border-radius:11px;
+  font-size:12px;line-height:1.4;color:var(--sub);background:rgba(243,180,74,.08);border:1px solid rgba(243,180,74,.3)}
+.mvo-diff b{color:var(--warn)}
 .mvo-go{width:100%;margin-top:14px;padding:14px;border-radius:14px;border:0;cursor:pointer;
   font-family:inherit;font-size:14px;font-weight:700}
 .mvo-go:disabled{opacity:.6}
@@ -14459,6 +14492,8 @@ function stkBack(){
   // Из камеры переезда — туда, откуда пришли: в список района или на склад.
   if(STK.view === 'move-scan'){ movCancel(); stkMoveDone(); return; }
   if(STK.view === 'move-pick'){ stkMoveDone(); return; }
+  if(STK.view === 'move-choose'){ stkPicker(); return; }
+  if(STK.view === 'mvn'){ mvnBack(); return; }
   // Отчёт открывают и со страницы района, и из истории — назад туда же.
   if(STK.view === 'report'){
     if(STK.repFrom === 'audits') stkAudits(STK.audFocus, STK.audFrom); else stkAuditPick(); return; }
@@ -14589,8 +14624,8 @@ async function stkPicker(тихо){
         ${sub('stkAudits()', I_HAUD, 'История')}
       </div>
       <div class="stk-col">
-        ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(nMov), 'в месяц',
-               'скан / куда везём')}
+        ${tile('stkMoveChoose()', I_MOV, 'Перемещение', fmt(nMov), 'в месяц',
+               'свободно / заявкой')}
         ${sub('stkMovesHist()', I_HAUD, 'История')}
       </div>
     </div></div>`;
@@ -14885,9 +14920,9 @@ async function stkLoadMoves(){
 // истории и может вернуть; свои строки подписи не требуют.
 function _mvWho(m){
   if(!m) return '';
-  // Переезд по заявке на перемещение — свой вид: видно, что бутылку увёз
-  // водитель по задаче, а не руками.
-  if(m.by_kind === 'move') return ` · по заявке, водитель ${escS(m.by_name || '')}`;
+  // Переезд по заявке на перемещение — свой вид: видно, что бутылку отдал
+  // водитель района по заявке (сканирует отдающий), а не руками.
+  if(m.by_kind === 'move') return ` · по заявке, отдал ${escS(m.by_name || '')}`;
   return m.by_kind === 'driver' ? ` · водитель ${escS(m.by_name || '')}` : '';
 }
 
@@ -16260,6 +16295,241 @@ const MOV_V = {
   nohome:  ['err',   'офис не указан',   'var(--dn)'],
   no_item: ['err',   'нет в каталоге',   'var(--dn)'],
 };
+
+// ── Перемещение: свободно или заявкой ───────────────────────────────────────
+// Владелец, 18 сен 2026: «когда он нажимает на эту кнопку — две опции:
+// свободное перемещение или создать заявку на перемещение, как у операторов;
+// только он сможет и сам перемещать бутылки в свободном формате».
+//   • свободное — как было: скан бутылки, куда везём, остаток переезжает сразу;
+//   • заявкой — ручная сборка, как у операторов, но районы любые: откуда,
+//     куда, что и сколько. Дальше её отрабатывают водители: отдающий
+//     сканирует, получатель принимает.
+function stkMoveChoose(){
+  STK.view = 'move-choose';
+  _setRail('stkRail', '');
+  _stkHead('Перемещение', 'свободно / заявкой', false);
+  const seg = document.getElementById('stkSeg'); if(seg) seg.style.display = 'none';
+  const ico = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+    stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  document.getElementById('stkMid').innerHTML = `
+    <button class="stk-mv-pick mvn-opt" onclick="stkMoveStart()">
+      <span class="stk-mv-code">${ico('<path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/>')}</span>
+      <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">Свободное перемещение</span>
+        <span class="stk-mv-pick-s">сами сканируете бутылку и выбираете, куда — остаток переезжает сразу</span></span>
+      <em class="mvn-go">${_SC_CHEV}</em></button>
+    <button class="stk-mv-pick mvn-opt" onclick="mvnOpen()">
+      <span class="stk-mv-code">${ico('<path d="M9 4h6M9 4a2 2 0 0 0-2 2v0h10v0a2 2 0 0 0-2-2M7 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-1"/><path d="M8 12h8M8 16h5"/>')}</span>
+      <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">Заявка на перемещение</span>
+        <span class="stk-mv-pick-s">откуда, куда, что и сколько — отдающий водитель отсканирует, получатель примет</span></span>
+      <em class="mvn-go">${_SC_CHEV}</em></button>
+    ${MVO.open ? `<button class="sc-r mvn-live" onclick="accOpen('moves')"><span>Перемещения в работе</span>
+      <b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
+}
+
+// Ручная заявка — та же, что у операторов, но районы любые. Строка помнит
+// и «откуда», и «куда»: сменили район — следующие позиции едут уже так, и в
+// одной заявке можно развезти по разным районам. Черновик — в телефоне.
+let MVN = {board: null, q: '', pick: '', draft: false, busy: false};
+let MVND = {from: '', to: '', lines: [], note: ''};
+try{ const x = JSON.parse(localStorage.getItem('star_mv_draft') || 'null');
+     if(x && Array.isArray(x.lines)) MVND = {...MVND, ...x}; }catch(e){}
+function _mvnSave(){ try{ localStorage.setItem('star_mv_draft', JSON.stringify(MVND)); }catch(e){} }
+function _mvnP(id){ return ((MVN.board || {}).products || []).find(x => x.id === id) || {}; }
+function _mvnD(id){ return ((MVN.board || {}).districts || []).find(x => x.id === id) || {id, code: id, name: ''}; }
+function _mvnStep(p){ return p && p.unit > 1 ? 0.5 : 1; }
+function _mvnU(p, n){ return p && p.unit > 1 ? (n % 1 ? 'коробки' : pluralize(n, 'коробка', 'коробки', 'коробок'))
+                                             : pluralize(n, 'бутылка', 'бутылки', 'бутылок'); }
+
+async function mvnOpen(){
+  STK.view = 'mvn'; MVN.pick = ''; MVN.draft = false; MVN.q = '';
+  _setRail('stkRail', '');
+  _stkHead('Заявка на перемещение', 'загрузка…', false);
+  document.getElementById('stkMid').innerHTML = '<div class="stk-none">Смотрим остатки по районам…</div>';
+  try{ MVN.board = await ownerApi.ownerFetch('/api/owner/move/board'); }
+  catch(e){ document.getElementById('stkMid').innerHTML = loadFail('mvnOpen()', 'Остатки не загрузились'); return; }
+  const ds = MVN.board.districts || [];
+  if(!ds.some(d => d.id === MVND.to)) MVND.to = (ds[0] || {}).id || '';
+  if(!ds.some(d => d.id === MVND.from) || MVND.from === MVND.to)
+    MVND.from = (ds.find(d => d.id !== MVND.to) || {}).id || '';
+  _mvnSave();
+  mvnPaint();
+}
+
+// Назад внутри конструктора: из выбора района и из заявки — к товару, из
+// товара — к выбору «свободно / заявкой».
+function mvnBack(){
+  if(MVN.pick){ MVN.pick = ''; mvnPaint(); return; }
+  if(MVN.draft){ MVN.draft = false; mvnPaint(); return; }
+  stkMoveChoose();
+}
+
+function mvnPaint(){
+  if(STK.view !== 'mvn') return;
+  const mid = document.getElementById('stkMid'), foot = document.getElementById('stkFoot');
+  const units = MVND.lines.reduce((a, l) => a + (+l.qty || 0), 0);
+  if(MVN.pick){
+    const other = MVN.pick === 'from' ? MVND.to : MVND.from;
+    _stkHead(MVN.pick === 'from' ? 'Откуда' : 'Куда', MVN.pick === 'from' ? 'район, который отдаёт' : 'район, который принимает', false);
+    mid.innerHTML = `<div class="pk-grid">${((MVN.board || {}).districts || []).map(d => `
+      <button class="pk-dist${d.id === other ? ' off' : ''}" ${d.id === other ? 'disabled' : ''}
+              onclick="mvnPickSet('${escS(d.id)}')">
+        <span class="pk-code">${escS(d.code)}</span>
+        <span class="pk-dist-b"><span class="pk-dist-n">${escS(d.name)}</span>
+          <span class="pk-dist-s">${d.id === other ? (MVN.pick === 'from' ? 'сюда везём' : 'отсюда везём')
+            : d.id === (MVN.pick === 'from' ? MVND.from : MVND.to) ? 'выбран' : ''}</span></span>
+      </button>`).join('')}</div>`;
+    foot.innerHTML = '';
+    return;
+  }
+  if(MVN.draft){
+    _stkHead('Заявка', MVND.lines.length ? `${MVND.lines.length} ${pluralize(MVND.lines.length,'строка','строки','строк')} · ${fmtQty(units)} ед.` : 'пусто', false);
+    mid.innerHTML = mvnDraftHtml();
+  }else{
+    const f = _mvnD(MVND.from), t = _mvnD(MVND.to);
+    _stkHead('Заявка на перемещение', 'откуда / куда / что и сколько', false);
+    mid.innerHTML = `<div class="pk-grid mvn-dirs">
+        <button class="pk-dist" onclick="mvnPick('from')"><span class="pk-code">${escS(f.code)}</span>
+          <span class="pk-dist-b"><span class="pk-dist-n">Откуда · ${escS(f.name)}</span>
+            <span class="pk-dist-s">отдаёт — его водитель сканирует</span></span><em class="mvn-go">${_SC_CHEV}</em></button>
+        <button class="pk-dist" onclick="mvnPick('to')"><span class="pk-code">${escS(t.code)}</span>
+          <span class="pk-dist-b"><span class="pk-dist-n">Куда · ${escS(t.name)}</span>
+            <span class="pk-dist-s">принимает — его водитель нажимает «Принял»</span></span><em class="mvn-go">${_SC_CHEV}</em></button>
+      </div>
+      <div class="pk-search">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="mvnQ" placeholder="Найти позицию" value="${escS(MVN.q)}" oninput="mvnFind(this.value)"
+          autocomplete="off" spellcheck="false">
+      </div>
+      <div id="mvnList">${mvnListHtml()}</div>`;
+  }
+  const froms = [...new Set(MVND.lines.map(l => `${_mvnD(l.from).code} → ${_mvnD(l.to).code}`))];
+  foot.innerHTML = !MVND.lines.length ? '' : MVN.draft
+    ? `<div class="qb-wrap"><button class="qb" ${MVN.busy ? 'disabled' : ''} onclick="mvnSend()">
+         ${MVN.busy ? 'Создаю…' : `Создать заявку · ${fmtQty(units)} ед.`}</button></div>`
+    : `<div class="qb-wrap"><div class="qb-row">
+         <button class="qb quiet mvn-cart" onclick="mvnDraftOpen()"><span>${escS(froms.slice(0, 2).join(', '))}${froms.length > 2 ? '…' : ''}</span>
+           <b>${MVND.lines.length} ${pluralize(MVND.lines.length,'строка','строки','строк')}</b></button>
+         <button class="qb" ${MVN.busy ? 'disabled' : ''} onclick="mvnSend()">${MVN.busy ? 'Создаю…' : 'Создать'}</button>
+       </div></div>`;
+}
+
+// Товар — весь каталог того, что где-то лежит, по разделам. Рядом — сколько
+// в районе «откуда», сколько там кодов и сколько уже уходит по открытым
+// заявкам: цифры для глаза, решает старший.
+function mvnListHtml(){
+  const B = MVN.board; if(!B) return '';
+  const q = MVN.q.trim().toLowerCase(), from = MVND.from, fc = _mvnD(from).code;
+  const list = (B.products || []).filter(p => !q || String(p.name).toLowerCase().includes(q))
+    .sort((a, b) => String(a.cat).localeCompare(String(b.cat)) || String(a.name).localeCompare(String(b.name)));
+  if(!list.length) return `<div class="stk-none">${q ? 'Ничего не нашли' : 'Товара нет ни в одном районе'}</div>`;
+  let cat = null, out = '';
+  for(const p of list){
+    if(p.cat !== cat){ cat = p.cat; out += `<div class="stk-grp2"><span>${escS(cat || 'Без раздела')}</span></div>`; }
+    const h = +(p.have || {})[from] || 0, c = +(p.codes || {})[from] || 0, gone = +(p.out || {})[from] || 0;
+    const inD = MVND.lines.filter(l => l.id === p.id && l.from === from && l.to === MVND.to)
+                          .reduce((a, l) => a + (+l.qty || 0), 0);
+    out += `<button class="pk-row mvn-p${inD ? ' in' : ''}${h ? '' : ' dim'}" onclick="mvnPlus('${escS(p.id)}')">
+      <img class="mvn-img" src="${escS(p.img || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <span class="pk-row-b"><span class="pk-name">${escS(p.name)}</span>
+        <span class="pk-slug">${h ? `в ${escS(fc)}: ${fmtQty(h)} ${p.unit > 1 ? 'кор' : 'шт'}${c < h ? ` · кодов ${fmtQty(c)}` : ''}${
+          gone ? ` · ${fmtQty(gone)} уже в заявке` : ''}` : `в ${escS(fc)} нет`}</span></span>
+      <span class="pk-n mvn-plus">${inD ? fmtQty(inD) : '+'}</span>
+    </button>`;
+  }
+  return out;
+}
+
+function mvnDraftHtml(){
+  if(!MVND.lines.length) return `<div class="stk-none">Заявка пустая — вернитесь к товару и нажмите на позицию</div>`;
+  const by = {};
+  MVND.lines.forEach((l, i) => { (by[l.from + '>' + l.to] = by[l.from + '>' + l.to] || []).push([l, i]); });
+  return Object.keys(by).map(k => {
+    const [f, t] = k.split('>');
+    return `<div class="stk-grp2"><span>Из ${escS(_mvnD(f).code)} ${escS(_mvnD(f).name)} → ${escS(_mvnD(t).code)} ${escS(_mvnD(t).name)}</span></div>`
+      + by[k].map(([l, i]) => {
+        const p = _mvnP(l.id);
+        return `<div class="pk-row mvn-li">
+          <span class="pk-row-b"><span class="pk-name">${escS(p.name || l.id)}</span>
+            <span class="pk-slug">${_mvnU(p, +l.qty || 0)}</span></span>
+          <span class="ord-st">
+            <button onclick="mvnQty(${i},-1)" aria-label="Меньше">−</button>
+            <input inputmode="decimal" value="${fmtQty(l.qty)}" onchange="mvnSetQ(${i}, this.value)" onfocus="this.select()">
+            <button onclick="mvnQty(${i},1)" aria-label="Больше">+</button>
+          </span>
+          <button class="mvn-x" onclick="mvnDel(${i})" aria-label="Убрать"><svg viewBox="0 0 24 24" width="15" height="15"
+            fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>`;
+      }).join('');
+  }).join('') + `<div class="pk-search mvn-note"><input maxlength="200" placeholder="Слово водителям (необязательно)"
+      value="${escS(MVND.note || '')}" oninput="MVND.note=this.value;_mvnSave()"></div>
+    <button class="ord-reset mvn-clear" onclick="mvnClear()">Очистить заявку</button>`;
+}
+
+function mvnPick(kind){ MVN.pick = kind; try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} mvnPaint(); }
+function mvnPickSet(id){
+  const kind = MVN.pick;
+  if(kind === 'from'){ if(id === MVND.to) return; MVND.from = id; }
+  else{ if(id === MVND.from) return; MVND.to = id; }
+  MVN.pick = ''; _mvnSave();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  mvnPaint();
+}
+function mvnFind(v){ MVN.q = v; const box = document.getElementById('mvnList'); if(box) box.innerHTML = mvnListHtml(); }
+function mvnDraftOpen(){ MVN.draft = true; mvnPaint(); }
+
+function mvnPlus(pid){
+  const p = _mvnP(pid), st = _mvnStep(p);
+  const l = MVND.lines.find(x => x.id === pid && x.from === MVND.from && x.to === MVND.to);
+  if(l) l.qty = Math.round((+l.qty + st) * 2) / 2;
+  else MVND.lines.push({from: MVND.from, to: MVND.to, id: pid, qty: st});
+  _mvnSave();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  mvnPaint();
+}
+function mvnQty(i, d){
+  const l = MVND.lines[i]; if(!l) return;
+  const st = _mvnStep(_mvnP(l.id));
+  l.qty = Math.round((+l.qty + d * st) * 2) / 2;
+  if(l.qty <= 0) MVND.lines.splice(i, 1);
+  _mvnSave(); mvnPaint();
+}
+function mvnSetQ(i, v){
+  const l = MVND.lines[i]; if(!l) return;
+  const st = _mvnStep(_mvnP(l.id));
+  const n = Math.round((parseFloat(String(v).replace(',', '.')) || 0) / st) * st;
+  if(n <= 0) MVND.lines.splice(i, 1); else l.qty = n;
+  _mvnSave(); mvnPaint();
+}
+function mvnDel(i){ MVND.lines.splice(i, 1); _mvnSave(); mvnPaint(); }
+async function mvnClear(){
+  if(!await askDialog('Очистить заявку?', 'Все строки уйдут из черновика', 'Очистить', 'Оставить', 'no')) return;
+  MVND.lines = []; MVND.note = ''; _mvnSave(); MVN.draft = false; mvnPaint();
+}
+
+async function mvnSend(){
+  if(MVN.busy || !MVND.lines.length) return;
+  MVN.busy = true; mvnPaint();
+  let r = null;
+  try{
+    r = await ownerApi.ownerFetch('/api/owner/move/create', {method: 'POST', body: {
+      by: 'STAR', note: MVND.note || '',
+      rows: MVND.lines.map(l => ({from: l.from, to: l.to, id: l.id, qty: l.qty}))}});
+  }catch(e){ _toast('Не удалось создать — повторите'); }
+  MVN.busy = false;
+  if(r && r.ok){
+    _toast(`Заявка создана · ${r.districts} ${pluralize(r.districts,'район','района','районов')}`);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    MVND = {from: MVND.from, to: MVND.to, lines: [], note: ''}; _mvnSave();
+    MVN.draft = false;
+    mvoLoad();
+    accOpen('moves');                 // сразу видно, как её отрабатывают
+    stkMoveChoose();
+    return;
+  }
+  if(r && !r.ok) _toast('Перемещать нечего — проверьте строки');
+  mvnPaint();
+}
 
 async function stkMoveStart(){
   // Перемещение всегда сегодняшним днём — к полосе дня на складе оно не
@@ -23160,13 +23430,19 @@ setInterval(() => { if(!document.hidden) ilLoad(); }, 30000);
 
 // ── Перемещения между районами ──────────────────────────────────────────────
 // Владелец, 18 сен 2026: «мне в AMBAR STAR инструмент, с помощью которого я
-// смогу следить за этой заявкой по каждому району отдельно». Задача висит на
-// районе-ПОЛУЧАТЕЛЕ: его водитель едет к соседу и забирает бутылки. Поэтому в
-// карточке главное — куда везут и откуда осталось забрать.
+// смогу следить за этой заявкой по каждому району отдельно». Сканирует тот, кто
+// отдаёт, а получатель, когда ему отдали всё, нажимает «Принял» или «Принял
+// неровно». Карточка — район-получатель; внутри — от кого он принимает: кто
+// отдаёт, сколько отдал, принято ли и что не сошлось.
 let MVO = {tasks: [], open: 0, plan: null, poll: null, busy: false, fold: new Set()};
-const MVO_ST = {free: ['свободна', ''], claimed: ['взял водитель', ''],
-                live: ['забирает сейчас', 'live'], done: ['выполнено', 'ok'],
+const MVO_ST = {free: ['ждёт отдающих', ''], live: ['отдают', 'live'],
+                given: ['ждёт «Принял»', 'live'], done: ['принято', 'ok'],
                 cancelled: ['снято', 'warn']};
+// Передача одной пары «откуда → куда» словами — строкой под районом.
+const MVO_SRC = {wait: () => 'ждёт отдающего', pause: s => `отдавал ${s.giver || '—'} · пауза`,
+                 live: s => `отдаёт ${s.giver || '—'}`, given: s => `${s.giver || 'водитель'} отдал всё · ждёт «Принял»`,
+                 done: s => `принял ${s.accepted_by || '—'}`, diff: s => `принял неровно · ${s.accepted_by || '—'}`,
+                 cancelled: () => 'снято'};
 
 async function mvoLoad(){
   if(HIDE) return;
@@ -23183,15 +23459,16 @@ function mvoHomePaint(){
   if(!live.length){ box.innerHTML = ''; return; }
   const need = live.reduce((a, t) => a + (+t.need || 0), 0);
   const got = live.reduce((a, t) => a + (+t.got || 0), 0);
+  const ждут = live.filter(t => t.status === 'given' || (t.sources || []).some(s => s.status === 'given')).length;
   box.innerHTML = `<button class="rcv il-home" onclick="accOpen('moves')">
     <div class="rcv-h"><span class="rcv-st ${got ? 'live' : ''}">перемещение</span>
       <span class="il-t">${live.length} ${pluralize(live.length,'район','района','районов')}</span></div>
     <div class="rcv-n"><span class="rcv-v">${fmtQty(got)}</span>
-      <span class="rcv-of">из ${fmtQty(need)} ед · ${live.filter(t => t.driver).length} взято</span>
+      <span class="rcv-of">из ${fmtQty(need)} ед отдали${ждут ? ` · ${ждут} ждут «Принял»` : ''}</span>
       <span class="rcv-pct">${need ? Math.round(got / need * 100) : 0}%</span></div>
     <div class="rcv-bar"><i style="width:${need ? Math.round(got / need * 100) : 0}%"></i></div>
     <div class="rcv-f"><span>${escS(live.map(t => t.district_code).join(', '))}</span>
-      <span class="rcv-aed">забрать по районам</span></div>
+      <span class="rcv-aed">принимают по районам</span></div>
   </button>`;
 }
 
@@ -23244,7 +23521,7 @@ function mvoPaint(){
                               : 'по районам');
   const t = MVO.tasks || [];
   const карточки = t.map(x => {
-    const [st, cls] = MVO_ST[x.status] || MVO_ST.free;
+    const [st, cls] = x.diff && x.status === 'done' ? ['принято неровно', 'warn'] : (MVO_ST[x.status] || MVO_ST.free);
     const pct = x.need ? Math.round(x.got / x.need * 100) : 0;
     // «13 позиций» и «0 / 23» — про разное: первое наименования, второе штуки.
     // Молчание об этом читается как ошибка, поэтому состав пишем словами склада.
@@ -23256,28 +23533,38 @@ function mvoPaint(){
              .filter(Boolean).join(' и ');
     };
     const src = (x.sources || []).map(s => {
-      // По нажатию — что именно берут у этого района (владелец, 18 сен 2026:
+      // По нажатию — что именно отдаёт этот район (владелец, 18 сен 2026:
       // «чтобы я мог нажимать на каждый из районов и видел какие там позиции»).
       const key = `${x.move_id}|${x.district}|${s.district}`;
       const open = MVO.fold.has(key);
-      return `<button class="pk-row il-row mvo-src${s.done ? ' done' : ''}${open ? ' on' : ''}"
+      const how = (MVO_SRC[s.status] || MVO_SRC.wait)(s);
+      const расх = s.status === 'diff'
+        ? `<div class="mvo-diff">${(s.accept_lines || []).map(d => `<span>${escS(d.name)}: отдали ${fmtQty(d.sent)}, пришло <b>${fmtQty(d.got)}</b></span>`).join('')}${
+            s.accept_note ? `<span>«${escS(s.accept_note)}»</span>` : ''}</div>` : '';
+      return `<button class="pk-row il-row mvo-src${s.status === 'done' ? ' done' : ''}${s.status === 'diff' ? ' warn' : ''}${open ? ' on' : ''}"
            onclick="mvoFold('${escS(key)}')">
          <span class="pk-row-b"><span class="pk-name">из ${escS(s.code)} ${escS(s.name)}</span>
            <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
-             состав(s.lines)}</span></span>
+             состав(s.lines)} · ${escS(how)}</span></span>
          <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
-         <span class="mvo-chev">${ICO_CHEV}</span></button>`
+         <span class="mvo-chev">${ICO_CHEV}</span></button>` + расх
         + (open ? `<div class="mvo-lines">${s.lines.map(l => `
             <div class="pk-row mvo-line${l.done ? ' done' : ''}">
               <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
                 <span class="pk-slug">${l.unit > 1 ? 'коробки' : 'бутылки'}</span></span>
               <span class="pk-n">${fmtQty(l.got)}<u> / ${fmtQty(l.qty)}</u></span></div>`).join('')}</div>` : '');
     }).join('');
-    return `<div class="rcv mvo-card">
+    // Справа сверху — что сейчас происходит: кто отдаёт прямо сейчас, или
+    // отдали и ждут «Принял», или никто не начинал.
+    const сейчас = [...new Set((x.sources || []).filter(s => s.status === 'live' || s.status === 'pause').map(s => s.giver).filter(Boolean))];
+    const кто = сейчас.length ? 'отдаёт ' + сейчас.join(', ')
+      : (x.sources || []).some(s => s.status === 'given') ? 'ждёт «Принял»'
+      : (x.sources || []).some(s => s.status === 'wait') ? 'никто не начал' : '';
+    return `<div class="rcv mvo-card${x.diff ? ' warn' : ''}">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
-        <span class="rcv-when">${escS(x.driver || 'никто не взял')}</span></div>
+        <span class="rcv-when">${escS(x.status === 'done' || x.status === 'cancelled' ? (x.by || '') : кто)}</span></div>
       <div class="rcv-n"><span class="rcv-v">${escS(x.district_code)}</span>
-        <span class="rcv-of">${escS(x.district_name)} · ${fmtQty(x.got)} из ${fmtQty(x.need)} ед</span>
+        <span class="rcv-of">${escS(x.district_name)} · отдали ${fmtQty(x.got)} из ${fmtQty(x.need)} ед</span>
         <span class="rcv-pct">${pct}%</span></div>
       <div class="rcv-bar"><i style="width:${pct}%"></i></div>
       ${src}

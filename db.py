@@ -5303,11 +5303,12 @@ async def supplies_between(day_from: str, day_to: str) -> list:
 
 
 # ── Заявка на перемещение между районами ─────────────────────────────────────
-# Обратная приёмке (владелец, 18 сен 2026): задача висит на районе-ПОЛУЧАТЕЛЕ.
-# Перемещение «из Бизнес Бея в JVC» — это работа водителя JVC: он приезжает в
-# Бизнес Бей, сканирует бутылки и увозит их к себе. Взять задачу может любой
-# водитель района, но достаётся она одному: захват атомарный, тем же приёмом,
-# что и у приёмки, — условие на пустого водителя стоит внутри find_one_and_update.
+# Задача хранится по району-ПОЛУЧАТЕЛЮ (tasks.<куда>), строки — с районом
+# «откуда». Сканирует отдающий, получатель принимает (владелец, 18 сен 2026):
+# передача пары — в tasks.<куда>.give.<откуда> (кто отдаёт, когда отдал всё,
+# кто и как принял). driver у самой задачи — старый порядок («Взять» у
+# получателя): его ставит только приложение, открытое до обновления, и ни
+# скан, ни приёмка от него не зависят.
 async def move_order_add(doc: dict) -> str:
     d = _db_or_none()
     if d is None: return ""
@@ -5376,14 +5377,81 @@ async def move_task_started(mid: str, district: str, now) -> None:
         {"$set": {f"tasks.{district}.started_at": now}})
 
 
-async def move_line_got(mid: str, district: str, i: int, was, add) -> bool:
-    """Отметить увезённое по строке. Условие на прежнее значение — чтобы два
-    скана подряд не записали одно и то же количество дважды."""
+async def move_line_reserve(mid: str, district: str, i: int, add, cap) -> bool:
+    """Занять в строке место под одну бутылку — ДО переезда. Условие «после
+    прибавки не больше заявленного» стоит в самом фильтре: два скана в одну
+    секунду (отдавать могут двое водителей района) не уведут строку за заявку.
+    Задача при этом должна быть жива: в снятую и закрытую место не занять."""
     d = _db_or_none()
     if d is None: return False
     r = await d.move_orders.update_one(
-        {"_id": mid, f"tasks.{district}.lines.{i}.got": was},
-        {"$set": {f"tasks.{district}.lines.{i}.got": round(float(was) + float(add), 3)}})
+        {"_id": mid, "status": "open",
+         f"tasks.{district}.done_at": None, f"tasks.{district}.cancelled_at": None,
+         f"tasks.{district}.lines.{i}.got": {"$lte": round(float(cap) - float(add), 6) + 1e-6}},
+        {"$inc": {f"tasks.{district}.lines.{i}.got": float(add)}})
+    return r.modified_count > 0
+
+
+async def move_line_reserve_exact(mid: str, district: str, i: int, was, add) -> bool:
+    """Последний код строки, чей остаток меньше кода (дробь из старой заявки):
+    условие — ровно прежнее значение, иначе такая строка не закрылась бы."""
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.move_orders.update_one(
+        {"_id": mid, "status": "open",
+         f"tasks.{district}.done_at": None, f"tasks.{district}.cancelled_at": None,
+         f"tasks.{district}.lines.{i}.got": was},
+        {"$inc": {f"tasks.{district}.lines.{i}.got": float(add)}})
+    return r.modified_count > 0
+
+
+async def move_line_unreserve(mid: str, district: str, i: int, add) -> None:
+    """Вернуть место: бутылка не переехала (её увели раньше, код списан)."""
+    d = _db_or_none()
+    if d is None: return
+    await d.move_orders.update_one(
+        {"_id": mid}, {"$inc": {f"tasks.{district}.lines.{i}.got": -float(add)}})
+
+
+async def move_give_mark(mid: str, district: str, src: str, driver: str, driver_id: int, now) -> None:
+    """Кто отдаёт с района src по задаче district и когда отдал последнюю."""
+    d = _db_or_none()
+    if d is None: return
+    k = f"tasks.{district}.give.{src}"
+    await d.move_orders.update_one({"_id": mid}, {"$set": {
+        f"{k}.driver": driver, f"{k}.driver_id": driver_id, f"{k}.at": now}})
+    await d.move_orders.update_one({"_id": mid, f"{k}.started_at": None},
+                                   {"$set": {f"{k}.started_at": now}})
+
+
+async def move_give_start(mid: str, district: str, src: str, driver: str, driver_id: int, now) -> None:
+    """«Начать перемещение»: кто отдаёт с района src по задаче district."""
+    d = _db_or_none()
+    if d is None: return
+    k = f"tasks.{district}.give.{src}"
+    await d.move_orders.update_one({"_id": mid}, {"$set": {
+        f"{k}.driver": driver, f"{k}.driver_id": driver_id}})
+    await d.move_orders.update_one({"_id": mid, f"{k}.claimed_at": None},
+                                   {"$set": {f"{k}.claimed_at": now}})
+
+
+async def move_give_accept(mid: str, district: str, src: str, rec: dict) -> bool:
+    """Получатель принял передачу src → district. Один раз: условие «ещё не
+    принято» стоит в фильтре, второй нажавший ничего не перезапишет."""
+    d = _db_or_none()
+    if d is None: return False
+    k = f"tasks.{district}.give.{src}"
+    r = await d.move_orders.update_one(
+        {"_id": mid, "status": "open", f"tasks.{district}.cancelled_at": None, f"{k}.accepted_at": None},
+        {"$set": {f"{k}.{f}": v for f, v in rec.items()}})
+    return r.modified_count > 0
+
+
+async def move_give_done(mid: str, district: str, src: str, now) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    k = f"tasks.{district}.give.{src}.done_at"
+    r = await d.move_orders.update_one({"_id": mid, k: None}, {"$set": {k: now}})
     return r.modified_count > 0
 
 

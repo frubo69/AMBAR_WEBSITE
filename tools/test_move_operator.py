@@ -3,7 +3,8 @@
 водители видят, и предельно удобно»). mongomock + настоящие move_routes:
   • доска: по каждой позиции — сколько лежит и сколько кодов в каждом районе,
     норма; предложение «по норме» — только для выбранного района;
-  • заявка — в свой район; в чужой нельзя; водители видят её как обычную;
+  • заявка: хотя бы одна сторона своя; её видят обе стороны — отдающий
+    («отдать») и получатель («забрать»);
   • «Сегодня»: оператору видно то, что везут к нему и от него, и только это;
   • снять можно неначатую задачу своего района; начатую — нет."""
 import asyncio, os, sys
@@ -66,9 +67,10 @@ async def main():
     doc = await db.move_order_get(mid)
     eq("кто создал — видно", doc["by"], "Умар · оператор")
     v = await MV.tasks_for_driver("Худоба", "jvc")
-    eq("водитель района видит её как обычную заявку", (len(v["free"]), v["free"][0]["need"]), (1, 6))
+    eq("получатель видит, что заберёт: из Бизнес Бея и из Силикона",
+       sorted((x["from_code"], x["need"]) for x in v["take"]), [("B2", 5), ("B3", 1)])
     g = await MV.tasks_for_driver("Парвиз", "bbay")
-    eq("отдающий видит, что у него заберут", (len(g["give"]), g["give"][0]["need"]), (1, 5))
+    eq("отдающий видит, что отдать", (len(g["give"]), g["give"][0]["need"]), (1, 5))
 
     # ── «Сегодня» ──────────────────────────────────────────────────────────
     lv = await MV.live_for(UMAR)
@@ -82,13 +84,16 @@ async def main():
 
     # ── снятие ─────────────────────────────────────────────────────────────
     eq("чужую задачу не снять", await MV.cancel_by_operator(mid, "jvc", {"bbay"}), {"ok": False, "error": "not_yours"})
-    await MV.claim(mid, "jvc", "Худоба", 5)
-    s1 = await MV.scan(mid, "jvc", "v0", "Худоба", 5)
-    eq("водитель начал — одна бутылка уже в машине", s1["ok"], True)
-    eq("начатую не снять", await MV.cancel_by_operator(mid, "jvc", UMAR), {"ok": False, "error": "started", "driver": "Худоба"})
+    await MV.give_start(mid, "jvc", "Парвиз", 5, "bbay")
+    s1 = await MV.scan(mid, "jvc", "v0", "Парвиз", 5, "bbay")
+    eq("отдающий начал — одна бутылка уже у получателя", s1["ok"], True)
+    eq("начатую не снять — видно, кто отдаёт", await MV.cancel_by_operator(mid, "jvc", UMAR),
+       {"ok": False, "error": "started", "driver": "Парвиз"})
     r2 = await MV.create_by_operator("Умар", "tecom", [{"from": "bbay", "id": gin, "qty": 1}], "ошибся районом", UMAR)
     eq("неначатую — снимается", await MV.cancel_by_operator(r2["move_id"], "tecom", UMAR), {"ok": True})
-    eq("и у водителей её больше нет", (await MV.tasks_for_driver("Файзуло", "tecom"))["free"], [])
+    eq("и у водителей её больше нет — ни у получателя, ни у отдающего",
+       ((await MV.tasks_for_driver("Файзуло", "tecom"))["take"],
+        [x for x in (await MV.tasks_for_driver("Парвиз", "bbay"))["give"] if x["district"] == "tecom"]), ([], []))
     rs = await MV.create(rows=[{"from": "bbay", "to": "jvc", "id": gin, "qty": 1}], by="STAR")
     eq("заявку владельца оператор не снимает", await MV.cancel_by_operator(rs["move_id"], "jvc", UMAR),
        {"ok": False, "error": "owner_order"})

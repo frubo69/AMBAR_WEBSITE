@@ -319,7 +319,10 @@ class World:
         roll = r.random()
         if roll < 0.3:
             src, me = r.choice(OFFICE_IDS), r.choice(STARS)
-            owners = {boss_of(d_["tasks"][to_], s_) for (m_, to_, s_, d_) in pairs if s_ == src}
+            # Кто держит ЕЩЁ НЕ ОТДАННЫЕ передачи района: отданное целиком брать
+            # уже нечего, и сервер честно отвечает «нечего», а не «взял другой».
+            owners = {boss_of(d_["tasks"][to_], s_) for (m_, to_, s_, d_) in pairs if s_ == src
+                      and MV.give_view(m_, d_, to_, d_["tasks"][to_], s_)["status"] in ("wait", "pause", "live")}
             res = await MV.senior_take(src, me, 1)
             stat("старший: взял район" if res.get("ok") else f"старший: не взял {res.get('error')}")
             others = owners - {"", me}

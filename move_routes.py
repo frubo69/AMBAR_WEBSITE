@@ -230,7 +230,10 @@ async def scan(mid: str, oid: str, code: str, name: str, tgid: int) -> dict:
                     want=", ".join(sorted({OFFICE_CODES.get(l["from"], "") for l in mine_pid})))
 
     await db.move_task_started(mid, oid, _now())
-    r = await sr.move_by_code(code, oid, tgid, name, "driver")
+    # Вид переезда «move», а не «driver»: такую строку водитель не вернёт из
+    # истории (там условие by_kind == "driver"), и правильно — отмена одной
+    # бутылки развела бы счёт задачи с полкой.
+    r = await sr.move_by_code(code, oid, tgid, name, "move")
     if not r.get("ok"):
         return _res(r.get("verdict") or "no", **{k: v for k, v in r.items()
                                                  if k not in ("ok", "verdict")})

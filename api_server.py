@@ -2990,6 +2990,14 @@ def main():
     except Exception as e:
         log.error(f"room routes setup failed: {e}")
 
+    # Демо приложения водителя: /demo — тот же driver/index.html с заглушками
+    # вместо телеграма и сервера. Ставим до статики: «/{path:.+}» забирает всё.
+    try:
+        import demo_page
+        demo_page.setup(app)
+    except Exception as e:
+        log.error(f"demo page setup failed: {e}")
+
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)
 

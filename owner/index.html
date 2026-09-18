@@ -21354,9 +21354,11 @@ function pathInner(){
   const m = (live && sup.money) || null;
   // Под «приняли» — бутылки, а не деньги: пока идёт приём, там всегда был
   // ноль дирхамов, и он отвечал не на тот вопрос.
+  // Под первым шагом — закупочная сумма заявки, как и в шапке «Закупаем»:
+  // прайс продажи в пути закупки ни при чём (владелец, 18 сен 2026).
   const money = m ? [m.asked, m.confirmed,
                      `${fmt(st.took)} из ${fmt(sup.total_qty || 0)}`]
-                  : [d.total_aed, null, null];
+                  : [d.total_cost != null ? d.total_cost : d.total_aed, null, null];
   return pathSteps(vals, money, step);
 }
 
@@ -22312,6 +22314,7 @@ function ordApply(res){
   if(res.row.need_total > 0){ if(i >= 0) d.rows[i] = res.row; else d.rows.push(res.row); }
   else if(i >= 0) d.rows.splice(i, 1);
   d.total_qty = res.total_qty; d.total_aed = res.total_aed;
+  if(res.total_cost != null) d.total_cost = res.total_cost;
   d.edited_count = res.edited_count;
   ACC_ORDER = d;
   ordRender();

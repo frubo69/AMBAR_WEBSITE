@@ -2569,6 +2569,7 @@ async def handle_order_edit(request):
     row = next((r for r in data["all_rows"] if r["id"] == pid), None)
     return web.json_response({"ok": True, "row": row,
                               "total_qty": data["total_qty"], "total_aed": data["total_aed"],
+                              "total_cost": data["total_cost"],
                               "edited_count": data["edited_count"],
                               "rows_count": len(data["rows"])},
                              headers=CORS_HEADERS)
@@ -2586,6 +2587,7 @@ async def handle_order_reset(request):
     data = await order_rows(day)
     return web.json_response({"ok": True, "total_qty": data["total_qty"],
                               "total_aed": data["total_aed"],
+                              "total_cost": data["total_cost"],
                               "edited_count": data["edited_count"],
                               "rows": data["rows"], "districts": data["districts"]},
                              headers=CORS_HEADERS)

@@ -159,6 +159,22 @@ async def main():
         tr = await d.stock_transfers.find({"by_kind": "move"}).to_list(length=10)
         eq("в книге переездов — два, на имена отдающих", sorted(x_["by_name"] for x_ in tr), ["Бахадыр", "Парвиз"])
 
+        print("── STAR: «Взять на себя» район и скан по передаче ─────────────────")
+        await d.qr_codes.insert_one({"_id": "v9", "status": "active", "product_id": "p1",
+            "product_name": "Absolut 1 ltr", "district": "bbay", "origin": "bbay", "src": "cover",
+            "qty": 1, "at": T0})
+        st, r2 = await own("POST", "/api/owner/move/create",
+                           {"by": "STAR", "rows": [{"from": "bbay", "to": "tecom", "id": "p1", "qty": 1}]})
+        mid2 = r2["move_id"]
+        st, x = await own("POST", "/api/owner/move/take", {"from": "bbay", "as": "STAR"})
+        eq("взял на себя всё с Бизнес Бея", (st, x["ok"], x["took"]), (200, True, 1))
+        st, g = await drv(102, "GET", "/api/driver/move")
+        eq("у водителя Бизнес Бея карточки больше нет", g["give"], [])
+        st, x = await own("POST", f"/api/owner/move/{mid2}/scan", {"district": "tecom", "from": "bbay", "code": "v9", "as": "STAR"})
+        eq("старший отсканировал — отдано в Тиком", (st, x["ok"], x["to_code"], x["finished"]), (200, True, "B5", True))
+        st, x = await own("POST", "/api/owner/move/drop", {"from": "bbay", "as": "STAR"})
+        eq("снять с себя отданное целиком — нечего", (st, x["ok"]), (200, False))
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 

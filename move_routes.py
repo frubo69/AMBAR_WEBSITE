@@ -98,6 +98,11 @@ def _pair_status(task: dict, g: dict, need: float, got: float) -> str:
     return "pause" if got > 0 else "wait"
 
 
+def _senior_of(g: dict) -> str:
+    """Кто из STAR взял передачу пары на себя (владелец, 18 сен 2026)."""
+    return ((g or {}).get("senior") or {}).get("name") or ""
+
+
 def _accept_view(g: dict) -> dict:
     return {"accepted_at": _iso(g.get("accepted_at")), "accepted_by": g.get("accepted_by") or "",
             "accept_ok": bool(g.get("accept_ok", True)) if g.get("accepted_at") else None,
@@ -121,6 +126,7 @@ def _sources(lines: list, task: dict) -> list:
         s["qty"] = sr._num(s["qty"]); s["got"] = sr._num(s["got"])
         s["giver"] = g.get("driver") or ""
         s["given_at"] = _iso(g.get("done_at"))
+        s["senior"] = _senior_of(g)
         s.update(_accept_view(g))
     return sorted(by_src.values(), key=lambda s: s["code"])
 
@@ -148,8 +154,8 @@ def task_view(mid: str, doc: dict, oid: str, task: dict, me: str = "") -> dict:
         "positions": len(lines), "left_positions": sum(1 for l in lines if not l["done"]),
         "sources": sources,
         "givers": sorted({s["giver"] for s in sources if s["giver"]}),
-        # Старший взял задачу района на себя: объезжает отдающих и сканирует сам.
-        "senior": (task.get("senior") or {}).get("name") or "",
+        # Кто из STAR взял передачи этого района на себя — по районам, откуда везут.
+        "seniors": sorted({s["senior"] for s in sources if s["senior"]}),
         # Приняли неровно хотя бы у одного отдающего — старшему решать.
         "diff": any(s["status"] == "diff" for s in sources),
         "lines": lines,
@@ -178,7 +184,8 @@ def give_view(mid: str, doc: dict, oid: str, task: dict, src: str, me: str = "")
         "to_code": OFFICE_CODES.get(oid, ""), "to_name": OFFICE_NAMES.get(oid, oid),
         "from": src, "from_code": OFFICE_CODES.get(src, ""), "from_name": OFFICE_NAMES.get(src, src),
         "giver": giver, "mine": bool(me) and giver == me,
-        "senior": (task.get("senior") or {}).get("name") or "",
+        # Передачу взял на себя старший (тот, кто в AMBAR STAR): забирает он.
+        "senior": _senior_of(g),
         # driver — у приложения, открытого до обновления, это «кто едет».
         "driver": task.get("driver") or "",
         "started_at": _iso(g.get("claimed_at") or g.get("started_at")),
@@ -280,8 +287,8 @@ async def tasks_for_driver(name: str, district: str) -> dict:
                     g = give_view(mid, doc, oid, t, src, name)
                     if g["status"] in ("wait", "pause", "live", "given"):
                         take.append(g)
-            elif district in srcs and not (t.get("senior") or {}).get("name"):
-                # Задачу района взял на себя старший — отдаёт он сам, водителям
+            elif district in srcs and not _senior_of((t.get("give") or {}).get(district)):
+                # Передачу взял на себя старший — отдаёт он сам, водителям
                 # отдающего района сканировать нечего, и карточки у них нет.
                 g = give_view(mid, doc, oid, t, district, name)
                 if g["status"] in ("wait", "pause", "live"):
@@ -307,8 +314,9 @@ async def give_start(mid: str, oid: str, name: str, tgid: int, district: str) ->
         return {"ok": False, "error": "gone"}
     if district == oid or not any(l.get("from") == district for l in task.get("lines") or []):
         return {"ok": False, "error": "not_giver"}
-    if (task.get("senior") or {}).get("name"):
-        return {"ok": False, "error": "senior_took", "senior": task["senior"]["name"]}
+    boss = _senior_of((task.get("give") or {}).get(district))
+    if boss:
+        return {"ok": False, "error": "senior_took", "senior": boss}
     g = give_view(mid, doc, oid, task, district, name)
     if g["status"] not in ("wait", "pause", "live"):
         return {"ok": False, "error": "given", "task": g}
@@ -376,33 +384,55 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
             "task_done": bool(task.get("done_at"))}
 
 
-async def senior_take(mid: str, oid: str, name: str, by: int = 0) -> dict:
-    """Старший берёт задачу района на себя (владелец, 18 сен 2026: «сделай
-    возможность старшему взять заявку на перемещение так же на себя на какие-то
-    определённые районы») — как «Взять на себя» в приёмке. Он сам объезжает
-    районы, откуда везут, и сканирует в STAR; водителям отдающих районов
-    сканировать эту задачу нечего. Принимает, как всегда, район-получатель.
-    Достаётся одному: второй старший увидит, кто взял."""
-    doc = await db.move_task_senior(mid, oid, name, by, _now())
-    if not doc:
-        cur = await db.move_order_get(mid)
-        t = ((cur or {}).get("tasks") or {}).get(oid) or {}
-        if not cur or cur.get("status") != "open" or not t or t.get("done_at") or t.get("cancelled_at"):
-            return {"ok": False, "error": "gone"}
-        return {"ok": False, "error": "taken", "senior": (t.get("senior") or {}).get("name") or ""}
-    log.info(f"[move] {mid}/{oid}: старший {name} взял на себя")
-    return {"ok": True, "task": task_view(mid, doc, oid, (doc.get("tasks") or {}).get(oid) or {})}
+async def senior_take(src: str, name: str, by: int = 0) -> dict:
+    """Старший берёт на себя всё, что надо забрать с района src (владелец,
+    18 сен 2026: «сделай возможность старшему взять заявку на перемещение так
+    же на себя на какие-то определённые районы»; «чтобы он видел, что должен с
+    JVC взять и куда отвезти, как у водителей»). Старший — тот, кто работает в
+    AMBAR STAR. Берутся все передачи с этого района во всех открытых заявках,
+    ещё не отданные целиком; дальше он сканирует по каждой — куда везёт.
+    Водителям района src эти передачи сканировать нечего. Передача,
+    которую уже взял другой старший, остаётся у него."""
+    if src not in OFFICE_IDS:
+        return {"ok": False, "error": "bad_district"}
+    took, others = 0, set()
+    for doc in await db.move_orders_open():
+        for to, t in (doc.get("tasks") or {}).items():
+            if t.get("done_at") or t.get("cancelled_at"):
+                continue
+            if not any(l.get("from") == src for l in t.get("lines") or []):
+                continue
+            g = give_view(doc["_id"], doc, to, t, src)
+            if g["status"] not in ("wait", "pause", "live"):
+                continue
+            if g["senior"] and g["senior"] != name:
+                others.add(g["senior"]); continue
+            if await db.move_pair_senior(doc["_id"], to, src, name, by, _now()):
+                took += 1
+    if not took:
+        return {"ok": False, "error": "taken" if others else "nothing", "senior": ", ".join(sorted(others))}
+    log.info(f"[move] старший {name} взял на себя всё с {src}: передач {took}")
+    return {"ok": True, "took": took, "others": sorted(others)}
 
 
-async def senior_drop(mid: str, oid: str, name: str) -> dict:
-    """Снять с себя: дальше отдают водители районов, как обычно. Что старший
-    уже отсканировал, осталось у получателя."""
-    ok = await db.move_task_senior_drop(mid, oid, name)
-    doc = await db.move_order_get(mid)
-    t = ((doc or {}).get("tasks") or {}).get(oid) or {}
-    log.info(f"[move] {mid}/{oid}: старший {name} снял с себя" if ok else
-             f"[move] {mid}/{oid}: снять с себя не вышло ({name})")
-    return {"ok": ok, "task": task_view(mid, doc, oid, t) if doc and t else None}
+async def senior_drop(src: str, name: str) -> dict:
+    """Снять с себя всё, что взял с района src: дальше отдают водители района,
+    как обычно. Что старший уже отсканировал, осталось у получателей."""
+    n = 0
+    for doc in await db.move_orders_open():
+        for to, t in (doc.get("tasks") or {}).items():
+            if t.get("done_at") or t.get("cancelled_at"):
+                continue
+            if _senior_of((t.get("give") or {}).get(src)) != name:
+                continue
+            # Отданное целиком остаётся за ним — это уже история: снимается
+            # только то, что ещё надо отдать.
+            if give_view(doc["_id"], doc, to, t, src)["status"] not in ("wait", "pause", "live"):
+                continue
+            if await db.move_pair_senior_drop(doc["_id"], to, src, name):
+                n += 1
+    log.info(f"[move] старший {name} снял с себя {src}: передач {n}")
+    return {"ok": n > 0, "dropped": n}
 
 
 # Старый порядок: «Взять» у получателя. Приложение, открытое до обновления,
@@ -442,10 +472,9 @@ async def scan(mid: str, oid: str, code: str, name: str, tgid: int, district: st
     только свои строки. Проверяем и код, и что он лежит у отдающего, и что
     позиция есть в его строках, — иначе уйдёт не то, а заявка не закроется.
 
-    senior — сканирует старший из STAR, взявший задачу района на себя: он сам
-    объезжает районы, откуда везут, и отдаёт с любого из них. Район-отдающий
-    тогда — тот, где бутылка числится; водителям этого района сканировать
-    нечего."""
+    senior — сканирует старший из STAR, взявший передачу на себя: district
+    тогда — район, ОТКУДА он забирает (передачу этого района он и взял);
+    водителям этого района её сканировать нечего."""
     code = str(code or "").strip()
     src = str(district or "")
     doc = await db.move_order_get(mid)
@@ -455,13 +484,17 @@ async def scan(mid: str, oid: str, code: str, name: str, tgid: int, district: st
     if not task or task.get("done_at") or task.get("cancelled_at"):
         return _res("gone")
     lines = task.get("lines") or []
-    boss = ((task.get("senior") or {}).get("name") or "")
+    boss = _senior_of((task.get("give") or {}).get(src))
     if senior:
+        if not any(l.get("from") == src for l in lines):
+            return _res("not_giver")
         if boss != name:
             return _res("senior_other" if boss else "not_taken", senior=boss)
+        if ((task.get("give") or {}).get(src) or {}).get("accepted_at"):
+            return _res("gone")
     else:
         if boss:
-            # Задачу района взял на себя старший — он и сканирует.
+            # Передачу взял на себя старший — он и сканирует.
             return _res("senior_took", senior=boss)
         if src == oid:
             # Получатель не сканирует: бутылку сканирует тот, кто её отдаёт.
@@ -481,19 +514,6 @@ async def scan(mid: str, oid: str, code: str, name: str, tgid: int, district: st
         return _res(st, code=code, name=pname, say=sr.MOVE_SAY.get(st, ""))
     pid = str(qr.get("product_id") or "")
     at = (qr.get("district") or "").strip()
-    srcs = {l.get("from") for l in lines}
-    if senior:
-        # У старшего отдающий — тот район, где бутылка числится сейчас.
-        if at == oid:
-            last = (qr.get("moves") or [])[-1:]
-            if last and (last[0] or {}).get("from") in srcs:
-                return _res("given", code=code, name=pname, to_code=OFFICE_CODES.get(oid, ""))
-            return _res("other_district", code=code, name=pname, from_code=OFFICE_CODES.get(at, ""))
-        if at not in srcs:
-            return _res("other_district", code=code, name=pname, from_code=OFFICE_CODES.get(at, ""))
-        src = at
-        if ((task.get("give") or {}).get(src) or {}).get("accepted_at"):
-            return _res("gone")
     mine = [i for i, l in enumerate(lines) if l.get("from") == src]
     if at == oid:
         # Бутылка уже числится у получателя. Если последним переездом она
@@ -602,7 +622,7 @@ async def pending_for_district(oid: str) -> list:
                     g = give_view(doc["_id"], doc, to, t, src)
                     if g["status"] in ("wait", "pause", "live", "given"):
                         out.append({**g, "side": "take"})
-            elif oid in srcs and not (t.get("senior") or {}).get("name"):
+            elif oid in srcs and not _senior_of((t.get("give") or {}).get(oid)):
                 # Взял старший — отдаёт он, смену водителей отдающего не держим.
                 g = give_view(doc["_id"], doc, to, t, oid)
                 if g["status"] in ("wait", "pause", "live"):
@@ -847,32 +867,27 @@ def _own_name(request, b) -> str:
 
 
 async def handle_own_take(request):
-    """POST {district, as} — старший берёт задачу района на себя."""
+    """POST {from, as} — старший берёт на себя всё, что надо забрать с района."""
     b = await _body(request)
-    r = await senior_take(request.match_info.get("mid") or "", str(b.get("district") or ""),
-                          _own_name(request, b), int(request.get("owner_id") or 0))
+    r = await senior_take(str(b.get("from") or ""), _own_name(request, b), int(request.get("owner_id") or 0))
     return web.json_response(r, status=200 if r.get("ok") else 409, headers=CORS_HEADERS,
                              dumps=lambda o: json.dumps(o, default=str))
 
 
 async def handle_own_drop(request):
-    """POST {district, as} — снять с себя."""
+    """POST {from, as} — снять с себя всё, что взял с района."""
     b = await _body(request)
-    r = await senior_drop(request.match_info.get("mid") or "", str(b.get("district") or ""),
-                          _own_name(request, b))
+    r = await senior_drop(str(b.get("from") or ""), _own_name(request, b))
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
 async def handle_own_scan(request):
-    """POST {district, code, as} — старший сканирует бутылку в задачу, которую взял."""
+    """POST {district, from, code, as} — старший сканирует бутылку в передачу
+    «from → district», которую взял на себя."""
     b = await _body(request)
     r = await scan(request.match_info.get("mid") or "", str(b.get("district") or ""),
                    str(b.get("code") or ""), _own_name(request, b),
-                   int(request.get("owner_id") or 0), senior=True)
-    if r.get("ok"):
-        doc = await db.move_order_get(request.match_info.get("mid") or "")
-        oid = str(b.get("district") or "")
-        r["take"] = task_view(doc["_id"], doc, oid, (doc.get("tasks") or {}).get(oid) or {})
+                   int(request.get("owner_id") or 0), str(b.get("from") or ""), senior=True)
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 

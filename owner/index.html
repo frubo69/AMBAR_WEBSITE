@@ -10482,6 +10482,12 @@ body.safe-open .cvo-hdr{opacity:0}
 .mvo-diff{display:flex;flex-direction:column;gap:3px;margin:0 0 8px 6px;padding:8px 12px;border-radius:11px;
   font-size:12px;line-height:1.4;color:var(--sub);background:rgba(243,180,74,.08);border:1px solid rgba(243,180,74,.3)}
 .mvo-diff b{color:var(--warn)}
+/* Старший взял район: под строкой получателя — «Сканировать · в B2». */
+.mvo-scan{display:block;width:calc(100% - 12px);margin:2px 0 10px 6px;padding:10px 12px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:700;color:#1a1408;border:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.mvo-scan:active{transform:scale(.985)}
+.mvo-rel{flex:1;padding:10px 12px;font-size:12px}
 .mvo-go{width:100%;margin-top:14px;padding:14px;border-radius:14px;border:0;cursor:pointer;
   font-family:inherit;font-size:14px;font-weight:700}
 .mvo-go:disabled{opacity:.6}
@@ -23440,7 +23446,7 @@ setInterval(() => { if(!document.hidden) ilLoad(); }, 30000);
 // отдаёт, а получатель, когда ему отдали всё, нажимает «Принял» или «Принял
 // неровно». Карточка — район-получатель; внутри — от кого он принимает: кто
 // отдаёт, сколько отдал, принято ли и что не сошлось.
-let MVO = {tasks: [], open: 0, plan: null, poll: null, busy: false, fold: new Set()};
+let MVO = {tasks: [], open: 0, plan: null, poll: null, busy: false, fold: new Set(), tab: 'give'};
 const MVO_ST = {free: ['ждёт отдающих', ''], live: ['отдают', 'live'],
                 given: ['ждёт «Принял»', 'live'], done: ['принято', 'ok'],
                 cancelled: ['снято', 'warn']};
@@ -23521,37 +23527,48 @@ async function mvoCancel(mid, district){
   mvoLoad();
 }
 
-async function mvoTake(mid, district){
+// ── «Взять на себя»: старший — тот, кто работает в AMBAR STAR ──────────────
+// Владелец, 18 сен 2026: «сделай возможность старшему взять заявку на
+// перемещение так же на себя на какие-то определённые районы»; «разве не
+// должно быть так у старшего, что он видит всё, что должен с JVC взять и куда
+// отвезти, — как у водителей». Поэтому экран — двумя вкладками, как «Товар»
+// у водителя: «Отдать» — по районам, откуда везут: что забрать и куда; там
+// «Взять на себя» район и сканер по каждому получателю; «Принять» — по
+// районам, куда везут: кто отдаёт, что принято.
+async function mvoTake(src){
   if(MVO.busy) return; MVO.busy = true;
   try{
-    await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(mid)}/take`,
-      {method: 'POST', body: {district, as: _rcvMe()}});
-    _toast('Взяли на себя — водителям отдающих районов сканировать не нужно');
+    const r = await ownerApi.ownerFetch('/api/owner/move/take', {method: 'POST', body: {from: src, as: _rcvMe()}});
+    _toast(`Взяли на себя · ${r.took} ${pluralize(r.took,'передача','передачи','передач')} — водителям этого района сканировать не нужно`);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   }catch(e){
     const p = (e && e.payload) || {};
-    _toast(p.error === 'taken' ? `Уже взял ${p.senior || 'другой старший'}` : 'Заявка закрыта');
+    _toast(p.error === 'taken' ? `Уже взял ${p.senior || 'другой'}` : 'Отдавать с этого района нечего');
   }
   MVO.busy = false; await mvoLoad();
 }
-async function mvoDrop(mid, district){
-  if(!await askDialog('Снять с себя?', 'Дальше отдают водители районов, как обычно. Отсканированное остаётся у получателя.',
+async function mvoDrop(src){
+  if(!await askDialog('Снять с себя?', 'Дальше отдают водители района, как обычно. Отсканированное остаётся у получателей.',
                       'Снять', 'Оставить', 'no')) return;
-  try{
-    await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(mid)}/drop`,
-      {method: 'POST', body: {district, as: _rcvMe()}});
-  }catch(e){ _toast('Не удалось'); }
+  try{ await ownerApi.ownerFetch('/api/owner/move/drop', {method: 'POST', body: {from: src, as: _rcvMe()}}); }
+  catch(e){ _toast('Не удалось'); }
   mvoLoad();
 }
+function mvoTab(t){
+  MVO.tab = t;
+  document.querySelectorAll('#mvoTabs button').forEach((b, i) => b.classList.toggle('on', (i === 1) === (t === 'take')));
+  const g = document.getElementById('mvoTabs'); if(g) movePill(g);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  mvoPaint();
+}
 
-// Камера старшего, взявшего задачу района: та же разметка, что у приёмки.
-// Бутылка узнаётся по коду — откуда она (район, где числится) и что это; её
-// нужно только поднести. Каждый скан сразу уходит на район-получатель.
+// Камера старшего — на одну передачу «откуда → куда», той же разметки, что у
+// приёмки: сканирует у отдающего, бутылка тем же сканом уходит получателю.
 let MVT = null;
 const MVT_NO = {
-  other_district: r => `числится на ${r.from_code || '—'} — оттуда сюда не везут`,
+  other_district: r => `числится на ${r.from_code || '—'} — не с этого района`,
   moved:          r => `числится на ${r.from_code || '—'}`,
-  not_in_task:    () => 'этой позиции нет в заявке',
+  not_in_task:    () => 'этой позиции нет в передаче',
   full:           () => 'по этой позиции уже всё',
   given:          () => 'уже отдана',
   unknown:        () => 'кода нет в реестре',
@@ -23561,13 +23578,15 @@ const MVT_NO = {
   gone:           () => 'заявка закрыта',
   busy:           () => 'её только что перевезли',
   not_taken:      () => 'сначала «Взять на себя»',
-  senior_other:   r => `задачу взял ${r.senior || 'другой'}`,
+  senior_other:   r => `взял ${r.senior || 'другой'}`,
 };
-async function mvtOpen(mid, district){
-  const t = (MVO.tasks || []).find(x => x.move_id === mid && x.district === district);
-  if(!t) return;
+async function mvtOpen(mid, to, src){
+  const x = (MVO.tasks || []).find(t => t.move_id === mid && t.district === to);
+  const s = x && (x.sources || []).find(q => q.district === src);
+  if(!s) return;
   mvoPollStop();
-  MVT = {mid, district, t, rows: [], busy: false};
+  MVT = {mid, to, src, x, s, rows: [], busy: false,
+         lines: s.lines.map(l => ({...l}))};
   mvtCam();
   try{
     await SCAN.start(document.getElementById('mvtVideo'), mvtScan, qrIdle, () => qrFlash('again'), qrHold);
@@ -23575,18 +23594,19 @@ async function mvtOpen(mid, district){
   const tb = document.getElementById('mvtTorch');
   if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
 }
+function mvtLeft(){ return (MVT.lines || []).reduce((a, l) => a + Math.max(0, (+l.qty || 0) - (+l.got || 0)), 0); }
 function mvtLeftTxt(){
-  const t = MVT.t || {};
-  const src = (t.sources || []).filter(s => s.status !== 'done' && s.status !== 'diff' && s.status !== 'given' && s.left > 0);
-  return src.length ? 'Осталось: ' + src.map(s => `${s.code} — ${fmtQty(s.left)}`).join(', ') : 'Всё собрано';
+  const left = (MVT.lines || []).filter(l => (+l.got || 0) < (+l.qty || 0));
+  return left.length ? 'Осталось: ' + left.slice(0, 4).map(l => `${l.name} ${fmtQty(l.qty - l.got)}`).join(', ')
+    + (left.length > 4 ? '…' : '') : 'Всё отдали';
 }
 function mvtCam(){
-  const t = MVT.t;
+  const {x, s} = MVT;
   ACC_BACK = mvtClose;
   _setRail('accRail', '');
   const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
-  _setText('accTitle', `${t.district_code} ${t.district_name}`);
-  _setText('accSub', 'перемещение · сканируйте у отдающих');
+  _setText('accTitle', `Из ${s.code} ${s.name}`);
+  _setText('accSub', `в ${x.district_code} ${x.district_name} · сканируйте, что отдаёте`);
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
@@ -23598,7 +23618,7 @@ function mvtCam(){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="mvtN">${fmtQty(t.left)}</b><span>осталось</span></div>
+          <div class="scan-pill"><b id="mvtN">${fmtQty(mvtLeft())}</b><span>осталось</span></div>
           <div class="scan-tools">
             <button class="scan-tool" id="mvtTorch" onclick="qrTorch(this)" style="display:none">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -23624,7 +23644,7 @@ function mvtFeed(){
       <span class="scan-b"><span class="scan-code">${escS(r.name || r.code)}</span>
         <span class="scan-raw">${escS(r.sub || '')}</span></span>
       <span class="scan-state" style="color:${r.ok ? 'var(--up)' : 'var(--dn)'}">${escS(r.ok ? 'отдана' : 'нет')}</span></div>`).join('');
-  const n = document.getElementById('mvtN'); if(n) n.textContent = fmtQty((MVT.t || {}).left || 0);
+  const n = document.getElementById('mvtN'); if(n) n.textContent = fmtQty(mvtLeft());
   const h = document.getElementById('qrHint'); if(h) h.textContent = mvtLeftTxt();
 }
 async function mvtScan(code){
@@ -23635,22 +23655,22 @@ async function mvtScan(code){
   let r = null;
   try{
     r = await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(MVT.mid)}/scan`,
-      {method: 'POST', body: {district: MVT.district, code, as: _rcvMe()}});
+      {method: 'POST', body: {district: MVT.to, from: MVT.src, code, as: _rcvMe()}});
   }catch(e){ r = null; }
   if(!MVT) return;
   MVT.busy = false;
   if(r && r.ok){
-    if(r.take) MVT.t = r.take;
-    MVT.rows.unshift({ok: true, code, name: r.name, sub: `из ${r.from_code} · ${fmtQty(r.line.got)}/${fmtQty(r.line.qty)}`});
-    qrFlash('ok', `${r.name} · из ${r.from_code}`);
+    if(r.task && r.task.lines) MVT.lines = r.task.lines;
+    MVT.rows.unshift({ok: true, code, name: r.name, sub: `${fmtQty(r.line.got)}/${fmtQty(r.line.qty)}`});
+    qrFlash('ok', r.name);
     mvtFeed();
-    if(!((MVT.t || {}).left > 0)){
-      _toast(`Всё собрано — «Принял» теперь у водителя ${(MVT.t || {}).district_code || ''}`);
+    if(r.finished){
+      _toast(`Всё отдали в ${MVT.x.district_code} — «Принял» у водителя ${MVT.x.district_code}`);
       return mvtClose();
     }
     return;
   }
-  const say = r ? ((MVT_NO[r.verdict] || (() => r.say || 'не из заявки'))(r)) : 'нет связи — поднесите ещё раз';
+  const say = r ? ((MVT_NO[r.verdict] || (() => r.say || 'не из передачи'))(r)) : 'нет связи — поднесите ещё раз';
   if(!r){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); }
   MVT.rows.unshift({ok: false, code, name: (r && r.name) || code, sub: say});
   qrFlash('err', say);
@@ -23662,68 +23682,113 @@ function mvtClose(){
   mvoPaint(); mvoLoad(); mvoPollStart();
 }
 
-function mvoPaint(){
-  _setText('accTitle', 'Перемещения');
-  _setText('accSub', MVO.open ? `${MVO.open} ${pluralize(MVO.open,'район','района','районов')} в работе`
-                              : 'по районам');
-  const t = MVO.tasks || [];
-  const карточки = t.map(x => {
-    const [st, cls] = x.diff && x.status === 'done' ? ['принято неровно', 'warn']
-      : x.senior && x.status === 'free' ? ['взяли на себя', 'live'] : (MVO_ST[x.status] || MVO_ST.free);
+// «13 позиций» и «0 / 23» — про разное: первое наименования, второе штуки.
+// Молчание об этом читается как ошибка, поэтому состав пишем словами склада.
+function _mvoСостав(ls){
+  const бут = ls.filter(l => l.unit <= 1).reduce((a, l) => a + l.qty, 0);
+  const кор = ls.filter(l => l.unit > 1).reduce((a, l) => a + l.qty, 0);
+  return [бут ? `${fmtQty(бут)} ${pluralize(бут,'бутылка','бутылки','бутылок')}` : '',
+          кор ? `${fmtQty(кор)} ${pluralize(кор,'коробка','коробки','коробок')}` : '']
+         .filter(Boolean).join(' и ');
+}
+function _mvoLines(key, lines){
+  return MVO.fold.has(key) ? `<div class="mvo-lines">${lines.map(l => `
+    <div class="pk-row mvo-line${l.done ? ' done' : ''}">
+      <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
+        <span class="pk-slug">${l.unit > 1 ? 'коробки' : 'бутылки'}</span></span>
+      <span class="pk-n">${fmtQty(l.got)}<u> / ${fmtQty(l.qty)}</u></span></div>`).join('')}</div>` : '';
+}
+function _mvoDiff(s){
+  return s.status === 'diff'
+    ? `<div class="mvo-diff">${(s.accept_lines || []).map(d => `<span>${escS(d.name)}: отдали ${fmtQty(d.sent)}, пришло <b>${fmtQty(d.got)}</b></span>`).join('')}${
+        s.accept_note ? `<span>«${escS(s.accept_note)}»</span>` : ''}</div>` : '';
+}
+
+// «Отдать»: по районам, откуда везут, — как у водителя. В карточке района —
+// куда и что отвезти, по строке на получателя; «Взять на себя» — весь район.
+function mvoGiveCards(){
+  const я = _rcvMe();
+  const by = {};
+  (MVO.tasks || []).forEach(x => {
+    if(x.status === 'cancelled' || x.status === 'done') return;
+    (x.sources || []).forEach(s => {
+      (by[s.district] = by[s.district] || {code: s.code, name: s.name, id: s.district, pairs: []}).pairs.push({x, s});
+    });
+  });
+  const cards = Object.values(by).filter(c => c.pairs.some(p => p.s.status !== 'done' && p.s.status !== 'diff'))
+    .sort((a, b) => a.code.localeCompare(b.code));
+  return cards.map(c => {
+    const need = c.pairs.reduce((a, p) => a + (+p.s.qty || 0), 0);
+    const got = c.pairs.reduce((a, p) => a + (+p.s.got || 0), 0);
+    const pct = need ? Math.round(got / need * 100) : 0;
+    const open = c.pairs.filter(p => ['wait', 'pause', 'live'].includes(p.s.status));
+    const мои = open.filter(p => p.s.senior === я), чужие = open.filter(p => p.s.senior && p.s.senior !== я);
+    const свободные = open.filter(p => !p.s.senior);
+    const отдают = [...new Set(open.filter(p => !p.s.senior && (p.s.status === 'live' || p.s.status === 'pause'))
+                                    .map(p => p.s.giver).filter(Boolean))];
+    const [st, cls] = !open.length ? ['отдано', 'ok'] : мои.length ? ['взяли на себя', 'live']
+      : отдают.length ? ['отдают', 'live'] : чужие.length ? ['взял старший', 'live'] : ['ждёт отдающих', ''];
+    const кто = мои.length ? 'везёте вы' : чужие.length ? 'везёт ' + [...new Set(чужие.map(p => p.s.senior))].join(', ')
+      : отдают.length ? 'отдаёт ' + отдают.join(', ') : open.length ? 'никто не начал' : 'ждут «Принял»';
+    const rows = c.pairs.map(({x, s}) => {
+      const key = `g|${x.move_id}|${x.district}|${s.district}`;
+      const how = s.senior && ['wait', 'pause', 'live'].includes(s.status)
+          ? (s.status === 'wait' ? (s.senior === я ? 'заберёте вы' : `заберёт ${s.senior}`)
+                                 : (s.senior === я ? 'отдаёте вы' : `отдаёт ${s.senior}`))
+        : s.status === 'wait' ? 'не начали'
+        : (MVO_SRC[s.status] || MVO_SRC.wait)(s);
+      const скан = s.senior === я && ['wait', 'pause', 'live'].includes(s.status)
+        ? `<button class="mvo-scan" onclick="mvtOpen('${escS(x.move_id)}','${escS(x.district)}','${escS(s.district)}')">Сканировать · в ${escS(x.district_code)}</button>` : '';
+      return `<button class="pk-row il-row mvo-src${s.status === 'done' ? ' done' : ''}${s.status === 'diff' ? ' warn' : ''}${MVO.fold.has(key) ? ' on' : ''}"
+           onclick="mvoFold('${escS(key)}')">
+         <span class="pk-row-b"><span class="pk-name">в ${escS(x.district_code)} ${escS(x.district_name)}</span>
+           <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
+             _mvoСостав(s.lines)} · ${escS(how)}</span></span>
+         <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
+         <span class="mvo-chev">${ICO_CHEV}</span></button>` + _mvoDiff(s) + _mvoLines(key, s.lines) + скан;
+    }).join('');
+    const act = свободные.length ? `<div class="rt-acts"><button class="rt-take" onclick="mvoTake('${escS(c.id)}')">Взять на себя</button></div>`
+      : мои.length ? `<div class="rt-acts"><button class="rt-rel mvo-rel" onclick="mvoDrop('${escS(c.id)}')">Снять с себя</button></div>` : '';
+    const куда = [...new Set(c.pairs.map(p => p.x.district))].length;
+    return `<div class="rcv mvo-card">
+      <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
+        <span class="rcv-when">${escS(кто)}</span></div>
+      <div class="rcv-n"><span class="rcv-v">${escS(c.code)}</span>
+        <span class="rcv-of">${escS(c.name)} · отдать в ${куда} ${pluralize(куда,'район','района','районов')} · отдали ${fmtQty(got)} из ${fmtQty(need)} ед</span>
+        <span class="rcv-pct">${pct}%</span></div>
+      <div class="rcv-bar"><i style="width:${pct}%"></i></div>
+      ${rows}
+      ${act}
+    </div>`;
+  }).join('');
+}
+
+// «Принять»: по районам, куда везут, — кто отдаёт, что принято, где неровно.
+function mvoTakeCards(){
+  const я = _rcvMe();
+  return (MVO.tasks || []).map(x => {
+    const [st, cls] = x.diff && x.status === 'done' ? ['принято неровно', 'warn'] : (MVO_ST[x.status] || MVO_ST.free);
     const pct = x.need ? Math.round(x.got / x.need * 100) : 0;
-    // «13 позиций» и «0 / 23» — про разное: первое наименования, второе штуки.
-    // Молчание об этом читается как ошибка, поэтому состав пишем словами склада.
-    const состав = ls => {
-      const бут = ls.filter(l => l.unit <= 1).reduce((a, l) => a + l.qty, 0);
-      const кор = ls.filter(l => l.unit > 1).reduce((a, l) => a + l.qty, 0);
-      return [бут ? `${fmtQty(бут)} ${pluralize(бут,'бутылка','бутылки','бутылок')}` : '',
-              кор ? `${fmtQty(кор)} ${pluralize(кор,'коробка','коробки','коробок')}` : '']
-             .filter(Boolean).join(' и ');
-    };
     const src = (x.sources || []).map(s => {
       // По нажатию — что именно отдаёт этот район (владелец, 18 сен 2026:
       // «чтобы я мог нажимать на каждый из районов и видел какие там позиции»).
       const key = `${x.move_id}|${x.district}|${s.district}`;
-      const open = MVO.fold.has(key);
-      // Задачу взял старший — за товаром к отдающему едет он.
-      const how = x.senior && s.status === 'wait'
-        ? (x.senior === _rcvMe() ? 'заберёте вы' : `заберёт ${x.senior}`)
+      const how = s.senior && s.status === 'wait' ? (s.senior === я ? 'заберёте вы' : `заберёт ${s.senior}`)
         : (MVO_SRC[s.status] || MVO_SRC.wait)(s);
-      const расх = s.status === 'diff'
-        ? `<div class="mvo-diff">${(s.accept_lines || []).map(d => `<span>${escS(d.name)}: отдали ${fmtQty(d.sent)}, пришло <b>${fmtQty(d.got)}</b></span>`).join('')}${
-            s.accept_note ? `<span>«${escS(s.accept_note)}»</span>` : ''}</div>` : '';
-      return `<button class="pk-row il-row mvo-src${s.status === 'done' ? ' done' : ''}${s.status === 'diff' ? ' warn' : ''}${open ? ' on' : ''}"
+      return `<button class="pk-row il-row mvo-src${s.status === 'done' ? ' done' : ''}${s.status === 'diff' ? ' warn' : ''}${MVO.fold.has(key) ? ' on' : ''}"
            onclick="mvoFold('${escS(key)}')">
          <span class="pk-row-b"><span class="pk-name">из ${escS(s.code)} ${escS(s.name)}</span>
            <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
-             состав(s.lines)} · ${escS(how)}</span></span>
+             _mvoСостав(s.lines)} · ${escS(how)}</span></span>
          <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
-         <span class="mvo-chev">${ICO_CHEV}</span></button>` + расх
-        + (open ? `<div class="mvo-lines">${s.lines.map(l => `
-            <div class="pk-row mvo-line${l.done ? ' done' : ''}">
-              <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
-                <span class="pk-slug">${l.unit > 1 ? 'коробки' : 'бутылки'}</span></span>
-              <span class="pk-n">${fmtQty(l.got)}<u> / ${fmtQty(l.qty)}</u></span></div>`).join('')}</div>` : '');
+         <span class="mvo-chev">${ICO_CHEV}</span></button>` + _mvoDiff(s) + _mvoLines(key, s.lines);
     }).join('');
     // Справа сверху — что сейчас происходит: кто отдаёт прямо сейчас, или
     // отдали и ждут «Принял», или никто не начинал.
     const сейчас = [...new Set((x.sources || []).filter(s => s.status === 'live' || s.status === 'pause').map(s => s.giver).filter(Boolean))];
-    const кто = x.senior && x.status !== 'done' && x.status !== 'cancelled'
-        ? (x.senior === _rcvMe() ? 'везёте вы' : 'везёт ' + x.senior)
-      : сейчас.length ? 'отдаёт ' + сейчас.join(', ')
+    const кто = сейчас.length ? 'отдаёт ' + сейчас.join(', ')
       : (x.sources || []).some(s => s.status === 'given') ? 'ждёт «Принял»'
       : (x.sources || []).some(s => s.status === 'wait') ? 'никто не начал' : '';
-    // «Взять на себя» — как в приёмке (владелец, 18 сен 2026): старший — тот,
-    // кто работает в AMBAR STAR, — сам объезжает районы, откуда везут, и
-    // сканирует; принимает получатель.
-    const я = _rcvMe(), живая = x.status !== 'done' && x.status !== 'cancelled';
-    const везу = живая && x.status !== 'given' && x.left > 0;
-    const act = !живая || !везу ? ''
-      : x.senior === я ? `<div class="rt-acts">
-          <button class="rt-take" onclick="mvtOpen('${escS(x.move_id)}','${escS(x.district)}')">Сканировать</button>
-          <button class="rt-rel" onclick="mvoDrop('${escS(x.move_id)}','${escS(x.district)}')">Снять с себя</button></div>`
-      : x.senior ? ''
-      : `<div class="rt-acts"><button class="rt-take" onclick="mvoTake('${escS(x.move_id)}','${escS(x.district)}')">Взять на себя</button></div>`;
     return `<div class="rcv mvo-card${x.diff ? ' warn' : ''}">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
         <span class="rcv-when">${escS(x.status === 'done' || x.status === 'cancelled' ? (x.by || '') : кто)}</span></div>
@@ -23732,11 +23797,18 @@ function mvoPaint(){
         <span class="rcv-pct">${pct}%</span></div>
       <div class="rcv-bar"><i style="width:${pct}%"></i></div>
       ${src}
-      ${act}
       ${x.status === 'done' || x.status === 'cancelled' ? '' :
         `<button class="ord-reset mvo-x" onclick="mvoCancel('${escS(x.move_id)}','${escS(x.district)}')">Снять заявку района</button>`}
     </div>`;
   }).join('');
+}
+
+function mvoPaint(){
+  _setText('accTitle', 'Перемещения');
+  _setText('accSub', MVO.open ? `${MVO.open} ${pluralize(MVO.open,'район','района','районов')} в работе`
+                              : 'по районам');
+  const tab = MVO.tab === 'take' ? 'take' : 'give';
+  const карточки = tab === 'give' ? mvoGiveCards() : mvoTakeCards();
   const p = MVO.plan;
   const план = !p ? '<div class="scan-empty">Считаю, что стоит перевезти…</div>'
     : !p.rows.length ? '<div class="scan-empty">Перевозить нечего — у соседей нет излишков</div>'
@@ -23752,9 +23824,15 @@ function mvoPaint(){
        ${p.rows.length > 40 ? `<div class="scan-empty">…и ещё ${p.rows.length - 40}</div>` : ''}
        <button class="nfoot-btn pri mvo-go" ${MVO.busy ? 'disabled' : ''} onclick="mvoCreate()">
          ${MVO.busy ? 'Создаю…' : `Создать заявку · ${p.districts.join(', ')}`}</button>`;
-  document.getElementById('accMid').innerHTML =
-    (карточки ? `<div class="sect"><span class="sect-t">В работе</span></div>${карточки}` : '')
+  document.getElementById('accMid').innerHTML = `
+    <div class="periods" id="mvoTabs" style="margin:2px 0 14px;--count:2">
+      <div class="period-pill"></div>
+      <button class="${tab === 'give' ? 'on' : ''}" onclick="mvoTab('give')">Отдать</button>
+      <button class="${tab === 'take' ? 'on' : ''}" onclick="mvoTab('take')">Принять</button>
+    </div>`
+    + (карточки || `<div class="scan-empty">${tab === 'give' ? 'Отдавать нечего' : 'Принимать нечего'}</div>`)
     + `<div class="sect"><span class="sect-t">Что стоит перевезти</span></div>${план}`;
+  const g = document.getElementById('mvoTabs'); if(g) requestAnimationFrame(() => movePill(g));
 }
 
 setTimeout(mvoLoad, 2000);

@@ -5460,27 +5460,28 @@ async def move_give_accept(mid: str, district: str, src: str, rec: dict) -> bool
     return r.modified_count > 0
 
 
-async def move_task_senior(mid: str, district: str, name: str, by: int, now):
-    """Старший берёт задачу района на себя. Достаётся одному: условие «никто не
-    взял или взял этот же» стоит в самом фильтре. Возвращает заявку или None."""
-    d = _db_or_none()
-    if d is None: return None
-    from pymongo import ReturnDocument
-    k = f"tasks.{district}"
-    return await d.move_orders.find_one_and_update(
-        {"_id": mid, "status": "open", f"{k}.done_at": None, f"{k}.cancelled_at": None,
-         f"{k}.lines": {"$exists": True},
-         "$or": [{f"{k}.senior": None}, {f"{k}.senior.name": name}]},
-        {"$set": {f"{k}.senior": {"name": name, "by": int(by or 0), "at": now}}},
-        return_document=ReturnDocument.AFTER)
-
-
-async def move_task_senior_drop(mid: str, district: str, name: str) -> bool:
+async def move_pair_senior(mid: str, district: str, src: str, name: str, by: int, now) -> bool:
+    """Старший берёт передачу src → district на себя. Достаётся одному:
+    условие «никто не взял или взял этот же» стоит в самом фильтре; принятую и
+    снятую не берём."""
     d = _db_or_none()
     if d is None: return False
     k = f"tasks.{district}"
-    r = await d.move_orders.update_one({"_id": mid, f"{k}.senior.name": name},
-                                       {"$set": {f"{k}.senior": None}})
+    g = f"{k}.give.{src}"
+    r = await d.move_orders.update_one(
+        {"_id": mid, "status": "open", f"{k}.done_at": None, f"{k}.cancelled_at": None,
+         f"{g}.accepted_at": None,
+         "$or": [{f"{g}.senior": None}, {f"{g}.senior.name": name}]},
+        {"$set": {f"{g}.senior": {"name": name, "by": int(by or 0), "at": now}}})
+    return r.matched_count > 0
+
+
+async def move_pair_senior_drop(mid: str, district: str, src: str, name: str) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    g = f"tasks.{district}.give.{src}"
+    r = await d.move_orders.update_one({"_id": mid, f"{g}.senior.name": name},
+                                       {"$set": {f"{g}.senior": None}})
     return r.modified_count > 0
 
 

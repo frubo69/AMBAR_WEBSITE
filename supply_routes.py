@@ -2543,9 +2543,10 @@ def setup(app):
         ("/api/owner/move/live",                    handle_move_live,    "GET"),
         ("/api/owner/move/create",                  handle_move_create,  "POST"),
         ("/api/owner/move/{mid}/cancel",            handle_move_cancel,  "POST"),
-        # Старший берёт задачу района на себя и сканирует сам (18 сен 2026).
-        ("/api/owner/move/{mid}/take",              handle_move_take,    "POST"),
-        ("/api/owner/move/{mid}/drop",              handle_move_drop,    "POST"),
+        # Старший берёт на себя то, что надо забрать с района, и сканирует
+        # сам — по каждому району, куда везёт (18 сен 2026).
+        ("/api/owner/move/take",                    handle_move_take,    "POST"),
+        ("/api/owner/move/drop",                    handle_move_drop,    "POST"),
         ("/api/owner/move/{mid}/scan",              handle_move_scan,    "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)

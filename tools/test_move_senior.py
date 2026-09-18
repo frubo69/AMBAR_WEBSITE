@@ -1,15 +1,17 @@
-"""Старший берёт заявку на перемещение на себя (владелец, 18 сен 2026: «сделай
-возможность старшему взять заявку на перемещение так же на себя на какие-то
-определённые районы»; «старший — тот, кто пользуется AMBAR STAR»: имя — кем
-подписан вход STAR, к конкретному человеку не привязано). mongomock +
-настоящие move_routes:
-  • «Взять на себя» — задача района-получателя достаётся одному старшему;
-  • пока взял старший, водителям отдающих районов карточки нет, «Начать» и
-    скан им отвечают «взял старший», смену их эта задача не держит;
-  • старший сканирует с любого района, откуда везут в эту задачу, — и только
-    оттуда; чужую задачу (не взятую им) не сканирует;
+"""Старший берёт перемещение на себя — по району, откуда везут (владелец,
+18 сен 2026: «сделай возможность старшему взять заявку на перемещение так же на
+себя на какие-то определённые районы»; «старший — тот, кто пользуется AMBAR
+STAR»; «он видит всё, что должен с JVC взять и куда отвезти, как у
+водителей»). mongomock + настоящие move_routes:
+  • «Взять на себя» район — все его передачи во всех открытых заявках, ещё не
+    отданные целиком; достаётся одному входу STAR, второй видит, кто взял;
+  • пока взял старший, водителям этого района карточек «отдать» нет, «Начать»
+    и скан им отвечают «взял старший», смену их это не держит; передачи других
+    районов живут как жили;
+  • старший сканирует по каждой передаче — куда везёт: бутылка с другого
+    района или в чужую (не взятую им) передачу не уходит;
   • получатель принимает как обычно — «Принял» после того, как отдано всё;
-  • «Снять с себя» — дальше отдают водители, отсканированное остаётся."""
+  • «Снять с себя» — дальше отдают водители района, отсканированное остаётся."""
 import asyncio, os, sys
 from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -40,78 +42,80 @@ async def shelf(oid, pid):
 async def main():
     db._db = AsyncMongoMockClient()["ambar_senior"]; d = db._db
     vodka, gin = "p1", "p55"
-    for oid, per in {"jvc": {vodka: 0, gin: 0}, "bbay": {vodka: 2, gin: 0}, "alguses": {vodka: 0, gin: 1},
-                     "tecom": {vodka: 1, gin: 0}}.items():
+    for oid, per in {"jvc": {vodka: 0, gin: 0}, "bbay": {vodka: 4, gin: 0}, "alguses": {vodka: 0, gin: 1},
+                     "tecom": {vodka: 0, gin: 0}}.items():
         await db.save_stock_count(oid, D, {"district": oid, "day": D, "counted_at": T0.isoformat(),
             "first_time": True, "counted_by": 0,
             "lines": [{"id": p, "name": p, "price": 100, "unit": 1, "actual": q, "counted": True}
                       for p, q in per.items()]})
-    await code(d, "v0", vodka, "bbay"); await code(d, "v1", vodka, "bbay")
-    await code(d, "g0", gin, "alguses"); await code(d, "vt", vodka, "tecom")
+    for i in range(4): await code(d, f"v{i}", vodka, "bbay")
+    await code(d, "g0", gin, "alguses")
     r = await MV.create([{"from": "bbay", "to": "jvc", "id": vodka, "qty": 2},
-                         {"from": "alguses", "to": "jvc", "id": gin, "qty": 1}], by="STAR")
+                         {"from": "alguses", "to": "jvc", "id": gin, "qty": 1},
+                         {"from": "bbay", "to": "tecom", "id": vodka, "qty": 1}], by="STAR")
     mid = r["move_id"]
 
-    print("── взять на себя ──────────────────────────────────────────────────")
-    a = await MV.senior_take(mid, "jvc", "STAR", 7)
-    eq("старший взял задачу B1", (a["ok"], a["task"]["senior"]), (True, "STAR"))
-    b = await MV.senior_take(mid, "jvc", "Другой старший", 8)
-    eq("второй вход STAR — «уже взял» и кто", (b["ok"], b.get("senior")), (False, "STAR"))
-    eq("тот же старший — повторное нажатие не ломает", (await MV.senior_take(mid, "jvc", "STAR", 7))["ok"], True)
+    print("── взять на себя район ────────────────────────────────────────────")
+    a = await MV.senior_take("bbay", "STAR", 7)
+    eq("старший взял всё с Бизнес Бея — две передачи", (a["ok"], a["took"]), (True, 2))
+    b = await MV.senior_take("bbay", "STAR-2", 8)
+    eq("второй вход STAR — «уже взял» и кто", (b["ok"], b["error"], b["senior"]), (False, "taken", "STAR"))
+    eq("тот же вход — повторное нажатие не ломает", (await MV.senior_take("bbay", "STAR", 7))["ok"], True)
+    eq("взять с района, откуда ничего не везут, — нечего", (await MV.senior_take("tecom", "STAR", 7))["error"], "nothing")
 
-    print("── водители отдающих районов ──────────────────────────────────────")
-    eq("у Бизнес Бея карточки «отдать» нет", (await MV.tasks_for_driver("Бахадыр", "bbay"))["give"], [])
-    eq("у Алгусеса тоже", (await MV.tasks_for_driver("Даврон", "alguses"))["give"], [])
-    eq("«Начать» водителю — «взял старший»",
+    print("── водители ───────────────────────────────────────────────────────")
+    eq("у Бизнес Бея карточек «отдать» нет", (await MV.tasks_for_driver("Бахадыр", "bbay"))["give"], [])
+    eq("у Алгусеса его передача на месте", [x["to_code"] for x in (await MV.tasks_for_driver("Даврон", "alguses"))["give"]], ["B1"])
+    eq("«Начать» водителю Бизнес Бея — «взял старший»",
        (await MV.give_start(mid, "jvc", "Бахадыр", 11, "bbay")).get("error"), "senior_took")
     s = await MV.scan(mid, "jvc", "v0", "Бахадыр", 11, "bbay")
     eq("скан водителя — «взял старший», склад стоит", (s["verdict"], s.get("senior"), await shelf("jvc", vodka)),
        ("senior_took", "STAR", 0))
-    eq("смену отдающих эта задача не держит",
-       (await MV.pending_for_district("bbay"), await MV.pending_for_district("alguses")), ([], []))
+    eq("смену Бизнес Бея это не держит", await MV.pending_for_district("bbay"), [])
+    eq("а Алгусес держит его собственная передача", [x["side"] for x in await MV.pending_for_district("alguses")], ["give"])
     v = await MV.tasks_for_driver("Худоба", "jvc")
-    eq("получатель видит обе серые карточки", sorted((x["from_code"], x["status"], x["senior"]) for x in v["take"]),
-       [("B2", "wait", "STAR"), ("B4", "wait", "STAR")])
+    eq("получатель JVC видит, кто везёт: из Бизнес Бея — старший",
+       sorted((x["from_code"], x["senior"]) for x in v["take"]), [("B2", "STAR"), ("B4", "")])
 
-    print("── старший сканирует ──────────────────────────────────────────────")
-    x = await MV.scan(mid, "jvc", "v0", "Другой старший", 8, senior=True)
-    eq("чужую задачу старший не сканирует", (x["verdict"], x.get("senior")), ("senior_other", "STAR"))
-    x = await MV.scan(mid, "jvc", "vt", "STAR", 7, senior=True)
-    eq("бутылка с района, откуда в задачу не везут, — отказ", (x["verdict"], x.get("from_code")), ("other_district", "B5"))
-    x = await MV.scan(mid, "jvc", "v0", "STAR", 7, senior=True)
-    eq("с Бизнес Бея — ушла на JVC", (x["ok"], x["from_code"], x["to_code"], x["task"]["giver"]), (True, "B2", "B1", "STAR"))
-    x = await MV.scan(mid, "jvc", "v0", "STAR", 7, senior=True)
-    eq("та же бутылка второй раз — «уже отдали»", x["verdict"], "given")
-    x = await MV.scan(mid, "jvc", "g0", "STAR", 7, senior=True)
-    eq("с Алгусеса — тоже, в одном проходе", (x["ok"], x["from_code"], x["finished"]), (True, "B4", True))
-    eq("склад: JVC +2, отдающие −1 каждый",
-       (await shelf("jvc", vodka), await shelf("jvc", gin), await shelf("bbay", vodka), await shelf("alguses", gin)),
-       (1, 1, 1, 0))
+    print("── старший сканирует по каждой передаче ───────────────────────────")
+    x = await MV.scan(mid, "jvc", "v0", "STAR-2", 8, "bbay", senior=True)
+    eq("чужую передачу не сканирует", (x["verdict"], x.get("senior")), ("senior_other", "STAR"))
+    x = await MV.scan(mid, "jvc", "g0", "STAR", 7, "alguses", senior=True)
+    eq("не взятую передачу Алгусеса — «сначала возьмите»", x["verdict"], "not_taken")
+    x = await MV.scan(mid, "jvc", "g0", "STAR", 7, "bbay", senior=True)
+    eq("бутылка Алгусеса в передачу Бизнес Бея — не с того района", (x["verdict"], x.get("from_code")), ("other_district", "B4"))
+    x = await MV.scan(mid, "jvc", "v0", "STAR", 7, "bbay", senior=True)
+    eq("Бизнес Бей → JVC: ушла", (x["ok"], x["from_code"], x["to_code"], x["task"]["giver"]), (True, "B2", "B1", "STAR"))
+    eq("та же бутылка второй раз — «уже отдали»", (await MV.scan(mid, "jvc", "v0", "STAR", 7, "bbay", senior=True))["verdict"], "given")
+    x = await MV.scan(mid, "jvc", "v1", "STAR", 7, "bbay", senior=True)
+    eq("в JVC отдано всё", (x["ok"], x["finished"]), (True, True))
+    x = await MV.scan(mid, "tecom", "v2", "STAR", 7, "bbay", senior=True)
+    eq("Бизнес Бей → Тиком: тем же старшим", (x["ok"], x["to_code"], x["finished"]), (True, "B5", True))
+    eq("склад: JVC +2, Тиком +1, Бизнес Бей −3",
+       (await shelf("jvc", vodka), await shelf("tecom", vodka), await shelf("bbay", vodka)), (2, 1, 1))
     v = await MV.tasks_for_driver("Худоба", "jvc")
-    eq("у получателя: Алгусес отдан — «Принял», Бизнес Бей ещё отдают",
-       sorted((t["from_code"], t["status"], t["giver"]) for t in v["take"]),
-       [("B2", "live", "STAR"), ("B4", "given", "STAR")])
+    eq("у получателя: из Бизнес Бея отдано — «Принял», Алгусес ждёт",
+       sorted((t["from_code"], t["status"]) for t in v["take"]), [("B2", "given"), ("B4", "wait")])
 
     print("── снять с себя ───────────────────────────────────────────────────")
-    eq("чужой не снимет", (await MV.senior_drop(mid, "jvc", "Другой старший"))["ok"], False)
-    dr = await MV.senior_drop(mid, "jvc", "STAR")
-    eq("снял с себя", (dr["ok"], dr["task"]["senior"]), (True, ""))
+    r2 = await MV.create([{"from": "bbay", "to": "silicon", "id": vodka, "qty": 1}], by="STAR")
+    eq("новая заявка с Бизнес Бея: старший берёт снова", (await MV.senior_take("bbay", "STAR", 7))["took"], 1)
+    eq("чужой не снимет", (await MV.senior_drop("bbay", "STAR-2"))["ok"], False)
+    dr = await MV.senior_drop("bbay", "STAR")
+    eq("снял с себя", (dr["ok"], dr["dropped"]), (True, 1))
     g = await MV.tasks_for_driver("Бахадыр", "bbay")
-    eq("карточка вернулась Бизнес Бею, отсканированное осталось",
-       [(x["to_code"], x["got"], x["need"]) for x in g["give"]], [("B1", 1, 2)])
-    eq("старший больше не сканирует", (await MV.scan(mid, "jvc", "v1", "STAR", 7, senior=True))["verdict"], "not_taken")
-    s = await MV.scan(mid, "jvc", "v1", "Бахадыр", 11, "bbay")
-    eq("водитель Бизнес Бея доотдал", (s["ok"], s["finished"]), (True, True))
+    eq("передача вернулась водителям Бизнес Бея", [(x["to_code"], x["senior"]) for x in g["give"]], [("B3", "")])
+    eq("старший её больше не сканирует",
+       (await MV.scan(r2["move_id"], "silicon", "v3", "STAR", 7, "bbay", senior=True))["verdict"], "not_taken")
 
     print("── принимает получатель, как всегда ───────────────────────────────")
-    for src in ("bbay", "alguses"):
-        await MV.accept(mid, "jvc", src, "Худоба", 5, "jvc")
-    doc = await db.move_order_get(mid)
-    eq("приняли всё — задача и заявка закрыты", (bool(doc["tasks"]["jvc"]["done_at"]), doc["status"]), (True, "done"))
-    eq("во взятую закрытую задачу старший не возьмёт", (await MV.senior_take(mid, "jvc", "STAR", 7))["error"], "gone")
+    await MV.accept(mid, "jvc", "bbay", "Худоба", 5, "jvc")
+    await MV.accept(mid, "tecom", "bbay", "Алишер", 6, "tecom")
+    eq("Тиком принял — его задача закрыта", bool((await db.move_order_get(mid))["tasks"]["tecom"]["done_at"]), True)
+    eq("JVC держит передача Алгусеса", bool((await db.move_order_get(mid))["tasks"]["jvc"].get("done_at")), False)
     tr = await d.stock_transfers.find({"by_kind": "move"}).to_list(length=10)
-    eq("в книге переездов — кто что отдал", sorted((x["by_name"], x["from"]) for x in tr),
-       [("STAR", "alguses"), ("STAR", "bbay"), ("Бахадыр", "bbay")])
+    eq("в книге переездов — отдавал старший", sorted((x["by_name"], x["from"], x["to"]) for x in tr),
+       [("STAR", "bbay", "jvc"), ("STAR", "bbay", "jvc"), ("STAR", "bbay", "tecom")])
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)

@@ -70,10 +70,12 @@ def build(src: str, ver: str = "") -> str:
 
 async def handle(request: web.Request) -> web.Response:
     try:
-        st = SRC.stat()
-        if _CACHE["mtime"] != st.st_mtime:
-            _CACHE["html"] = build(SRC.read_text(encoding="utf-8"), f"?v={int(st.st_mtime)}")
-            _CACHE["mtime"] = st.st_mtime
+        # Версия — по обоим файлам: телефон держит demo.js в кэше сутки, и если
+        # считать только по index.html, правка самого демо до людей не доедет.
+        mt = max(SRC.stat().st_mtime, (ROOT / "driver" / DEMO_JS).stat().st_mtime)
+        if _CACHE["mtime"] != mt:
+            _CACHE["html"] = build(SRC.read_text(encoding="utf-8"), f"?v={int(mt)}")
+            _CACHE["mtime"] = mt
             log.info("[демо] страница собрана заново")
     except Exception as e:                                   # noqa: BLE001
         log.error(f"[демо] не собралось: {e}")

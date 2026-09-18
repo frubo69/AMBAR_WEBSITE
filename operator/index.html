@@ -4583,6 +4583,7 @@ function mvbListHtml(){
         <div class="mvb-n">${_esc(p.name)}</div>
         <div class="mvb-m">у вас ${_mvQ(r.have, p)}${r.norm != null ? ' · норма ' + _mvR(r.norm) : ''}${
           r.need > 0 ? ` · <b>не хватает ${_mvQ(r.need, p)}</b>` : ''}</div>
+        ${p.premium && !r.have ? `<div class="mvb-m">дорогое — туда, где его нет, по норме не везём</div>` : ''}
         ${src}
       </div></div>`;
   };

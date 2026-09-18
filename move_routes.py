@@ -378,6 +378,20 @@ async def plan(day: str = "") -> dict:
 # Оператор собирает перемещение В СВОЙ район: ему видно, где чего лежит и чего
 # у него не хватает до нормы, а готовое предложение «по норме» — тот же расчёт,
 # что у STAR, только для одного района.
+# Дорогое — только туда, где его покупают (владелец, 18 сен 2026: «перемещение
+# дорогого алкоголя мы не принимаем — там, где у нас этих позиций ноль, живут
+# работяги, они никогда этого не купят»). Порог тот же, что у правила нормы
+# (tools/norm_rule.py, TEST_MAX): дороже 300 AED.
+PREMIUM = 300
+
+
+def _premium(p: dict) -> bool:
+    try:
+        return float((p or {}).get("price") or 0) > PREMIUM
+    except (TypeError, ValueError):
+        return False
+
+
 async def board(to: str, scope: set) -> dict:
     """Всё, что нужно, чтобы собрать заявку в район to: по каждой позиции —
     сколько лежит в каждом районе, сколько там кодов (столько сканером и
@@ -400,14 +414,17 @@ async def board(to: str, scope: set) -> dict:
         if not any(have.values()) and not any(norm.values()):
             continue
         products.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
-                         "img": p.get("img", ""), "unit": sr._unit(p),
+                         "img": p.get("img", ""), "unit": sr._unit(p), "premium": _premium(p),
                          "have": have, "codes": codes, "norm": norm})
     pl = await plan(day)
     return {"day": day, "to": to,
             "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
                            "mine": o in scope} for o in OFFICE_IDS],
             "products": products,
-            "suggest": [r for r in pl["rows"] if r["to"] == to]}
+            # «Собрать по норме» дорогое туда, где его сейчас ноль, не кладёт:
+            # руками добавить можно, но само оно туда не поедет.
+            "suggest": [r for r in pl["rows"] if r["to"] == to
+                        and not (_premium(cat.get(r["id"])) and float(r.get("to_have") or 0) <= 0)]}
 
 
 async def create_by_operator(who: str, to: str, lines: list, note: str, scope: set) -> dict:

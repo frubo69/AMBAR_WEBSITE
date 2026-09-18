@@ -14,9 +14,15 @@
 Остальное не трогаем: заявка с принятым товаром — это склад, а не запись.
 Перед удалением всё уходит в файл: восстановить можно целиком.
 
+Отдельно можно убрать названную заявку — например тестовую, которую приняли
+руками. Тут проверка другая: у неё не должно быть кодов, а её день обязан быть
+РАНЬШЕ последнего пересчёта района. Иначе принятое по ней сидит в остатке, и
+удаление молча украдёт бутылки со склада.
+
 Запуск на сервере из /opt/ambar:
     PYTHONPATH=/opt/ambar venv/bin/python tools/supplies_purge.py           # что удалится
     PYTHONPATH=/opt/ambar venv/bin/python tools/supplies_purge.py --apply   # удалить
+    PYTHONPATH=/opt/ambar venv/bin/python tools/supplies_purge.py --id X260914-015415 [--apply]
     PYTHONPATH=/opt/ambar venv/bin/python tools/supplies_purge.py --restore <копия.json>
 """
 import asyncio, json, sys, time
@@ -68,6 +74,40 @@ async def run(db, apply: bool, backup_dir: str = "/root", say=print) -> dict:
     return {"ok": True, "n": res.deleted_count, "backup": path}
 
 
+async def drop_one(db, sid: str, apply: bool, backup_dir: str = "/root", say=print) -> dict:
+    """Убрать названную заявку, если это безопасно для склада."""
+    d = db._db_or_none()
+    s = await d.supplies.find_one({"_id": sid})
+    if not s:
+        say(f"нет такой заявки: {sid}"); return {"ok": False}
+    codes = await d.qr_codes.count_documents({"supply_id": sid})
+    got = {oid: q for it in (s.get("items") or [])
+           for oid, q in (it.get("got") or {}).items() if q}
+    day = str(s.get("day") or "")
+    stop = []
+    if codes:
+        stop.append(f"на заявке {codes} кодов реестра")
+    for oid in got:
+        c = await d.stock_counts.find_one({"district": oid}, sort=[("day", -1)])
+        cday = str((c or {}).get("day") or "")
+        if not cday or day >= cday:
+            stop.append(f"принятое в {oid} попадает в остаток (пересчёт {cday or 'нет'}, заявка {day})")
+    say(f"{sid}: день {day}, статус {s.get('status')}, принято {got or 'ноль'}, кодов {codes}")
+    if stop:
+        say("СТОП: " + "; ".join(stop)); return {"ok": False, "stop": stop}
+    say("на склад не влияет: заявка раньше последнего пересчёта, кодов нет")
+    if not apply:
+        say("пробный прогон: ничего не удалено (--apply — удалить)")
+        return {"ok": True, "dry": True}
+    path = f"{backup_dir}/supply_{sid}_{time.strftime('%Y%m%d-%H%M%S')}.json"
+    with open(path, "w") as f:
+        json.dump([s], f, ensure_ascii=False,
+                  default=lambda v: {"$dt": v.isoformat()} if isinstance(v, datetime) else str(v))
+    await d.supplies.delete_one({"_id": sid})
+    say(f"копия: {path}\nудалена заявка {sid}")
+    return {"ok": True, "backup": path}
+
+
 async def restore(db, path: str, say=print) -> None:
     d = db._db_or_none()
 
@@ -92,6 +132,9 @@ async def main():
     if "--restore" in sys.argv:
         await restore(db, sys.argv[sys.argv.index("--restore") + 1])
         return
+    if "--id" in sys.argv:
+        r = await drop_one(db, sys.argv[sys.argv.index("--id") + 1], apply="--apply" in sys.argv)
+        sys.exit(0 if r.get("ok") else 1)
     res = await run(db, apply="--apply" in sys.argv)
     sys.exit(0 if res.get("ok") else 1)
 

@@ -5,8 +5,9 @@
 дни: заявки от STAR и от операторов (в том числе кривые), «Начать
 перемещение», сканы — правильные, чужие, повторные, списанные, одновременные,
 со старым чтением документа, — «Принял» и «Принял неровно» от своих и чужих,
-снятие задачи и заявки целиком, а ещё старший из STAR: берёт на себя всё,
-что надо забрать с района, снимает с себя и сканирует сам — по каждой
+снятие задачи и заявки целиком, а ещё старший из STAR: берёт на себя одну
+передачу «откуда → куда» или всё с района (так зовёт приложение, открытое до
+обновления), возвращает водителям одну или все и сканирует сам — по каждой
 передаче, куда везёт.
 После КАЖДОГО шага проверяется всё, что должно быть правдой всегда:
 
@@ -310,14 +311,52 @@ class World:
             ok(not res.get("ok") or res.get("already"), f"принято неотданное: {g['status']} {res}")
 
     async def act_senior(self):
-        """Старший из STAR: взять на себя всё, что надо забрать с района, снять
-        с себя или сканировать сам — по передаче, которую взял."""
+        """Старший из STAR: взять на себя одну передачу или всё с района, вернуть
+        водителям одну или все, сканировать сам — по передаче, которую взял."""
         r = self.r
         pairs = await self.open_pairs()
         if not pairs:
             return
         roll = r.random()
-        if roll < 0.3:
+        if roll < 0.35:
+            # По районам, куда везут (владелец, 18 сен 2026: «старший взял себе
+            # два района — остальные видны водителям и свободны»): одна передача.
+            drop = r.random() < 0.4
+            held = [x for x in pairs if boss_of(x[3]["tasks"][x[1]], x[2])]
+            mid, to, src, doc = r.choice(held if drop and held and r.random() < 0.75 else pairs)
+            t = doc["tasks"][to]
+            st_ = MV.give_view(mid, doc, to, t, src)["status"]
+            boss = boss_of(t, src)
+            me = boss if (drop and boss and r.random() < 0.8) else r.choice(STARS)
+            before = {(m_, to_, s_): boss_of(d_["tasks"][to_], s_) for (m_, to_, s_, d_) in pairs}
+            if drop:
+                res = await MV.senior_drop(src, me, to=to, mid=mid)
+                stat("старший: вернул передачу" if res.get("ok") else "старший: вернуть передачу нечего")
+                want = st_ in ("wait", "pause", "live") and boss == me
+                ok(bool(res.get("ok")) == want and res.get("dropped") == (1 if want else 0),
+                   f"вернуть {src}→{to} ({st_}, взял {boss or 'никто'}) от {me}: {res}")
+            else:
+                res = await MV.senior_take(src, me, 1, to=to, mid=mid)
+                stat("старший: взял передачу" if res.get("ok") else f"старший: не взял передачу {res.get('error')}")
+                if st_ not in ("wait", "pause", "live"):
+                    ok(not res.get("ok") and res.get("error") == "nothing", f"взял отданную {src}→{to} ({st_}): {res}")
+                elif boss in ("", me):
+                    ok(res.get("ok") and res.get("took") == 1, f"свободную {src}→{to} не взял: {res}")
+                else:
+                    ok(res.get("error") == "taken" and res.get("senior") == boss, f"взятую {boss} — {res}")
+            # Сдвинулась ровно эта передача — остальные у тех же, что были.
+            for (m_, to_, s_, d_) in await self.open_pairs():
+                was = before.get((m_, to_, s_))
+                now = boss_of(d_["tasks"][to_], s_)
+                if (m_, to_, s_) == (mid, to, src):
+                    if res.get("ok"):
+                        ok(now == ("" if drop else me), f"после {'возврата' if drop else 'взятия'} у {src}→{to}: «{now}»")
+                    else:
+                        ok(now == was, f"отказ сдвинул хозяина {src}→{to}: {was} → {now}")
+                elif was is not None:
+                    ok(now == was, f"взятие {src}→{to} задело {s_}→{to_}: {was} → {now}")
+            return
+        if roll < 0.5:
             src, me = r.choice(OFFICE_IDS), r.choice(STARS)
             # Кто держит ЕЩЁ НЕ ОТДАННЫЕ передачи района: отданное целиком брать
             # уже нечего, и сервер честно отвечает «нечего», а не «взял другой».
@@ -329,7 +368,7 @@ class World:
             if others and not res.get("ok"):
                 ok(res.get("error") == "taken", f"взять с района, где взял другой: {res}")
             return
-        if roll < 0.4:
+        if roll < 0.55:
             src, me = r.choice(OFFICE_IDS), r.choice(STARS)
             mine = [x for x in pairs if x[2] == src and boss_of(x[3]["tasks"][x[1]], src) == me
                     and MV.give_view(x[0], x[3], x[1], x[3]["tasks"][x[1]], src)["status"] in ("wait", "pause", "live")]

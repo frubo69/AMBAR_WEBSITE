@@ -11,7 +11,13 @@ STAR»; «он видит всё, что должен с JVC взять и ку�
   • старший сканирует по каждой передаче — куда везёт: бутылка с другого
     района или в чужую (не взятую им) передачу не уходит;
   • получатель принимает как обычно — «Принял» после того, как отдано всё;
-  • «Снять с себя» — дальше отдают водители района, отсканированное остаётся."""
+  • «Снять с себя» — дальше отдают водители района, отсканированное остаётся;
+  • по районам, куда везут (владелец, 18 сен 2026: «старший взял себе на
+    перемещение два района — остальные остаются видны для водителей и свободны
+    для принятия»): «Взять на себя · в B2» и «Вернуть» — у каждой передачи
+    свои; и случай с боя: старший взял JVC целиком старым приложением,
+    отдал в B2 и B4, вернул B3 и B5 — отданное остаётся за ним и принимается,
+    остальное доотдают водители, товар доезжает весь."""
 import asyncio, os, sys
 from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -171,6 +177,106 @@ async def main():
        sorted((x_["by_name"], x_["to"]) for x_ in tr),
        [("STAR", "bbay"), ("STAR", "bbay"), ("STAR", "tecom"), ("Фарух", "silicon"), ("Фарух", "silicon"),
         ("Худоба", "tecom")])
+
+    print("── по районам, куда везут: взял два — остальные у водителей ───────")
+    vod2 = "p2"   # свой товар — прошлые сценарии его не двигали
+    for i in range(8): await code(d, f"k{i}", vod2, "jvc")
+    await db.save_stock_count("jvc", D, {"district": "jvc", "day": D, "counted_at": T0.isoformat(),
+        "first_time": True, "counted_by": 0,
+        "lines": [{"id": vod2, "name": vod2, "price": 100, "unit": 1, "actual": 8, "counted": True}]})
+    base = {o: await shelf(o, vod2) for o in ("jvc", "bbay", "tecom", "silicon", "alguses")}
+    r4 = await MV.create([{"from": "jvc", "to": to, "id": vod2, "qty": 2} for to in ("bbay", "alguses", "silicon", "tecom")],
+                         by="STAR")
+    m4 = r4["move_id"]
+    a = await MV.senior_take("jvc", "STAR", 7, to="bbay", mid=m4)
+    eq("«Взять на себя · в B2» — одна передача", (a["ok"], a["took"]), (True, 1))
+    a = await MV.senior_take("jvc", "STAR", 7, to="alguses", mid=m4)
+    eq("и «в B4» — вторая", (a["ok"], a["took"]), (True, 1))
+    g = await MV.tasks_for_driver("Худоба", "jvc")
+    eq("водители JVC видят остальные два района и могут отдавать",
+       sorted((x["to_code"], x["senior"]) for x in g["give"] if x["move_id"] == m4), [("B3", ""), ("B5", "")])
+    eq("смену JVC держат только эти два",
+       sorted(x["to_code"] for x in await MV.pending_for_district("jvc") if x["move_id"] == m4), ["B3", "B5"])
+    b = await MV.senior_take("jvc", "STAR-2", 8, to="bbay", mid=m4)
+    eq("второй вход STAR: B2 уже взят — «уже взял» и кто", (b["ok"], b["error"], b["senior"]), (False, "taken", "STAR"))
+    b = await MV.senior_take("jvc", "STAR-2", 8, to="silicon", mid=m4)
+    eq("а свободный B3 второй вход STAR взять может", (b["ok"], b["took"]), (True, 1))
+    eq("теперь водителям JVC остаётся B5",
+       [x["to_code"] for x in (await MV.tasks_for_driver("Худоба", "jvc"))["give"] if x["move_id"] == m4], ["B5"])
+    eq("STAR-2 вернул B3 — снова у водителей", (await MV.senior_drop("jvc", "STAR-2", to="silicon", mid=m4))["dropped"], 1)
+    eq("вернуть не своё — нечего", (await MV.senior_drop("jvc", "STAR-2", to="bbay", mid=m4))["ok"], False)
+    eq("взять в район, куда из JVC не везут, — нечего",
+       (await MV.senior_take("jvc", "STAR", 7, to="jvc", mid=m4))["error"], "nothing")
+    # Водитель JVC начал отдавать в Тиком, старший забирает эту передачу у него.
+    await MV.give_start(m4, "tecom", "Фарух", 22, "jvc")
+    x = await MV.scan(m4, "tecom", "k0", "Фарух", 22, "jvc")
+    eq("водитель JVC отдал в Тиком одну", (x["ok"], x["task"]["got"]), (True, 1))
+    eq("старший забрал у него Тиком посреди", (await MV.senior_take("jvc", "STAR", 7, to="tecom", mid=m4))["took"], 1)
+    eq("следующий скан водителя — «взял старший», склад стоит",
+       ((await MV.scan(m4, "tecom", "k1", "Фарух", 22, "jvc"))["verdict"], await shelf("tecom", vod2) - base["tecom"]),
+       ("senior_took", 1))
+    eq("B3 у водителей — Фарух отдаёт туда, как обычно", (await MV.give_start(m4, "silicon", "Фарух", 22, "jvc"))["ok"], True)
+    for c_, to in (("k1", "tecom"), ("k2", "bbay"), ("k3", "bbay"), ("k4", "alguses"), ("k5", "alguses")):
+        x = await MV.scan(m4, to, c_, "STAR", 7, "jvc", senior=True)
+        eq(f"старший: {c_} → {to}", x["ok"], True)
+    for c_ in ("k6", "k7"):
+        x = await MV.scan(m4, "silicon", c_, "Фарух", 22, "jvc")
+    eq("водитель JVC отдал в B3 всё", x["finished"], True)
+    for to, who in (("bbay", "Бахадыр"), ("alguses", "Даврон"), ("silicon", "Азиз"), ("tecom", "Алишер")):
+        eq(f"«Принял» в {to}", (await MV.accept(m4, to, "jvc", who, 5, to))["ok"], True)
+    eq("заявка закрыта", (await db.move_order_get(m4))["status"], "done")
+    eq("склад: из JVC ушло 8, в каждый район по 2",
+       tuple([await shelf(o, vod2) - base[o] for o in ("jvc", "bbay", "alguses", "silicon", "tecom")]), (-8, 2, 2, 2, 2))
+
+    print("── случай с боя: взял JVC целиком, отдал в B2 и B4, вернул B3 и B5 ─")
+    vod3 = "p3"
+    # 18 сен 2026 вечером: старший нажал «Взять на себя» старым приложением
+    # (весь JVC), отсканировал в Бизнес Бей и Алгусес и повёз. Владелец: «не
+    # сломай этим нововведением их перемещение, товар у них должен в итоге
+    # переместиться успешно».
+    for i in range(8): await code(d, f"q{i}", vod3, "jvc")
+    await db.save_stock_count("jvc", D, {"district": "jvc", "day": D, "counted_at": T0.isoformat(),
+        "first_time": True, "counted_by": 0,
+        "lines": [{"id": vod3, "name": vod3, "price": 100, "unit": 1, "actual": 8, "counted": True}]})
+    base = {o: await shelf(o, vod3) for o in ("jvc", "bbay", "tecom", "silicon", "alguses")}
+    r5 = await MV.create([{"from": "jvc", "to": to, "id": vod3, "qty": 2} for to in ("bbay", "alguses", "silicon", "tecom")],
+                         by="STAR")
+    m5 = r5["move_id"]
+    eq("старое приложение: весь JVC — четыре передачи", (await MV.senior_take("jvc", "STAR", 7))["took"], 4)
+    for c_, to in (("q0", "bbay"), ("q1", "bbay"), ("q2", "alguses"), ("q3", "alguses")):
+        await MV.scan(m5, to, c_, "STAR", 7, "jvc", senior=True)
+    eq("вернуть отданный B2 нельзя — он ждёт «Принял»",
+       (await MV.senior_drop("jvc", "STAR", to="bbay", mid=m5))["ok"], False)
+    for to in ("silicon", "tecom"):
+        eq(f"вернул {to} водителям", (await MV.senior_drop("jvc", "STAR", to=to, mid=m5))["dropped"], 1)
+    doc = await db.move_order_get(m5)
+    eq("B2 и B4 — отданы старшим, за ним и остались",
+       [(to, MV.give_view(m5, doc, to, doc["tasks"][to], "jvc")["status"],
+         MV.give_view(m5, doc, to, doc["tasks"][to], "jvc")["senior"]) for to in ("bbay", "alguses")],
+       [("bbay", "given", "STAR"), ("alguses", "given", "STAR")])
+    eq("водителям JVC — B3 и B5",
+       sorted(x["to_code"] for x in (await MV.tasks_for_driver("Худоба", "jvc"))["give"] if x["move_id"] == m5), ["B3", "B5"])
+    eq("Бизнес Бей видит «Принял»",
+       [(t["status"], t["senior"]) for t in (await MV.tasks_for_driver("Бахадыр", "bbay"))["take"] if t["move_id"] == m5],
+       [("given", "STAR")])
+    eq("B2 принял", (await MV.accept(m5, "bbay", "jvc", "Бахадыр", 5, "bbay"))["ok"], True)
+    eq("B4 принял неровно — одной нет",
+       (await MV.accept(m5, "alguses", "jvc", "Даврон", 5, "alguses", ok=False,
+                        lines=[{"id": vod3, "got": 1}], note="одной нет"))["ok"], True)
+    for to, cs in (("silicon", ("q4", "q5")), ("tecom", ("q6", "q7"))):
+        await MV.give_start(m5, to, "Худоба", 21, "jvc")
+        for c_ in cs:
+            x = await MV.scan(m5, to, c_, "Худоба", 21, "jvc")
+        eq(f"водитель JVC отдал в {to}", x["finished"], True)
+    for to, who in (("silicon", "Азиз"), ("tecom", "Алишер")):
+        await MV.accept(m5, to, "jvc", who, 5, to)
+    doc = await db.move_order_get(m5)
+    eq("заявка закрыта, B4 — «принято неровно»",
+       (doc["status"], MV.task_view(m5, doc, "alguses", doc["tasks"]["alguses"], "")["diff"]), ("done", True))
+    eq("склад: из JVC ушло 8, в каждый район по 2",
+       tuple([await shelf(o, vod3) - base[o] for o in ("jvc", "bbay", "alguses", "silicon", "tecom")]), (-8, 2, 2, 2, 2))
+    eq("смену никому не держит", [x for x in await MV.pending_for_district("jvc") if x["move_id"] == m5]
+       + [x for o in ("bbay", "alguses", "silicon", "tecom") for x in await MV.pending_for_district(o) if x["move_id"] == m5], [])
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)

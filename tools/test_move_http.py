@@ -175,6 +175,23 @@ async def main():
         st, x = await own("POST", "/api/owner/move/drop", {"from": "bbay", "as": "STAR"})
         eq("снять с себя отданное целиком — нечего", (st, x["ok"]), (200, False))
 
+        print("── STAR: «Взять на себя · в B5» — одна передача, остальное водителям ─")
+        st, r3 = await own("POST", "/api/owner/move/create",
+                           {"by": "STAR", "rows": [{"from": "bbay", "to": "tecom", "id": "p1", "qty": 1},
+                                                   {"from": "bbay", "to": "silicon", "id": "p1", "qty": 1}]})
+        eq("заявка из Бизнес Бея в два района", (st, r3.get("ok")), (200, True))
+        mid3 = r3.get("move_id")
+        st, x = await own("POST", "/api/owner/move/take", {"from": "bbay", "to": "tecom", "move_id": mid3, "as": "STAR"})
+        eq("взял на себя только Тиком", (st, x["ok"], x["took"]), (200, True, 1))
+        st, g = await drv(102, "GET", "/api/driver/move")
+        eq("водителю Бизнес Бея осталась передача в Силикон", [y["to_code"] for y in g["give"]], ["B3"])
+        st, x = await own("POST", "/api/owner/move/take", {"from": "bbay", "to": "tecom", "move_id": mid3, "as": "STAR-2"})
+        eq("второй вход STAR — Тиком уже взят (409)", (st, x["ok"], x["error"], x["senior"]), (409, False, "taken", "STAR"))
+        st, x = await own("POST", "/api/owner/move/drop", {"from": "bbay", "to": "tecom", "move_id": mid3, "as": "STAR"})
+        eq("вернул Тиком водителям", (st, x["ok"], x["dropped"]), (200, True, 1))
+        st, g = await drv(102, "GET", "/api/driver/move")
+        eq("у водителя Бизнес Бея снова обе", sorted(y["to_code"] for y in g["give"]), ["B3", "B5"])
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 

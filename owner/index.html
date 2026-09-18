@@ -10482,12 +10482,14 @@ body.safe-open .cvo-hdr{opacity:0}
 .mvo-diff{display:flex;flex-direction:column;gap:3px;margin:0 0 8px 6px;padding:8px 12px;border-radius:11px;
   font-size:12px;line-height:1.4;color:var(--sub);background:rgba(243,180,74,.08);border:1px solid rgba(243,180,74,.3)}
 .mvo-diff b{color:var(--warn)}
-/* Старший взял район: под строкой получателя — «Сканировать · в B2». */
-.mvo-scan{display:block;width:calc(100% - 12px);margin:2px 0 10px 6px;padding:10px 12px;border-radius:11px;cursor:pointer;
-  font-family:inherit;font-size:12.5px;font-weight:700;color:#1a1408;border:0;
-  background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.mvo-scan:active{transform:scale(.985)}
-.mvo-rel{flex:1;padding:10px 12px;font-size:12px}
+/* Под строкой получателя — её действие: «Взять на себя · в B2» (свободная),
+   «Сканировать · в B2» и «Вернуть» (взятая этим входом STAR). */
+.mvo-acts{display:flex;gap:7px;margin:2px 6px 10px}
+.mvo-scan,.mvo-take,.mvo-back{padding:10px 12px;border-radius:11px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700}
+.mvo-scan{flex:1;color:#1a1408;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.mvo-take{flex:1;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.45)}
+.mvo-back{flex:0 0 auto;color:var(--sub);background:var(--card2);border:1px solid var(--border2)}
+.mvo-scan:active,.mvo-take:active,.mvo-back:active{transform:scale(.985)}
 .mvo-go{width:100%;margin-top:14px;padding:14px;border-radius:14px;border:0;cursor:pointer;
   font-family:inherit;font-size:14px;font-weight:700}
 .mvo-go:disabled{opacity:.6}
@@ -23535,22 +23537,29 @@ async function mvoCancel(mid, district){
 // у водителя: «Отдать» — по районам, откуда везут: что забрать и куда; там
 // «Взять на себя» район и сканер по каждому получателю; «Принять» — по
 // районам, куда везут: кто отдаёт, что принято.
-async function mvoTake(src){
+// По районам, куда везут (владелец, 18 сен 2026: «старший взял себе на
+// перемещение два района — остальные остаются видны водителям и свободны»):
+// «Взять на себя» и «Вернуть» — у каждой строки «в B2 …» своя.
+async function mvoTake(src, to, mid, giver){
+  // Водитель района прямо сейчас отдаёт эту передачу — забрать у него только
+  // осознанно: его следующий скан ответит «взял старший».
+  if(giver && !await askDialog('Забрать у водителя?', `Сейчас отдаёт ${giver}. Дальше отдаёте вы — у него эта передача пропадёт, отданное им останется у получателя.`,
+                               'Забрать', 'Оставить')) return;
   if(MVO.busy) return; MVO.busy = true;
   try{
-    const r = await ownerApi.ownerFetch('/api/owner/move/take', {method: 'POST', body: {from: src, as: _rcvMe()}});
-    _toast(`Взяли на себя · ${r.took} ${pluralize(r.took,'передача','передачи','передач')} — водителям этого района сканировать не нужно`);
+    await ownerApi.ownerFetch('/api/owner/move/take', {method: 'POST', body: {from: src, to, move_id: mid, as: _rcvMe()}});
+    _toast('Взяли на себя — водителям этого района её сканировать не нужно');
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   }catch(e){
     const p = (e && e.payload) || {};
-    _toast(p.error === 'taken' ? `Уже взял ${p.senior || 'другой'}` : 'Отдавать с этого района нечего');
+    _toast(p.error === 'taken' ? `Уже взял ${p.senior || 'другой'}` : 'Отдавать тут уже нечего');
   }
   MVO.busy = false; await mvoLoad();
 }
-async function mvoDrop(src){
-  if(!await askDialog('Снять с себя?', 'Дальше отдают водители района, как обычно. Отсканированное остаётся у получателей.',
-                      'Снять', 'Оставить', 'no')) return;
-  try{ await ownerApi.ownerFetch('/api/owner/move/drop', {method: 'POST', body: {from: src, as: _rcvMe()}}); }
+async function mvoDrop(src, to, mid){
+  if(!await askDialog('Вернуть водителям?', 'Эту передачу доотдадут водители района. Отсканированное остаётся у получателя.',
+                      'Вернуть', 'Оставить')) return;
+  try{ await ownerApi.ownerFetch('/api/owner/move/drop', {method: 'POST', body: {from: src, to, move_id: mid, as: _rcvMe()}}); }
   catch(e){ _toast('Не удалось'); }
   mvoLoad();
 }
@@ -23723,12 +23732,14 @@ function mvoGiveCards(){
     const pct = need ? Math.round(got / need * 100) : 0;
     const open = c.pairs.filter(p => ['wait', 'pause', 'live'].includes(p.s.status));
     const мои = open.filter(p => p.s.senior === я), чужие = open.filter(p => p.s.senior && p.s.senior !== я);
-    const свободные = open.filter(p => !p.s.senior);
     const отдают = [...new Set(open.filter(p => !p.s.senior && (p.s.status === 'live' || p.s.status === 'pause'))
                                     .map(p => p.s.giver).filter(Boolean))];
     const [st, cls] = !open.length ? ['отдано', 'ok'] : мои.length ? ['взяли на себя', 'live']
       : отдают.length ? ['отдают', 'live'] : чужие.length ? ['взял старший', 'live'] : ['ждёт отдающих', ''];
-    const кто = мои.length ? 'везёте вы' : чужие.length ? 'везёт ' + [...new Set(чужие.map(p => p.s.senior))].join(', ')
+    // Взяли не всё — в шапке, куда именно везёте вы; остальное у водителей района.
+    const кто = мои.length ? 'везёте вы' + (мои.length < open.length
+        ? ' · в ' + [...new Set(мои.map(p => p.x.district_code))].join(', ') : '')
+      : чужие.length ? 'везёт ' + [...new Set(чужие.map(p => p.s.senior))].join(', ')
       : отдают.length ? 'отдаёт ' + отдают.join(', ') : open.length ? 'никто не начал' : 'ждут «Принял»';
     const rows = c.pairs.map(({x, s}) => {
       const key = `g|${x.move_id}|${x.district}|${s.district}`;
@@ -23737,8 +23748,16 @@ function mvoGiveCards(){
                                  : (s.senior === я ? 'отдаёте вы' : `отдаёт ${s.senior}`))
         : s.status === 'wait' ? 'не начали'
         : (MVO_SRC[s.status] || MVO_SRC.wait)(s);
-      const скан = s.senior === я && ['wait', 'pause', 'live'].includes(s.status)
-        ? `<button class="mvo-scan" onclick="mvtOpen('${escS(x.move_id)}','${escS(x.district)}','${escS(s.district)}')">Сканировать · в ${escS(x.district_code)}</button>` : '';
+      // У каждой строки — своё действие: свободную можно взять на себя,
+      // свою — сканировать или вернуть водителям района.
+      const открыта = ['wait', 'pause', 'live'].includes(s.status);
+      const q = `'${escS(s.district)}','${escS(x.district)}','${escS(x.move_id)}'`;
+      const скан = !открыта ? ''
+        : s.senior === я ? `<div class="mvo-acts">
+            <button class="mvo-scan" onclick="mvtOpen('${escS(x.move_id)}','${escS(x.district)}','${escS(s.district)}')">Сканировать · в ${escS(x.district_code)}</button>
+            <button class="mvo-back" onclick="mvoDrop(${q})">Вернуть</button></div>`
+        : s.senior ? ''
+        : `<div class="mvo-acts"><button class="mvo-take" onclick="mvoTake(${q},'${s.status === 'live' ? escS(s.giver || '') : ''}')">Взять на себя · в ${escS(x.district_code)}</button></div>`;
       return `<button class="pk-row il-row mvo-src${s.status === 'done' ? ' done' : ''}${s.status === 'diff' ? ' warn' : ''}${MVO.fold.has(key) ? ' on' : ''}"
            onclick="mvoFold('${escS(key)}')">
          <span class="pk-row-b"><span class="pk-name">в ${escS(x.district_code)} ${escS(x.district_name)}</span>
@@ -23747,8 +23766,6 @@ function mvoGiveCards(){
          <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
          <span class="mvo-chev">${ICO_CHEV}</span></button>` + _mvoDiff(s) + _mvoLines(key, s.lines) + скан;
     }).join('');
-    const act = свободные.length ? `<div class="rt-acts"><button class="rt-take" onclick="mvoTake('${escS(c.id)}')">Взять на себя</button></div>`
-      : мои.length ? `<div class="rt-acts"><button class="rt-rel mvo-rel" onclick="mvoDrop('${escS(c.id)}')">Снять с себя</button></div>` : '';
     const куда = [...new Set(c.pairs.map(p => p.x.district))].length;
     return `<div class="rcv mvo-card">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
@@ -23758,7 +23775,6 @@ function mvoGiveCards(){
         <span class="rcv-pct">${pct}%</span></div>
       <div class="rcv-bar"><i style="width:${pct}%"></i></div>
       ${rows}
-      ${act}
     </div>`;
   }).join('');
 }

@@ -384,54 +384,68 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
             "task_done": bool(task.get("done_at"))}
 
 
-async def senior_take(src: str, name: str, by: int = 0) -> dict:
-    """Старший берёт на себя всё, что надо забрать с района src (владелец,
+async def senior_take(src: str, name: str, by: int = 0, to: str = "", mid: str = "") -> dict:
+    """Старший берёт на себя то, что надо забрать с района src (владелец,
     18 сен 2026: «сделай возможность старшему взять заявку на перемещение так
     же на себя на какие-то определённые районы»; «чтобы он видел, что должен с
     JVC взять и куда отвезти, как у водителей»). Старший — тот, кто работает в
-    AMBAR STAR. Берутся все передачи с этого района во всех открытых заявках,
-    ещё не отданные целиком; дальше он сканирует по каждой — куда везёт.
-    Водителям района src эти передачи сканировать нечего. Передача,
-    которую уже взял другой старший, остаётся у него."""
+    AMBAR STAR.
+
+    По районам, куда везут (владелец, 18 сен 2026: «старший взял себе два
+    района — остальные остаются видны водителям и свободны»): с to (и mid) —
+    одна передача «src → to»; без них — все передачи района src во всех
+    открытых заявках (так зовёт приложение, открытое до обновления). Берутся
+    только ещё не отданные целиком. Водителям района src взятые передачи
+    сканировать нечего; остальные — у них, как обычно. Передача, которую уже
+    взял другой старший, остаётся у него."""
     if src not in OFFICE_IDS:
         return {"ok": False, "error": "bad_district"}
     took, others = 0, set()
     for doc in await db.move_orders_open():
-        for to, t in (doc.get("tasks") or {}).items():
+        if mid and doc["_id"] != mid:
+            continue
+        for to_, t in (doc.get("tasks") or {}).items():
+            if to and to_ != to:
+                continue
             if t.get("done_at") or t.get("cancelled_at"):
                 continue
             if not any(l.get("from") == src for l in t.get("lines") or []):
                 continue
-            g = give_view(doc["_id"], doc, to, t, src)
+            g = give_view(doc["_id"], doc, to_, t, src)
             if g["status"] not in ("wait", "pause", "live"):
                 continue
             if g["senior"] and g["senior"] != name:
                 others.add(g["senior"]); continue
-            if await db.move_pair_senior(doc["_id"], to, src, name, by, _now()):
+            if await db.move_pair_senior(doc["_id"], to_, src, name, by, _now()):
                 took += 1
     if not took:
         return {"ok": False, "error": "taken" if others else "nothing", "senior": ", ".join(sorted(others))}
-    log.info(f"[move] старший {name} взял на себя всё с {src}: передач {took}")
+    log.info(f"[move] старший {name} взял на себя с {src}" + (f" в {to}" if to else "") + f": передач {took}")
     return {"ok": True, "took": took, "others": sorted(others)}
 
 
-async def senior_drop(src: str, name: str) -> dict:
-    """Снять с себя всё, что взял с района src: дальше отдают водители района,
-    как обычно. Что старший уже отсканировал, осталось у получателей."""
+async def senior_drop(src: str, name: str, to: str = "", mid: str = "") -> dict:
+    """Вернуть водителям района src то, что взял с него: с to (и mid) — одну
+    передачу, без них — все. Дальше отдают водители района, как обычно; что
+    старший уже отсканировал, осталось у получателей."""
     n = 0
     for doc in await db.move_orders_open():
-        for to, t in (doc.get("tasks") or {}).items():
+        if mid and doc["_id"] != mid:
+            continue
+        for to_, t in (doc.get("tasks") or {}).items():
+            if to and to_ != to:
+                continue
             if t.get("done_at") or t.get("cancelled_at"):
                 continue
             if _senior_of((t.get("give") or {}).get(src)) != name:
                 continue
             # Отданное целиком остаётся за ним — это уже история: снимается
             # только то, что ещё надо отдать.
-            if give_view(doc["_id"], doc, to, t, src)["status"] not in ("wait", "pause", "live"):
+            if give_view(doc["_id"], doc, to_, t, src)["status"] not in ("wait", "pause", "live"):
                 continue
-            if await db.move_pair_senior_drop(doc["_id"], to, src, name):
+            if await db.move_pair_senior_drop(doc["_id"], to_, src, name):
                 n += 1
-    log.info(f"[move] старший {name} снял с себя {src}: передач {n}")
+    log.info(f"[move] старший {name} вернул с {src}" + (f" в {to}" if to else "") + f": передач {n}")
     return {"ok": n > 0, "dropped": n}
 
 
@@ -867,17 +881,21 @@ def _own_name(request, b) -> str:
 
 
 async def handle_own_take(request):
-    """POST {from, as} — старший берёт на себя всё, что надо забрать с района."""
+    """POST {from, to?, move_id?, as} — старший берёт на себя передачу
+    «from → to» (или все с района from, если to не задан)."""
     b = await _body(request)
-    r = await senior_take(str(b.get("from") or ""), _own_name(request, b), int(request.get("owner_id") or 0))
+    r = await senior_take(str(b.get("from") or ""), _own_name(request, b), int(request.get("owner_id") or 0),
+                          str(b.get("to") or ""), str(b.get("move_id") or ""))
     return web.json_response(r, status=200 if r.get("ok") else 409, headers=CORS_HEADERS,
                              dumps=lambda o: json.dumps(o, default=str))
 
 
 async def handle_own_drop(request):
-    """POST {from, as} — снять с себя всё, что взял с района."""
+    """POST {from, to?, move_id?, as} — вернуть водителям передачу «from → to»
+    (или всё, что взял с района from, если to не задан)."""
     b = await _body(request)
-    r = await senior_drop(str(b.get("from") or ""), _own_name(request, b))
+    r = await senior_drop(str(b.get("from") or ""), _own_name(request, b),
+                          str(b.get("to") or ""), str(b.get("move_id") or ""))
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 

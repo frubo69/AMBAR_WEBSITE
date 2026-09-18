@@ -101,6 +101,9 @@ async def main():
     r2 = await MV.create_by_operator("Умар", "tecom", [{"from": "bbay", "id": gin, "qty": 1}], "ошибся районом", UMAR)
     eq("неначатую — снимается", await MV.cancel_by_operator(r2["move_id"], "tecom", UMAR), {"ok": True})
     eq("и у водителей её больше нет", (await MV.tasks_for_driver("Файзуло", "tecom"))["free"], [])
+    rs = await MV.create(rows=[{"from": "bbay", "to": "jvc", "id": gin, "qty": 1}], by="STAR")
+    eq("заявку владельца оператор не снимает", await MV.cancel_by_operator(rs["move_id"], "jvc", UMAR),
+       {"ok": False, "error": "owner_order"})
     eq("второй раз снять нечего", (await MV.cancel_by_operator(r2["move_id"], "tecom", UMAR))["error"], "gone")
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")

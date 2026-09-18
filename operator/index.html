@@ -283,8 +283,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   .mvb-chev svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .mvb.open .mvb-chev{transform:rotate(180deg)}
   .mvb .mvb-cart,.mvb .mvb-live{display:none}
-  .mvb.open .mvb-cart{display:block;max-height:42dvh}
-  .mvb.open .mvb-live{display:block;max-height:24dvh}
+  .mvb-l{overflow:hidden}
+  /* Раскрыли заявку — смотрят её: список товара и поиск прячем, а не сжимаем
+     в щель, где кнопки наезжают друг на друга. */
+  .mvb.open .mvb-tool,.mvb.open .mvb-list,.mvb.open .mvb-to,.mvb.open .mvb-l .mvb-hd .s{display:none}
+  .mvb.open .mvb-l{flex:0 0 auto}
+  .mvb.open .mvb-r{flex:1 1 auto;min-height:0}
+  .mvb.open .mvb-cart{display:block;flex:1 1 auto;max-height:none}
+  .mvb.open .mvb-live{display:block;max-height:26dvh}
   .mvb-foot{padding-top:8px}
   #moveBtn{display:none}
 }
@@ -4524,6 +4530,7 @@ function _mvQ(v, p){
 }
 function _mvCode(id){ const d = ((MVB.board||{}).districts||[]).find(x=>x.id===id); return d ? d.code : id; }
 function _mvDName(id){ const d = ((MVB.board||{}).districts||[]).find(x=>x.id===id); return d ? `${d.code} ${d.name}` : id; }
+function _mvN(v){ return String(_mvR(v)).replace('.', ','); }
 function _mvIn(pid){ return _mvDraft().lines.filter(l=>l.id===pid).reduce((a,l)=>a+(+l.qty||0), 0); }
 
 async function mvbOpen(){
@@ -4575,7 +4582,7 @@ function mvbListHtml(){
         const h = +(p.have||{})[d.id] || 0, c = +(p.codes||{})[d.id] || 0;
         const on = D.lines.some(l=>l.id===p.id && l.from===d.id);
         return `<button class="mvb-sb${on ? ' on' : ''}${c < h ? ' nocode' : ''}" onclick="mvbAdd('${_esc(p.id)}','${_esc(d.id)}')"
-          title="${c < h ? 'Кодов меньше, чем бутылок: сканером возьмут ' + c : ''}">${_esc(d.code)}<i>${_mvQ(h, p)}${c < h ? ' · кодов ' + _mvR(c) : ''}</i></button>`;
+          title="${c < h ? 'Кодов меньше, чем бутылок: сканером возьмут ' + c : ''}">${_esc(d.code)}<i>${_mvQ(h, p)}${c < h ? ' · кодов ' + String(_mvR(c)).replace('.', ',') : ''}</i></button>`;
       }).join('')}</div>` : `<div class="mvb-none">Ни в одном районе нет</div>`;
     return `<div class="mvb-p${r.need > 0 ? ' need' : ''}">
       <img class="mvb-img" src="${_esc(p.img || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
@@ -4600,7 +4607,7 @@ function mvbCartHtml(){
     const p = _mvP(l.id);
     return `<div class="mvb-li">
       <div class="nm">${_esc(p.name || l.id)}<i>из ${_esc(_mvDName(l.from))}</i></div>
-      <div class="mvb-st"><button onclick="mvbQty(${i},-1)" aria-label="Меньше">−</button><b>${_mvR(l.qty)}</b><button onclick="mvbQty(${i},1)" aria-label="Больше">+</button></div>
+      <div class="mvb-st"><button onclick="mvbQty(${i},-1)" aria-label="Меньше">−</button><b>${_mvN(l.qty)}</b><button onclick="mvbQty(${i},1)" aria-label="Больше">+</button></div>
       <button class="mvb-x" onclick="mvbDel(${i})" aria-label="Убрать"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`;
   }).join('');
@@ -4611,11 +4618,13 @@ function mvbLiveHtml(){
   return `<div class="mvb-sec">Сегодня${T.length ? ' · ' + T.length : ''}</div>` + (T.length ? T.map(t=>{
     const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
     const who = t.driver ? ` · ${_esc(t.driver)}` : '';
-    const can = t.side === 'in' && (t.status === 'free' || t.status === 'claimed') && !(+t.got);
+    // Снять можно только заявку операторов: собранную владельцем в STAR — нет.
+    const can = t.side === 'in' && (t.status === 'free' || t.status === 'claimed') && !(+t.got)
+      && /· оператор$/.test(String(t.by || ''));
     const key = t.move_id + '/' + t.district;
     return `<div class="mvb-t">
       <div class="h"><b>${_esc(from)} → ${_esc(t.district_code)}</b><em class="${t.status}">${ST[t.status] || t.status}${who}</em></div>
-      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · ${_mvR(t.got)} из ${_mvR(t.need)}${t.by ? ' · ' + _esc(t.by) : ''}</div>
+      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · ${_mvN(t.got)} из ${_mvN(t.need)} ед.${t.by ? ' · ' + _esc(t.by) : ''}</div>
       ${can ? `<button class="${MVB.sure === key ? 'sure' : ''}" onclick="mvbCancel('${_esc(t.move_id)}','${_esc(t.district)}')">${
           MVB.sure === key ? 'Точно снять?' : 'Снять'}</button>` : ''}
     </div>`;
@@ -4651,7 +4660,7 @@ function mvbPaint(){
         ${D.lines.length ? `<input class="mvb-note" placeholder="Слово водителю (необязательно)" maxlength="200" value="${_esc(D.note || '')}" oninput="mvbNote(this.value)">` : ''}
       </div>
       <div class="mvb-foot">
-        <div class="mvb-tot"><span>Всего</span><b>${_mvR(units)} ед.</b></div>
+        <div class="mvb-tot"><span>Всего</span><b>${_mvN(units)} ед.</b></div>
         <button class="mvb-go" ${D.lines.length && !MVB.busy ? '' : 'disabled'} onclick="mvbSend()">${MVB.busy ? 'Создаю…' : 'Создать заявку'}</button>
       </div>
       <div class="mvb-live" id="mvbLive">${mvbLiveHtml()}</div>
@@ -4736,6 +4745,7 @@ async function mvbCancel(mid, district){
   }catch(e){
     const d = (e && e.payload) || {};
     toast(d.error === 'started' ? `${d.driver || 'Водитель'} уже везёт — снять нельзя`
+        : d.error === 'owner_order' ? 'Эту заявку собирали в STAR — снять её может только владелец'
         : d.error === 'gone' ? 'Её уже нет' : 'Не получилось — повторите', 'err');
   }
   mvbLive();

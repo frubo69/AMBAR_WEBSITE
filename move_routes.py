@@ -457,6 +457,10 @@ async def cancel_by_operator(mid: str, district: str, scope: set) -> dict:
     if district not in scope:
         return {"ok": False, "error": "not_yours"}
     doc = await db.move_order_get(mid)
+    # Заявку владельца (STAR) оператор не снимает: её собирали и проверяли там,
+    # и решение снять — тоже там. Своё и других операторов — можно.
+    if not str((doc or {}).get("by") or "").endswith("· оператор"):
+        return {"ok": False, "error": "owner_order"}
     t = ((doc or {}).get("tasks") or {}).get(district)
     if not t or t.get("done_at") or t.get("cancelled_at"):
         return {"ok": False, "error": "gone"}

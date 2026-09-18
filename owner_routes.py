@@ -1643,14 +1643,36 @@ def _TEST_OFFICE() -> dict:
     return dict(TEST_OFFICE)
 
 
-def _car_of(name: str) -> dict | None:
-    """Машина водителя из реестра — {model, color, plate} или None."""
-    row = next((r for r in staff.roster_rows() if r.get("name") == name), None)
-    car = (row or {}).get("car") or None
-    if not car:
-        return None
-    return {"model": str(car.get("model") or ""), "color": str(car.get("color") or ""),
-            "plate": str(car.get("plate") or "")}
+# ── машины водителей ────────────────────────────────────────────────────────
+# Владелец, 18 сен 2026: «за каждым водителем закрепить его автомобиль», и
+# следом: «надо же уметь и между водителями перезакреплять машины». Машины —
+# общим списком (db.cars), у каждой свой водитель или никто.
+async def _fleet() -> list:
+    """Машины из базы. Пусто — сначала переносим заведённые полем в записи
+    водителя (так было первые часы)."""
+    cars = await db.cars_all()
+    if not cars and await db.cars_import_from_drivers():
+        cars = await db.cars_all()
+    return cars
+
+
+def _car_view(c: dict, names: set) -> dict:
+    """Машина для экрана. Водитель, которого в реестре нет, — всё равно что
+    никто: машина свободна."""
+    d = str(c.get("driver") or "")
+    return {"id": c["_id"], "model": str(c.get("model") or ""), "color": str(c.get("color") or ""),
+            "plate": str(c.get("plate") or ""), "driver": d if d in names else ""}
+
+
+async def _fleet_view() -> tuple:
+    """(все машины, машина по водителю). У водителя машина одна; оказалось две
+    (перезакрепление оборвалось посередине) — видна последняя закреплённая."""
+    names = {str(r.get("name") or "") for r in staff.roster_rows()}
+    raw = sorted(await _fleet(), key=lambda c: str(c.get("at") or ""))
+    cars = [_car_view(c, names) for c in raw]
+    by = {c["driver"]: c for c in cars if c["driver"]}
+    cars.sort(key=lambda c: (c["model"].lower(), db.car_plate_key(c["plate"])))
+    return cars, by
 
 
 async def _staff_payload() -> dict:
@@ -1659,6 +1681,7 @@ async def _staff_payload() -> dict:
     изменений — без второго прохода через охрану."""
     await _staff_fresh()
     moves = await db.staff_map_get()
+    cars, car_by = await _fleet_view()
     return {
         "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
                        "name": OFFICE_NAMES.get(d, d),
@@ -1678,7 +1701,9 @@ async def _staff_payload() -> dict:
         # «Штрафы/авансы/долги» ставят его отдельной карточкой наверх
         "stars": list(staff.SENIOR_STAR_IDS),
         # Телефоны водителей: кто привязан, кому выдана ссылка (без id).
-        "links": _links_view(),
+        "links": _links_view(car_by),
+        # Машины: все, у кого какая, свободные — перезакрепляют между водителями.
+        "cars": cars,
         # Трекер-приложения: у кого ключ выдан и когда была точка.
         "trackers": await _trackers_view(),
         # Водители тоже переставляются: список тем же видом, что и районы, —
@@ -1691,7 +1716,7 @@ async def _staff_payload() -> dict:
                                     if n in staff.DISTRICT_DRIVERS.get(d, [])), "")
                               != staff.base_district(n),
                      # Машина водителя — видна под именем (18 сен 2026).
-                     "car": _car_of(n)}
+                     "car": car_by.get(n)}
                     for n in staff.driver_names()],
     }
 
@@ -1722,8 +1747,9 @@ def _code_until(r: dict):
     return until if until > datetime.now(timezone.utc) else None
 
 
-def _links_view() -> list:
+def _links_view(car_by: dict = None) -> list:
     from config_offices import TEST_OFFICE
+    car_by = car_by or {}
     out = []
     for r in staff.roster_rows():
         until = _code_until(r)
@@ -1737,7 +1763,7 @@ def _links_view() -> list:
                     "tg_name": r.get("tg_name", "") or "", "tg_username": r.get("tg_username", "") or "",
                     "linked_at": _iso_dt(r.get("linked_at")) if r.get("telegram_id") else "",
                     "code_active": bool(until), "code_until": _iso_dt(until) if until else "",
-                    "car": _car_of(r.get("name", ""))})
+                    "car": car_by.get(r.get("name", ""))})
     return out
 
 
@@ -1783,26 +1809,158 @@ async def handle_drivers_add(request):
     return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
+def _car_fields(body: dict) -> dict:
+    clean = lambda v, n: re.sub(r"\s+", " ", str(v or "")).strip()[:n]
+    return {"model": clean(body.get("model"), 40), "color": clean(body.get("color"), 24),
+            "plate": clean(body.get("plate"), 16)}
+
+
+def _roster_names() -> set:
+    return {str(r.get("name") or "") for r in staff.roster_rows()}
+
+
+async def _cars_body(request):
+    """Тело запроса ручек машин; заодно свежий реестр водителей."""
+    await _staff_fresh()
+    try:
+        return await request.json()
+    except Exception:
+        return None
+
+
+async def _car_assign(cid: str, driver: str, mode: str = "take", expect: str | None = None, by: int = 0) -> str:
+    """Закрепить машину cid за водителем driver ("" — снять, машина свободна).
+    Машина была у другого: mode "swap" — тот садится на прежнюю машину
+    driver, "take" — остаётся без машины. Прежняя машина driver, если её
+    никому не отдали, — в свободные. expect — у кого машина, как её видел
+    экран: разошлось — "changed", ничего не меняем. Пусто — получилось."""
+    names = _roster_names()
+    cars = await _fleet()
+    x = next((c for c in cars if c["_id"] == cid), None)
+    if not x:
+        return "unknown_car"
+    if driver and driver not in names:
+        return "unknown_driver"
+    raw = str(x.get("driver") or "")
+    holder = raw if raw in names else ""
+    if expect is not None and str(expect or "") != holder:
+        return "changed"
+    if holder == driver:
+        return ""
+    if not await db.car_set_driver(cid, driver, by, expect=raw):
+        return "changed"
+    if driver:
+        # Прежняя машина driver (бывает и не одна, если прошлый раз оборвался):
+        # тому, у кого забрали, — при обмене; иначе — в свободные.
+        give = holder if (mode == "swap" and holder) else ""
+        for y in cars:
+            if y["_id"] != cid and str(y.get("driver") or "") == driver:
+                await db.car_set_driver(y["_id"], give, by)
+                give = ""                               # вторая лишняя — в свободные
+    return ""
+
+
+def _car_err(code: str, status: int = 409, **kw):
+    return web.json_response({"error": code, **kw}, status=status, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_cars_assign(request):
+    """POST {car, driver, mode, expect} — закрепить машину за водителем, забрать
+    у другого или поменяться машинами (mode swap|take); driver пустой — снять
+    машину, она уходит в свободные. Отвечает штатом целиком."""
+    body = await _cars_body(request)
+    if body is None:
+        return _car_err("invalid_json", 400)
+    cid, driver = str(body.get("car") or ""), str(body.get("driver") or "").strip()
+    mode = "swap" if body.get("mode") == "swap" else "take"
+    expect = body.get("expect")
+    err = await _car_assign(cid, driver, mode, None if expect is None else str(expect),
+                            request.get("owner_id") or 0)
+    if err:
+        return web.json_response({"error": err, "staff": await _staff_payload()},
+                                 status=404 if err.startswith("unknown") else 409, headers=CORS_HEADERS)
+    log.info(f"[staff] машина {cid} → {driver or 'свободна'} ({mode}) ({request.get('owner_id')})")
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_cars_save(request):
+    """POST {id?, model, color, plate, driver?} — новая машина (без id) или
+    правка данных машины. Новая с driver — сразу за ним; его прежняя — в
+    свободные. Номер уже есть у другой машины — 409 dup_plate."""
+    body = await _cars_body(request)
+    if body is None:
+        return _car_err("invalid_json", 400)
+    f = _car_fields(body)
+    if not (f["model"] or f["plate"]):
+        return _car_err("empty", 400)
+    cid, driver = str(body.get("id") or ""), str(body.get("driver") or "").strip()
+    cars = await _fleet()
+    if cid and not any(c["_id"] == cid for c in cars):
+        return _car_err("unknown_car", 404)
+    if driver and driver not in _roster_names():
+        return _car_err("unknown_driver", 404)
+    key = db.car_plate_key(f["plate"])
+    same = next((c for c in cars if key and c["_id"] != cid and db.car_plate_key(c.get("plate")) == key), None)
+    if same:
+        names = _roster_names()
+        return _car_err("dup_plate", car=_car_view(same, names))
+    by = request.get("owner_id") or 0
+    if cid:
+        await db.car_update(cid, f["model"], f["color"], f["plate"], by)
+    else:
+        cid = await db.car_add(f["model"], f["color"], f["plate"], by)
+        if driver:
+            await _car_assign(cid, driver, "take", None, by)
+    log.info(f"[staff] машина {cid}: {f}" + (f" → {driver}" if driver else "") + f" ({by})")
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_cars_delete(request):
+    """POST {id} — убрать машину из списка (продали, завели по ошибке). Если
+    была за водителем — он остаётся без машины."""
+    body = await _cars_body(request)
+    if body is None:
+        return _car_err("invalid_json", 400)
+    cid = str(body.get("id") or "")
+    if not await db.car_delete(cid):
+        return _car_err("unknown_car", 404)
+    log.info(f"[staff] машина {cid} удалена из списка ({request.get('owner_id')})")
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_drivers_car(request):
-    """POST {name, model, color, plate} — машина водителя (владелец, 18 сен
-    2026: «за каждым водителем закрепить его автомобиль»). Все три поля
-    пустые — машину снять."""
-    try:
-        body = await request.json()
-    except Exception:
+    """POST {name, model, color, plate} — так машину правил STAR, открытый до
+    общего списка машин (18 сен 2026). Поля пустые — машину снять (она
+    уходит в свободные); у водителя есть машина — правим её; номер уже в
+    списке — эту машину закрепляем за ним; иначе — новая машина за ним."""
+    body = await _cars_body(request)
+    if body is None:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     name = str(body.get("name") or "").strip()
-    if not any(r.get("name") == name for r in staff.roster_rows()):
+    names = _roster_names()
+    if name not in names:
         return web.json_response({"error": "unknown_driver"}, status=404, headers=CORS_HEADERS)
-    clean = lambda v, n: re.sub(r"\s+", " ", str(v or "")).strip()[:n]
-    car = {"model": clean(body.get("model"), 40), "color": clean(body.get("color"), 24),
-           "plate": clean(body.get("plate"), 16)}
-    if not any(car.values()):
-        car = None
-    await db.driver_car_set(name, car, request.get("owner_id") or 0)
-    await staff.sync(force=True)
-    log.info(f"[staff] машина {name}: {car or 'снята'} ({request.get('owner_id')})")
+    f, by = _car_fields(body), request.get("owner_id") or 0
+    cars = await _fleet()
+    mine = [c for c in cars if str(c.get("driver") or "") == name]
+    key = db.car_plate_key(f["plate"])
+    same = next((c for c in cars if key and db.car_plate_key(c.get("plate")) == key), None)
+    if not any(f.values()):
+        for c in mine:
+            await _car_assign(c["_id"], "", by=by)
+    elif same:
+        await db.car_update(same["_id"], f["model"], f["color"], f["plate"], by)
+        await _car_assign(same["_id"], name, "take", None, by)
+    elif mine:
+        await db.car_update(mine[-1]["_id"], f["model"], f["color"], f["plate"], by)
+    else:
+        cid = await db.car_add(f["model"], f["color"], f["plate"], by)
+        await _car_assign(cid, name, "take", None, by)
+    log.info(f"[staff] машина {name}: {f if any(f.values()) else 'снята'} ({by})")
     return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
@@ -4515,7 +4673,10 @@ def setup(app):
                    ("/api/owner/drivers/code", handle_drivers_code),
                    ("/api/owner/drivers/unlink", handle_drivers_unlink),
                    ("/api/owner/drivers/tracker", handle_drivers_tracker),
-                   ("/api/owner/drivers/car", handle_drivers_car)):
+                   ("/api/owner/drivers/car", handle_drivers_car),
+                   ("/api/owner/cars/assign", handle_cars_assign),
+                   ("/api/owner/cars/save", handle_cars_save),
+                   ("/api/owner/cars/delete", handle_cars_delete)):
         app.router.add_route("OPTIONS", _p, _h)
         app.router.add_post(_p, _h)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)

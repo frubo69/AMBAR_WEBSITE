@@ -2038,17 +2038,87 @@ async def driver_add(name: str, district: str, by: int = 0, test: bool = False) 
         upsert=True)
 
 
-async def driver_car_set(name: str, car: dict | None, by: int = 0) -> bool:
-    """Машина водителя (владелец, 18 сен 2026: «за каждым водителем закрепить
-    его автомобиль»): {model, color, plate}. Пусто — машину снять. False —
-    такого водителя в реестре нет."""
+# ── машины: общий список, у каждой свой водитель ─────────────────────────────
+# Владелец, 18 сен 2026: «в „Кто на каком районе“ за каждым водителем закрепить
+# его автомобиль», и следом: «надо же уметь и между водителями перезакреплять
+# машины». Машина — своя запись (cars), водитель — поле driver в ней ("" —
+# свободна). Снятая с водителя машина не пропадает, а ждёт в свободных. Первые
+# часы машина жила полем car в записи водителя — cars_import_from_drivers
+# переносит её оттуда один раз.
+
+def car_plate_key(plate: str) -> str:
+    """Номер без пробелов и знаков, заглавными: «97 448» и «97448» — одна машина."""
+    return re.sub(r"[^0-9A-Za-zА-Яа-яЁё]", "", str(plate or "")).upper()
+
+
+async def cars_all() -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.cars.find({}).to_list(length=500)
+
+
+async def car_add(model: str, color: str, plate: str, by: int = 0) -> str:
+    """Новая машина — свободной; за водителем её закрепляет car_set_driver."""
+    import secrets
+    db = _db_or_none()
+    if db is None: return ""
+    cid = "car_" + secrets.token_hex(4)
+    now = datetime.now(timezone.utc)
+    await db.cars.insert_one({"_id": cid, "model": model, "color": color, "plate": plate,
+                              "driver": "", "at": now, "by": int(by or 0), "created_at": now})
+    return cid
+
+
+async def car_update(cid: str, model: str, color: str, plate: str, by: int = 0) -> bool:
     db = _db_or_none()
     if db is None: return False
-    now = datetime.now(timezone.utc)
-    upd = ({"$set": {"car": car, "car_at": now, "car_by": int(by or 0)}} if car else
-           {"$unset": {"car": ""}, "$set": {"car_at": now, "car_by": int(by or 0)}})
-    r = await db.drivers.update_one({"name": name}, upd)
+    r = await db.cars.update_one({"_id": cid}, {"$set": {"model": model, "color": color, "plate": plate,
+                                                         "edited_at": datetime.now(timezone.utc),
+                                                         "edited_by": int(by or 0)}})
     return r.matched_count > 0
+
+
+async def car_delete(cid: str) -> bool:
+    db = _db_or_none()
+    if db is None: return False
+    return (await db.cars.delete_one({"_id": cid})).deleted_count > 0
+
+
+async def car_set_driver(cid: str, driver: str, by: int = 0, expect: str | None = None) -> bool:
+    """Закрепить машину за водителем ("" — свободна). expect — у кого машина
+    должна быть сейчас: не сходится — ничего не меняем, кто-то успел раньше."""
+    db = _db_or_none()
+    if db is None: return False
+    flt = {"_id": cid}
+    if expect is not None:
+        flt["driver"] = expect
+    r = await db.cars.update_one(flt, {"$set": {"driver": driver or "", "at": datetime.now(timezone.utc),
+                                                "by": int(by or 0)}})
+    return r.matched_count > 0
+
+
+async def cars_import_from_drivers() -> int:
+    """Машины из записей водителей — в общий список. Ключ записи — номер, так
+    что повторный перенос (два запроса разом) ничего не удвоит; из записи
+    водителя поле убирается, и удалённая потом машина не воскреснет."""
+    db = _db_or_none()
+    if db is None: return 0
+    n = 0
+    for r in await db.drivers.find({"car": {"$exists": True}}).to_list(length=500):
+        car = r.get("car") or {}
+        if isinstance(car, dict) and any(str(v or "").strip() for v in car.values()):
+            key = car_plate_key(car.get("plate")) or re.sub(r"\s+", "_", str(r.get("name") or ""))
+            await db.cars.update_one(
+                {"_id": "car_" + key},
+                {"$setOnInsert": {"model": str(car.get("model") or ""), "color": str(car.get("color") or ""),
+                                  "plate": str(car.get("plate") or ""), "driver": str(r.get("name") or ""),
+                                  "at": r.get("car_at") or datetime.now(timezone.utc),
+                                  "by": int(r.get("car_by") or 0),
+                                  "created_at": r.get("car_at") or datetime.now(timezone.utc)}},
+                upsert=True)
+            n += 1
+        await db.drivers.update_one({"_id": r["_id"]}, {"$unset": {"car": ""}})
+    return n
 
 
 async def driver_adopt(name: str, telegram_id: int, by: int = 0) -> None:

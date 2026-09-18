@@ -14,6 +14,7 @@ import logging
 import os
 import re
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urljoin
 
 from dotenv import load_dotenv
 from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo,
@@ -31,7 +32,11 @@ DRIVER_WEBAPP_URL = os.getenv("DRIVER_WEBAPP_URL", "https://ambar-delivery.com/d
 # Открываем кнопкой web_app, а не ссылкой: ссылка в телеграме открывается во
 # встроенном браузере — другое вебвью, без полного экрана и отклика кнопок,
 # то есть показывает не то, что человек увидит в работе.
-DEMO_URL = os.getenv("AMBAR_DEMO_URL", "https://ambar-delivery.com/demo")
+#
+# Адрес берём от приложения водителя, а не от домена: ambar-delivery.com у нас
+# не открывается — ни в браузере, ни в телеграме, — поэтому все приложения живут
+# на запасном хосте, и демо обязано жить там же, иначе кнопка ведёт в пустоту.
+DEMO_URL = os.getenv("AMBAR_DEMO_URL") or urljoin(DRIVER_WEBAPP_URL, "/demo")
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя

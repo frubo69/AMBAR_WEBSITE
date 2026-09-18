@@ -2229,7 +2229,9 @@ async def post_init(app: Application):
 # всеми теми же неизвестными, что были на телефоне водителя. Ссылкой не
 # проверить: ссылка открывается во встроенном браузере, а это другое вебвью
 # с другими правами. Уходит вместе с ответом на вопрос.
-MIC_TEST_URL = "https://ambar-delivery.com/driver/mic.html"
+# Адрес — от приложения водителя (пробник живёт рядом с ним): наш домен
+# у нас не открывается ни в браузере, ни в телеграме.
+MIC_TEST_URL = os.getenv("DRIVER_WEBAPP_URL", OPERATOR_WEBAPP_URL).rstrip("/") + "/mic.html"
 
 
 async def cmd_mic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -2245,7 +2247,10 @@ async def cmd_mic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ── демо приложения водителя ───────────────────────────────────────────────
 # Оператор объясняет водителю, что нажимать, и должен видеть те же экраны.
 # Данные в демо ненастоящие и живут только в телефоне того, кто открыл.
-DEMO_URL = os.getenv("AMBAR_DEMO_URL", "https://ambar-delivery.com/demo")
+# Адрес — от операторского приложения: ambar-delivery.com у нас не открывается
+# ни в браузере, ни в телеграме, приложения живут на запасном хосте.
+from urllib.parse import urljoin as _urljoin
+DEMO_URL = os.getenv("AMBAR_DEMO_URL") or _urljoin(OPERATOR_WEBAPP_URL, "/demo")
 
 
 async def cmd_demo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

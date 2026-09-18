@@ -2242,11 +2242,32 @@ async def cmd_mic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     log.info(f"[mic] пробник открыт: {update.effective_user.id}")
 
 
+# ── демо приложения водителя ───────────────────────────────────────────────
+# Оператор объясняет водителю, что нажимать, и должен видеть те же экраны.
+# Данные в демо ненастоящие и живут только в телефоне того, кто открыл.
+DEMO_URL = os.getenv("AMBAR_DEMO_URL", "https://ambar-delivery.com/demo")
+
+
+async def cmd_demo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_operator(update.effective_user.id):
+        await update.effective_message.reply_text("⛔ Нет доступа."); return
+    await update.effective_message.reply_text(
+        "🚚 Демо приложения водителя.\n\n"
+        "Внутри всё настоящее, кроме данных: заказы, приёмка и деньги придуманы и живут "
+        "только в этом телефоне. Ни одной настоящей бутылки и ни одного дирхама демо не трогает.\n\n"
+        "Откройте смену — через несколько секунд придёт заказ. В «Товаре» — приёмка и "
+        "перемещение между районами, сканер читает коды сам.",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("Открыть демо", web_app=WebAppInfo(url=DEMO_URL))]]))
+    log.info(f"[демо] открыто оператором: {update.effective_user.id}")
+
+
 def main():
     if not OPERATOR_BOT_TOKEN: print("❌ OPERATOR_BOT_TOKEN missing"); return
     app = Application.builder().token(OPERATOR_BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("mic", cmd_mic))
+    app.add_handler(CommandHandler("demo", cmd_demo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
     app.add_handler(CallbackQueryHandler(cb))
     app.add_error_handler(on_error)

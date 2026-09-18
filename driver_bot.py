@@ -27,6 +27,11 @@ import db
 load_dotenv()
 DRIVER_BOT_TOKEN = os.getenv("DRIVER_BOT_TOKEN", "")
 DRIVER_WEBAPP_URL = os.getenv("DRIVER_WEBAPP_URL", "https://ambar-delivery.com/driver/")
+# Демо приложения (demo_page.py): то же приложение, но с ненастоящими данными.
+# Открываем кнопкой web_app, а не ссылкой: ссылка в телеграме открывается во
+# встроенном браузере — другое вебвью, без полного экрана и отклика кнопок,
+# то есть показывает не то, что человек увидит в работе.
+DEMO_URL = os.getenv("AMBAR_DEMO_URL", "https://ambar-delivery.com/demo")
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)   # адрес запроса содержит токен — в журнал ему нельзя
@@ -179,6 +184,26 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _bind(update, code)
 
 
+def _demo_kb():
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("Открыть демо", web_app=WebAppInfo(url=DEMO_URL))]])
+
+
+DEMO_TEXT = ("Демо приложения водителя.\n\n"
+             "Внутри всё настоящее, кроме данных: заказы, приёмка и деньги придуманы и "
+             "живут только в этом телефоне. На работу это никак не влияет — ни одной "
+             "настоящей бутылки и ни одного дирхама демо не трогает.\n\n"
+             "Откройте смену — через несколько секунд придёт заказ. В «Товаре» лежат "
+             "приёмка и перемещение между районами: сканер там читает коды сам, камеру "
+             "наводить не нужно.")
+
+
+async def cmd_demo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    sent = await update.message.reply_text(DEMO_TEXT, reply_markup=_demo_kb())
+    await _remember(sent)
+    log.info(f"[демо] открыто: {update.effective_user.id}")
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     # Ссылка-приглашение: /start drv_<код>.
@@ -196,7 +221,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         # доступ теперь выдают ссылкой, а не по id (владелец, 15 сен 2026).
         await update.message.reply_text(
             "Этот аккаунт не подключён.\n\n"
-            "Откройте ссылку-приглашение от менеджера или пришлите сюда код из неё.")
+            "Откройте ссылку-приглашение от менеджера или пришлите сюда код из неё.\n\n"
+            "Посмотреть, как выглядит приложение, можно и без доступа — команда /demo.")
         log.info(f"вход без доступа: {uid} (@{update.effective_user.username})")
         return
 
@@ -369,6 +395,7 @@ def main():
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("where", cmd_where))
     app.add_handler(CommandHandler("mic", cmd_mic))
+    app.add_handler(CommandHandler("demo", cmd_demo))
     # И первое сообщение с точкой, и каждая правка живой трансляции.
     app.add_handler(MessageHandler(filters.LOCATION, on_location))
     app.add_handler(MessageHandler(

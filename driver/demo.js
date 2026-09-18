@@ -29,16 +29,31 @@ const LS = {
 };
 
 /* ═══ 1. Телеграм ═══════════════════════════════════════════════════════════
-   Демо открывают ссылкой в браузере, а приложение написано под мини-апп.
-   Заглушка отвечает на всё, о чём приложение спрашивает телеграм, и говорит,
-   что геопозиция есть: без неё смена не открывается. */
+   Демо открывают двумя путями, и они разные.
+
+   Из телеграма, кнопкой web_app, — там телеграм настоящий, и трогать его
+   нечего: полный экран, своя шапка, отклик кнопок, подтверждение выхода и
+   запрет свайпа вниз приложение получает само, как в бою. Подменяем ровно
+   одно — геопозицию: у демо её спрашивать не за чем, а без ответа не
+   открывается смена.
+
+   Из браузера (ссылкой, с домашнего экрана) телеграма нет вовсе — тогда
+   ставим заглушку целиком: она отвечает на всё, о чём приложение спрашивает. */
 const DEMO_POINT = {latitude: 25.0721, longitude: 55.1394, horizontal_accuracy: 12};
 const LM = {
   isInited: true, isLocationAvailable: true, isAccessRequested: true, isAccessGranted: true,
   init(cb){ cb && cb(); },
   getLocation(cb){ cb && cb(DEMO_POINT); },
 };
-window.Telegram = {WebApp: new Proxy({
+// Настоящий телеграм узнаём по площадке: библиотека, загруженная вне
+// телеграма, пишет туда 'unknown'.
+const TGW = (window.Telegram || {}).WebApp;
+const INSIDE = !!(TGW && TGW.platform && TGW.platform !== 'unknown');
+if(INSIDE){
+  try{ TGW.LocationManager = LM; }
+  catch(e){ try{ Object.defineProperty(TGW, 'LocationManager', {value: LM, configurable: true}); }catch(e2){} }
+}
+if(!INSIDE) window.Telegram = {WebApp: new Proxy({
   initData: 'demo', initDataUnsafe: {user: {id: 0, first_name: 'Демо'}},
   version: '8.0', platform: 'ios', colorScheme: 'dark', themeParams: {},
   viewportHeight: window.innerHeight, viewportStableHeight: window.innerHeight, isExpanded: true,

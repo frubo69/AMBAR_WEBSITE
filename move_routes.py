@@ -264,6 +264,11 @@ async def live(day: str = "") -> dict:
         mid = doc["_id"]
         for oid, t in (doc.get("tasks") or {}).items():
             v = task_view(mid, doc, oid, t)
+            # Снятую заявку целиком её задачи не переживают: у водителей они уже
+            # исчезли (там выборка по status=open), и у старшего не должны
+            # висеть свободными — иначе он снимает то, чего нет.
+            if doc.get("status") == "cancelled" and v["status"] not in ("done",):
+                v["status"] = "cancelled"
             v["by"] = doc.get("by", "")
             out.append(v)
     out.sort(key=lambda v: (v["status"] == "done", v["district_code"]))

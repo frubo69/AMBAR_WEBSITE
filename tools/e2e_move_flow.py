@@ -193,6 +193,19 @@ async def main():
     eq("снятую задачу водитель не видит", len((await MV.tasks_for_driver("Алишер", "tecom"))["mine"]), 0)
     eq("и смену она не держит", await DR._moves_left({"name": "Алишер", "district": "tecom"}), [])
 
+    # Снятая целиком заявка не висит у старшего свободной.
+    p8 = await MV.plan(D)
+    if p8["rows"]:
+        r8 = await MV.create(p8["rows"], by="STAR")
+        await db.move_order_cancel(r8["move_id"], "", datetime.now(timezone.utc))
+        l8 = await MV.live(D)
+        eq("снятая заявка не показывает живых задач",
+           [t["status"] for t in l8["tasks"] if t["move_id"] == r8["move_id"] and t["status"] != "cancelled"], [])
+        свободных = 0
+        for o in OFFICE_IDS:
+            свободных += len((await MV.tasks_for_driver("Х", o))["free"])
+        eq("и у водителя её нет", свободных, 0)
+
     print("\n── 9. товар без кодов не планируем ───────────────────────────────")
     # У Тикома на полке есть, но в реестре нет — сканировать нечего.
     await db.save_stock_count("tecom", D, {"district": "tecom", "day": D, "counted_at": T0.isoformat(),

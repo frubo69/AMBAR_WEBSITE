@@ -546,6 +546,20 @@ async def main():
     eq("норма в день", WRITES[-1], ("month", M, {"norm": 8000, "by": ""}, None))
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month=M, field="norm", value=-5)))
     eq("норма базе отрицательная → 400", r.status, 400)
+    print("— расход водителя безналом (18 сен 2026): расход дня, но не из наличных")
+    before = await fr.build(M)
+    b3 = next(r for r in before["days"] if r["day"] == "2026-09-03")
+    DRIVER_DAYS[0]["extras"] += [dict(id="e4", amount=70, kind="parking", status="approved", pay="card"),
+                                 dict(id="e5", amount=11, kind="kfc", status="pending", pay="card"),
+                                 dict(id="e6", amount=5, kind="kfc", status="approved", pay="cash")]
+    after = await fr.build(M)
+    a3 = next(r for r in after["days"] if r["day"] == "2026-09-03")
+    eq("расход дня: +70 безналом и +5 наличными", a3["spend"] - b3["spend"], 75)
+    eq("выручка дня (наличные): минус только 5 наличными", b3["handed"] - a3["handed"], 5)
+    eq("в столбик: наличными / безналом", (a3["spend_cash"], a3["spend_card"]), (b3["spend_cash"] + 5, 70))
+    eq("ждёт решения — только наличное (безнал 11 мимо)", a3["spend_pending"], b3["spend_pending"])
+    eq("прибыль по расчёту видит и безнал: −75", after["econ"] - before["econ"], -75)
+    del DRIVER_DAYS[0]["extras"][-3:]
     print()
     print("FAILED:", fails) if fails else print("ALL OK — сервер собирает книгу верно")
     sys.exit(1 if fails else 0)

@@ -612,7 +612,9 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
     первой быть не должно.
 
     Наличные на руках = взято наличными за заказы (по расчёту, если
-    рассчитывались не ровно) − расходы дня + приход (вернули/должны).
+    рассчитывались не ровно) − расходы дня + приход (вернули/должны). Траты
+    и приход безналом наличных не трогают — в «на руках» их нет, они
+    отдельно (spent_card, got_card).
 
     day — за какой день: после закрытия водитель смотрит итоги закрытой смены,
     пока оператор не открыл новую, а сутки к утру уже могли смениться."""
@@ -659,8 +661,11 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
     extras = [x for x in (d.get("extras") or []) if (x.get("status") or "approved") != "rejected"]
     for x in extras:
         x["kind"] = _kind_of(x)
-    spent = sum(int(x.get("amount") or 0) for x in extras if not EXTRA_KINDS.get(x["kind"], {}).get("plus"))
-    got = sum(int(x.get("amount") or 0) for x in extras if EXTRA_KINDS.get(x["kind"], {}).get("plus"))
+    plus_ = lambda x: bool(EXTRA_KINDS.get(x["kind"], {}).get("plus"))
+    spent = sum(int(x.get("amount") or 0) for x in extras if not plus_(x) and not is_card(x))
+    got = sum(int(x.get("amount") or 0) for x in extras if plus_(x) and not is_card(x))
+    spent_card = sum(int(x.get("amount") or 0) for x in extras if not plus_(x) and is_card(x))
+    got_card = sum(int(x.get("amount") or 0) for x in extras if plus_(x) and is_card(x))
     by_kind = [{"id": k, "t": v["t"], "plus": bool(v.get("plus")),
                 "aed": sum(int(x.get("amount") or 0) for x in extras if x["kind"] == k),
                 "n": sum(1 for x in extras if x["kind"] == k)}
@@ -687,6 +692,7 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         "closed_at": _iso_at(d.get("shift_close_at")),
         "on_hand": int(round(cash_taken - spent + got)),
         "cash_taken": int(round(cash_taken)), "spent": spent, "got": got,
+        "spent_card": spent_card, "got_card": got_card,
         "tips": tips, "tips_cash": tips_cash, "tips_other": tips - tips_cash,
         "tips_by": [{"who": w, "aed": a} for w, a in sorted(by_op.items(), key=lambda x: -x[1]) if a],
         "orders": sum(v["n"] for k, v in pay.items() if k != "free"), "gross": gross,
@@ -2134,7 +2140,7 @@ async def handle_edit_request(request):
 # был свой короткий список, всё, что не бензин и не мойка, приезжало к старшему
 # безымянным «доп. расходом»: он видел сумму и строчку словами, а к какому виду
 # она относится — угадывал. Два списка рядом расходятся в первую же неделю.
-from expense_routes import EXTRA_KINDS                  # noqa: E402
+from expense_routes import EXTRA_KINDS, PAY_T, is_card, asks_pay   # noqa: E402
 
 # Названия для тех видов, о которых водителя спрашивают каждый день.
 EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "parking": "Парковка", "other": ""}
@@ -2289,6 +2295,18 @@ async def handle_expense_add(request):
         log.info(f"[driver] {me['name']} убрал снимок машины у мойки")
         return web.json_response({"ok": True, "id": prev["id"]}, headers=CORS_HEADERS)
 
+    # Как платили — наличными или безналом (владелец, 18 сен 2026: «заставь его
+    # где-то выбрать, он заплатил наличными или безналичная оплата была»).
+    # Новое приложение шлёт поле всегда, и без ответа запись не примем. Старое,
+    # открытое до обновления, его не знает — его запись считается наличной,
+    # как все до этого, а ломать ему отправку посреди смены незачем.
+    pay = None
+    if "pay" in body and asks_pay(kind):
+        pay = str(body.get("pay") or "").strip()
+        if pay not in PAY_T:
+            return web.json_response({"error": "pay_required", "kind": kind},
+                                     status=400, headers=CORS_HEADERS)
+
     # Охрана — единственный расход, где платят не деньгами, а бутылкой. Сумму
     # тут спрашивать не у кого и незачем: код с крышки знает, что это за
     # бутылка, где она числится и сколько за неё отдали при закупке. Водитель
@@ -2369,10 +2387,11 @@ async def handle_expense_add(request):
                                        thumb if photo else None,
                                        kind=kind, kind_t=вид["t"],
                                        plus=bool(вид.get("plus")),
-                                       car_thumb=car_thumb if car_photo else None)
+                                       car_thumb=car_thumb if car_photo else None,
+                                       pay=pay)
         item = {**prev, "amount": amount, "comment": comment, "kind": kind,
                 "kind_t": вид["t"], "plus": bool(вид.get("plus")),
-                "status": "pending", "edited_at": now_iso}
+                "status": "pending", "edited_at": now_iso, **({"pay": pay} if pay else {})}
         if photo: item.update({"photo": True, "thumb": thumb})
         if car_photo: item.update({"car_photo": True, "car_thumb": car_thumb})
         log.info(f"[driver] {me['name']} поправил {comment}: "
@@ -2383,6 +2402,7 @@ async def handle_expense_add(request):
         item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
                 "kind": kind, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "by_driver": me["name"], "status": "pending", "at": now_iso}
+        if pay: item["pay"] = pay
         if photo: item.update({"photo": True, "thumb": thumb})
         if car_photo: item.update({"car_photo": True, "car_thumb": car_thumb})
         if бутылка: item.update(бутылка["item"])
@@ -2410,7 +2430,8 @@ async def handle_expense_add(request):
         await notify_owners(
             "expenses.request",
             f"{'🧾 *Расход изменён*' if prev else '💸 *Расход на согласование*'}\n"
-            f"{me['name']} ({me['district_code']}) — {amount} AED{was}\n"
+            f"{me['name']} ({me['district_code']}) — {amount} AED{was}"
+            + (f" · {PAY_T[item['pay']]}" if item.get("pay") in PAY_T else "") + "\n"
             f"_{comment}_")
     except Exception as e:
         log.warning(f"[driver] уведомление о расходе: {e}")
@@ -2534,7 +2555,7 @@ async def handle_expenses(request):
         "meal_rates": {"working": staff.MEAL_WORKING, "off": staff.MEAL_OFF},
         "extras": extras,
         "kinds": [{"id": k, "t": v["t"], "receipt": bool(v.get("receipt")),
-                   "plus": bool(v.get("plus"))} for k, v in EXTRA_KINDS.items()],
+                   "plus": bool(v.get("plus")), "pay": asks_pay(k)} for k, v in EXTRA_KINDS.items()],
         "by_kind": {k: {"sum": sum(x.get("amount", 0) for x in live if x["kind"] == k),
                         "count": sum(1 for x in live if x["kind"] == k)}
                     for k in EXTRA_KINDS},

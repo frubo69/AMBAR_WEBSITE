@@ -296,9 +296,12 @@ function movesLeft(){
 function cashOnHand(){
   const got = S.ord.filter(o => o.delivered_at && !o.prepaid)
                    .reduce((a, o) => a + (o.settle ? o.settle.taken : o.total), 0);
-  const spent = S.exp.filter(e => e.status !== 'rejected' && !e.plus).reduce((a, e) => a + e.amount, 0);
-  const back = S.exp.filter(e => e.status !== 'rejected' && e.plus).reduce((a, e) => a + e.amount, 0);
-  return {got: got, spent: spent, back: back, hand: num(got - spent + back)};
+  // Безналом — наличные не тронуты: в «на руках» не входит (как у боевого).
+  const live = S.exp.filter(e => e.status !== 'rejected');
+  const sum = f => live.filter(f).reduce((a, e) => a + e.amount, 0);
+  const spent = sum(e => !e.plus && e.pay !== 'card'), back = sum(e => e.plus && e.pay !== 'card');
+  return {got: got, spent: spent, back: back, hand: num(got - spent + back),
+          spent_card: sum(e => !e.plus && e.pay === 'card'), back_card: sum(e => e.plus && e.pay === 'card')};
 }
 function shiftView(){
   const sh = S.sh;
@@ -338,7 +341,8 @@ function summary(){
   });
   return {
     day: S.day, opened_at: S.sh.opened_at ? iso(S.sh.opened_at) : '', on_hand: c.hand,
-    cash_taken: c.got, spent: c.spent, got: c.back, tips: 0, tips_cash: 0, tips_other: 0, tips_by: [],
+    cash_taken: c.got, spent: c.spent, got: c.back, spent_card: c.spent_card, got_card: c.back_card,
+    tips: 0, tips_cash: 0, tips_other: 0, tips_by: [],
     orders: done.length, gross: done.reduce((a, o) => a + o.total, 0),
     pay: {cash: {n: cash.length, aed: cash.reduce((a, o) => a + o.total, 0)},
           app: {n: app.length, aed: app.reduce((a, o) => a + o.total, 0)},
@@ -352,11 +356,13 @@ function summary(){
 const KIND_T = {fuel: 'Заправка', wash: 'Мойка', parking: 'Парковка', guard: 'Охрана', kfc: 'KFC · премия',
                 we_gave: 'Мы вернули', owed_us: 'Нам должны', we_got: 'Нам вернули', we_owe: 'Мы должны',
                 other: 'Что-то ещё'};
-const KINDS = [{id: 'fuel', t: 'Заправка', receipt: true}, {id: 'wash', t: 'Мойка', receipt: true},
-               {id: 'parking', t: 'Парковка', receipt: true}, {id: 'guard', t: 'Охрана'},
-               {id: 'kfc', t: 'KFC · премия'}, {id: 'we_gave', t: 'Мы вернули'},
-               {id: 'owed_us', t: 'Нам должны'}, {id: 'we_got', t: 'Нам вернули', plus: true},
-               {id: 'we_owe', t: 'Мы должны', plus: true}, {id: 'other', t: 'Что-то ещё'}];
+// pay — спрашивать ли «как платили» (у охраны бутылка или наличные, «нам
+// должны» — не платёж), как у боевого сервера.
+const KINDS = [{id: 'fuel', t: 'Заправка', receipt: true, pay: true}, {id: 'wash', t: 'Мойка', receipt: true, pay: true},
+               {id: 'parking', t: 'Парковка', receipt: true, pay: true}, {id: 'guard', t: 'Охрана', pay: false},
+               {id: 'kfc', t: 'KFC · премия', pay: true}, {id: 'we_gave', t: 'Мы вернули', pay: true},
+               {id: 'owed_us', t: 'Нам должны', pay: false}, {id: 'we_got', t: 'Нам вернули', plus: true, pay: true},
+               {id: 'we_owe', t: 'Мы должны', plus: true, pay: true}, {id: 'other', t: 'Что-то ещё', pay: true}];
 
 /* ═══ 5. Фальшивый сервер ═══════════════════════════════════════════════════
    Те же пути и те же ответы, что у боевого. Чего не знаем — отвечаем {ok},
@@ -619,12 +625,14 @@ function route(path, opts){
     const old = body.id ? S.exp.find(e => e.id === body.id) : null;
     if(old){
       old.amount = +body.amount || old.amount; old.comment = body.comment || old.comment;
+      if(body.pay) old.pay = body.pay;
       old.status = 'pending'; old.at_ms = now();
     }else{
       S.exp.push({id: 'e' + (++S.seq), kind: body.kind, kind_t: KIND_T[body.kind] || 'Расход',
                   amount: +body.amount || 0, comment: body.comment || '', status: 'pending',
                   photo: body.photo ? 'p' : '', thumb: body.thumb || '', car_photo: body.car_photo ? 'p' : '',
-                  plus: !!(KINDS.find(k => k.id === body.kind) || {}).plus, at: iso(now()), at_ms: now()});
+                  plus: !!(KINDS.find(k => k.id === body.kind) || {}).plus, at: iso(now()), at_ms: now(),
+                  ...(body.pay ? {pay: body.pay} : {})});
       delete S.noexp[body.kind];
     }
     save();

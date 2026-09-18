@@ -2190,6 +2190,8 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   font-variant-numeric:tabular-nums}
 .cr-it-a.up{color:var(--up)}
 .cr-it.pend .cr-it-a,.cr-it.rej .cr-it-a{color:var(--muted);text-decoration:line-through}
+/* Безналом — расход, но не из наличных: в «к сдаче» не входит, сумма тише. */
+.cr-it.card .cr-it-a{color:var(--muted)}
 .cr-it.pend .cr-it-b i{color:var(--warn)}
 .cr-ok{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;
   padding:14px;border-radius:14px;border:1px solid transparent;cursor:pointer;font-family:inherit;
@@ -17948,6 +17950,7 @@ function crCard(x){
       <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(x.tips)}<u>AED</u></b></span>
     </div>
     <div class="cr-sub">наличные <b>${fmt(x.cash)}</b> · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · расход <b>${fmt(x.spend)}</b> за смену${
+      x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}</div>
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
@@ -17966,8 +17969,8 @@ function crCard(x){
 function crItem(e){
   const pend = e.status === 'pending', rej = e.status === 'rejected';
   const plus = e.amount < 0;
-  const кто = [e.who, e.note, e.photo ? 'чек' : ''].filter(Boolean).join(' · ');
-  return `<div class="cr-it${pend ? ' pend' : ''}${rej ? ' rej' : ''}">
+  const кто = [e.who, e.note, e.photo ? 'чек' : '', e.pay === 'card' ? 'безналом — не из наличных' : ''].filter(Boolean).join(' · ');
+  return `<div class="cr-it${pend ? ' pend' : ''}${rej ? ' rej' : ''}${e.pay === 'card' ? ' card' : ''}">
     <span class="cr-it-t">${e.at ? _hm(e.at) : '—'}</span>
     <span class="cr-it-b"><b>${escS(e.kind_t || 'Расход')}</b><i>${escS(кто)}${
       pend ? ' · ждёт решения' : rej ? ' · отклонён' : ''}</i></span>
@@ -18574,6 +18577,7 @@ function fbValues(){
   if(d){ V['d.gap_on'] = d.handed_fact !== null ? 1 : 0;
          V['d.ordered_on'] = d.ordered_fact !== null ? 1 : 0; V['d.extra_on'] = d.ordered_extra ? 1 : 0;
          V['d.cash_on'] = d.cash_need ? 1 : 0; V['d.pend_on'] = d.spend_pending ? 1 : 0;
+         V['d.card_on'] = d.spend_card ? 1 : 0;
          V['d.sal_on'] = d.salary_sum ? 1 : 0; V['d.paid_on'] = d.pay ? 1 : 0; V['d.extra_pay_on'] = d.pay_b_extra ? 1 : 0; }
   const mb = fbBook(FB.month || fbMonthNow());
   if(mb){
@@ -18809,7 +18813,8 @@ function fbDayBodyHtml(d){
     ${fbCapT('Выручка')}
     ${fbRow('Наличными за день', 'd.cash', d.cash)}
     ${fbRow('Чай водителям', 'd.tips_cash', d.tips_cash, {sign: '−'})}
-    ${fbRow('Расходы водителей', 'd.spend', d.spend, {sign: '−'})}
+    ${fbRow('Расходы водителей', 'd.spend_cash', d.spend_cash ?? d.spend, {sign: '−'})}
+    ${fbRow('Ещё безналом — не из наличных', 'd.spend_card', d.spend_card || 0, {sub: true, show: 'd.card_on', hide: !d.spend_card})}
     ${fbRow('Ждут решения', 'd.spend_pending', d.spend_pending, {sub: true, show: 'd.pend_on', hide: !d.spend_pending})}
     ${fbRow('Выручка по приложению', 'd.handed', d.handed, {sum: true, sign: '='})}
     <button class="sc-r fb-r sub" onclick="fbToCash()" style="cursor:pointer" data-show="d.cash_on"${d.cash_need ? '' : ' hidden'}>
@@ -27464,11 +27469,14 @@ function expPhotos(e){
   return out;
 }
 
+// Как платил водитель (владелец, 18 сен 2026): безналом — наличных водителя
+// трата не тронула, и из «к сдаче» и выручки дня она не вычитается.
+const EXP_PAY_W = {cash: 'наличными', card: 'безналом'};
 // Ожидающий расход — карточкой: вид и сумма, снимки крупно, под ними решение.
 function expPendCard(r, e){
   const ph = expPhotos(e);
   const кто = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
+               e.bottle || '', EXP_PAY_W[e.pay] || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
   return `<div class="exp-pend" id="pend-${escS(e.id)}">
     <div class="exp-pend-h">
       <span class="exp-pend-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
@@ -27509,7 +27517,7 @@ function expDoneRow(r, e){
   const st = e.status || 'approved';
   const ph = expPhotos(e);
   const что = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', e.by_driver ? 'от водителя' : '',
+               e.bottle || '', EXP_PAY_W[e.pay] || '', e.by_driver ? 'от водителя' : '',
                e.no_receipt ? 'без чека' : ''].filter(Boolean).join(' · ');
   return `<div class="exp-done ${st}">
     ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `

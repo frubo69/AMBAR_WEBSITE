@@ -3939,7 +3939,8 @@ async def cash_round(day: str) -> dict:
 
     На каждый район — что водители везут в кассу наличными, чаевые его людей
     и расход за смену (питание и согласованные разовые), отсюда «к сдаче» =
-    наличные − расход. Отметка «собрано» стоит на районе, а не на дне: деньги
+    наличные − расход. Разовые, оплаченные безналом (18 сен 2026), наличных не
+    тронули и из «к сдаче» не вычитаются — они отдельно, spend_card. Отметка «собрано» стоит на районе, а не на дне: деньги
     сдают по одному, и старший заходит сюда несколько раз за смену. Задача в
     чек-листе выполнена, когда собраны все районы, где было что собирать."""
     import expense_routes as _exp
@@ -3973,7 +3974,7 @@ async def cash_round(day: str) -> dict:
         tips = _tips_for(dl)["total"]
         team = [d for d in _staff.drivers() if d.get("district") == oid]
         operator = (team[0].get("operator") if team else "") or ""
-        items, spend, pending = [], 0, 0
+        items, spend, pending, spend_card = [], 0, 0, 0
         for d in team:
             r = saved.get(d["name"]) or {}
             w = r.get("working")
@@ -3986,14 +3987,19 @@ async def cash_round(day: str) -> dict:
             for e in r.get("extras") or []:
                 st = str(e.get("status") or "approved")
                 amt = _exp._signed(e)
+                card = _exp.is_card(e)
                 if st == "approved":
-                    spend += amt
-                elif st == "pending":
+                    if card:
+                        spend_card += amt
+                    else:
+                        spend += amt
+                elif st == "pending" and not card:
                     pending += amt
                 items.append({"id": e.get("id") or "", "kind": e.get("kind") or "other",
                               "kind_t": e.get("kind_t") or _exp._kind(e).get("t", "Что-то ещё"),
                               "who": d["name"], "amount": amt, "at": str(e.get("at") or ""),
                               "status": st, "note": str(e.get("comment") or "")[:80],
+                              "pay": "card" if card else ("cash" if e.get("pay") == "cash" else ""),
                               "photo": bool(e.get("photo") or e.get("thumb") or e.get("car_photo"))})
         # Питание — первой строкой, без времени: это плата за день, а не событие;
         # дальше траты по времени.
@@ -4012,6 +4018,7 @@ async def cash_round(day: str) -> dict:
         out.append({"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
                     "operator": operator, "drivers": [d["name"] for d in team],
                     "orders": len(dl), "cash": cash, "tips": tips, "spend": spend,
+                    "spend_card": spend_card,
                     "spend_pending": pending, "net": net, "items": items,
                     "empty": empty, "done": done, "done_at": str(m.get("at") or "")})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,

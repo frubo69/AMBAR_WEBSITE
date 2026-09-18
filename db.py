@@ -4614,7 +4614,7 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
                                 amount: int, comment: str,
                                 thumb: str | None = None, kind: str = "",
                                 kind_t: str = "", plus: bool | None = None,
-                                car_thumb: str | None = None) -> bool:
+                                car_thumb: str | None = None, pay: str | None = None) -> bool:
     """Водитель поправил свою же трату. Решение менеджера при этом сбрасывается:
     утверждали одну сумму, а стала другая — значит, смотреть надо заново.
 
@@ -4631,6 +4631,8 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
         поля["extras.$.kind"] = kind
         поля["extras.$.kind_t"] = kind_t
         поля["extras.$.plus"] = bool(plus)
+    if pay:
+        поля["extras.$.pay"] = pay
     # Новый снимок — новый вопрос: прежний ответ старшего по нему снимается.
     if thumb is not None:
         поля["extras.$.photo"] = True

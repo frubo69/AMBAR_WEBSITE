@@ -158,7 +158,9 @@ async def _spend(days: list[str]) -> dict:
             home[d.get("name")] = d.get("district") or ""
     except Exception:                             # noqa: BLE001
         pass
-    out = {d: dict(spend=0, pending=0, spend_by=dict()) for d in days}
+    # card — согласованное, оплаченное безналом (18 сен 2026): расход дня,
+    # но наличных водителя не тронул, и из выручки дня его не вычитаем.
+    out = {d: dict(spend=0, pending=0, card=0, spend_by=dict()) for d in days}
     work: dict = {}
     for r in rows:
         s = out.get(r.get("day") or "")
@@ -173,7 +175,9 @@ async def _spend(days: list[str]) -> dict:
             st = str(e.get("status") or "approved")
             if st == "approved":
                 amt += _exp._signed(e)
-            elif st == "pending":
+                if _exp.is_card(e):
+                    s["card"] += _exp._signed(e)
+            elif st == "pending" and not _exp.is_card(e):
                 s["pending"] += _exp._signed(e)
         s["spend"] += amt
         oid = home.get(r.get("driver")) or ""
@@ -807,8 +811,9 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
         en = by_day_entries.get(d) or {"rp": [], "np": [], "in": []}
         # выручка дня — то, что старший собирает наличными: наличные заказов
-        # минус чай (он водителя) минус расходы водителей; как в обзоре
-        handed = s["cash"] - s["tips_cash"] - sp["spend"]
+        # минус чай (он водителя) минус расходы водителей наличными; как в
+        # обзоре. Оплаченное безналом наличных не тронуло — не вычитаем.
+        handed = s["cash"] - s["tips_cash"] - (sp["spend"] - sp["card"])
         fact = m.get("handed_fact")
         base = handed if fact is None else calc._n(fact)
         ordered = m["ordered_fact"] if m.get("ordered_fact") is not None else pu["ordered"]
@@ -845,6 +850,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     for i, d in enumerate(days):
         r, s, sp, pu, m = book["days"][i], sales[d], spend[d], purch[d], manual.get(d) or {}
         r.update(orders=s["orders"], debt=s["debt"], spend_pending=sp["pending"],
+                 spend_cash=calc._i(sp["spend"] - sp["card"]), spend_card=calc._i(sp["card"]),
                  ordered_auto=pu["ordered"], ordered_fact=m.get("ordered_fact"),
                  ordered_cover=pu["cover"], supplies=pu["supplies"],
                  note=m.get("note") or "", future=d > today, today=d == today,

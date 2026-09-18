@@ -21673,8 +21673,9 @@ function _normRuleText(rule, coverDays){
   // Норма правилом (владелец, 18 сен 2026): считается из продаж района, а не
   // из состояния полки и не из головы. Дни запаса приезжают в самом правиле.
   if(rule && rule.kind === 'rule'){
-    const c = +rule.cover || coverDays;
-    return `норма по продажам · запас на ${c} ${pluralize(c, 'день', 'дня', 'дней')}`;
+    const c = +rule.cover || coverDays, m = +rule.manual || 0;
+    return `норма по продажам · запас на ${c} ${pluralize(c, 'день', 'дня', 'дней')}`
+      + (m ? ` · ${m} вручную` : '');
   }
   return `норма на ${coverDays} ${pluralize(coverDays, 'день', 'дня', 'дней')}`;
 }
@@ -30802,7 +30803,9 @@ function nmPaint(){
             : (w.norm_rule && w.norm_rule.kind === 'rule')
             ? `Норма по продажам района с ${_normRuleDay(w.norm_rule)}: запас на ${
               +w.norm_rule.cover || w.cover_days} ${pluralize(+w.norm_rule.cover || w.cover_days,
-              'день','дня','дней')}, потолок листа операторов, дорогое в район без продаж не ставим`
+              'день','дня','дней')}, потолок листа операторов, дорогое в район без продаж не ставим${
+              +w.norm_rule.manual ? `. Поверх расчёта ${w.norm_rule.manual} ${
+              pluralize(+w.norm_rule.manual,'клетка','клетки','клеток')} правлены вручную` : ''}`
             : `Расчёт держит запас на ${w.cover_days} ${
               pluralize(w.cover_days,'день','дня','дней')} по продажам за ${w.window_days} дней`}</div>
       </div>

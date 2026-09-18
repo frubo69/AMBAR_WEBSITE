@@ -30,6 +30,11 @@
     5. ПОЛ ПРИСУТСТВИЯ. Где позиция продаётся — не меньше двух штук (полкоробки
        у пива), чтобы полка не пустела на первом же заказе.
 
+    6. РУЧНАЯ ПРАВКА ВЛАДЕЛЬЦА СИЛЬНЕЕ ВСЕГО. Поверх расчёта ложится
+       tools/norm_overrides.py — 393 клетки, которые владелец с операторами
+       прошёл глазами 18 сен 2026. Пересчёт их не трогает: решение, принятое по
+       знанию района, не должно затираться свежими продажами.
+
 Что даёт против того, что было (замер на продажах августа-сентября, полный
 прогон по дням с переездами между районами):
 
@@ -59,8 +64,10 @@ Z        = 1.28           # подушка на разброс
 
 try:
     from norms_from_sheet import SHEET          # запуск из tools/
+    from norm_overrides import OVERRIDE
 except ImportError:                             # запуск из корня
     from tools.norms_from_sheet import SHEET
+    from tools.norm_overrides import OVERRIDE
 
 
 def _step(sr, cat, pid):
@@ -118,6 +125,12 @@ def build(sr, rate: dict) -> dict:
             else:
                 v = 0.0
             out[(oid, pid)] = math.ceil(v / step) * step
+    # Ручная правка владельца сильнее расчёта и переживает пересчёт: она сделана
+    # глазами по каждой клетке, и затирать её свежими продажами нельзя.
+    for oid, per in OVERRIDE.items():
+        for pid, v in per.items():
+            if (oid, pid) in out:
+                out[(oid, pid)] = float(v)
     return out
 
 
@@ -138,6 +151,7 @@ async def run(db, sr, apply: bool, backup_dir: str = "/root", say=print) -> dict
             if v == 0: zero += 1
             elif cur is None or v > float(cur): up += 1
             else: dn += 1
+    say(f"ручных правок владельца поверх расчёта: {sum(len(v) for v in OVERRIDE.values())}")
     say(f"норма: {sum(new.values()):.0f} ед на {money(new):,.0f} AED "
         f"(было {sum(float(v) for v in old.values()):.0f} ед)".replace(",", " "))
     say(f"клеток: вырастет {up}, упадёт {dn}, обнулится {zero}")
@@ -155,6 +169,7 @@ async def run(db, sr, apply: bool, backup_dir: str = "/root", say=print) -> dict
     await db.stock_norm_rule_set({
         "kind": "rule", "day": sr._biz_day(), "cover": COVER, "from": FROM_DAY,
         "cap_k": CAP_K, "test_max": TEST_MAX, "days": ndays,
+        "manual": sum(len(v) for v in OVERRIDE.values()),
         "note": f"норма по продажам с {FROM_DAY}: запас на {COVER} дней, "
                 f"потолок операторов ×{CAP_K}, дороже {TEST_MAX} AED в район без продаж не ставим",
         "at": datetime.now(timezone.utc).isoformat(), "by": 0})

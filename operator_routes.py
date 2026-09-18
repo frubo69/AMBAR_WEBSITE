@@ -1951,6 +1951,27 @@ async def handle_feed(request):
         except Exception as e:
             log.error(f"[pos] лента: просьбы закрыть смену не собрались: {e}")
 
+    # Геопозиция водителей своих районов — включил / выключил (владелец, 19 сен
+    # 2026: «операторы тоже получали такие сообщения, но не в чат телеграма, а
+    # внутрь миниаппа, в уведомления»). Только это: стоянка — не событие.
+    geo = []
+    if not _tflag(request):
+        try:
+            since = _bizday.day_start(today.isoformat()).astimezone(timezone.utc).isoformat()
+            for n in await db.geo_events_since(since):
+                m = n.get("meta") or {}
+                if not m.get("driver") or (m.get("district") or "") not in scope:
+                    continue
+                on = bool(m.get("on"))
+                geo.append({"type": "geo", "kind": "geo_on" if on else "geo_off", "on": on,
+                            "driver": m["driver"], "district": _code_of(m.get("district") or "", districts),
+                            "title": f"{m['driver']} " + ("включил геопозицию" if on
+                                     else "выключил геопозицию" if m.get("self", True)
+                                     else "— геопозиция выключена"),
+                            "at": n.get("created_at") or "", "mins": _mins_since(n.get("created_at") or "")})
+        except Exception as e:
+            log.error(f"[pos] лента: геопозиция не собралась: {e}")
+
     # Поддержка: вопрос без ответа — та же незакрытая задача, что и заказ.
     try:
         for t in await _support_rows():
@@ -1971,6 +1992,7 @@ async def handle_feed(request):
     return web.json_response({
         "need": need[:60],
         "recent": recent[:40],
+        "geo": geo[:40],
         "count": sum(1 for x in need if x["weight"] <= 2),
     }, headers=CORS_HEADERS)
 
@@ -2720,7 +2742,7 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
         w = work.get(name) or {}
         r = rows.get(name)
         if not r:
-            out.append({"driver": name, "has": False, "panic": name in скрыты,
+            out.append({"driver": name, "has": False, "online": False, "panic": name in скрыты,
                         "orders": w.get("live", 0), "done": w.get("done", 0)})
             continue
         at = _dt_utc(r.get("at"))
@@ -2736,6 +2758,7 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
             mv_at = day_start
         still = int((now - mv_at).total_seconds()) if mv_at else None
         streaming = bool(until and until > now)
+        stopped = _dt_utc(r.get("stopped_at"))
         out.append({
             "driver": name, "has": True,
             "lat": r.get("lat"), "lon": r.get("lon"),
@@ -2750,6 +2773,13 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
             # А идёт ли трансляция — отдельно: от неё зависит, будет ли видно
             # водителя, когда он уберёт телефон в карман.
             "stream": bool(until and until > now),
+            # Состояние одно из двух (владелец, 19 сен 2026): геопозиция
+            # включена — «в сети», как бы давно ни пришла точка и сколько бы
+            # он ни стоял (айфон на месте точек не шлёт, но геопозицию он не
+            # выключал); иначе — выключена: выключил сам или не включал.
+            "online": streaming,
+            # Когда выключил — по сигналу телеграма; только сегодняшнее.
+            "off_at": stopped.isoformat() if (stopped and not streaming and stopped >= day_start) else "",
             # Сколько минут трансляции осталось: у неё потолок в восемь часов,
             # и знать, что она кончится через двадцать минут, полезнее, чем
             # узнать это по погасшей метке. Считаем здесь — на телефоне часы

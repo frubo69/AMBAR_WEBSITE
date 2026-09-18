@@ -1,12 +1,17 @@
-"""Стояние и «пропал» по правилу владельца (11 сен 2026): пока трансляция
-идёт, человек на связи; пропал — только без движения два часа подряд.
+"""Геопозиция: два состояния и только два сообщения (владелец, 19 сен 2026:
+«присылай только сообщения о том, что водители включили/выключили геопозицию,
+больше не надо „снова в движении“ или „на месте 3 ч“»; «водитель, даже если на
+месте, геолокацию не отключал — он в сети»).
 
 Проверяем без Mongo: якорь стояния (db.geo_moved), состояние для панели
-(operator_routes.drivers_live) и сторожа (driver_routes._geo_state), сам
-проход сторожа по старшему и водителю (geo_watch.tick) с подменённой базой:
-точка из кармана раз в 3 мин на одном месте → ни одного сообщения; два часа
-на месте → одно сообщение «два часа без движения»; поехал → «снова в
-движении». Запуск: python3 tools/test_geo_still.py"""
+(operator_routes.drivers_live: online = идёт трансляция, off_at — когда
+выключил) и сторожа (driver_routes._geo_state: watch_ok = идёт трансляция),
+сам проход сторожа (geo_watch.tick) и мгновенный путь (on_stream) с
+подменённой базой: стоит сколько угодно — ни одного сообщения; поехал — тоже;
+выключил — «выключил геопозицию» с водителем и районом для «Событий»
+оператора; включил — «включил геопозицию · Не было N»; проход ловит только
+выключенную трансляцию, о которой не сказал телеграм; про старшего проход
+не пишет вовсе. Запуск: python3 tools/test_geo_still.py"""
 import asyncio, os, sys, logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("MONGO_URI", "")
@@ -71,10 +76,20 @@ async def states():
     POS["G"] = pos(1, 16 * 60)     # вчерашний якорь: стояние считается с начала суток (10:00 Дубай = 06:00 UTC с 16 сен)
     rows = {r["driver"]: r for r in (await operator_routes.drivers_live(list(POS), D))["drivers"]}
     eq("G: still = 10 ч с начала суток, lost", (rows["G"]["still"] // 3600, rows["G"]["lost"]), (10, True))
+    eq("в сети — у всех с трансляцией, сколько бы ни стояли (A, B, C, F, G)",
+       sorted(n for n, r in rows.items() if r["online"]), ["A", "B", "C", "F", "G"])
+    eq("E: разовая точка из приложения без трансляции — геолокация выключена", rows["E"]["online"], False)
+    POS["H"] = dict(pos(30, 30, until=""), stopped_at=NOW - timedelta(minutes=12))
+    POS["I"] = dict(pos(30, 30, until=""), stopped_at=NOW - timedelta(days=2))
+    rows = {r["driver"]: r for r in (await operator_routes.drivers_live(list(POS), D))["drivers"]}
+    eq("H: выключил 12 мин назад — off_at есть", (rows["H"]["online"], bool(rows["H"]["off_at"])), (False, True))
+    eq("I: выключал позавчера — off_at пустой (сегодня не включал)", rows["I"]["off_at"], "")
+    rows = {r["driver"]: r for r in (await operator_routes.drivers_live(["Никто"], D))["drivers"]}
+    eq("нет ни одной точки — не в сети", (rows["Никто"]["has"], rows["Никто"]["online"]), (False, False))
     g = await driver_routes._geo_state("A")
     eq("сторож A: fresh=True (3 мин < 15), watch_ok", (g["fresh"], g["watch_ok"], g["lost"]), (True, True, False))
     g = await driver_routes._geo_state("B")
-    eq("сторож B: not fresh, lost, watch_ok=False", (g["fresh"], g["lost"], g["watch_ok"]), (False, True, False))
+    eq("сторож B: стоит 2 ч 10 мин — lost по якорю, но в сети: watch_ok", (g["fresh"], g["lost"], g["watch_ok"]), (False, True, True))
     g = await driver_routes._geo_state("F")
     eq("сторож F: 119 мин на месте, точка 0 мин → ok", (g["ok"], g["watch_ok"]), (True, True))
 
@@ -91,7 +106,9 @@ async def get_driver_day(day, name): return DAYS.get(name)
 async def staff_map_get(): return {}
 async def driver_map_get(): return {}
 async def geo_lock_set(name, at, why): WATCH.setdefault(name, {})["locked_at"] = at; return "k"
-async def _owners(text, event, reply_markup=None, exclude=None): SENT.append((event, text)); return 1
+META = []
+async def _owners(text, event, reply_markup=None, exclude=None, meta=None):
+    SENT.append((event, text)); META.append(meta); return 1
 async def _driver(name, text): SENT.append(("driver:" + name, text))
 for n, f in dict(geo_watch_get=geo_watch_get, geo_watch_set=geo_watch_set, get_driver_days=get_driver_days,
                  get_driver_day=get_driver_day, staff_map_get=staff_map_get, driver_map_get=driver_map_get,
@@ -108,123 +125,95 @@ geo_watch._STARTED = None
 
 async def watch():
     global NOW
-    print("— проход сторожа: старший в кармане раз в 3 мин на одном месте")
-    POS.clear(); WATCH.clear(); DAYS.clear(); SENT.clear()
+    print("— стоит часами — ни одного сообщения; поехал — тоже")
+    POS.clear(); WATCH.clear(); DAYS.clear(); SENT.clear(); META.clear()
     DAYS["Али"] = {"working": True, "shift_open_at": "x"}
-    NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc)   # 20:00 Дубай — рабочее время
-    for k in range(0, 100, 3):                                   # 100 минут стоянки, точка раз в 3 мин
+    staff.DISTRICT_DRIVERS = {"jvc": ["Али"]}
+    for k in range(0, 200, 3):                                   # 3 ч 20 мин стоянки, точка раз в 3 мин
         NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc) + timedelta(minutes=k)
         POS["op:Старший"] = pos(2, k + 5)
         POS["Али"] = pos(2, k + 5)
         await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("за 100 мин стоянки — ни одного сообщения", [s for s in SENT if "без движения" in s[1] or "не видн" in s[1]], [])
-    NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc) + timedelta(minutes=121)
-    POS["op:Старший"] = pos(2, 126); POS["Али"] = pos(2, 126)
+    eq("3 ч 20 мин на месте — ни одного сообщения", SENT, [])
+    NOW += timedelta(minutes=125); POS["Али"] = pos(125, 330); POS["op:Старший"] = pos(125, 330)
+    await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
+    eq("айфон на месте 2 ч без единой точки, трансляция идёт — тоже тишина (и про старшего)", SENT, [])
+    NOW += timedelta(minutes=5); POS["Али"] = pos(0, 0); POS["op:Старший"] = pos(0, 0)
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("старший с точками на базе — виден и через 2 ч", out.get("senior_off"), None)
-    eq("водитель off (still)", out.get("off"), ["Али"])
-    texts = [t for _, t in SENT]
-    eq("о старшем — ни слова", any("Старш" in t for t in texts), False)
-    eq("в текстах нет «точек нет» и «потеряно»", any("точек нет" in t or "потерян" in t or "не видна" in t for t in texts), False)
-    eq("текст водителя: «На одном месте с 18:0…»", any("На одном месте с" in t and "Али" in t for t in texts), True)
+    eq("поехал — «снова в движении» больше нет", (SENT, out.get("back")), ([], []))
+
+    print("— выключил и включил: мгновенный путь")
+    r = await geo_watch.on_stream("Али", False, NOW)
+    eq("выключил — «выключил геопозицию»", (r, SENT[-1]), (True, (geo_watch.EVENT_OFF,
+       "📍 *Али*: выключил геопозицию\nОператор его не видит.")))
+    eq("в записи — водитель и район для «Событий» оператора", META[-1],
+       {"driver": "Али", "district": "jvc", "on": False, "self": True})
     n = len(SENT)
-    NOW += timedelta(minutes=3); POS["op:Старший"] = pos(1, 129); POS["Али"] = pos(1, 129)
-    await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("ещё стоит → повторов нет", len(SENT), n)
-    NOW += timedelta(minutes=5); POS["op:Старший"] = pos(0, 0); POS["Али"] = pos(0, 0)   # поехали
-    out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("поехал → водитель back", (out.get("senior_on"), out.get("back")), (None, ["Али"]))
-    texts = [t for _, t in SENT[n:]]
-    eq("тексты «снова в движении · Стоял …»", all("снова в движении" in t and "Стоял" in t for t in texts), True)
-    print("— выключенная трансляция по-прежнему ловится")
-    SENT.clear(); WATCH.clear()
+    await geo_watch.on_stream("Али", False, NOW + timedelta(minutes=1))
+    eq("повторный сигнал выключения — без повтора", len(SENT), n)
+    POS["Али"] = pos(30, 30, until="")
+    await geo_watch.tick((NOW + timedelta(minutes=2)).astimezone(geo_watch.DUBAI_TZ))
+    eq("проход о том же выключении не пишет", len(SENT), n)
+    r = await geo_watch.on_stream("Али", True, NOW + timedelta(minutes=17))
+    eq("включил — «включил геопозицию · Не было 17 мин»", (r, SENT[-1][1]),
+       (True, "📍 *Али*: включил геопозицию\nНе было 17 мин."))
+    eq("включение — тоже с водителем и районом", META[-1], {"driver": "Али", "district": "jvc", "on": True, "self": True})
+    r = await geo_watch.on_stream("Али", True, NOW + timedelta(minutes=18))
+    eq("включил без выключения (перезапуск) — просто «включил»", SENT[-1][1], "📍 *Али*: включил геопозицию")
+
+    print("— проход ловит только выключение, о котором не сказал телеграм")
+    SENT.clear(); META.clear(); WATCH.clear()
     POS["Али"] = pos(30, 30, until="")
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("водитель без трансляции → off (stream)", out.get("off"), ["Али"])
-    eq("текст: трансляция выключена", any("трансляция геопозиции выключена" in t for _, t in SENT), True)
-    print("— стояние не запирает: закрыл смену стоя — тихо снимается")
-    SENT.clear(); WATCH.clear()
-    POS["Али"] = pos(2, 150)
-    DAYS["Али"] = {"working": True, "shift_open_at": "x"}
+    eq("трансляции нет — «геопозиция выключена», один раз", (out.get("off"), [t for _, t in SENT]),
+       (["Али"], ["📍 *Али*: геопозиция выключена\nОператор его не видит."]))
+    eq("не сам (не знаем, он ли) — self False", META[-1]["self"], False)
     await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("сначала off (still)", (WATCH.get("Али") or {}).get("off_why"), "still")
-    DAYS["Али"]["shift_close_at"] = "y"
+    eq("второй проход — без повтора", len(SENT), 1)
+    NOW += timedelta(minutes=9); POS["Али"] = pos(0, 0)
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("замка нет, метка снята", (out.get("locked"), "off_since" in (WATCH.get("Али") or {})), ([], False))
-    print("— выключил трансляцию и не включил — замка нет, пропажа снимается тихо")
+    eq("трансляция вернулась — «включил геопозицию · Не было 9 мин»", (out.get("back"), SENT[-1][1]),
+       (["Али"], "📍 *Али*: включил геопозицию\nНе было 9 мин."))
+
+    print("— старая отметка «без движения» (до 19 сен) снимается молча")
+    SENT.clear(); WATCH.clear()
+    WATCH["Али"] = {"day": D, "off_since": NOW - timedelta(hours=3), "off_why": "still"}
+    POS["Али"] = pos(2, 200)
+    out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
+    eq("снята, сообщений нет", ("off_since" in WATCH["Али"], SENT, out.get("back")), (False, [], []))
+    WATCH["Али"] = {"day": D, "off_since": NOW - timedelta(hours=3), "off_why": "still"}
+    await geo_watch.on_stream("Али", True, NOW)
+    eq("перезапуск трансляции при старой отметке — «включил» без «Не было 3 ч»", SENT[-1][1], "📍 *Али*: включил геопозицию")
+
+    print("— конец смены: выключенная и не вернувшаяся — снимается тихо, замка нет")
     SENT.clear(); WATCH.clear(); DAYS["Али"] = {"working": True, "shift_open_at": "x"}
     POS["Али"] = pos(30, 30, until="")
     await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
     DAYS["Али"]["shift_close_at"] = "y"
+    n = len(SENT)
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("не заперт, метка снята", (out.get("locked"), "off_since" in (WATCH.get("Али") or {})), ([], False))
-    eq("в текстах нет «закроется»", any("закро" in t for _, t in SENT), False)
-    print("— «Стоял N» и «Без движения с» — от якоря, не от минуты обнаружения")
-    SENT.clear(); WATCH.clear(); DAYS["Али"] = {"working": True, "shift_open_at": "x"}
-    NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc)
-    POS["Али"] = pos(2, 126)                                   # якорь 13:54 UTC
-    await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    since = (WATCH["Али"]["off_since"] - (NOW - timedelta(minutes=126))).total_seconds()
-    eq("off_since = якорь (±1 с)", abs(since) < 1.5, True)
-    eq("текст: На одном месте с 17:54 (Дубай)", any("На одном месте с 17:54" in t for _, t in SENT), True)
-    NOW += timedelta(minutes=8); POS["Али"] = pos(0, 0)
-    await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("снова в движении · Стоял 2 ч 14 мин", any("Стоял 2 ч 14 мин" in t for _, t in SENT), True)
-    print("— слепота: трое стоят с редкими точками, один 3 ч — ловится, а не глушит")
+    eq("не заперт, метка снята, без сообщений", (out.get("locked"), "off_since" in (WATCH.get("Али") or {}), len(SENT) - n),
+       ([], False, 0))
+
+    print("— слепота: у всех на смене ни точки, ни трансляции — молчим, это наша беда")
     SENT.clear(); WATCH.clear()
     staff.DRIVER_IDS = {"А": 1, "Б": 2, "В": 3}
-    for n, (age, mv) in {"А": (16, 30), "Б": (17, 40), "В": (16, 180)}.items():
-        DAYS[n] = {"working": True, "shift_open_at": "x"}; POS[n] = pos(age, mv)
+    for n_ in ("А", "Б", "В"):
+        DAYS[n_] = {"working": True, "shift_open_at": "x"}; POS[n_] = pos(40, 40, until="")
     DAYS.pop("Али", None)
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("не слепой, off=[В]", (out.get("blind"), out.get("off")), (None, ["В"]))
-    print("— база лежит (ни у кого ни точки, ни трансляции) — по-прежнему молчим")
-    SENT.clear(); WATCH.clear()
-    for n in ("А", "Б", "В"): POS[n] = pos(40, 40, until="")
+    eq("blind, сообщений нет", (out.get("blind"), SENT), (True, []))
+    POS["А"] = pos(40, 40)                                    # у одного трансляция идёт — не слепые
     out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("blind", out.get("blind"), True)
-    print("— стояние до открытия смены не в счёт")
-    SENT.clear(); WATCH.clear(); staff.DRIVER_IDS = {"Али": 2}
-    for n in ("А", "Б", "В"): DAYS.pop(n, None); POS.pop(n, None)
-    DAYS["Али"] = {"working": True, "shift_open_at": NOW - timedelta(minutes=10)}
-    POS["Али"] = pos(1, 180)                                   # дома 3 ч, смену открыл 10 мин назад
-    out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("off нет", out.get("off"), [])
-    print("— перезапуск трансляции стоя не даёт «снова идёт»")
-    SENT.clear(); WATCH.clear(); DAYS["Али"] = {"working": True, "shift_open_at": "x"}
-    POS["Али"] = pos(2, 150)
-    await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    n = len(SENT)
-    r = await geo_watch.on_stream("Али", True, NOW)
-    eq("on_stream(on) при still — молчит, метка на месте", (r, len(SENT) == n, WATCH["Али"].get("off_why")), (False, True, "still"))
-    r = await geo_watch.on_stream("Али", False, NOW + timedelta(minutes=5))
-    eq("выключил после стояния — why=stream, off_since = минута выключения",
-       (WATCH["Али"].get("off_why"), WATCH["Али"].get("off_since") == NOW + timedelta(minutes=5)), ("stream", True))
-    print("— старший: часами на базе с точками — виден; два часа без единой точки — сообщение")
-    SENT.clear(); WATCH.clear(); DAYS.clear()
-    for k in range(0, 200, 3):
-        NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc) + timedelta(minutes=k)
-        POS["op:Старший"] = pos(2, k + 5)
-        await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("3 ч 20 мин на базе с точками — ни одного сообщения о старшем", [t for _, t in SENT if "Старш" in t], [])
-    NOW += timedelta(minutes=125); POS["op:Старший"] = pos(125, 330)
-    out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("2 ч 05 мин без точек → senior_off (silent)", (out.get("senior_off"), WATCH["op:Старший"].get("off_why")), (["Старший"], "silent"))
-    eq("текст: «телефон два часа не присылает точку»", any("телефон два часа не присылает точку" in t for _, t in SENT), True)
-    eq("off_since = последняя точка", WATCH["op:Старший"]["off_since"] == NOW - timedelta(minutes=125), True)
-    NOW += timedelta(minutes=3); POS["op:Старший"] = pos(0, 333)
-    out = await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("точка пришла → «точки снова идут · Не было 2 ч 8 мин»", any("точки снова идут" in t and "2 ч 8 мин" in t for _, t in SENT), True)
-    print("— старший только из панели: трансляции нет — «геопозиция не видна», без слова о трансляции")
-    SENT.clear(); WATCH.clear()
-    WATCH["op:Старший"] = {"day": D, "seen": True}
-    POS["op:Старший"] = pos(20, 20, until="")
-    await geo_watch.tick(NOW.astimezone(geo_watch.DUBAI_TZ))
-    eq("текст без «трансляция кончилась»", any("геопозиция не видна" in t and "кончилась" not in t for _, t in SENT), True)
+    eq("не слепой: выключены у Б и В", (out.get("blind"), sorted(out.get("off") or [])), (None, ["Б", "В"]))
+
+    print("— в текстах нет «без движения», «снова в движении», «молчит», «не присылает»")
+    bad = [t for _, t in SENT if any(w in t for w in ("без движения", "снова в движении", "молчит", "не присылает", "Стоял"))]
+    eq("ни одного", bad, [])
 
 async def main():
     await states(); await watch()
     print()
-    print("FAILED:", fails) if fails else print("ALL OK — стоянка не пропажа, пропажа только через два часа без движения")
+    print("FAILED:", fails) if fails else print("ALL OK — два состояния, сообщения только «включил» и «выключил»")
     sys.exit(1 if fails else 0)
 asyncio.run(main())

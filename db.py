@@ -1398,6 +1398,18 @@ async def insert_notification(event_key: str, text: str, owner_id: int = 0, meta
     await db.owner_notifications.insert_one(doc)
 
 
+async def geo_events_since(since_iso: str, limit: int = 300) -> list:
+    """Водители включили / выключили геопозицию — с какой минуты (19 сен
+    2026): «События» оператора берут отсюда своих, по meta.district."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.owner_notifications.find(
+        {"event_key": {"$in": ["drivers.geo_on", "drivers.geo_off"]},
+         "created_at": {"$gte": since_iso}, "meta.driver": {"$exists": True}},
+        {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
 async def get_notifications_since(since_iso: str, owner_id: int = 0, limit: int = 50) -> list:
     """Return notifications created after `since_iso`."""
     db = _db_or_none()

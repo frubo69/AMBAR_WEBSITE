@@ -1102,15 +1102,18 @@ async def handle_where(request):
                 # движения» — про людей.
                 r.update({"device": True, "district": "devices", "code": code, "name": "",
                           "gcode": "", "gname": "Устройства", "orders": 0, "done": 0,
-                          "lost": False, "still": None})
+                          "lost": False, "still": None,
+                          # У планшета бывает и точка из панели без трансляции.
+                          "online": bool(r.get("stream") or r.get("live"))})
                 devs.append(r)
             else:
                 # Старший сидит на базе часами — это работа, а не пропажа.
                 # Пропал он, только если телефон два часа не присылает точку.
+                # В сети — трансляция или свежая точка из панели: старший
+                # работает с открытой панелью и без трансляции.
                 r.update({"senior": True, "district": "senior", "code": code,
-                          "name": "", "orders": 0, "done": 0,
-                          "lost": bool(r.get("stream") and r.get("age") is not None
-                                       and r["age"] >= db.GEO_LOST_SEC)})
+                          "name": "", "orders": 0, "done": 0, "lost": False,
+                          "online": bool(r.get("stream") or r.get("live"))})
                 rows.append(r)
         data["drivers"] = rows + data["drivers"] + devs
         if want_key:
@@ -1176,8 +1179,25 @@ async def handle_where_route(request):
         log.warning(f"[where] маршрут {who} за {day}: {e}")
         pts = []
     today = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
-    out = route_stops.build(pts, orders, now=datetime.now(timezone.utc), today=(day == today))
+    now = datetime.now(timezone.utc)
+    out = route_stops.build(pts, orders, now=now, today=(day == today))
     out.update({"who": who, "day": day, "today": day == today})
+    # «Что сейчас» — по геопозиции, а не по возрасту точки (владелец, 19 сен
+    # 2026): трансляция идёт — он в сети, давно нет точки — значит стоит (айфон
+    # на месте молчит); выключена — так и говорим, с минутой выключения.
+    if day == today and isinstance(out.get("end"), dict):
+        try:
+            import operator_routes as _pos
+            r = next(iter(await db.driver_pos_all([key])), None) or {}
+            until = _pos._dt_utc(r.get("until"))
+            stopped = _pos._dt_utc(r.get("stopped_at"))
+            online = bool(until and until > now)
+            out["end"]["online"] = online
+            out["end"]["off_at"] = (stopped.isoformat() if stopped and not online
+                                    and stopped >= _biz_day_start(datetime.now(DUBAI_TZ)).astimezone(timezone.utc)
+                                    else "")
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[where] геопозиция для маршрута {who}: {e}")
     return web.json_response(out, headers=CORS_HEADERS)
 
 

@@ -46,6 +46,19 @@
 водителя, а бот тащить за собой весь сервер не должен. Номера сообщений
 кладём в реестры скрытого режима — и владельца, и водителя.
 
+Только включил и выключил (владелец, 19 сен 2026)
+--------------------------------------------------
+«Присылай только сообщения о том, что водители включили или выключили
+геопозицию; больше не надо „снова в движении“ или „на месте 3 ч“». Стоянка
+— не событие: водитель, который стоит, геопозицию не выключал, он в сети.
+Поэтому «два часа без движения», «снова в движении», «телефон не присылает
+точку» больше не пишем — ни про водителей, ни про старшего. Остались:
+«включил геопозицию» (после выключения — сколько её не было) и «выключил
+геопозицию» (или «геопозиция выключена», если сигнал телеграма прошёл мимо,
+а заметил проход). Те же события видят операторы — не в телеграме, а в
+«Событиях» своего приложения: запись уведомления несёт водителя и район
+(meta), лента оператора берёт своих.
+
 Чего здесь нет
 --------------
 Повторов: одна пропажа — одно сообщение. Автоматического открытия: замок
@@ -196,31 +209,18 @@ async def old_stream_end(key: str, chat, mid) -> bool:
 def text_stream_off(name: str, opened: bool) -> str:
     tail = "Оператор его не видит." if opened else "Смена у него не открыта."
 
-    return f"📍 *{_n(name)}*: выключил трансляцию геопозиции\n{tail}"
+    return f"📍 *{_n(name)}*: выключил геопозицию\n{tail}"
 
 
-def text_stream_on(name: str) -> str:
-    return f"📍 *{_n(name)}*: включил трансляцию геопозиции"
+def text_stream_on(name: str, gone_sec: float = 0) -> str:
+    return (f"📍 *{_n(name)}*: включил геопозицию"
+            + (f"\nНе было {_dur(gone_sec)}." if gone_sec else ""))
 
 
-def _since_still(geo: dict, now: datetime = None) -> datetime:
-    """С какой минуты стоит: сейчас минус длительность стояния."""
-    utc = now or datetime.now(timezone.utc)
-    return utc - timedelta(seconds=int(geo.get("still_sec") or 0))
-
-
-def text_off(name: str, why: str, geo: dict, now: datetime = None) -> str:
-    if why == "stream":
-        return (f"📍 *{_n(name)}*: трансляция геопозиции выключена\n"
-                "Оператор больше не видит, где он.")
-    return (f"📍 *{_n(name)}*: два часа без движения\n"
-            f"На одном месте с {_hhmm(_since_still(geo, now))}.")
-
-
-def text_back(name: str, gone_sec: float, why: str = "") -> str:
-    if why == "still":
-        return f"📍 *{_n(name)}*: снова в движении\nСтоял {_dur(gone_sec)}."
-    return f"📍 *{_n(name)}*: трансляция геопозиции снова идёт\nНе было {_dur(gone_sec)}."
+def text_gone(name: str) -> str:
+    """Трансляции нет, а сигнала телеграма мы не получили (бот лежал, срок
+    вышел): не «выключил» — мы не знаем, он ли."""
+    return f"📍 *{_n(name)}*: геопозиция выключена\nОператор его не видит."
 
 
 def text_lock(name: str, since: datetime, why: str = "") -> str:
@@ -243,31 +243,12 @@ def _sn(name: str) -> str:
     return f"*{_n(name)}* (старший)" if name.lower() != "старший" else "*Старший*"
 
 
-def text_senior_off(name: str, why: str, geo: dict, now: datetime = None) -> str:
-    if why == "stream":
-        return f"📍 {_sn(name)}: трансляция геопозиции выключена"
-    if why == "never":
-        return f"📍 {_sn(name)}: геопозиция не видна\nС начала смены не было ни одной точки."
-    if why == "still":
-        return (f"📍 {_sn(name)}: два часа без движения\n"
-                f"На одном месте с {_hhmm(_since_still(geo, now))}.")
-    age = int(geo.get("age_sec") or 0)
-    if why == "silent":
-        last = (now or datetime.now(timezone.utc)) - timedelta(seconds=age)
-        return (f"📍 {_sn(name)}: телефон два часа не присылает точку\n"
-                f"Трансляция включена, последняя точка была в {_hhmm(last)}.")
-    mins = age // 60
-    # until пустой — трансляции не было вовсе (точки шли из панели).
-    head = "трансляция геопозиции кончилась" if geo.get("until") else "геопозиция не видна"
-    return f"📍 {_sn(name)}: {head}\nПоследняя точка {mins} мин назад."
+def text_senior_off(name: str) -> str:
+    return f"📍 {_sn(name)}: выключил геопозицию"
 
 
-def text_senior_on(name: str, gone_sec: float = 0, why: str = "") -> str:
-    if why == "still":
-        return f"📍 {_sn(name)}: снова в движении\nСтоял {_dur(gone_sec)}."
-    if why == "silent":
-        return f"📍 {_sn(name)}: точки снова идут\nНе было {_dur(gone_sec)}."
-    return (f"📍 {_sn(name)}: геопозиция снова видна"
+def text_senior_on(name: str, gone_sec: float = 0) -> str:
+    return (f"📍 {_sn(name)}: включил геопозицию"
             + (f"\nНе было {_dur(gone_sec)}." if gone_sec else ""))
 
 
@@ -301,14 +282,23 @@ async def _post(token: str, chat_id: int, text: str, reply_markup: dict = None,
     return res or {}
 
 
+def geo_meta(name: str, on: bool, self_: bool = True) -> dict:
+    """Кто и в каком районе — по записи уведомления «Событиям» оператора
+    видно, чей это водитель (район — где он сейчас, после перестановок).
+    self_ — выключил сам (сигнал телеграма) или заметили проходом."""
+    district = next((d for d, names in (staff.DISTRICT_DRIVERS or {}).items() if name in (names or [])), "")
+    return {"driver": name, "district": district, "on": bool(on), "self": bool(self_)}
+
+
 async def _owners(text: str, event: str, reply_markup: dict = None,
-                  exclude: set = None) -> int:
+                  exclude: set = None, meta: dict = None) -> int:
     """Всем владельцам, мимо настроек и тихих часов: это правило, а не новость.
 
-    exclude — кому не слать: о пропаже старшего пишем владельцам, а не ему."""
+    exclude — кому не слать: о пропаже старшего пишем владельцам, а не ему.
+    meta — водитель и район: по ним событие видят операторы в приложении."""
     token = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
     try:
-        await db.insert_notification(event, text)
+        await db.insert_notification(event, text, meta=meta)
     except Exception as e:
         log.error(f"[geo-watch] уведомление {event} не записано: {e}")
     if not token:
@@ -368,18 +358,18 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
         return False
     opened = bool(d.get("shift_open_at")) and not d.get("shift_close_at")
     off_since = _dt(st.get("off_since")) if st.get("day") == day else None
+    try:
+        await staff.sync()                   # район — после сегодняшних перестановок
+    except Exception as e:                   # noqa: BLE001
+        log.debug(f"[geo-watch] перестановка не прочитана: {e}")
 
     if on:
-        if off_since and st.get("off_why") == "still":
-            # Стоит на месте и перезапустил трансляцию: стоять не перестал,
-            # «снова в движении» скажет проход, когда поедет.
-            log.info(f"[geo-watch] {name}: перезапустил трансляцию, стоит дальше")
-            return False
+        # «Не было N» — только после выключения. Старая отметка стоянки (до
+        # 19 сен 2026) не пропажа: снимаем её без счёта.
+        gone = (utc - off_since).total_seconds() if off_since and st.get("off_why") != "still" else 0
         if off_since:
             await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
-            await _owners(text_back(name, (utc - off_since).total_seconds()), EVENT_ON)
-        else:
-            await _owners(text_stream_on(name), EVENT_ON)
+        await _owners(text_stream_on(name, gone), EVENT_ON, meta=geo_meta(name, True))
         log.info(f"[geo-watch] {name}: включил трансляцию")
         return True
 
@@ -394,95 +384,39 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
         if not off_since or st.get("off_why") == "still":
             fields["off_since"] = utc          # выключил — с этой минуты, а не с начала стоянки
         await db.geo_watch_set(name, fields)
-    await _owners(text_stream_off(name, opened), EVENT_OFF)
+    await _owners(text_stream_off(name, opened), EVENT_OFF, meta=geo_meta(name, False))
     log.info(f"[geo-watch] {name}: выключил трансляцию")
     return True
 
 
 # ── старший ──────────────────────────────────────────────────────────────────
 # Правило другое, чем у водителей: замка нет, смены нет, трансляция не
-# обязательна — старший работает и без неё. Есть одно: владельцы должны
-# знать, когда его не видно. «Видно» — свежая точка любым путём: из панели,
-# пока она открыта, или из трансляции в чате STAR-бота.
+# обязательна — старший работает и без неё. С 19 сен 2026 и про него только
+# «включил» и «выключил» — по сигналу телеграма из чата STAR-бота; проходом
+# («два часа без точки», «не видно с начала смены») больше не пишем.
 def _senior_ids() -> set:
     return set(staff.SENIOR_STAR_IDS.values())
 
 
-async def _seniors_tick(now: datetime, utc: datetime, day: str, out: dict) -> None:
-    from driver_routes import _geo_state
-    if not _working_hours(now):
-        return
-    for name in list(staff.SENIOR_STAR_IDS):
-        key = SENIOR_PREFIX + name
-        g = await _geo_state(key)
-        # Старший сидит на базе часами — это работа. Правило одно на все
-        # пути (владелец, 11 сен 2026: «только если телефон два часа
-        # молчит»): пропал — это два часа без единой точки, что при живой
-        # трансляции, что без неё. Свежая точка из панели — виден.
-        age = g["age_sec"]
-        quiet = age is None or age >= db.GEO_LOST_SEC
-        # Без трансляции — по свежей точке из панели, как и было.
-        visible = (not quiet) if g["stream"] else g["fresh"]
-        st = await db.geo_watch_get(key)
-        # Молчание не кончается в полдень: о пропаже, про которую сказали
-        # вчера, в новый день второй раз не пишем (раньше в 12:00 шло
-        # «с начала смены ни одной точки», хотя владельцы уже знали).
-        off_since = _dt(st.get("off_since"))
-        if not visible and not off_since:
-            import bizday
-            last = utc - timedelta(seconds=age) if age is not None else None
-            never = last is None or last < bizday.day_start(day)     # ни одной точки с начала смены
-            why = ("stream" if st.get("stream_off") else "never" if never
-                   else "silent" if g["stream"] else "stale")
-            # Молчание считается с последней точки, а не с минуты, когда заметили.
-            since = last if why == "silent" and last else utc
-            await db.geo_watch_set(key, {"day": day, "off_since": since, "off_why": why},
-                                   unset=["stream_off"])
-            # О выключенной трансляции владельцам уже сказали в ту же секунду
-            # (on_senior_stream) — здесь только запоминаем, с какой минуты.
-            if why != "stream":
-                await _owners(text_senior_off(name, why, g, utc), EVENT_SENIOR, exclude=_senior_ids())
-            log.info(f"[geo-watch] старший {name}: не виден ({why})")
-            out.setdefault("senior_off", []).append(name)
-        elif visible:
-            fields = {"day": day, "seen": True}
-            if off_since:
-                why = st.get("off_why") or ""
-                await db.geo_watch_set(key, fields, unset=["off_since", "off_why"])
-                await _owners(text_senior_on(name, (utc - off_since).total_seconds(), why),
-                              EVENT_SENIOR, exclude=_senior_ids())
-                log.info(f"[geo-watch] старший {name}: снова виден")
-                out.setdefault("senior_on", []).append(name)
-            elif st.get("day") != day or not st.get("seen"):
-                await db.geo_watch_set(key, fields)
-
-
 async def on_senior_stream(name: str, on: bool, now: datetime = None) -> bool:
     """Старший включил или выключил трансляцию в чате STAR-бота — владельцам
-    в ту же секунду. Выключение запоминаем: проход через четверть часа
-    иначе написал бы «точек нет», хотя причина известна."""
+    (кроме самих старших) в ту же секунду."""
     utc = now or datetime.now(timezone.utc)
     day = _biz_day(utc.astimezone(DUBAI_TZ))
     key = SENIOR_PREFIX + name
     st = await db.geo_watch_get(key)
     off_since = _dt(st.get("off_since")) if st.get("day") == day else None
     if on:
-        if off_since:
-            await db.geo_watch_set(key, {"day": day, "seen": True},
-                                   unset=["off_since", "off_why", "stream_off"])
-            await _owners(text_senior_on(name, (utc - off_since).total_seconds()),
-                          EVENT_SENIOR, exclude=_senior_ids())
-        else:
-            await db.geo_watch_set(key, {"day": day, "seen": True}, unset=["stream_off"])
-            await _owners(f"📍 {_sn(name)}: включил трансляцию геопозиции",
-                          EVENT_SENIOR, exclude=_senior_ids())
+        gone = (utc - off_since).total_seconds() if off_since and st.get("off_why") == "stream" else 0
+        await db.geo_watch_set(key, {"day": day, "seen": True},
+                               unset=["off_since", "off_why", "stream_off"])
+        await _owners(text_senior_on(name, gone), EVENT_SENIOR, exclude=_senior_ids())
         return True
     if off_since and st.get("off_why") == "stream":
-        return False
-    # Точка из панели могла прийти минуту назад — тогда «не виден» ещё рано,
-    # но о выключении сказать надо: следующий проход допишет остальное.
-    await db.geo_watch_set(key, {"day": day, "stream_off": True})
-    await _owners(text_senior_off(name, "stream", {}), EVENT_SENIOR, exclude=_senior_ids())
+        return False                             # уже сказали про это же
+    await db.geo_watch_set(key, {"day": day, "off_since": utc, "off_why": "stream"},
+                           unset=["stream_off"])
+    await _owners(text_senior_off(name), EVENT_SENIOR, exclude=_senior_ids())
     return True
 
 
@@ -502,10 +436,6 @@ async def tick(now: datetime = None) -> dict:
     from driver_routes import _geo_state
 
     out = {"day": day}
-    try:
-        await _seniors_tick(now, utc, day, out)
-    except Exception as e:                       # noqa: BLE001
-        log.error(f"[geo-watch] старший: {e}")
 
     on_shift = []
     for d in await db.get_driver_days(day):
@@ -526,7 +456,7 @@ async def tick(now: datetime = None) -> dict:
     # выглядит перезапуск или отвалившаяся база. Считаем только открытые
     # смены: отмеченный, но не вышедший водитель ослеплял бы проверку вечно.
     live = [n for n, d in on_shift if not d.get("shift_close_at")]
-    if len(live) > 1 and not any(geos[n]["fresh"] or geos[n]["watch_ok"] for n in live):
+    if len(live) > 1 and not any(geos[n]["fresh"] or geos[n]["stream"] for n in live):
         log.warning("[geo-watch] точек нет ни у кого на смене — молчим, это похоже на нашу проблему")
         out.update({"on_shift": len(on_shift), "blind": True})
         return out
@@ -542,22 +472,23 @@ async def tick(now: datetime = None) -> dict:
         ended = bool(d.get("shift_close_at")) or by_clock
 
         if not ended:
-            if not g["watch_ok"] and not off_since:
-                # Выключение трансляции обычно уже ушло мгновенным путём
-                # (on_stream); здесь оно ловится, только если бот водителя
-                # в тот момент лежал. Второй случай — два часа без движения.
-                why = "stream" if not g["stream"] else "still"
-                # Стояние — с якоря, а не с минуты, когда заметили: «стоял N»
-                # и «без движения с» должны сходиться с «на одном месте с».
-                since = _since_still(g, utc) if why == "still" else utc
-                await db.geo_watch_set(name, {"day": day, "off_since": since, "off_why": why})
-                await _owners(text_off(name, why, g, utc), EVENT_OFF)
-                log.info(f"[geo-watch] {name}: геопозиция пропала ({why})")
-                out["off"].append(name)
-            elif g["watch_ok"] and off_since:
-                why = st.get("off_why") or ""
+            if off_since and st.get("off_why") == "still":
+                # Отметка «два часа без движения» из прежнего правила: стоянка
+                # — не пропажа (19 сен 2026). Снимаем молча; выключена ли
+                # трансляция на самом деле — скажет следующий проход.
                 await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
-                await _owners(text_back(name, (utc - off_since).total_seconds(), why), EVENT_ON)
+            elif not g["stream"] and not off_since:
+                # Выключение обычно уже ушло мгновенным путём (on_stream);
+                # здесь оно ловится, только если бот водителя в тот момент
+                # лежал или у трансляции вышел срок.
+                await db.geo_watch_set(name, {"day": day, "off_since": utc, "off_why": "stream"})
+                await _owners(text_gone(name), EVENT_OFF, meta=geo_meta(name, False, self_=False))
+                log.info(f"[geo-watch] {name}: геопозиция выключена")
+                out["off"].append(name)
+            elif g["stream"] and off_since:
+                await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
+                await _owners(text_stream_on(name, (utc - off_since).total_seconds()), EVENT_ON,
+                              meta=geo_meta(name, True))
                 log.info(f"[geo-watch] {name}: геопозиция вернулась")
                 out["back"].append(name)
             continue
@@ -569,8 +500,9 @@ async def tick(now: datetime = None) -> dict:
             continue
         why = st.get("off_why") or ""
         await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
-        if g["watch_ok"] and why != "still":
-            await _owners(text_back(name, (utc - off_since).total_seconds(), why), EVENT_ON)
+        if g["stream"] and why == "stream":
+            await _owners(text_stream_on(name, (utc - off_since).total_seconds()), EVENT_ON,
+                          meta=geo_meta(name, True))
             out["back"].append(name)
 
     if out["off"] or out["back"] or out["locked"]:

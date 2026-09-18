@@ -356,8 +356,9 @@ async def _geo_state(name: str, since=None) -> dict:
             "left_min": 0 if endless else left, "endless": endless,
             "age_sec": int((now - at).total_seconds()) if at else None,
             "still_sec": still, "lost": lost, "stopped": stopped,
-            # для сторожа: трансляция идёт и человек не пропал
-            "watch_ok": live and not lost}
+            # для сторожа: трансляция идёт. Стоянка — не пропажа: водитель,
+            # который стоит, геопозицию не выключал (владелец, 19 сен 2026).
+            "watch_ok": live}
 
 
 def _must_left(d: dict) -> list:

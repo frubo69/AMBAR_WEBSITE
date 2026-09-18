@@ -2267,6 +2267,12 @@ body.safe-open .cvo-hdr{opacity:0}
 .fd-i .r{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--muted);flex-shrink:0}
 .fd-i.hot .r{color:var(--warn-t)}
 .fd-empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+/* Геопозиция водителей: включил — зелёным, выключил — красным; новое с
+   последнего просмотра — рамкой. */
+.fd-geo.on .ic{color:var(--up)}
+.fd-geo.off .ic{color:var(--dn)}
+.fd-geo.new.on{border-color:rgba(76,175,125,.45)}
+.fd-geo.new.off{border-color:rgba(224,85,85,.45);background:rgba(224,85,85,.06)}
 
 /* ── поддержка: очередь обращений + переписка ────────────────────────────
    Экран поделён на три зоны, и каждая читается сама по себе: шапка на своей
@@ -5430,25 +5436,27 @@ const IC_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" '
 // Строка водителя отвечает на «кому отдать следующий заказ», а не «как его
 // зовут»: имя и так известно. Поэтому в ней три вещи — связь, район вместе с
 // остатком трансляции и сколько заказов уже на руках.
-// Три состояния, а не два, и разница между ними существенная.
 //
-//   идёт трансляция  — водителя видно прямо сейчас и будет видно дальше;
-//   свежая точка     — он был здесь минуту назад, но приложение закрыл, и
-//                      следующей точки может не быть вовсе;
-//   молчит           — последнее, что знаем, устарело.
-//
-// Раньше первые два были одним зелёным огоньком, и закрытое приложение ещё
-// пять минут выглядело как живая связь. Это обманывало ровно там, где решают,
-// кому отдать заказ.
-// Живая трансляция — «на связи», пока водитель двигался меньше двух часов
-// назад (r.lost считает сервер по якорю стояния): точка из кармана раз в
-// несколько минут — стоянка, а не пропажа. Возраст точки решает только для
-// разовой точки из приложения.
+// Состояний два, как в панели владельца (владелец, 19 сен 2026: «либо у него
+// геолокация выключена — сам выключил или не включал вовсе, — либо он в
+// сети»). Стоит на месте — всё равно «в сети», зелёным: геопозицию он не
+// выключал, айфон на месте просто не шлёт точек. «Молчит» больше нет. Что
+// считать «в сети», решает сервер (r.online): идёт трансляция.
 function whState(r){
-  if(!r.has) return 'none';
-  if(r.stream) return r.lost ? 'lost' : 'stream';
-  if(r.live) return 'snap';
-  return 'stale';
+  const on = r.online !== undefined ? r.online : !!r.stream;
+  return on ? 'online' : 'off';
+}
+// Во сколько была последняя точка — по возрасту, часами телефона.
+function whAtTime(age){
+  try{ return new Date(Date.now() - (age || 0) * 1000).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}); }
+  catch(e){ return ''; }
+}
+// Почему выключена: выключил во столько-то, была сегодня и кончилась, или
+// сегодня не включал вовсе.
+function whOffWhy(r){
+  if(r.off_at) return 'выключил в ' + _hmDubai(r.off_at);
+  if(r.has && r.day && r.day === ((WH.data || {}).day)) return 'последняя точка в ' + whAtTime(r.age);
+  return 'сегодня не включал';
 }
 function whDur(sec){
   const m = Math.round((sec || 0) / 60);
@@ -5459,25 +5467,19 @@ function whDur(sec){
 
 function whRow(r, trackOn){
   const st = whState(r);
-  const cls = st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : (r.has ? '' : 'off'));
-  // Два разных вопроса, и на оба надо ответить одной строкой: видно ли его
-  // сейчас — и будет ли видно, когда он уберёт телефон в карман. Трансляция
-  // отвечает на второй, точка из приложения — только на первый.
-  let state;
-  if(st === 'none')        state = 'не транслирует';
-  else if(st === 'stream') state = `<b>на связи</b>${r.still >= 300
-      ? ` <i>· на месте ${whDur(r.still)}</i>`
-      : (r.left && r.left <= 60 * 24 * 3
-          ? ` <i>· трансляция ещё ${r.left < 60 ? r.left + ' мин'
-                                              : Math.floor(r.left / 60) + ' ч'}</i>` : '')}`;
-  else if(st === 'lost')   state = 'без движения ' + whDur(r.still);
-  else if(st === 'snap')   state = `<u>был здесь ${whAgo(r.age)}</u>`;
-  else                     state = 'молчит ' + whAgo(r.age).replace(' назад', '');
+  const cls = st === 'online' ? 'live' : 'off';
+  const state = st === 'online'
+    ? `<b>в сети</b>${r.still >= 300
+        ? ` <i>· стоит на месте ${whDur(r.still)}</i>`
+        : (r.left && r.left <= 60 * 24 * 3
+            ? ` <i>· трансляция ещё ${r.left < 60 ? r.left + ' мин'
+                                                : Math.floor(r.left / 60) + ' ч'}</i>` : '')}`
+    : `геолокация выключена <i>· ${whOffWhy(r)}</i>`;
   return `<button class="wh-r ${cls}${WH.sel === r.driver ? ' on' : ''}${
             r.panic ? ' panic' : ''}"
           onclick="whPick('${_esc(r.driver)}')">
     <span class="wh-i">${r.panic ? '<i class="wh-sos"></i>'
-      : (st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF))}</span>
+      : (st === 'online' ? IC_LIVE : IC_OFF)}</span>
     <span class="wh-b">
       <span class="wh-n"><span class="wh-nm">${_esc(r.driver)}</span>${
         r.panic ? '<u>скрытый режим</u>' : ''}</span>
@@ -5500,12 +5502,11 @@ function whPaint(){
   if(WH.view === 'card') return whCard();
   $('whTtl').textContent = 'Где водители';
   const rows = d.drivers || [];
-  const live = rows.filter(r => whState(r) === 'stream').length;
-  const snap = rows.filter(r => whState(r) === 'snap').length;
+  const live = rows.filter(r => whState(r) === 'online').length;
+  const off = rows.length - live;
   const work = rows.reduce((a, r) => a + (r.orders || 0), 0);
-  $('whSub').textContent = (live + snap) ? `${live + snap} из ${rows.length} видно`
-                         + (snap ? ` · ${live} на связи` : '')
-                         : (rows.length ? 'никого не видно' : 'водителей нет');
+  $('whSub').textContent = live ? `${live} из ${rows.length} в сети`
+                         : (rows.length ? 'никого нет в сети' : 'водителей нет');
   const trackOn = (d.track || []).length > 1;
   const группы = [];
   rows.forEach(r => {
@@ -5516,17 +5517,17 @@ function whPaint(){
   });
   const разметка = (rows.length ? `
     <div class="wh-sum">
-      <span class="ok"><b>${live}</b><i>на связи</i></span>
-      <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
+      <span class="ok"><b>${live}</b><i>в сети</i></span>
+      <span class="${off ? '' : 'dim'}"><b>${off}</b><i>выключена</i></span>
       <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${plural(work,'заказ','заказа','заказов')} в пути</i></span>
     </div>` + группы.map(g => {
-      const живых = g.rows.filter(r => whState(r) === 'stream').length;
+      const живых = g.rows.filter(r => whState(r) === 'online').length;
       const заказы = g.rows.reduce((a, r) => a + (r.orders || 0), 0);
       return `<div class="wh-card-d">
         <div class="wh-grp">
           <span class="wh-grp-c">${_esc(g.code || '')}</span>
           <span class="wh-grp-n">${_esc(g.name || '')}</span>
-          <span class="wh-grp-s">${живых ? `${живых} на связи`
+          <span class="wh-grp-s">${живых ? `${живых} в сети`
             : `${g.rows.length} ${plural(g.rows.length,'водитель','водителя','водителей')}`}${
             заказы ? ` · ${заказы} в пути` : ''}</span>
         </div>
@@ -5558,18 +5559,15 @@ function whCard(){
     : (r.age < 3600 ? Math.round(r.age / 60) + ' мин' : Math.floor(r.age / 3600) + ' ч'));
   let head, sub;
   if(r.panic){ head = 'скрытый режим'; sub = 'приложение стало игрой · писать в бот нельзя'; }
-  else if(st === 'stream'){ head = 'на связи'; sub = r.still >= 300
-      ? `на месте ${whDur(r.still)} · трансляция ${left || 'идёт'}`
-      : `трансляция ${left || 'идёт'} · точка ${когда}`; }
-  else if(st === 'lost'){ head = 'без движения'; sub = `${whDur(r.still)} на одном месте · трансляция ${left || 'идёт'}`; }
-  else if(st === 'snap'){ head = 'был здесь'; sub = `${whAgo(r.age)} · приложение закрыто`; }
-  else if(r.has){ head = 'молчит'; sub = `${whAgo(r.age).replace(' назад','')} · последняя известная точка`; }
-  else { head = 'не виден'; sub = 'геопозицией не делится'; }
+  else if(st === 'online'){ head = 'в сети'; sub = r.still >= 300
+      ? `стоит на месте ${whDur(r.still)}${left ? ' · трансляция ' + left : ''}`
+      : `в движении${left ? ' · трансляция ' + left : ''} · точка ${когда}`; }
+  else { head = 'геолокация выключена'; sub = whOffWhy(r); }
   whSet(`
-    <div class="wh-card ${st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : '')}${r.panic ? ' panic' : ''}">
+    <div class="wh-card ${st === 'online' ? 'live' : ''}${r.panic ? ' panic' : ''}">
       <div class="wh-card-top">
         <span class="wh-card-i">${r.panic ? '<i class="wh-sos"></i>'
-          : (st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF))}</span>
+          : (st === 'online' ? IC_LIVE : IC_OFF)}</span>
         <span class="wh-card-b">
           <span class="wh-card-n">${head}</span>
           <span class="wh-card-s">${sub}</span>
@@ -5639,9 +5637,8 @@ function whSelBar(){
   else{
     const st = whState(r);
     const что = ((WH.data || {}).track || []).length > 1 ? 'маршрут за смену на карте'
-      : (st === 'stream' ? 'на связи сейчас'
-      : (r.has ? 'был ' + whAgo(r.age) : 'не транслирует'));
-    el.innerHTML = `<span class="wh-sel-d ${st}"></span>
+      : (st === 'online' ? (r.still >= 300 ? 'в сети · стоит на месте' : 'в сети') : 'геолокация выключена');
+    el.innerHTML = `<span class="wh-sel-d ${st === 'online' ? 'stream' : ''}"></span>
       <span class="wh-sel-b"><b>${_esc(r.driver)}</b><i>${что}</i></span>
       <button class="wh-sel-x" onclick="whPick('${_esc(r.driver)}')"
               aria-label="Снять выбор"><svg viewBox="0 0 24 24" width="14" height="14"
@@ -5680,10 +5677,10 @@ function whMapPaint(){
     const st = whState(r);
     L.marker([r.lat, r.lon], {icon: L.divIcon({
         className:'', iconSize:[30,30], iconAnchor:[15,30],
-        html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}"><span>${
+        html:`<div class="wh-pin${st === 'online' ? '' : ' stale'}"><span>${
           _esc(r.code || '')}</span></div>`})})
      .addTo(WH.layer)
-     .bindTooltip(`${_esc(r.driver)} · ${whAgo(r.age)}`, {direction:'top'});
+     .bindTooltip(`${_esc(r.driver)} · ${st === 'online' ? 'в сети' : 'геолокация выключена'}`, {direction:'top'});
   });
 
   // Маршрут выбранного водителя — линией поверх меток, когда его попросили.
@@ -5817,8 +5814,7 @@ function whProfPaint(){
   const box = $('whProfBody'); if(!box) return;
   if(!r){ box.innerHTML = '<div class="wh-note" style="border:0">Водитель не найден</div>'; return; }
   const st = whState(r);
-  const когда = r.has ? (st === 'stream' ? 'на связи сейчас' : 'был ' + whAgo(r.age))
-                      : 'не транслирует';
+  const когда = st === 'online' ? 'в сети' : 'геолокация выключена';
   const где = [r.code, r.name].filter(Boolean).join(' ');
   box.innerHTML = `
     <div class="wh-prof-h">
@@ -6578,7 +6574,7 @@ let _approveAfterSave='';
 // Одно место, где видно всё незакрытое: просьба водителя, непринятый заказ,
 // просроченное время, вопрос без ответа. Плюс то, что уже сделано за смену —
 // чтобы понять, не потерялось ли что-то, пока смотрели в другую вкладку.
-let FEED={need:[],recent:[],count:0}, _fdT=null;
+let FEED={need:[],recent:[],geo:[],count:0}, _fdT=null;
 
 const FD_ICO={
   driver_req:'<path d="M3 16V7h11v9M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
@@ -6592,13 +6588,43 @@ const FD_ICO={
   cancelled:'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
   declined:'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
   accepted:'<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  geo_on:'<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+  geo_off:'<path d="M3 3l18 18"/><path d="M18.5 12.6A7.9 7.9 0 0 0 19 10a7 7 0 0 0-11.4-5.4"/><path d="M5.4 6.6A7 7 0 0 0 5 10c0 5.2 7 11 7 11a29 29 0 0 0 3.3-3.4"/>',
 };
 function _fdIco(k){
   return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${FD_ICO[k]||FD_ICO.pending}</svg>`;
 }
+// Геопозиция водителей своих районов — включил / выключил (владелец, 19 сен
+// 2026: операторам «не в чат телеграма, а внутрь миниаппа, в уведомления»).
+// Новое с последнего просмотра ленты — в счётчике «События» и подсказкой
+// сверху, пока приложение открыто. Просмотр помним на этом устройстве.
+let GEO_LAST = null;             // самое свежее, что уже всплыло подсказкой
+function _geoSeenKey(){ return 'op_geo_seen_' + (curOp || ''); }
+function _geoSeen(){ try{ return localStorage.getItem(_geoSeenKey()) || ''; }catch(e){ return ''; } }
+function _geoSeenSet(at){ try{ if(at) localStorage.setItem(_geoSeenKey(), at); }catch(e){} }
+function _geoNew(){ const seen=_geoSeen(); return (FEED.geo||[]).filter(x=>x.at>seen).length; }
+function geoToast(){
+  const g=FEED.geo||[], newest=g.length ? g[0].at : '';
+  // Первый заход — старое подсказкой не всплывает: оно ждёт в ленте.
+  if(GEO_LAST===null){ GEO_LAST=newest; return; }
+  const fresh=g.filter(x=>x.at>GEO_LAST);
+  if(!fresh.length) return;
+  GEO_LAST=newest;
+  const x=fresh[0];
+  toast(x.title+(x.district?' · '+x.district:'')+(fresh.length>1?' · ещё '+(fresh.length-1):''), x.on?'ok':'err');
+  haptic(x.on?'light':'heavy');
+}
+function _fdGeoRow(x, isNew){
+  return `<div class="fd-i fd-geo ${x.on?'on':'off'}${isNew?' new':''}">
+    ${_fdIco(x.on?'geo_on':'geo_off')}
+    <div class="b">
+      <div class="n">${_esc(x.title)}<span class="r">${_hmDubai(x.at)}</span></div>
+      ${x.district?`<div class="s">${_esc(x.district)}</div>`:''}
+    </div></div>`;
+}
 function fdBadge(){
   const el=$('fdCnt'), b=$('fdBtn'); if(!el) return;
-  const n=FEED.count||0;
+  const n=(FEED.count||0)+_geoNew();
   el.textContent = n ? ('События · '+n) : 'События';
   // На телефоне подпись скрыта — число переезжает на сам значок.
   b.dataset.n = n || 0;
@@ -6608,6 +6634,7 @@ async function loadFeed(){
   if(PANIC) return;              // спрятаны — в сеть не ходим
   if(!curOp) return;
   try{ FEED = await opApi.opFetch('/api/operator/feed',{params:{as:curOp}}); }catch(e){ return; }
+  geoToast();
   fdBadge();
   if($('fdOv').classList.contains('show')) fdRender();
 }
@@ -6631,7 +6658,7 @@ function _fdRow(x, hot){
     </div></button>`;
 }
 function fdRender(){
-  const need=FEED.need||[], rec=FEED.recent||[];
+  const need=FEED.need||[], rec=FEED.recent||[], geo=FEED.geo||[], seen=_geoSeen();
   // Просьбы водителя и просрочка — сверху и подсвечены: это то, что стоит.
   const hot=need.filter(x=>x.weight<=2), cold=need.filter(x=>x.weight>2);
   $('fdBody').innerHTML =
@@ -6640,8 +6667,12 @@ function fdRender(){
       `<div class="fd-empty">Всё разобрано.<br>Ни одного заказа без ответа.</div>`)
     + (cold.length?`<div class="fd-sec">На очереди · ${cold.length}</div>${
       cold.map(x=>_fdRow(x,'warm')).join('')}`:'')
+    + (geo.length?`<div class="fd-sec">Геопозиция водителей</div>${
+      geo.map(x=>_fdGeoRow(x, x.at>seen)).join('')}`:'')
     + (rec.length?`<div class="fd-sec">Сегодня уже сделано</div>${
       rec.map(x=>_fdRow(x,'')).join('')}`:'');
+  // Лента открыта — новое прочитано: счётчик на кнопке гаснет.
+  if(geo.length && geo[0].at>seen){ _geoSeenSet(geo[0].at); fdBadge(); }
 }
 // Из ленты — сразу в карточку заказа, даже если он в другой вкладке.
 function fdGo(oid){

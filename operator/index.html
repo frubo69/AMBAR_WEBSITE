@@ -198,6 +198,96 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .dchip.alien i{display:block;font-style:normal;font-size:9px;font-weight:600;opacity:.75;
   letter-spacing:.2px;margin-top:1px}
 .dchip.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--gold2)}
+/* ── Перемещение между районами: заявка от оператора (18 сен 2026) ─────────
+   Слева — что где лежит и чего не хватает району до нормы; справа — сама
+   заявка и «Сегодня»: кто взял, сколько довёз. Та же заявка, что у STAR. */
+.mvb{display:flex;width:min(1180px,96vw);height:min(820px,92vh);border-radius:20px;overflow:hidden;
+  background:var(--bg3);border:1px solid var(--border3);box-shadow:0 24px 80px rgba(0,0,0,.7)}
+.mvb-l{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--border2)}
+.mvb-r{width:390px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0}
+.mvb-hd{display:flex;align-items:flex-start;gap:10px;padding:18px 18px 10px}
+.mvb-hd .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700}
+.mvb-hd .s{font-size:12px;color:var(--sub);margin-top:3px}
+.mvb-to{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 10px}
+.mvb-tool{display:flex;gap:8px;padding:0 18px 10px}
+.mvb-q{flex:1;min-width:0;height:42px;padding:0 13px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card);color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.mvb-q:focus{border-color:rgba(201,169,110,.5)}
+.mvb-fill{flex:0 0 auto;height:42px;padding:0 15px;border-radius:12px;border:1px solid rgba(201,169,110,.5);
+  background:var(--gold-soft);color:var(--gold2);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.mvb-fill:active{transform:scale(.98)}
+.mvb-fill:disabled{opacity:.45;cursor:default}
+.mvb-list{flex:1;overflow-y:auto;padding:0 12px 14px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.mvb-sec{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 6px 7px}
+.mvb-p{display:flex;gap:11px;align-items:flex-start;padding:10px;margin:0 0 6px;border-radius:13px;
+  background:var(--card);border:1px solid var(--border2)}
+.mvb-p.need{border-color:rgba(243,180,74,.32)}
+.mvb-img{flex:0 0 46px;width:46px;height:46px;border-radius:10px;object-fit:cover;background:var(--card2)}
+.mvb-b{flex:1;min-width:0}
+.mvb-n{font-size:13.5px;font-weight:700;line-height:1.25}
+.mvb-m{font-size:12px;color:var(--sub);margin-top:2px}
+.mvb-m b{color:var(--warn);font-weight:700}
+.mvb-src{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mvb-sb{display:flex;align-items:center;gap:6px;height:34px;padding:0 11px;border-radius:10px;border:1px solid var(--border3);
+  background:var(--card2);color:var(--text);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+.mvb-sb:active{transform:scale(.97)}
+.mvb-sb i{font-style:normal;color:var(--sub);font-weight:500}
+.mvb-sb.on{border-color:rgba(201,169,110,.6);background:var(--gold-soft);color:var(--gold2)}
+.mvb-sb.nocode i{color:var(--warn)}
+.mvb-none{font-size:12px;color:var(--muted);margin:6px 2px}
+.mvb-cart{flex:1;min-height:0;overflow-y:auto;padding:0 16px;-webkit-overflow-scrolling:touch}
+.mvb-li{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border2)}
+.mvb-li .nm{flex:1;min-width:0;font-size:13px;font-weight:700;line-height:1.25}
+.mvb-li .nm i{display:block;font-style:normal;font-size:11.5px;color:var(--sub);font-weight:500;margin-top:1px}
+.mvb-st{display:flex;align-items:center;gap:3px}
+.mvb-st button{width:32px;height:32px;border-radius:9px;border:1px solid var(--border3);background:var(--card2);
+  color:var(--text);font-family:inherit;font-size:17px;line-height:1;cursor:pointer}
+.mvb-st button:active{transform:scale(.94)}
+.mvb-st b{min-width:38px;text-align:center;font-size:14px}
+.mvb-x{width:30px;height:32px;border:none;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mvb-x svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.mvb-note{width:100%;margin:10px 0 0;padding:10px 12px;border-radius:11px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;outline:none}
+.mvb-foot{padding:12px 16px 14px;border-top:1px solid var(--border2)}
+.mvb-tot{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);margin-bottom:10px}
+.mvb-tot b{color:var(--text)}
+.mvb-go{width:100%;height:50px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#1a1408;font-family:inherit;font-size:15.5px;font-weight:800;cursor:pointer}
+.mvb-go:active{transform:scale(.99)}
+.mvb-go:disabled{opacity:.45;cursor:default;transform:none}
+.mvb-live{flex:0 0 auto;max-height:38%;overflow-y:auto;border-top:1px solid var(--border2);padding:2px 16px 12px}
+.mvb-t{padding:9px 0;border-bottom:1px solid var(--border2);font-size:12.5px}
+.mvb-t:last-child{border-bottom:none}
+.mvb-t .h{display:flex;justify-content:space-between;gap:8px}
+.mvb-t .h b{font-size:13px}
+.mvb-t .h em{font-style:normal;font-size:11.5px;font-weight:700;white-space:nowrap}
+.mvb-t .h em.free{color:var(--warn)} .mvb-t .h em.claimed,.mvb-t .h em.live{color:var(--info)}
+.mvb-t .h em.done{color:var(--up)} .mvb-t .h em.cancelled{color:var(--muted)}
+.mvb-t .sub{color:var(--sub);margin-top:2px}
+.mvb-t button{margin-top:7px;height:30px;padding:0 12px;border-radius:9px;border:1px solid var(--border3);background:none;
+  color:var(--sub);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.mvb-t button.sure{border-color:rgba(224,85,85,.5);color:var(--dn)}
+.mvb-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  text-align:center;color:var(--muted);font-size:13px;padding:24px}
+.mvb-empty b{color:var(--sub);font-size:14px}
+.mvb-chev{display:none}
+/* На телефоне экран один: товар занимает его целиком, а заявка внизу свёрнута
+   в строку «Заявка · 4 строки · 12 ед.» с кнопкой — раскрывается нажатием. */
+@media (max-width:760px){
+  #mvbOv{padding:0;align-items:stretch}
+  .mvb{flex-direction:column;width:100vw;height:100dvh;border-radius:0;border:none}
+  .mvb-l{border-right:none;min-height:0}
+  .mvb-r{width:auto;flex:0 0 auto;border-top:1px solid var(--border3);background:var(--bg3)}
+  .mvb-r .mvb-hd{cursor:pointer;padding:12px 16px 6px}
+  .mvb-chev{display:flex;margin-left:auto;align-self:center;color:var(--sub);transition:transform .2s var(--e1)}
+  .mvb-chev svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mvb.open .mvb-chev{transform:rotate(180deg)}
+  .mvb .mvb-cart,.mvb .mvb-live{display:none}
+  .mvb.open .mvb-cart{display:block;max-height:42dvh}
+  .mvb.open .mvb-live{display:block;max-height:24dvh}
+  .mvb-foot{padding-top:8px}
+  #moveBtn{display:none}
+}
 /* Отпущенный раньше водитель (18 сен 2026): виден, но не выбирается — новый
    заказ ему назначать нельзя, он уже закрывает смену. */
 .dchip.off{opacity:.5;cursor:default;border-style:dashed}
@@ -2554,6 +2644,9 @@ html.kb body{padding-bottom:40vh}
         <button class="pill" id="whereBtn" onclick="whereOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle
           cx="12" cy="10" r="2.6"/></svg><span id="whereLbl">Водители</span></button>
+        <button class="pill" id="moveBtn" onclick="mvbOpen()"><svg class="ic" viewBox="0 0 24 24"
+          aria-hidden="true"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></svg><span
+          id="moveLbl">Перемещения</span></button>
         <button class="pill" id="shiftBtn" onclick="shiftOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span
           id="shiftLbl">Смена</span></button>
@@ -2721,6 +2814,11 @@ html.kb body{padding-bottom:40vh}
       <button class="sbtn" onclick="hideOv('shLogOv')">Закрыть</button>
     </div>
   </div>
+</div>
+
+<!-- Перемещение между районами: заявка от оператора (18 сен 2026). -->
+<div class="ov" id="mvbOv" onclick="if(event.target===this)mvbClose()">
+  <div class="mvb" id="mvb"></div>
 </div>
 
 <!-- Просьба водителя закрыть смену раньше: контекст и решение (18 сен 2026). -->
@@ -4403,6 +4501,245 @@ function _decline(oid, r){
   })();
 }
 
+// ── перемещение между районами: заявка от оператора (18 сен 2026) ────────────
+// Владелец: «сделай так, чтобы операторы могли создавать заявку на перемещение —
+// ровно такую, как сегодня водители видят, и предельно удобно». Заявка та же,
+// что собирает STAR: водители района-получателя видят её в «Товаре», берут и
+// сканируют. Оператор собирает её в свой район: по каждой позиции видно, где
+// она лежит и сколько там кодов (столько сканером и возьмут), чего не хватает
+// до нормы; «Собрать по норме» кладёт в заявку готовый расчёт, как у STAR, и
+// дальше строки правятся руками. Черновик живёт в телефоне — случайно закрыли
+// окно, вернулись, а набранное на месте.
+let MVB = {board:null, live:null, to:'', q:'', busy:false, t:null, sure:'', open:false};
+let MVDS = {};                                   // черновики по районам: {jvc:{lines, note}}
+try{ const x = JSON.parse(localStorage.getItem('op_mv_drafts') || 'null'); if(x && typeof x === 'object') MVDS = x; }catch(e){}
+function _mvdSave(){ try{ localStorage.setItem('op_mv_drafts', JSON.stringify(MVDS)); }catch(e){} }
+function _mvDraft(){ return MVDS[MVB.to] || (MVDS[MVB.to] = {lines:[], note:''}); }
+function _mvP(id){ return ((MVB.board||{}).products||[]).find(x=>x.id===id) || {}; }
+function _mvStep(p){ return (p && p.unit > 1) ? 0.5 : 1; }
+function _mvR(v){ return Math.round((+v||0) * 2) / 2; }
+function _mvQ(v, p){
+  const n = _mvR(v), t = n % 1 ? String(n).replace('.', ',') : String(n);
+  return p && p.unit > 1 ? t + ' кор.' : t + ' шт';
+}
+function _mvCode(id){ const d = ((MVB.board||{}).districts||[]).find(x=>x.id===id); return d ? d.code : id; }
+function _mvDName(id){ const d = ((MVB.board||{}).districts||[]).find(x=>x.id===id); return d ? `${d.code} ${d.name}` : id; }
+function _mvIn(pid){ return _mvDraft().lines.filter(l=>l.id===pid).reduce((a,l)=>a+(+l.qty||0), 0); }
+
+async function mvbOpen(){
+  if(!curOp){ showOv('opOv'); return; }
+  showOv('mvbOv'); haptic('light');
+  MVB.q = ''; MVB.sure = '';
+  await mvbLoad(MVB.to || '');
+  mvbLive();
+  if(MVB.t) clearInterval(MVB.t);
+  // «Сегодня» живёт: водитель взял, довёз — видно без перезапуска.
+  MVB.t = setInterval(()=>{ if(!document.hidden && $('mvbOv').classList.contains('show')) mvbLive(); }, 5000);
+}
+function mvbClose(){ hideOv('mvbOv'); if(MVB.t){ clearInterval(MVB.t); MVB.t = null; } }
+async function mvbLoad(to){
+  MVB.board = null; mvbPaint();
+  try{ MVB.board = await opApi.opFetch('/api/operator/move/board', {params:{as:curOp, ...(to ? {to} : {})}}); }
+  catch(e){ $('mvb').innerHTML = `<div class="mvb-empty"><b>Не удалось загрузить остатки</b>Проверьте связь и откройте ещё раз</div>`; return; }
+  MVB.to = MVB.board.to;
+  mvbPaint();
+}
+async function mvbLive(){
+  try{ MVB.live = await opApi.opFetch('/api/operator/move/live', {params:{as:curOp}}); }catch(e){ return; }
+  const el = $('mvbLive'); if(el) el.innerHTML = mvbLiveHtml();
+}
+function mvbTo(id){ if(id === MVB.to) return; haptic('sel'); mvbLoad(id); }
+function mvbFind(v){
+  MVB.q = v; const box = $('mvbList'); if(box) box.innerHTML = mvbListHtml();
+}
+
+// Строки товара: сначала то, чего району не хватает до нормы (больше всего
+// нехватки — выше), потом всё остальное, что где-то лежит. Нажатие на район
+// кладёт позицию в заявку сразу нужным числом.
+function mvbListHtml(){
+  const B = MVB.board; if(!B) return '';
+  const to = MVB.to, q = MVB.q.trim().toLowerCase();
+  const rows = (B.products||[]).filter(p=>!q || String(p.name).toLowerCase().includes(q)).map(p=>{
+    const have = +(p.have||{})[to] || 0, norm = (p.norm||{})[to];
+    const need = norm != null ? Math.max(0, _mvR(norm - have - _mvIn(p.id))) : 0;
+    const srcs = (B.districts||[]).filter(d=>d.id !== to && (+(p.have||{})[d.id] || 0) > 0)
+      .sort((a,b)=>(+(p.have||{})[b.id]||0) - (+(p.have||{})[a.id]||0));
+    return {p, have, norm, need, srcs};
+  }).filter(r=>q || r.srcs.length);
+  const needR = rows.filter(r=>r.need > 0).sort((a,b)=>b.need - a.need);
+  const rest = rows.filter(r=>r.need <= 0).sort((a,b)=>String(a.p.name).localeCompare(String(b.p.name)));
+  const D = _mvDraft();
+  const row = r => {
+    const p = r.p;
+    const src = r.srcs.length ? `<div class="mvb-src">${r.srcs.map(d=>{
+        const h = +(p.have||{})[d.id] || 0, c = +(p.codes||{})[d.id] || 0;
+        const on = D.lines.some(l=>l.id===p.id && l.from===d.id);
+        return `<button class="mvb-sb${on ? ' on' : ''}${c < h ? ' nocode' : ''}" onclick="mvbAdd('${_esc(p.id)}','${_esc(d.id)}')"
+          title="${c < h ? 'Кодов меньше, чем бутылок: сканером возьмут ' + c : ''}">${_esc(d.code)}<i>${_mvQ(h, p)}${c < h ? ' · кодов ' + _mvR(c) : ''}</i></button>`;
+      }).join('')}</div>` : `<div class="mvb-none">Ни в одном районе нет</div>`;
+    return `<div class="mvb-p${r.need > 0 ? ' need' : ''}">
+      <img class="mvb-img" src="${_esc(p.img || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div class="mvb-b">
+        <div class="mvb-n">${_esc(p.name)}</div>
+        <div class="mvb-m">у вас ${_mvQ(r.have, p)}${r.norm != null ? ' · норма ' + _mvR(r.norm) : ''}${
+          r.need > 0 ? ` · <b>не хватает ${_mvQ(r.need, p)}</b>` : ''}</div>
+        ${src}
+      </div></div>`;
+  };
+  if(!needR.length && !rest.length)
+    return `<div class="mvb-none" style="padding:14px 6px">${q ? 'Ничего не нашли' : 'Ни в одном районе нет товара'}</div>`;
+  return (needR.length ? `<div class="mvb-sec">Не хватает до нормы · ${needR.length}</div>` + needR.map(row).join('') : '')
+    + (rest.length ? `<div class="mvb-sec">${q ? 'Нашли' : 'Остальное, что где-то лежит'}</div>` + rest.map(row).join('') : '');
+}
+
+function mvbCartHtml(){
+  const D = _mvDraft();
+  if(!D.lines.length) return `<div class="mvb-empty"><b>Заявка пустая</b>Нажмите на район у позиции слева — она ляжет сюда.<br>Или «Собрать по норме» — всё сразу.</div>`;
+  return D.lines.map((l, i)=>{
+    const p = _mvP(l.id);
+    return `<div class="mvb-li">
+      <div class="nm">${_esc(p.name || l.id)}<i>из ${_esc(_mvDName(l.from))}</i></div>
+      <div class="mvb-st"><button onclick="mvbQty(${i},-1)" aria-label="Меньше">−</button><b>${_mvR(l.qty)}</b><button onclick="mvbQty(${i},1)" aria-label="Больше">+</button></div>
+      <button class="mvb-x" onclick="mvbDel(${i})" aria-label="Убрать"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>`;
+  }).join('');
+}
+function mvbLiveHtml(){
+  const T = (MVB.live && MVB.live.tasks) || [];
+  const ST = {free:'свободна', claimed:'взяли', live:'везут', done:'довезено', cancelled:'снята'};
+  return `<div class="mvb-sec">Сегодня${T.length ? ' · ' + T.length : ''}</div>` + (T.length ? T.map(t=>{
+    const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
+    const who = t.driver ? ` · ${_esc(t.driver)}` : '';
+    const can = t.side === 'in' && (t.status === 'free' || t.status === 'claimed') && !(+t.got);
+    const key = t.move_id + '/' + t.district;
+    return `<div class="mvb-t">
+      <div class="h"><b>${_esc(from)} → ${_esc(t.district_code)}</b><em class="${t.status}">${ST[t.status] || t.status}${who}</em></div>
+      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · ${_mvR(t.got)} из ${_mvR(t.need)}${t.by ? ' · ' + _esc(t.by) : ''}</div>
+      ${can ? `<button class="${MVB.sure === key ? 'sure' : ''}" onclick="mvbCancel('${_esc(t.move_id)}','${_esc(t.district)}')">${
+          MVB.sure === key ? 'Точно снять?' : 'Снять'}</button>` : ''}
+    </div>`;
+  }).join('') : `<div class="mvb-none">Перемещений к вам и от вас пока нет</div>`);
+}
+function mvbPaint(){
+  const box = $('mvb'); if(!box) return;
+  const B = MVB.board;
+  if(!B){ box.innerHTML = `<div class="mvb-empty"><b>Смотрим остатки по районам…</b></div>`; return; }
+  const D = _mvDraft();
+  const mine = (B.districts||[]).filter(d=>d.mine);
+  const units = D.lines.reduce((a,l)=>a + (+l.qty||0), 0);
+  const sug = (B.suggest||[]).filter(r=>!D.lines.some(l=>l.id===r.id && l.from===r.from)).length;
+  box.innerHTML = `
+    <div class="mvb-l">
+      <div class="mvb-hd"><div><div class="t">Перемещение в ${_esc(_mvDName(MVB.to))}</div>
+        <div class="s">Нажмите на район у позиции — она ляжет в заявку нужным числом</div></div>
+        <button class="wh-x" style="margin-left:auto" onclick="mvbClose()" aria-label="Закрыть">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      ${mine.length > 1 ? `<div class="mvb-to">${mine.map(d=>`<button class="dchip${d.id === MVB.to ? ' on' : ''}" onclick="mvbTo('${_esc(d.id)}')">${_esc(d.code)} ${_esc(d.name)}</button>`).join('')}</div>` : ''}
+      <div class="mvb-tool">
+        <input class="mvb-q" placeholder="Найти позицию" value="${_esc(MVB.q)}" oninput="mvbFind(this.value)" autocomplete="off">
+        <button class="mvb-fill" ${sug ? '' : 'disabled'} onclick="mvbFill()">Собрать по норме${sug ? ' · ' + sug : ''}</button>
+      </div>
+      <div class="mvb-list" id="mvbList">${mvbListHtml()}</div>
+    </div>
+    <div class="mvb-r">
+      <div class="mvb-hd" onclick="mvbToggle(event)"><div><div class="t">Заявка</div>
+        <div class="s">${D.lines.length ? `${D.lines.length} ${plural(D.lines.length,'строка','строки','строк')} · водители ${_esc(_mvCode(MVB.to))} увидят её сразу` : 'Пока пусто'}</div></div>
+        ${D.lines.length ? `<button class="mvb-x" style="margin-left:auto;width:auto;padding:0 8px;font-family:inherit;font-size:12.5px" onclick="event.stopPropagation();mvbClear()">Очистить</button>` : ''}
+        <span class="mvb-chev"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></span></div>
+      <div class="mvb-cart">${mvbCartHtml()}
+        ${D.lines.length ? `<input class="mvb-note" placeholder="Слово водителю (необязательно)" maxlength="200" value="${_esc(D.note || '')}" oninput="mvbNote(this.value)">` : ''}
+      </div>
+      <div class="mvb-foot">
+        <div class="mvb-tot"><span>Всего</span><b>${_mvR(units)} ед.</b></div>
+        <button class="mvb-go" ${D.lines.length && !MVB.busy ? '' : 'disabled'} onclick="mvbSend()">${MVB.busy ? 'Создаю…' : 'Создать заявку'}</button>
+      </div>
+      <div class="mvb-live" id="mvbLive">${mvbLiveHtml()}</div>
+    </div>`;
+  box.classList.toggle('open', !!MVB.open);
+}
+function mvbToggle(e){
+  if(!matchMedia('(max-width:760px)').matches) return;       // на планшете заявка всегда видна
+  MVB.open = !MVB.open; haptic('light');
+  $('mvb').classList.toggle('open', MVB.open);
+}
+function mvbAdd(pid, from){
+  const p = _mvP(pid), D = _mvDraft(), step = _mvStep(p);
+  const have = +(p.have||{})[MVB.to] || 0, norm = (p.norm||{})[MVB.to];
+  const avail = +(p.have||{})[from] || 0;
+  const line = D.lines.find(l=>l.id===pid && l.from===from);
+  if(line){
+    if(line.qty + step > avail){ toast(`В ${_mvCode(from)} больше нет — там ${_mvQ(avail, p)}`, 'err'); return; }
+    line.qty = _mvR(line.qty + step);
+  }else{
+    const need = norm != null ? Math.max(0, _mvR(norm - have - _mvIn(pid))) : 0;
+    D.lines.push({id: pid, from, qty: Math.max(step, Math.min(avail, need > 0 ? need : step))});
+  }
+  _mvdSave(); haptic('sel'); mvbPaint();
+}
+function mvbQty(i, dir){
+  const D = _mvDraft(), l = D.lines[i]; if(!l) return;
+  const p = _mvP(l.id), step = _mvStep(p), avail = +(p.have||{})[l.from] || 0;
+  const v = _mvR(l.qty + dir * step);
+  if(v <= 0){ D.lines.splice(i, 1); }
+  else if(v > avail){ toast(`В ${_mvCode(l.from)} больше нет — там ${_mvQ(avail, p)}`, 'err'); return; }
+  else l.qty = v;
+  _mvdSave(); haptic('sel'); mvbPaint();
+}
+function mvbDel(i){ _mvDraft().lines.splice(i, 1); _mvdSave(); haptic('light'); mvbPaint(); }
+function mvbClear(){ MVDS[MVB.to] = {lines:[], note:''}; _mvdSave(); haptic('light'); mvbPaint(); }
+function mvbNote(v){ _mvDraft().note = v; _mvdSave(); }
+function mvbFill(){
+  const D = _mvDraft(); let n = 0;
+  (MVB.board.suggest || []).forEach(r=>{
+    if(D.lines.some(l=>l.id===r.id && l.from===r.from)) return;
+    D.lines.push({id: r.id, from: r.from, qty: r.qty}); n++;
+  });
+  _mvdSave(); haptic('medium'); mvbPaint();
+  toast(n ? `По норме: ${n} ${plural(n,'строка','строки','строк')} в заявке` : 'Всё из нормы уже в заявке');
+}
+async function mvbSend(){
+  const D = _mvDraft(); if(!D.lines.length || MVB.busy) return;
+  MVB.busy = true; mvbPaint();
+  try{
+    const r = await opApi.opFetch('/api/operator/move/create', {method:'POST',
+      body:{as: curOp, to: MVB.to, lines: D.lines.map(l=>({from:l.from, id:l.id, qty:l.qty})), note: D.note || ''}});
+    MVDS[MVB.to] = {lines:[], note:''}; _mvdSave();
+    toast(`Заявка создана · водители ${_mvCode(MVB.to)} уже её видят${r.skipped && r.skipped.length ? ' · ' + r.skipped.length + ' строк не взято' : ''}`, 'ok');
+    haptic('heavy');
+    MVB.busy = false;
+    await mvbLoad(MVB.to); mvbLive();
+    return;
+  }catch(e){
+    const d = (e && e.payload) || {};
+    toast(d.error === 'test_mode' ? 'В тест-режиме настоящую заявку не создать'
+        : d.error === 'not_yours' ? 'Это не ваш район'
+        : d.error === 'empty' ? 'Ни одной строки нельзя везти — проверьте районы и количество'
+        : 'Не получилось — повторите', 'err');
+  }
+  MVB.busy = false; mvbPaint();
+}
+// Снять — двумя нажатиями: первое спрашивает, второе снимает. Окно поверх окна
+// ради одной кнопки — лишнее.
+async function mvbCancel(mid, district){
+  const key = mid + '/' + district;
+  if(MVB.sure !== key){
+    MVB.sure = key; haptic('light');
+    const el = $('mvbLive'); if(el) el.innerHTML = mvbLiveHtml();
+    setTimeout(()=>{ if(MVB.sure === key){ MVB.sure = ''; const e2 = $('mvbLive'); if(e2) e2.innerHTML = mvbLiveHtml(); } }, 4000);
+    return;
+  }
+  MVB.sure = '';
+  try{
+    await opApi.opFetch('/api/operator/move/cancel', {method:'POST', body:{as: curOp, move_id: mid, district}});
+    toast('Снято · у водителей её больше нет', 'ok'); haptic('medium');
+  }catch(e){
+    const d = (e && e.payload) || {};
+    toast(d.error === 'started' ? `${d.driver || 'Водитель'} уже везёт — снять нельзя`
+        : d.error === 'gone' ? 'Её уже нет' : 'Не получилось — повторите', 'err');
+  }
+  mvbLive();
+}
+
 // ── просьба водителя закрыть смену раньше (18 сен 2026) ──────────────────────
 // Водитель доставил все заказы и просит отпустить. Решает оператор его района
 // и старший: «Отпустить» — с выбором питания за день, 80 или 40; «Не сейчас» —
@@ -5392,6 +5729,7 @@ let WH_PROF = null;
 // самих кнопок — они и так его знают, и второй источник правды здесь был бы
 // лишним.
 const MORE_ITEMS = [
+  {id:'moveBtn',  t:'Перемещения', ico:'<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>'},
   {id:'dayBtn',   t:'День',  ico:'<rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/>'},
   // Тест-режим — только тестерам (сервер отдаёт test_allowed); строка
   // показывает, включён он или нет, нажатие переключает и перезагружает панель.

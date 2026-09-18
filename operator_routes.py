@@ -1975,6 +1975,88 @@ async def handle_feed(request):
     }, headers=CORS_HEADERS)
 
 
+# ── перемещение между районами: заявка от оператора (18 сен 2026) ──────────────
+# Та же заявка, что собирает STAR, и те же водители её видят; оператор собирает
+# её в свой район. Логика — в move_routes (board / create_by_operator / live_for /
+# cancel_by_operator), здесь только кто за планшетом и какие у него районы.
+async def _op_scope(request, who: str) -> tuple:
+    districts = await _fresh_districts()
+    people = _people_for(request, districts)
+    scope = _scope(people, who, districts)
+    order = [d["id"] for d in districts if d["id"] in scope]
+    return scope, order
+
+
+def _mv_json(obj, status=200):
+    return web.json_response(obj, status=status, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str, ensure_ascii=False))
+
+
+@require_operator
+async def handle_move_board(request):
+    """GET ?as=&to= — что лежит по районам и чего не хватает району to."""
+    import move_routes
+    who = (request.query.get("as") or "").strip()
+    scope, order = await _op_scope(request, who)
+    if not scope:
+        return _mv_json({"error": "not_yours"}, 403)
+    to = (request.query.get("to") or "").strip()
+    if to not in scope:
+        to = order[0]
+    res = await move_routes.board(to, scope)
+    res["mine"] = order
+    return _mv_json(res)
+
+
+@require_operator
+async def handle_move_create(request):
+    """POST {as, to, lines:[{from, id, qty}], note} — заявка в свой район."""
+    import move_routes
+    if _tflag(request):
+        return _mv_json({"error": "test_mode"}, 403)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    who = str(body.get("as") or "").strip()
+    scope, _ = await _op_scope(request, who)
+    if not scope:
+        return _mv_json({"error": "not_yours"}, 403)
+    r = await move_routes.create_by_operator(who, str(body.get("to") or "").strip(),
+                                             body.get("lines") or [], str(body.get("note") or ""), scope)
+    return _mv_json(r, 200 if r.get("ok") else (403 if r.get("error") == "not_yours" else 400))
+
+
+@require_operator
+async def handle_move_live(request):
+    """GET ?as= — перемещения к районам оператора и от них: кто взял, сколько довёз."""
+    import move_routes
+    who = (request.query.get("as") or "").strip()
+    scope, _ = await _op_scope(request, who)
+    if not scope:
+        return _mv_json({"error": "not_yours"}, 403)
+    return _mv_json(await move_routes.live_for(scope))
+
+
+@require_operator
+async def handle_move_cancel(request):
+    """POST {as, move_id, district} — снять неначатую задачу своего района."""
+    import move_routes
+    if _tflag(request):
+        return _mv_json({"error": "test_mode"}, 403)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    who = str(body.get("as") or "").strip()
+    scope, _ = await _op_scope(request, who)
+    if not scope:
+        return _mv_json({"error": "not_yours"}, 403)
+    r = await move_routes.cancel_by_operator(str(body.get("move_id") or ""),
+                                             str(body.get("district") or ""), scope)
+    return _mv_json(r, 200 if r.get("ok") else 409)
+
+
 # ── просьба закрыть смену раньше (18 сен 2026) ────────────────────────────────
 @require_operator
 async def handle_close_decide(request):
@@ -3322,6 +3404,13 @@ def setup(app):
     r.add_get("/api/operator/orders", handle_list)
     r.add_route("OPTIONS", "/api/operator/close-request", _opt)
     r.add_post("/api/operator/close-request", handle_close_decide)
+    for _p in ("/api/operator/move/board", "/api/operator/move/live",
+               "/api/operator/move/create", "/api/operator/move/cancel"):
+        r.add_route("OPTIONS", _p, _opt)
+    r.add_get("/api/operator/move/board", handle_move_board)
+    r.add_get("/api/operator/move/live", handle_move_live)
+    r.add_post("/api/operator/move/create", handle_move_create)
+    r.add_post("/api/operator/move/cancel", handle_move_cancel)
     r.add_post("/api/operator/orders", handle_create)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}", _opt)
     r.add_patch("/api/operator/orders/{oid}", handle_patch)

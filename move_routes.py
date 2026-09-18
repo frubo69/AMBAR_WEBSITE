@@ -371,6 +371,86 @@ async def plan(day: str = "") -> dict:
             "districts": sorted({r["to_code"] for r in rows})}
 
 
+# ── Заявка от оператора (владелец, 18 сен 2026) ──────────────────────────────
+# «Сделай так, чтобы операторы могли создавать заявку на перемещение — ровно
+# такую, как сегодня водители видят, и предельно удобно». Заявка та же самая
+# (create), водители видят её так же; меняется только то, кто её собирает.
+# Оператор собирает перемещение В СВОЙ район: ему видно, где чего лежит и чего
+# у него не хватает до нормы, а готовое предложение «по норме» — тот же расчёт,
+# что у STAR, только для одного района.
+async def board(to: str, scope: set) -> dict:
+    """Всё, что нужно, чтобы собрать заявку в район to: по каждой позиции —
+    сколько лежит в каждом районе, сколько там кодов (столько сканером и
+    возьмут), норма; и предложение по норме для этого района."""
+    day = sr._biz_day()
+    cat = sr._catalog()
+    base = await sr._district_base(day)
+    norms = await db.get_stock_norms()
+    try:
+        reg = await db.qr_by_product_district_all()
+    except Exception as e:                            # noqa: BLE001
+        log.warning(f"[move] реестр кодов не прочитан: {e}")
+        reg = {}
+    products = []
+    for pid, p in cat.items():
+        have = {oid: sr._num(((base.get(oid) or {}).get("have_exact") or {}).get(pid) or 0) for oid in OFFICE_IDS}
+        codes = {oid: sr._num((reg.get(oid) or {}).get(pid) or 0) for oid in OFFICE_IDS}
+        norm = {oid: sr._num(norms[f"{oid}:{pid}"]) for oid in OFFICE_IDS if f"{oid}:{pid}" in norms}
+        # Нигде не лежит и нигде не нужна — в списке ей делать нечего.
+        if not any(have.values()) and not any(norm.values()):
+            continue
+        products.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
+                         "img": p.get("img", ""), "unit": sr._unit(p),
+                         "have": have, "codes": codes, "norm": norm})
+    pl = await plan(day)
+    return {"day": day, "to": to,
+            "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
+                           "mine": o in scope} for o in OFFICE_IDS],
+            "products": products,
+            "suggest": [r for r in pl["rows"] if r["to"] == to]}
+
+
+async def create_by_operator(who: str, to: str, lines: list, note: str, scope: set) -> dict:
+    """Заявка оператора: всё в один район (свой), откуда — по строкам."""
+    if to not in scope:
+        return {"ok": False, "error": "not_yours"}
+    rows = [{"from": str(l.get("from") or ""), "to": to, "id": str(l.get("id") or ""),
+             "qty": l.get("qty")} for l in (lines or []) if isinstance(l, dict)]
+    r = await create(rows, by=f"{who} · оператор", note=note)
+    return r
+
+
+async def live_for(scope: set) -> dict:
+    """Перемещения, которые касаются районов оператора: везут к ним или от них."""
+    lv = await live()
+    out = []
+    for v in lv["tasks"]:
+        into = v["district"] in scope
+        away = any(l.get("from") in scope for l in v["lines"])
+        if not (into or away):
+            continue
+        out.append({**v, "side": "in" if into else "out"})
+    return {"day": lv["day"], "tasks": out,
+            "open": sum(1 for v in out if v["status"] not in ("done", "cancelled"))}
+
+
+async def cancel_by_operator(mid: str, district: str, scope: set) -> dict:
+    """Снять неначатую задачу своего района. Начатую — нельзя: часть бутылок
+    уже в машине, и снимать поздно; это решает владелец в STAR."""
+    if district not in scope:
+        return {"ok": False, "error": "not_yours"}
+    doc = await db.move_order_get(mid)
+    t = ((doc or {}).get("tasks") or {}).get(district)
+    if not t or t.get("done_at") or t.get("cancelled_at"):
+        return {"ok": False, "error": "gone"}
+    if any(float(l.get("got") or 0) > 0 for l in (t.get("lines") or [])):
+        return {"ok": False, "error": "started", "driver": t.get("driver") or ""}
+    ok = await db.move_order_cancel(mid, district, _now())
+    if ok:
+        log.info(f"[move] {mid}/{district}: оператор снял задачу")
+    return {"ok": bool(ok)}
+
+
 # ── Ручки ────────────────────────────────────────────────────────────────────
 async def handle_drv_list(request):
     me = request["driver"]

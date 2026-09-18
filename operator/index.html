@@ -4653,7 +4653,8 @@ function mvbLiveHtml(){
   const ST = {free:'ждёт отдающих', live:'отдают', given:'ждёт «Принял»', done:'принято', cancelled:'снята'};
   return `<div class="mvb-sec">Сегодня${T.length ? ' · ' + T.length : ''}</div>` + (T.length ? T.map(t=>{
     const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
-    const who = t.status === 'live' && (t.givers||[]).length ? ` · ${_esc(t.givers.join(', '))}` : '';
+    const who = t.senior && t.status !== 'done' && t.status !== 'cancelled' ? ' · везёт старший'
+      : t.status === 'live' && (t.givers||[]).length ? ` · ${_esc(t.givers.join(', '))}` : '';
     const diff = (t.sources||[]).filter(x=>x.status === 'diff');
     // Снять можно только заявку операторов: собранную владельцем в STAR — нет.
     const can = (t.status === 'free' || t.status === 'claimed') && !(+t.got) && /· оператор$/.test(String(t.by || ''))

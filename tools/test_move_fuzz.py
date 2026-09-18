@@ -5,8 +5,9 @@
 дни: заявки от STAR и от операторов (в том числе кривые), «Начать
 перемещение», сканы — правильные, чужие, повторные, списанные, одновременные,
 со старым чтением документа, — «Принял» и «Принял неровно» от своих и чужих,
-снятие задачи и заявки целиком. После КАЖДОГО шага проверяется всё, что
-должно быть правдой всегда:
+снятие задачи и заявки целиком, а ещё старший из STAR: берёт задачу района
+на себя, снимает с себя и сканирует сам с любого района, откуда в неё везут.
+После КАЖДОГО шага проверяется всё, что должно быть правдой всегда:
 
   I1  код числится там, куда его увёз последний переезд, и переездов у кода
       ровно столько, сколько записей в книге;
@@ -17,8 +18,9 @@
   I5  статусы сходятся: «отдано» ⇔ отсканировано всё; «принято» — только
       отданное; задача закрыта ⇔ приняты все передачи; заявка закрыта ⇔
       закрыты или сняты все задачи;
-  I6  списки водителя: «отдать» — ровно неотданные передачи его района,
-      «забрать» — ровно непринятые передачи в его район; замок смены — то же;
+  I6  списки водителя: «отдать» — ровно неотданные передачи его района (кроме
+      задач, взятых старшим), «забрать» — ровно непринятые передачи в его
+      район; замок смены — то же;
   I7  «в пути» для заявки закупки = неотданный остаток открытых строк, в обе
       стороны;
   I8  отказ сканера склад не двигает;
@@ -44,6 +46,7 @@ CAT = SR._catalog()
 BOTTLES = [p for p, x in CAT.items() if SR._unit(x) == 1][:40]
 BEERS = [p for p, x in CAT.items() if SR._unit(x) > 1][:10]
 NAMES = {o: [f"{OFFICE_CODES[o]}-{k}" for k in "абв"] for o in OFFICE_IDS}
+STARS = ["STAR", "STAR-2"]                 # входы AMBAR STAR — «старшие»
 
 CHECKS = [0]
 # Что на самом деле случилось за прогон — чтобы видеть, что сценарии не пустые:
@@ -245,12 +248,15 @@ class World:
             res = [await MV.scan(mid, to, code, name, 1, who_d)]
             codes = [code]
         srcs = {ll["from"] for ll in t["lines"]}
+        boss = (t.get("senior") or {}).get("name")
         moved_now = {c for c, x in zip(codes, res) if x.get("ok")}
         for c, x in zip(codes, res):
             stat("скан: отдано" if x.get("ok") else f"скан: отказ {x.get('verdict')}")
             if x.get("ok"):
                 # Отдать может только район, который в этой задаче отдаёт, и
-                # только бутылку со своего района — по своей строке.
+                # только бутылку со своего района — по своей строке; и только
+                # пока задачу не взял старший.
+                ok(not boss, f"водитель отсканировал задачу, взятую старшим {boss}")
                 ok(who_d in srcs, f"отсканировал не отдающий: {who_d}, отдают {srcs}")
                 ok(before.get(c, {}).get("district") == who_d, f"ушёл код не с района отдающего: {c}")
                 self.codes[c]["district"] = to
@@ -259,7 +265,9 @@ class World:
                 self.model_got[(mid, to, i)] += float(x["qty"])
             else:
                 v = x.get("verdict")
-                if who_d == to:
+                if boss:
+                    ok(v in ("senior_took", "gone"), f"задача у старшего, а водителю: {v}")
+                elif who_d == to:
                     ok(v in ("giver_scans", "gone"), f"получатель: {v}")
                 elif who_d not in srcs:
                     ok(v in ("not_giver", "gone"), f"посторонний: {v}")
@@ -294,6 +302,57 @@ class World:
             ok(res.get("error") == "not_your_district", f"принял чужой район: {res}")
         elif g["status"] != "given":
             ok(not res.get("ok") or res.get("already"), f"принято неотданное: {g['status']} {res}")
+
+    async def act_senior(self):
+        """Старший из STAR: взять задачу на себя, снять с себя или сканировать
+        сам — с любого района, откуда в неё везут."""
+        r = self.r
+        pairs = await self.open_pairs()
+        if not pairs:
+            return
+        roll = r.random()
+        # Скан чаще — по задаче, которую кто-то из старших уже взял, и от его имени:
+        # иначе сценарий топчется на «сначала возьмите».
+        taken = [x for x in pairs if (x[3]["tasks"][x[1]].get("senior") or {}).get("name")]
+        if roll >= 0.45 and taken and r.random() < 0.75:
+            mid, to, src, doc = r.choice(taken)
+            me = doc["tasks"][to]["senior"]["name"]
+        else:
+            mid, to, src, doc = r.choice(pairs)
+            me = r.choice(STARS)
+        t = doc["tasks"][to]
+        boss = (t.get("senior") or {}).get("name")
+        if roll < 0.35:
+            res = await MV.senior_take(mid, to, me, 1)
+            stat("старший: взял" if res.get("ok") else f"старший: не взял {res.get('error')}")
+            if boss and boss != me:
+                ok(not res.get("ok") and res.get("senior") == boss, f"второй старший перебил {boss}: {res}")
+            return
+        if roll < 0.45:
+            res = await MV.senior_drop(mid, to, me)
+            stat("старший: снял с себя" if res.get("ok") else "старший: снять нечего")
+            ok(bool(res.get("ok")) == (boss == me), f"снять с себя: {res.get('ok')} при взявшем {boss}")
+            return
+        srcs = sorted({l["from"] for l in t["lines"]})
+        want = [l for l in t["lines"] if float(l["got"]) < float(l["qty"])]
+        pick = r.choice(want) if want and r.random() < 0.8 else None
+        code = (self.pick_code(pick["from"], pick["id"]) if pick else None) or self.pick_code(r.choice(OFFICE_IDS))
+        if not code:
+            return
+        before = self.codes[code]["district"]
+        x = await MV.scan(mid, to, code, me, 1, senior=True)
+        stat("старший: отдано" if x.get("ok") else f"старший: отказ {x.get('verdict')}")
+        if x.get("ok"):
+            ok(boss == me, f"старший {me} отсканировал задачу, взятую {boss}")
+            ok(before in srcs, f"старший увёз бутылку не из района заявки: {before}")
+            self.codes[code]["district"] = to
+            self.moves_qty += float(x["qty"])
+            i = next(k for k, ll in enumerate(t["lines"]) if ll["from"] == before and ll["id"] == self.codes[code]["pid"])
+            self.model_got[(mid, to, i)] += float(x["qty"])
+        else:
+            ok(self.codes[code]["district"] == before, f"отказ старшему сдвинул код {code}")
+            if boss != me:
+                ok(x.get("verdict") in ("not_taken", "senior_other", "gone"), f"не взявшему — {x.get('verdict')}")
 
     async def act_cancel(self):
         r = self.r
@@ -375,7 +434,7 @@ class World:
                     if gv.get("done_at"):
                         ok(given, f"{mid}/{to}/{src}: «отдано» при неотсканированных")
                     live = doc["status"] == "open" and not t.get("done_at") and not t.get("cancelled_at")
-                    if live and not given:
+                    if live and not given and not (t.get("senior") or {}).get("name"):
                         give_by[src].add((mid, to))
                     if live and not gv.get("accepted_at"):
                         take_by[to].add((mid, src))
@@ -432,15 +491,18 @@ class World:
         for _ in range(3):
             for mid, to, src, doc in await self.open_pairs():
                 t = doc["tasks"][to]
-                name = NAMES[src][0]
-                await MV.give_start(mid, to, name, 1, src)
+                boss = (t.get("senior") or {}).get("name")
+                name = boss or NAMES[src][0]
+                if not boss:
+                    await MV.give_start(mid, to, name, 1, src)
                 for l in [l for l in t["lines"] if l["from"] == src]:
                     need = float(l["qty"]) - float(l["got"])
                     while need > 1e-9:
                         c = self.pick_code(src, l["id"])
                         if not c:
                             break
-                        x = await MV.scan(mid, to, c, name, 1, src)
+                        x = await (MV.scan(mid, to, c, name, 1, senior=True) if boss
+                                   else MV.scan(mid, to, c, name, 1, src))
                         stat("конец дня: отдано" if x.get("ok") else f"конец дня: отказ {x.get('verdict')}")
                         if not x.get("ok"):
                             break
@@ -459,6 +521,7 @@ class World:
     async def run(self, steps):
         await self.setup()
         acts = [(self.act_create, 7), (self.act_scan, 50), (self.act_accept, 16), (self.act_cancel, 4),
+                (self.act_senior, 10),
                 (lambda: self.act_scan(concurrent=True), 8), (lambda: self.act_scan(stale=True), 6)]
         pool = [f for f, w in acts for _ in range(w)]
         for i in range(steps):

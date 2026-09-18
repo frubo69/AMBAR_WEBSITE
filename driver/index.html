@@ -6532,6 +6532,7 @@ const MVQ_NO = {
   same:           'Эту бутылку уже отдали',
   full:           'По этой позиции уже всё отдали',
   giver_scans:    'Сканирует водитель района, который отдаёт',
+  senior_took:    'Эту передачу взял старший — сканирует он',
   not_giver:      'С вашего района по этой заявке ничего не отдают',
   gone:           'Заявка закрыта',
   unknown:        'Код не из реестра',
@@ -9678,9 +9679,14 @@ function mvqTakeCard(t){
   const open = MVQ_FOLD.has(key);
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const ready = t.status === 'given';
-  const sub = ready ? `${t.giver ? esc(t.giver) + ' отдал' : 'отдали'} всё — проверьте и примите`
-    : t.got ? `отдаёт ${esc(t.giver || 'водитель ' + t.from_code)} · ${fmtQty(t.got)} из ${fmtQty(t.need)}`
-    : t.giver ? `${esc(t.giver)} начал отдавать`
+  // Задачу района взял на себя старший — тот, кто работает в AMBAR STAR
+  // (владелец, 18 сен 2026): он объезжает отдающих и сканирует сам. Водителю
+  // он — «старший», без имени.
+  const who = t.senior && t.giver === t.senior ? 'старший' : esc(t.giver || '');
+  const sub = ready ? `${who ? who + ' отдал' : 'отдали'} всё — проверьте и примите`
+    : t.got ? `отдаёт ${who || 'водитель ' + esc(t.from_code)} · ${fmtQty(t.got)} из ${fmtQty(t.need)}`
+    : t.senior ? 'везёт старший'
+    : t.giver ? `${who} начал отдавать`
     : `ждёт, когда водитель ${esc(t.from_code)} начнёт`;
   return `<div class="dcard ${ready ? 'mine' : 'mvq-off'}">
     <div class="dcard-h">
@@ -9697,7 +9703,8 @@ function mvqTakeCard(t){
     ${ready
       ? `<button class="dc-btn" onclick="mvqAccept('${t.move_id}','${t.district}','${t.from}')">Принял</button>
          <button class="dc-drop" onclick="mvqDiffOpen('${t.move_id}','${t.district}','${t.from}')">Принял неровно</button>`
-      : `<div class="mvq-hint">Каждую бутылку при вас отсканирует водитель ${esc(t.from_code)}. «Принял» появится, когда он отсканирует всё</div>`}
+      : `<div class="mvq-hint">${t.senior ? 'Везёт и сканирует старший'
+          : `Каждую бутылку при вас отсканирует водитель ${esc(t.from_code)}`}. «Принял» появится, когда он отсканирует всё</div>`}
   </div>`;
 }
 
@@ -9717,7 +9724,8 @@ async function mvqStart(mid, district){
   catch(e){ toast('Не получилось — повторите', 'err'); }
   MVQ_BUSY = false;
   if(r && !r.ok){
-    toast(r.error === 'given' ? 'Уже отдали всё' : 'Заявка закрыта', 'err');
+    toast(r.error === 'given' ? 'Уже отдали всё'
+        : r.error === 'senior_took' ? 'Эту передачу взял старший — сканирует он' : 'Заявка закрыта', 'err');
     return mvqLoad();
   }
   if(r && r.ok){

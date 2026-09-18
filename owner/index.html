@@ -21424,6 +21424,7 @@ function _accClose(){
   document.getElementById('accOv').classList.remove('pen-ui');
   CKL_RETURN = false;
   SCAN.stop();
+  MVT = null;
   supPollStop();
   qrPollStop(); rcvPollStop(); ilPollStop(); mvoPollStop();
   document.getElementById('accOv').classList.remove('show');
@@ -23454,7 +23455,7 @@ async function mvoLoad(){
   try{ const r = await ownerApi.ownerFetch('/api/owner/move/live'); MVO.tasks = r.tasks || []; MVO.open = r.open || 0; }
   catch(e){ return; }
   mvoHomePaint();
-  if(ACC_VIEW === 'moves') mvoPaint();
+  if(ACC_VIEW === 'moves' && !MVT) mvoPaint();
 }
 
 function mvoHomePaint(){
@@ -23496,7 +23497,7 @@ function mvoPollStop(){ if(MVO.poll){ clearInterval(MVO.poll); MVO.poll = null; 
 async function mvoPlan(){
   try{ MVO.plan = await ownerApi.ownerFetch('/api/owner/move/plan'); }
   catch(e){ MVO.plan = null; }
-  if(ACC_VIEW === 'moves') mvoPaint();
+  if(ACC_VIEW === 'moves' && !MVT) mvoPaint();
 }
 
 async function mvoCreate(){
@@ -23520,13 +23521,155 @@ async function mvoCancel(mid, district){
   mvoLoad();
 }
 
+async function mvoTake(mid, district){
+  if(MVO.busy) return; MVO.busy = true;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(mid)}/take`,
+      {method: 'POST', body: {district, as: _rcvMe()}});
+    _toast('Взяли на себя — водителям отдающих районов сканировать не нужно');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){
+    const p = (e && e.payload) || {};
+    _toast(p.error === 'taken' ? `Уже взял ${p.senior || 'другой старший'}` : 'Заявка закрыта');
+  }
+  MVO.busy = false; await mvoLoad();
+}
+async function mvoDrop(mid, district){
+  if(!await askDialog('Снять с себя?', 'Дальше отдают водители районов, как обычно. Отсканированное остаётся у получателя.',
+                      'Снять', 'Оставить', 'no')) return;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(mid)}/drop`,
+      {method: 'POST', body: {district, as: _rcvMe()}});
+  }catch(e){ _toast('Не удалось'); }
+  mvoLoad();
+}
+
+// Камера старшего, взявшего задачу района: та же разметка, что у приёмки.
+// Бутылка узнаётся по коду — откуда она (район, где числится) и что это; её
+// нужно только поднести. Каждый скан сразу уходит на район-получатель.
+let MVT = null;
+const MVT_NO = {
+  other_district: r => `числится на ${r.from_code || '—'} — оттуда сюда не везут`,
+  moved:          r => `числится на ${r.from_code || '—'}`,
+  not_in_task:    () => 'этой позиции нет в заявке',
+  full:           () => 'по этой позиции уже всё',
+  given:          () => 'уже отдана',
+  unknown:        () => 'кода нет в реестре',
+  written:        () => 'списана',
+  sold:           () => 'ушла с заказом',
+  deleted:        () => 'убрана из реестра',
+  gone:           () => 'заявка закрыта',
+  busy:           () => 'её только что перевезли',
+  not_taken:      () => 'сначала «Взять на себя»',
+  senior_other:   r => `задачу взял ${r.senior || 'другой'}`,
+};
+async function mvtOpen(mid, district){
+  const t = (MVO.tasks || []).find(x => x.move_id === mid && x.district === district);
+  if(!t) return;
+  mvoPollStop();
+  MVT = {mid, district, t, rows: [], busy: false};
+  mvtCam();
+  try{
+    await SCAN.start(document.getElementById('mvtVideo'), mvtScan, qrIdle, () => qrFlash('again'), qrHold);
+  }catch(e){ _toast('Нет доступа к камере'); return mvtClose(); }
+  const tb = document.getElementById('mvtTorch');
+  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+}
+function mvtLeftTxt(){
+  const t = MVT.t || {};
+  const src = (t.sources || []).filter(s => s.status !== 'done' && s.status !== 'diff' && s.status !== 'given' && s.left > 0);
+  return src.length ? 'Осталось: ' + src.map(s => `${s.code} — ${fmtQty(s.left)}`).join(', ') : 'Всё собрано';
+}
+function mvtCam(){
+  const t = MVT.t;
+  ACC_BACK = mvtClose;
+  _setRail('accRail', '');
+  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
+  _setText('accTitle', `${t.district_code} ${t.district_name}`);
+  _setText('accSub', 'перемещение · сканируйте у отдающих');
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
+    <div class="scan-cam" id="mvtCamBox">
+      <video id="mvtVideo" playsinline muted autoplay></video>
+      <div class="scan-frame" id="qrFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="qrBadge"></div>
+      </div>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="mvtN">${fmtQty(t.left)}</b><span>осталось</span></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="mvtTorch" onclick="qrTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="qrHint">${escS(mvtLeftTxt())}</div>
+        <div class="scan-hud-bot">
+          <div class="scan-strip" id="mvtFeed"></div>
+          <div class="scan-dockbar">
+            <button class="scan-go" onclick="mvtClose()">Готово</button>
+          </div>
+        </div>
+      </div>
+    </div></div>`;
+  scanLive('accOv');
+}
+function mvtFeed(){
+  const feed = document.getElementById('mvtFeed'); if(!feed || !MVT) return;
+  feed.innerHTML = MVT.rows.slice(0, 40).map(r => `<div class="scan-row ${r.ok ? 'new' : 'err'}">
+      <span class="scan-dot" style="background:${r.ok ? 'var(--up)' : 'var(--dn)'}"></span>
+      <span class="scan-b"><span class="scan-code">${escS(r.name || r.code)}</span>
+        <span class="scan-raw">${escS(r.sub || '')}</span></span>
+      <span class="scan-state" style="color:${r.ok ? 'var(--up)' : 'var(--dn)'}">${escS(r.ok ? 'отдана' : 'нет')}</span></div>`).join('');
+  const n = document.getElementById('mvtN'); if(n) n.textContent = fmtQty((MVT.t || {}).left || 0);
+  const h = document.getElementById('qrHint'); if(h) h.textContent = mvtLeftTxt();
+}
+async function mvtScan(code){
+  if(!MVT) return;
+  // Пока предыдущая бутылка у сервера, следующую не глотаем — её поднесут ещё раз.
+  if(MVT.busy){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); return; }
+  MVT.busy = true;
+  let r = null;
+  try{
+    r = await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(MVT.mid)}/scan`,
+      {method: 'POST', body: {district: MVT.district, code, as: _rcvMe()}});
+  }catch(e){ r = null; }
+  if(!MVT) return;
+  MVT.busy = false;
+  if(r && r.ok){
+    if(r.take) MVT.t = r.take;
+    MVT.rows.unshift({ok: true, code, name: r.name, sub: `из ${r.from_code} · ${fmtQty(r.line.got)}/${fmtQty(r.line.qty)}`});
+    qrFlash('ok', `${r.name} · из ${r.from_code}`);
+    mvtFeed();
+    if(!((MVT.t || {}).left > 0)){
+      _toast(`Всё собрано — «Принял» теперь у водителя ${(MVT.t || {}).district_code || ''}`);
+      return mvtClose();
+    }
+    return;
+  }
+  const say = r ? ((MVT_NO[r.verdict] || (() => r.say || 'не из заявки'))(r)) : 'нет связи — поднесите ещё раз';
+  if(!r){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); }
+  MVT.rows.unshift({ok: false, code, name: (r && r.name) || code, sub: say});
+  qrFlash('err', say);
+  mvtFeed();
+}
+function mvtClose(){
+  try{ SCAN.stop(); }catch(e){}
+  MVT = null; ACC_BACK = null;
+  mvoPaint(); mvoLoad(); mvoPollStart();
+}
+
 function mvoPaint(){
   _setText('accTitle', 'Перемещения');
   _setText('accSub', MVO.open ? `${MVO.open} ${pluralize(MVO.open,'район','района','районов')} в работе`
                               : 'по районам');
   const t = MVO.tasks || [];
   const карточки = t.map(x => {
-    const [st, cls] = x.diff && x.status === 'done' ? ['принято неровно', 'warn'] : (MVO_ST[x.status] || MVO_ST.free);
+    const [st, cls] = x.diff && x.status === 'done' ? ['принято неровно', 'warn']
+      : x.senior && x.status === 'free' ? ['взяли на себя', 'live'] : (MVO_ST[x.status] || MVO_ST.free);
     const pct = x.need ? Math.round(x.got / x.need * 100) : 0;
     // «13 позиций» и «0 / 23» — про разное: первое наименования, второе штуки.
     // Молчание об этом читается как ошибка, поэтому состав пишем словами склада.
@@ -23542,7 +23685,10 @@ function mvoPaint(){
       // «чтобы я мог нажимать на каждый из районов и видел какие там позиции»).
       const key = `${x.move_id}|${x.district}|${s.district}`;
       const open = MVO.fold.has(key);
-      const how = (MVO_SRC[s.status] || MVO_SRC.wait)(s);
+      // Задачу взял старший — за товаром к отдающему едет он.
+      const how = x.senior && s.status === 'wait'
+        ? (x.senior === _rcvMe() ? 'заберёте вы' : `заберёт ${x.senior}`)
+        : (MVO_SRC[s.status] || MVO_SRC.wait)(s);
       const расх = s.status === 'diff'
         ? `<div class="mvo-diff">${(s.accept_lines || []).map(d => `<span>${escS(d.name)}: отдали ${fmtQty(d.sent)}, пришло <b>${fmtQty(d.got)}</b></span>`).join('')}${
             s.accept_note ? `<span>«${escS(s.accept_note)}»</span>` : ''}</div>` : '';
@@ -23562,9 +23708,22 @@ function mvoPaint(){
     // Справа сверху — что сейчас происходит: кто отдаёт прямо сейчас, или
     // отдали и ждут «Принял», или никто не начинал.
     const сейчас = [...new Set((x.sources || []).filter(s => s.status === 'live' || s.status === 'pause').map(s => s.giver).filter(Boolean))];
-    const кто = сейчас.length ? 'отдаёт ' + сейчас.join(', ')
+    const кто = x.senior && x.status !== 'done' && x.status !== 'cancelled'
+        ? (x.senior === _rcvMe() ? 'везёте вы' : 'везёт ' + x.senior)
+      : сейчас.length ? 'отдаёт ' + сейчас.join(', ')
       : (x.sources || []).some(s => s.status === 'given') ? 'ждёт «Принял»'
       : (x.sources || []).some(s => s.status === 'wait') ? 'никто не начал' : '';
+    // «Взять на себя» — как в приёмке (владелец, 18 сен 2026): старший — тот,
+    // кто работает в AMBAR STAR, — сам объезжает районы, откуда везут, и
+    // сканирует; принимает получатель.
+    const я = _rcvMe(), живая = x.status !== 'done' && x.status !== 'cancelled';
+    const везу = живая && x.status !== 'given' && x.left > 0;
+    const act = !живая || !везу ? ''
+      : x.senior === я ? `<div class="rt-acts">
+          <button class="rt-take" onclick="mvtOpen('${escS(x.move_id)}','${escS(x.district)}')">Сканировать</button>
+          <button class="rt-rel" onclick="mvoDrop('${escS(x.move_id)}','${escS(x.district)}')">Снять с себя</button></div>`
+      : x.senior ? ''
+      : `<div class="rt-acts"><button class="rt-take" onclick="mvoTake('${escS(x.move_id)}','${escS(x.district)}')">Взять на себя</button></div>`;
     return `<div class="rcv mvo-card${x.diff ? ' warn' : ''}">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
         <span class="rcv-when">${escS(x.status === 'done' || x.status === 'cancelled' ? (x.by || '') : кто)}</span></div>
@@ -23573,8 +23732,9 @@ function mvoPaint(){
         <span class="rcv-pct">${pct}%</span></div>
       <div class="rcv-bar"><i style="width:${pct}%"></i></div>
       ${src}
+      ${act}
       ${x.status === 'done' || x.status === 'cancelled' ? '' :
-        `<button class="ord-reset mvo-x" onclick="mvoCancel('${escS(x.move_id)}','${escS(x.district)}')">Снять</button>`}
+        `<button class="ord-reset mvo-x" onclick="mvoCancel('${escS(x.move_id)}','${escS(x.district)}')">Снять заявку района</button>`}
     </div>`;
   }).join('');
   const p = MVO.plan;

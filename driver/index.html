@@ -1908,6 +1908,15 @@ body.xp-on{background:#070A12}
   font-family:inherit;font-size:14px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,#E8C98A,#C9A96E)}
 .dc-btn:active{transform:scale(.985)}
+/* Перемещение: «Отпустить» тише главной кнопки — это выход, а не действие.
+   Карточка «у вас заберут» без кнопок и приглушена: смотреть, не нажимать. */
+.dc-drop{width:100%;margin-top:6px;padding:11px;border-radius:12px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.14);background:transparent;
+  font-family:inherit;font-size:13px;font-weight:600;color:var(--sub)}
+.dc-drop:active{transform:scale(.985)}
+.dcard.give{opacity:.82;border-color:rgba(255,255,255,.08)}
+.dcard.give .dcode{background:rgba(255,255,255,.07);color:var(--sub)}
+.mvq-src{margin:6px 0 2px;padding:0 2px}
 .sup-tag{display:inline-block;vertical-align:2px;margin-left:4px;padding:1px 6px;border-radius:6px;
   font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;max-width:110px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -4602,13 +4611,14 @@ async function load(){
     // раз в пятнадцать секунд ради значка: лишний запрос от каждого водителя
     // каждые пять секунд база чувствует.
     const wantSup = TAB === 'supply' || Date.now() - _supAt > 15000;
-    const [o, e, s] = await Promise.all([
+    const [o, e, s, m] = await Promise.all([
       drvApi.drvFetch('/api/driver/orders'),
       drvApi.drvFetch('/api/driver/expenses'),
       wantSup ? drvApi.drvFetch('/api/driver/supply').catch(() => null) : null,
+      wantSup ? drvApi.drvFetch('/api/driver/move').catch(() => null) : null,
     ]);
     ORDERS = o; EXP = e;
-    if(wantSup){ _supAt = Date.now(); if(s) SUP = s; }
+    if(wantSup){ _supAt = Date.now(); if(s) SUP = s; if(m) MVQ = m; }
     // Штору мог опустить старший с планшета. Узнаём об этом здесь, а не только
     // при запуске: между «включил» и «увидел» не должно быть перезапуска
     // приложения — в такую минуту его никто не делает.
@@ -6020,6 +6030,7 @@ async function shCloseGo(){
     const p = e.payload || {};
     const msg = p.error === 'expenses_left' ? 'Сначала ответьте по расходам'
               : p.error === 'intake_open' ? 'Сначала завершите приёмку'
+              : p.error === 'moves_open' ? 'Сначала отработайте перемещения'
               : p.error === 'day_open' ? 'Оператор ещё не закрыл смену района — подождите'
               : p.error === 'orders_in_route'
                 ? `У вас ${(p.ids||[]).length} ${plural((p.ids||[]).length,'заказ','заказа','заказов')} в пути — сначала отметьте доставку`
@@ -6375,6 +6386,27 @@ async function mvLoad(force){
 // Экран во весь рост, как приёмка: камера, потом страница бутылки (владелец,
 // 14 сен 2026: «сканирование во весь экран как у нас везде; обнаружил
 // бутылку — страница с фото товара, сведениями и выбором района»).
+// Сканер задачи: тот же экран, что у ручного перемещения, но район назначения
+// известен заранее (наш), выбирать нечего, и каждый скан сразу уезжает в
+// задачу. В шапке — «сколько из скольких» по последней позиции: владелец,
+// 18 сен 2026, «показывать что они отсканировал --/-- имя позиции».
+function mvqScanOpen(mid, district){
+  const t = (MVQ.mine || []).find(x => x.move_id === mid && x.district === district);
+  MV = {item: null, code: '', to: '', total: 0, btl: 0, box: 0, busy: false, mode: 'scan',
+        task: {mid, district, t: t || null}, line: null};
+  document.getElementById('mvScr').classList.add('show');
+  mvScan();
+}
+
+function _mvqLeft(){
+  const t = (MV.task || {}).t;
+  if(!t) return '';
+  const left = (t.lines || []).filter(l => !l.done);
+  if(!left.length) return 'Всё забрали';
+  return 'Осталось: ' + left.slice(0, 4).map(l =>
+    `${esc(l.name)} ${fmtQty(l.left)}`).join(', ') + (left.length > 4 ? '…' : '');
+}
+
 async function mvOpen(){
   MV = {item: null, code: '', to: '', total: 0, btl: 0, box: 0, busy: false, mode: 'scan'};
   if(!MV_D.length) mvLoad(true);
@@ -6384,9 +6416,16 @@ async function mvOpen(){
 function _mvHead(t, sub){ _setText('mvT', t); _setText('mvS', sub); }
 async function mvScan(){
   MV.mode = 'scan'; MV.item = null; MV.code = ''; MV.to = '';
-  _mvHead('Переместить', 'Наведите камеру на QR-код');
+  const задача = MV.task;
+  if(задача){
+    const t = задача.t || {}, l = MV.line;
+    _mvHead((t.sources || []).map(x => x.code).join(', ') + ' → ' + (t.district_code || ''),
+            l ? `${fmtQty(l.got)}/${fmtQty(l.qty)} ${l.name}` : 'Наведите камеру на QR-код');
+  }else _mvHead('Переместить', 'Наведите камеру на QR-код');
   // Бутылки и пиво — разными числами: одно число на две единицы соврало бы.
-  document.getElementById('mvN').innerHTML = MV.btl && MV.box
+  document.getElementById('mvN').innerHTML = задача
+    ? `${fmtQty((задача.t || {}).got || 0)}<u>/${fmtQty((задача.t || {}).need || 0)}</u>`
+    : MV.btl && MV.box
     ? `${fmtQty(MV.btl)}<u> бут</u> ${fmtQty(MV.box)}<u> кор</u>`
     : MV.btl ? `${fmtQty(MV.btl)}<u> ${_mvWord(MV.btl, false)}</u>`
     : MV.box ? `${fmtQty(MV.box)}<u> ${_mvWord(MV.box, true)}</u>` : '';
@@ -6398,7 +6437,8 @@ async function mvScan(){
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="cam-badge" id="mvB"></div>
       </div>
-      <div class="cam-left"><span class="cam-hint" id="mvHint">Один QR-код — одна бутылка, у пива полкоробки</span></div>
+      <div class="cam-left"><span class="cam-hint" id="mvHint">${задача ? _mvqLeft()
+        : 'Один QR-код — одна бутылка, у пива полкоробки'}</span></div>
     </div>`;
   document.getElementById('mvBot').innerHTML = '';
   try{ await SCAN.start(document.getElementById('mvV'), mvCode, null, null, null); }   // start сам сбрасывает уже виденные коды
@@ -6409,7 +6449,51 @@ async function mvScan(){
 }
 
 // Код прочитан — камера гаснет, спрашиваем у сервера, что это за бутылка.
+// Отказы сервера — словами: водитель должен понять, что не так с бутылкой,
+// а не увидеть красную ошибку.
+const MVQ_NO = {
+  not_in_task:    'Этой позиции нет в заявке',
+  other_district: 'Эта бутылка не из того района',
+  full:           'По этой позиции уже всё забрали',
+  not_mine:       'Задачу взял другой водитель',
+  gone:           'Заявка закрыта',
+  unknown:        'Код не из реестра',
+  same:           'Бутылка уже на вашем районе',
+  busy:           'Бутылку только что перевезли — отсканируйте ещё раз',
+};
+
+async function mvqCode(code){
+  if(MV.busy) return;
+  MV.busy = true; SCAN.stop();
+  const f = document.getElementById('mvF'); if(f) f.className = 'cam-frame ok';
+  try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  let r;
+  try{
+    r = await drvApi.drvFetch(`/api/driver/move/${MV.task.mid}/scan`,
+      {method: 'POST', body: {district: MV.task.district, code}});
+  }catch(e){
+    toast('Не удалось — попробуйте ещё раз', 'err');
+    MV.busy = false; return mvScan();
+  }
+  MV.busy = false;
+  if(r.ok){
+    MV.task.t = r.task; MV.line = r.line; MV.total++;
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(r.finished){
+      toast('Перемещение выполнено');
+      MV.task = null; MV.line = null;
+      document.getElementById('mvScr').classList.remove('show');
+      return mvqLoad();
+    }
+  }else{
+    toast(MVQ_NO[r.verdict] || 'Эта бутылка не из заявки', 'err');
+    try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
+  }
+  mvScan();
+}
+
 async function mvCode(code){
+  if(MV.task) return mvqCode(code);
   if(MV.busy || MV.mode !== 'scan') return;
   MV.busy = true; SCAN.stop();
   const f = document.getElementById('mvF'); if(f) f.className = 'cam-frame ok';
@@ -6476,7 +6560,15 @@ async function mvConfirm(){
   MV.busy = false; mvItemPaint();
 }
 // Стрелка назад: со страницы бутылки — к камере, с камеры — закрыть.
-function mvBack(){ if(MV.mode === 'item'){ mvScan(); return; } mvDone(); }
+function mvBack(){
+  if(MV.task){                      // из задачи — сразу к списку, без страницы бутылки
+    MV.task = null; MV.line = null; SCAN.stop();
+    document.getElementById('mvScr').classList.remove('show');
+    return mvqLoad();
+  }
+  if(MV.mode === 'item'){ mvScan(); return; }
+  mvDone();
+}
 function mvDone(){
   SCAN.stop();
   document.getElementById('mvScr').classList.remove('show');
@@ -9171,6 +9263,12 @@ let TASK = null;                // открытая задача
 let LINE = null;                // позиция, которую считаем сейчас
 let SCAN_ROWS = [];             // лента текущей позиции
 let SUP_BUSY = false, _supAt = 0;
+// ── Заявка на перемещение ───────────────────────────────────────────────────
+// Обратная приёмке (владелец, 18 сен 2026): задача висит на НАШЕМ районе, а
+// ехать надо к соседу и забрать у него бутылки. Взять может любой водитель
+// района — достаётся одному, поэтому список перечитывается тем же опросом,
+// что и приёмка: чужую задачу видно ушедшей через пять секунд, без перезапуска.
+let MVQ = {mine: [], free: [], taken: [], give: []}, MVQ_FOLD = new Set(), MVQ_BUSY = false;
 
 function supBadge(){
   const b = document.getElementById('tbSup');
@@ -9293,6 +9391,97 @@ const plural = (n, a, b, c) => {
   return x > 10 && x < 20 ? c : y > 1 && y < 5 ? b : y === 1 ? a : c;
 };
 
+function mvqLines(t, only){
+  return (t.lines || []).filter(l => !only || l.from === only).map(l => `<div class="dpl ${l.done ? 'ok' : ''}">
+      <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
+      <span class="dpl-n">${esc(l.name)}</span>
+      <span class="dpl-q">${l.got ? `${fmtQty(l.got)}<u>/${fmtQty(l.qty)}</u>` : fmtQty(l.qty)}</span>
+    </div>`).join('');
+}
+
+// Карточка задачи на перемещение. Числа те же, что у приёмки, но подпись
+// другая: здесь важно, КУДА ехать, а не что привезут.
+function mvqCard(t){
+  const key = 'mv' + t.move_id + '/' + t.district;
+  const open = MVQ_FOLD.has(key);
+  const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
+  const where = (t.sources || []).map(s => esc(s.code)).join(', ');
+  const sub = t.mine ? (t.got ? 'забираете сейчас' : 'ваша задача')
+            : t.driver ? `забирает ${esc(t.driver)}` : 'свободна';
+  return `<div class="dcard ${t.mine ? 'mine' : ''}">
+    <div class="dcard-h">
+      <span class="dcode">${esc(t.district_code)}</span>
+      <span class="dcard-b"><b>Забрать из ${where || '—'}</b><i>${sub}</i></span>
+      <span class="dcard-n">${t.got ? `${fmtQty(t.got)}<i>/ ${fmtQty(t.need)}</i>`
+                                     : `${fmtQty(t.need)}<i>ед.</i>`}</span>
+    </div>
+    ${t.got ? `<span class="sup-bar dbar"><i style="width:${pct}%"></i></span>` : ''}
+    <button class="dfold ${open ? 'on' : ''}" onclick="mvqFold('${esc(key)}')">
+      <span>${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}${
+        t.left ? ` · осталось ${fmtQty(t.left)}` : ''}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    ${open ? `<div class="dfold-b">${(t.sources || []).map(s => `
+        <div class="sect mvq-src"><span class="sect-t">из ${esc(s.code)} ${esc(s.name)}</span>
+          <span class="sect-v">${fmtQty(s.got)}/${fmtQty(s.qty)}</span></div>
+        ${mvqLines(t, s.district)}`).join('')}</div>` : ''}
+    ${t.mine
+      ? `<button class="dc-btn" onclick="mvqScanOpen('${t.move_id}','${t.district}')">
+           ${t.got ? 'Продолжить' : 'Сканировать'}</button>
+         <button class="dc-drop" onclick="mvqDrop('${t.move_id}','${t.district}')">Отпустить</button>`
+      : t.driver ? ''
+      : `<button class="dc-btn" onclick="mvqTake('${t.move_id}','${t.district}')">Взять</button>`}
+  </div>`;
+}
+
+// Отдающему — только список того, что у него заберут. Нажимать нечего:
+// бутылки увезёт водитель другого района, и его задача — не мешать.
+function mvqGiveCard(g){
+  const key = 'gv' + g.move_id + '/' + g.district;
+  const open = MVQ_FOLD.has(key);
+  return `<div class="dcard give">
+    <div class="dcard-h">
+      <span class="dcode">${esc(g.to_code || g.district_code)}</span>
+      <span class="dcard-b"><b>Заберут в ${esc(g.to_name || g.district_name)}</b><i>${
+        g.driver ? esc(g.driver) + ' уже едет' : 'ждёт водителя'}</i></span>
+      <span class="dcard-n">${fmtQty(g.need)}<i>ед.</i></span>
+    </div>
+    <button class="dfold ${open ? 'on' : ''}" onclick="mvqFold('${esc(key)}')">
+      <span>${g.positions} ${plural(g.positions,'позиция','позиции','позиций')}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    ${open ? `<div class="dfold-b">${mvqLines(g)}</div>` : ''}
+  </div>`;
+}
+
+function mvqFold(k){ MVQ_FOLD.has(k) ? MVQ_FOLD.delete(k) : MVQ_FOLD.add(k); renderSupply(); }
+
+async function mvqLoad(){
+  try{ MVQ = await drvApi.drvFetch('/api/driver/move'); }catch(e){ return; }
+  if(TAB === 'supply') renderSupply();
+}
+
+async function mvqTake(mid, district){
+  if(MVQ_BUSY) return; MVQ_BUSY = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/move/${mid}/claim`, {method:'POST', body:{district}});
+    if(!r.ok){
+      toast(r.error === 'taken' ? `Уже взял ${r.driver || 'другой водитель'}` : 'Задача закрыта', 'err');
+    }else{
+      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    }
+  }catch(e){ toast('Не удалось взять', 'err'); }
+  MVQ_BUSY = false; await mvqLoad();
+}
+
+async function mvqDrop(mid, district){
+  if(MVQ_BUSY) return; MVQ_BUSY = true;
+  try{ await drvApi.drvFetch(`/api/driver/move/${mid}/release`, {method:'POST', body:{district}}); }
+  catch(e){ toast('Не удалось отпустить', 'err'); }
+  MVQ_BUSY = false; await mvqLoad();
+}
+
 function renderSupply(){
   const body = document.getElementById('body');
   const S = SUP || {mine:[], free:[], extra:[], taken:[]};
@@ -9300,7 +9489,9 @@ function renderSupply(){
   // Район, который взял другой водитель, у остальных исчезает (владелец,
   // 14 сен 2026): список товара — это то, что ещё можно взять, а не сводка
   // по всем. Когда взяли всё — экран пуст, как если бы заявки не было.
-  if(!S.mine.length && !S.free.length && !S.extra.length){
+  const MQ = MVQ || {mine:[], free:[], taken:[], give:[]};
+  const мвВсего = MQ.mine.length + MQ.free.length + MQ.give.length;
+  if(!S.mine.length && !S.free.length && !S.extra.length && !мвВсего){
     body.innerHTML = blank('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/>',
       S.taken.length ? 'Всё разобрали' : 'Принимать нечего',
       S.taken.length ? 'Районы этой поставки уже взяли другие водители'
@@ -9309,6 +9500,21 @@ function renderSupply(){
     return;
   }
   let h = '';
+  // Перемещение — выше приёмки: за ним ехать к соседу, и решать надо раньше.
+  if(MQ.mine.length){
+    h += `<div class="sect"><span class="sect-t">Моё перемещение</span></div>`;
+    h += MQ.mine.map(mvqCard).join('');
+  }
+  if(MQ.free.length){
+    h += `<div class="sect"><span class="sect-t">Перемещение</span>
+            <span class="sect-v">${MQ.free.length}</span></div>`;
+    h += MQ.free.map(mvqCard).join('');
+  }
+  if(MQ.give.length){
+    h += `<div class="sect"><span class="sect-t">У вас заберут</span>
+            <span class="sect-v">${MQ.give.length}</span></div>`;
+    h += MQ.give.map(mvqGiveCard).join('');
+  }
   if(S.mine.length){
     h += `<div class="sect"><span class="sect-t">Моя приёмка</span></div>`;
     h += S.mine.map(supCard).join('');

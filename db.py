@@ -5297,3 +5297,127 @@ async def supplies_between(day_from: str, day_to: str) -> list:
     for r in rows:
         r["supply_id"] = r.pop("_id")
     return rows
+
+
+# ── Заявка на перемещение между районами ─────────────────────────────────────
+# Обратная приёмке (владелец, 18 сен 2026): задача висит на районе-ПОЛУЧАТЕЛЕ.
+# Перемещение «из Бизнес Бея в JVC» — это работа водителя JVC: он приезжает в
+# Бизнес Бей, сканирует бутылки и увозит их к себе. Взять задачу может любой
+# водитель района, но достаётся она одному: захват атомарный, тем же приёмом,
+# что и у приёмки, — условие на пустого водителя стоит внутри find_one_and_update.
+async def move_order_add(doc: dict) -> str:
+    d = _db_or_none()
+    if d is None: return ""
+    await d.move_orders.insert_one(doc)
+    return doc["_id"]
+
+
+async def move_order_get(mid: str):
+    d = _db_or_none()
+    if d is None: return None
+    return await d.move_orders.find_one({"_id": mid})
+
+
+async def move_orders_open() -> list:
+    """Незакрытые заявки — из них собирается список задач водителю."""
+    d = _db_or_none()
+    if d is None: return []
+    return await d.move_orders.find({"status": "open"}).sort("at", 1).to_list(length=50)
+
+
+async def move_orders_since(day: str) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.move_orders.find({"day": {"$gte": day}}).sort("at", -1).to_list(length=200)
+
+
+async def move_task_claim(mid: str, district: str, driver: str,
+                          driver_id: int, now) -> tuple:
+    """Взять задачу. Достаётся одному — кто нажал первым."""
+    d = _db_or_none()
+    if d is None: return False, None
+    from pymongo import ReturnDocument
+    doc = await d.move_orders.find_one_and_update(
+        {"_id": mid, "status": "open",
+         f"tasks.{district}.driver": "", f"tasks.{district}.done_at": None,
+         f"tasks.{district}.cancelled_at": None},
+        {"$set": {f"tasks.{district}.driver": driver,
+                  f"tasks.{district}.driver_id": driver_id,
+                  f"tasks.{district}.claimed_at": now}},
+        return_document=ReturnDocument.AFTER)
+    if doc:
+        return True, (doc.get("tasks") or {}).get(district)
+    cur = await d.move_orders.find_one({"_id": mid}, {"tasks": 1})
+    return False, ((cur or {}).get("tasks") or {}).get(district)
+
+
+async def move_task_release(mid: str, district: str, driver: str = None) -> bool:
+    """Отпустить задачу. driver задан — отпускает сам водитель и только свою.
+    Отсканированное остаётся: бутылки уже уехали, и отменять их переезд нельзя."""
+    d = _db_or_none()
+    if d is None: return False
+    q = {"_id": mid, f"tasks.{district}.done_at": None}
+    if driver is not None:
+        q[f"tasks.{district}.driver"] = driver
+    r = await d.move_orders.update_one(q, {"$set": {
+        f"tasks.{district}.driver": "", f"tasks.{district}.driver_id": 0,
+        f"tasks.{district}.claimed_at": None}})
+    return r.modified_count > 0
+
+
+async def move_task_started(mid: str, district: str, now) -> None:
+    d = _db_or_none()
+    if d is None: return
+    await d.move_orders.update_one(
+        {"_id": mid, f"tasks.{district}.started_at": None},
+        {"$set": {f"tasks.{district}.started_at": now}})
+
+
+async def move_line_got(mid: str, district: str, i: int, was, add) -> bool:
+    """Отметить увезённое по строке. Условие на прежнее значение — чтобы два
+    скана подряд не записали одно и то же количество дважды."""
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.move_orders.update_one(
+        {"_id": mid, f"tasks.{district}.lines.{i}.got": was},
+        {"$set": {f"tasks.{district}.lines.{i}.got": round(float(was) + float(add), 3)}})
+    return r.modified_count > 0
+
+
+async def move_task_done(mid: str, district: str, now) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.move_orders.update_one(
+        {"_id": mid, f"tasks.{district}.done_at": None},
+        {"$set": {f"tasks.{district}.done_at": now}})
+    return r.modified_count > 0
+
+
+async def move_order_close_if_done(mid: str, now) -> bool:
+    """Заявка закрыта, когда закрыты или отменены все её задачи."""
+    d = _db_or_none()
+    if d is None: return False
+    doc = await d.move_orders.find_one({"_id": mid}, {"tasks": 1, "status": 1})
+    if not doc or doc.get("status") != "open":
+        return False
+    tasks = (doc.get("tasks") or {}).values()
+    if any(not (t.get("done_at") or t.get("cancelled_at")) for t in tasks):
+        return False
+    r = await d.move_orders.update_one({"_id": mid, "status": "open"},
+                                       {"$set": {"status": "done", "done_at": now}})
+    return r.modified_count > 0
+
+
+async def move_order_cancel(mid: str, district: str, now) -> bool:
+    """Снять задачу района (или всю заявку, если район пуст)."""
+    d = _db_or_none()
+    if d is None: return False
+    if district:
+        r = await d.move_orders.update_one(
+            {"_id": mid, f"tasks.{district}.done_at": None},
+            {"$set": {f"tasks.{district}.cancelled_at": now}})
+        await move_order_close_if_done(mid, now)
+        return r.modified_count > 0
+    r = await d.move_orders.update_one({"_id": mid, "status": "open"},
+                                       {"$set": {"status": "cancelled", "done_at": now}})
+    return r.modified_count > 0

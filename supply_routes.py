@@ -2450,6 +2450,31 @@ async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 
+# ── Перемещения между районами (STAR) ────────────────────────────────────────
+@require_owner
+async def handle_move_plan(request):
+    import move_routes
+    return await move_routes.handle_own_plan(request)
+
+
+@require_owner
+async def handle_move_live(request):
+    import move_routes
+    return await move_routes.handle_own_live(request)
+
+
+@require_owner
+async def handle_move_create(request):
+    import move_routes
+    return await move_routes.handle_own_create(request)
+
+
+@require_owner
+async def handle_move_cancel(request):
+    import move_routes
+    return await move_routes.handle_own_cancel(request)
+
+
 def setup(app):
     r = app.router
     # Точные пути раньше шаблонных: aiohttp разбирает их в порядке добавления,
@@ -2482,6 +2507,11 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/hold",       handle_own_hold,     "POST"),
         ("/api/owner/supply/{sid}/task/line",       handle_own_line,     "POST"),
         ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),
+        # Перемещения между районами: расчёт, создание заявки и живой статус.
+        ("/api/owner/move/plan",                    handle_move_plan,    "GET"),
+        ("/api/owner/move/live",                    handle_move_live,    "GET"),
+        ("/api/owner/move/create",                  handle_move_create,  "POST"),
+        ("/api/owner/move/{mid}/cancel",            handle_move_cancel,  "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
         r.add_route(method, path, handler)   # любой метод: словарь из двух ронял петлю на DELETE

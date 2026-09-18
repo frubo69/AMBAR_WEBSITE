@@ -440,6 +440,28 @@ async def _after_close(me: dict, day: str, d: dict) -> dict | None:
     return None if opened else last
 
 
+async def _moves_left(me: dict) -> list:
+    """Незакрытые перемещения района водителя.
+
+    Владелец, 18 сен 2026: «не давай им закрыть смену, пока все перемещения не
+    отработаны». Задача на перемещение висит на районе, а не на человеке: пока
+    её не забрали и не доработали, смену не закрывает никто из района — иначе
+    бутылки остаются лежать не там, где их ждёт заявка."""
+    if _tq(me):
+        return []
+    try:
+        import move_routes
+        rows = await move_routes.pending_for_district(me.get("district") or "")
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] перемещения {me['name']} не прочитаны: {e}")
+        return []
+    return [{"move_id": r["move_id"], "district_code": r["district_code"],
+             "need": r["need"], "got": r["got"], "left": r["left"],
+             "positions": r["left_positions"], "driver": r["driver"],
+             "sources": [s["code"] for s in r["sources"] if not s["done"]]}
+            for r in rows]
+
+
 async def _intake_left(me: dict) -> list:
     """Незавершённые приёмки водителя: взял или начал, но не завершил.
 
@@ -718,6 +740,12 @@ async def handle_shift_close(request):
     intake = await _intake_left(me)
     if intake:
         return web.json_response({"error": "intake_open", "tasks": intake},
+                                 status=409, headers=CORS_HEADERS)
+    # Перемещения района — так же, как приёмка: закрытая смена с неувезёнными
+    # бутылками означает, что завтра заявка снова попросит их купить.
+    moves = await _moves_left(me)
+    if moves:
+        return web.json_response({"error": "moves_open", "tasks": moves},
                                  status=409, headers=CORS_HEADERS)
     # Сначала смену района закрывает оператор, и только потом — водитель свою
     # (владелец, 13 сен 2026: «третьим шагом должно быть оператор закрыл смену,
@@ -2665,6 +2693,36 @@ async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 
+# ── Перемещение между районами ───────────────────────────────────────────────
+# Ручки живут в move_routes, здесь только права: водитель, не тестовый.
+@require_driver
+@_no_test
+async def handle_move_list(request):
+    import move_routes
+    return await move_routes.handle_drv_list(request)
+
+
+@require_driver
+@_no_test
+async def handle_move_claim(request):
+    import move_routes
+    return await move_routes.handle_drv_claim(request)
+
+
+@require_driver
+@_no_test
+async def handle_move_release(request):
+    import move_routes
+    return await move_routes.handle_drv_release(request)
+
+
+@require_driver
+@_no_test
+async def handle_move_scan(request):
+    import move_routes
+    return await move_routes.handle_drv_scan(request)
+
+
 def setup(app):
     r = app.router
     routes = (
@@ -2713,6 +2771,12 @@ def setup(app):
         ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
         ("/api/driver/supply/{sid}/hold",       handle_supply_hold,   "POST"),
         ("/api/driver/supply/{sid}/buy",        handle_supply_buy,    "POST"),
+        # Перемещение между районами: задача на районе-получателе, водитель
+        # едет к отдающему и сканирует то, что должен увезти.
+        ("/api/driver/move",                    handle_move_list,     "GET"),
+        ("/api/driver/move/{mid}/claim",        handle_move_claim,    "POST"),
+        ("/api/driver/move/{mid}/release",      handle_move_release,  "POST"),
+        ("/api/driver/move/{mid}/scan",         handle_move_scan,     "POST"),
     )
     seen = set()
     for path, handler, method in routes:

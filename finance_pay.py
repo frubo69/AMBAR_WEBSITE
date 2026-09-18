@@ -14,6 +14,17 @@
 сегодня (запись расхода), а с зарплаты снимутся с того месяца, который
 указали: «за следующий месяц наперёд» — значит с следующего, и следующую
 зарплату человек не получает.
+
+Владелец, 19 сен 2026: «водители могут попросить зарплату наперёд авансом —
+надо понимать, получил он зарплату наперёд или часть авансом; он должен
+видеть, сколько получает в этом месяце с учётом премии и сколько в следующем
+с учётом того, что часть или всю зарплату уже выплатили; премии настраиваемые
+каждому свои». Поэтому у аванса есть смысл (mode): «часть зарплаты» этого
+месяца (part), «зарплата наперёд» за следующий (ahead) или своя схема по
+частям; математика та же — с какого месяца и по сколько снимать. А у человека,
+как оклад, — своя премия в месяц (bonus, в дирхамах): действует с месяца,
+в котором вписана, и дальше, пока её не поменяют; 0 — премии больше нет.
+Разовые премии — записями «Премия», как и были.
 """
 from __future__ import annotations
 
@@ -25,6 +36,8 @@ CASH_KINDS = ('advance', 'loan')            # деньги выданы на р�
 MINUS_KINDS = ('fine', 'advance', 'loan', 'hold')   # снимаются с зарплаты
 PENALTY_KINDS = ('fine', 'hold')   # «Штрафы и удержания»: пересматриваются и отменяются без стирания
 PAY_KINDS = ('salary', 'advance', 'loan')  # записи фонда, которые считаются зарплатами
+# Смысл аванса — для слов старшему и водителю; считается он одинаково.
+ADVANCE_MODES = {'part': 'Аванс — часть зарплаты', 'ahead': 'Зарплата наперёд', 'custom': 'Аванс по частям'}
 ROLES = ('other', 'senior', 'operator', 'driver')      # руководство первым, как в тетради
 ROLE_T = {'other': 'Старшие', 'senior': 'Старший оператор', 'operator': 'Операторы', 'driver': 'Водители'}
 UNITS = ('month', 'day')
@@ -56,9 +69,9 @@ def schedule(item: dict, month: str) -> dict:
 def effective(person: dict, month_docs: list) -> dict:
     """Ставка человека на месяц: последняя вписанная не позже этого месяца.
     Дни и заметка — только из записи самого месяца."""
-    eff = dict(rate=None, unit='month', cur='AED', days=None, note='', rate_month='')
+    eff = dict(rate=None, unit='month', cur='AED', days=None, note='', rate_month='', bonus=None)
     for d in month_docs:                       # отсортированы по месяцу
-        for k in ('rate', 'unit', 'cur'):
+        for k in ('rate', 'unit', 'cur', 'bonus'):
             if d.get(k) is not None and d.get(k) != '':
                 eff[k] = d[k]
                 if k == 'rate':
@@ -77,17 +90,25 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
     rate_aed = rate * (usd if cur == 'USD' else 1.0)
     days = eff.get('days') if eff.get('days') is not None else days_auto
     accrued = rate_aed if unit == 'month' else rate_aed * _n(days)
-    rows, plus, minus, debt = [], 0.0, 0.0, 0.0
+    # Своя премия в месяц — как оклад: с месяца, где вписана, и дальше.
+    bonus_month = max(0.0, _n(eff.get('bonus')))
+    rows, plus, minus, debt = [], bonus_month, 0.0, 0.0
+    parts = dict(bonus_once=0.0, fines=0.0, holds=0.0, advance=0.0, loan=0.0)
     for it in items:
         if it.get('cancelled_at'):             # отменённый штраф — только в истории
             continue
         s = schedule(it, month)
-        if it.get('kind') == 'bonus':
+        k = it.get('kind')
+        if k == 'bonus':
             plus += s['due']
+            parts['bonus_once'] += s['due']
         else:
             minus += s['due']
             debt += s['after']
-        rows.append(dict(id=it.get('_id'), kind=it.get('kind'), t=KINDS.get(it.get('kind'), ''),
+            parts['fines' if k == 'fine' else 'holds' if k == 'hold' else 'advance' if k == 'advance' else 'loan'] += s['due']
+        rows.append(dict(id=it.get('_id'), kind=it.get('kind'),
+                         t=(ADVANCE_MODES.get(it.get('mode') or '') if it.get('kind') == 'advance' else '')
+                           or KINDS.get(it.get('kind'), ''), mode=it.get('mode') or '',
                          amount=_i(_n(it.get('amount'))), per_month=_i(_n(it.get('per_month'))),
                          start=str(it.get('from') or '')[:7], day=it.get('day') or '',
                          note=it.get('note') or '', reason=it.get('reason') or '',
@@ -100,6 +121,9 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
         rate_month=eff.get('rate_month') or '', rate_aed=_i(rate_aed),
         days=_i(_n(days)), days_auto=_i(_n(days_auto)), days_set=eff.get('days') is not None,
         note=eff.get('note') or '', accrued=_i(accrued), plus=_i(plus), minus=_i(minus),
+        bonus_month=_i(bonus_month), bonus_set=eff.get('bonus') is not None,
+        **{k: _i(v) for k, v in parts.items()},
+        minus_other=_i(parts['fines'] + parts['holds'] + parts['loan']),
         to_pay=_i(to_pay), paid=_i(paid), left=_i(to_pay - paid), debt=_i(debt),
         items=rows, payouts=payouts)
 

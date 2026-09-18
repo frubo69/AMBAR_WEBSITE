@@ -47,7 +47,7 @@ OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стоп�
 MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
 BOOKS = ('rp', 'np', 'in')
 ENTRY_KINDS = ('', 'salary', 'advance', 'loan')
-PAY_FIELDS = ('rate', 'unit', 'cur', 'days', 'note')
+PAY_FIELDS = ('rate', 'unit', 'cur', 'days', 'note', 'bonus')
 
 
 def _biz_day(ref: datetime = None) -> str:
@@ -675,6 +675,25 @@ async def writeoff_holds(name: str = "") -> list:
     return out
 
 
+async def pay_month(month: str) -> dict:
+    """Ведомость одного месяца без всей книги (выручки, поставок, сейфа): для
+    «следующего месяца» в профиле водителя — сколько он получит, если часть
+    или всю зарплату уже выдали наперёд."""
+    days = _month_days(month)
+    try:
+        entries = await db.fin_entries_get(days[0], days[-1])
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] записи {month} не прочитаны: {e}")
+        entries = []
+    try:
+        work = (await _spend(days)).get("_work", {})
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] дни работы {month} не прочитаны: {e}")
+        work = {}
+    fx = await _usd(await db.fin_month_get(month))
+    return await _payroll(month, days, _biz_day(), entries, work, fx["usd"])
+
+
 async def person_card(name: str, month: str) -> dict:
     """Зарплата и списания одного человека за месяц — для профиля в приложении
     водителя. Отдаём только его: чужие суммы туда не попадают."""
@@ -711,8 +730,30 @@ async def person_card(name: str, month: str) -> dict:
                month_total=pay._i(fines + holds), month_count=cnt, items=items,
                usd=pay_.get("usd"), found=bool(p))
     for k in ("role", "rate", "rate_aed", "unit", "cur", "days", "days_auto", "days_set",
-              "accrued", "plus", "minus", "to_pay", "paid", "left", "debt", "payouts"):
+              "accrued", "plus", "minus", "to_pay", "paid", "left", "debt", "payouts",
+              "bonus_month", "bonus_once", "advance", "loan"):
         out[k] = (p or {}).get(k)
+    # Авансы месяца — строками: «зарплата наперёд» или «часть зарплаты», когда
+    # выдан и сколько снимается в этом месяце.
+    out["advances"] = [dict(id=r.get("id"), t=r.get("t"), mode=r.get("mode") or "", amount=r.get("amount"),
+                            due=r.get("due"), day=r.get("day") or "", start=r.get("start") or "",
+                            after=r.get("after"))
+                       for r in ((p or {}).get("items") or []) if r.get("kind") == "advance" and r.get("due")]
+    # Следующий месяц: оклад, премия и что уже выдано наперёд (владелец, 19 сен
+    # 2026: «сколько в следующем с учётом того, что часть или всю зарплату
+    # выплатили уже в прошлом месяце»).
+    nxt = pay.next_month(month)
+    try:
+        q = next((x for x in ((await pay_month(nxt)).get("people") or []) if x.get("name") == name), None)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] следующий месяц {name}: {e}")
+        q = None
+    out["next"] = None if not q else dict(
+        month=nxt, accrued=q.get("accrued"), plus=q.get("plus"), bonus_month=q.get("bonus_month"),
+        advance=q.get("advance"), fines=q.get("fines"), holds=(q.get("holds") or 0) + (q.get("loan") or 0),
+        to_pay=q.get("to_pay"), unit=q.get("unit"),
+        advances=[dict(t=r.get("t"), mode=r.get("mode") or "", due=r.get("due"), day=r.get("day") or "")
+                  for r in (q.get("items") or []) if r.get("kind") == "advance" and r.get("due")])
     out["role_t"] = {"driver": "Водитель", "operator": "Оператор",
                      "senior": "Старший оператор", "other": "Старший"}.get((p or {}).get("role") or "", "")
     return out
@@ -1306,6 +1347,12 @@ async def handle_pay_month_set(request):
             value = _num(raw)
             if value is not None and value < 0:
                 return _json({"error": "bad_number"}, 400)
+        elif field == "bonus":
+            # Премия в месяц — с этого месяца и дальше. Пусто — 0, а не «как
+            # раньше»: стёрли — значит с этого месяца премии нет.
+            value = _num(raw) or 0
+            if value < 0:
+                return _json({"error": "bad_number"}, 400)
         elif field == "unit":
             value = str(raw or "") or None
             if value is not None and value not in pay.UNITS:
@@ -1325,7 +1372,7 @@ async def handle_pay_month_set(request):
     cur = body.get("cur")
     if field == "rate" and cur in pay.CURS:
         fields["cur"] = cur
-    if value is None or value == "":
+    if (value is None or value == "") and field != "bonus":
         await db.fin_pay_month_set(month, name, fields, unset=[field])
     else:
         await db.fin_pay_month_set(month, name, {**fields, field: value})
@@ -1354,6 +1401,15 @@ async def handle_pay_item_add(request):
         day = _day_arg(body.get("day") or _biz_day())
         month = _month_arg(body.get("month")) if body.get("month") else day[:7]
         frm = str(body.get("from") or "this")
+        mode = str(body.get("mode") or "") if kind == "advance" else ""
+        if mode and mode not in pay.ADVANCE_MODES:
+            return _json({"error": "bad_mode"}, 400)
+        # «Часть зарплаты» — с этого месяца разом; «наперёд» — со следующего
+        # разом; «по частям» — как задали (владелец, 19 сен 2026).
+        if mode == "part":
+            frm, per_month = "this", 0
+        elif mode == "ahead":
+            frm, per_month = "next", 0
         start = month if frm == "this" else pay.next_month(month) if frm == "next" else _month_arg(frm)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
@@ -1370,6 +1426,7 @@ async def handle_pay_item_add(request):
                                 "by": who, "at": datetime.now(timezone.utc)})
     item = {"_id": iid, "name": name, "kind": kind, "amount": amount,
             "per_month": per_month, "from": start, "day": day, "note": note,
+            **({"mode": mode} if mode else {}),
             **({"reason": reason} if reason else {}),
             "entry": entry_id, "by": who, "at": datetime.now(timezone.utc)}
     await db.fin_pay_item_add(item)

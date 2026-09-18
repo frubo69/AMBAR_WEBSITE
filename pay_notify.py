@@ -95,7 +95,13 @@ def added(item: dict, who: str) -> str:
     kind = item.get("kind") or ""
     t = pay.KINDS.get(kind, "Запись")
     head = f"{t} {_aed(item.get('amount'))}"
-    if kind in pay.CASH_KINDS:
+    if kind == "advance" and item.get("mode") == "ahead":
+        head = (f"Зарплата за {month_t(str(item.get('from') or '')[:7])} наперёд {_aed(item.get('amount'))}"
+                f" — выдана {day_t(item.get('day') or '')}")
+    elif kind == "advance" and item.get("mode") == "part":
+        head = (f"Аванс {_aed(item.get('amount'))} в счёт зарплаты за {month_t(str(item.get('from') or '')[:7])}"
+                f" — выдан {day_t(item.get('day') or '')}")
+    elif kind in pay.CASH_KINDS:
         head += f" — {'выдан' if kind == 'advance' else 'записан'} {day_t(item.get('day') or '')}"
     elif kind == "bonus":
         head += f" за {month_t(str(item.get('from') or item.get('day') or '')[:7])}"

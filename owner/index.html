@@ -6049,6 +6049,21 @@ button.shl-p:active{transform:scale(.96)}
 .exp-pay.card{color:var(--info);background:rgba(91,141,239,.14);border-color:rgba(91,141,239,.5)}
 .exp-pend-a .exp-pay{display:block;width:max-content;margin-left:auto}
 .exp-pend-ph{display:flex;gap:8px;margin-top:11px}
+/* Аванс: выбор строками (часть зарплаты / наперёд / по частям), ниже — сколько
+   он получит в этом и в следующем месяце. */
+.fb-adv{display:flex;flex-direction:column;gap:7px;padding:2px 0 8px}
+.fb-adv-o{display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;border-radius:13px;cursor:pointer;
+  font-family:inherit;text-align:left;color:var(--text);background:var(--card2);border:1px solid var(--border2)}
+.fb-adv-o.on{border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
+.fb-adv-r{flex:0 0 auto;width:22px;height:22px;border-radius:50%;border:2px solid var(--border3);display:flex;
+  align-items:center;justify-content:center;color:#1a1408}
+.fb-adv-o.on .fb-adv-r{background:var(--gold2);border-color:var(--gold2)}
+.fb-adv-b{flex:1;min-width:0}
+.fb-adv-b b{display:block;font-size:13.5px;font-weight:700}
+.fb-adv-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+.fb-adv-p{padding:4px 2px 2px;font-size:12.5px;color:var(--sub);line-height:1.45}
+.fb-adv-p i{font-style:normal}
+.fb-adv-p b{color:var(--gold2)}
 .exp-ph{flex:0 0 auto;width:96px;padding:0;border:0;background:none;cursor:pointer;
   font-family:inherit;text-align:left;color:var(--muted)}
 .exp-ph img{display:block;width:96px;height:72px;border-radius:10px;object-fit:cover;
@@ -18315,6 +18330,8 @@ const _FB_PEN = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" str
 function fbMonthNow(){ return _dayIsoFor(0).slice(0, 7); }
 function fbMonthT(m){ return `${MONTHS_RU[+m.slice(5, 7) - 1]} ${+m.slice(0, 4)}`; }
 function fbMonthGen(m){ return `${MONTHS_GEN[+m.slice(5, 7) - 1]} ${+m.slice(0, 4)}`; }
+const MONTHS_PREP = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
+function fbMonthPrep(m){ return MONTHS_PREP[+m.slice(5, 7) - 1]; }
 function fbMonthAdd(m, d){
   const dt = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + d, 1);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
@@ -20501,7 +20518,9 @@ async function accFinPerson(){
     ${fbIn('Дней', 'days', p.days_set ? p.days : null, sc, {ph: fbFmt(p.days_auto), phk: 'p.days_auto', eu: 'по сменам', unit: 'дн', im: 'numeric'})}
     ${fbRow('Курс доллара', 'pay.usd', fbCur(b).usd, {sub: true, dec: 1, show: 'p.usd_on', hide: p.cur !== 'USD'})}
     ${fbRow('Начислено', 'p.accrued', p.accrued, {sum: true, sign: '='})}
+    ${fbIn('Премия в месяц', 'bonus', p.bonus_set ? p.bonus_month : null, sc, {ph: '0', unit: 'AED', eu: 'нет', im: 'numeric'})}
   </div>
+  ${fbAdvHtml(p, b)}
   <div class="sc fb-gut">
     ${fbCapT('Удержания и премии')}
     <div id="fbList-items">${fbItems(p, b.month)}</div>
@@ -20522,7 +20541,8 @@ async function accFinPerson(){
     ${fbCapT('Итог')}
     ${fbRow('Начислено', 'p.accrued', p.accrued, {sign: '+'})}
     ${fbRow('Премии', 'p.plus', p.plus, {sign: '+'})}
-    ${fbRow('Удержания', 'p.minus', p.minus, {sign: '−'})}
+    ${fbRow('Аванс', 'p.advance', p.advance || 0, {sign: '−'})}
+    ${fbRow('Штрафы и удержания', 'p.minus_other', p.minus_other || 0, {sign: '−'})}
     ${fbRow('К выплате', 'p.to_pay', p.to_pay, {sum: true, sign: '=', mode: 'neg'})}
     ${fbRow('Выплачено', 'p.paid', p.paid, {sign: '−'})}
     ${fbRow('Осталось', 'p.left', p.left, {sum: true, sign: '=', mode: 'neg'})}
@@ -20534,6 +20554,95 @@ async function accFinPerson(){
     <button class="sc-r fb-r fb-hide" data-n="${escS(p.name)}" onclick="fbPersonHide(this.dataset.n)" style="cursor:pointer"><span>Убрать из зарплат</span><em>${_SC_CHEV}</em></button>
   </div>`;
 }
+// ── Аванс ───────────────────────────────────────────────────────────────
+// Владелец, 19 сен 2026: «водители могут попросить зарплату наперёд авансом;
+// надо понимать, получил он зарплату наперёд или часть авансом, и он должен
+// видеть, сколько получает в этом месяце с учётом премии и сколько в
+// следующем». Выбор — строками: часть зарплаты этого месяца, зарплата
+// наперёд за следующий или по частям. Под выбором — сколько он получит
+// тогда в этом и в следующем месяце. Деньги выдаются из фонда сегодня.
+const FB_ADV = {mode: 'part'};
+function fbAdvHtml(p, b){
+  const m = b.month, nm = fbMonthAdd(m, 1);
+  const opt = (mode, t, sub) => `<button class="fb-adv-o${FB_ADV.mode === mode ? ' on' : ''}" onclick="fbAdvPick('${mode}')">
+      <span class="fb-adv-r">${FB_ADV.mode === mode ? IC('check', 13) : ''}</span>
+      <span class="fb-adv-b"><b>${t}</b><i>${sub}</i></span></button>`;
+  const full = (p.accrued || 0) + (p.bonus_month || 0);
+  return `<div class="sc fb-gut" id="fbAdv">
+    ${fbCapT('Аванс')}
+    <div class="fb-adv">
+      ${opt('part', `Часть зарплаты за ${fbMonthT(m).toLowerCase()}`, `снимется с зарплаты за ${fbMonthT(m).toLowerCase()}`)}
+      ${opt('ahead', `Зарплата за ${fbMonthT(nm).toLowerCase()} наперёд`, `в ${fbMonthPrep(nm)} к выплате останется меньше на эту сумму`)}
+      ${opt('custom', 'По частям', 'снимать с зарплаты по сумме в месяц')}
+    </div>
+    <div class="fb-add">
+      <input class="fb-num" inputmode="decimal" placeholder="${FB_ADV.mode === 'ahead' ? fbFmt(full) : 'Сумма'}" autocomplete="off" id="fbAmt-adv" oninput="fbAdvCalc()">
+      <input class="fb-num" inputmode="decimal" placeholder="В месяц" autocomplete="off" id="fbPer-adv" oninput="fbAdvCalc()"${FB_ADV.mode === 'custom' ? '' : ' hidden'}>
+      <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="80" id="fbCmt-adv">
+      <div class="fb-adv-p" id="fbAdvP">${fbAdvPreview(p, b)}</div>
+      <button class="aud-b go" data-n="${escS(p.name)}" onclick="fbAdvGo(this.dataset.n)">Выдать аванс</button>
+    </div>
+  </div>`;
+}
+function fbAdvAmt(p){
+  const v = fbAmt('fbAmt-adv');
+  if(v > 0) return v;
+  return FB_ADV.mode === 'ahead' ? (p.accrued || 0) + (p.bonus_month || 0) : 0;
+}
+// Сколько он получит — в этом месяце и в следующем, если выдать сейчас.
+function fbAdvPreview(p, b){
+  const a = fbAdvAmt(p), m = b.month, nm = fbMonthAdd(m, 1);
+  const full = (p.accrued || 0) + (p.bonus_month || 0);
+  if(!(a > 0)) return `<i>Сейчас к выплате за ${fbMonthT(m).toLowerCase()}: <b>${fbFmt(p.to_pay)} AED</b></i>`;
+  if(FB_ADV.mode === 'part') return `<i>За ${fbMonthT(m).toLowerCase()} к выплате станет <b>${fbFmt(p.to_pay - a)} AED</b> (${fbFmt(p.to_pay)} − ${fbFmt(a)})</i>`;
+  if(FB_ADV.mode === 'ahead') return `<i>За ${fbMonthT(m).toLowerCase()} — как было, <b>${fbFmt(p.to_pay)} AED</b>; за ${fbMonthT(nm).toLowerCase()} — <b>${fbFmt(full - a)} AED</b> (оклад ${fbFmt(p.accrued)}${p.bonus_month ? ' + премия ' + fbFmt(p.bonus_month) : ''} − ${fbFmt(a)})</i>`;
+  const per = fbAmt('fbPer-adv') || 0;
+  const n = per > 0 ? Math.ceil(a / per) : 1;
+  return `<i>${per > 0 ? `По ${fbFmt(per)} AED в месяц, ${n} ${pluralize(n, 'месяц', 'месяца', 'месяцев')}` : 'Впишите, сколько снимать в месяц'}, начиная с ${fbMonthGen(FB.from === 'next' ? nm : m)}</i>
+    <div class="chip-row fb-chips" id="fbFrom">${fbFromChips()}</div>`;
+}
+function fbAdvPick(mode){
+  FB_ADV.mode = mode;
+  const b = fbBook(FB.month), p = b ? (fbCur(b).people || []).find(x => x.name === FB.person) : null;
+  const box = document.getElementById('fbAdv');
+  if(box && p && b){
+    const amt = (document.getElementById('fbAmt-adv') || {}).value || '', per = (document.getElementById('fbPer-adv') || {}).value || '';
+    box.outerHTML = fbAdvHtml(p, b);
+    const a = document.getElementById('fbAmt-adv'); if(a) a.value = amt;
+    const pr = document.getElementById('fbPer-adv'); if(pr) pr.value = per;
+    fbAdvCalc();
+  }
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbAdvCalc(){
+  const b = fbBook(FB.month), p = b ? (fbCur(b).people || []).find(x => x.name === FB.person) : null;
+  const box = document.getElementById('fbAdvP');
+  if(box && p && b) box.innerHTML = fbAdvPreview(p, b);
+}
+async function fbAdvGo(name){
+  const b = fbBook(FB.month), p = b ? (fbCur(b).people || []).find(x => x.name === name) : null;
+  if(!p) return;
+  const amount = fbAdvAmt(p);
+  if(!(amount > 0)){ _toast('Нужна сумма'); return; }
+  const per = FB_ADV.mode === 'custom' ? (fbAmt('fbPer-adv') || 0) : 0;
+  if(FB_ADV.mode === 'custom' && !(per > 0)){ _toast('Сколько снимать в месяц'); return; }
+  const nm = fbMonthAdd(FB.month, 1);
+  const what = FB_ADV.mode === 'ahead' ? `Зарплата за ${fbMonthT(nm).toLowerCase()} наперёд`
+             : FB_ADV.mode === 'part' ? `Аванс в счёт зарплаты за ${fbMonthT(FB.month).toLowerCase()}` : 'Аванс по частям';
+  if(!await askDialog(`${what} · ${fbFmt(amount)} AED`, `${name} получает деньги из фонда сегодня. ${
+      String(document.getElementById('fbAdvP').textContent || '').trim()}`, 'Выдать', 'Вернуться назад')) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/item',
+      {method: 'POST', body: {name, kind: 'advance', mode: FB_ADV.mode, amount, per_month: per,
+                              from: FB_ADV.mode === 'custom' ? FB.from : '', month: FB.month, day: _dayIsoFor(0),
+                              note: fbTxt('fbCmt-adv'), as: _meName()}});
+    ['fbAmt-adv', 'fbPer-adv', 'fbCmt-adv'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); accFinPerson(); }
+    _toast(`${what} выдан${FB_ADV.mode === 'ahead' ? 'а' : ''} · ${name}`);
+  }catch(e){ _toast('Не удалось записать'); }
+}
+
 async function fbPaySeg(field, value){
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/month',
@@ -21093,9 +21202,10 @@ function fbItemPersonPaint(){
   box.innerHTML = fbItemPersonList(b);
 }
 function fbItemForm(name){
-  return `<button class="sc-r fb-plus" onclick="fbAddToggle('item')"><span>Штраф, аванс или премия</span><em>${_FB_PLUS}</em></button>
+  if(FB.kind === 'advance') FB.kind = 'fine';
+  return `<button class="sc-r fb-plus" onclick="fbAddToggle('item')"><span>Штраф, долг или премия</span><em>${_FB_PLUS}</em></button>
   <div class="fb-add" id="fbAdd-item" hidden>
-    <div class="chip-row fb-chips" id="fbKind">${fbKindChips()}</div>
+    <div class="chip-row fb-chips" id="fbKind" data-noadv="1">${fbKindChips(false, true)}</div>
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-item">
     <input class="fb-num" inputmode="decimal" placeholder="В месяц" autocomplete="off" id="fbPer-item"${FB.kind === 'bonus' ? ' hidden' : ''}>
     <div class="chip-row fb-chips" id="fbFrom">${fbFromChips()}</div>
@@ -21105,17 +21215,18 @@ function fbItemForm(name){
   </div>`;
 }
 // nb — без премии: на странице удержаний записывают только штраф, аванс и долг
-function fbKindChips(nb){ return Object.keys(FB_KIND_T).filter(k => k !== 'hold' && !(nb && k === 'bonus')).map(k => `<button class="chip${FB.kind === k ? ' on' : ''}" onclick="fbKindPick('${k}')">${FB_KIND_T[k]}</button>`).join(''); }
+function fbKindChips(nb, noadv){ return Object.keys(FB_KIND_T).filter(k => k !== 'hold' && !(nb && k === 'bonus') && !(noadv && k === 'advance')).map(k => `<button class="chip${FB.kind === k ? ' on' : ''}" onclick="fbKindPick('${k}')">${FB_KIND_T[k]}</button>`).join(''); }
 function fbFromChips(){ return [['this', 'С этого месяца'], ['next', 'Со следующего']].map(([v, t]) => `<button class="chip${FB.from === v ? ' on' : ''}" onclick="fbFromPick('${v}')">${t}</button>`).join(''); }
 function fbKindPick(k){
   FB.kind = k;
-  const box = document.getElementById('fbKind'); if(box) box.innerHTML = fbKindChips(box.dataset.nb === '1');
+  const box = document.getElementById('fbKind'); if(box) box.innerHTML = fbKindChips(box.dataset.nb === '1', box.dataset.noadv === '1');
   const per = document.getElementById('fbPer-item'); if(per) per.hidden = k === 'bonus';
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 function fbFromPick(v){
   FB.from = v;
   const box = document.getElementById('fbFrom'); if(box) box.innerHTML = fbFromChips();
+  if(document.getElementById('fbAdvP')) fbAdvCalc();        // «по частям» — пересчитать, с какого месяца
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 async function fbItemAdd(name){

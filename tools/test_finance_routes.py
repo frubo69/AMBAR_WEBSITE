@@ -560,6 +560,10 @@ async def main():
     eq("ждёт решения — только наличное (безнал 11 мимо)", a3["spend_pending"], b3["spend_pending"])
     eq("прибыль по расчёту видит и безнал: −75", after["econ"] - before["econ"], -75)
     del DRIVER_DAYS[0]["extras"][-3:]
+    print("— профиль водителя: этот месяц и следующий (авансы, 19 сен 2026)")
+    card = await fr.person_card("Али", M)
+    eq("в профиле есть следующий месяц", (card.get("next") or {}).get("month"), "2026-10")
+    eq("и поля разбивки месяца", all(k in card for k in ("bonus_month", "advance", "advances", "plus")), True)
     print()
     print("FAILED:", fails) if fails else print("ALL OK — сервер собирает книгу верно")
     sys.exit(1 if fails else 0)

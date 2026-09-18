@@ -719,6 +719,11 @@ function PROFILE(){
           district: ME.district, district_name: ME.district_name, since: '2025-11-04', active: true,
           rate: 5000, cur: 'AED', unit: 'month', days: 26, accrued: 5000, plus: 0, minus: 400,
           fines: 0, holds: 400, to_pay: 4600, paid: 0, left: 4600, debt: 0, month_total: 400, month_count: 1,
+          bonus_month: 0, bonus_once: 0, advance: 0, loan: 0, advances: [],
+          // Следующий месяц — как у боевого (finance_routes.person_card): оклад без удержаний.
+          next: {month: (function(){ const y = +mon.slice(0, 4), m = +mon.slice(5, 7);
+                   return m === 12 ? (y + 1) + '-01' : y + '-' + String(m + 1).padStart(2, '0'); })(),
+                 accrued: 5000, plus: 0, bonus_month: 0, advance: 0, fines: 0, holds: 0, to_pay: 5000, unit: 'month', advances: []},
           items: [{id: 'p1', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: S.day,
                    at: iso(now() - 3 * 24 * 3600000), reason: '', note: 'Аванс на топливо', due: 400,
                    left: 0, done: true, cancelled: false}]};

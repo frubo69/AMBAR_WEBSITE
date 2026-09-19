@@ -21869,7 +21869,9 @@ function pathShort(){
 // на вопрос поинтереснее: сколько магазин обычно не даёт и во что это встаёт.
 function supHistLine(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
-  if(list.length < 2) return '';
+  // Закрытые закупки на хабе не стоят (_supCur) — значит, строка нужна, как
+  // только есть хоть одна: иначе единственная принятая исчезла бы из виду.
+  if(!list.some(x => x.status !== 'open')) return '';
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
   return `<button class="pnav-r pbig ttl pd-hist" onclick="supHistory()">
     <span class="pnav-i big live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -23898,7 +23900,17 @@ function mvoGiveCards(){
 // «Принять»: по районам, куда везут, — кто отдаёт, что принято, где неровно.
 function mvoTakeCards(){
   const я = _rcvMe();
-  return (MVO.tasks || []).map(x => {
+  // Живые задачи — сверху; принятые и снятые — отдельной группой внизу, как
+  // «Закрытые» в других базах (владелец, 19 сен 2026: «делай так со всеми
+  // полностью завершёнными заявками»). Вперемешку «снято» и «принято» стояли
+  // между задачами, которые ещё надо везти.
+  const конец = x => x.status === 'done' || x.status === 'cancelled';
+  const живые = (MVO.tasks || []).filter(x => !конец(x)), былые = (MVO.tasks || []).filter(конец);
+  return _mvoTakeHtml(живые, я)
+    + (былые.length ? `<div class="sect"><span class="sect-t">Завершённые</span></div>${_mvoTakeHtml(былые, я)}` : '');
+}
+function _mvoTakeHtml(tasks, я){
+  return (tasks || []).map(x => {
     const [st, cls] = x.diff && x.status === 'done' ? ['принято неровно', 'warn'] : (MVO_ST[x.status] || MVO_ST.free);
     const pct = x.need ? Math.round(x.got / x.need * 100) : 0;
     const src = (x.sources || []).map(s => {
@@ -24942,18 +24954,14 @@ let SUP_ID = null, SUP_D = null, SUP_BUSY = false;
 function _supMain(list){
   return (list || []).find(x => x.status === 'open' && x.kind !== 'extra') || null;
 }
-// Что считать текущей основной поставкой на хабе. Открытая — всегда. Закрытая
-// или отменённая — только сегодняшняя: это новость дня («отменили», «приняли»).
-// Вчерашняя и старше — уже история, и её числа на карточке «Заявка» путали:
-// хаб показывал 781 бутылку отменённой поставки от 14-го, а внутри заявка на
-// сегодня была на 4 (владелец, 16 сен 2026: «этой же заявки нет уже»).
+// Что считать текущей основной поставкой на хабе — только открытую. Принятая
+// целиком или отменённая уходит в «Историю закупок» сразу, не дожидаясь смены
+// дня (владелец, 19 сен 2026: «вот эту заявку же полностью приняли, путает
+// сильно, убирай её в историю, и делай так со всеми полностью завершёнными
+// заявками»). Раньше сегодняшняя закрытая оставалась на хабе «новостью дня» с
+// именами водителей по районам, и было не понять, идёт приём или кончился.
 function _supCur(list){
-  const open = _supMain(list);
-  if(open) return open;
-  let today = '';
-  try{ today = accDay(); }catch(e){}
-  return (list || []).find(x => x.kind !== 'extra'
-    && (x.day === today || String(x.at || '').slice(0, 10) === today)) || null;
+  return _supMain(list);
 }
 
 async function accSupply(goto, district, sid){

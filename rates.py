@@ -56,7 +56,7 @@ log = logging.getLogger(__name__)
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 }
 
 SRC_NAME = "Al Ansari Exchange"
@@ -333,7 +333,32 @@ def _payload(ok: bool) -> dict:
 @require_owner
 async def handle_rates(request):
     force = request.query.get("force") == "1"
-    return web.json_response(await get_rates(force), headers=CORS_HEADERS)
+    d = await get_rates(force)
+    # Наш курс для клиентов — рядом с курсом обменника, в том же разделе STAR.
+    try:
+        import fx_take
+        d["take"] = await fx_take.rates()
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[rates] курс для клиентов не прочитан: {e}")
+        d["take"] = []
+    return web.json_response(d, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_take_set(request):
+    """POST {code, rate, as} — наш курс приёма валюты у клиентов (владелец,
+    19 сен 2026: «чтобы мы могли его посмотреть и менять»)."""
+    try:
+        body = await request.json()
+    except Exception:                             # noqa: BLE001
+        body = {}
+    import fx_take
+    ok, res = await fx_take.set_rate(body.get("code"), body.get("rate"),
+                                     str(body.get("as") or "").strip()[:40])
+    if not ok:
+        return web.json_response({"error": res}, status=400, headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "row": res, "take": await fx_take.rates()},
+                             headers=CORS_HEADERS)
 
 
 async def _opt(request):
@@ -343,4 +368,6 @@ async def _opt(request):
 def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/rates", _opt)
     app.router.add_get("/api/owner/rates", handle_rates)
+    app.router.add_route("OPTIONS", "/api/owner/rates/take", _opt)
+    app.router.add_post("/api/owner/rates/take", handle_take_set)
     log.info("[rates] routes mounted")

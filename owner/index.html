@@ -6480,6 +6480,24 @@ button.exp-wait:active{transform:scale(.99)}
 .fx-strip s{display:block;margin-top:5px;text-decoration:none;font-size:10.5px;font-weight:600;
   color:var(--muted);font-variant-numeric:tabular-nums}
 .fx-strip s:empty{display:none}
+/* Наш курс для клиентов (владелец, 19 сен 2026): по нему водитель называет
+   клиенту сумму в валюте. Плитки под курсом обменника, правка — в раскрытом
+   разделе; тап по плитке раскрывает и ставит курсор в её поле. */
+.fin-strip.four{grid-template-columns:repeat(4,1fr)}
+.fin-strip.four > div{cursor:pointer}
+.fin-strip.four > div:active{background:rgba(255,255,255,.03)}
+.fx-take-cap{padding:10px 16px 0;border-top:1px solid var(--border2);font-size:9px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;color:var(--gold2)}
+#fxTake{border-top:0}
+.fx-take-h{margin:12px 2px 6px;font-size:12.5px;font-weight:700;color:var(--text)}
+.fx-take-h i{display:block;font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.fx-take-r{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--border2)}
+.fx-take-r:first-of-type{border-top:0}
+.fx-take-r .fx-n i{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-take-in{flex:0 0 84px;width:84px;text-align:right}
+.fx-take-r u{flex:0 0 auto;text-decoration:none;font-size:10.5px;font-weight:700;color:var(--muted)}
+.fx-take-sep{height:1px;margin:10px 0 12px;background:var(--border2)}
 
 /* ── Склад: сколько лежит и сколько это стоит ─────────────────────────────
    Три величины — три зоны. У каждой своя подложка, свои поля и своя треть
@@ -7521,7 +7539,10 @@ button.exp-wait:active{transform:scale(.99)}
       <div><b class="is-skel" id="fxEur">0000</b><i>Евро</i><s id="fxEurB"></s></div>
       <div><b class="is-skel" id="fxRub">0000</b><i>Рубль</i><s id="fxRubB"></s></div>
     </div>
+    <div class="fx-take-cap">Наш курс для клиентов</div>
+    <div class="fin-strip fx-strip four" id="fxTake"></div>
     <div class="fin-x">
+      <div id="fxTakeEd"></div>
       <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off"
              oninput="fxRender()">
       <div id="fxList"></div>
@@ -18317,6 +18338,7 @@ function fxRender(){
     if(sub) sub.textContent = r && r.cash_buy_aed ? `продаёт ${_fxN(r.cash_buy_aed)}` : '';
   };
   put('fxUsd','USD'); put('fxEur','EUR'); put('fxRub','RUB');
+  fxTakeRender();
   // Подпись отвечает на единственный вопрос, который к ней есть: насколько
   // это свежо. Молчащий источник тоже говорится словом.
   const sub = document.getElementById('fxSub');
@@ -18344,6 +18366,63 @@ function fxRender(){
     + `наличными (курс с его сайта, обновляется раз в час), рядом — почём он её продаёт. `
     + `Здесь только то, что он меняет наличными: `
     + `${FX.cash_n || rows.length} ${pluralize(FX.cash_n || rows.length,'валюта','валюты','валют')}.`);
+}
+
+// ── Наш курс для клиентов ───────────────────────────────────────────────
+// Владелец, 19 сен 2026: «для клиентов у нас другой курс, наш внутренний, он
+// есть у водителей — добавь его в раздел курсов, чтобы мы могли его посмотреть
+// и менять». По нему водитель называет клиенту сумму в валюте, и на заказе он
+// замораживается в момент выбора: поменяли — новые выборы по-новому, уже
+// выбранные остаются. Сервер: fx_take.py, POST /api/owner/rates/take.
+const FX_TAKE_NAME = {USD: 'Доллар', EUR: 'Евро', GBP: 'Фунт', SAR: 'Риял'};
+function _fxT(v){ return (+(+v).toFixed(4)).toString(); }
+function fxTakeRender(){
+  const take = (FX && FX.take) || [];
+  const strip = document.getElementById('fxTake');
+  if(strip) strip.innerHTML = take.map(t => `<div onclick="fxTakeGo('${escS(t.code)}')">
+      <b>${_fxT(t.rate)}</b><i>${escS(FX_TAKE_NAME[t.code] || t.code)}</i></div>`).join('');
+  const ed = document.getElementById('fxTakeEd'); if(!ed) return;
+  const rows = (FX && FX.rates) || [];
+  ed.innerHTML = take.length ? `<div class="fx-take-h">Наш курс для клиентов
+      <i>дирхамов за единицу — по нему водитель называет клиенту сумму в валюте</i></div>${
+    take.map(t => {
+      const ex = rows.find(r => r.code === t.code);
+      const sub = [ex && ex.cash_aed ? `обменник даёт ${_fxN(ex.cash_aed)}` : '',
+                   t.by_name ? `изменил ${t.by_name}` : ''].filter(Boolean).join(' · ');
+      return `<div class="fx-take-r">
+        <span class="fx-c">${escS(t.code)}</span>
+        <span class="fx-n">${escS(FX_TAKE_NAME[t.code] || t.name || t.code)}${sub ? `<i>${escS(sub)}</i>` : ''}</span>
+        <input class="oprx-in fx-take-in" id="fxTakeIn-${escS(t.code)}" inputmode="decimal"
+               value="${_fxT(t.rate)}" data-was="${t.rate}" onfocus="this.select()"
+               onkeydown="if(event.key==='Enter')this.blur()" onblur="fxTakeSave('${escS(t.code)}', this)">
+        <u>AED</u>
+      </div>`; }).join('')}<div class="fx-take-sep"></div>` : '';
+}
+function fxTakeGo(code){
+  const b = document.getElementById('fxBlock');
+  if(b && !b.classList.contains('open')) b.classList.add('open');
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  setTimeout(() => { const i = document.getElementById('fxTakeIn-' + code); if(i) i.focus(); }, 260);
+}
+// Сохраняем на уходе с поля — как цены в прайсе, но с вопросом: это цена для
+// клиентов у всех водителей сразу, случайная цифра тут дорогая.
+async function fxTakeSave(code, input){
+  const was = +input.dataset.was;
+  const v = parseFloat(String(input.value).replace(',', '.'));
+  if(!(v > 0) || Math.abs(v - was) < 1e-9){ input.value = _fxT(was); return; }
+  if(v > 50){ input.value = _fxT(was); _toast('Курс — от 0 до 50 дирхамов'); return; }
+  const имя = FX_TAKE_NAME[code] || code;
+  const ok = await askDialog('Курс для клиентов',
+    `${имя}: ${_fxT(was)} → ${_fxT(v)} AED. Водители будут называть клиентам сумму по новому курсу; `
+    + 'уже выбранные на заказах не изменятся', 'Сохранить', 'Не менять');
+  if(!ok){ input.value = _fxT(was); return; }
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/rates/take', {method:'POST', body:{code, rate: v, as: _meName()}}); }
+  catch(e){ input.value = _fxT(was); _toast('Не удалось сохранить курс'); return; }
+  if(FX) FX.take = r.take || FX.take;
+  fxTakeRender();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast(`Курс для клиентов: ${имя} — ${_fxT(v)} AED`);
 }
 
 (function initFxBlock(){

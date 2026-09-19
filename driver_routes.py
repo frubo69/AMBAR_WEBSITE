@@ -166,18 +166,16 @@ FX_SYM = {"USD": "$", "EUR": "€", "GBP": "£", "RUB": "₽", "TRY": "₺", "CN
 
 # Валюты, которыми берут оплату с клиента, и курс приёма — дирхамов за единицу.
 # Фиксированные, не рыночные (владелец, 15 сен 2026: «это те цены, по которым
-# мы принимаем от клиентов»). Курс в профиле, что идёт в зарплаты, — свой,
-# рыночный, и здесь не участвует.
-FX_TAKE = [
-    {"code": "USD", "name": "Доллар США", "rate": 3.5},
-    {"code": "EUR", "name": "Евро", "rate": 4.0},
-    {"code": "GBP", "name": "Фунт стерлингов", "rate": 4.5},
-    {"code": "SAR", "name": "Риал", "rate": 1.0},
-]
+# мы принимаем от клиентов»). С 19 сен 2026 курс живёт в базе и меняется в STAR
+# («Курс валют» → «Наш курс для клиентов», fx_take.py); FX_TAKE — умолчания.
+# Курс обменника (rates.py) здесь не участвует.
+from fx_take import DEFAULT as FX_TAKE          # noqa: E402
 
 
-def fx_take_list() -> list:
-    return [{**r, "sym": FX_SYM.get(r["code"], r["code"])} for r in FX_TAKE]
+async def fx_take_list() -> list:
+    import fx_take
+    return [{"code": r["code"], "name": r["name"], "rate": r["rate"],
+             "sym": FX_SYM.get(r["code"], r["code"])} for r in await fx_take.rates()]
 
 
 def _fx_view(o: dict) -> dict | None:
@@ -1607,7 +1605,7 @@ async def handle_orders(request):
         "day": day, "active": active, "done": done,
         "total_aed": sum(x["total"] for x in done),
         # Чем берут с клиента и по какому курсу — для меню «Валютой» на карточке.
-        "fx_take": fx_take_list(),
+        "fx_take": await fx_take_list(),
         # Скрытый режим едет вместе с заказами, а не только при запуске: его
         # может включить старший с планшета, и ждать перезапуска приложения в
         # такой момент нельзя. Опрос идёт каждые пять секунд — этого хватает.
@@ -1786,9 +1784,10 @@ async def handle_fx(request):
         await db.update_order(oid, pay_fx=None)
         log.info(f"[driver] {me['name']} #{oid}: расчёт снова в дирхамах")
         return web.json_response({"ok": True, "pay_fx": None}, headers=CORS_HEADERS)
-    # Курс приёма — фиксированный из FX_TAKE, а не рыночный: клиенту называют
+    # Курс приёма — наш, из STAR (fx_take), а не обменника: клиенту называют
     # ровно то число, по которому у нас берут.
-    row = next((r for r in FX_TAKE if r["code"] == code), None)
+    import fx_take
+    row = next((r for r in await fx_take.rates() if r["code"] == code), None)
     if not row:
         return web.json_response({"error": "no_rate"}, status=400, headers=CORS_HEADERS)
     rate = row["rate"]

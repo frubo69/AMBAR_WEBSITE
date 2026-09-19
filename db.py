@@ -5560,6 +5560,32 @@ async def fx_day_set(day: str, rates: dict) -> None:
                                upsert=True)
 
 
+async def fx_take_all() -> dict:
+    """Наш курс приёма валюты у клиентов, вписанный в STAR: {код: {rate,
+    by_name, at}}. Невписанные — по умолчанию из fx_take.DEFAULT."""
+    d = _db_or_none()
+    if d is None: return {}
+    out = {}
+    async for doc in d.fx_take.find({}):
+        out[str(doc.get("_id"))] = {"rate": doc.get("rate"), "by_name": doc.get("by_name", ""),
+                                    "at": str(doc.get("at") or "")}
+    return out
+
+
+async def fx_take_put(code: str, rate: float, by_name: str = "") -> None:
+    d = _db_or_none()
+    if d is None: return
+    await d.fx_take.update_one({"_id": code}, {"$set": {
+        "rate": rate, "by_name": str(by_name or "")[:40], "at": datetime.now(timezone.utc)}}, upsert=True)
+
+
+async def fx_take_log_add(doc: dict) -> None:
+    """Журнал изменений курса для клиентов: кто, когда, с какого на какое."""
+    d = _db_or_none()
+    if d is None: return
+    await d.fx_take_log.insert_one({**doc, "at": datetime.now(timezone.utc)})
+
+
 async def fx_days(limit: int = 8) -> list:
     d = _db_or_none()
     if d is None: return []

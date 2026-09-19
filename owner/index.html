@@ -6639,10 +6639,10 @@ button.exp-wait:active{transform:scale(.99)}
 .stkbd td.tot.z{color:var(--muted);opacity:.5}
 
 /* ── Цены по позициям ─────────────────────────────────────────────────────
-   Три цены в строке, и они про разное: во сколько встала бутылка, за сколько
-   уходит по прайсу и за сколько в приложении. Закупка стоит первой и она же
-   единственная, которую правят руками, — поэтому у неё рамка поля, а у
-   остальных её нет: видно, что можно трогать, а что справка. */
+   Три числа в строке: во сколько встала бутылка, за сколько уходит и сколько
+   процентов сверху (с 19 сен 2026 вместо «в приложении» — цена приложения
+   равна продажной). Закупка и продажа — поля с рамкой, их правят; накрутка —
+   справка без рамки: видно, что можно трогать, а что считается само. */
 .oprx-r{padding:11px 14px;border-top:1px solid var(--border2)}
 .oprx-r:first-of-type{border-top:0}
 .oprx-h{display:flex;align-items:baseline;gap:9px}
@@ -6671,6 +6671,13 @@ button.exp-wait:active{transform:scale(.99)}
   color:var(--muted);margin-top:4px;height:11px}
 .oprx-src.hand{color:var(--gold2)}
 .oprx-in.gold{color:var(--gold2)}
+/* Накрутка: высота и шрифт поля, чтобы число стояло в одну линию с ценами
+   слева, но без рамки и фона. */
+.oprx-m{display:flex;align-items:center;height:34px;padding:0 2px;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.oprx-m.dn{color:var(--dn)}
+.oprx-m.none{color:var(--dim)}
 /* Позиции без закупки — красная карточка сверху, дышит: это невыполненная
    работа, а не справка. Нажатие оставляет в списке только их. */
 .oprx-alert{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 10px;
@@ -22334,7 +22341,7 @@ function ordSumInner(){
 // Прайс — внизу карточки «Закупаем», строками, как «По районам» под остатками
 // (владелец, 19 сен 2026: «прайс перенеси сюда как доп. кнопки внизу этого
 // окна»; карточку «Прайс» в «Финансах» — убрать). «Прайс» открывает таблицу
-// цен, справа — средняя наценка по позициям, где известны обе цены. Позиции
+// цен, справа — средняя накрутка по позициям, где известны обе цены. Позиции
 // без закупочной цены — своей красной строкой: по нажатию прайс показывает
 // только их. Все цены известны — строки нет.
 let PR_D = null, _prBusy = null;
@@ -22355,12 +22362,11 @@ function prPaint(){
 }
 function ordPrInner(){
   const d = PR_D, rows = (d && d.rows) || [];
-  const both = rows.filter(r => r.cost && r.price_app);
-  const mark = both.length
-    ? Math.round(both.reduce((a, r) => a + (r.price_app / r.cost - 1) * 100, 0) / both.length) : null;
+  const marks = rows.map(_oprMark).filter(v => v !== null);
+  const mark = marks.length ? marks.reduce((a, v) => a + v, 0) / marks.length : null;
   const miss = rows.filter(r => !r.cost).length;
   return `<button class="sc-r" onclick="ordPrices()"><span>Прайс</span>${d
-      ? `<b>${mark !== null ? '+' + fmt(mark) + '%' : '—'}<u>наценка</u></b>`
+      ? `<b>${_oprMarkTxt(mark)}<u>накрутка</u></b>`
       : '<b class="is-skel">0000</b>'}<em>${_SC_CHEV}</em></button>${miss ? `
     <button class="sc-r dn" onclick="ordPrices(true)"><span>Без закупочной цены</span>
       <b>${miss}<u>${pluralize(miss, 'позиция', 'позиции', 'позиций')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
@@ -22605,7 +22611,8 @@ function _perBottle(price, unit){
                              : r.toFixed(1).replace('.', ',');
 }
 
-// Три цены в строке, и правится из них одна.
+// Закупка, продажа и накрутка в строке; правятся обе цены, накрутка
+// считается из них (с 19 сен 2026 — вместо колонки «в приложении»).
 //
 // Прежде страница показывала только продажную цену и была витриной, которую
 // нечем было исправить: цена менялась в магазине, а в приложении оставалась
@@ -22638,7 +22645,7 @@ async function ordPrices(only){
     return;
   }
   // Тот же ответ — и строкам под «Закупаем»: правки в таблице меняют эти
-  // же строки, и при закрытии наценка и «без закупочной цены» уже новые.
+  // же строки, и при закрытии накрутка и «без закупочной цены» уже новые.
   OPR.rows = d.rows || []; OPR.d = d; PR_D = d;
   oprPaint();
 }
@@ -22713,62 +22720,67 @@ function oprRow(r){
         <div class="oprx-src ${рука ? 'hand' : ''}">${escS(r.cost_src || '')}</div>
       </div>
       <div class="oprx-c">
-        <div class="oprx-l">прайс</div>
-        <input class="oprx-in" inputmode="numeric" placeholder="—"
+        <div class="oprx-l">продажа</div>
+        <input class="oprx-in gold" inputmode="numeric" placeholder="—"
                value="${r.price_list ? fmt(r.price_list) : ''}"
                onfocus="this.select()"
                onkeydown="if(event.key==='Enter'){this.blur()}"
-               onblur="oprPrice('${escS(r.id)}', 'list', this)">
+               onblur="oprPrice('${escS(r.id)}', this)">
         <div class="oprx-src"></div>
       </div>
-      <div class="oprx-c sell">
-        <div class="oprx-l">в приложении</div>
-        <input class="oprx-in gold" inputmode="numeric" placeholder="—"
-               value="${r.price_app ? fmt(r.price_app) : ''}"
-               onfocus="this.select()"
-               onkeydown="if(event.key==='Enter'){this.blur()}"
-               onblur="oprPrice('${escS(r.id)}', 'app', this)">
-        <div class="oprx-src ${_oprAppSrc(r)[1]}">${_oprAppSrc(r)[0]}</div>
+      <div class="oprx-c">
+        <div class="oprx-l">накрутка</div>
+        ${_oprMarkCell(r)}
+        <div class="oprx-src"></div>
       </div>
     </div>
   </div>`;
 }
 
-// Откуда цена приложения: равна прайсу (скидки приложения нет с 16 сен 2026)
-// или поставлена рукой. Расхождение с прайсом видно сразу — золотым «вручную».
-const APP_OFF = 0;
-function _appFromList(list){ return Math.ceil(Math.round(list * (1 - APP_OFF) * 1e6) / 1e6); }
-function _oprAppSrc(r){
-  if(!r.price_list || !r.price_app) return ['', ''];
-  return r.price_app === _appFromList(r.price_list) ? ['как прайс', ''] : ['вручную', 'hand'];
+// Накрутка — сколько процентов продажа сверху закупки: продажа / закупка − 1
+// (владелец, 19 сен 2026: «сделай закупка, продажа и процент накрутки вместо
+// „в приложении“ — в приложении у нас теперь нет других цен»). Не поле, а
+// справка: считается из двух цен слева и меняется сама, когда их правят.
+// Нет закупки или продажи — «—», а не ноль. Продают ниже закупки — красным.
+function _oprMark(r){
+  const sale = +(r.price_list || r.price_app) || 0, cost = +r.cost || 0;
+  return sale > 0 && cost > 0 ? (sale / cost - 1) * 100 : null;
+}
+function _oprMarkTxt(v){
+  if(v === null) return '—';
+  const n = Math.round(v);
+  return (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n)) + '%';
+}
+function _oprMarkCell(r){
+  const v = _oprMark(r);
+  return `<div class="oprx-m${v === null ? ' none' : v < 0 ? ' dn' : ''}">${_oprMarkTxt(v)}</div>`;
+}
+function _oprMarkPaint(r){
+  const row = document.getElementById('opr-' + r.id);
+  const el = row && row.querySelector('.oprx-m');
+  if(el) el.outerHTML = _oprMarkCell(r);
 }
 
-// Прайс и цена приложения — той же механикой, что закупка: сохраняем на уходе
-// с поля, тем же запросом, что и каталог (/api/owner/catalog/{id}), чтобы
-// цена была одна на всех. Поменяли прайс — сервер сам пересчитал цену
-// приложения и вернул обе; поменяли цену приложения — прайс не трогается.
-// У пива единица — ящик, поэтому у него правятся цены за 24.
-async function oprPrice(id, kind, input){
+// Продажа — той же механикой, что закупка: сохраняем на уходе с поля, тем же
+// запросом, что и каталог (/api/owner/catalog/{id}), чтобы цена была одна на
+// всех. Цену в приложении сервер ставит равной ей сам (скидки приложения нет с
+// 16 сен 2026), отдельно её больше не правят. У пива единица — коробка,
+// поэтому у него правится цена за 24.
+async function oprPrice(id, input){
   const r = (OPR.rows || []).find(x => x.id === id); if(!r) return;
-  const key = kind === 'list' ? 'price_list' : 'price_app';
-  const было = Math.round(r[key] || 0);
+  const было = Math.round(r.price_list || 0);
   const стало = parseInt(String(input.value).replace(/[^\d]/g, ''), 10) || 0;
   if(стало === было){ input.value = было ? fmt(было) : ''; return; }
   if(стало <= 0 || стало > 100000){ input.value = было ? fmt(было) : ''; _toast('Цена от 1 до 100 000'); return; }
   const ящик = r.unit > 1;
-  const field = kind === 'list' ? (ящик ? 'price_24_full' : 'price_full')
-                                : (ящик ? 'price_24' : 'price');
+  const field = ящик ? 'price_24_full' : 'price_full';
   try{
     const res = await ownerApi.ownerFetch('/api/owner/catalog/' + encodeURIComponent(id),
       {method:'POST', body:{[field]: стало}});
     r.price_list = +(ящик ? res.price_24_full : res.price_full) || r.price_list;
     r.price_app  = +(ящик ? res.price_24 : res.price) || 0;
-    const row = document.getElementById('opr-' + id);
-    const ins = row ? row.querySelectorAll('.oprx-in') : [];
-    if(ins[1]){ ins[1].value = fmt(r.price_list); }
-    if(ins[2]){ ins[2].value = r.price_app ? fmt(r.price_app) : '';
-      const src = ins[2].parentElement.querySelector('.oprx-src');
-      const [t, c] = _oprAppSrc(r); if(src){ src.textContent = t; src.className = 'oprx-src ' + c; } }
+    input.value = fmt(r.price_list);
+    _oprMarkPaint(r);
     input.classList.add('saved');
     setTimeout(() => input.classList.remove('saved'), 900);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -22807,6 +22819,7 @@ async function oprSave(id, input){
     setTimeout(() => input.classList.remove('saved'), 900);
     const src = input.parentElement.querySelector('.oprx-src');
     if(src){ src.textContent = r.cost_src || ''; src.classList.toggle('hand', r.cost_src === 'вручную'); }
+    _oprMarkPaint(r);
     // Доля покрытия меняется вместе с ценой — пересчитываем на месте.
     const known = (OPR.rows || []).filter(x => x.cost).length;
     OPR.d.cost_known = known;

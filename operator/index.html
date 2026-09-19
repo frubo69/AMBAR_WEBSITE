@@ -4656,8 +4656,19 @@ function mvbCartHtml(){
 // «Принял» или «Принял неровно» (владелец, 18 сен 2026). Статус — словами.
 function mvbLiveHtml(){
   const T = (MVB.live && MVB.live.tasks) || [];
+  // Живые — сверху; принятые и снятые — отдельной группой ниже (владелец,
+  // 19 сен 2026: «делай так со всеми полностью завершёнными заявками»):
+  // вперемешку «снята» и «принято» стояли между тем, что ещё надо везти.
+  const конец = t => t.status === 'done' || t.status === 'cancelled';
+  const живые = T.filter(t => !конец(t)), былые = T.filter(конец);
+  return `<div class="mvb-sec">Сегодня${живые.length ? ' · ' + живые.length : ''}</div>`
+    + (живые.length ? _mvbTasks(живые) : `<div class="mvb-none">${былые.length ? 'Всё отработано'
+        : 'Перемещений к вам и от вас пока нет'}</div>`)
+    + (былые.length ? `<div class="mvb-sec">Завершённые · ${былые.length}</div>${_mvbTasks(былые)}` : '');
+}
+function _mvbTasks(T){
   const ST = {free:'ждёт отдающих', live:'отдают', given:'ждёт «Принял»', done:'принято', cancelled:'снята'};
-  return `<div class="mvb-sec">Сегодня${T.length ? ' · ' + T.length : ''}</div>` + (T.length ? T.map(t=>{
+  return T.map(t=>{
     const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
     const who = (t.seniors||[]).length && t.status !== 'done' && t.status !== 'cancelled' ? ' · везёт старший'
       : t.status === 'live' && (t.givers||[]).length ? ` · ${_esc(t.givers.join(', '))}` : '';
@@ -4673,7 +4684,7 @@ function mvbLiveHtml(){
       ${can ? `<button class="${MVB.sure === key ? 'sure' : ''}" onclick="mvbCancel('${_esc(t.move_id)}','${_esc(t.district)}')">${
           MVB.sure === key ? 'Точно снять?' : 'Снять'}</button>` : ''}
     </div>`;
-  }).join('') : `<div class="mvb-none">Перемещений к вам и от вас пока нет</div>`);
+  }).join('');
 }
 function mvbPaint(){
   const box = $('mvb'); if(!box) return;

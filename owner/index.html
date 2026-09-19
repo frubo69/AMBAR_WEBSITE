@@ -3674,10 +3674,13 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    Анатомия «Сейфа»: шапка-кнопка, внутри вложенные блоки этапов (①, ②) с
    золотистой рамкой; районы — пять плиток, распределение — три; внизу одно
    следующее действие. Этап под замком — серый, цифры предложения тусклые. */
-.fb-crc-h{align-items:flex-start;min-height:0;padding:15px 12px 12px 16px}
-.fb-crc-t{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;font-weight:700;
-  letter-spacing:.7px;text-transform:uppercase;line-height:1.25}
-.fb-crc-day{flex:0 0 auto;margin-top:2px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.fb-crc-h{width:100%;min-height:58px;padding:12px 12px 12px 16px;border:0;
+  border-bottom:1px solid rgba(201,169,110,.14);background:none;color:inherit;text-align:left;
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fb-crc-h:active{background:rgba(201,169,110,.05)}
+.fb-crc-h > span{min-width:0;line-height:1.25}
+.fb-crc-h > i{flex:0 0 auto}
+.fb-crc-h + .fb-crc-s{margin-top:12px}
 .fb-crc-s{margin:0 12px 10px 16px;padding:12px 12px 12px 13px;border-radius:13px;cursor:pointer;
   border:1px solid rgba(201,169,110,.2);background:rgba(201,169,110,.05);-webkit-tap-highlight-color:transparent}
 .fb-crc-s:active{background:rgba(201,169,110,.09)}
@@ -19106,9 +19109,12 @@ function fbCrcState(){
 }
 function fbCrcHtml(){
   const st = fbCrcState(), today = _dayIsoFor(0);
-  const head = `<button class="fb-safe-h fb-crc-h" onclick="fbOpenCash()">
-      <span class="fb-crc-t">Ежедневный сбор и распределение выручки</span>
-      <span class="fb-crc-day">${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'сегодня'}</span>
+  // Шапка — настоящий заголовок карточки, как «Сентябрь 2026» и «Зарплаты»:
+  // своя полоса с волоском под ней (владелец: «сделай это как настоящий
+  // заголовок, отдели»); нажатие — страница сбора.
+  const head = `<button class="sc-cap fb-crc-h" onclick="fbOpenCash()">
+      <span>Ежедневный сбор и распределение выручки</span>
+      <i>${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'сегодня'}</i>
       <em class="fb-chev r">${_SC_CHEV}</em></button>`;
   if(!st) return `<div class="sc fb-hub fb-crc">${head}
       <div class="fb-crc-s"><div class="fb-crc-sh"><span class="fb-crc-n">1</span><b>Сбор</b>

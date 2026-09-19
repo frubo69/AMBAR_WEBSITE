@@ -2927,6 +2927,50 @@ async def handle_move_accept(request):
     return await move_routes.handle_drv_accept(request)
 
 
+# Ревизия своего района (владелец, 19 сен 2026): та же, что у старшего в
+# STAR; район — из входа водителя, день — сегодняшний (driver_audit.py).
+@require_driver
+@_no_test
+async def handle_audit(request):
+    import driver_audit
+    return await driver_audit.handle_state(request)
+
+
+@require_driver
+@_no_test
+async def handle_audit_brief(request):
+    import driver_audit
+    return await driver_audit.handle_brief(request)
+
+
+@require_driver
+@_no_test
+async def handle_audit_start(request):
+    import driver_audit
+    return await driver_audit.handle_start(request)
+
+
+@require_driver
+@_no_test
+async def handle_audit_scan(request):
+    import driver_audit
+    return await driver_audit.handle_scan(request)
+
+
+@require_driver
+@_no_test
+async def handle_audit_undo(request):
+    import driver_audit
+    return await driver_audit.handle_undo(request)
+
+
+@require_driver
+@_no_test
+async def handle_audit_finish(request):
+    import driver_audit
+    return await driver_audit.handle_finish(request)
+
+
 def setup(app):
     r = app.router
     routes = (
@@ -2987,6 +3031,13 @@ def setup(app):
         ("/api/driver/move/{mid}/scan",         handle_move_scan,     "POST"),
         ("/api/driver/move/{mid}/start",        handle_move_start,    "POST"),
         ("/api/driver/move/{mid}/accept",       handle_move_accept,   "POST"),
+        # Ревизия своего района.
+        ("/api/driver/audit",                   handle_audit,         "GET"),
+        ("/api/driver/audit/brief",             handle_audit_brief,   "GET"),
+        ("/api/driver/audit/start",             handle_audit_start,   "POST"),
+        ("/api/driver/audit/scan",              handle_audit_scan,    "POST"),
+        ("/api/driver/audit/undo",              handle_audit_undo,    "POST"),
+        ("/api/driver/audit/finish",            handle_audit_finish,  "POST"),
     )
     seen = set()
     for path, handler, method in routes:

@@ -701,6 +701,22 @@ body.test-drv .wo-fix{display:none}
 .wo-fix .wo-btn + .wo-btn{margin-top:8px}
 .wo-btn.ghost{padding:14px 12px;font-size:14.5px;color:var(--sub);background:var(--card);
   border-color:var(--border2)}
+/* Ревизия — там, где раньше было «Переместить бутылки» (владелец, 19 сен
+   2026): тихая кнопка с золотым значком; ревизия идёт — кнопка золотая
+   целиком, чтобы к ней вернуться. */
+.wo-btn.aud svg{color:var(--gold2);opacity:1}
+.wo-btn.aud.run{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.45)}
+/* Ревизия: строка позиции — «нашёл / числится с кодом». Не хватает — золотом,
+   как «осталось» в приёмке; нашёл больше, чем числится, — жёлтым; сошлось —
+   зелёным и гаснет, как добранная строка приёмки. */
+.dpl.aud-over .dpl-q{background:var(--warn-soft);color:var(--warn)}
+.dpl.aud-miss .dpl-q{background:var(--dn-soft);color:var(--dn)}
+.dpl-n i.warn{color:var(--warn)}
+.aud-none{margin:6px 2px 12px;font-size:12px;line-height:1.45;color:var(--muted)}
+.aud-note{margin:0 2px 12px;padding:12px 14px;border-radius:14px;background:var(--card);
+  border:1px solid var(--border2);font-size:13px;line-height:1.45;color:var(--sub);font-style:italic}
+.aud-sent{display:flex;align-items:center;gap:8px;justify-content:center;font-size:12.5px;color:var(--sub)}
+.aud-sent svg{color:var(--up)}
 /* Перемещение: куда везём — пять кодов в ряд над камерой, выбранный золотом. */
 .mv-ret{flex:0 0 auto;padding:8px 11px;border-radius:9px;cursor:pointer;font-family:inherit;
   font-size:11.5px;font-weight:700;color:var(--sub);background:none;border:1px solid var(--border2)}
@@ -2854,7 +2870,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .exp-why-r + .exp-why-r{margin-top:3px}
 /* Окно завершения зовут с экрана приёмки, а он стоит выше обычных шторок
    (95 против 90): без этого окно открывалось ПОД списком и его не было видно. */
-#finSheet{z-index:120}
+#finSheet,#audFinSheet{z-index:120}
 .sup-top{display:flex;align-items:center;gap:11px;flex-shrink:0;
   padding:calc(10px + var(--safe-top)) 13px 11px;
   background:rgba(7,7,15,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
@@ -3645,6 +3661,24 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <div class="sup-bot" id="supBot"></div>
 </div>
 
+<!-- Ревизия своего района (владелец, 19 сен 2026): тот же каркас, что у
+     приёмки — список позиций «нашёл / числится», камера во весь экран, итог. -->
+<div class="sup-scr" id="audScr">
+  <div class="sup-top">
+    <button class="sup-back" onclick="audBack()" aria-label="Назад">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="sup-top-b">
+      <div class="sup-top-t" id="audT">Ревизия</div>
+      <div class="sup-top-s" id="audS"></div>
+    </div>
+    <div class="sup-top-v" id="audV"></div>
+  </div>
+  <div class="sup-mid" id="audMid"></div>
+  <div class="sup-bot" id="audBot"></div>
+</div>
+
 <!-- Итоги смены перед закрытием: наличные на руках, чай операторов, заказы и
      расходы дня. Тот же каркас, что у приёмки; кнопка внизу ждёт галочку. -->
 <div class="sup-scr" id="shsScr">
@@ -3795,6 +3829,23 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 
 <!-- Расчёт наличными: сколько денег реально в руке. Разницу с суммой заказа
      считаем сами — водитель не должен в уме превращать деньги в долг. -->
+<!-- Завершить ревизию: что не нашли и комментарий старшему. -->
+<div class="sheet" id="audFinSheet" onclick="if(event.target===this)audFinClose()">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t" id="audFinT">Завершить ревизию?</div>
+        <div class="sheet-s" id="audFinS"></div>
+      </div>
+    </div>
+    <div id="audFinBody"></div>
+    <div class="sheet-acts">
+      <button class="btn btn-gh" onclick="audFinClose()">Назад</button>
+      <button class="btn btn-pri" id="audFinGo" onclick="audFinSend()">Завершить</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet" id="stlSheet" onclick="if(event.target===this)stlClose()">
   <div class="sheet-in">
     <div class="sheet-hd">
@@ -4467,6 +4518,7 @@ const ICO = {
   minusc:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12h7.6"/>',
   sort: '<path d="M4 7h15M4 12h10M4 17h6"/>',
   clip: '<rect x="5" y="4.5" width="14" height="17" rx="2.2"/><path d="M9 2.5h6v3.5H9z"/><path d="M9 12h6M9 16h4.5"/>',
+  audit:'<rect x="5" y="4.5" width="14" height="17" rx="2.2"/><path d="M9 2.5h6v3.5H9z"/><path d="M9 13.6l2.2 2.2 4.3-4.4"/>',
   hist: '<path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/>',
   flask: '<path d="M9 3h6"/><path d="M10 3v6.5L5 18a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-8.5V3"/><path d="M7.5 15h9"/>',
 };
@@ -9709,7 +9761,7 @@ async function supLoad(){
   try{ SUP = await drvApi.drvFetch('/api/driver/supply'); }
   catch(e){ SUP = SUP || {mine:[], free:[], taken:[]}; }
   supBadge();
-  woLoad(); supHistLoad();
+  woLoad(); supHistLoad(); audBriefLoad();
   if(TAB === 'supply') renderSupply();
 }
 
@@ -10101,7 +10153,429 @@ function woFoot(){
       <span class="dpl-n">${esc(r.extra ? (r.base || 'Другая база') : 'Основная заявка')}<i>${supHistWhen(r.done_at)} · принято ${fmtQty(r.got)}${
         r.noscan_at && r.got < r.need ? ' · без сканирования' : ''}</i></span>
       <em class="ex-c">${svg(ICO.chevR, 16)}</em></button>`).join('')}</div>` : ''}
-    <div class="wo-sp"></div>`;
+    <div class="wo-sp"></div>${audBtn()}`;
+}
+
+// ── Ревизия своего района ──────────────────────────────────────────────────
+// Владелец, 19 сен 2026: «можем водителям тоже сделать кнопку ревизия? там,
+// где у них раньше была кнопка „переместить“, во вкладке „Товар“; но ревизия
+// должна проходить исключительно по их билдингу; по итогам ревизии отчёт
+// старшему должен приходить и операторам». Та же ревизия, что у старшего в
+// STAR: район берёт сервер (из входа водителя), проход общий — начатую
+// старшим продолжают здесь и наоборот. Водитель сканирует и завершает;
+// решения по недостаче и излишку — у старшего, отчёт уходит ему и операторам.
+// Числа — в единицах склада: бутылки, у пива коробки (код — полкоробки).
+var AUDS = null;            // лист ревизии с сервера
+var AUD_BRIEF = null;       // состояние для кнопки на «Товаре»
+var AUD_CAM = false;        // открыта камера
+var AUD_ROWS = [];          // лента сканов этого захода в камеру
+var AUD_LAST = '';          // последняя позиция — «3 из 5» на камере
+var AUD_BUSY = false, _audBriefAt = 0;
+const AUDQ = {items:[], busy:false, onDone:null, push:SCANQ.push, _run:SCANQ._run};
+
+async function audBriefLoad(force){
+  if(!force && Date.now() - _audBriefAt < 10000) return;
+  _audBriefAt = Date.now();
+  try{
+    AUD_BRIEF = await drvApi.drvFetch('/api/driver/audit/brief');
+    if(TAB === 'supply' && !document.getElementById('supScr').classList.contains('show')) renderSupply();
+  }catch(e){}
+}
+
+function audBtn(){
+  const st = (AUD_BRIEF || {}).state || 'idle';
+  if(st === 'none') return '';                 // у водителя нет района — ревизии нет
+  const t = st === 'running' ? 'Продолжить ревизию'
+          : (st === 'pending' || st === 'closed') ? 'Итог ревизии' : 'Ревизия';
+  return `<div class="wo-fix"><button class="wo-btn ghost aud${st === 'running' ? ' run' : ''}" onclick="audOpen()">
+      ${svg(ICO.audit, 19)}<span>${t}</span></button></div>`;
+}
+
+const _audU = r => (r && r.unit > 1) ? 'кор' : 'бут';
+function _audT(){
+  const rows = (AUDS && AUDS.rows) || [];
+  // found — найдено в пределах числящегося: лишняя бутылка одной позиции не
+  // закрывает недостачу другой, и «нашли 21 из 24» при «осталось 5» не бывает.
+  const t = {coded: 0, actual: 0, found: 0, noqr: 0, short: 0, over: 0, done: 0};
+  rows.forEach(r => {
+    t.coded += r.coded || 0; t.actual += r.actual || 0; t.noqr += r.noqr || 0;
+    t.found += Math.min(r.coded || 0, r.actual || 0);
+    const d = (r.coded || 0) - (r.actual || 0);
+    if(d > 0) t.short += d; else if(d < 0) t.over += -d;
+    if(r.coded && !d) t.done++;
+  });
+  t.live = rows.filter(r => r.coded || r.actual).length;
+  return t;
+}
+
+async function audOpen(){
+  document.getElementById('audScr').classList.add('show');
+  AUD_CAM = false; AUD_ROWS = [];
+  _setText('audT', 'Ревизия'); _setText('audS', 'загрузка…'); _setText('audV', '');
+  document.getElementById('audMid').innerHTML = '<div class="empty">Загрузка…</div>';
+  document.getElementById('audBot').innerHTML = '';
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  await audReload();
+}
+
+async function audReload(){
+  try{ AUDS = await drvApi.drvFetch('/api/driver/audit'); }
+  catch(e){
+    if(AUD_CAM) return;
+    const p = (e && e.payload) || {};
+    document.getElementById('audMid').innerHTML = p.error === 'no_district'
+      ? '<div class="empty">Вы не закреплены за районом — ревизию проводят водители района</div>'
+      : loadFail('audReload()', 'Ревизия не загрузилась');
+    _setText('audS', '');
+    return;
+  }
+  if(AUD_CAM) audCamPaint(); else audRender();
+}
+
+function audBack(){ if(AUD_CAM) return audCamClose(); audClose(); }
+function audClose(){
+  SCAN.stop(); AUD_CAM = false;
+  document.getElementById('audScr').classList.remove('show');
+  AUDS = null; AUD_ROWS = [];
+  audBriefLoad(true);
+}
+
+function _audWhere(){ return AUDS ? `${AUDS.district_code} ${AUDS.district_name}`.trim() : ''; }
+
+function audRender(){
+  const A = AUDS; if(!A) return;
+  const a = A.audit || {}, st = a.state || 'idle';
+  if(st === 'pending' || st === 'closed') return audRenderDone();
+  _setText('audT', 'Ревизия');
+  _setText('audS', `${_audWhere()} · ${st === 'running'
+    ? 'идёт с ' + hhmm(a.started_at) + (a.started_by ? ' · ' + a.started_by : '') : 'не начата'}`);
+  _setText('audV', '');
+  const t = _audT();
+  const pct = t.coded ? Math.min(100, Math.round(t.found / t.coded * 100)) : 0;
+  const rows = (A.rows || []).filter(r => r.coded || r.actual).slice().sort((x, y) => {
+    const dx = (x.coded || 0) - (x.actual || 0), dy = (y.coded || 0) - (y.actual || 0);
+    return (!dx) - (!dy) || (x.no || 999) - (y.no || 999);
+  });
+  if(!A.coded_codes && st === 'idle'){
+    document.getElementById('audMid').innerHTML = blank(ICO.audit, 'Считать нечего',
+      'На районе нет бутылок с QR-кодом. Сначала старший вносит коды — потом ревизия', 'short');
+    document.getElementById('audBot').innerHTML = '';
+    return;
+  }
+  const line = r => {
+    const d = (r.coded || 0) - (r.actual || 0);
+    const cls = !d ? 'ok' : d < 0 ? 'aud-over' : '';
+    const sub = d < 0 ? `<i class="warn">лишние: ${fmtQty(-d)} ${_audU(r)}</i>`
+              : r.noqr ? `<i>ещё ${fmtQty(r.noqr)}${r.unit > 1 ? ' кор' : ''} без QR-кода</i>` : '';
+    return `<div class="dpl dli ${cls}">
+      <img class="dimg" src="/products/${esc(r.id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <span class="dpl-n">${esc(r.name)}${sub}</span>
+      <span class="dpl-q">${fmtQty(r.actual || 0)}<u>/${fmtQty(r.coded || 0)}${r.unit > 1 ? ' кор' : ''}</u></span>
+    </div>`;
+  };
+  document.getElementById('audMid').innerHTML = `<div class="dtop">
+      <span class="dtop-b"><span class="dchip">${st === 'running' ? 'идёт ревизия' : 'не начата'}</span>
+        <span class="dtop-s">${st === 'running'
+          ? `${t.done} из ${rows.length} ${plural(rows.length, 'позиции', 'позиций', 'позиций')} сошлось`
+          : 'Сканируйте каждую бутылку на полке — позицию камера найдёт сама'}</span></span>
+      <span class="dtop-n">${fmtQty(t.found)}<i>из ${fmtQty(t.coded)} ед. с QR-кодом</i></span>
+      <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
+    </div>
+    ${t.noqr ? `<div class="aud-none">Без QR-кода на районе ещё ${fmtQty(t.noqr)} ед. — камера их не видит, в недостачу они не идут.</div>` : ''}
+    ${rows.length ? `<div class="dcard dlist">${rows.map(line).join('')}</div>` : ''}`;
+  document.getElementById('audBot').innerHTML = st === 'running' ? `
+    <div class="sup-tot">
+      <span class="sup-tot-l">Осталось найти</span>
+      <span class="sup-tot-v">${fmtQty(t.short)}<u> ед.</u></span>
+    </div>
+    <button class="btn btn-pri" onclick="audCamOpen()">Продолжить сканирование</button>
+    <button class="btn btn-gh" onclick="audFinOpen()">Завершить ревизию</button>` : `
+    <div class="sup-tot">
+      <span class="sup-tot-l">Числится с QR-кодом</span>
+      <span class="sup-tot-v">${fmtQty(t.coded)}<u> ед.</u></span>
+    </div>
+    <button class="btn btn-pri" id="audGo" onclick="audStart()">Начать ревизию</button>`;
+}
+
+async function audStart(){
+  if(AUD_BUSY) return; AUD_BUSY = true;
+  const b = document.getElementById('audGo'); if(b) b.disabled = true;
+  let r;
+  try{ r = await drvApi.drvFetch('/api/driver/audit/start', {method:'POST', body:{}}); }
+  catch(e){ toast('Не удалось начать', 'err'); if(b) b.disabled = false; AUD_BUSY = false; return; }
+  AUD_BUSY = false;
+  AUDS = r;
+  if(!r.ok){ toast('Ревизию за сегодня уже завершили', 'err'); return audRender(); }
+  try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  audBriefLoad(true);
+  audCamOpen();
+}
+
+// ── камера ──
+async function audCamOpen(){
+  AUD_CAM = true; AUD_ROWS = []; AUD_LAST = '';
+  audCamPaint(true);
+  try{
+    await SCAN.start(document.getElementById('audVid'), audScan, audIdle,
+                     () => audFlash('dup', 'уже посчитана'), camHold);
+    const tb = document.getElementById('audTorch');
+    if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
+  }catch(e){
+    toast('Нет доступа к камере', 'err');
+    audCamClose();
+  }
+}
+
+async function audCamClose(){
+  SCAN.stop(); AUD_CAM = false; AUD_ROWS = [];
+  audRender();
+  await audReload();
+}
+
+// Шапка и полоса под камерой — без пересоздания видео: камера живёт, пока
+// открыт экран, перерисовываются только числа и лента.
+function audCamPaint(first){
+  const A = AUDS || {}, t = _audT();
+  const r = (A.rows || []).find(x => x.id === AUD_LAST);
+  _setText('audT', r ? r.name : 'Ревизия');
+  _setText('audS', r ? `${_audWhere()} · нашли ${fmtQty(r.actual || 0)} из ${fmtQty(r.coded || 0)}${r.unit > 1 ? ' кор' : ''}`
+                     : `${_audWhere()} · наводите на код каждой бутылки`);
+  const v = document.getElementById('audV');
+  v.innerHTML = `${fmtQty(t.found)}<u> / ${fmtQty(t.coded)}</u>`;
+  if(first || !document.getElementById('audVid')){
+    document.getElementById('audMid').innerHTML = `
+      <div class="cam">
+        <video id="audVid" playsinline muted autoplay></video>
+        <div class="cam-tools">
+          <button class="cam-t ${SFX.on ? '' : 'muted'}" onclick="camSound(this)" aria-label="Звук">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 5 6 9H2v6h4l5 4z"/><path class="s-on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
+              <path class="s-off" d="M22 9l-6 6M16 9l6 6"/></svg>
+          </button>
+          <button class="cam-t" id="audTorch" onclick="camTorch(this)" style="display:none" aria-label="Фонарик">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
+          </button>
+        </div>
+        <div class="cam-frame" id="audF">
+          <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+          <div class="cam-badge" id="audB"></div>
+        </div>
+        <div class="cam-left">
+          <b id="audLeft">${fmtQty(t.short)}</b><span>осталось</span>
+          <span class="cam-hint" id="audHint">Наведите на код</span>
+        </div>
+      </div>
+      <div id="audFeed"></div>`;
+    document.getElementById('audBot').innerHTML = `
+      <div class="sc-acts">
+        <button class="btn btn-gh" id="audUndo" onclick="audUndo()" disabled>Отменить скан</button>
+        <button class="btn btn-pri" onclick="audCamClose()">К списку</button>
+      </div>`;
+  }
+  _setText('audLeft', fmtQty(t.short));
+  audFeed();
+}
+
+// Что сказать про бутылку — теми же словами, что у старшего в STAR.
+const AUD_SAY = {
+  ok:      ['посчитана',        'var(--up)',   'ok'],
+  other:   ['числится на другом районе', 'var(--warn)', 'dup'],
+  written: ['списана',          'var(--warn)', 'dup'],
+  sold:    ['ушла с заказом',   'var(--warn)', 'dup'],
+  alien:   ['нет в реестре',    'var(--dn)',   'err'],
+};
+function _audSay(r){
+  if(r.state === 'sending') return ['отправляю…', 'var(--muted)'];
+  if(r.state === 'fail') return ['не сохранилось', 'var(--dn)'];
+  if(r.state === 'dup') return ['уже посчитана', 'var(--warn)'];
+  const [t, c] = AUD_SAY[r.verdict] || AUD_SAY.ok;
+  return [r.verdict === 'other' && r.home_code ? `числится на ${r.home_code}` : t, c];
+}
+function audFeed(){
+  const f = document.getElementById('audFeed'); if(!f) return;
+  f.innerHTML = AUD_ROWS.slice(0, 25).map(r => {
+    const [txt, color] = _audSay(r);
+    const raw = r.code.length > 24 ? r.code.slice(0, 22) + '…' : r.code;
+    return `<div class="sc-row">
+      <span class="sc-dot" style="background:${color}"></span>
+      <span class="sc-b">
+        <span class="sc-code">${esc(r.name || r.label || '…')}</span>
+        <span class="sc-raw">${esc(r.label ? r.label + ' · ' + raw : raw)}</span>
+      </span>
+      <span class="sc-st" style="color:${color}">${esc(txt)}</span></div>`;
+  }).join('');
+  const u = document.getElementById('audUndo');
+  if(u) u.disabled = !AUD_ROWS.some(r => r.state === 'new');
+}
+
+function audFlash(kind, text){
+  const f = document.getElementById('audF'), b = document.getElementById('audB');
+  if(!f || !b) return;
+  const hap = kind === 'ok' ? 'success' : kind === 'err' ? 'error' : 'warning';
+  b.textContent = text || '';
+  f.classList.remove('ok', 'dup', 'err'); void f.offsetWidth; f.classList.add(kind);
+  _fOn = true; _fAt = Date.now(); _hAt = Date.now();
+  try{ tg.HapticFeedback.notificationOccurred(hap); }catch(e){}
+  if(kind === 'ok') SFX.ok(); else if(kind === 'err') SFX.err(); else SFX.warn();
+  clearTimeout(_fT);
+  _fT = setTimeout(audFlashClear, 6000);
+}
+function audFlashClear(){
+  const f = document.getElementById('audF'), b = document.getElementById('audB');
+  if(f) f.classList.remove('ok', 'dup', 'err');
+  if(b) b.textContent = '';
+  _fOn = false;
+}
+function audIdle(sinceMs, frames, fps){
+  if(_fOn && Date.now() - _hAt > 350 && Date.now() - _fAt > 700) audFlashClear();
+  const h = document.getElementById('audHint'); if(!h) return;
+  if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'cam-hint'; return; }
+  if(!fps || fps < 4) h.textContent = 'Телефон не успевает';
+  else if(sinceMs > 8000) h.textContent = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Ближе, ровнее, включите фонарик';
+  else h.textContent = 'Ищу код…';
+  h.className = 'cam-hint warn';
+}
+
+// Скан не ждёт сервера: зелёная вспышка сразу, рука тянется к следующей
+// бутылке; вердикт сервера перекрасит строку, если бутылка не наша.
+function audScan(code){
+  if(!AUD_CAM) return;
+  AUD_ROWS.unshift({code, state: 'sending', verdict: '', name: '', label: ''});
+  audFlash('ok', 'посчитана');
+  audFeed();
+  AUDQ.push({path: '/api/driver/audit/scan', body: {code}, code});
+}
+AUDQ.onDone = (err, r, job) => {
+  const row = AUD_ROWS.find(x => x.code === job.code && x.state === 'sending');
+  if(err || !r || !r.ok){
+    if(r && r.error === 'finished'){
+      toast('Ревизию уже завершили', 'err');
+      if(AUD_CAM) audCamClose();
+      return;
+    }
+    if(row) row.state = 'fail';
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);   // отсканировать заново
+    audFlash('err', 'не сохранилось'); audFeed(); return;
+  }
+  if(row){
+    row.state = r.new ? 'new' : 'dup'; row.verdict = r.verdict;
+    row.name = r.name || (r.verdict === 'alien' ? 'Неизвестная бутылка' : '');
+    row.label = r.label || ''; row.home_code = r.home_code || '';
+    row.pid = r.product_id || '';
+  }
+  // Счёт по позиции — с сервера: район могут проходить вдвоём.
+  if(r.product_id && AUDS){
+    let l = (AUDS.rows || []).find(x => x.id === r.product_id);
+    if(!l){ l = {id: r.product_id, name: r.name || '', unit: r.unit || 1, coded: 0, actual: 0, noqr: 0};
+            (AUDS.rows = AUDS.rows || []).push(l); }
+    l.actual = r.count;
+    AUD_LAST = r.product_id;
+  }
+  if(!r.new) audFlash('dup', 'уже посчитана');
+  else if(r.verdict !== 'ok'){
+    const [t] = _audSay({state: 'new', verdict: r.verdict, home_code: r.home_code});
+    audFlash((AUD_SAY[r.verdict] || AUD_SAY.ok)[2], t);
+  }
+  audCamPaint();
+};
+
+async function audUndo(){
+  const row = AUD_ROWS.find(r => r.state === 'new'); if(!row) return;
+  let r;
+  try{ r = await drvApi.drvFetch('/api/driver/audit/undo', {method: 'POST', body: {code: row.code}}); }
+  catch(e){ return toast('Не удалось отменить', 'err'); }
+  if(!r.ok) return toast(r.error === 'finished' ? 'Ревизию уже завершили' : 'Не удалось отменить', 'err');
+  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
+  AUD_ROWS.splice(AUD_ROWS.indexOf(row), 1);
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  await audReload();                         // счёт по позиции сервер в ответе не шлёт
+}
+
+// ── завершение ──
+function audFinOpen(){
+  const t = _audT();
+  const miss = ((AUDS && AUDS.rows) || []).filter(r => (r.coded || 0) > (r.actual || 0))
+    .sort((a, b) => (a.no || 999) - (b.no || 999));
+  const пусто = !t.actual && t.coded > 0;
+  _setText('audFinT', пусто ? 'Камера не увидела ни одной бутылки' : 'Завершить ревизию?');
+  _setText('audFinS', пусто ? 'Всё с QR-кодом уйдёт в недостачу'
+    : `Нашли ${fmtQty(t.found)} из ${fmtQty(t.coded)} ед.` + (t.short ? ` · не нашли ${fmtQty(t.short)}` : ' · всё сошлось')
+      + (t.over ? ` · лишние ${fmtQty(t.over)}` : ''));
+  document.getElementById('audFinBody').innerHTML =
+    (miss.length && !пусто ? `<div class="card" style="margin-bottom:12px">${
+      miss.slice(0, 8).map(r => `<div class="ord-item" style="margin-bottom:7px">
+        <span>${esc(r.name)}</span><b>не нашли ${fmtQty((r.coded || 0) - (r.actual || 0))} ${_audU(r)}</b></div>`).join('')
+      }${miss.length > 8 ? `<div class="sup-row-s">…и ещё ${miss.length - 8}</div>` : ''}</div>` : '') +
+    `<textarea id="audNote" maxlength="300" placeholder="Комментарий старшему — если нужен"></textarea>`;
+  const go = document.getElementById('audFinGo');
+  go.textContent = пусто ? 'Всё равно завершить' : 'Завершить';
+  go.disabled = false;
+  document.getElementById('audFinSheet').classList.add('show');
+}
+function audFinClose(){ document.getElementById('audFinSheet').classList.remove('show'); }
+
+async function audFinSend(){
+  if(AUD_BUSY) return; AUD_BUSY = true;
+  const go = document.getElementById('audFinGo'); go.disabled = true;
+  const note = ((document.getElementById('audNote') || {}).value || '').trim();
+  let r;
+  try{ r = await drvApi.drvFetch('/api/driver/audit/finish', {method: 'POST', body: {note}}); }
+  catch(e){ toast('Не удалось завершить', 'err'); go.disabled = false; AUD_BUSY = false; return; }
+  AUD_BUSY = false;
+  audFinClose();
+  SCAN.stop(); AUD_CAM = false; AUD_ROWS = [];
+  AUDS = r;
+  if(!r.ok) toast(r.error === 'finished' ? 'Ревизию уже завершили' : 'Не удалось завершить', 'err');
+  else{ try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){} }   // «отчёт ушёл» — строкой внизу итога
+  audBriefLoad(true);
+  audRender();
+}
+
+// ── итог ──
+// Что нашла ревизия — теми же разделами, что у старшего, но без денег и без
+// решений: их принимает старший, здесь видно только, ждёт ли он ещё.
+function audRenderDone(){
+  const A = AUDS, a = A.audit || {}, t = _audT();
+  const short = a.short || [], over = a.over || [];
+  const ok = !short.length && !over.length && !a.alien;
+  const closed = a.state === 'closed';
+  _setText('audT', 'Ревизия');
+  _setText('audS', `${_audWhere()} · завершена ${hhmm(a.finished_at)}`);
+  _setText('audV', '');
+  const who = a.finished_kind === 'driver' ? `Провёл ${a.finished_by || 'водитель'}` : 'Завершил старший';
+  const img = id => `<img class="dimg" src="/products/${esc(id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
+  let h = `<div class="dtop">
+      <span class="dtop-b"><span class="dchip ${ok || closed ? 'ok' : 'warn'}">${ok ? 'всё сошлось'
+          : closed ? 'старший решил' : 'ждёт решения старшего'}</span>
+        <span class="dtop-s">${esc(who)} · в ${hhmm(a.finished_at)}</span></span>
+      <span class="dtop-n ${ok ? '' : 'warn'}">${fmtQty(t.found)}<i>из ${fmtQty(t.coded)} ед. нашли</i></span>
+    </div>`;
+  if(short.length){
+    h += `<div class="sect"><span class="sect-t">Не хватает</span><span class="sect-v">${short.length}</span></div>
+      <div class="dcard dlist">${short.map(l => `<div class="dpl dli aud-miss">${img(l.id)}
+        <span class="dpl-n">${esc(l.name)}</span>
+        <span class="dpl-q">−${fmtQty(l.qty)}<u>&nbsp;${_audU(l)}</u></span></div>`).join('')}</div>`;
+  }
+  if(over.length){
+    h += `<div class="sect"><span class="sect-t">Лишние</span><span class="sect-v">${over.length}</span></div>
+      <div class="dcard dlist">${over.map(l => {
+        const why = [];
+        if((l.homes || []).length) why.push('числится на ' + l.homes.join(', '));
+        if(l.written) why.push('была списана');
+        if(l.sold) why.push('ушла с заказом');
+        return `<div class="dpl dli aud-over">${img(l.id)}
+          <span class="dpl-n">${esc(l.name)}${why.length ? `<i>${esc(why.join(' · '))}</i>` : ''}</span>
+          <span class="dpl-q">+${fmtQty(l.qty)}<u>&nbsp;${_audU(l)}</u></span></div>`; }).join('')}</div>`;
+  }
+  if(a.alien) h += `<div class="aud-none">Кодов не из реестра: ${a.alien} — такие бутылки внесёт старший.</div>`;
+  if(a.note) h += `<div class="aud-note">«${esc(a.note)}»</div>`;
+  document.getElementById('audMid').innerHTML = h;
+  document.getElementById('audBot').innerHTML = `
+    ${a.finished_kind === 'driver' ? `<div class="aud-sent">${svg(ICO.ok, 15)}<span>Отчёт ушёл старшему и операторам</span></div>` : ''}
+    <button class="btn btn-pri" onclick="audClose()">Готово</button>`;
 }
 
 async function supClaim(sid, oid){

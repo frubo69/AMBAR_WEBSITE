@@ -950,6 +950,9 @@ _DEFAULT_PREFS = {
     "shift.closed": True,
     # Приёмка: итог по району и отдельно — то, на что стоит посмотреть глазами.
     "supply.done": True, "supply.flag": True,
+    # Ревизию провёл водитель района — итог старшему (владелец, 19 сен 2026:
+    # «по итогам ревизии отчёт старшему должен приходить и операторам»).
+    "stock.audit": True,
     "customers.new": False, "customers.verify": True, "customers.verified": True, "customers.vip": False,
     "customers.vipReturn": False, "customers.vipChurn": False,
     "ops.officeEmpty": True,

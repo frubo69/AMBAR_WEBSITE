@@ -28,6 +28,7 @@ AMBAR — склад: пересчёт, перемещения, заявка и 
 
 Весь модуль под require_owner: доступ только владельцу и менеджерам.
 """
+import asyncio
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -1613,6 +1614,53 @@ def _scan_state(district: str, day: str, counts: dict, odd: list,
     }
 
 
+def audit_code(raw) -> str:
+    """Код с крышки без пробелов и переносов, не длиннее 120 знаков."""
+    import re as _re
+    return _re.sub(r"\s+", "", str(raw or ""))[:120]
+
+
+async def audit_scan(district: str, day: str, code: str, by: int, by_name: str = "") -> dict:
+    """Записать бутылку в проход — одно и то же у старшего в STAR и у водителя
+    района (владелец, 19 сен 2026: «можем водителям тоже сделать кнопку
+    ревизия»). district уже проверен вызывающим, code — очищен (audit_code)."""
+    doc = await db.qr_get(code)
+    verdict = _scan_verdict(doc, district)
+    pid = (doc or {}).get("product_id") or ""
+    cat = _catalog()
+    p = cat.get(pid) or {}
+    rec = {
+        "at": datetime.now(timezone.utc), "by": by,
+        "product_id": pid if verdict != "alien" else "",
+        "product_name": (doc or {}).get("product_name") or p.get("name", ""),
+        "label": (doc or {}).get("label") or "",
+        "verdict": verdict,
+        "home": (doc or {}).get("district") or "",
+        # Сколько единиц за этим кодом: бутылка 1, код пива 0.5.
+        "qty": float((doc or {}).get("qty") or 1),
+    }
+    if by_name:
+        rec["by_name"] = by_name
+    fresh = await db.audit_scan_add(district, day, code, rec)
+    counts = await db.audit_scan_counts(district, day)
+    unit = _unit(p) if p else 1
+    if verdict == "alien":
+        log.warning(f"[audit] {district}: код не из реестра — {code[:40]}")
+    return {
+        "ok": True, "new": fresh, "code": code, "verdict": verdict,
+        "product_id": pid, "name": (doc or {}).get("product_name") or p.get("name", ""),
+        "label": (doc or {}).get("label") or "",
+        "home": (doc or {}).get("district") or "",
+        "home_code": OFFICE_CODES.get((doc or {}).get("district") or "", ""),
+        # Счёт по позиции — в единицах склада: коды несут qty, у пива это
+        # коробки и полкоробки.
+        "count": _num(counts.get(pid) or 0),
+        "unit": unit,
+        "total": _num(sum(counts.values())),
+        "positions": len(counts),
+    }
+
+
 @require_owner
 async def handle_audit_scan(request):
     """Записать бутылку в проход. body: {district, code, day?}
@@ -1628,43 +1676,17 @@ async def handle_audit_scan(request):
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
     day = str(body.get("day") or "").strip() or _biz_day()
-    import re as _re
-    code = _re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    code = audit_code(body.get("code"))
     if not code:
         return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    return web.json_response(await audit_scan(district, day, code, request["owner_id"]),
+                             headers=CORS_HEADERS)
 
-    doc = await db.qr_get(code)
-    verdict = _scan_verdict(doc, district)
-    pid = (doc or {}).get("product_id") or ""
-    cat = _catalog()
-    p = cat.get(pid) or {}
-    fresh = await db.audit_scan_add(district, day, code, {
-        "at": datetime.now(timezone.utc), "by": request["owner_id"],
-        "product_id": pid if verdict != "alien" else "",
-        "product_name": (doc or {}).get("product_name") or p.get("name", ""),
-        "label": (doc or {}).get("label") or "",
-        "verdict": verdict,
-        "home": (doc or {}).get("district") or "",
-        # Сколько единиц за этим кодом: бутылка 1, код пива 0.5.
-        "qty": float((doc or {}).get("qty") or 1),
-    })
-    counts = await db.audit_scan_counts(district, day)
-    unit = _unit(p) if p else 1
-    if verdict == "alien":
-        log.warning(f"[audit] {district}: код не из реестра — {code[:40]}")
-    return web.json_response({
-        "ok": True, "new": fresh, "code": code, "verdict": verdict,
-        "product_id": pid, "name": (doc or {}).get("product_name") or p.get("name", ""),
-        "label": (doc or {}).get("label") or "",
-        "home": (doc or {}).get("district") or "",
-        "home_code": OFFICE_CODES.get((doc or {}).get("district") or "", ""),
-        # Счёт по позиции — в единицах склада: коды несут qty, у пива это
-        # коробки и полкоробки.
-        "count": _num(counts.get(pid) or 0),
-        "unit": unit,
-        "total": _num(sum(counts.values())),
-        "positions": len(counts),
-    }, headers=CORS_HEADERS)
+
+async def audit_scan_state(district: str, day: str) -> dict:
+    return _scan_state(district, day, await db.audit_scan_counts(district, day),
+                       await db.audit_scan_odd(district, day),
+                       await db.audit_scan_stats(district, day), _catalog())
 
 
 @require_owner
@@ -1676,11 +1698,13 @@ async def handle_audit_scan_state(request):
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
     day = (request.query.get("day") or "").strip() or _biz_day()
-    return web.json_response(
-        _scan_state(district, day, await db.audit_scan_counts(district, day),
-                    await db.audit_scan_odd(district, day),
-                    await db.audit_scan_stats(district, day), _catalog()),
-        headers=CORS_HEADERS)
+    return web.json_response(await audit_scan_state(district, day), headers=CORS_HEADERS)
+
+
+async def audit_scan_undo(district: str, day: str, code: str) -> dict:
+    ok = await db.audit_scan_del(district, day, code)
+    counts = await db.audit_scan_counts(district, day)
+    return {"ok": ok, "code": code, "total": sum(counts.values()), "positions": len(counts)}
 
 
 @require_owner
@@ -1695,12 +1719,8 @@ async def handle_audit_scan_undo(request):
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     district = str(body.get("district") or "").strip()
     day = str(body.get("day") or "").strip() or _biz_day()
-    import re as _re
-    code = _re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
-    ok = await db.audit_scan_del(district, day, code)
-    counts = await db.audit_scan_counts(district, day)
-    return web.json_response({"ok": ok, "code": code, "total": sum(counts.values()),
-                              "positions": len(counts)}, headers=CORS_HEADERS)
+    code = audit_code(body.get("code"))
+    return web.json_response(await audit_scan_undo(district, day, code), headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1867,6 +1887,9 @@ def _audit_view(a: dict | None) -> dict:
         "state": state,
         "started_at": a.get("started_at", ""), "started_by": a.get("started_by_name", ""),
         "finished_at": a.get("finished_at", ""), "closed_at": a.get("closed_at", ""),
+        # Кто завершил: водитель района или старший в STAR, и что написал.
+        "finished_by": a.get("finished_by_name", ""),
+        "finished_kind": a.get("finished_kind", ""), "note": a.get("finished_note", ""),
         "short": a.get("short") or None, "over": a.get("over") or None,
         "alien": int(a.get("alien") or 0),
         "result": a.get("result") or None,
@@ -1920,6 +1943,11 @@ async def handle_audit_sheet(request):
     district, day = _district_of(request)
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    return web.json_response(await audit_sheet(district, day), headers=CORS_HEADERS)
+
+
+async def audit_sheet(district: str, day: str) -> dict:
+    """Лист ревизии района — старшему в STAR и водителю района один и тот же."""
     a = await db.audit_get(district, day) or {}
     if a.get("finished_at"):
         rows = _audit_rows_saved(a)
@@ -1934,7 +1962,7 @@ async def handle_audit_sheet(request):
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[audit] коды района не посчитаны ({district}): {e}")
         coded = 0
-    return web.json_response({
+    return {
         "district": district,
         "district_name": OFFICE_NAMES.get(district, district),
         "district_code": OFFICE_CODES.get(district, ""),
@@ -1943,7 +1971,22 @@ async def handle_audit_sheet(request):
         # считать, камера ответит «нет в реестре» на каждую бутылку.
         "coded": int(coded),
         "audit": _audit_view(a), "scan": stats,
-    }, headers=CORS_HEADERS)
+    }
+
+
+async def audit_start(district: str, day: str, by: int, by_name: str) -> tuple:
+    """(код, ответ). Повтор — не ошибка: ревизию прерывают и возвращаются к
+    ней; начатую другим (старшим или вторым водителем района) продолжают."""
+    a = await db.audit_get(district, day) or {}
+    if a.get("finished_at"):
+        return 409, {"error": "finished", "audit": _audit_view(a)}
+    if not a.get("started_at"):
+        a = await db.audit_set(district, day, {
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_by": int(by or 0),
+            "started_by_name": str(by_name or "").strip()[:60]})
+        log.info(f"[audit] {district} {day}: ревизия начата · {by_name or '—'}")
+    return 200, {"ok": True, "audit": _audit_view(a)}
 
 
 @require_owner
@@ -1957,17 +2000,8 @@ async def handle_audit_start(request):
     district, day = _district_of(request, body)
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
-    a = await db.audit_get(district, day) or {}
-    if a.get("finished_at"):
-        return web.json_response({"error": "finished", "audit": _audit_view(a)},
-                                 status=409, headers=CORS_HEADERS)
-    if not a.get("started_at"):
-        a = await db.audit_set(district, day, {
-            "started_at": datetime.now(timezone.utc).isoformat(),
-            "started_by": int(request["owner_id"] or 0),
-            "started_by_name": str(body.get("as") or "").strip()[:60]})
-        log.info(f"[audit] {district} {day}: ревизия начата")
-    return web.json_response({"ok": True, "audit": _audit_view(a)}, headers=CORS_HEADERS)
+    st, res = await audit_start(district, day, request["owner_id"], str(body.get("as") or ""))
+    return web.json_response(res, status=st, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1984,12 +2018,32 @@ async def handle_audit_finish(request):
     district, day = _district_of(request, body)
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    st, res = await audit_finish(district, day, request["owner_id"],
+                                 str(body.get("as") or "").strip()[:60])
+    return web.json_response(res, status=st, headers=CORS_HEADERS)
+
+
+_AUDIT_FIN_LOCKS: dict = {}
+
+
+async def audit_finish(district: str, day: str, by: int, who: str, extra: dict = None) -> tuple:
+    """(код, отчёт). Одно завершение на STAR и водителя района; extra — что
+    дописать в ревизию (кем завершена — водителем, его комментарий).
+
+    Завершают теперь с двух сторон — старший в STAR и любой водитель района,
+    — и два нажатия в одну секунду записали бы пересчёт и отчёт дважды. Второй
+    ждёт первого и получает «уже завершена»."""
+    lock = _AUDIT_FIN_LOCKS.setdefault(f"{district}:{day}", asyncio.Lock())
+    async with lock:
+        return await _audit_finish(district, day, by, who, extra)
+
+
+async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict = None) -> tuple:
     a = await db.audit_get(district, day) or {}
     if a.get("finished_at"):
-        return web.json_response({"error": "finished", "audit": _audit_view(a)},
-                                 status=409, headers=CORS_HEADERS)
+        return 409, {"error": "finished", "audit": _audit_view(a)}
     if not a.get("started_at"):
-        return web.json_response({"error": "not_started"}, status=409, headers=CORS_HEADERS)
+        return 409, {"error": "not_started"}
 
     await _audit_refresh_alien(district, day)
     lines, counted = await _audit_lines(district, day)
@@ -2024,30 +2078,31 @@ async def handle_audit_finish(request):
 
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
-    who = str(body.get("as") or "").strip()[:60]
+    who = str(who or "").strip()[:60]
     # Пересчёт — обычным документом, в учётных единицах: с него дальше живут
     # заявка и стоимость склада, и ревизия для них — просто свежий снимок.
     doc_lines = _audit_snapshot_lines(lines)
     doc = {"district": district, "district_name": OFFICE_NAMES.get(district, district),
            "day": day, "first_time": False,
-           "counted_by": request["owner_id"], "counted_at": now_iso,
+           "counted_by": by, "counted_at": now_iso,
            "lines": doc_lines,
            "short_qty": tot["short_qty"], "short_aed": tot["short_aed"],
            "over_qty": tot["over_qty"],
            "counted_qty": len(doc_lines), "total_qty": len(doc_lines),
            "scan_qty": int(stats.get("total") or 0),
            "audit_started_at": a.get("started_at") or now_iso,
-           "audit_finished_at": now_iso, "audit_by": request["owner_id"],
+           "audit_finished_at": now_iso, "audit_by": by,
            "marked_qty": len(doc_lines), "matched_qty": tot["matched"],
            "mismatch_qty": tot["mismatched"]}
     await db.save_stock_count(district, day, doc)
     base_drop()
     fields = {
-        "finished_at": now_iso, "finished_by": int(request["owner_id"] or 0),
+        "finished_at": now_iso, "finished_by": int(by or 0),
         "finished_by_name": who, "short": short, "over": over, "alien": alien,
         "result": {**tot, "scan_qty": int(stats.get("total") or 0), "counted": counted},
         "lines": [{"id": l["id"], "expected": l["expected"], "coded": l["coded"], "actual": l["actual"],
                    "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"]} for l in lines],
+        **(extra or {}),
     }
     # Сошлось и чужих кодов нет — закрыта сразу. Чужие коды — это бутылки без
     # места в учёте; ревизия ждёт, пока их внесут (см. _audit_alien).
@@ -2060,7 +2115,7 @@ async def handle_audit_finish(request):
     await backdate.notify(day, who, "ревизия",
                           f"{OFFICE_CODES.get(district, district)} — сканом {stats.get('total', 0)}"
                           + (f", недостача {tot['short_aed']} AED" if tot["short_aed"] else ""))
-    return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+    return 200, await _audit_report(district, day, a)
 
 
 def _audit_snapshot_lines(lines: list) -> list:
@@ -2443,6 +2498,7 @@ async def handle_audit_reopen(request):
     undone["moves"], undone["restored"] = await _audit_undo_over(a)
     await db.delete_stock_count(district, day)
     a = await db.audit_unset(district, day, ["finished_at", "finished_by", "finished_by_name",
+                                            "finished_kind", "finished_note",
                                             "closed_at", "short", "over", "alien", "result", "lines"])
     a = await db.audit_set(district, day, {"reopened_at": now_iso, "reopened_by_name": by_name,
                                           "reopens": int(a.get("reopens") or 0) + 1})

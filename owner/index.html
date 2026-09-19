@@ -1010,6 +1010,8 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-res-t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase}
 .aud-res-s{font-size:11.5px;color:var(--muted);margin-top:5px}
+/* Комментарий водителя, который провёл ревизию, — его словами. */
+.aud-res-note{font-size:12.5px;font-style:italic;color:var(--sub);margin-top:8px;line-height:1.35}
 .aud-res-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:14px}
 .aud-res-g .aud-t{text-align:center}
 .aud-sec{margin:0 0 10px;border-radius:16px;overflow:hidden;background:var(--card);border:1px solid var(--border2)}
@@ -8111,6 +8113,7 @@ button.exp-wait:active{transform:scale(.99)}
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Смена закрыта у всех</div><div class="nrow-s">Утренний итог и заявка в магазин файлом</div></div><label class="tg"><input type="checkbox" data-p="shift.closed" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Приёмка закрыта</div><div class="nrow-s">Что водитель забрал и чего не хватило</div></div><label class="tg"><input type="checkbox" data-p="supply.done" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Приёмка требует взгляда</div><div class="nrow-s">Темп сканирования, отмены, странные коды</div></div><label class="tg"><input type="checkbox" data-p="supply.flag" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Ревизия водителя</div><div class="nrow-s">Итог по району: чего не хватает и что лишнее</div></div><label class="tg"><input type="checkbox" data-p="stock.audit" checked><i></i></label></div>
         </div>
       </div>
 
@@ -15447,7 +15450,7 @@ function audPage(){
   const sh = STK.sheet; if(!sh) return;
   const box = document.getElementById('stkMid');
   const a = sh.audit || {}, st = a.state || 'idle';
-  const sub = st === 'running' ? `идёт с ${fmtHM(a.started_at)}`
+  const sub = st === 'running' ? `идёт с ${fmtHM(a.started_at)}${a.started_by ? ' · ' + a.started_by : ''}`
             : st === 'pending' ? 'ждёт решения'
             : st === 'closed'  ? `закрыта ${fmtHM(a.closed_at)}` : 'ревизия';
   _stkHead(`${sh.district_code} ${sh.district_name}`, sub, false);
@@ -15589,6 +15592,8 @@ function audReport(rep){
     <div class="aud-res-t">${allOk ? 'Всё сошлось' : 'Есть расхождения'}</div>
     <div class="aud-res-s">${escS(_dayName(rep.day))} · ${fmt(t.positions || 0)} ${
       pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmt(t.scan_qty || 0)}</div>
+    ${a.finished_kind === 'driver' ? `<div class="aud-res-s">Провёл водитель ${escS(a.finished_by || '')}</div>` : ''}
+    ${a.note ? `<div class="aud-res-note">«${escS(a.note)}»</div>` : ''}
     ${allOk ? '' : `<div class="aud-res-g">
       <div class="aud-t ${t.short_qty ? 'dn' : ''}"><span class="aud-tl">Недостача</span>
         <b class="aud-tv">${fmtQty(audUnits(rep.rows || []).short)}</b>
@@ -30070,7 +30075,7 @@ function _buildAlerts(){
       'timing.late25':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
       'reviews.bad3':'dn','reviews.good5':'info','reviews.comment':'info','reviews.any':'info',
       'stock.out':'warn','stock.low':'info',
-      'shift.closed':'info','supply.done':'info','supply.flag':'warn',
+      'shift.closed':'info','supply.done':'info','supply.flag':'warn','stock.audit':'warn',
       'customers.new':'info','customers.verify':'warn','customers.verified':'info','customers.vip':'info',
       'support.new':'warn','support.escalation':'dn','support.unresolved':'warn',
       'support.complaint':'dn','support.replied':'info',
@@ -30086,7 +30091,7 @@ function _buildAlerts(){
       'reviews.bad3':IC('warn'),'reviews.good5':IC('star'),'reviews.comment':IC('chat'),
       'reviews.any':IC('note'),
       'stock.out':IC('emptyBox'),'stock.low':IC('zzz'),
-      'shift.closed':IC('clock'),'supply.done':IC('box'),'supply.flag':IC('warn'),
+      'shift.closed':IC('clock'),'supply.done':IC('box'),'supply.flag':IC('warn'),'stock.audit':IC('box'),
       'drivers.geo_off':IC('car'),'drivers.geo_on':IC('car'),'drivers.geo_lock':IC('ban'),
       'customers.new':IC('user'),'customers.verify':IC('note'),'customers.vip':IC('gem'),
       'support.new':IC('chat'),'support.escalation':IC('siren'),'support.unresolved':IC('inbox'),

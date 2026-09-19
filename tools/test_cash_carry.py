@@ -129,6 +129,23 @@ async def main():
         await db.checklist_set(D2, "cash", True, "1")
         c21 = await get("/api/owner/cash-round", day="2026-09-21")
         eq("отметка на весь 19-е обрывает цепочку Бизнес Бея", [c["day"] for c in dist(c21, "bbay")["carry"]], [])
+
+        # Владелец, 19 сен 2026: «соберу завтра должна быть отдельно по каждому
+        # району — вдруг он с какого-то забрал, а где-то просто не успевает».
+        print("── «Соберу завтра» по одному району ─────────────────────────")
+        order("f", D3, "silicon", 200)
+        r = await post("/api/owner/cash-round/later", {"day": D3, "districts": ["silicon"]})
+        eq("отложен только названный район", (r["changed"], dist(r, "silicon")["later"], dist(r, "jvc")["later"]),
+           (["silicon"], True, False))
+        eq("JVC не решён — строка чек-листа ещё горит", r["settled"], False)
+        r = await post("/api/owner/cash-round/later", {"day": D3, "districts": ["jvc"]})
+        eq("JVC — своей кнопкой; теперь решено по всем", (r["changed"], r["later"], r["settled"]), (["jvc"], 2, True))
+        r = await post("/api/owner/cash-round/later", {"day": D3, "on": False, "districts": ["silicon"]})
+        eq("снять у одного — второй остаётся отложенным",
+           (r["changed"], dist(r, "silicon")["later"], dist(r, "jvc")["later"]), (["silicon"], False, True))
+        r = await post("/api/owner/cash-round/later", {"day": D3, "districts": ["bbay"]})
+        eq("полученный район не откладывается", (r["changed"], dist(r, "bbay")["done"], dist(r, "bbay")["later"]),
+           ([], True, False))
     print("\nвсё прошло" if not FAIL else f"\nНЕ ПРОШЛИ: {FAIL}")
     return 1 if FAIL else 0
 

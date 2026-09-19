@@ -2221,6 +2221,17 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-ok.on{background:rgba(76,175,125,.14);border-color:rgba(76,175,125,.45);color:var(--up)}
 .cr-ok svg{width:16px;height:16px}
 .cr-ok:active{transform:scale(.98)}
+/* «Соберу завтра» — своя у каждого района, рядом с «Получил» и тише его:
+   главное действие — получить. Нажата — янтарная, как отметка в шапке
+   карточки; нажать ещё раз — снять. */
+.cr-acts{display:flex;gap:8px;margin-top:12px}
+.cr-acts .cr-ok{margin-top:0;flex:1 1 auto;min-width:0}
+.cr-later{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 14px;border-radius:14px;border:1px solid var(--border2);background:var(--card2);
+  color:var(--sub);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:700;white-space:nowrap}
+.cr-later.on{color:var(--warn);background:rgba(243,180,74,.14);border-color:rgba(243,180,74,.4)}
+.cr-later svg{width:14px;height:14px}
+.cr-later:active{transform:scale(.98)}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -18081,6 +18092,10 @@ function crCard(x){
   // «за 2 дня»; один день, и тот прошлый, — по имени: «за 19 сентября».
   const заСколько = дней >= 2 ? `за ${дней} ${pluralize(дней, 'день', 'дня', 'дней')}`
     : carry.length ? `за ${_dayName(carry[0].day)}` : '';
+  // На кнопке рядом с «Соберу завтра» «за 18 сентября» не влезает в строку —
+  // там дата короче: «за 18.09».
+  const заКнопка = дней < 2 && carry.length
+    ? `за ${String(carry[0].day).slice(8, 10)}.${String(carry[0].day).slice(5, 7)}` : заСколько;
   const st = x.done ? `<span class="cr-st">${IC('check', 12)}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>`
     : x.later ? '<span class="cr-st later">соберу завтра</span>'
     : заСколько ? `<span class="cr-days">${заСколько}</span>` : '';
@@ -18112,9 +18127,14 @@ function crCard(x){
       </button>${open ? `<div class="cr-items">${x.items.map(crItem).join('')}${
         foldEnd(n, `crFold('${escS(x.id)}', 1)`)}</div>` : ''}`
       : '<div class="cr-noexp">Расходов за смену не было</div>'}
-    <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
-      ${x.done ? `${IC('check', 16)}Получил · снять отметку` : заСколько ? `Получил ${заСколько}` : 'Получил'}
-    </button>
+    <div class="cr-acts">
+      <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
+        ${x.done ? `${IC('check', 16)}Получил · снять отметку` : заКнопка ? `Получил ${заКнопка}` : 'Получил'}
+      </button>
+      ${!x.done && CR && CR.day === CR.today ? `<button class="cr-later${x.later ? ' on' : ''}"
+        onclick="crLater('${escS(x.id)}', ${!x.later})"${x.later ? ' aria-label="Снять «Соберу завтра»"' : ''}>${
+        x.later ? IC('check', 14) : ''}Соберу завтра</button>` : ''}
+    </div>
   </div>`;
 }
 
@@ -18139,36 +18159,32 @@ function crFold(id, снизу){
   if(снизу) foldSeen('cr-' + id);
 }
 
-// «Соберу завтра» — внизу экрана, на все районы, где выручку ещё не получили
-// (владелец, 19 сен 2026: «пусть в сборе выручки будет кнопка „соберу
-// завтра“»). Выручка переедет на завтра и без неё — кнопка говорит, что это
+// «Соберу завтра» — у каждого района своя, рядом с «Получил» (владелец,
+// 19 сен 2026: «соберу завтра должна быть отдельно по каждому району — вдруг
+// он с какого-то забрал, а где-то просто не успевает»). Раньше была одна
+// кнопка внизу на все неполученные районы — её больше нет, подвал пуст.
+// Выручка переедет на завтра и без отметки — отметка говорит, что это
 // решение, и строка чек-листа за день не горит. Только в сегодняшнем сборе;
-// снимается там же.
+// нажать ещё раз — снять.
 function crFoot(){
-  const f = document.getElementById('accFoot'); if(!f) return;
-  const d = CR;
-  if(!d || d.day !== d.today){ f.innerHTML = ''; return; }
-  const ждут = (d.districts || []).filter(x => !x.done && !x.empty && !x.later).length;
-  f.innerHTML = ждут
-    ? `<div class="qb-wrap"><button class="qb quiet" onclick="crLater(true)">Соберу завтра${
-        ждут < d.need ? ` · ${ждут} ${pluralize(ждут, 'район', 'района', 'районов')}` : ''}</button></div>`
-    : d.later
-    ? `<div class="qb-wrap"><button class="qb quiet" onclick="crLater(false)">Отменить «Соберу завтра»</button></div>`
-    : '';
+  const f = document.getElementById('accFoot'); if(f) f.innerHTML = '';
 }
 
-async function crLater(on){
+async function crLater(id, on){
   if(!CR || CR_BUSY) return;
   CR_BUSY = true;
   let r;
-  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/later', {method:'POST', body:{day: CR.day, on}}); }
+  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/later',
+         {method:'POST', body:{day: CR.day, on, districts: [id]}}); }
   catch(e){ _toast('Не удалось'); CR_BUSY = false; return; }
   CR_BUSY = false;
   CR = r;
   crRender();
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(on ? 'warning' : 'success'); }catch(e){}
-  const кого = (r.changed || []).map(id => ((r.districts || []).find(x => x.id === id) || {}).code || id).join(', ');
-  if(on && кого) _toast(`Соберу завтра: ${кого} — выручка переедет на завтра`);
+  const x = (r.districts || []).find(d => d.id === id) || {};
+  if((r.changed || []).includes(id))
+    _toast(on ? `${x.code || ''} · соберу завтра — выручка переедет на завтра`
+              : `${x.code || ''} · «соберу завтра» снято`);
   CKL = null;                       // строка чек-листа перечитается при возврате
 }
 

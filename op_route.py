@@ -96,9 +96,25 @@ async def chats(district: str = "") -> list:
     return out
 
 
+async def own_chats(district: str) -> list:
+    """Только оператор района — все его устройства, без старших, планшета и
+    подмены соседом: так уходят вещи, которые касаются одного района и не
+    требуют действия от остальных (отчёт ревизии водителя, владелец, 19 сен
+    2026: «отчёт операторам только оператору района»). Оператор района — по
+    сегодняшней расстановке; спрятался — никому."""
+    district = (district or "").strip()
+    имя = staff.DISTRICT_OPERATOR.get(district) or staff.base_operator(district)
+    if not имя:
+        return []
+    if await hidden(имя):
+        log.info(f"[route] {district}: оператор {имя} в скрытом режиме — не пишем")
+        return []
+    return [{"chat_id": чат, "prefix": ""} for чат in staff.operator_chats(имя)]
+
+
 async def send(text: str, district: str = "", parse_mode: str = "HTML",
                reply_markup=None, register: bool = True, test: bool = False,
-               retry_plain: bool = False) -> dict:
+               retry_plain: bool = False, own_only: bool = False) -> dict:
     """Разослать по маршруту. Возвращает {chat_id: message_id} — по ним заказ
     потом правят и по ним же чистят чат, если человек уйдёт в скрытый режим.
 
@@ -107,7 +123,9 @@ async def send(text: str, district: str = "", parse_mode: str = "HTML",
     вместе со всем сообщением.
 
     retry_plain — чат не принял сообщение с кнопками: отправить ещё раз без
-    них. Для сообщений, где кнопка — удобство, а главное — текст."""
+    них. Для сообщений, где кнопка — удобство, а главное — текст.
+
+    own_only — только оператору района (own_chats), мимо старших и планшета."""
     from api_server import tg_send, OPERATOR_BOT_TOKEN
     from datetime import datetime, timezone
     out = {}
@@ -118,7 +136,7 @@ async def send(text: str, district: str = "", parse_mode: str = "HTML",
         from config import TEST_OPERATOR_IDS
         targets = [{"chat_id": c, "prefix": ""} for c in sorted(TEST_OPERATOR_IDS)]
     else:
-        targets = await chats(district)
+        targets = await (own_chats(district) if own_only else chats(district))
     for цель in targets:
         try:
             разметка = (reply_markup(цель["chat_id"]) if callable(reply_markup)

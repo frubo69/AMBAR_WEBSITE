@@ -15,8 +15,9 @@
     ровно так же, как после старшего; вернуть её в работу («Возобновить»)
     может только старший;
   • по завершении отчёт уходит старшему — бот AMBAR STAR, событие
-    stock.audit, — и операторам района: бот операторов тем же маршрутом, что
-    заказы района (свой оператор, старшие операторы и планшет).
+    stock.audit, — и оператору района: бот операторов, только его устройства,
+    без старших операторов и планшета (владелец, 19 сен 2026: «отчёт
+    операторам только оператору района»).
 """
 from __future__ import annotations
 
@@ -193,7 +194,7 @@ async def handle_undo(request):
 
 async def handle_finish(request):
     """POST {note?} — завершить ревизию своего района. Пересчёт записывается
-    так же, как у старшего; отчёт — старшему и операторам района."""
+    так же, как у старшего; отчёт — старшему и оператору района."""
     district, day = _where(request)
     if not district:
         return _json({"ok": False, "error": "no_district"})
@@ -280,7 +281,7 @@ def owner_text(a: dict, driver: str) -> str:
 
 
 def operator_text(a: dict, driver: str) -> str:
-    """Операторам — HTML, как остальные сообщения бота операторов; без денег."""
+    """Оператору района — HTML, как остальные сообщения бота операторов; без денег."""
     import html
     e = lambda s: html.escape(str(s or ""), quote=False)
     p = report_lines(a, driver, money=False)
@@ -302,7 +303,7 @@ def operator_text(a: dict, driver: str) -> str:
 
 
 async def tell(district: str, day: str, a: dict, driver: str) -> None:
-    """Отчёт старшему (AMBAR STAR) и операторам района. Сбой одной стороны не
+    """Отчёт старшему (AMBAR STAR) и оператору района. Сбой одной стороны не
     отменяет другую."""
     try:
         from owner_routes import notify_owners
@@ -311,6 +312,7 @@ async def tell(district: str, day: str, a: dict, driver: str) -> None:
         log.error(f"[audit] отчёт старшему не ушёл ({district}): {e}")
     try:
         import op_route
-        await op_route.send(operator_text(a, driver), district=district, parse_mode="HTML")
+        await op_route.send(operator_text(a, driver), district=district, parse_mode="HTML",
+                            own_only=True)
     except Exception as e:                          # noqa: BLE001
-        log.error(f"[audit] отчёт операторам не ушёл ({district}): {e}")
+        log.error(f"[audit] отчёт оператору района не ушёл ({district}): {e}")

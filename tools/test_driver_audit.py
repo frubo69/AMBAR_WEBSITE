@@ -55,7 +55,7 @@ owner_auth.install_validator(lambda s: {"id": int(s)} if s.isdigit() else None)
 
 SENT = {"owner": [], "op": []}
 async def _owners(kind, text, **k): SENT["owner"].append((kind, text))
-async def _ops(text, district="", **k): SENT["op"].append((district, text, k.get("parse_mode")))
+async def _ops(text, district="", **k): SENT["op"].append((district, text, k.get("parse_mode"), k.get("own_only")))
 owner_routes.notify_owners = _owners
 op_route.send = _ops
 
@@ -203,7 +203,8 @@ async def main():
                      "Лишние", "числится на B2", "списана", "Кодов не из реестра: 1", "Решение — в STAR"):
             eq(f"старшему: «{want}»", want in ot, True)
         eq("старшему — сумма недостачи в AED", "AED" in ot, True)
-        eq("операторам — один раз, район JVC, HTML", [(x[0], x[2]) for x in SENT["op"]], [("jvc", "HTML")])
+        eq("оператору района — один раз, JVC, HTML, только свой оператор",
+           [(x[0], x[2], x[3]) for x in SENT["op"]], [("jvc", "HTML", True)])
         opt = SENT["op"][0][1] if SENT["op"] else ""
         eq("операторам без денег", "AED" in opt, False)
         eq("операторам комментарий экранирован", "&lt;b&gt;разбились&lt;/b&gt;" in opt, True)
@@ -258,6 +259,34 @@ async def main():
         eq("STAR: повтор — 409 finished", (st, r["error"]), (409, "finished"))
         st, r = await own("POST", "/api/owner/stock/audit/finish", {"district": "tecom"})
         eq("STAR: не начата — 409 not_started", (st, r["error"]), (409, "not_started"))
+
+    print("── маршрут: только оператор района ──────────────────────────────")
+    import importlib
+    OR = importlib.reload(op_route)            # настоящий send/own_chats, без подмены из начала
+    ops = {501: "Умар", 502: "Умар", 503: "Фарух", 504: "Джанабиль"}
+    staff.operator_chats = lambda name: [t for t, n in ops.items() if n == name]
+    hid = set()
+    async def _hid(name): return name in hid
+    OR.hidden = _hid
+    eq("JVC — оба устройства Умара, и только они", sorted(c["chat_id"] for c in await OR.own_chats("jvc")), [501, 502])
+    eq("без приставки «подмена»", {c["prefix"] for c in await OR.own_chats("jvc")}, {""})
+    hid.add("Умар")
+    eq("оператор в скрытом режиме — никому (и не соседу)", await OR.own_chats("jvc"), [])
+    hid.clear()
+    was = dict(staff.DISTRICT_OPERATOR)
+    staff.DISTRICT_OPERATOR["jvc"] = "Джанабиль"           # перестановка на сегодня
+    eq("перестановка: сегодняшний оператор района", [c["chat_id"] for c in await OR.own_chats("jvc")], [504])
+    staff.DISTRICT_OPERATOR.clear(); staff.DISTRICT_OPERATOR.update(was)
+    eq("неизвестный район — никому", await OR.own_chats("nowhere"), [])
+    import api_server
+    got = []
+    async def _tg(token, chat, text, **k):
+        got.append(chat); return {"ok": True, "result": {"message_id": 7}}
+    api_server.tg_send = _tg; api_server.OPERATOR_BOT_TOKEN = "x"
+    async def _reg(*a, **k): return None
+    db.drv_msg_add = _reg
+    r = await OR.send("текст", district="jvc", own_only=True)
+    eq("send(own_only) — только устройства оператора района", sorted(got), [501, 502])
 
     print("\nвсё прошло" if not FAIL else f"\nНЕ ПРОШЛИ: {FAIL}")
     return 1 if FAIL else 0

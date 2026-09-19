@@ -10172,7 +10172,8 @@ function woFoot(){
 // старшему должен приходить и операторам». Та же ревизия, что у старшего в
 // STAR: район берёт сервер (из входа водителя), проход общий — начатую
 // старшим продолжают здесь и наоборот. Водитель сканирует и завершает;
-// решения по недостаче и излишку — у старшего, отчёт уходит ему и операторам.
+// решения по недостаче и излишку — у старшего, отчёт уходит ему и оператору
+// района (только ему — владелец, 19 сен 2026).
 // Числа — в единицах склада: бутылки, у пива коробки (код — полкоробки).
 var AUDS = null;            // лист ревизии с сервера
 var AUD_BRIEF = null;       // состояние для кнопки на «Товаре»
@@ -10592,7 +10593,7 @@ function audRenderDone(){
   if(a.note) h += `<div class="aud-note">«${esc(a.note)}»</div>`;
   document.getElementById('audMid').innerHTML = h;
   document.getElementById('audBot').innerHTML = `
-    ${a.finished_kind === 'driver' ? `<div class="aud-sent">${svg(ICO.ok, 15)}<span>Отчёт ушёл старшему и операторам</span></div>` : ''}
+    ${a.finished_kind === 'driver' ? `<div class="aud-sent">${svg(ICO.ok, 15)}<span>Отчёт ушёл старшему и оператору района</span></div>` : ''}
     <button class="btn btn-pri" onclick="audClose()">Готово</button>`;
 }
 

@@ -4924,7 +4924,7 @@ function errText(e){
   if(st) return 'ошибка ' + st;
   return 'нет связи';
 }
-// Курсы — те же, что у владельца в «Финансах»: где обменник обновился, его, иначе рыночный
+// Курсы — те же, что у владельца в «Финансах»: только обменник (Al Ansari), рынка нет
 async function fxdLoad(again){
   if(FXD) return;
   try{ FXD = await drvApi.drvFetch('/api/driver/rates'); FXD_ERR = ''; }
@@ -5044,8 +5044,7 @@ function fxdRows(){
         <em class="fxr-c">${svg(ICO.chevR, 13)}</em>
       </button>
       ${open ? `<div class="fxr-d">
-        <span><u>Обменник</u><b>${r.cash ? fxdN(r.rate) + ' AED' : 'не меняет'}</b></span>
-        <span><u>Рынок</u><b>${r.market ? fxdN(r.market) + ' AED' : '—'}</b></span>
+        <span><u>Обменник</u><b>${fxdN(r.rate) + ' AED'}</b></span>
         <span><u>Вчера</u><b>${r.prev ? fxdN(r.prev) + ' AED' : 'нет данных'}</b></span>
       </div>` : ''}
     </div>`;
@@ -5350,7 +5349,7 @@ function profFxTile(){
   return `<button class="pf-tile pf-tap" onclick="profRates()">
       <span>${svg(ICO.cash, 17)}</span>
       <div><u>Курс валют</u><b>${m ? m.v + ' AED' : (FXD_ERR ? '—' : skb(58, 14))}</b>
-        <i>${m ? `за 1 ${m.code} · ${m.cash ? 'обменник' : 'рынок'}` : (FXD_ERR ? 'курс не загрузился' : skb(64, 9))}</i></div>
+        <i>${m ? `за 1 ${m.code} · обменник` : (FXD_ERR ? 'курс не загрузился' : skb(64, 9))}</i></div>
       <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
     </button>`;
 }
@@ -6965,8 +6964,8 @@ async function stlSend(){
 }
 
 // ── Оплата валютой ────────────────────────────────────────────────────────
-// Курсы — из «Финансов» владельца (наличные обменника, где свежие, иначе
-// рынок), дирхамов за единицу. В списке сразу видно, сколько это в каждой
+// Курсы — из «Финансов» владельца (наличные обменника Al Ansari), дирхамов
+// за единицу. В списке сразу видно, сколько это в каждой
 // валюте; выбор замораживает курс на заказе, сменить можно до закрытия.
 let FX = {oid: null, busy: false};
 // Выбор валюты — та же страница «Курс валют», что в профиле (владелец, 14 сен

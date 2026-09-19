@@ -7503,7 +7503,7 @@ button.exp-wait:active{transform:scale(.99)}
 </div>
 
 <!-- ============ MORE ============ -->
-<!-- Финансы: долги и удержания, прайс, курс, кошелёк. Всё карточками, без
+<!-- Финансы: долги и удержания, курс, кошелёк. Всё карточками, без
      подписей: каждая карточка называет себя сама. -->
 <div class="page" id="pg-finance">
   <!-- Книга учёта денег — месячный отчёт старшего: месяц со стрелками, три
@@ -7511,21 +7511,8 @@ button.exp-wait:active{transform:scale(.99)}
        шапка, полоса чисел, тело. -->
   <div id="finBook"></div>
 
-  <div class="fin-sec" id="prBlock">
-    <button class="fin-sec-h" onclick="ordPrices()">
-      <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
-      <span class="fin-sec-b"><b>Прайс</b><i class="is-skel" id="prSub" style="min-width:150px">0000</i></span>
-      <svg class="fin-sec-go arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-    </button>
-    <div class="fin-strip">
-      <div><b class="is-skel" id="prKpiN">0000</b><i>Позиций</i></div>
-      <div><b class="is-skel" id="prKpiC">0000</b><i>Закупка известна</i></div>
-      <div><b class="is-skel" id="prKpiM">0000</b><i>Наценка</i></div>
-    </div>
-    <div class="fin-bar"><i id="prBar" style="width:0"></i></div>
-  </div>
-
+  <!-- Прайса здесь нет: он внизу карточки «Закупаем» на экране заявки
+       (владелец, 19 сен 2026). -->
   <div class="fin-sec" id="fxBlock">
     <button class="fin-sec-h" id="fxBlockHdr">
       <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17"
@@ -10860,7 +10847,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
       // Кошелёк в «Сейфе» — не тем, что загрузилось при старте: сервер держит
       // ответ полминуты, заход на «Финансы» того стоит.
       else ownerApi.ownerFetch('/api/owner/wallet').then(w => { if(w) ACC_WAL = w; walBlockRender(); }).catch(() => {});
-      prLoad(); fbHub();
+      fbHub();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
@@ -17875,8 +17862,7 @@ const CK_GO = {
 };
 
 async function chkPrices(){
-  await ordPrices();
-  if(!OPR.only){ OPR.only = true; oprPaint(); }
+  await ordPrices(true);
 }
 
 async function chkAudit(){
@@ -18496,7 +18482,6 @@ function finHeroPaint(){
   _skel('finHeroThey', !!d, d ? fmt(d.they) : '');
   _skel('finHeroWe',   !!d, d ? fmt(d.we) : '');
   _skel('finHeroUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
-  _skel('finHeroMark', PR_MARK !== null, PR_MARK !== null ? PR_MARK : '');
 }
 // Ячейка сводки ведёт к разделу — и раскрывает его, если он сворачивается.
 function finGo(id){
@@ -21610,29 +21595,6 @@ async function accFinNP(){
   ${fbDays(days)}`;
 }
 
-// Прайс: закупка и продажа. Сама таблица — на своём экране, здесь три числа.
-let PR_D = null;
-async function prLoad(){
-  if(PR_D) return prPaint();
-  try{ PR_D = await ownerApi.ownerFetch('/api/owner/stock/prices'); }catch(e){ PR_D = null; }
-  prPaint();
-}
-let PR_MARK = null;
-function prPaint(){
-  const d = PR_D, rows = (d && d.rows) || [];
-  const with_ = rows.filter(r => r.cost && r.price_app);
-  const mark = with_.length
-    ? Math.round(with_.reduce((a, r) => a + (r.price_app / r.cost - 1) * 100, 0) / with_.length) : 0;
-  _skel('prSub', !!d, d ? `закупка известна у ${d.cost_cover || 0}% позиций` : '', 150);
-  _skel('prKpiN', !!d, d ? fmt(d.total || rows.length) : '');
-  _skel('prKpiC', !!d, d ? fmt(d.cost_known || 0) : '');
-  _skel('prKpiM', !!d, d ? (with_.length ? '+' + mark + '%' : '—') : '');
-  const bar = document.getElementById('prBar');
-  if(bar) bar.style.width = (d ? Math.max(0, Math.min(100, d.cost_cover || 0)) : 0) + '%';
-  PR_MARK = d ? (with_.length ? '+' + mark + '%' : '—') : null;
-  finHeroPaint();
-}
-
 (function initWalBlock(){
   const block = document.getElementById('walBlock');
   const hdr = document.getElementById('walBlockHdr');
@@ -21947,6 +21909,7 @@ async function accOrder(){
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accFoot').innerHTML = '';
+  prLoad();              // прайс под «Закупаем» — пока открывают заявку, он уже здесь
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}}); }
   catch(e){ document.getElementById('accMid').innerHTML =
@@ -22336,6 +22299,7 @@ function accOrderList(){
   ORD.view = 'districts'; ORD.q = ''; ORD.open = null;
   _setText('accTitle', 'Заявка');
   ordRender();
+  if(!PR_D) prLoad();
   supActShow();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -22365,6 +22329,41 @@ function ordSumInner(){
           aria-label="Цена по позициям"><b>${fmt(d.total_cost != null ? d.total_cost : d.total_aed || 0)
           }<u>AED</u></b><i>закупка</i></span>
     <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
+}
+
+// Прайс — внизу карточки «Закупаем», строками, как «По районам» под остатками
+// (владелец, 19 сен 2026: «прайс перенеси сюда как доп. кнопки внизу этого
+// окна»; карточку «Прайс» в «Финансах» — убрать). «Прайс» открывает таблицу
+// цен, справа — средняя наценка по позициям, где известны обе цены. Позиции
+// без закупочной цены — своей красной строкой: по нажатию прайс показывает
+// только их. Все цены известны — строки нет.
+let PR_D = null, _prBusy = null;
+function prLoad(){
+  if(_prBusy) return _prBusy;
+  _prBusy = ownerApi.ownerFetch('/api/owner/stock/prices')
+    .then(d => { PR_D = d; })
+    .catch(() => {
+      // Не ответил — строка остаётся серой полоской, спросим ещё раз сами.
+      if(!PR_D) setTimeout(() => { if(document.getElementById('ordPr')) prLoad(); }, 5000);
+    })
+    .finally(() => { _prBusy = null; prPaint(); });
+  return _prBusy;
+}
+function prPaint(){
+  const el = document.getElementById('ordPr');
+  if(el) el.innerHTML = ordPrInner();
+}
+function ordPrInner(){
+  const d = PR_D, rows = (d && d.rows) || [];
+  const both = rows.filter(r => r.cost && r.price_app);
+  const mark = both.length
+    ? Math.round(both.reduce((a, r) => a + (r.price_app / r.cost - 1) * 100, 0) / both.length) : null;
+  const miss = rows.filter(r => !r.cost).length;
+  return `<button class="sc-r" onclick="ordPrices()"><span>Прайс</span>${d
+      ? `<b>${mark !== null ? '+' + fmt(mark) + '%' : '—'}<u>наценка</u></b>`
+      : '<b class="is-skel">0000</b>'}<em>${_SC_CHEV}</em></button>${miss ? `
+    <button class="sc-r dn" onclick="ordPrices(true)"><span>Без закупочной цены</span>
+      <b>${miss}<u>${pluralize(miss, 'позиция', 'позиции', 'позиций')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
 }
 
 // Откуда нормы, словами: снимок склада на утро такого-то дня (владелец, 16 сен
@@ -22409,6 +22408,7 @@ function ordRender(){
     <div class="ord-sumc">
       <div class="ord-cap">Закупаем</div>
       <div class="ord-sum">${ordSumInner()}</div>
+      <div id="ordPr">${ordPrInner()}</div>
     </div>
 
     ${общий ? find : `<button class="shl-card ord-dh ord-all" onclick="ordAll(true)">
@@ -22618,7 +22618,11 @@ function _perBottle(price, unit){
 // что снять правку и вернуться к прайсу.
 let OPR = {rows: [], q: '', only: false, busy: false};
 
-async function ordPrices(){
+// only — сразу только позиции без закупочной цены (строка «Без закупочной
+// цены» и чек-лист). Любой вход открывает прайс с чистого листа: фильтр и
+// поиск с прошлого раза не тянутся.
+async function ordPrices(only){
+  OPR.only = only === true; OPR.q = '';
   const ov = document.getElementById('oprOv');
   ov.classList.add('show');
   requestAnimationFrame(() => ov.classList.add('in'));
@@ -22633,7 +22637,9 @@ async function ordPrices(){
       loadFail();
     return;
   }
-  OPR.rows = d.rows || []; OPR.d = d;
+  // Тот же ответ — и строкам под «Закупаем»: правки в таблице меняют эти
+  // же строки, и при закрытии наценка и «без закупочной цены» уже новые.
+  OPR.rows = d.rows || []; OPR.d = d; PR_D = d;
   oprPaint();
 }
 
@@ -22820,6 +22826,7 @@ function ordPricesClose(){
   const ov = document.getElementById('oprOv');
   ov.classList.remove('in');
   setTimeout(() => ov.classList.remove('show'), 260);
+  prPaint();
 }
 
 function ordSearch(v){

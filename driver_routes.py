@@ -446,6 +446,14 @@ async def _after_close(me: dict, day: str, d: dict) -> dict | None:
     return None if opened else last
 
 
+# Перемещения смену пока не держат (владелец, 19 сен 2026: «пока что сделай
+# так, что водители могут закрыть смену без закрытой заявки на перемещение;
+# эту заявку пока оставим в покое»). Замок 18 сен (_moves_left) цел: в
+# состоянии смены шага «Отработать перемещения» нет, закрытие его не
+# проверяет; вернуть — True. Сами заявки живут как жили — на «Товаре».
+MOVES_HOLD_SHIFT = False
+
+
 async def _moves_left(me: dict) -> list:
     """Незакрытые перемещения района водителя — с обеих сторон.
 
@@ -524,7 +532,7 @@ async def _shift_view(me: dict) -> dict:
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
     route = await _in_route(me) if opened and not closed else []
     intake = await _intake_left(me) if opened and not closed else []
-    moves = await _moves_left(me) if opened and not closed else []
+    moves = await _moves_left(me) if MOVES_HOLD_SHIFT and opened and not closed else []
     after = await _after_close(me, day, d)
     # День района закрыт оператором — значит заказов сегодня больше не будет, и
     # неотвеченные расходы превращаются из «успею» в «держу всех». Водителю про
@@ -788,8 +796,9 @@ async def handle_shift_close(request):
         return web.json_response({"error": "intake_open", "tasks": intake},
                                  status=409, headers=CORS_HEADERS)
     # Перемещения района — так же, как приёмка: закрытая смена с неувезёнными
-    # бутылками означает, что завтра заявка снова попросит их купить.
-    moves = await _moves_left(me)
+    # бутылками означает, что завтра заявка снова попросит их купить. Пока
+    # выключено (MOVES_HOLD_SHIFT, 19 сен 2026).
+    moves = await _moves_left(me) if MOVES_HOLD_SHIFT else []
     if moves:
         return web.json_response({"error": "moves_open", "tasks": moves},
                                  status=409, headers=CORS_HEADERS)

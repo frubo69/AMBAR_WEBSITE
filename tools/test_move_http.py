@@ -125,19 +125,28 @@ async def main():
         st, t = await drv(101, "GET", "/api/driver/move")
         eq("у получателя — активная", [(x_["status"], x_["got"]) for x_ in t["take"]], [("given", 2)])
 
-        print("── смена: перемещение держит ──────────────────────────────────────")
+        print("── смена: перемещение пока не держит (19 сен 2026) ─────────────────")
         async def _geo(me): return {"ok": True}
         DR._geo_for = _geo
         # Обязательные расходы отвечены («не было»): перед замком перемещений
         # сервер проверяет их — иначе отказ был бы про расходы, а не про нас.
         await db.save_driver_day(DR._biz_day(), "Худоба", {"working": True, "shift_open_at": datetime.now(timezone.utc),
                                                            "no_expense": {k: True for k in DR.MUST_ANSWER}})
+        eq("замок перемещений выключен", DR.MOVES_HOLD_SHIFT, False)
         st, sh = await drv(101, "GET", "/api/driver/shift")
-        eq("в смене JVC — шаг «принять из B2», закрыть нельзя",
+        eq("в смене JVC шага перемещения нет, закрыть можно",
+           (st, sh["moves"], sh["can_close"]), (200, [], True))
+        st, x = await drv(101, "POST", "/api/driver/shift/close")
+        eq("сервер про перемещение не спрашивает (дальше — ждём оператора)", (st, x.get("error")), (409, "day_open"))
+        # Замок цел — включили обратно, и он держит, как 18 сен.
+        DR.MOVES_HOLD_SHIFT = True
+        st, sh = await drv(101, "GET", "/api/driver/shift")
+        eq("включённый замок: шаг «принять из B2», закрыть нельзя",
            (st, [(m["side"], m["code"], m["status"]) for m in sh["moves"]], sh["can_close"]),
            (200, [("take", "B2", "given")], False))
         st, x = await drv(101, "POST", "/api/driver/shift/close")
         eq("и сервер не закроет", (st, x.get("error")), (409, "moves_open"))
+        DR.MOVES_HOLD_SHIFT = False
 
         print("── «Принял» ───────────────────────────────────────────────────────")
         st, x = await drv(102, "POST", f"/api/driver/move/{mid}/accept", {"district": "jvc", "from": "bbay"})

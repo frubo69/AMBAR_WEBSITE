@@ -29,11 +29,12 @@ foreign_action, trtype S — обменник покупает валюту у �
 • cash_buy_aed — сколько стоит купить единицу валюты в обменнике (он
   продаёт), у основных валют: по нему считается зарплата в долларах, если курс
   месяца не вписан руками (finance_routes._usd);
-• aed — рыночный курс (open.er-api), по всем валютам: для сравнения и там, где
-  обменник валюту не меняет.
-Число обменника, которое расходится с рынком больше чем на треть, — не курс
-(у сомони Al Ansari отвечает 0.0003 при рыночных 0.40: наличных сомони у него
-нет), такой валюте показывается рынок с честной подписью.
+• aed — рыночный курс (open.er-api): только для сравнения в строке обменника.
+В списке — только то, что обменник меняет (владелец, 19 сен 2026: «то, что
+обменник не меняет, вообще оттуда убирай»). Число обменника, которое
+расходится с рынком больше чем на треть, — не курс (у сомони Al Ansari
+отвечает 0.0003 при рыночных 0.40: наличных сомони у него нет) — такой
+валюты в списке нет.
 """
 from __future__ import annotations
 
@@ -244,8 +245,10 @@ async def _fetch_market() -> tuple[dict, str] | None:
 
 
 async def _fetch() -> list[dict] | None:
-    """Список валют: рынок по всем, наличные обменника — где он их меняет.
-    Рынок молчит — строки только из обменника; молчат оба — None."""
+    """Только то, что меняет обменник (владелец, 19 сен 2026: «то, что
+    обменник не меняет, вообще оттуда убирай»): в списке — его курс, рынок —
+    лишь для сравнения в той же строке. Обменник молчит — None: держим его
+    последний курс с отметкой времени, рынок вместо него не подставляем."""
     mkt = await _fetch_market()
     rates, mkt_at = mkt if mkt else ({}, "")
     if rates:
@@ -253,30 +256,22 @@ async def _fetch() -> list[dict] | None:
     # Сверка обменника с рынком — по свежему рынку, а молчит он — по последнему
     # известному: курс за сутки не уходит на треть.
     cash = await _fetch_cash(rates or _CACHE.get("mkt_rates"))
-    if not rates and not cash:
+    if not cash:
         return None
     out = []
-    for code in sorted(set(rates) | set(cash)):
-        if code == "AED":
-            continue
+    for code, c in cash.items():
         per_aed = rates.get(code)
-        c = cash.get(code)
-        if not per_aed and not c:
-            continue
-        row = {"code": code, "name": RU.get(code) or code}
+        row = {"code": code, "name": RU.get(code) or code,
+               "cash_aed": round(c["sell"], 4), "cash_at": c["at"]}
+        if c.get("buy"):
+            row["cash_buy_aed"] = round(c["buy"], 4)
         if per_aed:
             row["per_aed"] = round(per_aed, 6)
             row["aed"] = round(1 / per_aed, 4)
-        if c:
-            row["cash_aed"] = round(c["sell"], 4)
-            if c.get("buy"):
-                row["cash_buy_aed"] = round(c["buy"], 4)
-            row["cash_at"] = c["at"]
-            if row.get("aed"):
-                # Насколько обменник дешевле рынка, когда у нас покупает, — его
-                # заработок на нас.
-                row["spread"] = round((c["sell"] / row["aed"] - 1) * 100, 2)
-        if "aed" not in row:
+            # Насколько обменник дешевле рынка, когда у нас покупает, — его
+            # заработок на нас.
+            row["spread"] = round((c["sell"] / row["aed"] - 1) * 100, 2)
+        else:
             row["aed"] = row["cash_aed"]
         out.append(row)
     order = {c: i for i, c in enumerate(MAIN)}

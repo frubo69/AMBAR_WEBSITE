@@ -18316,10 +18316,9 @@ function fxRender(){
     const el = document.getElementById(id); if(!el) return;
     const r = rows.find(x => x.code === c);
     el.classList.remove('is-skel');
-    el.textContent = !r ? '—' : _fxN(r.cash_aed || r.aed);
+    el.textContent = !r || !r.cash_aed ? '—' : _fxN(r.cash_aed);
     const sub = document.getElementById(id + 'B');
-    if(sub) sub.textContent = !r ? '' : r.cash_aed
-      ? (r.cash_buy_aed ? `продаёт ${_fxN(r.cash_buy_aed)}` : '') : 'рыночный';
+    if(sub) sub.textContent = r && r.cash_buy_aed ? `продаёт ${_fxN(r.cash_buy_aed)}` : '';
   };
   put('fxUsd','USD'); put('fxEur','EUR'); put('fxRub','RUB');
   // Подпись отвечает на единственный вопрос, который к ней есть: насколько
@@ -18330,27 +18329,25 @@ function fxRender(){
     : (FX.silent ? `${FX.source || 'обменник'} молчит · последнее ${_fxWhen(FX.fetched_at)}`
                  : `${FX.source || 'обменник'} · ${_fxWhen(FX.fetched_at)}`));
   const q = (document.getElementById('fxQ')?.value || '').trim().toLowerCase();
-  const shown = q ? rows.filter(r => r.code.toLowerCase().includes(q)
-                                  || (r.name || '').toLowerCase().includes(q))
-                  : rows.filter(r => (FX.main || []).includes(r.code) || r.cash_aed);
+  // В списке — только то, что меняет обменник (владелец, 19 сен 2026: «то,
+  // что обменник не меняет, вообще оттуда убирай»); сервер других не отдаёт.
+  const shown = rows.filter(r => r.cash_aed && (!q || r.code.toLowerCase().includes(q)
+                                  || (r.name || '').toLowerCase().includes(q)));
   box.innerHTML = shown.length ? shown.map(r => `
     <div class="fx-r">
       <span class="fx-c">${escS(r.code)}</span>
       <span class="fx-n">${escS(r.name || r.code)}</span>
       <span class="fx-v">
         <b>${_fxN(r.cash_aed || r.aed)} AED</b>
-        ${r.cash_aed
-          ? `<i>обменник${r.cash_buy_aed ? ' · продаёт ' + _fxN(r.cash_buy_aed) : ''} · рынок ${_fxN(r.aed)}</i>`
-          : '<i class="none">рыночный · обменник не меняет</i>'}
+        <i>обменник${r.cash_buy_aed ? ' · продаёт ' + _fxN(r.cash_buy_aed) : ''} · рынок ${_fxN(r.aed)}</i>
       </span>
     </div>`).join('')
     : '<div class="cat-block-empty">Ничего не нашлось</div>';
   _setText('fxNote', !FX ? '' :
     `Крупное число — сколько дирхамов даст ${FX.source || 'обменник'} за единицу валюты `
     + `наличными (курс с его сайта, обновляется раз в час), рядом — почём он её продаёт `
-    + `и рыночный курс для сравнения. Наличными он меняет ${FX.cash_n || 0} `
-    + `${pluralize(FX.cash_n || 0,'валюту','валюты','валют')} из ${rows.length}; `
-    + `у остальных показан рыночный.`);
+    + `и рыночный курс для сравнения. Здесь только то, что он меняет наличными: `
+    + `${FX.cash_n || rows.length} ${pluralize(FX.cash_n || rows.length,'валюта','валюты','валют')}.`);
 }
 
 (function initFxBlock(){

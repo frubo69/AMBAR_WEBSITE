@@ -1967,21 +1967,24 @@ body.xp-on{background:#070A12}
   font-family:inherit;font-size:14px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,#E8C98A,#C9A96E)}
 .dc-btn:active{transform:scale(.985)}
-/* Тихая вторая кнопка под главной: «Принял неровно» под «Принял» — главное
-   действие одно, и оно заметнее (владелец, 18 сен 2026). */
+/* Тихая вторая кнопка под главной: «Не всё пришло» под «Принять — сканировать»
+   — главное действие одно, и оно заметнее (владелец, 18 сен 2026). */
 .dc-drop{width:100%;margin-top:6px;padding:11px;border-radius:12px;cursor:pointer;
   border:1px solid rgba(255,255,255,.14);background:transparent;
   font-family:inherit;font-size:13px;font-weight:600;color:var(--sub)}
 .dc-drop:active{transform:scale(.985)}
 /* Перемещение у обеих сторон: у отдающего «Отдать в …» с кнопкой и сканером,
    у получателя «Забрать из …» — серая, пока отдающий не отсканирует всё, потом
-   золотая рамка и «Принял». В значке — код района, с которым передача. */
+   золотая рамка и «Принять — сканировать» (с 19 сен 2026 получатель тоже
+   сканирует каждую бутылку). В значке — код района, с которым передача. */
 .dcard.mvq-off{opacity:.62}
 .dcard.mvq-off .dcode{background:rgba(255,255,255,.06);color:var(--sub);border-color:var(--border2)}
 .dcard.mvq-off .dcard-n{color:var(--sub)}
 .mvq-hint{margin-top:9px;font-size:11.5px;line-height:1.4;color:var(--muted);text-align:center}
-/* «Принял неровно»: строка, где пришло не столько, сколько отдали, — жёлтая. */
+/* «Не всё пришло»: строка, где отсканировали меньше, чем отдали, — жёлтая. */
 .mvd-rows{margin:0 0 12px}
+/* «Не всё пришло» внизу сканера получателя — на тёмной полосе камеры. */
+.dc-drop.mv-miss{margin-top:0;background:rgba(0,0,0,.35)}
 .er.mvd-ch{border-color:rgba(243,180,74,.45)}
 .er.mvd-ch .er-p{color:var(--warn)}
 .sup-tag{display:inline-block;vertical-align:2px;margin-left:4px;padding:1px 6px;border-radius:6px;
@@ -4356,16 +4359,17 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   </div>
 </div>
 
-<!-- «Принял неровно»: сколько пришло на самом деле и что не так. -->
+<!-- «Не всё пришло»: получатель отсканировал не всё, что отдали; расхождение —
+     по сканам, чисел руками нет. -->
 <div class="sheet" id="mvdSheet" onclick="if(event.target===this)mvdClose()">
   <div class="sheet-in">
-    <div class="sheet-t">Принял неровно</div>
-    <div class="sheet-s" id="mvdS">Сколько пришло на самом деле</div>
+    <div class="sheet-t">Не всё пришло</div>
+    <div class="sheet-s" id="mvdS">Чего нет по скану</div>
     <div class="mvd-rows" id="mvdRows"></div>
-    <textarea id="mvdNote" maxlength="300" placeholder="Что не так — например, одна бутылка разбита" oninput="mvdGoState()"></textarea>
+    <textarea id="mvdNote" maxlength="300" placeholder="Что случилось — например, одна бутылка разбита" oninput="mvdGoState()"></textarea>
     <div class="sheet-acts">
       <button class="btn btn-ico" style="width:auto;padding:13px 16px" onclick="mvdClose()">Отмена</button>
-      <button class="btn btn-pri" id="mvdGo" onclick="mvdSend()">Сохранить</button>
+      <button class="btn btn-pri" id="mvdGo" onclick="mvdSend()">Принять как есть</button>
     </div>
   </div>
 </div>
@@ -6632,12 +6636,29 @@ function mvqScanOpen(mid, district){
 }
 
 function _mvqLeft(){
-  const t = (MV.task || {}).t;
+  const T = MV.task || {}, t = T.t;
   if(!t) return '';
+  if(T.recv){
+    const left = (t.lines || []).filter(l => (+l.recv_left || 0) > 0);
+    if(!left.length) return 'Всё приняли';
+    return 'Осталось принять: ' + left.slice(0, 4).map(l =>
+      `${esc(l.name)} ${fmtQty(l.recv_left)}`).join(', ') + (left.length > 4 ? '…' : '');
+  }
   const left = (t.lines || []).filter(l => !l.done);
   if(!left.length) return 'Всё отдали';
   return 'Осталось: ' + left.slice(0, 4).map(l =>
     `${esc(l.name)} ${fmtQty(l.left)}`).join(', ') + (left.length > 4 ? '…' : '');
+}
+
+// Сканер получателя (владелец, 19 сен 2026: «принимающая сторона отныне тоже
+// сканирует товар»): тот же экран, что у отдающего; каждый скан — сверка с тем,
+// что отдали, склад он не двигает. Отсканировал всё — передача принята сама.
+function mvqRecvOpen(mid, district, from){
+  const t = (MVQ.take || []).find(x => x.move_id === mid && x.district === district && x.from === from);
+  MV = {item: null, code: '', to: '', total: 0, btl: 0, box: 0, busy: false, mode: 'scan',
+        task: {mid, district, from, recv: true, t: t || null}, line: null};
+  document.getElementById('mvScr').classList.add('show');
+  mvScan();
 }
 
 // Произвольного переезда больше нет: экран открывается только из задачи
@@ -6648,13 +6669,19 @@ function _mvHead(t, sub){ _setText('mvT', t); _setText('mvS', sub); }
 async function mvScan(){
   MV.mode = 'scan'; MV.item = null; MV.code = ''; MV.to = '';
   const задача = MV.task;
-  if(задача){
+  if(задача && задача.recv){
+    const t = задача.t || {}, l = MV.line;
+    _mvHead(`Принять из ${t.from_code || ''} ${t.from_name || ''}`.trim(),
+            l ? `${fmtQty(l.recv)}/${fmtQty(l.got)} ${l.name}` : 'Отсканируйте каждую бутылку');
+  }else if(задача){
     const t = задача.t || {}, l = MV.line;
     _mvHead(`Отдать в ${t.to_code || t.district_code || ''} ${t.to_name || ''}`.trim(),
             l ? `${fmtQty(l.got)}/${fmtQty(l.qty)} ${l.name}` : 'Наведите камеру на QR-код');
   }else _mvHead('Переместить', 'Наведите камеру на QR-код');
   // Бутылки и пиво — разными числами: одно число на две единицы соврало бы.
-  document.getElementById('mvN').innerHTML = задача
+  document.getElementById('mvN').innerHTML = задача && задача.recv
+    ? `${fmtQty((задача.t || {}).recv || 0)}<u>/${fmtQty((задача.t || {}).got || 0)}</u>`
+    : задача
     ? `${fmtQty((задача.t || {}).got || 0)}<u>/${fmtQty((задача.t || {}).need || 0)}</u>`
     : MV.btl && MV.box
     ? `${fmtQty(MV.btl)}<u> бут</u> ${fmtQty(MV.box)}<u> кор</u>`
@@ -6671,7 +6698,9 @@ async function mvScan(){
       <div class="cam-left"><span class="cam-hint" id="mvHint">${задача ? _mvqLeft()
         : 'Один QR-код — одна бутылка, у пива полкоробки'}</span></div>
     </div>`;
-  document.getElementById('mvBot').innerHTML = '';
+  // У получателя внизу — «Не всё пришло»: бутылки нет — досканировать нечего.
+  document.getElementById('mvBot').innerHTML = задача && задача.recv
+    ? '<button class="dc-drop mv-miss" onclick="mvqRecvMiss()">Не всё пришло</button>' : '';
   try{ await SCAN.start(document.getElementById('mvV'), mvCode, null, null, null); }   // start сам сбрасывает уже виденные коды
   catch(e){
     const h = document.getElementById('mvHint');
@@ -6700,15 +6729,33 @@ const MVQ_NO = {
   deleted:        'Код убран из реестра',
 };
 
+// Отказы сканера получателя — тоже словами: что это за бутылка и почему она
+// не из этой передачи.
+const MVR_NO = {
+  again:             'Эту бутылку вы уже отсканировали',
+  not_in_transfer:   'Эта бутылка уже была на вашем районе — не из этой передачи',
+  not_scanned:       r => `Эта бутылка ещё числится за ${r.from_code || 'отдающим'} — водитель её не сканировал`,
+  other_district:    r => `Эта бутылка числится на ${r.from_code || 'другом районе'} — не из этой передачи`,
+  not_in_task:       'Этой позиции нет в передаче',
+  full:              'По этой позиции уже всё приняли',
+  not_given:         'Водитель ещё не отдал всё — подождите',
+  accepted:          'Эта передача уже принята',
+  not_your_district: 'Эта передача не на ваш район',
+  gone:              'Заявка закрыта',
+  unknown:           'Код не из реестра',
+};
+
 async function mvqCode(code){
   if(MV.busy) return;
   MV.busy = true; SCAN.stop();
   const f = document.getElementById('mvF'); if(f) f.className = 'cam-frame ok';
   try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  const recv = !!MV.task.recv;
   let r;
   try{
-    r = await drvApi.drvFetch(`/api/driver/move/${MV.task.mid}/scan`,
-      {method: 'POST', body: {district: MV.task.district, code}});
+    r = await drvApi.drvFetch(`/api/driver/move/${MV.task.mid}/${recv ? 'receive' : 'scan'}`,
+      {method: 'POST', body: recv ? {district: MV.task.district, from: MV.task.from, code}
+                                  : {district: MV.task.district, code}});
   }catch(e){
     toast('Не удалось — попробуйте ещё раз', 'err');
     MV.busy = false; return mvScan();
@@ -6718,15 +6765,16 @@ async function mvqCode(code){
     MV.task.t = r.task; MV.line = r.line; MV.total++;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(r.finished){
-      // Отдали всё, что эта передача просила: камера закрывается, карточка уходит.
-      toast(`Всё отдали в ${(r.task && r.task.to_code) || 'район'}`);
+      // Отдали всё / приняли всё: камера закрывается, карточка уходит.
+      toast(recv ? `Приняли всё из ${(r.task && r.task.from_code) || 'района'}`
+                 : `Всё отдали в ${(r.task && r.task.to_code) || 'район'}`);
       MV.task = null; MV.line = null;
       document.getElementById('mvScr').classList.remove('show');
       shLoad();
       return mvqLoad();
     }
   }else{
-    const say = MVQ_NO[r.verdict];
+    const say = (recv ? MVR_NO : MVQ_NO)[r.verdict];
     toast(typeof say === 'function' ? say(r) : (say || r.say || 'Эта бутылка не из заявки'), 'err');
     try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
   }
@@ -9746,7 +9794,9 @@ let SUP_BUSY = false, _supAt = 0;
 // активная — нажать „Начать перемещение“, потом сканировать; после того как
 // всё отсканировал водитель отдающей стороны, у принимающего заявка из серой
 // становится активной, и появляется кнопка „Принял“ / „Принял неровно“ —
-// заметнее „Принял“». Карточка — одна передача «откуда → куда»: у отдающего
+// заметнее „Принял“». С 19 сен 2026 «Принял» — это скан получателя: каждую
+// бутылку, последний скан принимает сам; «Принял неровно» — «Не всё пришло»,
+// по сканам. Карточка — одна передача «откуда → куда»: у отдающего
 // «Отдать в …», у получателя «Забрать из …». Список перечитывается тем же
 // опросом, что и приёмка: серая карточка оживает сама, без перезапуска.
 let MVQ = {give: [], take: [], mine: [], free: [], taken: []}, MVQ_FOLD = new Set(), MVQ_BUSY = false;
@@ -9924,40 +9974,58 @@ function mvqGiveCard(g){
 
 // «Забрать»: товар едет на наш район. Сканирует отдающий — пока он не
 // отсканировал всё, карточка серая: смотреть, не нажимать. Отдал всё — она
-// оживает: «Принял» (главная) и «Принял неровно».
+// оживает, и теперь сканирует и получатель (владелец, 19 сен 2026: «сделай
+// так, чтобы принимающая перемещения сторона отныне тоже сканировала товар»):
+// «Принять — сканировать» — каждую бутылку, последний скан принимает сам.
+// Чего-то нет — «Не всё пришло».
 function mvqTakeCard(t){
   const key = 'tk' + t.move_id + '/' + t.district + '/' + t.from;
   const open = MVQ_FOLD.has(key);
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const ready = t.status === 'given';
+  const recv = +t.recv || 0, got = +t.got || 0;
   // Задачу района взял на себя старший — тот, кто работает в AMBAR STAR
   // (владелец, 18 сен 2026): он объезжает отдающих и сканирует сам. Водителю
   // он — «старший», без имени.
   const who = t.senior && t.giver === t.senior ? 'старший' : esc(t.giver || '');
-  const sub = ready ? `${who ? who + ' отдал' : 'отдали'} всё — проверьте и примите`
+  const sub = ready ? (recv ? `приняли ${fmtQty(recv)} из ${fmtQty(got)} — сканируйте дальше`
+                            : `${who ? who + ' отдал' : 'отдали'} всё — отсканируйте каждую бутылку`)
     : t.status === 'pause' ? `отдали ${fmtQty(t.got)} из ${fmtQty(t.need)} · ждёт водителя ${esc(t.from_code)}`
     : t.got ? `отдаёт ${who || 'водитель ' + esc(t.from_code)} · ${fmtQty(t.got)} из ${fmtQty(t.need)}`
     : t.senior ? 'везёт старший'
     : t.giver ? `${who} начал отдавать`
     : `ждёт, когда водитель ${esc(t.from_code)} начнёт`;
+  const num = ready ? (recv ? `${fmtQty(recv)}<i>/ ${fmtQty(got)} ед.</i>` : `${fmtQty(got)}<i>ед.</i>`) : mvqNum(t);
+  const bar = ready ? (recv ? Math.round(recv / (got || 1) * 100) : 0) : (t.got ? pct : 0);
   return `<div class="dcard ${ready ? 'mine' : 'mvq-off'}">
     <div class="dcard-h">
       ${mvqChip(t.from_code)}
       <span class="dcard-b"><b>Забрать из ${esc(t.from_code)} ${esc(t.from_name)}</b><i>${sub}</i></span>
-      <span class="dcard-n">${ready ? `${fmtQty(t.need)}<i>ед.</i>` : mvqNum(t)}</span>
+      <span class="dcard-n">${num}</span>
     </div>
-    ${t.got && !ready ? `<span class="sup-bar dbar"><i style="width:${pct}%"></i></span>` : ''}
+    ${bar ? `<span class="sup-bar dbar"><i style="width:${bar}%"></i></span>` : ''}
     <button class="dfold ${open ? 'on' : ''}" onclick="mvqFold('${esc(key)}')">
-      <span>${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}</span>
+      <span>${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}${
+        ready && recv ? ` · осталось ${fmtQty(t.recv_left)} ед.` : ''}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
-    ${open ? `<div class="dfold-b">${mvqLines(t)}</div>` : ''}
+    ${open ? `<div class="dfold-b">${ready ? mvqRecvLines(t) : mvqLines(t)}</div>` : ''}
     ${ready
-      ? `<button class="dc-btn" onclick="mvqAccept('${t.move_id}','${t.district}','${t.from}')">Принял</button>
-         <button class="dc-drop" onclick="mvqDiffOpen('${t.move_id}','${t.district}','${t.from}')">Принял неровно</button>`
+      ? `<button class="dc-btn" onclick="mvqRecvOpen('${t.move_id}','${t.district}','${t.from}')">${
+           recv ? 'Продолжить сканирование' : 'Принять — сканировать'}</button>
+         <button class="dc-drop" onclick="mvqDiffOpen('${t.move_id}','${t.district}','${t.from}')">Не всё пришло</button>`
       : `<div class="mvq-hint">${t.senior ? 'Везёт и сканирует старший'
-          : `Каждую бутылку при вас отсканирует водитель ${esc(t.from_code)}`}. «Принял» появится, когда он отсканирует всё</div>`}
+          : `Каждую бутылку при вас отсканирует водитель ${esc(t.from_code)}`}. Потом каждую бутылку отсканируете вы — так она принята</div>`}
   </div>`;
+}
+// Строки у получателя, когда отдали всё: сколько он уже отсканировал из отданного.
+function mvqRecvLines(t){
+  return (t.lines || []).map(l => `<div class="dpl ${(+l.recv_left || 0) > 0 ? '' : 'ok'}">
+      <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
+      <span class="dpl-n">${esc(l.name)}</span>
+      <span class="dpl-q">${l.recv ? `${fmtQty(l.recv)}<u>/${fmtQty(l.got)}</u>` : fmtQty(l.got)}</span>
+    </div>`).join('');
 }
 
 function mvqFold(k){ MVQ_FOLD.has(k) ? MVQ_FOLD.delete(k) : MVQ_FOLD.add(k); renderSupply(); }
@@ -9989,59 +10057,47 @@ async function mvqStart(mid, district){
   }
 }
 
-// «Принял» — всё сошлось. Карточка уходит; последняя принятая передача
-// снимает с района замок смены.
-async function mvqAccept(mid, district, from){
-  if(MVQ_BUSY) return; MVQ_BUSY = true;
-  try{
-    const r = await drvApi.drvFetch(`/api/driver/move/${mid}/accept`,
-      {method:'POST', body:{district, from, ok: true}});
-    if(r.ok){
-      toast('Принято');
-      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    }else toast(r.error === 'not_given' ? 'Ещё не всё отсканировали' : 'Заявка закрыта', 'err');
-  }catch(e){ toast('Не получилось — повторите', 'err'); }
-  MVQ_BUSY = false; await mvqLoad(); shLoad();
-}
-
-// «Принял неровно» — сколько пришло на самом деле по каждой позиции и что не
-// так. По умолчанию — сколько отсканировали: поправить надо только то, что не
-// сошлось. Склад это не двигает — видят старший и оператор.
+// «Не всё пришло» — получатель отсканировал не всё, что отдали (владелец,
+// 19 сен 2026: принимающая сторона сканирует товар). Расхождение — то, что
+// отдали, но не отсканировали: чисел руками нет, пришло то, что прошло через
+// камеру. Склад это не двигает — видят старший и оператор.
 let MVD_DIFF = null;
 function mvqDiffOpen(mid, district, from){
   const t = (MVQ.take || []).find(x => x.move_id === mid && x.district === district && x.from === from);
   if(!t) return;
   MVD_DIFF = {mid, district, from, busy: false,
-              lines: (t.lines || []).map(l => ({id: l.id, name: l.name, unit: l.unit, sent: +l.got || 0, got: +l.got || 0}))};
-  document.getElementById('mvdS').textContent = `Из ${t.from_code} ${t.from_name}: сколько пришло на самом деле`;
+              lines: (t.lines || []).map(l => ({id: l.id, name: l.name, unit: l.unit, sent: +l.got || 0, got: +l.recv || 0}))};
+  document.getElementById('mvdS').textContent = `Из ${t.from_code} ${t.from_name}: отсканировано ${
+    fmtQty(+t.recv || 0)} из ${fmtQty(+t.got || 0)}. Чего нет — увидят старший и оператор`;
   document.getElementById('mvdNote').value = '';
   mvdPaint();
   document.getElementById('mvdSheet').classList.add('show');
 }
+// Из сканера: камера гаснет, лист открывается с тем, что уже отсканировали.
+function mvqRecvMiss(){
+  const T = MV.task; if(!T) return;
+  SCAN.stop();
+  document.getElementById('mvScr').classList.remove('show');
+  MV.task = null; MV.line = null;
+  if(T.t){
+    const i = (MVQ.take || []).findIndex(x => x.move_id === T.mid && x.district === T.district && x.from === T.from);
+    if(i >= 0) MVQ.take[i] = T.t;
+  }
+  mvqDiffOpen(T.mid, T.district, T.from);
+}
 function mvdClose(){ document.getElementById('mvdSheet').classList.remove('show'); MVD_DIFF = null; }
 function mvdPaint(){
   const D = MVD_DIFF; if(!D) return;
-  document.getElementById('mvdRows').innerHTML = D.lines.map((l, i) => {
-    const step = l.unit > 1 ? 0.5 : 1;
-    return `<div class="er ${l.got !== l.sent ? 'mvd-ch' : ''}">
+  document.getElementById('mvdRows').innerHTML = D.lines.map(l => {
+    const u = l.unit > 1 ? 'кор.' : 'шт', miss = l.sent - l.got;
+    return `<div class="er ${miss > 0 ? 'mvd-ch' : ''}">
       <div class="er-b">
         <div class="er-n">${esc(l.name)}</div>
-        <div class="er-p">отдали ${fmtQty(l.sent)} ${l.unit > 1 ? 'кор.' : 'шт'}${l.got !== l.sent ? ` · пришло ${fmtQty(l.got)}` : ''}</div>
-      </div>
-      <div class="er-st">
-        <button onclick="mvdQty(${i},-${step})" ${l.got <= 0 ? 'disabled' : ''} aria-label="Меньше">${svg(ICO.minus, 15)}</button>
-        <span class="er-q">${fmtQty(l.got)}</span>
-        <button onclick="mvdQty(${i},${step})" aria-label="Больше">${svg(ICO.plus, 15)}</button>
+        <div class="er-p">отдали ${fmtQty(l.sent)} ${u} · отсканировали ${fmtQty(l.got)}${miss > 0 ? ` · нет ${fmtQty(miss)}` : ''}</div>
       </div>
     </div>`;
   }).join('');
   mvdGoState();
-}
-function mvdQty(i, d){
-  const l = MVD_DIFF && MVD_DIFF.lines[i]; if(!l) return;
-  l.got = Math.max(0, Math.round((l.got + d) * 2) / 2);
-  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-  mvdPaint();
 }
 // Сохранить можно, когда есть что сказать: поправили число или написали, что не так.
 function mvdGoState(){
@@ -10055,14 +10111,13 @@ async function mvdSend(){
   D.busy = true; mvdGoState();
   try{
     const r = await drvApi.drvFetch(`/api/driver/move/${D.mid}/accept`, {method:'POST', body:{
-      district: D.district, from: D.from, ok: false, note,
-      lines: D.lines.map(l => ({id: l.id, got: l.got}))}});
+      district: D.district, from: D.from, ok: false, note}});
     if(r.ok){
       mvdClose();
-      toast('Принято неровно — старший увидит');
+      toast('Принято как есть — старший увидит, чего нет');
       try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    }else toast(r.error === 'diff_empty' ? 'Поправьте число или напишите, что не так'
-              : r.error === 'not_given' ? 'Ещё не всё отсканировали' : 'Заявка закрыта', 'err');
+    }else toast(r.error === 'diff_empty' ? 'Всё отсканировано — напишите, что не так'
+              : r.error === 'not_given' ? 'Водитель ещё не отдал всё' : 'Заявка закрыта', 'err');
   }catch(e){ toast('Не получилось — повторите', 'err'); }
   if(MVD_DIFF) MVD_DIFF.busy = false;
   mvdGoState();

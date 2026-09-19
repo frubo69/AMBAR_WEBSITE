@@ -1,5 +1,7 @@
 """Сквозной прогон перемещений между районами — порядок с 18 сен 2026 (вечер):
-сканирует тот, кто отдаёт, получатель принимает («Принял» / «Принял неровно»).
+сканирует тот, кто отдаёт, получатель принимает; с 19 сен 2026 получатель тоже
+сканирует каждую бутылку — последний скан принимает сам, «не всё пришло» — по
+сканам.
 
 mongomock + настоящие move_routes, stock_routes, driver_routes. Проверяется не
 «функция вернула словарь», а то, ради чего всё делалось: бутылка уехала ровно
@@ -37,6 +39,16 @@ D = "2026-09-18"
 T0 = datetime(2026, 9, 18, 0, 0, tzinfo=timezone.utc)   # раньше «сейчас» — переезд считается после пересчёта
 SR._biz_day = lambda *a, **k: D
 VODKA, BEER, WINE = "p1", "p31", "p98"
+
+
+async def recv_all(mid, to, src, who, tgid):
+    """Получатель сканирует всё, что ему отдали по паре src → to (коды берём
+    из передачи) — последний скан принимает сам."""
+    doc = await db.move_order_get(mid)
+    r = None
+    for c in (((doc["tasks"][to].get("give") or {}).get(src) or {}).get("codes") or []):
+        r = await MV.receive(mid, to, src, c, who, tgid, to)
+    return r
 
 
 async def code(d, cid, pid, district, qty=1, status="active"):
@@ -166,12 +178,16 @@ async def main():
     v = await MV.tasks_for_driver("Худоба", "jvc")
     eq("у JVC все три карточки активные", sorted(t["status"] for t in v["take"]), ["given"] * 3)
     eq("задача ещё открыта — ничего не принято", (await db.move_order_get(mid))["tasks"]["jvc"].get("done_at"), None)
+    eq("«Принял» без сканов получателя — нельзя",
+       (await MV.accept(mid, "jvc", "bbay", "Худоба", 11, "jvc"))["error"], "scan_all")
     for src in ("bbay", "silicon"):
-        await MV.accept(mid, "jvc", src, "Худоба", 11, "jvc")
+        rr = await recv_all(mid, "jvc", src, "Худоба", 11)
+        eq(f"получатель отсканировал всё из {src} — принято само", (rr["finished"], rr["task"]["status"]), (True, "done"))
     eq("два приняли — замок держит третий",
        [(m["code"], m["status"]) for m in await DR._moves_left(me_j)], [("B4", "given")])
-    last = await MV.accept(mid, "jvc", "alguses", "Фарух", 12, "jvc", ok=False,
-                           lines=[{"id": BEER, "got": 0.5}], note="полкоробки мокрые")
+    # Из Алгусеса дошли полкоробки: получатель отсканировал один код из двух.
+    eq("скан получателя — полкоробки", (await MV.receive(mid, "jvc", "alguses", "b0", "Фарух", 12, "jvc"))["qty"], 0.5)
+    last = await MV.accept(mid, "jvc", "alguses", "Фарух", 12, "jvc", ok=False, note="полкоробки мокрые")
     eq("третий — «Принял неровно», задача закрылась", (last["task"]["status"], last["task_done"]), ("diff", True))
 
     print("\n── 6. что стало после ────────────────────────────────────────────")
@@ -249,11 +265,17 @@ async def main():
 
     async def _geo(me): return {"ok": True}
     DR._geo_for = _geo
+    # Замок смены перемещениями выключен с 19 сен 2026 (MOVES_HOLD_SHIFT) —
+    # проверяем сам замок, включив его на время проверки.
+    DR.MOVES_HOLD_SHIFT = True
     view = await DR._shift_view({"name": "Алишер", "district": "tecom"})
     eq("у водителя Тикома в смене — шаг «перемещение»",
        sorted((m["side"], m["code"], m["status"]) for m in view["moves"]),
        [("take", "B2", "wait"), ("take", "B3", "given")])
     eq("«Закрыть смену» заперта", view["can_close"], False)
+    DR.MOVES_HOLD_SHIFT = False
+    view = await DR._shift_view({"name": "Алишер", "district": "tecom"})
+    eq("замок выключен — шага нет", view["moves"], [])
 
     print("\nИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)

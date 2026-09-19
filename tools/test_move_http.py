@@ -148,11 +148,23 @@ async def main():
         eq("и сервер не закроет", (st, x.get("error")), (409, "moves_open"))
         DR.MOVES_HOLD_SHIFT = False
 
+        print("── получатель сканирует (с 19 сен 2026) ───────────────────────────")
+        st, x = await drv(101, "POST", f"/api/driver/move/{mid}/accept", {"district": "jvc", "from": "bbay"})
+        eq("«Принял» без сканов — нельзя", (st, x.get("error")), (200, "scan_all"))
+        st, x = await drv(102, "POST", f"/api/driver/move/{mid}/receive", {"district": "jvc", "from": "bbay", "code": "v0"})
+        eq("сканировать за получателя нельзя — район из подписи", x.get("verdict"), "not_your_district")
+        st, x = await drv(101, "POST", f"/api/driver/move/{mid}/receive", {"district": "jvc", "from": "bbay", "code": "v0"})
+        eq("скан получателя: принято 1 из 2", (st, x["ok"], x["task"]["recv"], x["finished"]), (200, True, 1, False))
+        st, t = await drv(101, "GET", "/api/driver/move")
+        eq("в карточке получателя — принято 1, осталось 1", [(x_["recv"], x_["recv_left"]) for x_ in t["take"]], [(1, 1)])
+
         print("── «Принял» ───────────────────────────────────────────────────────")
         st, x = await drv(102, "POST", f"/api/driver/move/{mid}/accept", {"district": "jvc", "from": "bbay"})
         eq("за получателя не примешь — район из подписи", x.get("error"), "not_your_district")
+        # «Не всё пришло»: вторую бутылку получатель не нашёл. Число руками
+        # старого приложения («пришло 1») не берётся — пришло то, что отсканировал.
         st, x = await drv(101, "POST", f"/api/driver/move/{mid}/accept",
-                          {"district": "jvc", "from": "bbay", "ok": False, "lines": [{"id": "p1", "got": 1}],
+                          {"district": "jvc", "from": "bbay", "ok": False, "lines": [{"id": "p1", "got": 2}],
                            "note": "одна разбита"})
         eq("«Принял неровно»", (st, x["ok"], x["task"]["status"], x["task_done"]), (200, True, "diff", True))
         st, sh = await drv(101, "GET", "/api/driver/shift")

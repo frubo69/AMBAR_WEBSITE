@@ -111,7 +111,7 @@ function line(pid, n, unit){
 }
 function mvLine(pid, from, qty, got){
   return {from: from, from_code: DCODE[from], from_name: DNAME[from], id: pid, name: P[pid].name,
-          unit: 1, qty: qty, got: got || 0, left: qty - (got || 0), done: (got || 0) >= qty};
+          unit: 1, qty: qty, got: got || 0, left: qty - (got || 0), done: (got || 0) >= qty, recv: 0};
 }
 function fresh(){
   const t = now();
@@ -129,10 +129,11 @@ function fresh(){
       driver: 'Фарух', claimed_at: t - 20 * 60000, started_at: t - 12 * 60000, done_at: 0, noscan_at: 0,
       lines: [line('p12', 6), line('p6', 2)],
     },
-    // Перемещение (владелец, 18 сен 2026): сканирует тот, кто отдаёт,
-    // получатель принимает. Демо-водитель — на обеих сторонах: отдаёт в Бизнес
-    // Бей и принимает из Бизнес Бея и Алгусеса. Из Бизнес Бея уже отдали всё —
-    // «Принял» можно нажать сразу; Алгусес начнёт отдавать через полминуты, и
+    // Перемещение (владелец, 18 сен 2026): сканирует тот, кто отдаёт; с 19 сен
+    // сканирует и получатель — каждую бутылку, последний скан принимает сам.
+    // Демо-водитель — на обеих сторонах: отдаёт в Бизнес Бей и принимает из
+    // Бизнес Бея и Алгусеса. Из Бизнес Бея уже отдали всё — «Принять —
+    // сканировать» можно сразу; Алгусес начнёт отдавать через полминуты, и
     // серая карточка оживёт на глазах.
     mvIn: {move_id: 'MV260918-01', at: t - 50 * 60000, pairs: {
       bbay:    {giver: 'Авазбек', lines: [mvLine('p14', 'bbay', 4, 4)], acc: null},
@@ -257,8 +258,11 @@ function simIn(){
 }
 // Передача одной пары «откуда → куда» — как отдаёт её сервер.
 function pairView(mid, at, to, from, giver, lines, acc){
-  const ls = lines.map(function(l){ return {...l, left: num(Math.max(0, l.qty - l.got)), done: l.got >= l.qty}; });
+  const ls = lines.map(function(l){ const rv = +l.recv || 0;
+    return {...l, left: num(Math.max(0, l.qty - l.got)), done: l.got >= l.qty,
+            recv: num(rv), recv_left: num(Math.max(0, l.got - rv))}; });
   const need = num(ls.reduce((a, l) => a + l.qty, 0)), got = num(ls.reduce((a, l) => a + l.got, 0));
+  const recv = num(ls.reduce((a, l) => a + l.recv, 0));
   return {
     move_id: mid, day: S.day, at: iso(at), by: 'STAR', note: '',
     district: to, district_code: DCODE[to], district_name: DNAME[to], to_code: DCODE[to], to_name: DNAME[to],
@@ -267,6 +271,7 @@ function pairView(mid, at, to, from, giver, lines, acc){
     accepted_at: acc ? iso(now()) : '', accepted_by: acc ? ME.name : '', accept_ok: acc ? !!acc.ok : null,
     accept_lines: acc ? acc.lines || [] : [], accept_note: acc ? acc.note || '' : '',
     need: need, got: got, left: num(Math.max(0, need - got)), positions: ls.length,
+    recv: recv, recv_left: num(Math.max(0, got - recv)),
     left_positions: ls.filter(l => !l.done).length, sources: [], lines: ls,
     status: acc ? (acc.ok ? 'done' : 'diff') : got >= need ? 'given' : giver ? 'live' : 'wait',
   };
@@ -587,7 +592,7 @@ function route(path, opts){
 
   /* ── перемещение между районами ── */
   if(p === '/api/driver/move' && m === 'GET') return moves();
-  const mm = p.match(/^\/api\/driver\/move\/([^/]+)\/(start|scan|accept|claim|release)$/);
+  const mm = p.match(/^\/api\/driver\/move\/([^/]+)\/(start|scan|accept|receive|claim|release)$/);
   if(mm){
     const what = mm[2];
     if(what === 'start'){
@@ -603,17 +608,42 @@ function route(path, opts){
       const v = inView(body.from);
       if(v.status === 'done' || v.status === 'diff') return {ok: true, already: true, task: v};
       if(v.status !== 'given') return {ok: false, error: 'not_given', task: v};
+      // Как на сервере с 19 сен: «Принял» — только отсканировав всё; «не всё
+      // пришло» — по сканам получателя, числа руками не берутся.
       if(body.ok === false){
-        const want = {};
-        (body.lines || []).forEach(function(x){ want[x.id] = +x.got || 0; });
-        const diff = v.lines.filter(l => l.id in want && want[l.id] !== l.got)
-          .map(l => ({id: l.id, name: l.name, unit: l.unit, sent: l.got, got: want[l.id]}));
+        const diff = v.lines.filter(l => l.recv !== l.got)
+          .map(l => ({id: l.id, name: l.name, unit: l.unit, sent: l.got, got: l.recv}));
         const note = String(body.note || '').trim();
         if(!diff.length && !note) return {ok: false, error: 'diff_empty', task: v};
         pr.acc = {ok: false, lines: diff, note: note};
-      }else pr.acc = {ok: true};
+      }else{
+        if(v.recv_left > 0) return {ok: false, error: 'scan_all', task: v};
+        pr.acc = {ok: true};
+      }
       save();
       return {ok: true, task: inView(body.from)};
+    }
+    if(what === 'receive'){
+      // Скан получателя: код демонстрационный — DEMO-<позиция>-<номер>.
+      simIn();
+      const pr = S.mvIn.pairs[body.from];
+      if(!pr) return {ok: false, verdict: 'gone'};
+      const v = inView(body.from);
+      if(v.status === 'done' || v.status === 'diff') return {ok: false, verdict: 'accepted', task: v};
+      if(v.status !== 'given') return {ok: false, verdict: 'not_given', task: v, from_code: v.from_code};
+      const pid = String(body.code || '').split('-')[1] || '';
+      const l = pr.lines.find(x => x.id === pid && (+x.recv || 0) < x.got);
+      if(!l){
+        const any = pr.lines.find(x => x.id === pid);
+        return {ok: false, verdict: any ? 'full' : 'not_in_transfer', code: body.code, name: (P[pid] || {}).name || ''};
+      }
+      l.recv = num((+l.recv || 0) + 1);
+      let t = inView(body.from);
+      const finished = t.recv_left <= 0;
+      if(finished){ pr.acc = {ok: true}; t = inView(body.from); }
+      save();
+      return {ok: true, code: body.code, name: l.name, qty: 1, unit: 1,
+              line: t.lines.find(x => x.id === pid), task: t, finished: finished, task_done: finished};
     }
     if(what === 'scan'){
       // Скан отдающего: код демонстрационный, товар в нём зашит — DEMO-<позиция>-<номер>.
@@ -804,8 +834,17 @@ function nextCode(id){
     try{ if(typeof LINE !== 'undefined' && LINE && LINE.id) return one(LINE.id); }catch(e){}
     return null;
   }
-  if(id === 'mvV'){                                   // перемещение: то, что отдаём
-    const l = S.mvOut.lines.find(x => x.got < x.qty);
+  if(id === 'mvV'){
+    // Принимаем: бутылка той передачи, что принимаем сейчас (следующая
+    // неотсканированная позиция).
+    try{
+      if(typeof MV !== 'undefined' && MV && MV.task && MV.task.recv){
+        const pr = S.mvIn.pairs[MV.task.from];
+        const l = pr && pr.lines.find(x => (+x.recv || 0) < x.got);
+        return l ? one(l.id) : null;
+      }
+    }catch(e){}
+    const l = S.mvOut.lines.find(x => x.got < x.qty);  // отдаём
     return l ? one(l.id) : one('p6');
   }
   return one('p1');                                   // бой и бутылка охране
@@ -937,7 +976,7 @@ function intro(){
   const w = sheet('<h4>Это демо приложения водителя</h4>'
     + '<p>Всё настоящее, кроме данных: заказы, приёмка и деньги придуманы и живут только в этом телефоне.</p>'
     + '<ul><li>Откройте смену — через несколько секунд придёт заказ.</li>'
-    + '<li>«Товар» — приёмка и перемещение между районами: отдаёте — сканируете, принимаете — нажимаете «Принял». Сканер работает сам, камеру наводить не нужно.</li>'
+    + '<li>«Товар» — приёмка и перемещение между районами: отдаёте — сканируете, принимаете — тоже сканируете каждую бутылку. Сканер работает сам, камеру наводить не нужно.</li>'
     + '<li>«Расходы» — заправка с чеком уходит старшему на согласование.</li>'
     + '<li>Смена не закроется, пока заказ не доставлен, а приёмка не завершена, — как в бою.</li></ul>'
     + '<button id="dmoGo">Начать</button>');

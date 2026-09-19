@@ -16,9 +16,12 @@
     бутылка уходит с остатка отдающего на остаток получателя. Отдавать может
     любой водитель района — кто сканировал последним, тот и видится отдающим.
   • Получатель: пока отдают, карточка серая — смотреть, не нажимать. Всё
-    отсканировали — «Принял» (главная) или «Принял неровно»: сколько пришло
-    на самом деле и что не так. Расхождение склад сам не двигает — какой именно
-    бутылки нет, неизвестно; его видят старший и оператор и решают.
+    отсканировали — теперь сканирует и он (владелец, 19 сен 2026: «сделай так,
+    чтобы принимающая перемещения сторона отныне тоже сканировала товар»):
+    каждую бутылку, которую ему отдали; засчитывается только код этой
+    передачи. Отсканировал всё — передача принята сама. Чего-то нет —
+    «Не всё пришло»: расхождение — то, что отдали, но не отсканировали у
+    получателя. Склад его сам не двигает — его видят старший и оператор.
   • Задача района закрывается, когда он принял передачи от всех, заявка —
     когда закрыты все задачи.
 
@@ -75,11 +78,13 @@ async def _mid() -> str:
 def _line_view(l: dict) -> dict:
     need = float(l.get("qty") or 0)
     got = float(l.get("got") or 0)
+    recv = float(l.get("recv") or 0)            # отсканировал получатель
     return {"from": l.get("from"), "from_code": OFFICE_CODES.get(l.get("from"), ""),
             "from_name": OFFICE_NAMES.get(l.get("from"), ""),
             "id": l.get("id"), "name": l.get("name", ""), "unit": int(l.get("unit") or 1),
             "qty": sr._num(need), "got": sr._num(got), "left": sr._num(max(0.0, need - got)),
-            "done": got >= need - 1e-9}
+            "done": got >= need - 1e-9,
+            "recv": sr._num(recv), "recv_left": sr._num(max(0.0, got - recv))}
 
 
 def _pair_status(task: dict, g: dict, need: float, got: float) -> str:
@@ -116,14 +121,15 @@ def _sources(lines: list, task: dict) -> list:
     for l in lines:
         s = by_src.setdefault(l["from"], {"district": l["from"], "code": l["from_code"],
                                           "name": l["from_name"], "qty": 0.0, "got": 0.0,
-                                          "lines": []})
-        s["qty"] += l["qty"]; s["got"] += l["got"]; s["lines"].append(l)
+                                          "recv": 0.0, "lines": []})
+        s["qty"] += l["qty"]; s["got"] += l["got"]; s["recv"] += l["recv"]; s["lines"].append(l)
     for src, s in by_src.items():
         g = give.get(src) or {}
         s["status"] = _pair_status(task, g, s["qty"], s["got"])
         s["done"] = s["got"] >= s["qty"] - 1e-9          # отсканировано всё
         s["left"] = sr._num(max(0.0, s["qty"] - s["got"]))
-        s["qty"] = sr._num(s["qty"]); s["got"] = sr._num(s["got"])
+        s["recv_left"] = sr._num(max(0.0, s["got"] - s["recv"]))
+        s["qty"] = sr._num(s["qty"]); s["got"] = sr._num(s["got"]); s["recv"] = sr._num(s["recv"])
         s["giver"] = g.get("driver") or ""
         s["given_at"] = _iso(g.get("done_at"))
         s["senior"] = _senior_of(g)
@@ -172,6 +178,7 @@ def give_view(mid: str, doc: dict, oid: str, task: dict, src: str, me: str = "")
     lines = [_line_view(l) for l in (task.get("lines") or []) if l.get("from") == src]
     need = sum(l["qty"] for l in lines)
     got = sum(l["got"] for l in lines)
+    recv = sum(l["recv"] for l in lines)
     left = max(0.0, need - got)
     g = (task.get("give") or {}).get(src) or {}
     giver = g.get("driver") or ""
@@ -192,6 +199,8 @@ def give_view(mid: str, doc: dict, oid: str, task: dict, src: str, me: str = "")
         "given_at": _iso(g.get("done_at")),
         **_accept_view(g),
         "need": sr._num(need), "got": sr._num(got), "left": sr._num(left),
+        # Сверка получателя: сколько из отданного он уже отсканировал.
+        "recv": sr._num(recv), "recv_left": sr._num(max(0.0, got - recv)),
         "positions": len(lines), "left_positions": sum(1 for l in lines if not l["done"]),
         "sources": [], "lines": lines,
         "status": _pair_status(task, g, need, got),
@@ -334,7 +343,12 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
 
     Принять можно только отданное целиком: пока отдающий сканирует, карточка
     у получателя серая. Расхождение склад не двигает — какой именно бутылки
-    нет, неизвестно; его видят старший и оператор."""
+    нет, неизвестно; его видят старший и оператор.
+
+    С 19 сен 2026 получатель сканирует каждую бутылку (receive): «Принял» —
+    только когда отсканировано всё (последний скан и принимает сам); «не всё
+    пришло» (ok=False) — расхождение считается по сканам: отдали — пришло то,
+    что отсканировал получатель. Числа руками (lines) больше не берутся."""
     if district != oid:
         return {"ok": False, "error": "not_your_district"}
     doc = await db.move_order_get(mid)
@@ -349,19 +363,15 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
     if g["status"] != "given":
         return {"ok": False, "error": "not_given", "task": g}
     note = str(note or "").strip()[:300]
+    if ok and g["recv_left"] > 1e-9:
+        # Не всё отсканировано — «Принял» нельзя: досканировать или «не всё пришло».
+        return {"ok": False, "error": "scan_all", "task": g}
     diff = []
     if not ok:
-        got_by = {}
-        for x in lines or []:
-            if isinstance(x, dict) and x.get("id"):
-                try:
-                    got_by[str(x["id"])] = max(0.0, min(9999.0, sr._round_step(x.get("got"))))
-                except Exception:                            # noqa: BLE001
-                    pass
         for l in g["lines"]:
-            if l["id"] in got_by and abs(got_by[l["id"]] - float(l["got"])) > 1e-9:
+            if abs(float(l["recv"]) - float(l["got"])) > 1e-9:
                 diff.append({"id": l["id"], "name": l["name"], "unit": l["unit"],
-                             "sent": l["got"], "got": sr._num(got_by[l["id"]])})
+                             "sent": l["got"], "got": l["recv"]})
         if not diff and not note:
             # «Неровно», но ничего не поменяли и ничего не написали — сказать нечего.
             return {"ok": False, "error": "diff_empty", "task": g}
@@ -571,6 +581,7 @@ async def scan(mid: str, oid: str, code: str, name: str, tgid: int, district: st
         return _res(v, **{k: x for k, x in r.items() if k not in ("ok", "verdict")})
 
     now = _now()
+    await db.move_give_code(mid, oid, src, code, add)     # по нему сверит получатель
     await db.move_task_started(mid, oid, now)
     await db.move_give_mark(mid, oid, src, name, tgid, now)
     doc = await db.move_order_get(mid)
@@ -590,6 +601,89 @@ async def scan(mid: str, oid: str, code: str, name: str, tgid: int, district: st
                 # finished — эта передача отсканирована целиком: отдавать больше
                 # нечего, дальше «Принял» у получателя.
                 finished=g["left"] <= 0)
+
+
+async def receive(mid: str, oid: str, src: str, code: str, name: str, tgid: int,
+                  district: str) -> dict:
+    """Получатель сканирует бутылку, которую ему отдали (владелец, 19 сен 2026:
+    «сделай так, чтобы принимающая перемещения сторона отныне тоже сканировала
+    товар»).
+
+    Склад этот скан не двигает — бутылка переехала ещё сканом отдающего; это
+    сверка: пришло ли в руки то, что отдали. Засчитывается только бутылка этой
+    передачи — код из тех, что отдающий отсканировал по паре src → oid. У
+    передач, отданных до 19 сен (целиком или частью), кода в списке может не
+    быть: пока отдано больше, чем записано кодами (codes_q), бутылка годится и
+    по старому признаку — числится у получателя и пришла к нему последним
+    переездом из src. Отсканировал всё — передача принята сама, как «Принял»."""
+    code = str(code or "").strip()
+    if district != oid:
+        return _res("not_your_district")
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid)
+    if not doc or doc.get("status") != "open" or not task or task.get("cancelled_at"):
+        return _res("gone")
+    lines = task.get("lines") or []
+    if not any(l.get("from") == src for l in lines):
+        return _res("gone")
+    g = give_view(mid, doc, oid, task, src, name)
+    if g["status"] in ("done", "diff"):
+        return _res("accepted", task=g)
+    if g["status"] != "given":
+        # Отдающий ещё не отсканировал всё — принимать рано.
+        return _res("not_given", task=g, from_code=g["from_code"])
+    gv = (task.get("give") or {}).get(src) or {}
+    if code in (gv.get("recv_codes") or []):
+        return _res("again", code=code, task=g)
+    qr = await db.qr_get(code)
+    if not qr:
+        return _res("unknown", code=code)
+    pname = qr.get("product_name") or ""
+    pid = str(qr.get("product_id") or "")
+    at = (qr.get("district") or "").strip()
+    codes = gv.get("codes") or []
+    last = (qr.get("moves") or [])[-1:]
+    given_q = sum(float(l.get("got") or 0) for l in lines if l.get("from") == src)
+    unrec = given_q - float(gv.get("codes_q") or 0) > 1e-9     # отдано без записи кода (до 19 сен)
+    ours = code in codes or (unrec and at == oid and bool(last) and (last[0] or {}).get("from") == src)
+    if not ours:
+        # Не из этой передачи: ещё у отдающего — он её не сканировал; уже у
+        # получателя — своя бутылка района; иначе — чужая.
+        if at == src:
+            return _res("not_scanned", code=code, name=pname, from_code=g["from_code"])
+        if at == oid:
+            return _res("not_in_transfer", code=code, name=pname)
+        return _res("other_district", code=code, name=pname, from_code=OFFICE_CODES.get(at, ""))
+    idx = next((i for i, l in enumerate(lines) if l.get("from") == src and l.get("id") == pid), None)
+    if idx is None:
+        return _res("not_in_task", code=code, name=pname)
+    given = float(lines[idx].get("got") or 0)
+    add = float(qr.get("qty") or 1)
+    if float(lines[idx].get("recv") or 0) >= given - 1e-9:
+        return _res("full", code=code, name=pname)
+    if not await db.move_recv_add(mid, oid, src, idx, code, add, given):
+        # Два скана в одну секунду или передачу только что приняли — перечитать.
+        doc = await db.move_order_get(mid)
+        task = ((doc or {}).get("tasks") or {}).get(oid) or {}
+        gv = (task.get("give") or {}).get(src) or {}
+        if code in (gv.get("recv_codes") or []):
+            return _res("again", code=code, task=give_view(mid, doc, oid, task, src, name))
+        if not doc or doc.get("status") != "open" or gv.get("accepted_at") or task.get("cancelled_at"):
+            return _res("gone")
+        return _res("full", code=code, name=pname)
+    doc = await db.move_order_get(mid)
+    task = (doc.get("tasks") or {}).get(oid) or {}
+    g = give_view(mid, doc, oid, task, src, name)
+    line = next(l for l in g["lines"] if l["id"] == pid)
+    log.info(f"[move] {mid}/{oid}: {name} принял скан {code} ({pid}) из {src} · {g['recv']}/{g['got']}")
+    finished, task_done = g["recv_left"] <= 1e-9, False
+    if finished:
+        # Отсканировано всё, что отдали, — передача принята сама.
+        a = await accept(mid, oid, src, name, tgid, district, ok=True)
+        g = a.get("task") or g
+        task_done = bool(a.get("task_done"))
+    return _res("ok", code=code, name=pname or line["name"], qty=sr._num(add), unit=line["unit"],
+                line=line, task=g, finished=finished, task_done=task_done)
 
 
 async def live(day: str = "") -> dict:
@@ -864,8 +958,20 @@ async def handle_drv_start(request):
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
+async def handle_drv_receive(request):
+    """POST {district, from, code} — получатель сканирует бутылку передачи
+    from → district (district — его район, сверяется с подписью)."""
+    me, b = request["driver"], await _body(request)
+    r = await receive(request.match_info.get("mid") or "", str(b.get("district") or ""),
+                      str(b.get("from") or ""), str(b.get("code") or ""), me["name"],
+                      request["tg"].get("id") or 0, me.get("district") or "")
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
 async def handle_drv_accept(request):
-    """POST {district, from, ok, lines:[{id, got}], note} — «Принял» / «Принял неровно»."""
+    """POST {district, from, ok, note} — «Принял» (только когда отсканировано
+    всё) / «Не всё пришло» (ok=false: расхождение — по сканам получателя;
+    lines из старого приложения не берутся)."""
     me, b = request["driver"], await _body(request)
     r = await accept(request.match_info.get("mid") or "", str(b.get("district") or ""),
                      str(b.get("from") or ""), me["name"], request["tg"].get("id") or 0,

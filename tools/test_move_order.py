@@ -15,7 +15,11 @@ mongomock + настоящие move_routes и stock_routes.move_by_code.
   • сканирует только отдающий и только своё: получатель, чужой район, чужая
     бутылка, лишний и повторный скан отвечают словами, склад не двигается;
   • скан сразу переносит бутылку на получателя; пиво — полкоробки на код;
-  • отдали всё — у получателя «Принял» / «Принял неровно»; раньше — нельзя;
+  • отдали всё — получатель сканирует каждую бутылку (с 19 сен 2026:
+    «принимающая сторона отныне тоже сканирует товар»): засчитывается только
+    код этой передачи, склад скан получателя не двигает, последний скан
+    принимает сам; «Принял» без сканов — нельзя; «не всё пришло» считается по
+    сканам, а не по числам руками;
   • задача закрывается, когда приняли от всех, заявка — следом;
   • смену держат обе стороны: отдающий — пока не отдал, получатель — пока не принял;
   • заявка закупки считает полку так, будто перемещения уже сделаны: у
@@ -46,6 +50,13 @@ async def code(d, cid, pid, district, qty=1, status="active"):
 async def shelf(oid, pid):
     SR.base_drop()
     return float(((await SR._district_base(D))[oid].get("have_exact") or {}).get(pid) or 0)
+
+async def recv(mid, to, src, codes, who="Алишер", tgid=11):
+    """Получатель сканирует коды передачи src → to — ответ последнего."""
+    r = None
+    for c in codes:
+        r = await MV.receive(mid, to, src, c, who, tgid, to)
+    return r
 
 async def main():
     db._db = AsyncMongoMockClient()["ambar_test"]; d = db._db
@@ -138,9 +149,37 @@ async def main():
     eq("Силикон держит его передача", [(x["side"], x["status"]) for x in ps], [("give", "wait")])
     eq("у постороннего замка нет", await MV.pending_for_district("alguses"), [])
 
+    print("── получатель сканирует ───────────────────────────────────────────")
+    eq("«Принял» без сканов — нельзя", (await MV.accept(mid, "jvc", "bbay", "Алишер", 11, "jvc"))["error"], "scan_all")
+    eq("серую (Силикон ещё не отдал) не сканировать",
+       (await MV.receive(mid, "jvc", "silicon", "b0", "Алишер", 11, "jvc"))["verdict"], "not_given")
+    eq("сканирует только получатель",
+       (await MV.receive(mid, "jvc", "bbay", "v0", "Худоба", 12, "bbay"))["verdict"], "not_your_district")
+    eq("своя бутылка JVC — не из этой передачи",
+       (await MV.receive(mid, "jvc", "bbay", "vj", "Алишер", 11, "jvc"))["verdict"], "not_in_transfer")
+    eq("бутылка Тикома — чужая", (await MV.receive(mid, "jvc", "bbay", "vt", "Алишер", 11, "jvc"))["verdict"],
+       "other_district")
+    eq("ещё у Бизнес Бея — отдающий её не сканировал",
+       (await MV.receive(mid, "jvc", "bbay", "v3", "Алишер", 11, "jvc"))["verdict"], "not_scanned")
+    eq("кода нет в реестре", (await MV.receive(mid, "jvc", "bbay", "нет", "Алишер", 11, "jvc"))["verdict"], "unknown")
+    before = (await shelf("jvc", vodka), await shelf("bbay", vodka))
+    r0 = await MV.receive(mid, "jvc", "bbay", "v0", "Алишер", 11, "jvc")
+    eq("скан получателя засчитан: 1 из 3, ещё не принято",
+       (r0["ok"], r0["task"]["recv"], r0["task"]["recv_left"], r0["finished"], r0["task"]["status"]),
+       (True, 1, 2, False, "given"))
+    eq("тот же код второй раз — не засчитан", (await MV.receive(mid, "jvc", "bbay", "v0", "Алишер", 11, "jvc"))["verdict"],
+       "again")
+    eq("пока не всё отсканировано — «Принял» нельзя",
+       (await MV.accept(mid, "jvc", "bbay", "Алишер", 11, "jvc"))["error"], "scan_all")
+    eq("карточка у получателя: принято 1 из 3",
+       [(x["recv"], x["recv_left"]) for x in (await MV.tasks_for_driver("Алишер", "jvc"))["take"] if x["from"] == "bbay"],
+       [(1, 2)])
+    a1 = await recv(mid, "jvc", "bbay", ["v1", "v2"])
+    eq("последний скан принял передачу сам",
+       (a1["finished"], a1["task"]["status"], a1["task"]["accepted_by"], a1["task"]["accept_ok"]), (True, "done", "Алишер", True))
+    eq("склад сканы получателя не двигают", (await shelf("jvc", vodka), await shelf("bbay", vodka)), before)
+
     print("── «Принял» ───────────────────────────────────────────────────────")
-    a1 = await MV.accept(mid, "jvc", "bbay", "Алишер", 11, "jvc")
-    eq("«Принял»", (a1["ok"], a1["task"]["status"], a1["task"]["accepted_by"]), (True, "done", "Алишер"))
     eq("принять за другой район нельзя",
        (await MV.accept(mid, "jvc", "silicon", "Худоба", 12, "bbay"))["error"], "not_your_district")
     eq("второй раз — уже принято, ничего не перезаписано",
@@ -153,12 +192,13 @@ async def main():
     eq("первый код пива — полкоробки", (b0["qty"], b0["line"]["got"], b0["finished"]), (0.5, 0.5, False))
     b1 = await MV.scan(mid, "jvc", "b1", "Азиз", 16, "silicon")
     eq("второй код добрал коробку — передача отдана", (b1["line"]["got"], b1["finished"]), (1, True))
-    eq("«неровно» без поправки и без слова — нечего сказать",
-       (await MV.accept(mid, "jvc", "silicon", "Алишер", 11, "jvc", ok=False, lines=[{"id": beer, "got": 1}]))["error"],
-       "diff_empty")
+    rb = await MV.receive(mid, "jvc", "silicon", "b0", "Алишер", 11, "jvc")
+    eq("получатель отсканировал полкоробки", (rb["ok"], rb["qty"], rb["task"]["recv"], rb["finished"]), (True, 0.5, 0.5, False))
+    # Числа руками старого приложения («пришло 1») не берутся: пришло то, что
+    # отсканировали.
     a2 = await MV.accept(mid, "jvc", "silicon", "Алишер", 11, "jvc", ok=False,
-                         lines=[{"id": beer, "got": 0.5}], note="одна упаковка порвана")
-    eq("«Принял неровно»: расхождение записано",
+                         lines=[{"id": beer, "got": 1}], note="одна упаковка порвана")
+    eq("«Не всё пришло»: расхождение — по сканам получателя",
        (a2["task"]["status"], a2["task"]["accept_lines"][0]["sent"], a2["task"]["accept_lines"][0]["got"],
         a2["task"]["accept_note"], a2["task_done"]), ("diff", 1, 0.5, "одна упаковка порвана", True))
     eq("расхождение склад не двигает: коды уже у JVC", (await shelf("jvc", beer), await shelf("silicon", beer)), (1, 0))
@@ -214,6 +254,23 @@ async def main():
     await db.move_order_cancel(r2["move_id"], "", T0)
     eq("сняли заявку целиком — снова предлагает",
        [(r_["from"], r_["to"]) for r_ in (await MV.plan(D))["rows"] if r_["id"] == vodka], [("jvc", "tecom")])
+
+    print("── передача, отданная до 19 сен (коды не записаны) ────────────────")
+    await code(d, "L0", vodka, "silicon"); await code(d, "L1", vodka, "silicon"); await code(d, "LJ", vodka, "tecom")
+    rl = await MV.create([{"from": "silicon", "to": "tecom", "id": vodka, "qty": 2}])
+    ml = rl["move_id"]
+    await MV.give_start(ml, "tecom", "Азиз", 16, "silicon")
+    for c in ("L0", "L1"):
+        await MV.scan(ml, "tecom", c, "Азиз", 16, "silicon")
+    # Как было до обновления: списка кодов у передачи нет.
+    await d.move_orders.update_one({"_id": ml}, {"$unset": {"tasks.tecom.give.silicon.codes": "",
+                                                           "tasks.tecom.give.silicon.codes_q": ""}})
+    eq("своя бутылка Тикома — не из передачи и без списка",
+       (await MV.receive(ml, "tecom", "silicon", "LJ", "Алишер", 41, "tecom"))["verdict"], "not_in_transfer")
+    eq("пришедшая из Силикона — годится по старому признаку",
+       (await MV.receive(ml, "tecom", "silicon", "L0", "Алишер", 41, "tecom"))["ok"], True)
+    ll = await MV.receive(ml, "tecom", "silicon", "L1", "Алишер", 41, "tecom")
+    eq("вторая — и передача принята", (ll["finished"], ll["task"]["status"]), (True, "done"))
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)

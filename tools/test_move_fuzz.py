@@ -26,7 +26,13 @@
   I7  «в пути» для заявки закупки = неотданный остаток открытых строк, в обе
       стороны;
   I8  отказ сканера склад не двигает;
-  I9  заявка закупки считает полку так, будто перемещения сделаны (выборочно).
+  I9  заявка закупки считает полку так, будто перемещения сделаны (выборочно);
+  I10 сверка получателя (с 19 сен 2026 он сканирует то, что ему отдали):
+      коды передачи — ровно удачные сканы отдающего; засчитанные у
+      получателя — только из них и без повторов; счёт «принято» по строке =
+      удачным сканам получателя и не больше отданного; «Принял» ровно — только
+      когда отсканировано всё; «не всё пришло» записывает то, что
+      отсканировали; скан получателя склад не двигает.
 
 Запуск: python3 tools/test_move_fuzz.py [сценариев] [первое зерно]
 По умолчанию — 30 сценариев (для общего прогона тестов). Большой прогон —
@@ -88,6 +94,8 @@ class World:
         self.start = {}            # (район, позиция) → остаток по пересчёту
         self.mids = []
         self.model_got = {}        # (mid, куда, i) → сколько отдано по нашим подсчётам
+        self.model_recv = {}       # (mid, куда, i) → сколько отсканировал получатель
+        self.deliv = {}            # (mid, куда, откуда) → коды удачных сканов отдающего, с повторами
         self.moves_qty = 0.0       # сумма удачных сканов
         self.log = []
 
@@ -170,6 +178,7 @@ class World:
             for to, t in doc["tasks"].items():
                 for i, l in enumerate(t["lines"]):
                     self.model_got[(res["move_id"], to, i)] = 0.0
+                    self.model_recv[(res["move_id"], to, i)] = 0.0
                     step = SR.code_qty(CAT[l["id"]])
                     ok(abs(l["qty"] / step - round(l["qty"] / step)) < 1e-9 and l["qty"] > 0,
                        f"строка не целым числом кодов: {l}")
@@ -270,6 +279,7 @@ class World:
                 self.moves_qty += float(x["qty"])
                 i = next(k for k, ll in enumerate(t["lines"]) if ll["from"] == who_d and ll["id"] == self.codes[c]["pid"])
                 self.model_got[(mid, to, i)] += float(x["qty"])
+                self.deliv.setdefault((mid, to, who_d), []).append(c)
             else:
                 v = x.get("verdict")
                 if boss:
@@ -309,6 +319,68 @@ class World:
             ok(res.get("error") == "not_your_district", f"принял чужой район: {res}")
         elif g["status"] != "given":
             ok(not res.get("ok") or res.get("already"), f"принято неотданное: {g['status']} {res}")
+        elif res.get("ok") and not res.get("already"):
+            if res["task"]["status"] == "done":
+                ok(g["recv_left"] <= 1e-9, f"«Принял» при неотсканированном: {g['recv_left']}")
+            else:
+                # «Не всё пришло»: записано то, что отсканировал получатель.
+                for dl in res["task"]["accept_lines"]:
+                    ln = next(l for l in g["lines"] if l["id"] == dl["id"])
+                    ok(abs(float(dl["got"]) - float(ln["recv"])) < 1e-9 and abs(float(dl["sent"]) - float(ln["got"])) < 1e-9,
+                       f"«не всё пришло» не по сканам: {dl} при {ln}")
+        elif g["recv_left"] > 1e-9 and res.get("error") not in ("gone",):
+            ok(res.get("error") in ("scan_all", "diff_empty"), f"«Принял» без сканов не отбит словом: {res}")
+
+    async def act_receive(self):
+        """Получатель сканирует то, что ему отдали (с 19 сен 2026): свои коды
+        передачи, повторы, любые бутылки сети, скан с чужого района."""
+        r = self.r
+        pairs = await self.open_pairs()
+        if not pairs:
+            return
+        given = [x for x in pairs if all(float(l["got"]) >= float(l["qty"]) - 1e-9
+                                         for l in x[3]["tasks"][x[1]]["lines"] if l["from"] == x[2])]
+        mid, to, src, doc = r.choice(given if given and r.random() < 0.85 else pairs)
+        t = doc["tasks"][to]
+        gv = (t.get("give") or {}).get(src) or {}
+        g = MV.give_view(mid, doc, to, t, src)
+        codes = list(gv.get("codes") or [])
+        was = set(gv.get("recv_codes") or [])
+        roll = r.random()
+        if roll < 0.65 and codes:
+            c = r.choice([x for x in codes if x not in was] or codes)
+        elif roll < 0.8 and was:
+            c = r.choice(sorted(was))                           # повтор
+        else:
+            c = r.choice(sorted(self.codes))                    # любая бутылка сети
+        who_d = to if r.random() < 0.9 else r.choice(OFFICE_IDS)
+        before = {k: x["district"] for k, x in self.codes.items()}
+        x = await MV.receive(mid, to, src, c, r.choice(NAMES[who_d]), 1, who_d)
+        stat("получатель: " + ("засчитан" if x.get("ok") else str(x.get("verdict"))))
+        docs = {q["_id"]: q for q in await self.d.qr_codes.find({}).to_list(length=100000)}
+        for k, dist in before.items():
+            ok(docs[k]["district"] == dist, f"скан получателя сдвинул код {k}")
+        if who_d != to:
+            ok(x.get("verdict") == "not_your_district", f"скан получателя чужим районом: {x}")
+            return
+        if x.get("ok"):
+            ok(g["status"] == "given", f"скан получателя засчитан при «{g['status']}»")
+            ok(c in codes and c not in was, f"засчитан не тот код: {c}")
+            i = next(k for k, ll in enumerate(t["lines"]) if ll["from"] == src and ll["id"] == self.codes[c]["pid"])
+            self.model_recv[(mid, to, i)] += float(x["qty"])
+            if x.get("finished"):
+                stat("получатель отсканировал всё — принято само")
+                ok(x["task"]["status"] == "done", f"последний скан не принял: {x['task']['status']}")
+        else:
+            v = x.get("verdict")
+            if g["status"] in ("done", "diff"):
+                ok(v in ("accepted", "gone"), f"скан в принятую: {v}")
+            elif g["status"] != "given":
+                ok(v in ("not_given", "gone"), f"скан в неотданную: {v}")
+            elif c in was:
+                ok(v == "again", f"повтор не узнан: {v}")
+            else:
+                ok(c not in codes, f"код передачи не засчитан: {c} {v}")
 
     async def act_senior(self):
         """Старший из STAR: взять на себя одну передачу или всё с района, вернуть
@@ -400,6 +472,7 @@ class World:
             self.moves_qty += float(x["qty"])
             i = next(k for k, ll in enumerate(t["lines"]) if ll["from"] == src and ll["id"] == self.codes[code]["pid"])
             self.model_got[(mid, to, i)] += float(x["qty"])
+            self.deliv.setdefault((mid, to, src), []).append(code)
         else:
             ok(self.codes[code]["district"] == before, f"отказ старшему сдвинул код {code}")
             if boss != me:
@@ -480,6 +553,28 @@ class World:
                     gv = (t.get("give") or {}).get(src) or {}
                     ls = [l for l in t["lines"] if l["from"] == src]
                     given = all(float(l["got"]) >= float(l["qty"]) - 1e-9 for l in ls)
+                    # I10: сверка получателя.
+                    cs, rc = gv.get("codes") or [], gv.get("recv_codes") or []
+                    dv = self.deliv.get((mid, to, src), [])
+                    ok(len(cs) == len(set(cs)), f"{mid}/{to}/{src}: код передачи дважды")
+                    ok(set(cs) == set(dv), f"{mid}/{to}/{src}: коды передачи ≠ удачным сканам отдающего")
+                    ok(abs(float(gv.get("codes_q") or 0) - sum(float(l["got"]) for l in ls)) < 1e-9,
+                       f"{mid}/{to}/{src}: отдано с записью кода ≠ отданному")
+                    ok(abs(sum(self.codes[c]["qty"] for c in dv) - sum(float(l["got"]) for l in ls)) < 1e-9,
+                       f"{mid}/{to}/{src}: удачные сканы ≠ отданному")
+                    if len(dv) != len(set(dv)):
+                        stat("I10: бутылка приехала по одной передаче дважды")
+                    ok(len(rc) == len(set(rc)) and set(rc) <= set(cs), f"{mid}/{to}/{src}: засчитан чужой или повтор")
+                    for i, l in enumerate(t["lines"]):
+                        if l["from"] != src:
+                            continue
+                        rv = float(l.get("recv") or 0)
+                        ok(rv <= float(l["got"]) + 1e-9, f"{mid}/{to}/{i}: принято {rv} больше отданного")
+                        ok(abs(rv - self.model_recv[(mid, to, i)]) < 1e-9,
+                           f"{mid}/{to}/{i}: принято {rv}, удачных сканов получателя {self.model_recv[(mid, to, i)]}")
+                    if gv.get("accepted_at") and gv.get("accept_ok", True):
+                        ok(all(abs(float(l.get("recv") or 0) - float(l["got"])) < 1e-9 for l in ls),
+                           f"{mid}/{to}/{src}: «принято ровно», а отсканировано не всё")
                     if gv.get("accepted_at"):
                         ok(given, f"{mid}/{to}/{src}: принято неотданное")
                     if gv.get("done_at"):
@@ -537,8 +632,9 @@ class World:
 
     async def finish(self):
         """Конец дня: всё, что можно отдать, — отдают свои, всё отданное —
-        принимают. Что упирается в бутылку без кода, так и остаётся открытым
-        (недобора не бывает — снимает старший): проверяем, что оно держит смену."""
+        получатель сканирует (последний скан принимает сам). Что упирается в
+        бутылку без кода, так и остаётся открытым (недобора не бывает —
+        снимает старший): проверяем, что оно держит смену."""
         for _ in range(3):
             for mid, to, src, doc in await self.open_pairs():
                 t = doc["tasks"][to]
@@ -561,17 +657,30 @@ class World:
                         self.moves_qty += float(x["qty"])
                         i = next(k for k, ll in enumerate(t["lines"]) if ll["from"] == src and ll["id"] == l["id"])
                         self.model_got[(mid, to, i)] += float(x["qty"])
+                        self.deliv.setdefault((mid, to, src), []).append(c)
                         need -= float(x["qty"])
                     await self.check()
             for mid, to, src, doc in await self.open_pairs():
-                res = await MV.accept(mid, to, src, NAMES[to][0], 1, to)
-                if res.get("ok") and not res.get("already"):
-                    stat("конец дня: принял")
+                t = doc["tasks"][to]
+                gv = (t.get("give") or {}).get(src) or {}
+                if gv.get("accepted_at"):
+                    continue
+                was = set(gv.get("recv_codes") or [])
+                for c in [c for c in (gv.get("codes") or []) if c not in was]:
+                    x = await MV.receive(mid, to, src, c, NAMES[to][0], 1, to)
+                    if not x.get("ok"):
+                        stat(f"конец дня: скан получателя — {x.get('verdict')}")
+                        break
+                    i = next(k for k, ll in enumerate(t["lines"]) if ll["from"] == src and ll["id"] == self.codes[c]["pid"])
+                    self.model_recv[(mid, to, i)] += float(x["qty"])
+                    if x.get("finished"):
+                        stat("конец дня: принял сканами")
                 await self.check()
 
     async def run(self, steps):
         await self.setup()
-        acts = [(self.act_create, 7), (self.act_scan, 50), (self.act_accept, 16), (self.act_cancel, 4),
+        acts = [(self.act_create, 7), (self.act_scan, 50), (self.act_accept, 8), (self.act_receive, 24),
+                (self.act_cancel, 4),
                 (self.act_senior, 10),
                 (lambda: self.act_scan(concurrent=True), 8), (lambda: self.act_scan(stale=True), 6)]
         pool = [f for f, w in acts for _ in range(w)]

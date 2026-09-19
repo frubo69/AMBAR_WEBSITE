@@ -2926,6 +2926,14 @@ async def handle_move_accept(request):
     return await move_routes.handle_drv_accept(request)
 
 
+# Получатель сканирует то, что ему отдали (владелец, 19 сен 2026).
+@require_driver
+@_no_test
+async def handle_move_receive(request):
+    import move_routes
+    return await move_routes.handle_drv_receive(request)
+
+
 # Ревизия своего района (владелец, 19 сен 2026): та же, что у старшего в
 # STAR; район — из входа водителя, день — сегодняшний (driver_audit.py).
 @require_driver
@@ -3030,6 +3038,7 @@ def setup(app):
         ("/api/driver/move/{mid}/scan",         handle_move_scan,     "POST"),
         ("/api/driver/move/{mid}/start",        handle_move_start,    "POST"),
         ("/api/driver/move/{mid}/accept",       handle_move_accept,   "POST"),
+        ("/api/driver/move/{mid}/receive",      handle_move_receive,  "POST"),
         # Ревизия своего района.
         ("/api/driver/audit",                   handle_audit,         "GET"),
         ("/api/driver/audit/brief",             handle_audit_brief,   "GET"),

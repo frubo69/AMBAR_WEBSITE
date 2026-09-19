@@ -5789,6 +5789,36 @@ async def move_give_start(mid: str, district: str, src: str, driver: str, driver
                                    {"$set": {f"{k}.claimed_at": now}})
 
 
+async def move_give_code(mid: str, district: str, src: str, code: str, qty) -> None:
+    """Код, который отдающий передал по паре src → district: по этому списку
+    получатель сверяет свои сканы (владелец, 19 сен 2026: «принимающая сторона
+    отныне тоже сканирует товар»). codes_q — сколько отдано с записанным кодом:
+    у передач, начатых до 19 сен, часть отдана без записи, и получатель сверяет
+    её по старому признаку, пока codes_q меньше отданного."""
+    d = _db_or_none()
+    if d is None: return
+    g = f"tasks.{district}.give.{src}"
+    await d.move_orders.update_one(
+        {"_id": mid}, {"$addToSet": {f"{g}.codes": code}, "$inc": {f"{g}.codes_q": float(qty)}})
+
+
+async def move_recv_add(mid: str, district: str, src: str, i: int, code: str, add, cap) -> bool:
+    """Получатель отсканировал бутылку передачи src → district. Один код —
+    один раз, и по строке не больше, чем отдали: оба условия в самом фильтре,
+    два скана в одну секунду не засчитаются дважды. В принятую и снятую — нет."""
+    d = _db_or_none()
+    if d is None: return False
+    g = f"tasks.{district}.give.{src}"
+    r = await d.move_orders.update_one(
+        {"_id": mid, "status": "open", f"tasks.{district}.cancelled_at": None,
+         f"{g}.accepted_at": None, f"{g}.recv_codes": {"$ne": code},
+         f"tasks.{district}.lines.{i}.recv": {"$not": {"$gt": round(float(cap) - float(add), 6) + 1e-6}}},
+        {"$addToSet": {f"{g}.recv_codes": code},
+         "$inc": {f"tasks.{district}.lines.{i}.recv": float(add)},
+         "$set": {f"{g}.recv_at": datetime.now(timezone.utc)}})
+    return r.modified_count > 0
+
+
 async def move_give_accept(mid: str, district: str, src: str, rec: dict) -> bool:
     """Получатель принял передачу src → district. Один раз: условие «ещё не
     принято» стоит в фильтре, второй нажавший ничего не перезапишет."""

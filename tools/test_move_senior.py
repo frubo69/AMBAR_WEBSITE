@@ -45,6 +45,15 @@ async def shelf(oid, pid):
     SR.base_drop()
     return float(((await SR._district_base(D))[oid].get("have_exact") or {}).get(pid) or 0)
 
+async def recv_all(mid, to, src, who, tgid):
+    """Получатель сканирует всё, что ему отдали по паре src → to (с 19 сен
+    2026 «Принял» — только так): последний скан принимает сам."""
+    doc = await db.move_order_get(mid)
+    r = None
+    for c in (((doc["tasks"][to].get("give") or {}).get(src) or {}).get("codes") or []):
+        r = await MV.receive(mid, to, src, c, who, tgid, to)
+    return r
+
 async def main():
     db._db = AsyncMongoMockClient()["ambar_senior"]; d = db._db
     vodka, gin = "p1", "p55"
@@ -115,8 +124,9 @@ async def main():
        (await MV.scan(r2["move_id"], "silicon", "v3", "STAR", 7, "bbay", senior=True))["verdict"], "not_taken")
 
     print("── принимает получатель, как всегда ───────────────────────────────")
-    await MV.accept(mid, "jvc", "bbay", "Худоба", 5, "jvc")
-    await MV.accept(mid, "tecom", "bbay", "Алишер", 6, "tecom")
+    eq("отданное старшим получатель сканирует так же — коды старшего в передаче",
+       (await recv_all(mid, "jvc", "bbay", "Худоба", 5))["task"]["status"], "done")
+    await recv_all(mid, "tecom", "bbay", "Алишер", 6)
     eq("Тиком принял — его задача закрыта", bool((await db.move_order_get(mid))["tasks"]["tecom"]["done_at"]), True)
     eq("JVC держит передача Алгусеса", bool((await db.move_order_get(mid))["tasks"]["jvc"].get("done_at")), False)
     tr = await d.stock_transfers.find({"by_kind": "move"}).to_list(length=10)
@@ -166,7 +176,7 @@ async def main():
         x = await MV.scan(m3, "silicon", c, "Фарух", 22, "jvc")
     eq("другой водитель JVC отдал в Силикон", x["finished"], True)
     for to, who in (("bbay", "Бахадыр"), ("tecom", "Алишер"), ("silicon", "Азиз")):
-        await MV.accept(m3, to, "jvc", who, 5, to)
+        await recv_all(m3, to, "jvc", who, 5)
     doc = await db.move_order_get(m3)
     eq("все приняли — заявка закрыта", doc["status"], "done")
     eq("склад: из JVC ушло 6, в каждый район пришло по 2",
@@ -223,7 +233,7 @@ async def main():
         x = await MV.scan(m4, "silicon", c_, "Фарух", 22, "jvc")
     eq("водитель JVC отдал в B3 всё", x["finished"], True)
     for to, who in (("bbay", "Бахадыр"), ("alguses", "Даврон"), ("silicon", "Азиз"), ("tecom", "Алишер")):
-        eq(f"«Принял» в {to}", (await MV.accept(m4, to, "jvc", who, 5, to))["ok"], True)
+        eq(f"«Принял» в {to} — отсканировал всё", (await recv_all(m4, to, "jvc", who, 5))["task"]["status"], "done")
     eq("заявка закрыта", (await db.move_order_get(m4))["status"], "done")
     eq("склад: из JVC ушло 8, в каждый район по 2",
        tuple([await shelf(o, vod2) - base[o] for o in ("jvc", "bbay", "alguses", "silicon", "tecom")]), (-8, 2, 2, 2, 2))
@@ -259,17 +269,18 @@ async def main():
     eq("Бизнес Бей видит «Принял»",
        [(t["status"], t["senior"]) for t in (await MV.tasks_for_driver("Бахадыр", "bbay"))["take"] if t["move_id"] == m5],
        [("given", "STAR")])
-    eq("B2 принял", (await MV.accept(m5, "bbay", "jvc", "Бахадыр", 5, "bbay"))["ok"], True)
-    eq("B4 принял неровно — одной нет",
-       (await MV.accept(m5, "alguses", "jvc", "Даврон", 5, "alguses", ok=False,
-                        lines=[{"id": vod3, "got": 1}], note="одной нет"))["ok"], True)
+    eq("B2 принял — отсканировал обе", (await recv_all(m5, "bbay", "jvc", "Бахадыр", 5))["task"]["status"], "done")
+    eq("B4 отсканировал одну из двух", (await MV.receive(m5, "alguses", "jvc", "q2", "Даврон", 5, "alguses"))["ok"], True)
+    a4 = await MV.accept(m5, "alguses", "jvc", "Даврон", 5, "alguses", ok=False, note="одной нет")
+    eq("B4 — «не всё пришло»: отдали 2, пришла 1",
+       (a4["ok"], a4["task"]["accept_lines"][0]["sent"], a4["task"]["accept_lines"][0]["got"]), (True, 2, 1))
     for to, cs in (("silicon", ("q4", "q5")), ("tecom", ("q6", "q7"))):
         await MV.give_start(m5, to, "Худоба", 21, "jvc")
         for c_ in cs:
             x = await MV.scan(m5, to, c_, "Худоба", 21, "jvc")
         eq(f"водитель JVC отдал в {to}", x["finished"], True)
     for to, who in (("silicon", "Азиз"), ("tecom", "Алишер")):
-        await MV.accept(m5, to, "jvc", who, 5, to)
+        await recv_all(m5, to, "jvc", who, 5)
     doc = await db.move_order_get(m5)
     eq("заявка закрыта, B4 — «принято неровно»",
        (doc["status"], MV.task_view(m5, doc, "alguses", doc["tasks"]["alguses"], "")["diff"]), ("done", True))

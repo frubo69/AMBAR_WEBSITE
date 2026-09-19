@@ -16606,7 +16606,7 @@ function mvnPaint(){
             <span class="pk-dist-s">отдаёт — его водитель сканирует</span></span><em class="mvn-go">${_SC_CHEV}</em></button>
         <button class="pk-dist" onclick="mvnPick('to')"><span class="pk-code">${escS(t.code)}</span>
           <span class="pk-dist-b"><span class="pk-dist-n">Куда · ${escS(t.name)}</span>
-            <span class="pk-dist-s">принимает — его водитель нажимает «Принял»</span></span><em class="mvn-go">${_SC_CHEV}</em></button>
+            <span class="pk-dist-s">принимает — его водитель тоже сканирует</span></span><em class="mvn-go">${_SC_CHEV}</em></button>
       </div>
       <div class="pk-search">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -24431,16 +24431,19 @@ setInterval(() => { if(!document.hidden) ilLoad(); }, 30000);
 // ── Перемещения между районами ──────────────────────────────────────────────
 // Владелец, 18 сен 2026: «мне в AMBAR STAR инструмент, с помощью которого я
 // смогу следить за этой заявкой по каждому району отдельно». Сканирует тот, кто
-// отдаёт, а получатель, когда ему отдали всё, нажимает «Принял» или «Принял
-// неровно». Карточка — район-получатель; внутри — от кого он принимает: кто
-// отдаёт, сколько отдал, принято ли и что не сошлось.
+// отдаёт; с 19 сен 2026 сканирует и получатель — каждую бутылку, когда ему
+// отдали всё (последний скан принимает сам, или «Не всё пришло»). Карточка —
+// район-получатель; внутри — от кого он принимает: кто отдаёт, сколько отдал,
+// сколько получатель уже отсканировал, принято ли и что не сошлось.
 let MVO = {tasks: [], open: 0, plan: null, poll: null, busy: false, fold: new Set(), tab: 'give'};
 const MVO_ST = {free: ['ждёт отдающих', ''], live: ['отдают', 'live'],
-                given: ['ждёт «Принял»', 'live'], done: ['принято', 'ok'],
+                given: ['принимают сканом', 'live'], done: ['принято', 'ok'],
                 cancelled: ['снято', 'warn']};
 // Передача одной пары «откуда → куда» словами — строкой под районом.
 const MVO_SRC = {wait: () => 'ждёт отдающего', pause: () => 'начато · ждёт отдающего',
-                 live: s => `отдаёт ${s.giver || '—'}`, given: s => `${s.giver || 'водитель'} отдал всё · ждёт «Принял»`,
+                 live: s => `отдаёт ${s.giver || '—'}`,
+                 given: s => `${s.giver || 'водитель'} отдал всё · ${+s.recv
+                   ? `получатель отсканировал ${fmtQty(s.recv)} из ${fmtQty(s.got)}` : 'ждёт скана получателя'}`,
                  done: s => `принял ${s.accepted_by || '—'}`, diff: s => `принял неровно · ${s.accepted_by || '—'}`,
                  cancelled: () => 'снято'};
 
@@ -24464,7 +24467,7 @@ function mvoHomePaint(){
     <div class="rcv-h"><span class="rcv-st ${got ? 'live' : ''}">перемещение</span>
       <span class="il-t">${live.length} ${pluralize(live.length,'район','района','районов')}</span></div>
     <div class="rcv-n"><span class="rcv-v">${fmtQty(got)}</span>
-      <span class="rcv-of">из ${fmtQty(need)} ед приняли${ждут ? ` · ${ждут} ждут «Принял»` : ''}</span>
+      <span class="rcv-of">из ${fmtQty(need)} ед отдали${ждут ? ` · ${ждут} принимают сканом` : ''}</span>
       <span class="rcv-pct">${need ? Math.round(got / need * 100) : 0}%</span></div>
     <div class="rcv-bar"><i style="width:${need ? Math.round(got / need * 100) : 0}%"></i></div>
     <div class="rcv-f"><span>${escS(live.map(t => t.district_code).join(', '))}</span>
@@ -24660,7 +24663,7 @@ async function mvtScan(code){
     qrFlash('ok', r.name);
     mvtFeed();
     if(r.finished){
-      _toast(`Всё отдали в ${MVT.x.district_code} — «Принял» у водителя ${MVT.x.district_code}`);
+      _toast(`Всё отдали в ${MVT.x.district_code} — теперь водитель ${MVT.x.district_code} сканирует и принимает`);
       return mvtClose();
     }
     return;
@@ -24726,7 +24729,7 @@ function mvoGiveCards(){
     const кто = мои.length ? 'везёте вы' + (мои.length < open.length
         ? ' · в ' + [...new Set(мои.map(p => p.x.district_code))].join(', ') : '')
       : чужие.length ? 'везёт ' + [...new Set(чужие.map(p => p.s.senior))].join(', ')
-      : отдают.length ? 'отдаёт ' + отдают.join(', ') : open.length ? 'никто не начал' : 'ждут «Принял»';
+      : отдают.length ? 'отдаёт ' + отдают.join(', ') : open.length ? 'никто не начал' : 'принимают сканом';
     const rows = c.pairs.map(({x, s}) => {
       const key = `g|${x.move_id}|${x.district}|${s.district}`;
       const how = s.senior && ['wait', 'pause', 'live'].includes(s.status)
@@ -24796,10 +24799,10 @@ function _mvoTakeHtml(tasks, я){
          <span class="mvo-chev">${ICO_CHEV}</span></button>` + _mvoDiff(s) + _mvoLines(key, s.lines);
     }).join('');
     // Справа сверху — что сейчас происходит: кто отдаёт прямо сейчас, или
-    // отдали и ждут «Принял», или никто не начинал.
+    // отдали и получатель сканирует, или никто не начинал.
     const сейчас = [...new Set((x.sources || []).filter(s => s.status === 'live' || s.status === 'pause').map(s => s.giver).filter(Boolean))];
     const кто = сейчас.length ? 'отдаёт ' + сейчас.join(', ')
-      : (x.sources || []).some(s => s.status === 'given') ? 'ждёт «Принял»'
+      : (x.sources || []).some(s => s.status === 'given') ? 'принимают сканом'
       : (x.sources || []).some(s => s.status === 'wait') ? 'никто не начал' : '';
     return `<div class="rcv mvo-card${x.diff ? ' warn' : ''}">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>

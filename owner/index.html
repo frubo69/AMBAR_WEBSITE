@@ -10752,10 +10752,22 @@ function _navSave(){
     sessionStorage.setItem('ambar_nav', JSON.stringify({pg, acc: ACC_VIEW || '', stock}));
   }catch(e){}
 }
+// Кнопка «Открыть отчёт» под сообщением бота о ревизии водителя открывает
+// приложение сразу на этом отчёте (?go=audit&d=район&day=день). Прошлый
+// раздел из сессии тогда не восстанавливаем — он лёг бы поверх отчёта.
+const GO_AUDIT = (() => {
+  try{
+    const q = new URLSearchParams(location.search);
+    return q.get('go') === 'audit' && q.get('d') ? {d: q.get('d'), day: q.get('day') || ''} : null;
+  }catch(e){ return null; }
+})();
+if(GO_AUDIT) window.addEventListener('load', () => setTimeout(() => {
+  if(!HIDE) audReportOpen(GO_AUDIT.d, GO_AUDIT.day, 'link');
+}, 700));
 function _navRestore(){
   let nav = null;
   try{ nav = JSON.parse(sessionStorage.getItem('ambar_nav') || 'null'); }catch(e){}
-  if(!nav || HIDE) return;
+  if(!nav || HIDE || GO_AUDIT) return;
   try{
     const btn = document.querySelector(`.tb[data-pg="${nav.pg}"]`);
     if(btn && !btn.classList.contains('on')) btn.click();
@@ -14519,8 +14531,9 @@ function stkBack(){
   if(STK.view === 'mvn'){ mvnBack(); return; }
   // Отчёт открывают и со страницы района, и из истории — назад туда же.
   if(STK.view === 'report'){
-    // Из чек-листа — обратно в чек-лист (closeStock откроет его по CKL_RETURN).
-    if(STK.repFrom === 'checklist'){ closeStock(); return; }
+    // Из чек-листа — обратно в чек-лист (closeStock откроет его по CKL_RETURN);
+    // из кнопки бота или «Алертов» — закрыть склад, туда, где были.
+    if(STK.repFrom === 'checklist' || STK.repFrom === 'link'){ closeStock(); return; }
     if(STK.repFrom === 'audits') stkAudits(STK.audFocus, STK.audFrom); else stkAuditPick(); return; }
   if(STK.view === 'sheet'){ stkAuditPick(); return; }
   // История открывается и с плитки склада, и с карточки района — назад туда же.
@@ -17835,6 +17848,20 @@ async function chkAudit(){
   ACC_VIEW = null;
   CKL_RETURN = true;
   if(!t){ openStock(); return; }
+  await audReportOpen(t.district, t.day, 'checklist');
+}
+
+// Отчёт ревизии района одним нажатием. Зовут трое: строка чек-листа, кнопка
+// «Открыть отчёт» под сообщением бота о ревизии водителя (?go=audit) и строка
+// «Алертов» (владелец, 19 сен 2026: «сделай, чтобы открывалось сразу одним
+// нажатием»). from — откуда пришли: «назад» из отчёта ведёт туда же
+// (checklist — в чек-лист, link — закрыть склад, см. stkBack).
+async function audReportOpen(district, day, from){
+  // Раздел учёта лежит на том же слое, что склад, и позже в разметке —
+  // открытый, он накрыл бы отчёт (см. chkAudit).
+  document.getElementById('accOv').classList.remove('show');
+  ACC_VIEW = null;
+  if(from !== 'checklist') CKL_RETURN = false;
   // Раздел склада открываем без списка районов: он бы приехал позже отчёта
   // и лёг поверх него.
   document.getElementById('stkOv').classList.add('show');
@@ -17845,10 +17872,17 @@ async function chkAudit(){
   document.getElementById('stkMid').innerHTML = '<div class="stk-empty">Загрузка…</div>';
   let rep;
   try{ rep = await ownerApi.ownerFetch('/api/owner/stock/audit/report',
-        {params:{district: t.district, day: t.day}}); }
-  catch(e){ _toast('Отчёт не найден'); stkPicker(); return; }
+        {params:{district, day}}); }
+  catch(e){
+    // Отчёта нет — ревизию возобновили или ещё не завершили: показываем, что
+    // с ней сейчас, на странице района.
+    _toast('Отчёта нет — ревизия идёт');
+    await audOpen(district);
+    return;
+  }
+  if(STK.view !== 'report') return;            // пока ехало — ушли
   await stkLoadContext();
-  STK.district = t.district; STK.repFrom = 'checklist'; STK.audFocus = t.district; STK.audFrom = 'stock';
+  STK.district = district; STK.repFrom = from; STK.audFocus = district; STK.audFrom = 'stock';
   audReport(rep);
 }
 
@@ -30007,6 +30041,12 @@ function _alertClickTarget(n, fullText, ts, ico){
     const som = txt.match(/#(AMB\d+)/i);
     if(som) return ()=>{ closeAlerts(); openDetail('support:order-'+som[1]); };
     return ()=>{ closeAlerts(); openDetail('support:list'); };
+  }
+  // Ревизия водителя — сразу в её отчёт, где и решают (владелец, 19 сен 2026:
+  // «сделай, чтобы открывалось сразу одним нажатием»). Район и день — в meta.
+  if(ek === 'stock.audit' && n.meta && n.meta.district){
+    const m = n.meta;
+    return ()=>{ closeAlerts(); audReportOpen(m.district, m.day || '', 'link'); };
   }
   const om = txt.match(/#(AMB\d+)/i);
   if(om){ const oid = om[1]; return ()=>{ closeAlerts(); openDetail('order:'+oid); }; }

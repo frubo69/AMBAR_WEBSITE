@@ -54,7 +54,8 @@ staff.test_driver = lambda uid, force=False: None
 owner_auth.install_validator(lambda s: {"id": int(s)} if s.isdigit() else None)
 
 SENT = {"owner": [], "op": []}
-async def _owners(kind, text, **k): SENT["owner"].append((kind, text))
+os.environ["OWNER_WEBAPP_URL"] = "https://stand.example/owner/"
+async def _owners(kind, text, **k): SENT["owner"].append((kind, text)); SENT.setdefault("owner_k", []).append(k)
 async def _ops(text, district="", **k): SENT["op"].append((district, text, k.get("parse_mode"), k.get("own_only")))
 owner_routes.notify_owners = _owners
 op_route.send = _ops
@@ -204,6 +205,12 @@ async def main():
                      "Где решать: STAR → Учёт → Чек-лист смены → «Решения по ревизиям»"):
             eq(f"старшему: «{want}»", want in ot, True)
         eq("старшему — сумма недостачи в AED", "AED" in ot, True)
+        k0 = (SENT.get("owner_k") or [{}])[0]
+        eq("в ленту STAR — район и день (строка «Алертов» откроет отчёт)", k0.get("meta"), {"district": "jvc", "day": D})
+        btn = ((k0.get("reply_markup") or {}).get("inline_keyboard") or [[{}]])[0][0]
+        eq("кнопка «Открыть отчёт» — мини-апп STAR сразу на отчёте",
+           (btn.get("text"), (btn.get("web_app") or {}).get("url")),
+           ("Открыть отчёт", f"https://stand.example/owner/?go=audit&d=jvc&day={D}"))
         eq("оператору района — один раз, JVC, HTML, только свой оператор",
            [(x[0], x[2], x[3]) for x in SENT["op"]], [("jvc", "HTML", True)])
         opt = SENT["op"][0][1] if SENT["op"] else ""
@@ -288,6 +295,18 @@ async def main():
     db.drv_msg_add = _reg
     r = await OR.send("текст", district="jvc", own_only=True)
     eq("send(own_only) — только устройства оператора района", sorted(got), [501, 502])
+
+    print("── кнопка под сообщением старшему ───────────────────────────────")
+    calls = []
+    async def _tg2(token, chat, text, parse_mode="Markdown", reply_markup=None, **k):
+        calls.append(bool(reply_markup))
+        if reply_markup: return {"ok": False, "description": "Bad Request: BUTTON_TYPE_INVALID"}
+        return {"ok": True, "result": {"message_id": 9}}
+    owner_routes.tg_send = _tg2
+    r = await owner_routes._send_md("t", 1, "*Ревизия*", reply_markup=DA.open_button("jvc", D))
+    eq("не приняли с кнопкой — ушло без неё", (r.get("ok"), calls), (True, [True, False]))
+    os.environ["OWNER_WEBAPP_URL"] = ""
+    eq("нет адреса STAR — нет и кнопки (свой домен людям не даём)", DA.open_button("jvc", D), None)
 
     print("\nвсё прошло" if not FAIL else f"\nНЕ ПРОШЛИ: {FAIL}")
     return 1 if FAIL else 0

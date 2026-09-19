@@ -24,6 +24,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+from urllib.parse import urlencode
 
 from aiohttp import web
 
@@ -312,12 +314,27 @@ def operator_text(a: dict, driver: str) -> str:
     return "\n".join(out)
 
 
+def open_button(district: str, day: str) -> dict | None:
+    """Кнопка под сообщением старшему — STAR сразу на этом отчёте, одним
+    нажатием (владелец, 19 сен 2026: «сделай, чтобы открывалось сразу одним
+    нажатием»). Адрес — от OWNER_WEBAPP_URL: наш домен людям не даём, и
+    адреса нет — нет и кнопки, сообщение уходит без неё."""
+    url = os.getenv("OWNER_WEBAPP_URL", "").strip()
+    if not url:
+        return None
+    url += ("&" if "?" in url else "?") + urlencode({"go": "audit", "d": district, "day": day})
+    return {"inline_keyboard": [[{"text": "Открыть отчёт", "web_app": {"url": url}}]]}
+
+
 async def tell(district: str, day: str, a: dict, driver: str) -> None:
     """Отчёт старшему (AMBAR STAR) и оператору района. Сбой одной стороны не
-    отменяет другую."""
+    отменяет другую. В ленту уведомлений STAR — с районом и днём: строка
+    «Алертов» по ним открывает сам отчёт."""
     try:
         from owner_routes import notify_owners
-        await notify_owners("stock.audit", owner_text(a, driver))
+        await notify_owners("stock.audit", owner_text(a, driver),
+                            meta={"district": district, "day": day},
+                            reply_markup=open_button(district, day))
     except Exception as e:                          # noqa: BLE001
         log.error(f"[audit] отчёт старшему не ушёл ({district}): {e}")
     try:

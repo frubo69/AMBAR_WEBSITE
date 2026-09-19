@@ -2561,12 +2561,15 @@ async def _notify_testers(event_key: str, text: str, parse_mode: str = "Markdown
 
 
 async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown",
-                        meta: dict | None = None, test: bool = False) -> list:
+                        meta: dict | None = None, test: bool = False,
+                        reply_markup: dict | None = None) -> list:
     """Send notification to subscribed owners/managers. Returns list of
     {"chat_id": int, "message_id": int} for each successfully sent message
     so callers can delete them later if needed. `meta` is persisted with the
     notification for the owner app (e.g. support conv_key routing).
-    test=True — событие по тест-заказу: только тестерам, мимо архива."""
+    test=True — событие по тест-заказу: только тестерам, мимо архива.
+    reply_markup — кнопка под сообщением (например, «Открыть отчёт» —
+    мини-апп сразу на нужном экране); не принял с кнопкой — уйдёт без неё."""
     if test:
         return await _notify_testers(event_key, text, parse_mode)
     try:
@@ -2585,7 +2588,8 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown",
     log.info(f"[owner-notif] {event_key} → {owner_ids}")
     for oid in owner_ids:
         try:
-            result = await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            result = await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode,
+                                    reply_markup=reply_markup)
             if result and result.get("ok"):
                 sent.append({"chat_id": oid, "message_id": result["result"]["message_id"]})
             else:
@@ -2721,16 +2725,22 @@ def _md(s) -> str:
     return out
 
 
-async def _send_md(token, chat_id, text, parse_mode="Markdown"):
+async def _send_md(token, chat_id, text, parse_mode="Markdown", reply_markup=None):
     """Send, and if Telegram refuses to parse the entities, resend as PLAIN text.
 
     Belt-and-braces on top of _md(): a formatting slip must never cost the owner
-    an entire notification. Returns the final Telegram response."""
-    r = await tg_send(token, chat_id, text, parse_mode=parse_mode)
+    an entire notification. Returns the final Telegram response.
+
+    Кнопка — удобство, сообщение — главное: не принял с кнопкой (мини-апп в
+    кнопке телеграм пускает не везде) — шлём то же самое без неё."""
+    r = await tg_send(token, chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
     if r and not r.get("ok") and "parse" in str(r.get("description", "")).lower():
         log.error(f"[owner-notif] parse error → retrying plain: {r.get('description')}")
         plain = text.replace("*", "").replace("`", "").replace("\\", "")
-        r = await tg_send(token, chat_id, plain, parse_mode=None)
+        r = await tg_send(token, chat_id, plain, parse_mode=None, reply_markup=reply_markup)
+    if reply_markup and r and not r.get("ok"):
+        log.warning(f"[owner-notif] с кнопкой не принял ({r.get('description')}) — шлём без неё")
+        return await _send_md(token, chat_id, text, parse_mode=parse_mode)
     return r
 
 

@@ -730,6 +730,8 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .3s var(--e1)}
 .aud-bar u.ok{background:var(--up)}
 .aud-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:12px 13px 13px}
+/* Сейф: три стопки и кошелёк — квадратом, а не три в ряд и одна под ними. */
+.aud-g.fb-safe4{grid-template-columns:repeat(2,1fr)}
 .aud-t{position:relative;min-width:0;padding:11px 10px 12px;border-radius:14px;
   background:var(--card2);border:1px solid var(--border2);text-align:left;
   font-family:inherit;color:var(--text)}
@@ -18105,6 +18107,8 @@ function walBlockRender(){
         'перевод','перевода','переводов')}${
         (d.old || []).length ? ` · старый ${fmtUsdt(старые)} USDT` : ''}`) : '', 130);
   _skel('walKpiUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
+  try{ const fb = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
+       if(fb && mb) fb.innerHTML = fbHubHtml(mb); }catch(e){}
   _skel('walKpiOrd',  !!d, d ? fmtUsdt((d.paid || {}).usdt) : '');
   _skel('walKpiOth',  !!t, t ? fmtUsdt(t.direct) : '');
   finHeroPaint();
@@ -18479,6 +18483,7 @@ function fbHubHtml(b, err){
       fbTile('Прибыль', 'np.days', null)}</div>
     <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
+  const wal = fbWal(b), all = fbSafeAll(b);
   return `<div class="sc fb-hub">${fbCap(month, true)}
     <div class="aud-g">
       ${fbTile('Доход', 't.gross', t.gross, {go: 'fbAnOpen()'})}
@@ -18488,11 +18493,13 @@ function fbHubHtml(b, err){
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
   </div>
   <div class="sc fb-hub fb-safe">
-    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${b.safe.total < 0 ? ' dn' : ''}" data-f="safe.total" data-fc="neg">${fbFmt(b.safe.total)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>
+    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>
     <div class="fb-safe-k">
       ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе'})}
       ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg'})}
       ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
+      ${fbGo('Кошелёк', 'safe.wal', wal ? wal.aed : null, "fbOpenWal()",
+             {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT'})}
     </div>
   </div>
   <div class="sc fb-hub">
@@ -18510,6 +18517,28 @@ function fbOpenToday(){
 function fbOpenB(){
   if(DAY_OFFSET) accDayGo(0);
   accOpen('finb');
+}
+// Кошелёк — четвёртая стопка сейфа (владелец, 19 сен 2026: «добавь в сейф
+// четвёртым пунктом кошелёк»): крипта, которой платят клиенты, — такие же
+// наши деньги, как наличные в стопках. USDT всех кошельков (текущего и
+// старых) по курсу доллара месяца из «Финансов»; не загрузился — null, строка
+// показывает прочерк, а сумма сейфа до его прихода — без него.
+function fbWal(mb){
+  const w = ACC_WAL; if(!w || !w.balance) return null;
+  const usdt = (+w.balance.usdt || 0)
+    + (w.old || []).reduce((a, o) => a + (+((o.balance || {}).usdt) || 0), 0);
+  const rate = +((mb && fbCur(mb) || {}).usd) || 3.6725;
+  return {usdt, aed: Math.round(usdt * rate)};
+}
+// Сумма сейфа вместе с кошельком — в шапке карточки и на экране «Сейф».
+function fbSafeAll(mb){
+  const wal = fbWal(mb);
+  return ((mb && mb.safe && mb.safe.total) || 0) + (wal ? wal.aed : 0);
+}
+// Из «Сейфа» в кошелёк и обратно в «Сейф», а не в «Учёт».
+function fbOpenWal(back){
+  accOpen('wallet');
+  if(back) ACC_BACK = back;
 }
 async function fbMonthStep(d){
   const m = fbMonthAdd(FB.month || fbMonthNow(), d);
@@ -18602,6 +18631,8 @@ function fbValues(){
     const pay = fbCur(mb);
     for(const k in pay.totals) V['pay.' + k] = pay.totals[k];
     V['pay.usd'] = pay.usd; V['pay.usd_auto'] = pay.usd_auto;
+    const wal = fbWal(mb);
+    V['safe.wal'] = wal ? wal.aed : null; V['safe.all'] = fbSafeAll(mb);
     const p = FB.person ? (pay.people || []).find(x => x.name === FB.person) : null;
     if(p) for(const k in p) if(typeof p[k] === 'number' || p[k] === null) V['p.' + k] = p[k];
     if(p){ V['p.usd_on'] = p.cur === 'USD' ? 1 : 0; V['p.left_pos'] = p.left > 0 ? p.left : 0; }
@@ -18916,17 +18947,19 @@ function fbOpenIn(label, field, b, o){
 // сложилась, по факту пересчёта и разница.
 async function accFinSafe(){
   const b = await fbMonthScreen('Сейф'); if(!b) return;
-  const s = b.safe || {};
+  const s = b.safe || {}, wal = fbWal(b);
   const days = (b.days || []).filter(d => !d.future && d.base > 0).reverse();
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
-    <div class="aud-g">
+    <div class="aud-g fb-safe4">
       ${fbTile('Барракуда', 'safe.b', s.b)}
       ${fbTile('РП', 'safe.rp', s.rp, {mode: 'neg'})}
       ${fbTile('ЧП', 'safe.np', s.np, {mode: 'neg'})}
+      ${fbTile('Кошелёк', 'safe.wal', wal ? wal.aed : null,
+               {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT', go: 'fbOpenWal(accFinSafe)'})}
     </div>
-    ${fbRow('Всего в сейфе', 'safe.total', s.total, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbRow('Всего в сейфе', 'safe.all', fbSafeAll(b), {sum: true, sign: '=', mode: 'neg'})}
   </div>
   <div class="sc">${fbCapT('Распределение по дням')}<div class="fb-one">${
     days.length ? days.map(fbSafeDayRow).join('') : '<div class="fb-none">Выручки в этом месяце ещё нет</div>'}</div></div>

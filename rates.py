@@ -1,50 +1,45 @@
-"""Курс валют к дирхаму — коммерческий, тот, по которому реально меняют.
+"""Курс валют к дирхаму — у обменника, по которому реально меняют наличные.
 
 Зачем не центробанк
 -------------------
 Официальный курс ЦБ ОАЭ считается для налогов, а не для обмена: доллар у него
 вечные 3.6725, потому что дирхам к нему привязан. Человек с наличными в руках
-получит другое число — у обменника своя цена. Зарплаты здесь равняются на
-доллар, а водители привозят наличные, поэтому смысл имеет только курс, по
-которому эти наличные примут.
+получит другое число — у обменника своя цена, и у него их две: за сколько он
+купит нашу валюту и за сколько продаст свою.
 
-Откуда берём
-------------
-Публичного API у обменников нет: собственные сайты Al Ansari и Al Fardan
-рисуют курсы уже в браузере, а страницы банков отдают серверу 403. Единственный
-путь, который отвечает обычным запросом, — витрина, где те же курсы Al Ansari
-выложены готовыми, с отметкой времени по каждой валюте.
+Откуда берём (с 19 сен 2026)
+----------------------------
+С сайта самого Al Ansari Exchange — тем же запросом, которым его конвертер
+«Foreign Exchange» считает обмен наличных (admin-ajax.php, action
+foreign_action, trtype S — обменник покупает валюту у нас, B — продаёт нам).
+Ключ запроса (nonce) и справочник валют лежат на странице конвертера; ключ
+живёт около суток, поэтому страница перечитывается при каждом обновлении.
 
-Что важно в разборе
--------------------
-У валюты бывает ДВЕ строки: перевод и наличные. Разница не косметическая — у
-доллара это 3.79 против 3.68, почти четыре процента. Нам нужны наличные, и
-берётся всегда вторая строка; первая остаётся запасной на случай, когда второй
-нет вовсе.
+До 19 сен курс брался с витрины masarif.ae, и это было неверно (владелец:
+«убедись, что курсы актуальны именно с обменников»): у доллара там стоял курс
+денежного перевода (3.6805 — калькулятор «Send money» на главной Al Ansari),
+а у евро, рубля и остальных — только перевод месячной давности, поэтому
+показывался рыночный. Настоящий курс наличных у доллара в тот вечер — 3.655
+(купит) / 3.677 (продаст), у евро 4.1485 / 4.2684, у рубля 0.0393 / 0.0450.
 
-Свежесть источник сообщает сам, по каждой валюте отдельно — и это оказалось
-решающим. На проверке 2 сентября 2026 из 69 валют витрины свежими были единицы:
-доллар и фунт обновлены в тот же день, а евро, рубль, лира, юань, тенге и
-сомони висели с 25 августа и были помечены самим источником как устаревшие.
-Хуже того, у 51 валюты курса наличных нет вовсе — только перевод, а это другая
-цена: у доллара 3.68 наличными против 3.79 переводом.
-
-Проверка на живых числах: рубль на витрине шёл 0.0347 дирхама, при рыночных
-0.0423 — на восемнадцать процентов мимо. Показать такое как «курс, по которому
-поменяют» значит ошибиться в зарплате на пятую часть.
-
-Поэтому источников два, и каждое число подписано, откуда оно:
-  • рыночный курс — по всем валютам, обновляется ежесуточно и сходится с
-    привязкой дирхама к доллару (3.6725) до знака;
-  • курс наличных обменника — только там, где витрина отдаёт его свежим.
-    Сегодня это доллар, а он здесь и главный: зарплаты равняются на него.
-
-Устаревшее не показывается молча никогда: либо стоит отметка времени, либо
-строки нет вовсе.
+Что показываем
+--------------
+• cash_aed — сколько дирхамов дадут за единицу валюты в обменнике (он у нас
+  покупает): по нему меняют наличные, привезённые с заказов;
+• cash_buy_aed — сколько стоит купить единицу валюты в обменнике (он
+  продаёт), у основных валют: по нему считается зарплата в долларах, если курс
+  месяца не вписан руками (finance_routes._usd);
+• aed — рыночный курс (open.er-api), по всем валютам: для сравнения и там, где
+  обменник валюту не меняет.
+Число обменника, которое расходится с рынком больше чем на треть, — не курс
+(у сомони Al Ansari отвечает 0.0003 при рыночных 0.40: наличных сомони у него
+нет), такой валюте показывается рынок с честной подписью.
 """
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import logging
 import re
 import time as _t
@@ -63,28 +58,29 @@ CORS_HEADERS = {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
 }
 
-SRC_URL = ("https://masarif.ae/currency-exchanges/al-ansari-exchange"
-           "/currency-exchange-rates")
 SRC_NAME = "Al Ansari Exchange"
-# Рыночный курс: 166 валют, без ключа, одно обновление в сутки, и сам сообщает,
-# когда будет следующее.
+SRC_PAGE = "https://alansariexchange.com/service/foreign-exchange/"
+SRC_AJAX = "https://alansariexchange.com/wp-admin/admin-ajax.php"
+AED_ID = 91                 # дирхам в справочнике Al Ansari
+# Рыночный курс: 166 валют, без ключа, одно обновление в сутки.
 MKT_URL = "https://open.er-api.com/v6/latest/AED"
 MKT_NAME = "рыночный курс"
-# Витрина обменника считается пригодной, только если она сама назвала курс
-# свежим И у валюты есть цена наличных. Всё остальное — не курс обмена.
-CASH_MAX_AGE_H = 36
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126 Safari/537.36")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-TTL_SEC = 6 * 3600          # чаще раза в шесть часов ходить незачем: источник
-                            # сам обновляется раз в сутки
+TTL_SEC = 3600              # обменник меняет цену в течение дня — раз в час
 RETRY_SEC = 15 * 60         # столько ждём после неудачи, прежде чем пробовать
+MAX_OFF = 0.33              # дальше от рынка — не курс, а ошибка источника
 
-# Что показываем первым. Остальные шесть десятков доступны в раскрытом списке.
-# Сомони — седьмой по слову владельца: под юанем стоял афгани, который тут
-# никому не нужен, а таджикскими платят.
+# Что показываем первым. Остальные доступны в раскрытом списке.
+# Сомони — седьмой по слову владельца: таджикскими платят.
 MAIN = ["USD", "EUR", "GBP", "RUB", "TRY", "CNY", "TJS"]
+# Что спрашиваем у обменника: основные и те, которыми платят клиенты и
+# которые возят люди. Весь справочник (сотня валют) — это сотня запросов к
+# чужому сайту каждый час, а смотрят из него эти.
+ASK = MAIN + ["SAR", "KZT", "KGS", "UAH", "AMD", "GEL", "INR", "PKR", "CHF", "CAD",
+              "AUD", "JPY", "QAR", "KWD", "OMR", "BHD", "EGP", "THB"]
 
 # Имена по-русски для тех, кого читают чаще всего. Для остальных остаётся то,
 # как валюту называет источник.
@@ -112,83 +108,116 @@ RU = {
 _CACHE: dict = {"at": 0.0, "data": None, "fail_at": 0.0}
 
 
-def _text(html: str) -> list[str]:
-    """Страница в строки: разметка нам не нужна, нужен порядок значений."""
-    h = re.sub(r"<script.*?</script>", " ", html, flags=re.S)
-    h = re.sub(r"<style.*?</style>", " ", h, flags=re.S)
-    h = re.sub(r"<[^>]+>", "\n", h)
-    return [x.strip() for x in h.split("\n") if x.strip()]
-
-
-_RATE = re.compile(r"^1\s*AED\s*=\s*([0-9][0-9.,]*)\s*([A-Z]{3})$")
-_WHEN = re.compile(r"^([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}\s+\d{1,2}:\d{2})$")
-
-
-def parse(html: str) -> list[dict]:
-    """Разобрать витрину в список валют.
-
-    Блок валюты выглядит так, и порядок строк в нём постоянен:
-
-        USD
-        (History)
-        United States Dollar
-        1 AED = 0.2637 USD      ← перевод
-        1 AED = 0.2717 USD      ← наличные (может не быть)
-        Sep 02, 2026 19:39
-        Fresh
-    """
-    lines = _text(html)
-    out, seen = [], set()
-    for i, l in enumerate(lines):
-        m = _RATE.match(l)
-        if not m:
+# ── обменник ────────────────────────────────────────────────────────────────
+def page_nonce(html: str) -> str:
+    """Ключ запроса из страницы конвертера. Лежит в CC_Ajax_Object — то прямо в
+    тексте, то в сжатой вставке NitroCDN (base64), то экранированным JSON."""
+    m = re.search(r"CC_Ajax_Object\s*=\s*(\{.*?\})", html)
+    if m:
+        try:
+            v = json.loads(m.group(1)).get("ajax_nonce")
+            if v:
+                return str(v)
+        except ValueError:
+            pass
+    for b in re.findall(r'registerInlineScript\("[^"]+",\s*"([A-Za-z0-9+/=]+)"', html):
+        try:
+            t = base64.b64decode(b).decode("utf-8", "ignore")
+        except Exception:                          # noqa: BLE001
             continue
-        code = m.group(2)
-        if code in seen:
-            continue
-        # Курсы идут подряд: первый — перевод, второй — наличные.
-        rates = []
-        j = i
-        while j < len(lines):
-            mm = _RATE.match(lines[j])
-            if not mm or mm.group(2) != code:
-                break
-            try:
-                rates.append(float(mm.group(1).replace(",", "")))
-            except ValueError:
-                pass
-            j += 1
-        if not rates:
-            continue
-        when, fresh = "", None
-        for k in range(j, min(j + 3, len(lines))):
-            if _WHEN.match(lines[k]):
-                when = lines[k]
-            elif lines[k] in ("Fresh", "Stale"):
-                fresh = lines[k] == "Fresh"
-        name = lines[i - 1] if i >= 1 else code
-        if name.startswith("1 AED") or name == "(History)":
-            name = code
-        # Наличные — вторая строка, когда она есть.
-        cash = rates[1] if len(rates) > 1 else rates[0]
-        if not cash:
-            continue
-        seen.add(code)
-        out.append({
-            "code": code,
-            "name": RU.get(code) or name,
-            "per_aed": round(cash, 6),          # сколько валюты за 1 дирхам
-            "aed": round(1 / cash, 4),          # сколько дирхамов за 1 единицу
-            "transfer": round(rates[0], 6),
-            "only_transfer": len(rates) == 1,   # наличных на витрине нет
-            "at": when,
-            "fresh": fresh,
-        })
-    order = {c: i for i, c in enumerate(MAIN)}
-    out.sort(key=lambda r: (order.get(r["code"], 99), r["code"]))
+        m = re.search(r"ajax_nonce[\"']?\s*:\s*[\"']([0-9a-f]+)", t)
+        if m:
+            return m.group(1)
+    m = re.search(r'ajax_nonce\\?"\s*:\s*\\?"([0-9a-f]+)', html)
+    return m.group(1) if m else ""
+
+
+def page_codes(html: str) -> dict:
+    """{валюта: (currfrom, cntcode)} из списка конвертера. У евро и доллара
+    строк много (по странам) — берём ту, где страна и валюта совпадают, иначе
+    первую."""
+    out: dict = {}
+    for code, cnt, to in re.findall(
+            r'data-ccyname="([A-Z]{3})"\s+data-cntcode="(\d+)"\s+data-toccy="(\d+)"', html):
+        if code not in out or cnt == to:
+            out[code] = (int(to), int(cnt))
     return out
 
 
+async def _ajax(s: aiohttp.ClientSession, nonce: str, frm: int, cnt: int, tr: str) -> float | None:
+    data = {"action": "foreign_action", "currfrom": frm, "currto": AED_ID, "cntcode": cnt,
+            "amt": 1, "security": nonce, "trtype": tr}
+    try:
+        async with s.post(SRC_AJAX, data=data,
+                          headers={"X-Requested-With": "XMLHttpRequest", "Referer": SRC_PAGE}) as r:
+            if r.status != 200:
+                return None
+            d = json.loads(await r.text())
+    except Exception:                              # noqa: BLE001
+        return None
+    if not isinstance(d, dict) or d.get("status_msg") != "SUCCESS":
+        return None
+    try:
+        v = float(d.get("rate") or 0)
+    except (TypeError, ValueError):
+        return None
+    return v if v > 0 else None
+
+
+async def _fetch_cash(market: dict | None = None) -> dict:
+    """{валюта: {sell, buy, at}} — дирхамов за единицу: sell — обменник у нас
+    покупает, buy — нам продаёт (только у основных). Молчит — пусто."""
+    try:
+        timeout = aiohttp.ClientTimeout(total=40)
+        async with aiohttp.ClientSession(timeout=timeout, headers={"User-Agent": UA}) as s:
+            async with s.get(SRC_PAGE) as r:
+                if r.status != 200:
+                    log.warning(f"[rates] Al Ansari: страница ответила {r.status}")
+                    return {}
+                html = await r.text()
+            nonce, codes = page_nonce(html), page_codes(html)
+            if not nonce or not codes:
+                log.warning(f"[rates] Al Ansari: на странице нет ключа ({bool(nonce)}) "
+                            f"или списка валют ({len(codes)})")
+                return {}
+            sem = asyncio.Semaphore(4)
+
+            async def one(code: str, tr: str):
+                frm, cnt = codes[code]
+                async with sem:
+                    return code, tr, await _ajax(s, nonce, frm, cnt, tr)
+
+            jobs = [one(c, "S") for c in ASK if c in codes]
+            jobs += [one(c, "B") for c in MAIN if c in codes]
+            got = await asyncio.gather(*jobs)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[rates] Al Ansari не ответил: {e}")
+        return {}
+    at = datetime.now(DUBAI_TZ).isoformat(timespec="minutes")
+    out: dict = {}
+    for code, tr, v in got:
+        if not v:
+            continue
+        # Сверка с рынком: 0.0003 у сомони — не курс, а «не меняем».
+        per_aed = (market or {}).get(code)
+        if per_aed:
+            mkt = 1 / per_aed
+            if abs(v / mkt - 1) > MAX_OFF:
+                log.info(f"[rates] Al Ansari {code} {tr}: {v} при рынке {mkt:.4f} — не курс, пропускаю")
+                continue
+        row = out.setdefault(code, {"at": at})
+        row["sell" if tr == "S" else "buy"] = round(v, 6)
+    # Продаёт не дороже, чем покупает, — не курс (у сомони обе цены 0.0003):
+    # проверка на случай, когда сверить с рынком не с чем.
+    for code, row in list(out.items()):
+        if row.get("buy") and row.get("sell") and row["buy"] <= row["sell"]:
+            log.info(f"[rates] Al Ansari {code}: продаёт {row['buy']} не дороже, чем покупает "
+                     f"{row['sell']} — не курс, пропускаю")
+            out.pop(code)
+    return {c: r for c, r in out.items() if r.get("sell")}
+
+
+# ── рынок ───────────────────────────────────────────────────────────────────
 async def _get(url: str, json_: bool = False):
     try:
         timeout = aiohttp.ClientTimeout(total=25)
@@ -214,43 +243,41 @@ async def _fetch_market() -> tuple[dict, str] | None:
     return rates, str(d.get("time_last_update_utc") or "")
 
 
-async def _fetch_cash() -> dict:
-    """Курс наличных обменника — только по тем валютам, где витрина назвала
-    его свежим. Устаревшее не берём вовсе: недельной давности курс рубля
-    ошибается на пятую часть, и лучше не показать ничего."""
-    html = await _get(SRC_URL)
-    if not html:
-        return {}
-    out = {}
-    for r in parse(html):
-        if r.get("fresh") and not r.get("only_transfer"):
-            out[r["code"]] = {"aed": r["aed"], "at": r["at"]}
-    return out
-
-
 async def _fetch() -> list[dict] | None:
-    """Собрать список: рыночный курс по всем, наличные — где есть свежие."""
+    """Список валют: рынок по всем, наличные обменника — где он их меняет.
+    Рынок молчит — строки только из обменника; молчат оба — None."""
     mkt = await _fetch_market()
-    if not mkt:
+    rates, mkt_at = mkt if mkt else ({}, "")
+    if rates:
+        _CACHE["mkt_rates"] = rates
+    # Сверка обменника с рынком — по свежему рынку, а молчит он — по последнему
+    # известному: курс за сутки не уходит на треть.
+    cash = await _fetch_cash(rates or _CACHE.get("mkt_rates"))
+    if not rates and not cash:
         return None
-    rates, mkt_at = mkt
-    cash = await _fetch_cash()          # молчит — не беда, рынок уже есть
     out = []
-    for code, per_aed in rates.items():
-        if code == "AED" or not per_aed:
+    for code in sorted(set(rates) | set(cash)):
+        if code == "AED":
             continue
-        row = {
-            "code": code,
-            "name": RU.get(code) or code,
-            "per_aed": round(per_aed, 6),
-            "aed": round(1 / per_aed, 4),
-        }
+        per_aed = rates.get(code)
         c = cash.get(code)
+        if not per_aed and not c:
+            continue
+        row = {"code": code, "name": RU.get(code) or code}
+        if per_aed:
+            row["per_aed"] = round(per_aed, 6)
+            row["aed"] = round(1 / per_aed, 4)
         if c:
-            row["cash_aed"] = c["aed"]
+            row["cash_aed"] = round(c["sell"], 4)
+            if c.get("buy"):
+                row["cash_buy_aed"] = round(c["buy"], 4)
             row["cash_at"] = c["at"]
-            # Насколько обменник дороже рынка — это и есть его заработок.
-            row["spread"] = round((c["aed"] / row["aed"] - 1) * 100, 2)
+            if row.get("aed"):
+                # Насколько обменник дешевле рынка, когда у нас покупает, — его
+                # заработок на нас.
+                row["spread"] = round((c["sell"] / row["aed"] - 1) * 100, 2)
+        if "aed" not in row:
+            row["aed"] = row["cash_aed"]
         out.append(row)
     order = {c: i for i, c in enumerate(MAIN)}
     out.sort(key=lambda r: (order.get(r["code"], 99), r["code"]))
@@ -280,9 +307,10 @@ async def get_rates(force: bool = False) -> dict:
         except Exception as e:                    # noqa: BLE001
             log.warning(f"[rates] снимок дня не записан: {e}")
         log.info(f"[rates] обновлено · валют {len(rows)}"
-                 f" · наличными {_CACHE.get('cash_n', 0)}"
+                 f" · у обменника {_CACHE.get('cash_n', 0)}"
                  + (f" · доллар рынок {usd['aed']}"
-                    + (f", обменник {usd['cash_aed']}" if usd.get("cash_aed") else "")
+                    + (f", обменник купит {usd['cash_aed']} / продаст {usd.get('cash_buy_aed')}"
+                       if usd.get("cash_aed") else ", обменник молчит")
                     if usd else ""))
         return _payload(ok=True)
     _CACHE["fail_at"] = now
@@ -293,6 +321,7 @@ def _payload(ok: bool) -> dict:
     at = _CACHE["at"]
     return {
         "source": SRC_NAME,
+        "source_url": SRC_PAGE,
         "market": MKT_NAME,
         "rates": _CACHE["data"] or [],
         "fetched_at": int(at * 1000) if at else 0,

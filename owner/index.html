@@ -6476,6 +6476,11 @@ button.exp-wait:active{transform:scale(.99)}
   color:var(--up);line-height:1.25;margin-top:2px}
 .fx-v i.none{color:var(--dim);font-weight:500}
 .fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
+/* Под числом обменника — почём он же продаёт: сдать и купить — две цены, и
+   разница между ними и есть его заработок. */
+.fx-strip s{display:block;margin-top:5px;text-decoration:none;font-size:10.5px;font-weight:600;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.fx-strip s:empty{display:none}
 
 /* ── Склад: сколько лежит и сколько это стоит ─────────────────────────────
    Три величины — три зоны. У каждой своя подложка, свои поля и своя треть
@@ -7512,10 +7517,10 @@ button.exp-wait:active{transform:scale(.99)}
       <span class="fin-sec-b"><b>Курс валют</b><i class="is-skel" id="fxSub" style="min-width:150px">0000</i></span>
       <svg class="fin-sec-go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
     </button>
-    <div class="fin-strip">
-      <div><b class="is-skel" id="fxUsd">0000</b><i>Доллар</i></div>
-      <div><b class="is-skel" id="fxEur">0000</b><i>Евро</i></div>
-      <div><b class="is-skel" id="fxRub">0000</b><i>Рубль</i></div>
+    <div class="fin-strip fx-strip">
+      <div><b class="is-skel" id="fxUsd">0000</b><i>Доллар</i><s id="fxUsdB"></s></div>
+      <div><b class="is-skel" id="fxEur">0000</b><i>Евро</i><s id="fxEurB"></s></div>
+      <div><b class="is-skel" id="fxRub">0000</b><i>Рубль</i><s id="fxRubB"></s></div>
     </div>
     <div class="fin-x">
       <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off"
@@ -18304,15 +18309,17 @@ function _fxN(v){ return v >= 1 ? v.toFixed(3) : v.toFixed(4); }
 function fxRender(){
   const box = document.getElementById('fxList'); if(!box) return;
   const rows = (FX && FX.rates) || [];
-  const val = c => {
-    const r = rows.find(x => x.code === c);
-    return r ? (r.cash_aed || r.aed) : null;
-  };
+  // Крупно — сколько дирхамов даст обменник за единицу (он у нас покупает):
+  // по этой цене меняют наличные с заказов. Ниже — почём он продаёт. Нет
+  // курса у обменника — рыночный с пометкой, а не молча.
   const put = (id, c) => {
     const el = document.getElementById(id); if(!el) return;
-    const v = val(c);
+    const r = rows.find(x => x.code === c);
     el.classList.remove('is-skel');
-    el.textContent = v == null ? '—' : _fxN(v);
+    el.textContent = !r ? '—' : _fxN(r.cash_aed || r.aed);
+    const sub = document.getElementById(id + 'B');
+    if(sub) sub.textContent = !r ? '' : r.cash_aed
+      ? (r.cash_buy_aed ? `продаёт ${_fxN(r.cash_buy_aed)}` : '') : 'рыночный';
   };
   put('fxUsd','USD'); put('fxEur','EUR'); put('fxRub','RUB');
   // Подпись отвечает на единственный вопрос, который к ней есть: насколько
@@ -18320,8 +18327,8 @@ function fxRender(){
   const sub = document.getElementById('fxSub');
   if(sub) sub.classList.remove('is-skel');
   _setText('fxSub', !FX ? 'не удалось загрузить'
-    : (FX.silent ? `источник молчит · последнее ${_fxWhen(FX.fetched_at)}`
-                 : `обновлено ${_fxWhen(FX.fetched_at)}`));
+    : (FX.silent ? `${FX.source || 'обменник'} молчит · последнее ${_fxWhen(FX.fetched_at)}`
+                 : `${FX.source || 'обменник'} · ${_fxWhen(FX.fetched_at)}`));
   const q = (document.getElementById('fxQ')?.value || '').trim().toLowerCase();
   const shown = q ? rows.filter(r => r.code.toLowerCase().includes(q)
                                   || (r.name || '').toLowerCase().includes(q))
@@ -18333,18 +18340,17 @@ function fxRender(){
       <span class="fx-v">
         <b>${_fxN(r.cash_aed || r.aed)} AED</b>
         ${r.cash_aed
-          ? `<i>обменник · рынок ${_fxN(r.aed)}</i>`
-          : '<i class="none">рыночный · обменник молчит</i>'}
+          ? `<i>обменник${r.cash_buy_aed ? ' · продаёт ' + _fxN(r.cash_buy_aed) : ''} · рынок ${_fxN(r.aed)}</i>`
+          : '<i class="none">рыночный · обменник не меняет</i>'}
       </span>
     </div>`).join('')
     : '<div class="cat-block-empty">Ничего не нашлось</div>';
   _setText('fxNote', !FX ? '' :
-    `Крупное число — дирхамы за единицу валюты: там, где обменник обновляет курс, `
-    + `это его цена наличными, и рыночная стоит ниже для сравнения. Свежий курс `
-    + `наличных сегодня есть у ${FX.cash_n || 0} `
-    + `${pluralize(FX.cash_n || 0,'валюты','валют','валют')} из ${rows.length} — `
-    + `у остальных показан рыночный, потому что устаревший курс обменника врёт `
-    + `сильнее, чем рынок. Наличные — ${escS(FX.source||'')}.`);
+    `Крупное число — сколько дирхамов даст ${FX.source || 'обменник'} за единицу валюты `
+    + `наличными (курс с его сайта, обновляется раз в час), рядом — почём он её продаёт `
+    + `и рыночный курс для сравнения. Наличными он меняет ${FX.cash_n || 0} `
+    + `${pluralize(FX.cash_n || 0,'валюту','валюты','валют')} из ${rows.length}; `
+    + `у остальных показан рыночный.`);
 }
 
 (function initFxBlock(){

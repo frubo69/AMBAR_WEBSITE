@@ -5044,7 +5044,7 @@ function fxdRows(){
         <em class="fxr-c">${svg(ICO.chevR, 13)}</em>
       </button>
       ${open ? `<div class="fxr-d">
-        <span><u>Обменник</u><b>${r.cash ? fxdN(r.rate) + ' AED' : 'не обновлял'}</b></span>
+        <span><u>Обменник</u><b>${r.cash ? fxdN(r.rate) + ' AED' : 'не меняет'}</b></span>
         <span><u>Рынок</u><b>${r.market ? fxdN(r.market) + ' AED' : '—'}</b></span>
         <span><u>Вчера</u><b>${r.prev ? fxdN(r.prev) + ' AED' : 'нет данных'}</b></span>
       </div>` : ''}
@@ -5067,7 +5067,7 @@ function profRatesHtml(){
     ${FXD_ERR ? `<div class="pf-warn">${svg(ICO.warn, 16)}<b>Курсы не обновились · ${esc(FXD_ERR)}</b>
       <button onclick="fxdRetry()">Обновить</button></div>` : ''}
     <div id="pfFxList">${fxdRows()}</div>
-    <div class="pf-fxnote">Дирхамов за единицу. Где обменник обновил курс — он, иначе рыночный.${
+    <div class="pf-fxnote">Дирхамов за единицу — сколько даст обменник Al Ansari наличными (курс с его сайта, раз в час). Где он валюту не меняет — рыночный.${
       FXD && FXD.at ? (FXD.silent ? ` Источник молчит, последнее ${fxdWhen(FXD.at)}.` : ` Обновлено ${fxdWhen(FXD.at)}.`) : ''}${
       FXD && !FXD.days ? ' Проценты и графики появятся, когда наберётся история по дням.' : ''}</div>`;
 }

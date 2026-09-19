@@ -489,7 +489,10 @@ async def _usd(mdoc: dict) -> dict:
         r = await rates.get_rates()
         row = next((x for x in (r.get("rates") or []) if x.get("code") == "USD"), None)
         if row:
-            auto = float(row.get("cash_aed") or row.get("aed") or 0) or None
+            # Зарплата в долларах — по цене, за которую доллар продаёт обменник
+            # (Al Ansari, 19 сен 2026: 3.677): столько стоит купить эти доллары.
+            # До 19 сен здесь был курс перевода с витрины (3.6805).
+            auto = float(row.get("cash_buy_aed") or row.get("cash_aed") or row.get("aed") or 0) or None
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] курс доллара не прочитан: {e}")
     return dict(usd=auto or USD_FALLBACK, usd_auto=auto, usd_set=False)

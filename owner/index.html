@@ -1010,6 +1010,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-res-t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase}
 .aud-res-s{font-size:11.5px;color:var(--muted);margin-top:5px}
+.aud-d b small.aud-u{font-size:11px;font-weight:600;opacity:.75;margin-left:3px}
 /* Комментарий водителя, который провёл ревизию, — его словами. */
 .aud-res-note{font-size:12.5px;font-style:italic;color:var(--sub);margin-top:8px;line-height:1.35}
 .aud-res-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:14px}
@@ -14503,8 +14504,9 @@ function closeStock(){
   document.getElementById('stkOv').classList.remove('show');
   _navSave();
   accLoadSummaries();              // плитка «Пересчёт склада» в «Учёте» — с новыми цифрами
-  // Пришли из чек-листа — он под нами, и строка про ревизию уже могла позеленеть.
-  if(CKL_RETURN){ CKL_RETURN = false; accChecklist(); }
+  // Пришли из чек-листа — возвращаемся в него (раздел спрятан, пока открыт
+  // склад, см. chkAudit), и строка про ревизию уже могла позеленеть.
+  if(CKL_RETURN){ CKL_RETURN = false; accOpen('checklist'); }
 }
 // Крестик уводит на шаг назад, а не сразу из экрана: из списка — к районам,
 // из списка районов — наружу.
@@ -14517,6 +14519,8 @@ function stkBack(){
   if(STK.view === 'mvn'){ mvnBack(); return; }
   // Отчёт открывают и со страницы района, и из истории — назад туда же.
   if(STK.view === 'report'){
+    // Из чек-листа — обратно в чек-лист (closeStock откроет его по CKL_RETURN).
+    if(STK.repFrom === 'checklist'){ closeStock(); return; }
     if(STK.repFrom === 'audits') stkAudits(STK.audFocus, STK.audFrom); else stkAuditPick(); return; }
   if(STK.view === 'sheet'){ stkAuditPick(); return; }
   // История открывается и с плитки склада, и с карточки района — назад туда же.
@@ -15575,6 +15579,12 @@ async function audReopen(){
 // Сошлось — одна зелёная карточка. Нет — недостача и излишек разделами, и под
 // каждым решение: с кого удержать (или без виновного) и «внести на район».
 // Закрыта ревизия только когда решено всё.
+// Строки отчёта — в единицах склада, как их отдаёт сервер: у пива коробки,
+// полкоробки — 0,5 (раньше делили на 24, и полкоробки Heineken выходила «−0»).
+// Итог раздела одним числом: есть пиво — «ед.», одно слово «бут» на две
+// единицы соврало бы.
+function _audUnitTag(l){ return l && l.unit > 1 ? '<small class="aud-u">кор</small>' : ''; }
+function _audSecUnit(b){ return ((b && b.lines) || []).some(l => l.unit > 1) ? 'ед.' : 'бут'; }
 function audReport(rep){
   STK.view = 'report'; STK.report = rep; _setRail('stkRail', '');
   const a = rep.audit || {}, t = rep.totals || {};
@@ -15605,7 +15615,7 @@ function audReport(rep){
   if(short){
     const rows = (short.lines || []).map(l => `<div class="aud-r">${img(l.id)}
       <span class="ord-r-n">${escS(l.name)}</span>
-      <span class="aud-d"><b class="dn">−${fmtQty((l.qty || 0) / (l.unit > 1 ? l.unit : 1))}</b>${(l.due || l.loss) ? `<i>${fmt(l.due || l.loss)} AED</i>` : ''}</span></div>`).join('');
+      <span class="aud-d"><b class="dn">−${fmtQty(l.qty || 0)}${_audUnitTag(l)}</b>${(l.due || l.loss) ? `<i>${fmt(l.due || l.loss)} AED</i>` : ''}</span></div>`).join('');
     const foot = short.resolved_at
       ? `<div class="aud-done">${_AUD_CHECK}<span>${short.blame
           ? `Удержано <b>${fmt(short.amount)} AED</b> · ${escS(short.who || '')}`
@@ -15614,7 +15624,7 @@ function audReport(rep){
           <button class="aud-b soft" onclick="audShortNone()">Без виновного</button>
           <button class="aud-b go" onclick="audHoldOpen()">Удержать с виновного</button></div>`;
     secs += `<div class="aud-sec dn"><div class="aud-sec-h"><span>Недостача</span>
-      <b>${fmt(short.qty)}<u>бут</u></b>${short.aed ? `<b>${fmt(short.aed)}<u>AED</u></b>` : ''}</div>
+      <b>${fmtQty(short.qty)}<u>${_audSecUnit(short)}</u></b>${short.aed ? `<b>${fmt(short.aed)}<u>AED</u></b>` : ''}</div>
       ${rows}${foot}</div>`;
   }
   if(over){
@@ -15629,14 +15639,14 @@ function audReport(rep){
       if(l.sold)    bits.push(`ушла с заказом${l.sold > 1 ? ' · ' + l.sold : ''}`);
       return `<div class="aud-r">${img(l.id)}
         <span class="ord-r-n">${escS(l.name)}${bits.length ? `<span class="aud-r-s">${escS(bits.join(' · '))}</span>` : ''}</span>
-        <span class="aud-d"><b class="warn">+${fmtQty((l.qty || 0) / (l.unit > 1 ? l.unit : 1))}</b></span></div>`;
+        <span class="aud-d"><b class="warn">+${fmtQty(l.qty || 0)}${_audUnitTag(l)}</b></span></div>`;
     }).join('');
     const foot = over.resolved_at
       ? `<div class="aud-done">${_AUD_CHECK}<span>Внесено на <b>${escS(rep.district_code)}</b>${
           (over.moved || over.restored) ? ` · перевезено ${fmt(over.moved || 0)} · возвращено ${fmt(over.restored || 0)}` : ''}</span></div>`
       : `<div class="aud-act"><button class="aud-b go" onclick="audOver()">Внести на район</button></div>`;
     secs += `<div class="aud-sec warn"><div class="aud-sec-h"><span>Излишки</span>
-      <b>${fmt(over.qty)}<u>бут</u></b></div>${rows}${foot}</div>`;
+      <b>${fmtQty(over.qty)}<u>${_audSecUnit(over)}</u></b></div>${rows}${foot}</div>`;
   }
   // Коды не из реестра — свой раздел с решением, как недостача и излишек:
   // бутылка на полке есть, в учёте нет — её вносят как новый товар. Раздел
@@ -17816,6 +17826,14 @@ async function chkPrices(){
 async function chkAudit(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'audit')) || {};
   const t = (r.tasks || [])[0];
+  // Чек-лист живёт в #accOv, склад — в #stkOv: слой у них один, а #accOv в
+  // разметке позже, и отчёт открывался ПОД карточкой чек-листа — нажатие
+  // выглядело пустым (владелец, 10 сен 2026: «не открывается, нажимаю назад —
+  // а оно сидело под карточкой»). Раздел прячем, но не через _accClose: она
+  // снимает CKL_RETURN, а по нему «назад» из отчёта вернёт в чек-лист.
+  document.getElementById('accOv').classList.remove('show');
+  ACC_VIEW = null;
+  CKL_RETURN = true;
   if(!t){ openStock(); return; }
   // Раздел склада открываем без списка районов: он бы приехал позже отчёта
   // и лёг поверх него.
@@ -17830,7 +17848,7 @@ async function chkAudit(){
         {params:{district: t.district, day: t.day}}); }
   catch(e){ _toast('Отчёт не найден'); stkPicker(); return; }
   await stkLoadContext();
-  STK.district = t.district; STK.repFrom = 'audits'; STK.audFocus = t.district; STK.audFrom = 'stock';
+  STK.district = t.district; STK.repFrom = 'checklist'; STK.audFocus = t.district; STK.audFrom = 'stock';
   audReport(rep);
 }
 

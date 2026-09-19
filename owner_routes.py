@@ -4246,6 +4246,17 @@ def _pl_positions(n: int) -> str:
     return "позиция" if n == 1 else "позиции" if 2 <= n <= 4 else "позиций"
 
 
+def _aud_qty(block: dict) -> str:
+    """Сколько в разделе ревизии — словами склада. Строки в единицах: у пива
+    коробки и полкоробки, поэтому есть пиво — «ед.» (одно слово на две
+    единицы соврало бы), нет — бутылки; полкоробки не теряем («5,5», не «5»)."""
+    q = float((block or {}).get("qty") or 0)
+    s = f"{q:g}".replace(".", ",")
+    if any(((l or {}).get("unit") or 1) > 1 for l in (block or {}).get("lines") or []):
+        return f"{s} ед."
+    return f"{s} {_pl_bottles(int(q))}"
+
+
 def _pl_bottles(n: int) -> str:
     n = abs(int(n)) % 100
     if 11 <= n <= 19: return "бутылок"
@@ -4459,9 +4470,9 @@ async def handle_checklist(request):
             sh, ov = a.get("short") or {}, a.get("over") or {}
             parts = []
             if sh and not sh.get("resolved_at"):
-                parts.append(f"недостача {int(sh.get('qty') or 0)} {_pl_bottles(int(sh.get('qty') or 0))}")
+                parts.append(f"недостача {_aud_qty(sh)}")
             if ov and not ov.get("resolved_at"):
-                parts.append(f"излишки {int(ov.get('qty') or 0)}")
+                parts.append(f"излишки {_aud_qty(ov)}")
             if int(a.get("alien_left") or 0):
                 parts.append(f"QR код не внесён {int(a['alien_left'])}")
             return " · ".join(parts)

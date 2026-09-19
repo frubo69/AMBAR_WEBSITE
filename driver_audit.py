@@ -221,6 +221,13 @@ def _q(qty, unit) -> str:
     return f"{s} {'кор' if (unit or 1) > 1 else 'бут'}"
 
 
+def _codes(n: int) -> str:
+    n = int(n or 0)
+    k = n % 100
+    w = "кодов" if 11 <= k <= 19 else "код" if k % 10 == 1 else "кода" if 2 <= k % 10 <= 4 else "кодов"
+    return f"{n} {w}"
+
+
 def _mins(a: dict):
     return SR._minutes_between(a.get("started_at"), a.get("finished_at"))
 
@@ -271,12 +278,15 @@ def owner_text(a: dict, driver: str) -> str:
             out += ["", f"*{_md(head)}:*"] + [f"• {_md(r)}" for r in rows[:12]]
             if len(rows) > 12:
                 out.append(f"…и ещё {len(rows) - 12}")
+    # «Ключ: значение» — так строку разложит и лента уведомлений в STAR.
     if p["alien"]:
-        out += ["", f"Кодов не из реестра: {p['alien']} — внести как новый товар"]
+        out += ["", f"Не из реестра: {_codes(p['alien'])} — внести как новый товар"]
     if p["note"]:
         out += ["", f"_{_md(p['note'])}_"]
     if not p["ok"]:
-        out += ["", f"Решение — в STAR: Склад → {_md(p['where'])}."]
+        # Путь — ровно теми словами, что на экранах STAR: «Учёт» внизу, сверху
+        # «Чек-лист смены», в нём красная строка ведёт прямо в этот отчёт.
+        out += ["", "Где решать: STAR → Учёт → Чек-лист смены → «Решения по ревизиям»"]
     return "\n".join(out)
 
 
@@ -294,7 +304,7 @@ def operator_text(a: dict, driver: str) -> str:
             if len(rows) > 12:
                 out.append(f"…и ещё {len(rows) - 12}")
     if p["alien"]:
-        out += ["", f"Кодов не из реестра: {p['alien']}"]
+        out += ["", f"Не из реестра: {_codes(p['alien'])}"]
     if p["note"]:
         out += ["", f"<i>{e(p['note'])}</i>"]
     if not p["ok"]:

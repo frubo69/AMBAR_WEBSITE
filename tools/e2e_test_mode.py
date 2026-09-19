@@ -80,7 +80,12 @@ async def main():
         check("тест-оператор: в очереди «новые»", any(x["order_id"] == oid for x in lanes["new"]))
         pg = Req(query={}); pg["op_id"] = 0; pg["op_user"] = {"id": 0}; pg["op_test"] = True
         ping = json.loads((await pos.handle_ping.__wrapped__(pg)).body.decode())
-        check("тест-оператору в районах только тест-водитель", all(x["drivers"] == [TD] for x in ping["districts"]))
+        # Тест-водителей с 18 сен 2026 несколько (реестр, config_staff.test_driver_names):
+        # важно не «ровно этот один», а что боевых имён в районах нет вовсе.
+        тест_имена = staff.test_driver_names()
+        чужие = sorted({d for x in ping["districts"] for d in x["drivers"] if d not in тест_имена})
+        check("тест-оператору в районах только тест-водители",
+              not чужие and all(x["drivers"] for x in ping["districts"]), чужие or "районы пусты")
         # 4. назначение тест-водителю и приложение водителя
         await db.update_order(oid, status="approved", driver=TD, day=day, confirmed_at=o["timestamp"])
         r = Req(query={}); r["driver"] = me_t

@@ -2236,6 +2236,30 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    Над кнопкой подвала — кого ещё ждём; карточка дня — как «Касса дня»:
    выручка, Барракуда и РП+ со знаком минус, ЧП итогом; под названием строки —
    откуда число (половина, норма). */
+/* Два этапа одной страницы — переключатель наверху, прилипает к шапке (как
+   поиск в прайсе: поднят на отступ списка и стоит на сплошном фоне). Этап под
+   замком — тусклый, нажатие объясняет, кого ждём. */
+.cr-steps{position:sticky;top:-10px;z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  margin:-10px -14px 10px;padding:10px 14px;background:var(--bg)}
+.cr-step{display:flex;align-items:center;gap:10px;min-width:0;padding:10px 12px;border-radius:14px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);font-family:inherit;
+  text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cr-step:active{transform:scale(.98)}
+.cr-step-n{flex:0 0 26px;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:12.5px;font-weight:800;background:var(--card3);color:var(--sub)}
+.cr-step-b{flex:1;min-width:0}
+.cr-step-b b{display:block;font-size:13.5px;font-weight:700;line-height:1.2;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.cr-step-b i{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--muted);
+  margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-step.on{border-color:rgba(201,169,110,.6);background:linear-gradient(180deg,#1c1a2b 0%,#141424 100%)}
+.cr-step.on .cr-step-n{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.cr-step.done:not(.on) .cr-step-n{color:var(--up);background:rgba(76,175,125,.16)}
+.cr-step.done .cr-step-b i{color:var(--up)}
+.cr-step.locked{opacity:.55;cursor:default}
+.cr-step.locked:active{transform:none}
+.cr-step.locked .cr-step-n{color:var(--muted);background:var(--card3)}
+.cr-step-n svg{width:14px;height:14px}
 .cr-foot-cap{margin:0 4px 9px;font-size:12.5px;font-weight:600;color:var(--muted);text-align:center;line-height:1.35}
 .crd .sc-cap i.crd-st{display:inline-flex;align-items:center;gap:5px;color:var(--warn)}
 .crd .sc-cap i.crd-st.ok{color:var(--up)}
@@ -18065,7 +18089,7 @@ function crRender(){
   const list = [...d.districts].sort((a, b) => (a.empty - b.empty) || (a.done - b.done));
   const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
   const head = `<div class="ck-head cr-head${all ? ' all' : ''}">
-    <div class="ck-h-l">Ежедневный сбор и распределение выручки</div>
+    <div class="ck-h-l">Сбор выручки</div>
     <div class="ck-h-n">
       <span class="ck-h-v">${d.done}<u>/${d.need}</u></span>
       <span class="ck-h-w">${d.need ? 'районов получил' + (d.later ? ` · ${d.later} соберу завтра` : '') : 'получать нечего'}</span>
@@ -18080,7 +18104,7 @@ function crRender(){
     ${d.carry_total ? `<div class="cr-carry-note">из них за прошлые дни — ${d.carry_total < 0 ? '−' : ''}${
       fmt(Math.abs(d.carry_total))} AED: не получили вовремя</div>` : ''}
   </div>`;
-  document.getElementById('accMid').innerHTML = head + list.map(crCard).join('');
+  document.getElementById('accMid').innerHTML = crSteps(1) + head + list.map(crCard).join('');
   crFoot();
   crDistPrefetch();
   // Строка «Сбор выручки» на «Финансах» — те же числа сразу, а не при
@@ -18195,23 +18219,71 @@ function crFoot(){
   if(!d || CRD.open || !(d.need > 0)){ f.innerHTML = ''; return; }
   // Шаг 2 — после шага 1: пока не со всех районов получено, кнопка не
   // нажимается и говорит, кого ещё ждём.
-  const wait = crWait();
-  if(wait.length){
-    f.innerHTML = `<div class="qb-wrap"><div class="cr-foot-cap">Сначала получите выручку: ${
-      wait.map(x => escS(x.code) + (x.later ? ' — завтра' : '')).join(', ')}</div>
+  const st = crDistState();
+  if(st.wait.length){
+    f.innerHTML = `<div class="qb-wrap"><div class="cr-foot-cap">Сначала получите выручку: ${crWaitTxt(st.wait)}</div>
       <button class="qb quiet" disabled>Распределить выручку</button></div>`;
     return;
   }
+  f.innerHTML = `<div class="qb-wrap">${st.done
+    ? `<button class="qb quiet" onclick="crDist()">${IC('check', 17)}Распределено · посмотреть</button>`
+    : st.known && !st.any
+    ? '<button class="qb quiet" disabled>Распределять нечего — выручки нет</button>'
+    : `<button class="qb" onclick="crDist()">Распределить выручку${st.sum > 0 ? ` · ${fbFmt(st.sum)} AED` : ''}</button>`}</div>`;
+}
+// Состояние второго этапа — одно на подвал и переключатель этапов.
+function crDistState(){
+  const wait = crWait();
   const days = crDistDays().map(crDistBook);
   const known = days.every(Boolean);
   const pend = days.filter(b => b && b.base > 0 && !b.ok);
-  const sum = pend.reduce((a, b) => a + b.base, 0);
   const any = days.some(b => b && b.base > 0);
-  f.innerHTML = `<div class="qb-wrap">${known && !pend.length && any
-    ? `<button class="qb quiet" onclick="crDist()">${IC('check', 17)}Распределено · посмотреть</button>`
-    : known && !any
-    ? '<button class="qb quiet" disabled>Распределять нечего — выручки нет</button>'
-    : `<button class="qb" onclick="crDist()">Распределить выручку${sum > 0 ? ` · ${fbFmt(sum)} AED` : ''}</button>`}</div>`;
+  return {wait, known, any, pend, sum: pend.reduce((a, b) => a + b.base, 0),
+          locked: !CR || !(CR.need > 0) || wait.length > 0,
+          done: known && any && !pend.length};
+}
+function crWaitTxt(wait){ return wait.map(x => escS(x.code) + (x.later ? ' — завтра' : '')).join(', '); }
+
+// Одна страница из двух этапов (владелец, 19 сен 2026: «сделай так, чтобы эта
+// страница была двусоставной, из двух этапов: к распределению не перейти, пока
+// не собрал всю выручку, но когда собрал — мог обратно вернуться посмотреть,
+// сколько с какого района забрал»). Переключатель наверху обоих этапов и
+// прилипает к шапке: «Сбор» — всегда можно вернуться; «Распределение» — под
+// замком, пока ждём хоть один район.
+function crSteps(stage){
+  const d = CR || {}, st = crDistState();
+  const got = d.need > 0 && d.done >= d.need;
+  const s1 = !d.need ? 'получать нечего' : got ? `получено со всех · ${d.need}` : `${d.done} из ${d.need} районов`;
+  const s2 = st.locked ? (d.need > 0 ? 'после сбора' : 'нечего распределять')
+    : !st.known ? 'выручка дня' : st.done ? 'согласовано' : !st.any ? 'нечего распределять'
+    : `${fbFmt(st.sum)} AED`;
+  return `<div class="cr-steps">
+    <button class="cr-step${stage === 1 ? ' on' : ''}${got ? ' done' : ''}" onclick="crStage(1)">
+      <span class="cr-step-n">${got && stage !== 1 ? IC('check', 14) : '1'}</span>
+      <span class="cr-step-b"><b>Сбор</b><i>${s1}</i></span>
+    </button>
+    <button class="cr-step${stage === 2 ? ' on' : ''}${st.locked ? ' locked' : ''}${st.done ? ' done' : ''}" onclick="crStage(2)"
+      ${st.locked ? 'aria-disabled="true"' : ''}>
+      <span class="cr-step-n">${st.locked ? IC('lock', 13) : st.done && stage !== 2 ? IC('check', 14) : '2'}</span>
+      <span class="cr-step-b"><b>Распределение</b><i>${s2}</i></span>
+    </button>
+  </div>`;
+}
+function crStepsPaint(){
+  const el = document.querySelector('#accMid .cr-steps');
+  if(el) el.outerHTML = crSteps(CRD.open ? 2 : 1);
+}
+function crStage(n){
+  if(n === 1){ if(CRD.open) crDistBack(); return; }
+  if(CRD.open) return;
+  const st = crDistState();
+  if(st.locked){
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    _toast(st.wait.length ? `Сначала получите выручку: ${crWaitTxt(st.wait)}`.replace(/<[^>]+>/g, '')
+                          : 'Распределять нечего — в этот день нечего было получать');
+    return;
+  }
+  crDist();
 }
 
 async function crLater(id, on){
@@ -18289,7 +18361,7 @@ function crDistNorm(day){ return (((fbBook(day.slice(0, 7)) || {}).budget) || {}
 function crDistPrefetch(){
   [...new Set(crDistDays().map(d => d.slice(0, 7)))].forEach(m => {
     if(fbBook(m) && !fbStale(m)) return;
-    fbLoad(m).then(() => { if(ACC_VIEW === 'cashround' && !CRD.open) crFoot(); }).catch(() => {});
+    fbLoad(m).then(() => { if(ACC_VIEW === 'cashround' && !CRD.open){ crFoot(); crStepsPaint(); } }).catch(() => {});
   });
 }
 
@@ -18297,15 +18369,16 @@ async function crDist(){
   if(!CR) return;
   CRD = {open: true, edit: null, busy: false, back: CRD.open ? CRD.back : ACC_BACK};
   ACC_BACK = crDistBack;
-  _setText('accTitle', 'Распределение выручки');
+  _setText('accTitle', 'Ежедневный сбор и распределение выручки');
   _setText('accSub', CR.day === CR.today ? 'сегодня' : _dayName(CR.day));
   document.getElementById('accFoot').innerHTML = '';
   const mid = document.getElementById('accMid');
-  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  mid.innerHTML = crSteps(2) + '<div class="exp-empty">Загрузка…</div>';
+  mid.scrollTop = 0;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   const months = [...new Set(crDistDays().map(d => d.slice(0, 7)))];
   try{ await Promise.all(months.map(m => (fbBook(m) && !fbStale(m)) ? null : fbLoad(m))); }
-  catch(e){ if(CRD.open) mid.innerHTML = loadFail('crDist()'); return; }
+  catch(e){ if(CRD.open) mid.innerHTML = crSteps(2) + loadFail('crDist()'); return; }
   if(CRD.open) crDistRender();
 }
 // Назад — к сбору того же дня; дальше «назад» ведёт туда, откуда пришли в сбор.
@@ -18313,12 +18386,14 @@ function crDistBack(){
   ACC_BACK = CRD.back || null;
   CRD = {open: false, edit: null, busy: false, back: null};
   CR_DAY = CR ? CR.day : '';
+  const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accCashRound();
 }
 
 function crDistRender(){
   const mid = document.getElementById('accMid'); if(!mid || !CRD.open) return;
-  mid.innerHTML = crDistDays().map(crDistCard).join('');
+  mid.innerHTML = crSteps(2) + crDistDays().map(crDistCard).join('');
 }
 function crDistCard(day){
   const b = crDistBook(day), norm = crDistNorm(day);

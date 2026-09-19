@@ -3681,18 +3681,31 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 /* Текст в шапке растянут на всю ширину (.sc-cap span{flex:1}) — поэтому
    центрируем сам текст, как в полосе месяца, а не только его блок. */
 .fb-an-t span{text-align:center}
-/* Четыре числа в ряд (владелец: «4 цифры должны быть в ряд»): плитки уже,
-   поэтому кегль числа и подписи меньше, чем у трёх. */
-.aud-g.fb-an-g{grid-template-columns:repeat(4,1fr);gap:6px;padding:11px 12px 13px}
-.fb-an-g .aud-t{padding:9px 5px 10px}
-.fb-an-g .aud-tl{font-size:7.5px;letter-spacing:.2px;line-height:1.2;min-height:18px}
-.fb-an-g .aud-tv{font-size:15.5px;letter-spacing:-.4px}
-.fb-an-g .aud-tu{font-size:8.5px;margin-top:4px}
-.fb-an-g .aud-t.tap::after{top:8px;right:6px;width:5px;height:5px}
-.fb-an-g .aud-t.tap .aud-tl{padding-right:7px}
-@media (max-width:380px){ .fb-an-g .aud-tv{font-size:14.5px} .fb-an-g .aud-t{padding-left:4px;padding-right:4px} }
+/* Три денежных числа — плитками, как везде в учёте; рентабельность — своя
+   строка под ними: подпись, крупный процент и полоса доли прибыли в вале.
+   Так её видно, но она не спорит с тремя числами (владелец, 20 сен 2026). */
+.aud-g.fb-an-g{padding-bottom:9px}
+.fb-an-g .aud-tl{line-height:1.2;min-height:20px}
+/* Число подстраивается под ширину экрана: шестизначный вал при 26px не влезал
+   в плитку на узком телефоне и лез на соседнюю. */
+.fb-an-g .aud-tv{font-size:clamp(16px,5.2vw,24px);letter-spacing:-.6px;
+  white-space:nowrap;overflow:hidden;text-overflow:clip}
+.fb-an-rent{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:4px 10px;
+  padding:0 16px 14px}
+.fb-an-rent-l{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
+.fb-an-rent-v{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;line-height:1;
+  color:var(--gold2);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.fb-an-rent.dn .fb-an-rent-v{color:var(--dn)}
+.fb-an-rent-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  color:var(--muted);margin-left:3px}
+.fb-an-bar{grid-column:1 / -1;height:5px;border-radius:3px;background:var(--card3);overflow:hidden}
+.fb-an-bar i{display:block;height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .4s var(--e1)}
+.fb-an-rent.dn .fb-an-bar i{background:var(--dn)}
+.fb-an-rent-s{grid-column:1 / -1;font-size:11px;font-weight:600;color:var(--muted)}
+.fb-an-rent.dn .fb-an-rent-s{color:var(--warn)}
 .fb-an-mini{display:none}
-.fb-an.small .fb-an-t,.fb-an.small .aud-g,.fb-an.small > .sc-r{display:none}
+.fb-an.small .fb-an-t,.fb-an.small .aud-g,.fb-an.small .fb-an-rent,.fb-an.small > .sc-r{display:none}
 .fb-an.small .fb-an-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:2px 12px 12px}
 .fb-an.small .sc-cap.fb-cap{border-bottom:0;min-height:42px}
 .fb-an-mini span{min-width:0;text-align:center}
@@ -19083,6 +19096,22 @@ function fbAn(b){
     ? +b.econ : gross - ((+t.ordered || 0) + (+t.expenses || 0) + (+t.spend || 0) + (+t.tips || 0));
   return {gross, out: gross - profit, profit, margin: gross ? Math.round(profit / gross * 100) : 0};
 }
+// Рентабельность — не четвёртое число в ряду, а своя строка под ними
+// (владелец, 20 сен 2026: «пусть там будут эти три числа, а рентабельность
+// красиво въедет и будет отличаться: заметно, но не нагромождено»): подпись,
+// крупный процент золотом и полоса — какая доля вала осталась прибылью.
+function fbAnRent(an){
+  if(!an) return `<div class="fb-an-rent"><span class="fb-an-rent-l">Рентабельность</span>
+    <b class="fb-an-rent-v is-skel" style="min-width:56px">0000</b>
+    <span class="fb-an-bar"><i style="width:0"></i></span></div>`;
+  const w = Math.max(0, Math.min(100, an.margin));
+  return `<div class="fb-an-rent${an.margin < 0 ? ' dn' : ''}">
+    <span class="fb-an-rent-l">Рентабельность</span>
+    <b class="fb-an-rent-v" data-f="t.margin" data-fc="neg">${fbFmt(an.margin)}<u>%</u></b>
+    <span class="fb-an-bar"><i style="width:${w}%"></i></span>
+    <span class="fb-an-rent-s">${an.margin < 0 ? 'месяц в минусе' : `${fbFmt(an.margin)}% вала — прибыль`}</span>
+  </div>`;
+}
 function fbCap(month, arrows){
   const fut = month >= fbMonthNow();
   if(!arrows) return `<div class="sc-cap"><span>${escS(fbMonthT(month))}</span></div>`;
@@ -19143,12 +19172,24 @@ function fbCrcBooks(){
 }
 function fbHubRepaint(){
   const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-  if(box && mb){ box.innerHTML = fbHubHtml(mb); fbAnStick(); }
+  if(box && mb){ box.innerHTML = fbHubHtml(mb); fbAnStick(); fbAnFit(); }
 }
 // «Аналитика месяца» закреплена сверху экрана и в прокрутке сжимается до
 // полосы с четырьмя числами (владелец, 20 сен 2026: «сворачивается до
 // компактного вида и не листается вместе со страницей, а закреплена сверху»),
 // как карточка выручки на «Обзоре».
+// Кегль числа подбираем по факту: в плитку из трёх должен влезть и
+// шестизначный вал, и семизначный — на узком телефоне они разной ширины.
+function fbAnFit(){
+  document.querySelectorAll('#fbAnCard .fb-an-g .aud-tv').forEach(el => {
+    el.style.fontSize = '';
+    const box = el.clientWidth;
+    if(!box) return;
+    let f = parseFloat(getComputedStyle(el).fontSize) || 24;
+    let n = 0;
+    while(el.scrollWidth > box && f > 12 && n++ < 30){ f -= 0.5; el.style.fontSize = f + 'px'; }
+  });
+}
 let _fbAnRaf = null;
 function fbAnStick(){
   const card = document.getElementById('fbAnCard'); if(!card) return;
@@ -19300,7 +19341,7 @@ async function fbHub(force){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
   box.innerHTML = fbHubHtml(fbBook(FB.month));
-  fbAnStick();
+  fbAnStick(); fbAnFit();
   fbCrcBooks();
 }
 function fbHubHtml(b, err){
@@ -19309,7 +19350,8 @@ function fbHubHtml(b, err){
     <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
     ${fbCap(month, true)}
     <div class="aud-g fb-an-g">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
-      fbTile('Чистая прибыль', 'econ', null)}${fbTile('Рентабельность', 't.margin', null, {unit: '%'})}</div>
+      fbTile('Чистая прибыль', 'econ', null)}</div>
+    ${fbAnRent(null)}
     <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>
     ${fbCrcHtml()}`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
@@ -19322,8 +19364,8 @@ function fbHubHtml(b, err){
       ${fbTile('Вал', 't.gross', t.gross, {go: 'fbAnOpen()'})}
       ${fbTile('Расходы', 't.out_all', an.out, {go: 'fbAnOpen()'})}
       ${fbTile('Чистая прибыль', 'econ', an.profit, {mode: 'neg', go: 'fbAnOpen()'})}
-      ${fbTile('Рентабельность', 't.margin', an.margin, {unit: '%', mode: 'neg', go: 'fbAnOpen()'})}
     </div>
+    ${fbAnRent(an)}
     <div class="fb-an-mini">
       <span><i>вал</i><b data-f="t.gross">${fbFmt(an.gross)}</b></span>
       <span><i>расходы</i><b data-f="t.out_all">${fbFmt(an.out)}</b></span>
@@ -19490,6 +19532,7 @@ function fbValues(){
 }
 function fbPaint(){
   const V = fbValues();
+  requestAnimationFrame(fbAnFit);
   document.querySelectorAll('#accMid [data-f]').forEach(el => {
     const v = V[el.dataset.f]; if(v === undefined) return;
     const u = el.querySelector('u');

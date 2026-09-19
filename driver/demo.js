@@ -144,6 +144,9 @@ function fresh(){
             lines: [mvLine('p6', 'jvc', 2)]},
     exp: [], noexp: {}, asked: [], wo: [], seq: 0, scans: 0,
     cr: null,               // просьба закрыть смену раньше
+    // Ревизия района (владелец, 19 сен 2026): та же, что у старшего, без денег.
+    aud: {state: 'idle', started_at: 0, started_by: '', finished_at: 0, finished_by: '',
+          note: '', codes: {}},
   };
 }
 let S = (function(){
@@ -359,6 +362,70 @@ function summary(){
     ...(S.sh.closed ? {closed_at: iso(S.sh.closed_at)} : {}),
   };
 }
+/* ── ревизия района ──────────────────────────────────────────────────────
+   На полке демо-района числится десять единиц с QR-кодом: четыре Absolut,
+   три Gordon's (и ещё одна бутылка без кода — камера её не видит), два
+   Jameson и коробка пива (код пива = полкоробки). Камера показа находит не
+   всё: второго Jameson на полке нет, зато попадается бутылка, числящаяся на
+   B1. Итог выходит как в жизни — с недостачей и с лишней. */
+const AUD_SHELF = [
+  {id: 'p1',  no: 1, unit: 1,  coded: 4, noqr: 0},
+  {id: 'p55', no: 2, unit: 1,  coded: 3, noqr: 1},
+  {id: 'p14', no: 3, unit: 1,  coded: 2, noqr: 0},
+  {id: 'p31', no: 4, unit: 12, coded: 1, noqr: 0},
+];
+const AUD_HOME = 'alguses';                     // чей чужой код попадётся
+const AUD_SEES = ['p1', 'p1', 'p1', 'p1', 'p55', 'p55', 'p55', 'p14',
+                  'p31', 'p31', 'p12'];         // порядок бутылок на полке
+const audQty = pid => (P[pid] && P[pid].pack) ? 0.5 : 1;
+const audOur = pid => AUD_SHELF.some(r => r.id === pid);
+function audCount(pid){
+  let q = 0;
+  Object.keys(S.aud.codes).forEach(function(c){ if(S.aud.codes[c] === pid) q += audQty(pid); });
+  return num(q);
+}
+function audRows(){
+  const rows = AUD_SHELF.map(r => ({id: r.id, name: P[r.id].name, no: r.no, unit: r.unit,
+                                    coded: r.coded, actual: audCount(r.id), noqr: r.noqr}));
+  Object.keys(S.aud.codes).forEach(function(c){
+    const pid = S.aud.codes[c];
+    if(audOur(pid) || rows.some(r => r.id === pid)) return;
+    rows.push({id: pid, name: P[pid] ? P[pid].name : 'Бутылка', no: rows.length + 1,
+               unit: 1, coded: 0, actual: audCount(pid), noqr: 0});
+  });
+  return rows;
+}
+function audView(rows){
+  const a = S.aud, short = [], over = [];
+  rows.forEach(function(r){
+    const d = num(r.coded - r.actual);
+    if(d > 0) short.push({id: r.id, name: r.name, qty: d, unit: r.unit});
+    else if(d < 0) over.push({id: r.id, name: r.name, qty: -d, unit: r.unit,
+                              homes: [DCODE[AUD_HOME]], written: 0, sold: 0});
+  });
+  const done = a.state === 'pending' || a.state === 'closed';
+  return {state: a.state, started_at: a.started_at ? iso(a.started_at) : '',
+          started_by: a.started_by, finished_at: a.finished_at ? iso(a.finished_at) : '',
+          finished_by: a.finished_by, finished_kind: a.finished_at ? 'driver' : '',
+          note: a.note, closed_at: '', alien: 0,
+          short: done ? short : [], over: done ? over : [],
+          short_done: false, over_done: false};
+}
+function audFull(){
+  const rows = audRows();
+  const t = {coded: 0, actual: 0, noqr: 0, short: 0, over: 0};
+  rows.forEach(function(r){
+    t.coded += r.coded; t.actual += r.actual; t.noqr += r.noqr;
+    const d = r.coded - r.actual;
+    if(d > 0) t.short += d; else if(d < 0) t.over += -d;
+  });
+  Object.keys(t).forEach(function(k){ t[k] = num(t[k]); });
+  return {district: ME.district, district_code: ME.district_code, district_name: ME.district_name,
+          day: S.day, coded_codes: AUD_SHELF.reduce((a, r) => a + r.coded, 0),
+          rows: rows, totals: t, scan: {total: Object.keys(S.aud.codes).length, odd: 0},
+          audit: audView(rows)};
+}
+
 // Две пачки — как на боевом сервере (cash_math.piles): выручка (валюта как
 // есть + дирхамы) и чай операторов; питание и бонус остаются водителю.
 function demoHand(done){
@@ -720,6 +787,52 @@ function route(path, opts){
                   : {ok: false, say: 'не наша бутылка'};
   }
 
+  /* ── ревизия района ── */
+  if(p === '/api/driver/audit/brief')
+    return {state: S.aud.state, district_code: ME.district_code, district_name: ME.district_name,
+            scans: S.aud.state === 'running' ? Object.keys(S.aud.codes).length : 0};
+  if(p === '/api/driver/audit' && m === 'GET') return audFull();
+  if(p === '/api/driver/audit/start'){
+    if(S.aud.finished_at) return {ok: false, error: 'finished', ...audFull()};
+    if(S.aud.state !== 'running'){
+      S.aud.state = 'running'; S.aud.started_at = now(); S.aud.started_by = ME.name; save();
+    }
+    return {ok: true, ...audFull()};
+  }
+  if(p === '/api/driver/audit/scan'){
+    const code = String(body.code || '');
+    if(!code) return {ok: false, error: 'empty_code'};
+    if(S.aud.finished_at) return {ok: false, error: 'finished'};
+    if(S.aud.state !== 'running'){
+      S.aud.state = 'running'; S.aud.started_at = now(); S.aud.started_by = ME.name;
+    }
+    const pid = code.split('-')[1] || 'p1';
+    const fresh_ = !S.aud.codes[code];
+    if(fresh_){ S.aud.codes[code] = pid; save(); }
+    const our = audOur(pid);
+    return {ok: true, new: fresh_, code: code, verdict: our ? 'ok' : 'other',
+            product_id: pid, name: P[pid] ? P[pid].name : 'Бутылка',
+            label: (our ? ME.district_code : DCODE[AUD_HOME]) + '-' + (1000 + Object.keys(S.aud.codes).length),
+            home: our ? ME.district : AUD_HOME,
+            home_code: our ? ME.district_code : DCODE[AUD_HOME],
+            count: audCount(pid), unit: (AUD_SHELF.find(r => r.id === pid) || {}).unit || 1,
+            total: num(Object.keys(S.aud.codes).length), positions: audRows().filter(r => r.actual).length};
+  }
+  if(p === '/api/driver/audit/undo'){
+    if(S.aud.finished_at) return {ok: false, error: 'finished'};
+    const code = String(body.code || '');
+    if(S.aud.codes[code]){ delete S.aud.codes[code]; save(); }
+    return {ok: true, code: code, total: Object.keys(S.aud.codes).length,
+            positions: audRows().filter(r => r.actual).length};
+  }
+  if(p === '/api/driver/audit/finish'){
+    if(S.aud.finished_at) return {ok: false, error: 'finished', ...audFull()};
+    S.aud.state = 'pending'; S.aud.finished_at = now(); S.aud.finished_by = ME.name;
+    S.aud.note = String(body.note || '').slice(0, 300);
+    save();
+    return {ok: true, ...audFull()};
+  }
+
   /* ── справочники ── */
   if(p === '/api/driver/catalog')
     return {items: Object.values(P).map(function(x){
@@ -846,6 +959,19 @@ function nextCode(id){
     }catch(e){}
     const l = S.mvOut.lines.find(x => x.got < x.qty);  // отдаём
     return l ? one(l.id) : one('p6');
+  }
+  if(id === 'audVid'){
+    // Ревизия: бутылки полки по порядку, каждая — один раз за проход.
+    const шли = {};
+    Object.keys(S.aud.codes).forEach(function(c){
+      const pid = S.aud.codes[c]; шли[pid] = (шли[pid] || 0) + 1;
+    });
+    for(let i = 0; i < AUD_SEES.length; i++){
+      const pid = AUD_SEES[i];
+      const было = AUD_SEES.slice(0, i).filter(x => x === pid).length;
+      if((шли[pid] || 0) <= было) return one(pid);
+    }
+    return null;                                      // полка кончилась
   }
   return one('p1');                                   // бой и бутылка охране
 }
@@ -977,6 +1103,7 @@ function intro(){
     + '<p>Всё настоящее, кроме данных: заказы, приёмка и деньги придуманы и живут только в этом телефоне.</p>'
     + '<ul><li>Откройте смену — через несколько секунд придёт заказ.</li>'
     + '<li>«Товар» — приёмка и перемещение между районами: отдаёте — сканируете, принимаете — тоже сканируете каждую бутылку. Сканер работает сам, камеру наводить не нужно.</li>'
+    + '<li>«Ревизия» внизу «Товара» — пересчёт своего района по кодам: что не нашли и что лишнее, отчёт уходит старшему.</li>'
     + '<li>«Расходы» — заправка с чеком уходит старшему на согласование.</li>'
     + '<li>Смена не закроется, пока заказ не доставлен, а приёмка не завершена, — как в бою.</li></ul>'
     + '<button id="dmoGo">Начать</button>');

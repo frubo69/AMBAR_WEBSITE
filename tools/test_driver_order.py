@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("MONGO_URI", "")
 logging.basicConfig(level=logging.ERROR)
 from aiohttp.test_utils import make_mocked_request
-import db, driver_routes as dr, operator_routes as op, rates
+import db, driver_routes as dr, operator_routes as op, rates, fx_take
 
 CAT = [{"id": "gin", "name": "Джин", "cat": "Джин", "price": 95, "price_full": 100, "stock": True},
        {"id": "beer", "name": "Пиво", "cat": "Пиво", "price": 50, "price_full": 55, "price_12_full": 55,
@@ -28,6 +28,7 @@ async def get_rates(force=False):
     return {"rates": [{"code": "USD", "name": "Доллар", "aed": 3.6725, "cash_aed": 3.67},
                       {"code": "EUR", "name": "Евро", "aed": 4.0}], "main": ["USD", "EUR"], "fetched_iso": "t"}
 rates.get_rates = get_rates
+fx_take.drop()                      # курс приёма — умолчания, без базы
 ME = {"name": "Али", "district": "a", "district_code": "B1"}
 
 def raw(h):
@@ -80,15 +81,20 @@ async def main():
     eq("доставка ушла оператору", (st, ORDERS["o1"]["driver_req"]["kind"]), (200, "delivered"))
     print("— курсы и оплата валютой")
     st, r = await call(dr.handle_rates, method="GET")
-    eq("USD по наличному 3.67, EUR по рынку 4.0, основные первыми", [(x["code"], x["rate"], x["cash"]) for x in r["rates"]], [("USD", 3.67, True), ("EUR", 4.0, False)])
+    eq("справка о курсах: USD по наличному 3.67, USDT к доллару один к одному, EUR по рынку 4.0",
+       [(x["code"], x["rate"], x["cash"]) for x in r["rates"]],
+       [("USD", 3.67, True), ("USDT", 3.67, True), ("EUR", 4.0, False)])
     fresh()
+    # С 15 сен 2026 платят по НАШЕМУ курсу приёма, курс обменника в оплате не
+    # участвует — он остаётся справкой выше. База тут не поднята, поэтому
+    # действуют умолчания: доллар 3.5 (tools/test_fx_take.py).
     st, r = await call(dr.handle_fx, {"code": "usd"})
-    eq("USD: курс 3.67, сумма 100/3.67", (st, r["pay_fx"]["code"], r["pay_fx"]["rate"], r["pay_fx"]["amount"]), (200, "USD", 3.67, 27.25))
+    eq("USD по нашему курсу 3.5: 100 AED = $28.57", (st, r["pay_fx"]["code"], r["pay_fx"]["rate"], r["pay_fx"]["amount"]), (200, "USD", 3.5, 28.57))
     ORDERS["o1"]["total"] = 200
     v = dr._order_view(ORDERS["o1"])
-    eq("итог изменился — сумма в валюте пересчиталась, курс тот же", (v["pay_fx"]["amount"], v["pay_fx"]["rate"]), (54.5, 3.67))
+    eq("итог изменился — сумма в валюте пересчиталась, курс тот же", (v["pay_fx"]["amount"], v["pay_fx"]["rate"]), (57.14, 3.5))
     st, r = await call(dr.handle_fx, {"code": "XXX"})
-    eq("нет курса → 503", (st, r.get("error")), (503, "no_rate"))
+    eq("валюты нет в списке приёма → 400", (st, r.get("error")), (400, "no_rate"))
     st, r = await call(dr.handle_fx, {"code": ""})
     eq("снова дирхамы", (st, r["pay_fx"], ORDERS["o1"].get("pay_fx")), (200, None, None))
     ORDERS["o1"]["payment_method"] = "debt"
@@ -98,12 +104,12 @@ async def main():
     fresh(); ORDERS["o1"]["total"] = 100
     await call(dr.handle_fx, {"code": "USD"})
     st, r = await call(dr.handle_settle, {"fx": {"code": "USD", "amount": 30}})
-    eq("30 $ = 110.1 AED, сдача 10.1", (st, ORDERS["o1"]["settle"]["taken"], r["diff"], ORDERS["o1"]["settle"]["fx"]["amount"]), (200, 110.1, 10.1, 30))
+    eq("30 $ по 3.5 = 105 AED, сдача 5", (st, ORDERS["o1"]["settle"]["taken"], r["diff"], ORDERS["o1"]["settle"]["fx"]["amount"]), (200, 105.0, 5.0, 30.0))
     st, r = await call(dr.handle_settle, {"fx": {"code": "EUR", "amount": 30}})
     eq("другая валюта, чем у заказа → no_fx", (st, r.get("error")), (400, "no_fx"))
     print("— оператор: итог правки по источнику, сводка несёт валюту и расчёт")
     s2 = op._summary(ORDERS["o1"])
-    eq("summary pay_fx/settle", (s2["pay_fx"]["code"], s2["settle"]["taken"]), ("USD", 110.1))
+    eq("summary pay_fx/settle", (s2["pay_fx"]["code"], s2["settle"]["taken"]), ("USD", 105.0))
     tot = await op._order_total_for(ORDERS["o1"], [{"id": "gin", "qty": 2}])
     eq("app total 2×95+5", tot, 195.0)
     tot = await op._order_total_for({"source": "manual"}, [{"id": "gin", "qty": 2}])

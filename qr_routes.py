@@ -867,7 +867,17 @@ async def handle_check_scan(request):
     fresh = await db.qr_check_add(cid, item)
     if verdict == "alien":
         log.warning(f"[qr] чужая бутылка при проверке {chk.get('driver') or 'свободной'}: {code[:40]}")
-    return web.json_response({"ok": True, "new": fresh, **item,
+    # Закупка и продажа — в карточку бутылки (владелец, 19 сен 2026: «когда
+    # проверку бутылки по скану делаешь, там внизу, где вся информация, ещё
+    # писать закупочную цену и продажную»). В проверку не пишем: цена живёт
+    # в каталоге, и проверка не должна её замораживать.
+    money = {}
+    try:
+        import stock_value
+        money = await stock_value.unit_money(item["product_id"])
+    except Exception as e:                          # noqa: BLE001
+        log.warning(f"[qr] цены для проверки не прочитались: {e}")
+    return web.json_response({"ok": True, "new": fresh, **item, **money,
                               "at": item["at"].isoformat()}, headers=CORS_HEADERS)
 
 

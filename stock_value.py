@@ -132,6 +132,18 @@ def _app_unit_price(p: dict, unit: int) -> int:
     return int(p.get("price") or p.get("price_full") or 0)
 
 
+async def unit_money(pid: str) -> dict:
+    """Закупка и продажа одной учётной единицы позиции — те же числа, что на
+    экране «Закупочные цены»: за бутылку, у пива за коробку. Закупки нет —
+    cost None (не выдумываем); позиции нет в каталоге — пусто."""
+    p = stock_routes._catalog().get(pid) if pid else None
+    if not p:
+        return {}
+    unit = stock_routes._unit(p)
+    return {"unit": unit, "price": _app_unit_price(p, unit),
+            "cost": (await cost_map()).get(pid) or None}
+
+
 async def build(day: str = "") -> dict:
     """Весь каталог с остатком по районам и деньгами.
 

@@ -5241,6 +5241,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .si-row .v.mono{font-family:'Space Grotesk',sans-serif;letter-spacing:.3px;
   font-size:12.5px;color:rgba(255,255,255,.8)}
+.si-row .v.mute{font-weight:500;color:rgba(255,255,255,.4)}
 .si-big{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2)}
 
 /* Базовые стили списка — для не-камерных экранов (сводка ревизии, посадка
@@ -13237,10 +13238,19 @@ function chkRowInfo(i){
   const кл = v.c === 'ok' ? 'ok' : v.c === 'bad' ? 'bad' : 'warn';
   const таких = x.product_name
     ? (CHK_FEED||[]).filter(y => y.product_name === x.product_name).length : 0;
+  // Цены — за бутылку, у пива за коробку (код на коробке — половина её), в
+  // дирхамах как есть, с копейками закупки: 34,65 и 79,80, а не 35 и 80.
+  // Закупки нет — так и пишем, не прячем строку.
+  const ед = x.unit > 1 ? ' за коробку' : '';
+  const aed = n => { const к = Number.isInteger(+n) ? 0 : 2;
+    return (+n).toLocaleString('ru-RU', {minimumFractionDigits: к, maximumFractionDigits: к}) + ' AED' + ед; };
+  const цены = 'price' in x;
   scanInfo(x.product_name || x.label, v.t, кл, [
     _siRow('В этой проверке', таких > 1 ? таких + ' шт' : '', 'big'),
     _siRow('Заведена', x.added_at ? escS(_when(x.added_at)) : ''),
     _siRow('Район', escS(x.district || '')),
+    _siRow('Закупочная цена', !цены ? '' : x.cost ? aed(x.cost) : 'не внесена', x.cost ? '' : 'mute'),
+    _siRow('Цена продажи', цены && x.price ? aed(x.price) : ''),
     _siRow('Метка', escS(x.label || ''), 'mono'),
     _siRow('Код', escS(String(x.code || '')), 'mono'),
   ]);

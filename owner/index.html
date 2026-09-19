@@ -22717,7 +22717,7 @@ function oprRow(r){
                onfocus="this.select()"
                onkeydown="if(event.key==='Enter'){this.blur()}"
                onblur="oprSave('${escS(r.id)}', this)">
-        <div class="oprx-src ${рука ? 'hand' : ''}">${escS(r.cost_src || '')}</div>
+        <div class="oprx-src ${рука ? 'hand' : ''}">${escS(_oprSrc(r))}</div>
       </div>
       <div class="oprx-c">
         <div class="oprx-l">продажа</div>
@@ -22736,6 +22736,12 @@ function oprRow(r){
     </div>
   </div>`;
 }
+
+// Откуда закупка — под полем мелко. Цена с листа магазина — обычное дело,
+// её не подписываем: слово «прайс» под закупкой читалось как продажная цена
+// (владелец, 19 сен 2026: «слово убери отсюда»). Остаётся «вручную» — это
+// правка поверх листа, её видно золотом, — и «поставка».
+function _oprSrc(r){ return r.cost_src === 'прайс' ? '' : (r.cost_src || ''); }
 
 // Накрутка — сколько процентов продажа сверху закупки: продажа / закупка − 1
 // (владелец, 19 сен 2026: «сделай закупка, продажа и процент накрутки вместо
@@ -22818,7 +22824,7 @@ async function oprSave(id, input){
     input.classList.add('saved');
     setTimeout(() => input.classList.remove('saved'), 900);
     const src = input.parentElement.querySelector('.oprx-src');
-    if(src){ src.textContent = r.cost_src || ''; src.classList.toggle('hand', r.cost_src === 'вручную'); }
+    if(src){ src.textContent = _oprSrc(r); src.classList.toggle('hand', r.cost_src === 'вручную'); }
     _oprMarkPaint(r);
     // Доля покрытия меняется вместе с ценой — пересчитываем на месте.
     const known = (OPR.rows || []).filter(x => x.cost).length;

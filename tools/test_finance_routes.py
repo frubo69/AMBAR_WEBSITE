@@ -184,7 +184,8 @@ async def main():
     eq("стопки на день 4: после оплаты сверх 5 из ЧП", (d4["stack_b"], d4["stack_rp"], d4["stack_np"], d4["stack_total"]), (34540, 65, 41038, 75643))
     eq("b.ratio = 1417 / (1270/100)", b["b"]["ratio"], round(1417 / 12.7, 1))
     eq("b.paid", b["b"]["paid"], 65)
-    eq("econ = 1270 − 1417 − 25 − 140 (приход не доход)", b["econ"], -312)
+    eq("econ = 1270 − 1417 − 25 − 140 − чай (приход не доход; чай — расход с 20 сен)",
+       b["econ"], 1270 - 1417 - 25 - 140 - b["totals"]["tips"])
     print("— без бюджета: нормы нет, курс доллара с биржи, зарплаты пустые")
     eq("budget пустой, norm 0, prev_has False", (b["budget"]["empty"], b["budget"]["norm"], b["budget"]["prev_has"]), (True, 0, False))
     eq("usd с биржи (наличный курс)", (b["pay"]["usd"], b["pay"]["usd_set"]), (3.67, False))

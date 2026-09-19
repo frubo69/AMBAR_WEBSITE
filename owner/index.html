@@ -3670,6 +3670,26 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-safe-k .fb-r{min-height:50px;padding:6px 8px 6px 14px;border-top:0}
 .fb-safe-k .fb-r + .fb-r{border-top:1px solid rgba(201,169,110,.14)}
 .fb-safe-k .fb-r > span{font-size:14px}
+/* ── «Аналитика месяца» ──
+   Закреплена сверху экрана: страница едет под ней, а сама карточка в
+   прокрутке сжимается до полосы с четырьмя числами (владелец, 20 сен 2026).
+   Четыре числа — квадратом, как стопки в сейфе: четыре в ряд не читаются. */
+.fb-an{position:sticky;top:var(--hero-top,124px);z-index:20}
+.aud-g.fb-an-g{grid-template-columns:repeat(2,1fr)}
+.fb-an-mini{display:none}
+.fb-an.small .fb-an-t,.fb-an.small .aud-g,.fb-an.small > .sc-r{display:none}
+.fb-an.small .fb-an-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:2px 12px 12px}
+.fb-an.small .sc-cap.fb-cap{border-bottom:0;min-height:42px}
+.fb-an-mini span{min-width:0;text-align:center}
+.fb-an-mini i{display:block;font-style:normal;font-size:8.5px;font-weight:700;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--muted)}
+.fb-an-mini b{display:block;margin-top:3px;font-family:'Space Grotesk',sans-serif;font-size:14.5px;
+  font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-an-mini b.dn{color:var(--dn)}
+.fb-an-mini u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;
+  color:var(--muted);margin-left:2px}
+
 /* ── Карточка «Ежедневный сбор и распределение выручки» ──
    Анатомия «Сейфа»: шапка-кнопка, внутри вложенные блоки этапов (①, ②) с
    золотистой рамкой; районы — пять плиток, распределение — три; внизу одно
@@ -19034,6 +19054,20 @@ function fbTile(t, key, v, o){
     <span class="aud-tu">${o.unit || 'AED'}</span>`;
   return o.go ? `<button ${at} onclick="${o.go}">${in_}</button>` : `<div ${at}>${in_}</div>`;
 }
+// Аналитика месяца (владелец, 20 сен 2026: «первое не доход, а вал; потом
+// расходы — вообще все, включая чай, расходы водителей, весь РП−, всё, что
+// оттуда вычитается; справа чистая прибыль и четвёртым — рентабельность»).
+// Вал − расходы = чистая прибыль (та же, что «по расчёту» в ЧП),
+// рентабельность — сколько от вала осталось прибылью.
+function fbAn(b){
+  const t = (b && b.totals) || {};
+  const gross = +t.gross || 0;
+  // Прибыль считает сервер (econ), расходы берём из неё же — тогда на экране
+  // всегда сходится: вал − расходы = прибыль.
+  const profit = b && b.econ !== undefined && b.econ !== null
+    ? +b.econ : gross - ((+t.ordered || 0) + (+t.expenses || 0) + (+t.spend || 0) + (+t.tips || 0));
+  return {gross, out: gross - profit, profit, margin: gross ? Math.round(profit / gross * 100) : 0};
+}
 function fbCap(month, arrows){
   const fut = month >= fbMonthNow();
   if(!arrows) return `<div class="sc-cap"><span>${escS(fbMonthT(month))}</span></div>`;
@@ -19094,8 +19128,26 @@ function fbCrcBooks(){
 }
 function fbHubRepaint(){
   const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-  if(box && mb) box.innerHTML = fbHubHtml(mb);
+  if(box && mb){ box.innerHTML = fbHubHtml(mb); fbAnStick(); }
 }
+// «Аналитика месяца» закреплена сверху экрана и в прокрутке сжимается до
+// полосы с четырьмя числами (владелец, 20 сен 2026: «сворачивается до
+// компактного вида и не листается вместе со страницей, а закреплена сверху»),
+// как карточка выручки на «Обзоре».
+let _fbAnRaf = null;
+function fbAnStick(){
+  const card = document.getElementById('fbAnCard'); if(!card) return;
+  // Прилипает вплотную к шапке приложения: в зазор между нею и карточкой
+  // пролезал бы контент страницы. Меряем по самой шапке, а не константой.
+  const hdr = document.querySelector('.hdr');
+  const top = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 88;
+  if(card._top !== top){ card._top = top; card.style.top = top + 'px'; }
+  card.classList.toggle('small', window.scrollY > 24);
+}
+window.addEventListener('scroll', () => {
+  if(_fbAnRaf) return;
+  _fbAnRaf = requestAnimationFrame(() => { _fbAnRaf = null; fbAnStick(); });
+}, {passive: true});
 function fbCrcState(){
   const c = FB_CR; if(!c) return null;
   const ds = c.districts || [], net = x => x.net_all != null ? x.net_all : (x.net || 0);
@@ -19233,22 +19285,35 @@ async function fbHub(force){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
   box.innerHTML = fbHubHtml(fbBook(FB.month));
+  fbAnStick();
   fbCrcBooks();
 }
 function fbHubHtml(b, err){
   const month = FB.month || fbMonthNow();
-  if(!b) return `<div class="sc fb-hub">${fbCap(month, true)}
-    <div class="aud-g">${fbTile('Доход', 't.gross', null)}${fbTile('Расходы', 't.expenses', null)}${
-      fbTile('Прибыль', 'np.days', null)}</div>
+  if(!b) return `<div class="sc fb-hub fb-an" id="fbAnCard">
+    <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
+    ${fbCap(month, true)}
+    <div class="aud-g fb-an-g">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
+      fbTile('Чистая прибыль', 'econ', null)}${fbTile('Рентабельность', 't.margin', null, {unit: '%'})}</div>
     <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>
     ${fbCrcHtml()}`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   const wal = fbWal(b), all = fbSafeAll(b);
-  return `<div class="sc fb-hub">${fbCap(month, true)}
-    <div class="aud-g">
-      ${fbTile('Доход', 't.gross', t.gross, {go: 'fbAnOpen()'})}
-      ${fbTile('Расходы', 't.expenses', t.expenses, {go: 'fbAnOpen()'})}
-      ${fbTile('Прибыль', 'np.days', b.np.days, {mode: 'neg', go: 'fbAnOpen()'})}
+  const an = fbAn(b);
+  return `<div class="sc fb-hub fb-an" id="fbAnCard">
+    <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
+    ${fbCap(month, true)}
+    <div class="aud-g fb-an-g">
+      ${fbTile('Вал', 't.gross', t.gross, {go: 'fbAnOpen()'})}
+      ${fbTile('Расходы', 't.out_all', an.out, {go: 'fbAnOpen()'})}
+      ${fbTile('Чистая прибыль', 'econ', an.profit, {mode: 'neg', go: 'fbAnOpen()'})}
+      ${fbTile('Рентабельность', 't.margin', an.margin, {unit: '%', mode: 'neg', go: 'fbAnOpen()'})}
+    </div>
+    <div class="fb-an-mini">
+      <span><i>вал</i><b data-f="t.gross">${fbFmt(an.gross)}</b></span>
+      <span><i>расходы</i><b data-f="t.out_all">${fbFmt(an.out)}</b></span>
+      <span><i>прибыль</i><b data-f="econ" data-fc="neg"${an.profit < 0 ? ' class="dn"' : ''}>${fbFmt(an.profit)}</b></span>
+      <span><i>рент.</i><b data-f="t.margin"${an.margin < 0 ? ' class="dn"' : ''}>${fbFmt(an.margin)}<u>%</u></b></span>
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
   </div>
@@ -19383,6 +19448,9 @@ function fbValues(){
   if(mb){
     for(const g of ['totals', 'rp', 'np', 'b', 'safe']) for(const k in mb[g]) V[(g === 'totals' ? 't' : g) + '.' + k] = mb[g][k];
     V['econ'] = mb.econ;
+    // Аналитика месяца: все расходы одной суммой и рентабельность.
+    const _an = fbAn(mb);
+    V['t.out_all'] = _an.out; V['t.margin'] = _an.margin;
     V['b.debt_delta'] = mb.b.debt_end - mb.b.debt_open; V['b.extra_pay_on'] = mb.b.pay_extra ? 1 : 0;
     V['b.paid_on'] = mb.b.paid ? 1 : 0;
     const bu = mb.budget || {};
@@ -22164,7 +22232,8 @@ async function accFinNP(){
     ${fbRow('Купили у Барракуды', 't.ordered', b.totals.ordered, {sign: '−'})}
     ${fbRow('Расходы', 't.expenses', b.totals.expenses, {sign: '−'})}
     ${fbRow('Расходы водителей', 't.spend', b.totals.spend, {sign: '−'})}
-    ${fbRow('Прибыль по расчёту', 'econ', b.econ, {sum: true, sign: '=', mode: 'neg'})}
+    ${fbRow('Чай', 't.tips', b.totals.tips, {sign: '−'})}
+    ${fbRow('Чистая прибыль', 'econ', b.econ, {sum: true, sign: '=', mode: 'neg'})}
     ${fbRow('Долг Барракуде за месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
   </div>
   ${fbDays(days)}`;

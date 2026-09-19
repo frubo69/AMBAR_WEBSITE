@@ -133,7 +133,8 @@ async def handle_brief(request):
     a = await db.audit_get(district, day) or {}
     st = SR._audit_view(a)["state"] if a else "idle"
     n = (await db.audit_scan_stats(district, day)).get("total", 0) if st == "running" else 0
-    return _json({"state": st, "district_code": OFFICE_CODES.get(district, ""), "scans": int(n or 0)})
+    return _json({"state": st, "district_code": OFFICE_CODES.get(district, ""),
+                  "district_name": OFFICE_NAMES.get(district, district), "scans": int(n or 0)})
 
 
 async def _body(request) -> dict:

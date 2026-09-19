@@ -168,7 +168,7 @@ async def main():
         st, r = await scan(102, "bb1")
         eq("скан Парвиза уходит в ревизию B2, не в JVC", (r["verdict"], r["total"]), ("ok", 1))
         eq("кнопка у Худобы: идёт, сканов 7 (повтор не пишется)",
-           (await drv(101, "GET", "/api/driver/audit/brief"))[1], {"state": "running", "district_code": "B1", "scans": 7})
+           (await drv(101, "GET", "/api/driver/audit/brief"))[1], {"state": "running", "district_code": "B1", "district_name": "JVC", "scans": 7})
 
         st, r = await drv(101, "POST", "/api/driver/audit/undo", {"code": "a2"})
         eq("отмена скана", (r["ok"], r["total"]), (True, 4.5))

@@ -713,6 +713,14 @@ body.test-drv .wo-fix{display:none}
 .dpl.aud-miss .dpl-q{background:var(--dn-soft);color:var(--dn)}
 .dpl-n i.warn{color:var(--warn)}
 .aud-none{margin:6px 2px 12px;font-size:12px;line-height:1.45;color:var(--muted)}
+/* Билдинг ревизии — главное в шапке: золотой код, как на карточках районов,
+   и название крупно (владелец, 19 сен 2026: «нужно более очевидно показывать,
+   что это за билдинг, на котором ревизию водитель делает»). */
+.aud-code{width:40px;height:40px;border-radius:12px;font-size:15px}
+#audScr .sup-top-t{font-size:19px;letter-spacing:-.2px}
+/* Подпись — в одну строку: на камере она меняется с каждым сканом, и шапка
+   не должна прыгать по высоте. */
+#audScr .sup-top-s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aud-note{margin:0 2px 12px;padding:12px 14px;border-radius:14px;background:var(--card);
   border:1px solid var(--border2);font-size:13px;line-height:1.45;color:var(--sub);font-style:italic}
 .aud-sent{display:flex;align-items:center;gap:8px;justify-content:center;font-size:12.5px;color:var(--sub)}
@@ -3669,6 +3677,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
+    <span class="dcode aud-code" id="audCode" style="display:none"></span>
     <div class="sup-top-b">
       <div class="sup-top-t" id="audT">Ревизия</div>
       <div class="sup-top-s" id="audS"></div>
@@ -10185,8 +10194,10 @@ async function audBriefLoad(force){
 function audBtn(){
   const st = (AUD_BRIEF || {}).state || 'idle';
   if(st === 'none') return '';                 // у водителя нет района — ревизии нет
-  const t = st === 'running' ? 'Продолжить ревизию'
-          : (st === 'pending' || st === 'closed') ? 'Итог ревизии' : 'Ревизия';
+  const b = AUD_BRIEF || {};
+  const where = `${b.district_code || ''} ${b.district_name || ''}`.trim();
+  const t = (st === 'running' ? 'Продолжить ревизию'
+          : (st === 'pending' || st === 'closed') ? 'Итог ревизии' : 'Ревизия') + (where ? ' · ' + where : '');
   return `<div class="wo-fix"><button class="wo-btn ghost aud${st === 'running' ? ' run' : ''}" onclick="audOpen()">
       ${svg(ICO.audit, 19)}<span>${t}</span></button></div>`;
 }
@@ -10211,7 +10222,7 @@ function _audT(){
 async function audOpen(){
   document.getElementById('audScr').classList.add('show');
   AUD_CAM = false; AUD_ROWS = [];
-  _setText('audT', 'Ревизия'); _setText('audS', 'загрузка…'); _setText('audV', '');
+  audHead('Ревизия · загрузка…'); _setText('audV', '');
   document.getElementById('audMid').innerHTML = '<div class="empty">Загрузка…</div>';
   document.getElementById('audBot').innerHTML = '';
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -10226,7 +10237,7 @@ async function audReload(){
     document.getElementById('audMid').innerHTML = p.error === 'no_district'
       ? '<div class="empty">Вы не закреплены за районом — ревизию проводят водители района</div>'
       : loadFail('audReload()', 'Ревизия не загрузилась');
-    _setText('audS', '');
+    audHead('Ревизия');
     return;
   }
   if(AUD_CAM) audCamPaint(); else audRender();
@@ -10240,14 +10251,23 @@ function audClose(){
   audBriefLoad(true);
 }
 
-function _audWhere(){ return AUDS ? `${AUDS.district_code} ${AUDS.district_name}`.trim() : ''; }
+// Шапка ревизии на всех трёх видах — список, камера, итог: код и название
+// билдинга, ниже — что происходит. Билдинг известен ещё до листа (из
+// состояния кнопки), поэтому видно его сразу, а не после загрузки.
+function audHead(sub){
+  const code = (AUDS && AUDS.district_code) || (AUD_BRIEF && AUD_BRIEF.district_code) || '';
+  const name = (AUDS && AUDS.district_name) || (AUD_BRIEF && AUD_BRIEF.district_name) || '';
+  const c = document.getElementById('audCode');
+  if(c){ c.textContent = code; c.style.display = code ? '' : 'none'; }
+  _setText('audT', name || 'Ревизия');
+  _setText('audS', sub);
+}
 
 function audRender(){
   const A = AUDS; if(!A) return;
   const a = A.audit || {}, st = a.state || 'idle';
   if(st === 'pending' || st === 'closed') return audRenderDone();
-  _setText('audT', 'Ревизия');
-  _setText('audS', `${_audWhere()} · ${st === 'running'
+  audHead(`Ревизия · ${st === 'running'
     ? 'идёт с ' + hhmm(a.started_at) + (a.started_by ? ' · ' + a.started_by : '') : 'не начата'}`);
   _setText('audV', '');
   const t = _audT();
@@ -10337,9 +10357,8 @@ async function audCamClose(){
 function audCamPaint(first){
   const A = AUDS || {}, t = _audT();
   const r = (A.rows || []).find(x => x.id === AUD_LAST);
-  _setText('audT', r ? r.name : 'Ревизия');
-  _setText('audS', r ? `${_audWhere()} · нашли ${fmtQty(r.actual || 0)} из ${fmtQty(r.coded || 0)}${r.unit > 1 ? ' кор' : ''}`
-                     : `${_audWhere()} · наводите на код каждой бутылки`);
+  audHead(r ? `${r.name} · ${fmtQty(r.actual || 0)} из ${fmtQty(r.coded || 0)}${r.unit > 1 ? ' кор' : ''}`
+             : 'Ревизия · наводите на код каждой бутылки');
   const v = document.getElementById('audV');
   v.innerHTML = `${fmtQty(t.found)}<u> / ${fmtQty(t.coded)}</u>`;
   if(first || !document.getElementById('audVid')){
@@ -10542,8 +10561,7 @@ function audRenderDone(){
   const short = a.short || [], over = a.over || [];
   const ok = !short.length && !over.length && !a.alien;
   const closed = a.state === 'closed';
-  _setText('audT', 'Ревизия');
-  _setText('audS', `${_audWhere()} · завершена ${hhmm(a.finished_at)}`);
+  audHead(`Ревизия завершена в ${hhmm(a.finished_at)}`);
   _setText('audV', '');
   const who = a.finished_kind === 'driver' ? `Провёл ${a.finished_by || 'водитель'}` : 'Завершил старший';
   const img = id => `<img class="dimg" src="/products/${esc(id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;

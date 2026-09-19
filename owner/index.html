@@ -6670,6 +6670,9 @@ button.exp-wait:active{transform:scale(.99)}
 .oprx-src{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
   color:var(--muted);margin-top:4px;height:11px}
 .oprx-src.hand{color:var(--gold2)}
+/* Подписи под полем теперь почти всегда пустые («прайс» под закупкой убран):
+   пустая не держит под полями полосу. «Вручную» появляется — строка растёт. */
+.oprx-src:empty{display:none}
 .oprx-in.gold{color:var(--gold2)}
 /* Накрутка: высота и шрифт поля, чтобы число стояло в одну линию с ценами
    слева, но без рамки и фона. */
@@ -6678,6 +6681,10 @@ button.exp-wait:active{transform:scale(.99)}
   font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
 .oprx-m.dn{color:var(--dn)}
 .oprx-m.none{color:var(--dim)}
+/* Сводка сверху прайса — карточка «Финансов» (.fin-sec), но не кнопка: ни
+   шапка, ни плитки не нажимаются. */
+.opr-sum .fin-sec-h,.opr-sum .fin-strip.four > div{cursor:default}
+.opr-sum .fin-sec-h:active,.opr-sum .fin-strip.four > div:active{background:none}
 /* Позиции без закупки — красная карточка сверху, дышит: это невыполненная
    работа, а не справка. Нажатие оставляет в списке только их. */
 .oprx-alert{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 10px;
@@ -22662,6 +22669,7 @@ function oprPaint(keepFocus){
   _setText('oprSub', `${all.length} ${pluralize(all.length,'позиция','позиции','позиций')}
     · закупка у ${d.cost_known || 0}`);
   document.getElementById('oprMid').innerHTML = `
+    ${oprSumCard()}
     <div class="oprx-bar">
       <input class="oprx-q" id="oprQ" placeholder="Найти позицию"
              value="${escS(OPR.q)}" oninput="oprFilter(this.value)">
@@ -22675,6 +22683,42 @@ function oprPaint(keepFocus){
     if(i){ i.focus(); i.selectionStart = i.value.length; }
   }
   oprFootPaint();
+}
+
+// Сводка прайса — окошко, как было в «Финансах» (владелец, 19 сен 2026:
+// «сделай такое же окошко, как у нас было в финансах — четыре поля: позиций,
+// в закупке, в продаже, общая накрутка средняя»). «В закупке» и «в продаже» —
+// у скольких позиций вписана эта цена; накрутка — средняя по позициям, где
+// есть обе цены, та же, что в строке «Прайс» под «Закупаем». Полоса — доля
+// позиций с закупкой. Считается по всему прайсу, не по найденному: поиск и
+// «Без цены» её не меняют, а правка цены — меняет сразу.
+function oprSumCard(){
+  const all = OPR.rows || [];
+  const cost = all.filter(r => r.cost).length;
+  const sale = all.filter(r => r.price_list || r.price_app).length;
+  const marks = all.map(_oprMark).filter(v => v !== null);
+  const mark = marks.length ? marks.reduce((a, v) => a + v, 0) / marks.length : null;
+  const cover = all.length ? Math.round(cost / all.length * 100) : 0;
+  return `<div class="fin-sec opr-sum" id="oprSum">
+    <div class="fin-sec-h">
+      <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path
+        d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle
+        cx="7.5" cy="7.5" r="1.5"/></svg></span>
+      <span class="fin-sec-b"><b>Прайс</b></span>
+    </div>
+    <div class="fin-strip four">
+      <div><b>${fmt(all.length)}</b><i>позиций</i></div>
+      <div><b>${fmt(cost)}</b><i>в закупке</i></div>
+      <div><b>${fmt(sale)}</b><i>в продаже</i></div>
+      <div><b>${_oprMarkTxt(mark)}</b><i>средняя накрутка</i></div>
+    </div>
+    <div class="fin-bar"><i style="width:${cover}%"></i></div>
+  </div>`;
+}
+function oprSumPaint(){
+  const el = document.getElementById('oprSum');
+  if(el) el.outerHTML = oprSumCard();
 }
 
 // Внизу — то, ради чего сюда заходят с экрана склада: у скольких позиций
@@ -22787,6 +22831,7 @@ async function oprPrice(id, input){
     r.price_app  = +(ящик ? res.price_24 : res.price) || 0;
     input.value = fmt(r.price_list);
     _oprMarkPaint(r);
+    oprSumPaint();
     input.classList.add('saved');
     setTimeout(() => input.classList.remove('saved'), 900);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -22831,6 +22876,7 @@ async function oprSave(id, input){
     OPR.d.cost_known = known;
     OPR.d.cost_cover = OPR.rows.length ? Math.round(known / OPR.rows.length * 100) : 0;
     oprFootPaint();
+    oprSumPaint();
     _setText('oprSub', `${OPR.rows.length} ${
       pluralize(OPR.rows.length,'позиция','позиции','позиций')} · закупка у ${known}`);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}

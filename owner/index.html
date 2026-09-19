@@ -10957,10 +10957,6 @@ try{
 // Место считаем руками. scrollWidth тут врёт: под дату отведён правый отступ
 // (или она стоит соседом), столбец залезает в него — и переполнения по
 // scrollWidth не возникает, хотя цифры уже лежат поверх даты.
-// Вычеты из валовой, посчитанные разбором финансов: чаевые и расход смены.
-// Держим рядом, чтобы карточка районов не пересчитывала их по-своему.
-let OFF_CUT = {tips: 0, spend: 0};
-
 function heroSideFit(side){
   side = side || document.getElementById('heroSide');
   const box = side && side.parentElement;
@@ -13989,9 +13985,11 @@ function _paintHero(p, f){
   _setAed('offTips',  tips);
   _setAed('offSpend', spend);
   // Крупное число на «Районах» — то же, что на «Обзоре»: валовая минус чаевые
-  // и расход. Вычеты запоминаем: карточки районов считаются своим кодом и
-  // позже, а два экрана за один день обязаны показывать одно и то же.
-  OFF_CUT = {tips, spend};
+  // и расход. Ставится только здесь: карточки районов (renderOffices) шапку
+  // не пересчитывают — они складывали уже чистые суммы районов, называли это
+  // «валовой» и вычитали чай и расход второй раз (владелец, 19 сен 2026:
+  // «почему вот так?? неправильно, надо считать как у нас в обзоре» — 18.09
+  // «Районы» показывали 29 160 при валовой 30 830, «Обзор» — 30 830 при 32 500).
   _setAed('offHeroRev', Math.max(0, f.revenue.current - tips - spend));
   heroSideFit(document.getElementById('offSide'));
   _setAed('heroPrev', f.revenue.previous);
@@ -28615,10 +28613,9 @@ function renderOffices(rows){
     tot.style.removeProperty('display');
     if(window.HERO_PLACE) HERO_PLACE();
     if(window.OFF_HERO_APPLY) OFF_HERO_APPLY();
-    // Валовая — сумма карточек: она и есть проверка, что доли складываются.
-    // Крупным числом стоит остаток в руках, как на «Обзоре».
-    _setAed('offGross', total);
-    _setAed('offHeroRev', Math.max(0, total - (OFF_CUT.tips || 0) - (OFF_CUT.spend || 0)));
+    // Валовую, чаевые, расход и крупное число шапки ставит _paintHero — те же,
+    // что на «Обзоре». Карточки районов складываются в них: сумма их крупных
+    // чисел (чистые районов) и есть крупное число шапки.
     _setText('offTotOrd', ord);
     offShiftLoad();
     _setText('offTotMin', mins.length

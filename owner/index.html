@@ -3670,10 +3670,61 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-safe-k .fb-r{min-height:50px;padding:6px 8px 6px 14px;border-top:0}
 .fb-safe-k .fb-r + .fb-r{border-top:1px solid rgba(201,169,110,.14)}
 .fb-safe-k .fb-r > span{font-size:14px}
-/* Длинное название строки («Ежедневный сбор и распределение выручки») —
-   в две строки, а не обрезанным многоточием. */
-.fb-r.fb-wrap{padding-top:9px;padding-bottom:9px}
-.fb-r.fb-wrap > span{white-space:normal;line-height:1.25}
+/* ── Карточка «Ежедневный сбор и распределение выручки» ──
+   Анатомия «Сейфа»: шапка-кнопка, внутри вложенные блоки этапов (①, ②) с
+   золотистой рамкой; районы — пять плиток, распределение — три; внизу одно
+   следующее действие. Этап под замком — серый, цифры предложения тусклые. */
+.fb-crc-h{align-items:flex-start;min-height:0;padding:15px 12px 12px 16px}
+.fb-crc-t{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;font-weight:700;
+  letter-spacing:.7px;text-transform:uppercase;line-height:1.25}
+.fb-crc-day{flex:0 0 auto;margin-top:2px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.fb-crc-s{margin:0 12px 10px 16px;padding:12px 12px 12px 13px;border-radius:13px;cursor:pointer;
+  border:1px solid rgba(201,169,110,.2);background:rgba(201,169,110,.05);-webkit-tap-highlight-color:transparent}
+.fb-crc-s:active{background:rgba(201,169,110,.09)}
+.fb-crc-s.locked{border-color:var(--border2);background:rgba(255,255,255,.02)}
+.fb-crc-sh{display:flex;align-items:center;gap:9px;min-width:0}
+.fb-crc-n{flex:0 0 22px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:800;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.fb-crc-n.ok{color:var(--up);background:rgba(76,175,125,.16)}
+.fb-crc-n.lock{color:var(--muted);background:var(--card3)}
+.fb-crc-n svg{width:12px;height:12px}
+.fb-crc-sh > b{flex:0 0 auto;font-size:14px;font-weight:700}
+.fb-crc-sh > i{flex:1;min-width:0;font-style:normal;font-size:11.5px;font-weight:600;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-crc-sh > i.ok{color:var(--up)} .fb-crc-sh > i.warn{color:var(--warn)}
+.fb-crc-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.fb-crc-v.dn{color:var(--dn)}
+.fb-crc-v u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
+.fb-crc-bar{height:3px;border-radius:2px;margin:11px 0 10px;background:rgba(255,255,255,.07);overflow:hidden}
+.fb-crc-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.fb-crc-bar.all i{background:var(--up)}
+.fb-crc-ds{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.fb-crc-d{min-width:0;padding:7px 3px 6px;border-radius:10px;text-align:center;
+  background:var(--card2);border:1px solid var(--border2)}
+.fb-crc-d b{display:flex;align-items:center;justify-content:center;gap:2px;font-family:'Space Grotesk',sans-serif;
+  font-size:12px;font-weight:700;color:var(--sub)}
+.fb-crc-d b svg{width:10px;height:10px;stroke-width:3}
+.fb-crc-d i{display:block;margin-top:3px;font-style:normal;font-size:11px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-crc-d.got{border-color:rgba(76,175,125,.45);background:rgba(76,175,125,.1)}
+.fb-crc-d.got b{color:var(--up)}
+.fb-crc-d.later{border-color:rgba(243,180,74,.4);background:rgba(243,180,74,.1)}
+.fb-crc-d.later i{color:var(--warn)}
+.fb-crc-d.neg i{color:var(--dn)}
+.fb-crc-d.empty{opacity:.45}
+.fb-crc-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:11px}
+.fb-crc-g span{min-width:0;padding:8px 9px 9px;border-radius:10px;background:var(--card2);border:1px solid var(--border2)}
+.fb-crc-g i{display:block;font-style:normal;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.fb-crc-g b{display:block;margin-top:5px;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1}
+.fb-crc-g b.dn{color:var(--dn)}
+.fb-crc-s.locked .fb-crc-g{opacity:.45}
+.fb-crc-short{margin-top:8px;font-size:11.5px;font-weight:600;color:var(--warn)}
+.fb-crc-a{display:flex;gap:8px;padding:2px 12px 14px 16px}
+.fb-crc-a .aud-b{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px 10px;font-size:14px}
+.fb-crc-a .aud-b.fb-crc-ed{flex:0 0 auto;padding-left:20px;padding-right:20px}
+.fb-crc-a .aud-b svg{width:15px;height:15px}
 .fb-safe-k .fb-r > b{font-size:15px}
 .fb-safe-k .fb-r em{width:24px;height:24px}
 /* Сейф: сумма в заголовке карточки, значок «дней ждут подтверждения»,
@@ -18064,6 +18115,9 @@ let CR = null, CR_OPEN = new Set(), CR_BUSY = false, CR_DAY = '';
 // Второй шаг — распределение выручки (crDist ниже): открыт ли, какой день
 // правят, куда вела стрелка назад до него.
 let CRD = {open: false, edit: null, busy: false, back: null};
+// Открыть сразу второй этап (карточка на «Финансах»): 2 — после загрузки сбора
+// перейти к распределению, если сбор закончен.
+let CR_GO = 0;
 
 async function accCashRound(){
   CRD.open = false;
@@ -18073,6 +18127,7 @@ async function accCashRound(){
   // чек-листа, из которого пришли, или выбранный в приложении.
   const day = CR_DAY || (CKL && CKL.day) || accDay();
   CR_DAY = '';
+  const go = CR_GO; CR_GO = 0;
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
   catch(e){
     document.getElementById('accMid').innerHTML =
@@ -18080,6 +18135,7 @@ async function accCashRound(){
     return;
   }
   crRender();
+  if(go === 2 && !crDistState().locked) crDist();
 }
 
 function crRender(){
@@ -18471,6 +18527,7 @@ async function crDistOk(day, aside, collected){
          {method: 'POST', body: {day, aside, collected, as: _meName()}}); }
   catch(e){ CRD.busy = false; _toast('Не удалось сохранить распределение'); return; }
   if(res && res.book) fbApply(res.book);
+  fbHubRepaint();                   // карточка на «Финансах» под этим экраном — тоже
   // Подтвердили день прошлого месяца (перенос через первое число) — книга
   // сбрасывает следующие месяцы: их остатки теперь другие. Дотягиваем.
   const miss = [...new Set(crDistDays().map(d => d.slice(0, 7)))].filter(m => !fbBook(m));
@@ -19001,29 +19058,150 @@ function fbCashLoad(){
   ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: _dayIsoFor(0)}})
     .then(d => {
       FB_CR = d; FB_CR_AT = Date.now();
-      const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-      if(box && mb) box.innerHTML = fbHubHtml(mb);
+      fbCrcBooks();
+      fbHubRepaint();
     })
     .catch(() => {})
     .finally(() => { FB_CR_BUSY = false; });
 }
-// Справа у строки сбора: сколько районов получил, а когда получено всё —
-// распределена ли выручка (второй шаг того же экрана). Книга дня ещё не
-// загружена — про распределение молчим, а не гадаем.
-function fbCashUnit(){
-  const c = FB_CR;
-  if(!c) return 'районов';
-  if(!c.need) return 'получать нечего';
-  let u = `из ${c.need} получил`;
-  if(c.later) u += ` · ${c.later} завтра`;
-  if(c.done >= c.need){
-    const days = new Set([c.day]);
-    (c.districts || []).forEach(x => (x.carry || []).forEach(k => { if(k.day) days.add(k.day); }));
-    const bs = [...days].map(d => fbDayOf(fbBook(d.slice(0, 7)), d));
-    if(bs.every(Boolean) && bs.some(b => b.base > 0))
-      u += bs.some(b => b.base > 0 && !b.ok) ? ' · распределить' : ' · распределено';
+// ── Карточка «Ежедневный сбор и распределение выручки» ────────────────────
+// Отдельная карточка «Финансов», наравне с «Сейфом» (владелец, 19 сен 2026:
+// «сделай это отдельным окошком, красивым, наравне со всеми, с полноценным
+// функционалом и необходимой информацией на самой карточке»). Два этапа, как
+// на странице: ① сбор — сколько районов получено и с какого района сколько;
+// ② распределение — Барракуда / РП+ / ЧП (предложение книги или уже
+// согласованное), под замком, пока сбор не закончен. Внизу — следующее
+// действие: собрать, согласовать прямо отсюда (день один — цифры те, что на
+// карточке) или «распределено». Строка «Сбор выручки» в карточке месяца снята.
+function fbCrcDays(c){
+  const set = new Set([c.day]);
+  (c.districts || []).forEach(x => (x.carry || []).forEach(k => { if(k.day) set.add(k.day); }));
+  return [...set].sort();
+}
+// Книги месяцев, которые нужны карточке (сегодня и перенос), — если их нет в
+// памяти (листали другой месяц), подтягиваем и перерисовываем.
+function fbCrcBooks(){
+  const c = FB_CR; if(!c) return;
+  [...new Set(fbCrcDays(c).map(d => d.slice(0, 7)))].filter(m => !fbBook(m))
+    .forEach(m => fbLoad(m).then(() => fbHubRepaint()).catch(() => {}));
+}
+function fbHubRepaint(){
+  const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
+  if(box && mb) box.innerHTML = fbHubHtml(mb);
+}
+function fbCrcState(){
+  const c = FB_CR; if(!c) return null;
+  const ds = c.districts || [], net = x => x.net_all != null ? x.net_all : (x.net || 0);
+  const live = ds.filter(x => !x.empty);
+  const wait = live.filter(x => !x.done);
+  const bs = fbCrcDays(c).map(d => fbDayOf(fbBook(d.slice(0, 7)), d));
+  const known = bs.every(Boolean);
+  const pend = bs.filter(b => b && b.base > 0 && !b.ok);
+  const real = bs.filter(b => b && b.base > 0);
+  return {c, ds, net, wait, known, pend, real, bs,
+          total: live.reduce((a, x) => a + net(x), 0),
+          inHand: live.filter(x => x.done).reduce((a, x) => a + net(x), 0),
+          got: c.need > 0 && !wait.length, locked: !(c.need > 0) || wait.length > 0,
+          done: known && real.length > 0 && !pend.length};
+}
+function fbCrcHtml(){
+  const st = fbCrcState(), today = _dayIsoFor(0);
+  const head = `<button class="fb-safe-h fb-crc-h" onclick="fbOpenCash()">
+      <span class="fb-crc-t">Ежедневный сбор и распределение выручки</span>
+      <span class="fb-crc-day">${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'сегодня'}</span>
+      <em class="fb-chev r">${_SC_CHEV}</em></button>`;
+  if(!st) return `<div class="sc fb-hub fb-crc">${head}
+      <div class="fb-crc-s"><div class="fb-crc-sh"><span class="fb-crc-n">1</span><b>Сбор</b>
+        <i><span class="is-skel" style="min-width:90px">0000</span></i></div></div>
+      <div class="fb-crc-s locked"><div class="fb-crc-sh"><span class="fb-crc-n lock">${IC('lock', 12)}</span><b>Распределение</b>
+        <i><span class="is-skel" style="min-width:70px">0000</span></i></div></div>
+    </div>`;
+  const {c, ds, net, wait, known, pend, real} = st;
+  // ① Сбор: районы плитками — код и сколько; получил — зелёная, «завтра» —
+  // янтарная, где брать нечего — тусклая с прочерком.
+  const pct = c.need ? Math.round(c.done / c.need * 100) : 0;
+  const tiles = ds.map(x => {
+    const v = net(x);
+    const cls = x.empty ? 'empty' : x.done ? 'got' : x.later ? 'later' : '';
+    const txt = x.empty ? '—' : x.later && !x.done ? 'завтра' : fbFmt(v);
+    return `<span class="fb-crc-d ${cls}${!x.empty && !(x.later && !x.done) && v < 0 ? ' neg' : ''}"><b>${
+      x.done ? IC('check', 10) : ''}${escS(x.code)}</b><i>${txt}</i></span>`;
+  }).join('');
+  const s1 = !c.need ? 'получать нечего' : st.got ? 'получено со всех' : `${c.done} из ${c.need} районов`;
+  // «получено из всего» — пока есть что получать; выручка дня в минусе (одни
+  // расходы) — просто итог красным, «0 из −550» не читается.
+  const v1 = !c.need ? '' : st.got || st.total <= 0 ? `${fbFmt(st.total)}<u>AED</u>`
+    : `${fbFmt(st.inHand)}<u>из ${fbFmt(st.total)}</u>`;
+  const stage1 = `<div class="fb-crc-s" role="button" onclick="fbOpenCash()">
+      <div class="fb-crc-sh"><span class="fb-crc-n${st.got ? ' ok' : ''}">${st.got ? IC('check', 12) : '1'}</span>
+        <b>Сбор</b><i class="${st.got ? 'ok' : ''}">${s1}</i>
+        ${v1 ? `<span class="fb-crc-v${st.total < 0 ? ' dn' : ''}">${v1}</span>` : ''}</div>
+      <div class="fb-crc-bar${st.got ? ' all' : ''}"><i style="width:${pct}%"></i></div>
+      <div class="fb-crc-ds">${tiles}</div>
+    </div>`;
+  // ② Распределение: пока ждём районы — предложение тускло и под замком; есть
+  // что согласовать — его цифры; всё согласовано — согласованные.
+  const shown = pend.length ? pend : real;
+  const sum = f => shown.reduce((a, b) => a + (f(b) || 0), 0);
+  const tB = sum(b => b.aside), tR = sum(b => b.collected), tN = sum(b => b.base - (b.aside || 0) - (b.collected || 0));
+  const norm = ((fbBook(c.day.slice(0, 7)) || {}).budget || {}).norm || 0;
+  const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0)), 0) : 0;
+  const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';
+  const s2 = st.locked ? (c.need ? 'после сбора' : 'нечего распределять')
+    : !known ? 'загрузка…' : !real.length ? 'нечего распределять'
+    : st.done ? 'согласовано' + okBy
+    : pend.length > 1 ? `ждут согласования · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}` : 'ждёт согласования';
+  const has = known && real.length > 0;
+  const g = (t, v, dn) => `<span><i>${t}</i><b${dn ? ' class="dn"' : ''}>${has ? fbFmt(v) : '—'}</b></span>`;
+  const stage2 = `<div class="fb-crc-s${st.locked ? ' locked' : ''}" role="button" onclick="${st.locked ? 'fbCrcLocked()' : 'fbOpenDist()'}">
+      <div class="fb-crc-sh"><span class="fb-crc-n${st.locked ? ' lock' : st.done ? ' ok' : ''}">${
+        st.locked ? IC('lock', 12) : st.done ? IC('check', 12) : '2'}</span>
+        <b>Распределение</b><i class="${st.done ? 'ok' : !st.locked && pend.length ? 'warn' : ''}">${s2}</i></div>
+      <div class="fb-crc-g">${g('Барракуда', tB)}${g('РП+', tR)}${g('ЧП', tN, tN < 0)}</div>
+      ${has && short > 0 && !st.locked ? `<div class="fb-crc-short">до нормы РП+ не хватает ${fbFmt(short)} AED</div>` : ''}
+    </div>`;
+  // Следующее действие — одно, и оно же главное.
+  let act = '';
+  if(c.need){
+    if(wait.length) act = `<button class="aud-b go" onclick="fbOpenCash()">Собрать выручку</button>`;
+    else if(!known) act = `<button class="aud-b go" onclick="fbOpenDist()">Распределить выручку</button>`;
+    else if(!real.length) act = '<button class="aud-b soft" disabled>Распределять нечего</button>';
+    else if(st.done) act = `<button class="aud-b soft" onclick="fbOpenDist()">${IC('check', 15)}Распределено · посмотреть</button>`;
+    else if(pend.length === 1) act = `<button class="aud-b go" onclick="fbCrcOk('${pend[0].day}')">Согласовать</button>
+        <button class="aud-b soft fb-crc-ed" onclick="fbOpenDist()">Изменить</button>`;
+    else act = `<button class="aud-b go" onclick="fbOpenDist()">Распределить · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}</button>`;
   }
-  return u;
+  return `<div class="sc fb-hub fb-crc">${head}${stage1}${stage2}${act ? `<div class="fb-crc-a">${act}</div>` : ''}</div>`;
+}
+function fbCrcLocked(){
+  const st = fbCrcState(); if(!st) return;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  _toast(st.wait.length ? 'Сначала получите выручку: ' + st.wait.map(x => x.code + (x.later ? ' — завтра' : '')).join(', ')
+                        : 'Распределять нечего — сегодня нечего было получать');
+}
+// «Согласовать» прямо с карточки: день один, и его цифры — ровно те, что на
+// карточке (предложение книги). Править — на странице («Изменить»).
+async function fbCrcOk(day){
+  if(FB.crcBusy) return;
+  const b = fbDayOf(fbBook(day.slice(0, 7)), day); if(!b) return;
+  FB.crcBusy = true;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok',
+      {method: 'POST', body: {day, aside: b.aside || 0, collected: b.collected || 0, as: _meName()}});
+    if(res && res.book) fbApply(res.book);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    const nb = fbDayOf(fbBook(day.slice(0, 7)), day) || b;
+    _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)} · ЧП ${fbFmt(nb.np_plus)}`);
+  }catch(e){ _toast('Не удалось согласовать'); }
+  FB.crcBusy = false;
+  fbCrcBooks();
+  fbHubRepaint();
+}
+// Сразу на второй этап: страница сбора открывается и, если сбор закончен,
+// переходит к распределению (под замком — остаётся на сборе).
+function fbOpenDist(){
+  CR_GO = 2;
+  fbOpenCash();
 }
 function fbOpenCash(){
   CR_DAY = _dayIsoFor(0);
@@ -19045,13 +19223,15 @@ async function fbHub(force){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
   box.innerHTML = fbHubHtml(fbBook(FB.month));
+  fbCrcBooks();
 }
 function fbHubHtml(b, err){
   const month = FB.month || fbMonthNow();
   if(!b) return `<div class="sc fb-hub">${fbCap(month, true)}
     <div class="aud-g">${fbTile('Доход', 't.gross', null)}${fbTile('Расходы', 't.expenses', null)}${
       fbTile('Прибыль', 'np.days', null)}</div>
-    <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>`;
+    <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>
+    ${fbCrcHtml()}`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   const wal = fbWal(b), all = fbSafeAll(b);
   return `<div class="sc fb-hub">${fbCap(month, true)}
@@ -19061,9 +19241,8 @@ function fbHubHtml(b, err){
       ${fbTile('Прибыль', 'np.days', b.np.days, {mode: 'neg', go: 'fbAnOpen()'})}
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
-    ${fbGo('Ежедневный сбор и распределение выручки', 'cr.done', FB_CR ? FB_CR.done : null, "fbOpenCash()",
-           {cls: 'fb-wrap', unit: fbCashUnit()})}
   </div>
+  ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">
     <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b>${wal ? `<span class="fb-safe-usdt">${fmtUsdt(wal.usdt)}<u>USDT</u></span>` : ''}<em class="fb-chev r">${_SC_CHEV}</em></button>
     <div class="fb-safe-k">

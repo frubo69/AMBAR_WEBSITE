@@ -3964,23 +3964,30 @@ async def _chk_orders(day_start, day_end):
     return {"route": route, "req": req}
 
 
-async def cash_round(day: str) -> dict:
-    """Сбор денег по районам за учётный день.
+# ── перенос несобранной выручки ─────────────────────────────────────────────
+# Владелец, 19 сен 2026: «пусть в сборе выручки будет кнопка „соберу завтра“, и
+# программа аккумулирует всю выручку, что он вчера не забрал, — на следующий
+# день он забирает выручку за два дня»; «даже если не нажал, но за всю смену
+# не нажал, что забрал, — всё равно на следующий день писать, что надо собрать
+# то, что вчера не собрал». Поэтому переносится всё, что не отмечено
+# «Получил», — кнопка «Соберу завтра» только говорит, что это решение, а не
+# забыли (строка чек-листа за день тогда не горит). Переносится по районам:
+# деньги лежат у водителей района. Копится, пока район не отметят «Получил» —
+# отметка закрывает и все перенесённые дни (via — день, которым их получили).
+# С этой смены: раньше «Получил» почти не отмечали (с 5 по 18 сен — два дня
+# из четырнадцати), и перенос с начала времён показал бы две недели выручки,
+# давно сданной руками. Выручка в книге «Финансов» остаётся в своём дне.
+CASH_CARRY_FROM = "2026-09-19"
+CASH_CARRY_MAX = 31
 
-    На каждый район — что водители везут в кассу наличными, чай операторов и
-    расход за смену (питание и согласованные разовые). Старший забирает две
-    пачки: выручку = наличные − чай − расход и чай (19 сен 2026, как в
-    «Обзоре»: чай сидит в цене бутылки). Разовые, оплаченные безналом (18 сен
-    2026), наличных не тронули и не вычитаются — они отдельно, spend_card. Отметка «собрано» стоит на районе, а не на дне: деньги
-    сдают по одному, и старший заходит сюда несколько раз за смену. Задача в
-    чек-листе выполнена, когда собраны все районы, где было что собирать."""
+
+async def _cash_amounts(day: str, orders: list) -> dict:
+    """{район: наличные, чай, расход, выручка, …} за учётный день — та же
+    арифметика, что в итогах смены водителя (cash_math). orders — доставленные
+    заказы хотя бы с начала этого дня."""
     import expense_routes as _exp
     import config_staff as _staff
-    try:
-        orders = list((await db.orders_from(_bizday.since_utc(day))).values())
-    except Exception as e:                                   # noqa: BLE001
-        log.warning(f"[cash] заказы за день: {e}")
-        orders = []
+    import cash_math
     by_o: dict = {o: [] for o in OFFICE_IDS}
     for o in orders:
         if o.get("status") != "delivered":
@@ -3993,12 +4000,9 @@ async def cash_round(day: str) -> dict:
     try:
         saved = {r.get("driver"): r for r in await db.get_driver_days(day)}
     except Exception as e:                                   # noqa: BLE001
-        log.warning(f"[cash] расходы за день: {e}")
+        log.warning(f"[cash] расходы за {day}: {e}")
         saved = {}
-    marks = await db.checklist_get(day)
-    legacy = bool((marks.get("cash") or {}).get("done"))     # старая отметка на весь день
-    out, done_n, need_n, net_total = [], 0, 0, 0
-    import cash_math
+    out = {}
     for oid in OFFICE_IDS:
         dl = by_o.get(oid, [])
         # Наличные — что водители физически держат (по расчёту, валюта — по
@@ -4018,7 +4022,6 @@ async def cash_round(day: str) -> dict:
                 x["amount"] = round(x["amount"] + amount, 2)
                 x["aed"] = round(x["aed"] + m_["aed"], 2)
         team = [d for d in _staff.drivers() if d.get("district") == oid]
-        operator = (team[0].get("operator") if team else "") or ""
         items, spend, pending, spend_card = [], 0, 0, 0
         for d in team:
             r = saved.get(d["name"]) or {}
@@ -4049,31 +4052,153 @@ async def cash_round(day: str) -> dict:
         # Питание — первой строкой, без времени: это плата за день, а не событие;
         # дальше траты по времени.
         items.sort(key=lambda x: (x["at"] != "", x["at"]))
+        out[oid] = {"orders": len(dl), "cash": cash, "tips": tips, "spend": spend,
+                    "spend_card": spend_card, "spend_pending": pending,
+                    "fx": sorted(fx.values(), key=lambda v: v["code"]), "items": items,
+                    "operator": (team[0].get("operator") if team else "") or "",
+                    "drivers": [d["name"] for d in team],
+                    # Выручка — без чая: чай сидит в цене бутылки и сдаётся
+                    # отдельной пачкой (владелец, 19 сен 2026: «две пачки —
+                    # выручка и чай»).
+                    "net": cash - tips - spend,
+                    # Нечего собирать — ни наличных, ни расхода, ни чая.
+                    "empty": not cash and not spend and not tips}
+    return out
+
+
+def _cash_back_days(day: str) -> list:
+    """Дни, откуда может приехать несобранное: вчера, позавчера… не раньше
+    начала переноса и не дальше месяца."""
+    from datetime import date as _date
+    try:
+        d0 = _date.fromisoformat(day)
+    except ValueError:
+        return []
+    out = []
+    for i in range(1, CASH_CARRY_MAX + 1):
+        d = (d0 - timedelta(days=i)).isoformat()
+        if d < CASH_CARRY_FROM:
+            break
+        out.append(d)
+    return out
+
+
+def _cash_chain(day: str, oid: str, back: list, marks: dict) -> list:
+    """Дни района, чья выручка едет в этот день: назад от вчера, пока не
+    встретится день, где её получили (кроме полученных именно этим днём —
+    via: они в нём и числятся). Пустые дни отсеет подсчёт."""
+    out = []
+    for d in back:
+        mk = marks.get(d) or {}
+        m = mk.get(f"cash:{oid}") or {}
+        if (mk.get("cash") or {}).get("done") and not m.get("via"):
+            break                                            # старая отметка на весь день
+        if m.get("done"):
+            if m.get("via") == day:
+                out.append(d)
+                continue
+            break
+        out.append(d)
+    return out
+
+
+async def cash_round(day: str) -> dict:
+    """Сбор денег по районам за учётный день.
+
+    На каждый район — что водители везут в кассу наличными, чай операторов и
+    расход за смену (питание и согласованные разовые). Старший забирает две
+    пачки: выручку = наличные − чай − расход и чай (19 сен 2026, как в
+    «Обзоре»: чай сидит в цене бутылки). Разовые, оплаченные безналом (18 сен
+    2026), наличных не тронули и не вычитаются — они отдельно, spend_card. Отметка «собрано» стоит на районе, а не на дне: деньги
+    сдают по одному, и старший заходит сюда несколько раз за смену. Задача в
+    чек-листе выполнена, когда собраны все районы, где было что собирать.
+
+    Несобранное за прошлые дни (с CASH_CARRY_FROM) едет сюда же — carry по
+    району, и «выручка» / «чаевые» района — вместе с ним (net_all, tips_all):
+    столько старший и забирает. later — «Соберу завтра»."""
+    back = _cash_back_days(day)
+    try:
+        marks_all = await db.checklist_many([day] + back)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] отметки: {e}")
+        marks_all = {}
+    marks = marks_all.get(day) or {}
+    chains = {oid: _cash_chain(day, oid, back, marks_all) for oid in OFFICE_IDS}
+    need_days = sorted({d for ch in chains.values() for d in ch})
+    since = min(need_days) if need_days else day
+    try:
+        orders = list((await db.orders_from(_bizday.since_utc(since))).values())
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] заказы с {since}: {e}")
+        orders = []
+    today_amounts = await _cash_amounts(day, orders)
+    past = {d: await _cash_amounts(d, orders) for d in need_days}
+    legacy = bool((marks.get("cash") or {}).get("done"))     # старая отметка на весь день
+    out, done_n, need_n, later_n = [], 0, 0, 0
+    net_total = tips_total = cash_total = spend_total = carry_total = 0
+    for oid in OFFICE_IDS:
+        a = today_amounts[oid]
+        carry = []
+        for d in chains[oid]:
+            p = past[d][oid]
+            if p["empty"]:
+                continue
+            carry.append({"day": d, "net": p["net"], "tips": p["tips"], "cash": p["cash"],
+                          "spend": p["spend"], "orders": p["orders"]})
+        c_net = sum(c["net"] for c in carry)
+        c_tips = sum(c["tips"] for c in carry)
         m = marks.get(f"cash:{oid}") or {}
         done = bool(m.get("done")) or legacy
-        # Нечего собирать — ни наличных, ни расхода: район не ждёт, и в счёт
-        # «собрано из» не входит. Иначе пустой район вечно висел бы делом.
-        empty = not cash and not spend and not tips
+        later = bool(m.get("later")) and not done
+        empty = a["empty"] and not carry
         if not empty:
             need_n += 1
             if done:
                 done_n += 1
-        # Выручка — без чая: чай сидит в цене бутылки и сдаётся отдельной
-        # пачкой (владелец, 19 сен 2026: «две пачки — выручка и чай»).
-        net = cash - tips - spend
-        net_total += net
+            elif later:
+                later_n += 1
+        net_all, tips_all = a["net"] + c_net, a["tips"] + c_tips
+        net_total += net_all
+        tips_total += tips_all
+        cash_total += a["cash"] + sum(c["cash"] for c in carry)
+        spend_total += a["spend"] + sum(c["spend"] for c in carry)
+        carry_total += c_net
         out.append({"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
-                    "operator": operator, "drivers": [d["name"] for d in team],
-                    "orders": len(dl), "cash": cash, "tips": tips, "spend": spend,
-                    "spend_card": spend_card, "fx": sorted(fx.values(), key=lambda v: v["code"]),
-                    "spend_pending": pending, "net": net, "items": items,
-                    "empty": empty, "done": done, "done_at": str(m.get("at") or "")})
+                    "operator": a["operator"], "drivers": a["drivers"],
+                    "orders": a["orders"], "cash": a["cash"], "tips": a["tips"], "spend": a["spend"],
+                    "spend_card": a["spend_card"], "fx": a["fx"],
+                    "spend_pending": a["spend_pending"], "net": a["net"], "items": a["items"],
+                    "carry": carry, "carry_net": c_net, "carry_tips": c_tips,
+                    "net_all": net_all, "tips_all": tips_all,
+                    "empty": empty, "done": done, "done_at": str(m.get("at") or ""),
+                    "later": later, "later_at": str(m.get("at") or "") if later else ""})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
             "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
-            "net_total": net_total,
-            "cash_total": sum(d["cash"] for d in out),
-            "spend_total": sum(d["spend"] for d in out),
-            "tips_total": sum(d["tips"] for d in out)}
+            # Решено по всем: получил или «Соберу завтра» — строка чек-листа
+            # за этот день тогда не горит.
+            "later": later_n, "settled": need_n > 0 and done_n + later_n >= need_n,
+            "net_total": net_total, "tips_total": tips_total,
+            "cash_total": cash_total, "spend_total": spend_total,
+            "carry_total": carry_total}
+
+
+async def cash_receive(day: str, oid: str, done: bool, who: str) -> None:
+    """«Получил» по району — и за все дни, что в него переехали (via = этот
+    день); «снять отметку» — возвращает их обратно в перенос."""
+    back = _cash_back_days(day)
+    marks_all = await db.checklist_many(back) if back else {}
+    if done:
+        for d in _cash_chain(day, oid, back, marks_all):
+            m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
+            if not m.get("done"):
+                await db.checklist_put(d, f"cash:{oid}", {"done": True, "by": who, "via": day})
+        await db.checklist_set(day, f"cash:{oid}", True, who)
+    else:
+        for d in back:
+            m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
+            if m.get("via") == day:
+                await db.checklist_put(d, f"cash:{oid}", None)
+        await db.checklist_set(day, f"cash:{oid}", False, who)
 
 
 @require_owner
@@ -4428,10 +4553,15 @@ async def handle_checklist(request):
         # из рук в руки. Поэтому единственная отметка, которую ставит человек,
         # — и сумма рядом, чтобы было с чем сверяться.
         _chk_row("cash", "Выручка получена",
-                 (f"получил {cr['done']} из {cr['need']} · выручка {cr['net_total']:,}".replace(",", " ") + " AED"
+                 (f"получил {cr['done']} из {cr['need']}"
+                  + (f" · соберу завтра {cr.get('later', 0)}" if cr.get("later") else "")
+                  + f" · выручка {cr['net_total']:,}".replace(",", " ") + " AED"
+                  + (f" · из них за прошлые дни {cr.get('carry_total', 0):,}".replace(",", " ")
+                     if cr.get("carry_total") else "")
                   if cr["need"] else "наличных за смену не было"),
-                 cr["all_done"] or not cr["need"],
-                 now, day, plan, go="cash", n=max(0, cr["need"] - cr["done"])),
+                 cr["all_done"] or cr.get("settled") or not cr["need"],
+                 now, day, plan, go="cash",
+                 n=max(0, cr["need"] - cr["done"] - cr.get("later", 0))),
     ]
     # Недобор появляется в списке только когда он есть: пункт, который штатно
     # выполнен, каждый день занимал бы строку и приучал не читать список.
@@ -4605,8 +4735,48 @@ async def handle_checklist_mark(request):
     if not day or not ok_item:
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
     who = str(request.get("owner_id") or "")
-    await db.checklist_set(day, item, bool(body.get("done")), who)
+    if item.startswith("cash:"):
+        # «Получил» по району закрывает и перенесённые в него дни.
+        await cash_receive(day, item[5:], bool(body.get("done")), who)
+    else:
+        await db.checklist_set(day, item, bool(body.get("done")), who)
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_cash_later(request):
+    """POST {day, on, districts?} — «Соберу завтра»: районы, где выручку ещё не
+    получили, помечаются отложенными (on=false — снять). Без списка — все
+    такие районы дня. Переедет выручка на завтра и без этой отметки; отметка
+    говорит, что это решение, и строка чек-листа за день не горит."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    day = str(body.get("day") or "").strip()
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    on = body.get("on") is not False
+    want = [d for d in (body.get("districts") or []) if d in OFFICE_IDS]
+    cr = await cash_round(day)
+    who = str(request.get("owner_id") or "")
+    changed = []
+    for x in cr["districts"]:
+        if want and x["id"] not in want:
+            continue
+        if on and not x["done"] and not x["empty"] and not x["later"]:
+            await db.checklist_put(day, f"cash:{x['id']}", {"later": True, "by": who})
+            changed.append(x["id"])
+        elif not on and x["later"]:
+            await db.checklist_put(day, f"cash:{x['id']}", None)
+            changed.append(x["id"])
+    log.info(f"[cash] {day}: «соберу завтра» {'поставлено' if on else 'снято'} — "
+             f"{', '.join(OFFICE_CODES.get(o, o) for o in changed) or 'нечего'}")
+    return web.json_response({"ok": True, "changed": changed, **(await cash_round(day))},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 # ── История заказов ────────────────────────────────────────────────────────
@@ -4779,6 +4949,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/cash-round", handle_cash_round)
     app.router.add_get(             "/api/owner/cash-round", handle_cash_round)
+    app.router.add_route("OPTIONS", "/api/owner/cash-round/later", handle_cash_later)
+    app.router.add_post(            "/api/owner/cash-round/later", handle_cash_later)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)

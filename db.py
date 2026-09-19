@@ -5002,6 +5002,33 @@ async def checklist_set(day: str, item: str, done: bool, by: str = "") -> dict:
     return val
 
 
+async def checklist_many(days: list) -> dict:
+    """{день: отметки} за несколько дней одним запросом — сбору выручки нужно
+    смотреть назад, пока не встретится день, где район получили."""
+    db = _db_or_none()
+    if db is None or not days:
+        return {}
+    out = {d: {} for d in days}
+    async for doc in db.checklist.find({"day": {"$in": list(days)}}, {"_id": 0, "day": 1, "items": 1}):
+        out[doc.get("day")] = doc.get("items") or {}
+    return out
+
+
+async def checklist_put(day: str, item: str, val: dict | None) -> None:
+    """Отметка целиком, со своими полями (via — каким днём получили, later —
+    «Соберу завтра»); None — снять."""
+    db = _db_or_none()
+    if db is None:
+        return
+    if val is None:
+        await db.checklist.update_one({"day": day}, {"$unset": {f"items.{item}": ""},
+                                                     "$set": {"day": day}}, upsert=True)
+        return
+    val = {**val, "at": val.get("at") or datetime.now(timezone.utc).isoformat()}
+    await db.checklist.update_one({"day": day}, {"$set": {f"items.{item}": val, "day": day}},
+                                  upsert=True)
+
+
 async def get_stock_counts_for_day(day: str) -> list:
     db = _db_or_none()
     if db is None: return []

@@ -2158,6 +2158,23 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-st{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:9px;
   font-size:11px;font-weight:700;color:var(--up);background:rgba(76,175,125,.14)}
 .cr-st svg{width:12px;height:12px}
+/* «Соберу завтра» — решение, а не долг: жёлтым, не красным. */
+.cr-st.later{color:var(--warn);background:rgba(243,180,74,.14)}
+/* Несобранное за прошлые дни едет в сегодняшний сбор (владелец, 19 сен
+   2026): метка «за 2 дня» у названия и разбивка по дням под суммами. */
+.cr-days{flex:0 0 auto;display:inline-flex;align-items:center;padding:5px 9px;border-radius:9px;
+  font-size:11px;font-weight:700;color:var(--gold2);background:rgba(201,169,110,.14)}
+.cr-carry{margin-top:12px;border-radius:12px;background:rgba(201,169,110,.06);
+  border:1px solid rgba(201,169,110,.22);padding:4px 12px}
+.cr-carry-r{display:flex;align-items:baseline;gap:10px;padding:7px 0;border-top:1px solid rgba(201,169,110,.14);
+  font-size:12.5px;color:var(--sub)}
+.cr-carry-r:first-child{border-top:0}
+.cr-carry-r span{flex:1;min-width:0}
+.cr-carry-r b{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.cr-carry-r b.dn{color:var(--dn)}
+.cr-carry-r i{font-style:normal;font-size:11.5px;color:var(--gold2);min-width:74px;text-align:right}
+.cr-carry-note{margin-top:6px;font-size:11.5px;color:var(--gold2)}
 .cr-none{flex:0 0 auto;font-size:11.5px;color:var(--muted)}
 /* Две суммы, которые старший забирает, — крупно и слева: выручка (наличные
    минус расход водителя) и чай, порознь, потому что и берутся порознь.
@@ -17974,7 +17991,7 @@ function crRender(){
     <div class="ck-h-l">Сбор выручки</div>
     <div class="ck-h-n">
       <span class="ck-h-v">${d.done}<u>/${d.need}</u></span>
-      <span class="ck-h-w">${d.need ? 'районов получил' : 'получать нечего'}</span>
+      <span class="ck-h-w">${d.need ? 'районов получил' + (d.later ? ` · ${d.later} соберу завтра` : '') : 'получать нечего'}</span>
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
     <div class="cr-tot">
@@ -17983,8 +18000,11 @@ function crRender(){
       <span><i>наличные</i><b>${fmt(d.cash_total)}</b></span>
       <span><i>расход</i><b class="dn">${fmt(d.spend_total)}</b></span>
     </div>
+    ${d.carry_total ? `<div class="cr-carry-note">из них за прошлые дни — ${d.carry_total < 0 ? '−' : ''}${
+      fmt(Math.abs(d.carry_total))} AED: не получили вовремя</div>` : ''}
   </div>`;
   document.getElementById('accMid').innerHTML = head + list.map(crCard).join('');
+  crFoot();
   // Строка «Сбор выручки» на «Финансах» — те же числа сразу, а не при
   // следующем заходе: отметили район «получил» — там тоже на один больше.
   if(d.day === _dayIsoFor(0)){
@@ -18008,17 +18028,36 @@ function crCard(x){
   // Два числа, которые старший забирает: выручка (наличные минус расход
   // водителя) и чай — порознь, потому что и берутся порознь. Доплат
   // водителю нет: ушёл в минус — так и пишем, с минусом.
-  const net = x.net;
+  // Вместе с тем, что не получили в прошлые дни, — столько старший и
+  // забирает; из чего сложилось — разбивкой по дням ниже.
+  const carry = x.carry || [];
+  const net = x.net_all != null ? x.net_all : x.net;
+  const tips = x.tips_all != null ? x.tips_all : x.tips;
+  const дней = carry.length + ((x.cash || x.spend || x.tips) ? 1 : 0);
+  // «за 2 дня»; один день, и тот прошлый, — по имени: «за 19 сентября».
+  const заСколько = дней >= 2 ? `за ${дней} ${pluralize(дней, 'день', 'дня', 'дней')}`
+    : carry.length ? `за ${_dayName(carry[0].day)}` : '';
+  const st = x.done ? `<span class="cr-st">${IC('check', 12)}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>`
+    : x.later ? '<span class="cr-st later">соберу завтра</span>'
+    : заСколько ? `<span class="cr-days">${заСколько}</span>` : '';
+  const money = v => `${v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
+  const сегодня = CR && CR.day === CR.today ? 'сегодня' : _dayName(CR && CR.day);
+  const разбивка = carry.length ? `<div class="cr-carry">${
+      (x.cash || x.spend || x.tips) ? `<div class="cr-carry-r"><span>${escS(сегодня)}</span>
+        <b${x.net < 0 ? ' class="dn"' : ''}>${money(x.net)}</b><i>чаевые ${fmt(x.tips)}</i></div>` : ''}${
+      carry.map(c => `<div class="cr-carry-r"><span>${escS(_dayName(c.day))} · не получили</span>
+        <b${c.net < 0 ? ' class="dn"' : ''}>${money(c.net)}</b><i>чаевые ${fmt(c.tips)}</i></div>`).join('')}</div>` : '';
   return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
       <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
-      ${x.done ? `<span class="cr-st">${IC('check', 12)}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>` : ''}
+      ${st}
     </div>
     <div class="cr-main">
-      <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${net < 0 ? '−' : ''}${fmt(Math.abs(net))}<u>AED</u></b></span>
-      <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(x.tips)}<u>AED</u></b></span>
+      <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${money(net)}<u>AED</u></b></span>
+      <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(tips)}<u>AED</u></b></span>
     </div>
+    ${разбивка}
     <div class="cr-sub">наличные <b>${fmt(x.cash)}</b>${(x.fx || []).length ? ` (из них ${
       x.fx.map(f => `<b>${escS(f.sym)}${fmt(f.amount)}</b>`).join(', ')} валютой)` : ''} · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · чаевые <b>${fmt(x.tips)}</b> · расход <b>${fmt(x.spend)}</b> за смену${
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
@@ -18030,7 +18069,7 @@ function crCard(x){
         foldEnd(n, `crFold('${escS(x.id)}', 1)`)}</div>` : ''}`
       : '<div class="cr-noexp">Расходов за смену не было</div>'}
     <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
-      ${x.done ? `${IC('check', 16)}Получил · снять отметку` : 'Получил'}
+      ${x.done ? `${IC('check', 16)}Получил · снять отметку` : заСколько ? `Получил ${заСколько}` : 'Получил'}
     </button>
   </div>`;
 }
@@ -18054,6 +18093,39 @@ function crFold(id, снизу){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   crRender();
   if(снизу) foldSeen('cr-' + id);
+}
+
+// «Соберу завтра» — внизу экрана, на все районы, где выручку ещё не получили
+// (владелец, 19 сен 2026: «пусть в сборе выручки будет кнопка „соберу
+// завтра“»). Выручка переедет на завтра и без неё — кнопка говорит, что это
+// решение, и строка чек-листа за день не горит. Только в сегодняшнем сборе;
+// снимается там же.
+function crFoot(){
+  const f = document.getElementById('accFoot'); if(!f) return;
+  const d = CR;
+  if(!d || d.day !== d.today){ f.innerHTML = ''; return; }
+  const ждут = (d.districts || []).filter(x => !x.done && !x.empty && !x.later).length;
+  f.innerHTML = ждут
+    ? `<div class="qb-wrap"><button class="qb quiet" onclick="crLater(true)">Соберу завтра${
+        ждут < d.need ? ` · ${ждут} ${pluralize(ждут, 'район', 'района', 'районов')}` : ''}</button></div>`
+    : d.later
+    ? `<div class="qb-wrap"><button class="qb quiet" onclick="crLater(false)">Отменить «Соберу завтра»</button></div>`
+    : '';
+}
+
+async function crLater(on){
+  if(!CR || CR_BUSY) return;
+  CR_BUSY = true;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/later', {method:'POST', body:{day: CR.day, on}}); }
+  catch(e){ _toast('Не удалось'); CR_BUSY = false; return; }
+  CR_BUSY = false;
+  CR = r;
+  crRender();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(on ? 'warning' : 'success'); }catch(e){}
+  const кого = (r.changed || []).map(id => ((r.districts || []).find(x => x.id === id) || {}).code || id).join(', ');
+  if(on && кого) _toast(`Соберу завтра: ${кого} — выручка переедет на завтра`);
+  CKL = null;                       // строка чек-листа перечитается при возврате
 }
 
 // Галочка ставится и снимается одним нажатием, без вопросов: действие
@@ -18585,7 +18657,7 @@ function fbHubHtml(b, err){
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
     ${fbGo('Сбор выручки', 'cr.done', FB_CR ? FB_CR.done : null, "fbOpenCash()",
-           {unit: !FB_CR ? 'районов' : FB_CR.need ? `из ${FB_CR.need} получил` : 'получать нечего'})}
+           {unit: !FB_CR ? 'районов' : FB_CR.need ? `из ${FB_CR.need} получил${FB_CR.later ? ` · ${FB_CR.later} завтра` : ''}` : 'получать нечего'})}
   </div>
   <div class="sc fb-hub fb-safe">
     <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b>${wal ? `<span class="fb-safe-usdt">${fmtUsdt(wal.usdt)}<u>USDT</u></span>` : ''}<em class="fb-chev r">${_SC_CHEV}</em></button>

@@ -7219,8 +7219,6 @@ button.exp-wait:active{transform:scale(.99)}
   <!-- Приёмка «без сканирования», которую досканируют сейчас: видна, пока идёт,
        и пропадает, как только завершена (см. ilHomePaint). Пусто — места не занимает. -->
   <div id="ilHome"></div>
-  <!-- Перемещения между районами: пока заявка живёт. Пусто — места не занимает. -->
-  <div id="mvoHome"></div>
   <!-- Bento KPIs -->
   <div class="bento">
     <div class="card" data-detail="kpi:orders">
@@ -24451,29 +24449,12 @@ async function mvoLoad(){
   if(HIDE) return;
   try{ const r = await ownerApi.ownerFetch('/api/owner/move/live'); MVO.tasks = r.tasks || []; MVO.open = r.open || 0; }
   catch(e){ return; }
-  mvoHomePaint();
   if(ACC_VIEW === 'moves' && !MVT) mvoPaint();
 }
 
-function mvoHomePaint(){
-  const box = document.getElementById('mvoHome'); if(!box) return;
-  // На «Обзоре» — только живые: выполненное уходит, как и у приёмки.
-  const live = MVO.tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
-  if(!live.length){ box.innerHTML = ''; return; }
-  const need = live.reduce((a, t) => a + (+t.need || 0), 0);
-  const got = live.reduce((a, t) => a + (+t.got || 0), 0);
-  const ждут = live.filter(t => t.status === 'given' || (t.sources || []).some(s => s.status === 'given')).length;
-  box.innerHTML = `<button class="rcv il-home" onclick="accOpen('moves')">
-    <div class="rcv-h"><span class="rcv-st ${got ? 'live' : ''}">перемещение</span>
-      <span class="il-t">${live.length} ${pluralize(live.length,'район','района','районов')}</span></div>
-    <div class="rcv-n"><span class="rcv-v">${fmtQty(got)}</span>
-      <span class="rcv-of">из ${fmtQty(need)} ед отдали${ждут ? ` · ${ждут} принимают сканом` : ''}</span>
-      <span class="rcv-pct">${need ? Math.round(got / need * 100) : 0}%</span></div>
-    <div class="rcv-bar"><i style="width:${need ? Math.round(got / need * 100) : 0}%"></i></div>
-    <div class="rcv-f"><span>${escS(live.map(t => t.district_code).join(', '))}</span>
-      <span class="rcv-aed">принимают по районам</span></div>
-  </button>`;
-}
+// Карточки перемещений на «Обзоре» больше нет (владелец, 20 сен 2026: «убери
+// перемещения из обзора, это была временная мера»). Заявки — в «Учёте», склад →
+// «Перемещения между районами»; MVO.open по-прежнему считает «в работе» для той строки.
 
 function mvoFold(key){
   MVO.fold.has(key) ? MVO.fold.delete(key) : MVO.fold.add(key);

@@ -4544,7 +4544,7 @@ function _decline(oid, r){
 // подсказывается и не считается: оператор сам выбирает, откуда и куда, сам
 // находит позицию и сам ставит число. Заявка та же, что собирает STAR, и видна
 // обеим сторонам: водитель района, который отдаёт, начинает и сканирует,
-// водитель района-получателя, когда ему отдали всё, нажимает «Принял». Строка
+// водитель района-получателя, когда ему отдали всё, тоже сканирует. Строка
 // помнит свой «откуда» — в одной заявке можно забрать из нескольких районов.
 // Черновик живёт в телефоне: закрыли окно — набранное на месте.
 let MVB = {board:null, live:null, q:'', busy:false, t:null, sure:'', open:false};
@@ -4652,8 +4652,9 @@ function mvbCartHtml(){
     </div>`;
   }).join('')).join('');
 }
-// Сканирует тот, кто отдаёт; получатель, когда ему отдали всё, нажимает
-// «Принял» или «Принял неровно» (владелец, 18 сен 2026). Статус — словами.
+// Сканирует тот, кто отдаёт; получатель, когда ему отдали всё, тоже сканирует
+// каждую бутылку (владелец, 20 сен 2026: «у оператора тоже поменяй на
+// „принимают сканом“»). Статус — словами.
 function mvbLiveHtml(){
   const T = (MVB.live && MVB.live.tasks) || [];
   // Живые — сверху; принятые и снятые — отдельной группой ниже (владелец,
@@ -4667,7 +4668,7 @@ function mvbLiveHtml(){
     + (былые.length ? `<div class="mvb-sec">Завершённые · ${былые.length}</div>${_mvbTasks(былые)}` : '');
 }
 function _mvbTasks(T){
-  const ST = {free:'ждёт отдающих', live:'отдают', given:'ждёт «Принял»', done:'принято', cancelled:'снята'};
+  const ST = {free:'ждёт отдающих', live:'отдают', given:'принимают сканом', done:'принято', cancelled:'снята'};
   return T.map(t=>{
     const from = [...new Set((t.lines||[]).map(l=>l.from_code))].join(', ');
     const who = (t.seniors||[]).length && t.status !== 'done' && t.status !== 'cancelled' ? ' · везёт старший'
@@ -4679,7 +4680,7 @@ function _mvbTasks(T){
     const key = t.move_id + '/' + t.district;
     return `<div class="mvb-t">
       <div class="h"><b>${_esc(from)} → ${_esc(t.district_code)}</b><em class="${t.diff ? 'diff' : t.status}">${t.diff && t.status === 'done' ? 'принято неровно' : (ST[t.status] || t.status)}${who}</em></div>
-      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · приняли ${_mvN(t.got)} из ${_mvN(t.need)} ед.${t.by ? ' · ' + _esc(t.by) : ''}</div>
+      <div class="sub">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · отдали ${_mvN(t.got)} из ${_mvN(t.need)} ед.${t.by ? ' · ' + _esc(t.by) : ''}</div>
       ${diff.map(x=>`<div class="sub diff">из ${_esc(x.code)}: ${(x.accept_lines||[]).map(d=>`${_esc(d.name)} ${_mvN(d.got)} из ${_mvN(d.sent)}`).join(', ')}${x.accept_note ? ` · «${_esc(x.accept_note)}»` : ''}</div>`).join('')}
       ${can ? `<button class="${MVB.sure === key ? 'sure' : ''}" onclick="mvbCancel('${_esc(t.move_id)}','${_esc(t.district)}')">${
           MVB.sure === key ? 'Точно снять?' : 'Снять'}</button>` : ''}

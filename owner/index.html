@@ -6685,6 +6685,18 @@ button.exp-wait:active{transform:scale(.99)}
    шапка, ни плитки не нажимаются. */
 .opr-sum .fin-sec-h,.opr-sum .fin-strip.four > div{cursor:default}
 .opr-sum .fin-sec-h:active,.opr-sum .fin-strip.four > div:active{background:none}
+/* «N позиций без закупочной цены» — низ карточки «Прайс»: во всю ширину, под
+   красным волоском, без своих углов и полей. Дышит фоном — тенью наружу
+   внутри карточки не подышать, её срезает край. */
+.opr-sum .oprx-alert{margin:0;border:0;border-top:1px solid rgba(224,85,85,.3);border-radius:0;
+  padding:13px 16px;animation:oprBreathIn 2.6s var(--e1) infinite}
+.opr-sum .oprx-alert.on{animation:none}
+.opr-sum .oprx-alert:active{transform:none;background:rgba(224,85,85,.22)}
+@keyframes oprBreathIn{
+  0%,100%{background-color:rgba(224,85,85,.10)}
+  50%    {background-color:rgba(224,85,85,.20)}
+}
+@media (prefers-reduced-motion:reduce){ .opr-sum .oprx-alert{animation:none} }
 /* Позиции без закупки — красная карточка сверху, дышит: это невыполненная
    работа, а не справка. Нажатие оставляет в списке только их. */
 .oprx-alert{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 10px;
@@ -22675,7 +22687,6 @@ function oprPaint(keepFocus){
              value="${escS(OPR.q)}" oninput="oprFilter(this.value)">
       <button class="oprx-f ${OPR.only ? 'on' : ''}" onclick="oprOnly()">Без цены</button>
     </div>
-    ${oprAlert()}
     ${rows.length ? `<div class="oprx-list">${rows.map(r => oprRow(r)).join('')}</div>`
       : '<div class="opr-none">Ничего не нашлось</div>'}`;
   if(keepFocus){
@@ -22714,6 +22725,7 @@ function oprSumCard(){
       <div><b>${_oprMarkTxt(mark)}</b><i>средняя накрутка</i></div>
     </div>
     <div class="fin-bar"><i style="width:${cover}%"></i></div>
+    ${oprAlert()}
   </div>`;
 }
 function oprSumPaint(){
@@ -22721,6 +22733,10 @@ function oprSumPaint(){
   if(el) el.outerHTML = oprSumCard();
 }
 
+// С 19 сен 2026 — низом карточки «Прайс» (владелец: «6 позиций без
+// закупочной цены прикрепи вот туда в карточку снизу»), а не отдельно под
+// поиском; перерисовывается вместе с карточкой.
+//
 // Внизу — то, ради чего сюда заходят с экрана склада: у скольких позиций
 // закупки нет. Число, а не процент: «3 позиции без цены» — это работа, которую
 // видно и можно сделать здесь же, нажатием показав только их.

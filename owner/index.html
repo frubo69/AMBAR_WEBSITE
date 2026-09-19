@@ -3674,10 +3674,16 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    Закреплена сверху экрана: страница едет под ней, а сама карточка в
    прокрутке сжимается до полосы с четырьмя числами (владелец, 20 сен 2026).
    Четыре числа — квадратом, как стопки в сейфе: четыре в ряд не читаются. */
-.fb-an{position:sticky;top:var(--hero-top,124px);z-index:20}
-/* Заголовок — крупный и по центру (владелец, 20 сен 2026: «аналитика месяца
-   крупнее, отцентруй и сделай прям заголовком»). */
-.fb-an-t{justify-content:center;min-height:52px;font-size:19px;letter-spacing:1.1px}
+/* Сжатие карточки меняет высоту содержимого над прокруткой, и браузер
+   «якорит» страницу — отматывает её в начало. Якорение на странице выключено,
+   как в списках склада (.stk-mid). */
+#pg-finance{overflow-anchor:none}
+.fb-an{position:sticky;top:var(--hero-top,124px);z-index:20;will-change:height;overflow-anchor:none}
+/* Заголовок — крупный, по центру и золотом (владелец, 20 сен 2026: «аналитика
+   месяца крупнее, отцентруй и сделай прям заголовком»; «сделай заголовок
+   золотым»). */
+.fb-an-t{justify-content:center;min-height:52px;font-size:19px;letter-spacing:1.1px;
+  color:var(--gold2);overflow:hidden}
 /* Текст в шапке растянут на всю ширину (.sc-cap span{flex:1}) — поэтому
    центрируем сам текст, как в полосе месяца, а не только его блок. */
 .fb-an-t span{text-align:center}
@@ -3704,10 +3710,12 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-an-rent.dn .fb-an-bar i{background:var(--dn)}
 .fb-an-rent-s{grid-column:1 / -1;font-size:11px;font-weight:600;color:var(--muted)}
 .fb-an-rent.dn .fb-an-rent-s{color:var(--warn)}
-.fb-an-mini{display:none}
-.fb-an.small .fb-an-t,.fb-an.small .aud-g,.fb-an.small .fb-an-rent,.fb-an.small > .sc-r{display:none}
-.fb-an.small .fb-an-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:2px 12px 12px}
-.fb-an.small .sc-cap.fb-cap{border-bottom:0;min-height:42px}
+/* Свёрнутый вид — та же карточка, сжатая прокруткой: полоса из четырёх чисел
+   лежит у нижнего края и проявляется по мере сжатия (владелец, 20 сен 2026:
+   «она должна плавно сворачиваться по мере того, как я листаю»). */
+.fb-an-mini{position:absolute;left:0;right:0;bottom:0;display:grid;
+  grid-template-columns:repeat(4,1fr);gap:6px;padding:0 12px 11px;opacity:0;pointer-events:none}
+.fb-an-fade{will-change:opacity}
 .fb-an-mini span{min-width:0;text-align:center}
 .fb-an-mini i{display:block;font-style:normal;font-size:8.5px;font-weight:700;letter-spacing:.4px;
   text-transform:uppercase;color:var(--muted)}
@@ -3756,6 +3764,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-crc-d b{display:flex;align-items:center;justify-content:center;gap:2px;font-family:'Space Grotesk',sans-serif;
   font-size:12px;font-weight:700;color:var(--sub)}
 .fb-crc-d b svg{width:10px;height:10px;stroke-width:3}
+/* Под кодом — название района (владелец, 20 сен 2026: «сделай, чтобы было
+   B1 JVC и так далее»): мелко и одной строкой, длинное — с многоточием. */
+.fb-crc-d s{display:block;margin-top:1px;text-decoration:none;font-size:8.5px;font-weight:600;
+  letter-spacing:.2px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fb-crc-d i{display:block;margin-top:3px;font-style:normal;font-size:11px;font-weight:700;color:var(--text);
   font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fb-crc-d.got{border-color:rgba(76,175,125,.45);background:rgba(76,175,125,.1)}
@@ -19101,11 +19113,11 @@ function fbAn(b){
 // красиво въедет и будет отличаться: заметно, но не нагромождено»): подпись,
 // крупный процент золотом и полоса — какая доля вала осталась прибылью.
 function fbAnRent(an){
-  if(!an) return `<div class="fb-an-rent"><span class="fb-an-rent-l">Рентабельность</span>
+  if(!an) return `<div class="fb-an-rent fb-an-fade"><span class="fb-an-rent-l">Рентабельность</span>
     <b class="fb-an-rent-v is-skel" style="min-width:56px">0000</b>
     <span class="fb-an-bar"><i style="width:0"></i></span></div>`;
   const w = Math.max(0, Math.min(100, an.margin));
-  return `<div class="fb-an-rent${an.margin < 0 ? ' dn' : ''}">
+  return `<div class="fb-an-rent fb-an-fade${an.margin < 0 ? ' dn' : ''}">
     <span class="fb-an-rent-l">Рентабельность</span>
     <b class="fb-an-rent-v" data-f="t.margin" data-fc="neg">${fbFmt(an.margin)}<u>%</u></b>
     <span class="fb-an-bar"><i style="width:${w}%"></i></span>
@@ -19172,7 +19184,7 @@ function fbCrcBooks(){
 }
 function fbHubRepaint(){
   const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-  if(box && mb){ box.innerHTML = fbHubHtml(mb); fbAnStick(); fbAnFit(); }
+  if(box && mb){ box.innerHTML = fbHubHtml(mb); fbAnFit(); fbAnStick(); }
 }
 // «Аналитика месяца» закреплена сверху экрана и в прокрутке сжимается до
 // полосы с четырьмя числами (владелец, 20 сен 2026: «сворачивается до
@@ -19190,7 +19202,22 @@ function fbAnFit(){
     while(el.scrollWidth > box && f > 12 && n++ < 30){ f -= 0.5; el.style.fontSize = f + 'px'; }
   });
 }
+// Карточка сжимается непрерывно, кадр в кадр (владелец, 20 сен 2026: «она
+// должна плавно сворачиваться по мере того, как я листаю»), как карточка
+// выручки на «Обзоре»: заголовок сходит на нет, плитки и полоса гаснут и
+// срезаются высотой карточки, а внизу проявляется полоса из четырёх чисел.
+// Развёрнутая и свёрнутая высоты меряются у самой карточки — стоит поменять
+// содержимое, и они пересчитываются (fbAnMeasure).
+const FB_AN_DIST = 130;                    // на скольких точках прокрутки сжимается
 let _fbAnRaf = null;
+function fbAnMeasure(card){
+  const t = card.querySelector('.fb-an-t'), cap = card.querySelector('.sc-cap.fb-cap'),
+        mini = card.querySelector('.fb-an-mini');
+  card.style.height = ''; if(t){ t.style.height = ''; t.style.minHeight = ''; }
+  card._tH = t ? t.offsetHeight : 0;
+  card._min = (cap ? cap.offsetHeight : 46) + (mini ? mini.offsetHeight : 44);
+  card._full = card.offsetHeight;
+}
 function fbAnStick(){
   const card = document.getElementById('fbAnCard'); if(!card) return;
   // Прилипает вплотную к шапке приложения: в зазор между нею и карточкой
@@ -19198,12 +19225,44 @@ function fbAnStick(){
   const hdr = document.querySelector('.hdr');
   const top = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 88;
   if(card._top !== top){ card._top = top; card.style.top = top + 'px'; }
-  card.classList.toggle('small', window.scrollY > 24);
+  if(!card._full) fbAnMeasure(card);
+  const p = Math.max(0, Math.min(1, window.scrollY / FB_AN_DIST));
+  const title = card.querySelector('.fb-an-t');
+  if(title){
+    // min-height у заголовка своя, поэтому одной высоты мало — иначе он не
+    // сжимается и в свёрнутом виде закрывает месяц.
+    const th = (card._tH * (1 - Math.min(1, p * 1.25)));
+    title.style.height = th + 'px'; title.style.minHeight = th + 'px';
+    title.style.opacity = String(Math.max(0, 1 - p * 1.6));
+  }
+  card.style.height = (card._min + (card._full - card._min) * (1 - p)) + 'px';
+  // Сначала гаснут плитки, и только потом проявляется полоса: иначе на
+  // середине пути два набора чисел видны разом и наезжают друг на друга.
+  const fade = String(Math.max(0, 1 - p * 1.8));
+  card.querySelectorAll('.fb-an-fade').forEach(el => { el.style.opacity = fade; });
+  const mini = card.querySelector('.fb-an-mini');
+  if(mini) mini.style.opacity = String(Math.max(0, Math.min(1, (p - .62) / .33)));
 }
 window.addEventListener('scroll', () => {
   if(_fbAnRaf) return;
   _fbAnRaf = requestAnimationFrame(() => { _fbAnRaf = null; fbAnStick(); });
 }, {passive: true});
+window.addEventListener('resize', () => {
+  const card = document.getElementById('fbAnCard');
+  if(card){ card._full = 0; fbAnFit(); fbAnStick(); }
+});
+// Карточку «Финансов» перерисовывают из пяти мест (сводка сбора, книга, месяц,
+// правки). После перерисовки карточка новая — без подобранного кегля и без
+// сжатия, и на прокрученной странице она разворачивалась обратно. Следим за
+// самим узлом, а не за всеми, кто его трогает.
+(function fbAnWatch(){
+  const box = document.getElementById('finBook'); if(!box) return;
+  let raf = null;
+  new MutationObserver(() => {
+    if(raf) return;
+    raf = requestAnimationFrame(() => { raf = null; fbAnFit(); fbAnStick(); });
+  }).observe(box, {childList: true, subtree: true});
+})();
 function fbCrcState(){
   const c = FB_CR; if(!c) return null;
   const ds = c.districts || [], net = x => x.net_all != null ? x.net_all : (x.net || 0);
@@ -19243,7 +19302,7 @@ function fbCrcHtml(){
     const cls = x.empty ? 'empty' : x.done ? 'got' : x.later ? 'later' : '';
     const txt = x.empty ? '—' : x.later && !x.done ? 'завтра' : fbFmt(v);
     return `<span class="fb-crc-d ${cls}${!x.empty && !(x.later && !x.done) && v < 0 ? ' neg' : ''}"><b>${
-      x.done ? IC('check', 10) : ''}${escS(x.code)}</b><i>${txt}</i></span>`;
+      x.done ? IC('check', 10) : ''}${escS(x.code)}</b><s>${escS(x.name || '')}</s><i>${txt}</i></span>`;
   }).join('');
   const s1 = !c.need ? 'получать нечего' : st.got ? 'получено со всех' : `${c.done} из ${c.need} районов`;
   // «получено из всего» — пока есть что получать; выручка дня в минусе (одни
@@ -19341,7 +19400,7 @@ async function fbHub(force){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
   box.innerHTML = fbHubHtml(fbBook(FB.month));
-  fbAnStick(); fbAnFit();
+  fbAnFit(); fbAnStick();
   fbCrcBooks();
 }
 function fbHubHtml(b, err){
@@ -19349,7 +19408,7 @@ function fbHubHtml(b, err){
   if(!b) return `<div class="sc fb-hub fb-an" id="fbAnCard">
     <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
     ${fbCap(month, true)}
-    <div class="aud-g fb-an-g">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
+    <div class="aud-g fb-an-g fb-an-fade">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
       fbTile('Чистая прибыль', 'econ', null)}</div>
     ${fbAnRent(null)}
     <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>
@@ -19360,7 +19419,7 @@ function fbHubHtml(b, err){
   return `<div class="sc fb-hub fb-an" id="fbAnCard">
     <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
     ${fbCap(month, true)}
-    <div class="aud-g fb-an-g">
+    <div class="aud-g fb-an-g fb-an-fade">
       ${fbTile('Вал', 't.gross', t.gross, {go: 'fbAnOpen()'})}
       ${fbTile('Расходы', 't.out_all', an.out, {go: 'fbAnOpen()'})}
       ${fbTile('Чистая прибыль', 'econ', an.profit, {mode: 'neg', go: 'fbAnOpen()'})}
@@ -19369,10 +19428,10 @@ function fbHubHtml(b, err){
     <div class="fb-an-mini">
       <span><i>вал</i><b data-f="t.gross">${fbFmt(an.gross)}</b></span>
       <span><i>расходы</i><b data-f="t.out_all">${fbFmt(an.out)}</b></span>
-      <span><i>прибыль</i><b data-f="econ" data-fc="neg"${an.profit < 0 ? ' class="dn"' : ''}>${fbFmt(an.profit)}</b></span>
+      <span><i>ЧП</i><b data-f="econ" data-fc="neg"${an.profit < 0 ? ' class="dn"' : ''}>${fbFmt(an.profit)}</b></span>
       <span><i>рент.</i><b data-f="t.margin"${an.margin < 0 ? ' class="dn"' : ''}>${fbFmt(an.margin)}<u>%</u></b></span>
     </div>
-    ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
+    ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {cls: 'fb-an-fade', unit: bu.empty ? 'не заполнен' : 'в день'})}
   </div>
   ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">

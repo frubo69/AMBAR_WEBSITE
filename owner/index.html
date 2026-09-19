@@ -2232,6 +2232,24 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-later.on{color:var(--warn);background:rgba(243,180,74,.14);border-color:rgba(243,180,74,.4)}
 .cr-later svg{width:14px;height:14px}
 .cr-later:active{transform:scale(.98)}
+/* ── Распределение выручки — второй шаг сбора ──
+   Над кнопкой подвала — кого ещё ждём; карточка дня — как «Касса дня»:
+   выручка, Барракуда и РП+ со знаком минус, ЧП итогом; под названием строки —
+   откуда число (половина, норма). */
+.cr-foot-cap{margin:0 4px 9px;font-size:12.5px;font-weight:600;color:var(--muted);text-align:center;line-height:1.35}
+.crd .sc-cap i.crd-st{display:inline-flex;align-items:center;gap:5px;color:var(--warn)}
+.crd .sc-cap i.crd-st.ok{color:var(--up)}
+.crd .sc-cap i.crd-st svg{width:12px;height:12px}
+.crd .fb-r span i{display:block;font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.crd .fb-r{min-height:56px}
+.crd .fb-num{width:116px}
+.crd-short{margin:-4px 16px 8px 38px;font-size:12px;font-weight:600;color:var(--warn)}
+.crd-short b{font-weight:800}
+.crd-short[hidden]{display:none}
+.crd-note{padding:6px 16px 16px;font-size:12.5px;color:var(--muted);line-height:1.4}
+.crd-acts{display:flex;gap:8px;padding:12px 14px 14px}
+.crd-acts .aud-b{padding:14px 10px;font-size:14.5px}
+.crd-acts .aud-b.soft{flex:0 0 auto;padding-left:20px;padding-right:20px}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -18019,8 +18037,12 @@ async function chkCash(){
 // ним из чего оно сложилось, и список расходов за смену по времени. Собраны
 // все районы, где было что собирать, — задача в чек-листе гаснет сама.
 let CR = null, CR_OPEN = new Set(), CR_BUSY = false, CR_DAY = '';
+// Второй шаг — распределение выручки (crDist ниже): открыт ли, какой день
+// правят, куда вела стрелка назад до него.
+let CRD = {open: false, edit: null, busy: false, back: null};
 
 async function accCashRound(){
+  CRD.open = false;
   _setText('accTitle', 'Ежедневный сбор и распределение выручки');
   _setText('accSub', 'загрузка…');
   // CR_DAY — день, названный входом (с «Финансов» — сегодня); иначе день
@@ -18060,6 +18082,7 @@ function crRender(){
   </div>`;
   document.getElementById('accMid').innerHTML = head + list.map(crCard).join('');
   crFoot();
+  crDistPrefetch();
   // Строка «Сбор выручки» на «Финансах» — те же числа сразу, а не при
   // следующем заходе: отметили район «получил» — там тоже на один больше.
   if(d.day === _dayIsoFor(0)){
@@ -18167,7 +18190,28 @@ function crFold(id, снизу){
 // решение, и строка чек-листа за день не горит. Только в сегодняшнем сборе;
 // нажать ещё раз — снять.
 function crFoot(){
-  const f = document.getElementById('accFoot'); if(f) f.innerHTML = '';
+  const f = document.getElementById('accFoot'); if(!f) return;
+  const d = CR;
+  if(!d || CRD.open || !(d.need > 0)){ f.innerHTML = ''; return; }
+  // Шаг 2 — после шага 1: пока не со всех районов получено, кнопка не
+  // нажимается и говорит, кого ещё ждём.
+  const wait = crWait();
+  if(wait.length){
+    f.innerHTML = `<div class="qb-wrap"><div class="cr-foot-cap">Сначала получите выручку: ${
+      wait.map(x => escS(x.code) + (x.later ? ' — завтра' : '')).join(', ')}</div>
+      <button class="qb quiet" disabled>Распределить выручку</button></div>`;
+    return;
+  }
+  const days = crDistDays().map(crDistBook);
+  const known = days.every(Boolean);
+  const pend = days.filter(b => b && b.base > 0 && !b.ok);
+  const sum = pend.reduce((a, b) => a + b.base, 0);
+  const any = days.some(b => b && b.base > 0);
+  f.innerHTML = `<div class="qb-wrap">${known && !pend.length && any
+    ? `<button class="qb quiet" onclick="crDist()">${IC('check', 17)}Распределено · посмотреть</button>`
+    : known && !any
+    ? '<button class="qb quiet" disabled>Распределять нечего — выручки нет</button>'
+    : `<button class="qb" onclick="crDist()">Распределить выручку${sum > 0 ? ` · ${fbFmt(sum)} AED` : ''}</button>`}</div>`;
 }
 
 async function crLater(id, on){
@@ -18208,6 +18252,162 @@ async function crToggle(id){
   // Чек-лист перечитается при возврате — строка «Выручка получена» считается
   // на сервере из этих же отметок.
   CKL = null;
+}
+
+// ── Распределение выручки ────────────────────────────────────────────────
+// Второй шаг «Ежедневного сбора и распределения выручки» (владелец, 19 сен
+// 2026: «инструмент, чтобы распределять деньги по сейфу: предлагаться должно
+// автоматом, но старший должен иметь возможность согласовать или
+// отредактировать; на Барракуду обычно половина выручки, на РП+ — сколько
+// надо по бюджету, сейчас 10 200 в день, остальное — ЧП»; «он сначала должен
+// забрать все деньги, а потом уже их распределить»).
+//
+// Кнопка «Распределить выручку» внизу сбора нажимается, только когда со всех
+// районов получено. Предложение и подтверждение — те же, что в «Кассе дня»:
+// книга учёта (finance_routes.build) предлагает Барракуде половину, в РП+ —
+// норму бюджета (не больше остатка), ЧП — что осталось; POST /book/day/ok
+// замораживает. Своей арифметики здесь нет: согласовал здесь — в «Кассе дня»
+// тоже согласовано, и наоборот.
+//
+// Дни — день сбора и прошлые, чью выручку забрали только сейчас («соберу
+// завтра», перенос): деньги в руках за все эти дни. Каждый день — своей
+// карточкой, как и в книге. Состояние шага — CRD (объявлено рядом с CR).
+
+function crDistDays(){
+  const d = CR; if(!d) return [];
+  const set = new Set([d.day]);
+  (d.districts || []).forEach(x => (x.carry || []).forEach(c => { if(c.day) set.add(c.day); }));
+  return [...set].sort();
+}
+// Кого ещё ждём: районы, где было что брать и «Получил» не отмечено.
+// «Соберу завтра» — тоже ещё не получено: распределим, когда заберут.
+function crWait(){ return ((CR && CR.districts) || []).filter(x => !x.empty && !x.done); }
+function crDistBook(day){ return fbDayOf(fbBook(day.slice(0, 7)), day); }
+function crDistNorm(day){ return (((fbBook(day.slice(0, 7)) || {}).budget) || {}).norm || 0; }
+// Книгу месяца (двух — перенос через первое число) подтягиваем, пока идёт
+// сбор: к нажатию «Распределить» числа уже на месте.
+function crDistPrefetch(){
+  [...new Set(crDistDays().map(d => d.slice(0, 7)))].forEach(m => {
+    if(fbBook(m) && !fbStale(m)) return;
+    fbLoad(m).then(() => { if(ACC_VIEW === 'cashround' && !CRD.open) crFoot(); }).catch(() => {});
+  });
+}
+
+async function crDist(){
+  if(!CR) return;
+  CRD = {open: true, edit: null, busy: false, back: CRD.open ? CRD.back : ACC_BACK};
+  ACC_BACK = crDistBack;
+  _setText('accTitle', 'Распределение выручки');
+  _setText('accSub', CR.day === CR.today ? 'сегодня' : _dayName(CR.day));
+  document.getElementById('accFoot').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  const months = [...new Set(crDistDays().map(d => d.slice(0, 7)))];
+  try{ await Promise.all(months.map(m => (fbBook(m) && !fbStale(m)) ? null : fbLoad(m))); }
+  catch(e){ if(CRD.open) mid.innerHTML = loadFail('crDist()'); return; }
+  if(CRD.open) crDistRender();
+}
+// Назад — к сбору того же дня; дальше «назад» ведёт туда, откуда пришли в сбор.
+function crDistBack(){
+  ACC_BACK = CRD.back || null;
+  CRD = {open: false, edit: null, busy: false, back: null};
+  CR_DAY = CR ? CR.day : '';
+  accCashRound();
+}
+
+function crDistRender(){
+  const mid = document.getElementById('accMid'); if(!mid || !CRD.open) return;
+  mid.innerHTML = crDistDays().map(crDistCard).join('');
+}
+function crDistCard(day){
+  const b = crDistBook(day), norm = crDistNorm(day);
+  const title = CR && day === CR.today ? 'Сегодня' : fbDayT(day);
+  if(!b) return `<div class="sc fb-gut crd">${fbCapT(escS(title))}
+    <div class="crd-note">За этот день в книге ничего нет</div></div>`;
+  if(!(b.base > 0)) return `<div class="sc fb-gut crd">${fbCapT(escS(title), 'распределять нечего')}
+    <div class="sc-r fb-r"><span>Выручка</span><b class="${b.base < 0 ? 'dn' : 'none'}">${fbFmt(b.base)}<u>AED</u></b></div>
+    <div class="crd-note">${b.base < 0 ? 'Расходы водителей больше наличных — в сейф в этот день ничего не приходит.'
+      : 'Выручки в этот день нет.'}</div></div>`;
+  const ed = CRD.edit === day;
+  const aside = b.aside || 0, col = b.collected || 0, np = b.base - aside - col;
+  const half = Math.floor(b.base / 2);
+  const short = norm > 0 && col < norm ? norm - col : 0;
+  const val = (f, v) => ed
+    ? `<b><input class="fb-num crd-in" id="crd-${f}-${day}" inputmode="numeric" value="${fbFmt(v)}"
+         onfocus="this.select()" oninput="crDistLive('${day}')"
+         onkeydown="if(event.key==='Enter'){this.blur()}"><u>AED</u></b>`
+    : `<b>${fbFmt(v)}<u>AED</u></b>`;
+  return `<div class="sc fb-gut crd${b.ok ? ' ok' : ''}" id="crd-${day}">
+    <div class="sc-cap"><span>${escS(title)}</span><i class="crd-st${b.ok ? ' ok' : ''}">${
+      b.ok ? IC('check', 12) + 'согласовано' + (b.ok_by ? ' · ' + escS(b.ok_by) : '') : 'ждёт согласования'}</i></div>
+    <div class="sc-r fb-r"><span>Выручка${b.handed_fact != null ? '<i>по факту</i>' : ''}</span><b>${fbFmt(b.base)}<u>AED</u></b></div>
+    <div class="sc-r fb-r crd-r${ed ? ' fb-i' : ''}"><em class="fb-sign">−</em><span>Барракуда<i>${
+      !ed && aside === half ? 'половина выручки' : 'половина — ' + fbFmt(half)}</i></span>${val('aside', aside)}</div>
+    <div class="sc-r fb-r crd-r${ed ? ' fb-i' : ''}"><em class="fb-sign">−</em><span>РП+<i>${
+      norm ? 'норма ' + fbFmt(norm) + ' в день' : 'норма в бюджете не задана'}</i></span>${val('collected', col)}</div>
+    <div class="crd-short" id="crd-short-${day}"${short ? '' : ' hidden'}>до нормы РП+ не хватает <b>${fbFmt(short)}</b> AED</div>
+    <div class="sc-r fb-r sum"><em class="fb-sign">=</em><span>ЧП<i>остаток</i></span><b id="crd-np-${day}"${
+      np < 0 ? ' class="dn"' : ''}>${fbFmt(np)}<u>AED</u></b></div>
+    <div class="crd-acts">${ed
+      ? `<button class="aud-b go" onclick="crDistSave('${day}')">Сохранить</button>
+         <button class="aud-b soft" onclick="crDistEdit('')">Отмена</button>`
+      : b.ok
+      ? `<button class="aud-b soft" onclick="crDistEdit('${day}')">Изменить</button>`
+      : `<button class="aud-b go" onclick="crDistOk('${day}')">Согласовать</button>
+         <button class="aud-b soft" onclick="crDistEdit('${day}')">Изменить</button>`}</div>
+  </div>`;
+}
+function crDistNum(id){
+  const el = document.getElementById(id); if(!el) return 0;
+  const v = parseFloat(String(el.value).replace(/[^\d.,]/g, '').replace(',', '.'));
+  return Number.isFinite(v) ? v : 0;
+}
+// Правят — ЧП и «не хватает до нормы» пересчитываются под пальцем.
+function crDistLive(day){
+  const b = crDistBook(day); if(!b) return;
+  const norm = crDistNorm(day);
+  const col = crDistNum(`crd-collected-${day}`);
+  const np = b.base - crDistNum(`crd-aside-${day}`) - col;
+  const el = document.getElementById(`crd-np-${day}`);
+  if(el){ el.innerHTML = `${fbFmt(np)}<u>AED</u>`; el.classList.toggle('dn', np < 0); }
+  const sh = document.getElementById(`crd-short-${day}`);
+  if(sh){ const s = norm > 0 && col < norm ? norm - col : 0; sh.hidden = !s; if(s) sh.querySelector('b').textContent = fbFmt(s); }
+}
+function crDistEdit(day){
+  CRD.edit = day || null;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  crDistRender();
+}
+function crDistSave(day){
+  crDistOk(day, crDistNum(`crd-aside-${day}`), crDistNum(`crd-collected-${day}`));
+}
+// «Согласовать» — предложенное как есть; «Сохранить» — поправленное. Всё
+// распределено — назад к сбору (там внизу «Распределено»); остался ещё день
+// (перенос) — остаёмся, он на экране следующим.
+async function crDistOk(day, aside, collected){
+  if(CRD.busy) return;
+  const b = crDistBook(day); if(!b) return;
+  if(aside === undefined){ aside = b.aside || 0; collected = b.collected || 0; }
+  if(aside < 0 || collected < 0){ _toast('Сумма не может быть меньше нуля'); return; }
+  CRD.busy = true;
+  let res;
+  try{ res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok',
+         {method: 'POST', body: {day, aside, collected, as: _meName()}}); }
+  catch(e){ CRD.busy = false; _toast('Не удалось сохранить распределение'); return; }
+  if(res && res.book) fbApply(res.book);
+  // Подтвердили день прошлого месяца (перенос через первое число) — книга
+  // сбрасывает следующие месяцы: их остатки теперь другие. Дотягиваем.
+  const miss = [...new Set(crDistDays().map(d => d.slice(0, 7)))].filter(m => !fbBook(m));
+  if(miss.length){ try{ await Promise.all(miss.map(m => fbLoad(m))); }catch(e){} }
+  CRD.busy = false;
+  CRD.edit = null;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  const nb = crDistBook(day) || b;
+  _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)} · ЧП ${fbFmt(nb.np_plus)}`);
+  const left = crDistDays().map(crDistBook).filter(x => x && x.base > 0 && !x.ok);
+  if(!left.length){ crDistBack(); return; }
+  crDistRender();
 }
 
 function chkGo(id){
@@ -18732,6 +18932,24 @@ function fbCashLoad(){
     .catch(() => {})
     .finally(() => { FB_CR_BUSY = false; });
 }
+// Справа у строки сбора: сколько районов получил, а когда получено всё —
+// распределена ли выручка (второй шаг того же экрана). Книга дня ещё не
+// загружена — про распределение молчим, а не гадаем.
+function fbCashUnit(){
+  const c = FB_CR;
+  if(!c) return 'районов';
+  if(!c.need) return 'получать нечего';
+  let u = `из ${c.need} получил`;
+  if(c.later) u += ` · ${c.later} завтра`;
+  if(c.done >= c.need){
+    const days = new Set([c.day]);
+    (c.districts || []).forEach(x => (x.carry || []).forEach(k => { if(k.day) days.add(k.day); }));
+    const bs = [...days].map(d => fbDayOf(fbBook(d.slice(0, 7)), d));
+    if(bs.every(Boolean) && bs.some(b => b.base > 0))
+      u += bs.some(b => b.base > 0 && !b.ok) ? ' · распределить' : ' · распределено';
+  }
+  return u;
+}
 function fbOpenCash(){
   CR_DAY = _dayIsoFor(0);
   accOpen('cashround');
@@ -18769,7 +18987,7 @@ function fbHubHtml(b, err){
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
     ${fbGo('Ежедневный сбор и распределение выручки', 'cr.done', FB_CR ? FB_CR.done : null, "fbOpenCash()",
-           {cls: 'fb-wrap', unit: !FB_CR ? 'районов' : FB_CR.need ? `из ${FB_CR.need} получил${FB_CR.later ? ` · ${FB_CR.later} завтра` : ''}` : 'получать нечего'})}
+           {cls: 'fb-wrap', unit: fbCashUnit()})}
   </div>
   <div class="sc fb-hub fb-safe">
     <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b>${wal ? `<span class="fb-safe-usdt">${fmtUsdt(wal.usdt)}<u>USDT</u></span>` : ''}<em class="fb-chev r">${_SC_CHEV}</em></button>

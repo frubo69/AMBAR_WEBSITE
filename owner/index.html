@@ -3675,7 +3675,19 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    прокрутке сжимается до полосы с четырьмя числами (владелец, 20 сен 2026).
    Четыре числа — квадратом, как стопки в сейфе: четыре в ряд не читаются. */
 .fb-an{position:sticky;top:var(--hero-top,124px);z-index:20}
-.aud-g.fb-an-g{grid-template-columns:repeat(2,1fr)}
+/* Заголовок — крупный и по центру (владелец, 20 сен 2026: «аналитика месяца
+   крупнее, отцентруй и сделай прям заголовком»). */
+.fb-an-t{justify-content:center;min-height:52px;font-size:19px;letter-spacing:1.1px}
+/* Четыре числа в ряд (владелец: «4 цифры должны быть в ряд»): плитки уже,
+   поэтому кегль числа и подписи меньше, чем у трёх. */
+.aud-g.fb-an-g{grid-template-columns:repeat(4,1fr);gap:6px;padding:11px 12px 13px}
+.fb-an-g .aud-t{padding:9px 5px 10px}
+.fb-an-g .aud-tl{font-size:7.5px;letter-spacing:.2px;line-height:1.2;min-height:18px}
+.fb-an-g .aud-tv{font-size:15.5px;letter-spacing:-.4px}
+.fb-an-g .aud-tu{font-size:8.5px;margin-top:4px}
+.fb-an-g .aud-t.tap::after{top:8px;right:6px;width:5px;height:5px}
+.fb-an-g .aud-t.tap .aud-tl{padding-right:7px}
+@media (max-width:380px){ .fb-an-g .aud-tv{font-size:14.5px} .fb-an-g .aud-t{padding-left:4px;padding-right:4px} }
 .fb-an-mini{display:none}
 .fb-an.small .fb-an-t,.fb-an.small .aud-g,.fb-an.small > .sc-r{display:none}
 .fb-an.small .fb-an-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:2px 12px 12px}

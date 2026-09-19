@@ -114,7 +114,7 @@ async def main():
     # Осталась одна водка. Двое водителей Бизнес Бея сканируют две разные
     # бутылки в одну секунду — отдать можно только одну.
     s1, s2 = await asyncio.gather(MV.scan(mid, "jvc", "v2", "Парвиз", 21, "bbay"),
-                                  MV.scan(mid, "jvc", "v3", "Бахадыр", 22, "bbay"))
+                                  MV.scan(mid, "jvc", "v3", "Баха", 22, "bbay"))
     eq("строку не перебрали: прошла одна из двух", sorted([s1["ok"], s2["ok"]]), [False, True])
     eq("вторая — «уже всё отдали»", (s1 if not s1["ok"] else s2)["verdict"], "full")
     eq("у JVC ровно три водки", await shelf("jvc", VODKA), 3)
@@ -192,7 +192,7 @@ async def main():
        (t["status"], t["diff"], [(s_["code"], s_["status"], s_["accepted_by"]) for s_ in t["sources"]]),
        ("done", True, [("B2", "done", "Худоба"), ("B3", "done", "Худоба"), ("B4", "diff", "Фарух")]))
     tr = await d.stock_transfers.find({"by_kind": "move"}).to_list(length=100)
-    свои = {"bbay": {"Парвиз", "Бахадыр"}, "silicon": {"Фаредун"}, "alguses": {"Даврон"}}
+    свои = {"bbay": {"Парвиз", "Баха"}, "silicon": {"Фаредун"}, "alguses": {"Даврон"}}
     eq("в книге переездов — семь сканов, каждый записан на отдающего своего района",
        (len(tr), all(x["to"] == "jvc" and x["by_name"] in свои.get(x["from"], ()) for x in tr)), (7, True))
 

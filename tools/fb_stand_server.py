@@ -222,7 +222,7 @@ async def staff(request):
     return web.json_response({"districts": [
         dict(id="jvc", code="B1", name="JVC", operator="Умар", base="Умар", moved=False, drivers=["Худоба", "Фарух"]),
         dict(id="bbay", code="B2", name="Бизнес Бей", operator="Джанабиль", base="Джанабиль", moved=False,
-             drivers=["Парвиз", "Авазбек", "Бахадыр"]),
+             drivers=["Парвиз", "Авазбек", "Баха"]),
         dict(id="tecom", code="B5", name="Тиком", operator="Умар", base="Умар", moved=False, drivers=["Файзуло", "Алишер"]),
     ], "drivers": [], "stars": ["Старший"]})
 

@@ -33,6 +33,10 @@ async def tg_send(token, cid, text, **k): SENT.append((cid, text)); return {"ok"
 api_server.tg_send = tg_send
 import bizday; bizday.biz_day = lambda *a, **k: D
 dr._biz_day = lambda *a, **k: D
+# «Отпущен ли сегодня» у оператора считает день своими часами — тот же день,
+# иначе после 10:00 следующего дня тест смотрел бы в пустой день.
+from datetime import date as _date
+op._biz_date = lambda *a, **k: _date.fromisoformat(D)
 SHIFTS = {}
 async def sfd(day): return dict(SHIFTS)
 db.shifts_for_day = sfd

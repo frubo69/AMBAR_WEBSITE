@@ -2160,6 +2160,34 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-st svg{width:12px;height:12px}
 /* «Соберу завтра» — решение, а не долг: жёлтым, не красным. */
 .cr-st.later{color:var(--warn);background:rgba(243,180,74,.14)}
+/* Расходы района ещё не согласованы — таблетка-предупреждение, она же ведёт
+   в «Расходы смены»; кнопки сбора до решения не нажимаются. */
+.cr-st.pend{color:var(--warn);background:rgba(243,180,74,.14);border:1px solid rgba(243,180,74,.4);
+  cursor:pointer;font-family:inherit;text-align:left;line-height:1.2}
+.cr-st.pend:active{transform:scale(.98)}
+.cr-ok.off,.cr-later.off{opacity:.5}
+.cr-ok.off{background:var(--card2);color:var(--sub);border:1px solid var(--border2);box-shadow:none}
+/* «Что стоит перевезти» на экране создания заявки: свёрнутый блок сверху. */
+.mvn-plan{margin:0 0 12px;border-radius:16px;background:var(--card);border:1px solid var(--border2);overflow:hidden}
+.mvn-plan-h{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 14px;
+  border:0;background:none;color:inherit;text-align:left;cursor:pointer;font-family:inherit}
+.mvn-plan-h:disabled{cursor:default}
+.mvn-plan-h:active{background:rgba(255,255,255,.02)}
+.mvn-plan-b{flex:1;min-width:0}
+.mvn-plan-b b{display:block;font-size:13.5px;font-weight:700}
+.mvn-plan-b i{display:block;margin-top:3px;font-style:normal;font-size:11.5px;font-weight:600;color:var(--muted);
+  line-height:1.3}
+.mvn-plan-h.on .fb-chev{transform:rotate(90deg)}
+.mvn-plan-x{padding:0 14px 14px;border-top:1px solid var(--border2)}
+.mvn-plan-x .pk-row:first-child{margin-top:8px}
+.mvn-plan-x .mvo-go{margin-top:12px}
+/* «Заберу всё завтра» — в шапке сбора, справа от чисел. */
+.cr-allater{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:7px;
+  padding:9px 13px;border-radius:12px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;
+  color:var(--warn);background:rgba(243,180,74,.12);border:1px solid rgba(243,180,74,.38)}
+.cr-allater.off{opacity:.55}
+.cr-allater:active{transform:scale(.98)}
+.cr-allater svg{width:14px;height:14px}
 /* Несобранное за прошлые дни едет в сегодняшний сбор (владелец, 19 сен
    2026): метка «за 2 дня» у названия и разбивка по дням под суммами. */
 .cr-days{flex:0 0 auto;display:inline-flex;align-items:center;padding:5px 9px;border-radius:9px;
@@ -3678,6 +3706,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    «якорит» страницу — отматывает её в начало. Якорение на странице выключено,
    как в списках склада (.stk-mid). */
 #pg-finance{overflow-anchor:none}
+/* Обёртка держит место карточки в потоке: карточка внутри сжимается, а
+   страница под ней едет ровно за пальцем. */
+.fb-an-wrap{position:relative}
 .fb-an{position:sticky;top:var(--hero-top,124px);z-index:20;will-change:height;overflow-anchor:none}
 /* Заголовок — крупный, по центру и золотом (владелец, 20 сен 2026: «аналитика
    месяца крупнее, отцентруй и сделай прям заголовком»; «сделай заголовок
@@ -16596,8 +16627,8 @@ function stkMoveChoose(){
       <em class="mvn-go">${_SC_CHEV}</em></button>
     <button class="stk-mv-pick mvn-opt" onclick="mvnOpen()">
       <span class="stk-mv-code">${ico('<path d="M9 4h6M9 4a2 2 0 0 0-2 2v0h10v0a2 2 0 0 0-2-2M7 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-1"/><path d="M8 12h8M8 16h5"/>')}</span>
-      <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">Заявка на перемещение</span>
-        <span class="stk-mv-pick-s">откуда, куда, что и сколько — отдающий водитель отсканирует, получатель примет</span></span>
+      <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">Создать заявку на перемещение</span>
+        <span class="stk-mv-pick-s">откуда, куда, что и сколько — сканируют обе стороны: и отдающий водитель, и принимающий</span></span>
       <em class="mvn-go">${_SC_CHEV}</em></button>
     ${MVO.open ? `<button class="sc-r mvn-live" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
       <b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
@@ -16620,8 +16651,9 @@ function _mvnU(p, n){ return p && p.unit > 1 ? (n % 1 ? 'коробки' : plura
 async function mvnOpen(){
   STK.view = 'mvn'; MVN.pick = ''; MVN.draft = false; MVN.q = '';
   _setRail('stkRail', '');
-  _stkHead('Заявка на перемещение', 'загрузка…', false);
+  _stkHead('Создать заявку на перемещение', 'загрузка…', false);
   document.getElementById('stkMid').innerHTML = '<div class="stk-none">Смотрим остатки по районам…</div>';
+  mvoPlan();                                  // расчёт «что стоит перевезти» — сюда же
   try{ MVN.board = await ownerApi.ownerFetch('/api/owner/move/board'); }
   catch(e){ document.getElementById('stkMid').innerHTML = loadFail('mvnOpen()', 'Остатки не загрузились'); return; }
   const ds = MVN.board.districts || [];
@@ -16629,6 +16661,41 @@ async function mvnOpen(){
   if(!ds.some(d => d.id === MVND.from) || MVND.from === MVND.to)
     MVND.from = (ds.find(d => d.id !== MVND.to) || {}).id || '';
   _mvnSave();
+  mvnPaint();
+}
+
+// Что стоит перевезти — расчёт по остаткам и нормам: излишек соседа закрывает
+// дыру, и эту закупку не надо делать. Живёт здесь, рядом с ручной сборкой
+// (владелец, 20 сен 2026: «перемести и рекомендацию, и кнопку в „создать
+// заявку на перемещение“»), свёрнутым блоком: сначала своё, расчёт — когда
+// захотят посмотреть.
+function mvnPlanHtml(){
+  const p = MVO.plan;
+  if(!p) return `<button class="mvn-plan-h" disabled><span class="mvn-plan-b"><b>Что стоит перевезти</b>
+    <i>считаю по остаткам и нормам…</i></span></button>`;
+  if(!p.rows.length) return `<button class="mvn-plan-h" disabled><span class="mvn-plan-b"><b>Что стоит перевезти</b>
+    <i>перевозить нечего — у соседей нет излишков</i></span></button>`;
+  const open = !!MVN.plan;
+  return `<button class="mvn-plan-h${open ? ' on' : ''}" onclick="mvnPlanToggle()">
+      <span class="mvn-plan-b"><b>Что стоит перевезти</b>
+        <i>излишек соседа закроет ${fmtQty(p.qty)} ед на ${fmt(p.aed)} AED закупки</i></span>
+      <em class="fb-chev">${_SC_CHEV}</em></button>
+    ${open ? `<div class="mvn-plan-x">
+      ${p.no_codes ? `<div class="ord-hint warn">Из них <b>${fmtQty(p.no_codes)} ед</b> пока без кодов —
+        эти районы сперва вносят товар, сканером их не взять</div>` : ''}
+      ${p.rows.slice(0, 40).map(r => `<div class="pk-row">
+        <span class="pk-row-b"><span class="pk-name">${escS(r.name)}</span>
+          <span class="pk-slug">${escS(r.from_code)} → ${escS(r.to_code)} · у отдающего останется ${fmtQty(r.from_left)}${
+            r.no_codes ? ` · ${fmtQty(r.no_codes)} без кодов` : ''}</span></span>
+        <span class="pk-n">${fmtQty(r.qty)}<u> ${r.unit > 1 ? 'кор' : 'бут'}</u></span></div>`).join('')}
+      ${p.rows.length > 40 ? `<div class="scan-empty">…и ещё ${p.rows.length - 40}</div>` : ''}
+      <button class="nfoot-btn pri mvo-go" ${MVO.busy ? 'disabled' : ''} onclick="mvoCreate()">
+        ${MVO.busy ? 'Создаю…' : `Создать заявку по расчёту · ${p.districts.join(', ')}`}</button>
+    </div>` : ''}`;
+}
+function mvnPlanToggle(){
+  MVN.plan = !MVN.plan;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   mvnPaint();
 }
 
@@ -16663,8 +16730,9 @@ function mvnPaint(){
     mid.innerHTML = mvnDraftHtml();
   }else{
     const f = _mvnD(MVND.from), t = _mvnD(MVND.to);
-    _stkHead('Заявка на перемещение', 'откуда / куда / что и сколько', false);
-    mid.innerHTML = `<div class="pk-grid mvn-dirs">
+    _stkHead('Создать заявку на перемещение', 'откуда / куда / что и сколько', false);
+    mid.innerHTML = `<div class="mvn-plan">${mvnPlanHtml()}</div>
+      <div class="pk-grid mvn-dirs">
         <button class="pk-dist" onclick="mvnPick('from')"><span class="pk-code">${escS(f.code)}</span>
           <span class="pk-dist-b"><span class="pk-dist-n">Откуда · ${escS(f.name)}</span>
             <span class="pk-dist-s">отдаёт — его водитель сканирует</span></span><em class="mvn-go">${_SC_CHEV}</em></button>
@@ -18221,8 +18289,7 @@ function crRender(){
     <div class="cr-tot">
       <span><i>выручка</i><b${d.net_total < 0 ? ' class="dn"' : ''}>${d.net_total < 0 ? '−' : ''}${fmt(Math.abs(d.net_total))}</b></span>
       <span><i>чаевые</i><b class="gold">${fmt(d.tips_total)}</b></span>
-      <span><i>наличные</i><b>${fmt(d.cash_total)}</b></span>
-      <span><i>расход</i><b class="dn">${fmt(d.spend_total)}</b></span>
+      ${crLaterAllBtn()}
     </div>
     ${d.carry_total ? `<div class="cr-carry-note">из них за прошлые дни — ${d.carry_total < 0 ? '−' : ''}${
       fmt(Math.abs(d.carry_total))} AED: не получили вовремя</div>` : ''}
@@ -18237,6 +18304,49 @@ function crRender(){
     try{ const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
          if(box && mb) box.innerHTML = fbHubHtml(mb); }catch(e){}
   }
+}
+
+// «Заберу всё завтра» — одной кнопкой на все районы, которые сегодня не
+// получили (владелец, 20 сен 2026: «вместо наличных и расхода сделай общую
+// кнопку заберу всё завтра, чтобы можно было одной кнопкой все районы завтра
+// собрать»). Нечего откладывать — кнопки нет; у района расходы ещё не
+// согласованы — сначала они, то же правило, что у кнопок района.
+function crLaterAllBtn(){
+  const d = CR; if(!d || d.day !== d.today) return '';
+  const можно = (d.districts || []).filter(x => !x.empty && !x.done && !x.later);
+  if(!можно.length) return '';
+  const ждут = можно.filter(x => +x.spend_pending > 0);
+  return `<button class="cr-allater${ждут.length ? ' off' : ''}" onclick="${
+    ждут.length ? `crNeedExp('${escS(ждут.map(x => x.code).join(', '))}')` : 'crLaterAll()'}">
+    ${IC('clock', 14)}Заберу всё завтра</button>`;
+}
+async function crLaterAll(){
+  if(!CR || CR_BUSY) return;
+  CR_BUSY = true;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/later', {method:'POST', body:{day: CR.day, on: true}}); }
+  catch(e){ _toast('Не удалось'); CR_BUSY = false; return; }
+  CR_BUSY = false;
+  CR = r; crRender();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  const кого = (r.changed || []).map(id => ((r.districts || []).find(x => x.id === id) || {}).code || id).join(', ');
+  if(кого) _toast(`Соберу завтра: ${кого} — выручка переедет на завтра`);
+  CKL = null;
+}
+// Пока расходы района ждут решения, собирать нельзя (владелец, 20 сен 2026:
+// «сначала он должен согласовать или нет все расходы, а потом собирать
+// выручку; если расход не согласован — водитель отдаёт выручку БЕЗ вычета
+// этого расхода»). Несогласованное из «к сдаче» и так не вычитается: сервер
+// считает spend только по согласованным, а ждущее показывает отдельно.
+function crNeedExp(коды){
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  _toast(`Сначала подтвердите расходы${коды ? ' · ' + коды : ''}`, 'err');
+}
+// С карточки района — сразу в «Расходы смены», и обратно тем же путём.
+function crToExp(){
+  const day = CR ? CR.day : '';
+  accOpen('expenses');
+  ACC_BACK = () => { CR_DAY = day; accCashRound(); };
 }
 
 function crCard(x){
@@ -18266,7 +18376,10 @@ function crCard(x){
   // там дата короче: «за 18.09».
   const заКнопка = дней < 2 && carry.length
     ? `за ${String(carry[0].day).slice(8, 10)}.${String(carry[0].day).slice(5, 7)}` : заСколько;
+  // Расходы района ещё ждут решения — об этом таблеткой, и собирать нельзя.
+  const ждут = +x.spend_pending > 0 && !x.done;
   const st = x.done ? `<span class="cr-st">${IC('check', 12)}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>`
+    : ждут ? '<button class="cr-st pend" onclick="crToExp()">расходы не согласованы</button>'
     : x.later ? '<span class="cr-st later">соберу завтра</span>'
     : заСколько ? `<span class="cr-days">${заСколько}</span>` : '';
   const money = v => `${v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
@@ -18298,11 +18411,13 @@ function crCard(x){
         foldEnd(n, `crFold('${escS(x.id)}', 1)`)}</div>` : ''}`
       : '<div class="cr-noexp">Расходов за смену не было</div>'}
     <div class="cr-acts">
-      <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
+      <button class="cr-ok${x.done ? ' on' : ''}${ждут ? ' off' : ''}" onclick="${
+        ждут ? `crNeedExp('${escS(x.code)}')` : `crToggle('${escS(x.id)}')`}">
         ${x.done ? `${IC('check', 16)}Получил · снять отметку` : заКнопка ? `Получил ${заКнопка}` : 'Получил'}
       </button>
-      ${!x.done && CR && CR.day === CR.today ? `<button class="cr-later${x.later ? ' on' : ''}"
-        onclick="crLater('${escS(x.id)}', ${!x.later})"${x.later ? ' aria-label="Снять «Соберу завтра»"' : ''}>${
+      ${!x.done && CR && CR.day === CR.today ? `<button class="cr-later${x.later ? ' on' : ''}${ждут ? ' off' : ''}"
+        onclick="${ждут ? `crNeedExp('${escS(x.code)}')` : `crLater('${escS(x.id)}', ${!x.later})`}"${
+        x.later ? ' aria-label="Снять «Соберу завтра»"' : ''}>${
         x.later ? IC('check', 14) : ''}Соберу завтра</button>` : ''}
     </div>
   </div>`;
@@ -19121,7 +19236,7 @@ function fbAnRent(an){
     <span class="fb-an-rent-l">Рентабельность</span>
     <b class="fb-an-rent-v" data-f="t.margin" data-fc="neg">${fbFmt(an.margin)}<u>%</u></b>
     <span class="fb-an-bar"><i style="width:${w}%"></i></span>
-    <span class="fb-an-rent-s">${an.margin < 0 ? 'месяц в минусе' : `${fbFmt(an.margin)}% вала — прибыль`}</span>
+    <span class="fb-an-rent-s">${an.margin < 0 ? 'месяц в минусе' : `${fbFmt(an.margin)}% вала — чистая прибыль`}</span>
   </div>`;
 }
 function fbCap(month, arrows){
@@ -19208,15 +19323,21 @@ function fbAnFit(){
 // срезаются высотой карточки, а внизу проявляется полоса из четырёх чисел.
 // Развёрнутая и свёрнутая высоты меряются у самой карточки — стоит поменять
 // содержимое, и они пересчитываются (fbAnMeasure).
-const FB_AN_DIST = 130;                    // на скольких точках прокрутки сжимается
 let _fbAnRaf = null;
 function fbAnMeasure(card){
   const t = card.querySelector('.fb-an-t'), cap = card.querySelector('.sc-cap.fb-cap'),
-        mini = card.querySelector('.fb-an-mini');
-  card.style.height = ''; if(t){ t.style.height = ''; t.style.minHeight = ''; }
+        mini = card.querySelector('.fb-an-mini'), wrap = card.parentElement;
+  card.style.height = ''; card.style.position = ''; card.style.left = ''; card.style.width = '';
+  if(t){ t.style.height = ''; t.style.minHeight = ''; }
+  if(wrap) wrap.style.height = '';
   card._tH = t ? t.offsetHeight : 0;
   card._min = (cap ? cap.offsetHeight : 46) + (mini ? mini.offsetHeight : 44);
   card._full = card.offsetHeight;
+  // Место в потоке не отдаём: карточка сжимается ровно на столько, на сколько
+  // ушла страница, и соседняя карточка идёт за пальцем — как будто поджимает
+  // её (владелец, 20 сен 2026: «нижнее окно заезжает под неё, хотя должно как
+  // бы толкать её и сворачивать»).
+  if(wrap) wrap.style.height = card._full + 'px';
 }
 function fbAnStick(){
   const card = document.getElementById('fbAnCard'); if(!card) return;
@@ -19226,7 +19347,10 @@ function fbAnStick(){
   const top = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 88;
   if(card._top !== top){ card._top = top; card.style.top = top + 'px'; }
   if(!card._full) fbAnMeasure(card);
-  const p = Math.max(0, Math.min(1, window.scrollY / FB_AN_DIST));
+  const wrap = card.parentElement;
+  const ход = Math.max(0, card._full - card._min);          // сколько всего сжимается
+  const сжали = Math.max(0, Math.min(ход, window.scrollY)); // ровно на прокрутку
+  const p = ход ? сжали / ход : 0;
   const title = card.querySelector('.fb-an-t');
   if(title){
     // min-height у заголовка своя, поэтому одной высоты мало — иначе он не
@@ -19235,7 +19359,19 @@ function fbAnStick(){
     title.style.height = th + 'px'; title.style.minHeight = th + 'px';
     title.style.opacity = String(Math.max(0, 1 - p * 1.6));
   }
-  card.style.height = (card._min + (card._full - card._min) * (1 - p)) + 'px';
+  card.style.height = (card._full - сжали) + 'px';
+  // Сжалась до полосы — дальше она закреплена сверху сама по себе: место
+  // обёртки к этому времени уезжает вверх, и липкая карточка ушла бы с ним.
+  if(wrap){
+    if(сжали >= ход - .5){
+      const box = wrap.getBoundingClientRect();
+      card.style.position = 'fixed';
+      card.style.left = Math.round(box.left) + 'px';
+      card.style.width = Math.round(box.width) + 'px';
+    }else if(card.style.position === 'fixed'){
+      card.style.position = ''; card.style.left = ''; card.style.width = '';
+    }
+  }
   // Сначала гаснут плитки, и только потом проявляется полоса: иначе на
   // середине пути два набора чисел видны разом и наезжают друг на друга.
   const fade = String(Math.max(0, 1 - p * 1.8));
@@ -19405,18 +19541,18 @@ async function fbHub(force){
 }
 function fbHubHtml(b, err){
   const month = FB.month || fbMonthNow();
-  if(!b) return `<div class="sc fb-hub fb-an" id="fbAnCard">
+  if(!b) return `<div class="fb-an-wrap" id="fbAnWrap"><div class="sc fb-hub fb-an" id="fbAnCard">
     <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
     ${fbCap(month, true)}
     <div class="aud-g fb-an-g fb-an-fade">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
       fbTile('Чистая прибыль', 'econ', null)}</div>
     ${fbAnRent(null)}
-    <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div>
+    <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div></div>
     ${fbCrcHtml()}`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   const wal = fbWal(b), all = fbSafeAll(b);
   const an = fbAn(b);
-  return `<div class="sc fb-hub fb-an" id="fbAnCard">
+  return `<div class="fb-an-wrap" id="fbAnWrap"><div class="sc fb-hub fb-an" id="fbAnCard">
     <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
     ${fbCap(month, true)}
     <div class="aud-g fb-an-g fb-an-fade">
@@ -19432,7 +19568,7 @@ function fbHubHtml(b, err){
       <span><i>рент.</i><b data-f="t.margin"${an.margin < 0 ? ' class="dn"' : ''}>${fbFmt(an.margin)}<u>%</u></b></span>
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {cls: 'fb-an-fade', unit: bu.empty ? 'не заполнен' : 'в день'})}
-  </div>
+  </div></div>
   ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">
     <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b>${wal ? `<span class="fb-safe-usdt">${fmtUsdt(wal.usdt)}<u>USDT</u></span>` : ''}<em class="fb-chev r">${_SC_CHEV}</em></button>
@@ -24712,6 +24848,7 @@ async function mvoPlan(){
   try{ MVO.plan = await ownerApi.ownerFetch('/api/owner/move/plan'); }
   catch(e){ MVO.plan = null; }
   if(ACC_VIEW === 'moves' && !MVT) mvoPaint();
+  if(STK.view === 'mvn') mvnPaint();          // расчёт живёт на экране создания
 }
 
 async function mvoCreate(){
@@ -25041,29 +25178,17 @@ function mvoPaint(){
                               : 'по районам');
   const tab = MVO.tab === 'take' ? 'take' : 'give';
   const карточки = tab === 'give' ? mvoGiveCards() : mvoTakeCards();
-  const p = MVO.plan;
-  const план = !p ? '<div class="scan-empty">Считаю, что стоит перевезти…</div>'
-    : !p.rows.length ? '<div class="scan-empty">Перевозить нечего — у соседей нет излишков</div>'
-    : `<div class="ord-hint">Излишек соседа закрывает дыру: <b>${fmtQty(p.qty)} ед</b>
-         на <b>${fmt(p.aed)} AED</b> закупки, которые не надо покупать</div>
-       ${p.no_codes ? `<div class="ord-hint warn">Из них <b>${fmtQty(p.no_codes)} ед</b> пока без кодов —
-         эти районы сперва вносят товар, сканером их не взять</div>` : ''}
-       ${p.rows.slice(0, 40).map(r => `<div class="pk-row">
-         <span class="pk-row-b"><span class="pk-name">${escS(r.name)}</span>
-           <span class="pk-slug">${escS(r.from_code)} → ${escS(r.to_code)} · у отдающего останется ${fmtQty(r.from_left)}${
-             r.no_codes ? ` · ${fmtQty(r.no_codes)} без кодов` : ''}</span></span>
-         <span class="pk-n">${fmtQty(r.qty)}<u> ${r.unit > 1 ? 'кор' : 'бут'}</u></span></div>`).join('')}
-       ${p.rows.length > 40 ? `<div class="scan-empty">…и ещё ${p.rows.length - 40}</div>` : ''}
-       <button class="nfoot-btn pri mvo-go" ${MVO.busy ? 'disabled' : ''} onclick="mvoCreate()">
-         ${MVO.busy ? 'Создаю…' : `Создать заявку · ${p.districts.join(', ')}`}</button>`;
+  // Что стоит перевезти и кнопка создания — на экране «Создать заявку на
+  // перемещение» (владелец, 20 сен 2026: «из активных перемещений убери эту
+  // рекомендацию и кнопку создать заявку — тут мы смотрим только активные
+  // заявки»). Здесь — только то, что уже в работе.
   document.getElementById('accMid').innerHTML = `
     <div class="periods" id="mvoTabs" style="margin:2px 0 14px;--count:2">
       <div class="period-pill"></div>
       <button class="${tab === 'give' ? 'on' : ''}" onclick="mvoTab('give')">Отдать</button>
       <button class="${tab === 'take' ? 'on' : ''}" onclick="mvoTab('take')">Принять</button>
     </div>`
-    + (карточки || `<div class="scan-empty">${tab === 'give' ? 'Отдавать нечего' : 'Принимать нечего'}</div>`)
-    + `<div class="sect"><span class="sect-t">Что стоит перевезти</span></div>${план}`;
+    + (карточки || `<div class="scan-empty">${tab === 'give' ? 'Отдавать нечего' : 'Принимать нечего'}</div>`);
   const g = document.getElementById('mvoTabs'); if(g) requestAnimationFrame(() => movePill(g));
 }
 

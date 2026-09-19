@@ -17893,12 +17893,15 @@ async function chkCash(){
 // На карточке района одно главное число — «к сдаче» (наличные − расход), под
 // ним из чего оно сложилось, и список расходов за смену по времени. Собраны
 // все районы, где было что собирать, — задача в чек-листе гаснет сама.
-let CR = null, CR_OPEN = new Set(), CR_BUSY = false;
+let CR = null, CR_OPEN = new Set(), CR_BUSY = false, CR_DAY = '';
 
 async function accCashRound(){
   _setText('accTitle', 'Сбор выручки');
   _setText('accSub', 'загрузка…');
-  const day = (CKL && CKL.day) || accDay();
+  // CR_DAY — день, названный входом (с «Финансов» — сегодня); иначе день
+  // чек-листа, из которого пришли, или выбранный в приложении.
+  const day = CR_DAY || (CKL && CKL.day) || accDay();
+  CR_DAY = '';
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
   catch(e){
     document.getElementById('accMid').innerHTML =
@@ -17929,6 +17932,13 @@ function crRender(){
     </div>
   </div>`;
   document.getElementById('accMid').innerHTML = head + list.map(crCard).join('');
+  // Строка «Сбор выручки» на «Финансах» — те же числа сразу, а не при
+  // следующем заходе: отметили район «получил» — там тоже на один больше.
+  if(d.day === _dayIsoFor(0)){
+    FB_CR = d; FB_CR_AT = Date.now();
+    try{ const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
+         if(box && mb) box.innerHTML = fbHubHtml(mb); }catch(e){}
+  }
 }
 
 function crCard(x){
@@ -18463,8 +18473,35 @@ function fbIni(name){ return String(name || '?').trim().slice(0, 2).toUpperCase(
 // ── Карточка на странице «Финансы» ────────────────────────────────────────
 // Месяц со стрелками, три числа месяца и семь книг строками; справа у книги
 // — её главное число.
+//
+// «Сбор выручки» — строкой под «Бюджетом» (владелец, 19 сен 2026: «нужно,
+// чтобы где-то в финансах был отдельной кнопкой ещё сбор выручки, чтобы он
+// туда не только из чек-листа мог заходить»). За сегодня, как «Касса дня» с
+// карточки; справа — сколько районов уже сдали, как в чек-листе. Сводку
+// держим минуту: карточку перерисовывают часто, а сдают раз в несколько часов.
+let FB_CR = null, FB_CR_AT = 0, FB_CR_BUSY = false;
+function fbCashLoad(){
+  if(FB_CR_BUSY || Date.now() - FB_CR_AT < 60000) return;
+  FB_CR_BUSY = true;
+  ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: _dayIsoFor(0)}})
+    .then(d => {
+      FB_CR = d; FB_CR_AT = Date.now();
+      const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
+      if(box && mb) box.innerHTML = fbHubHtml(mb);
+    })
+    .catch(() => {})
+    .finally(() => { FB_CR_BUSY = false; });
+}
+function fbOpenCash(){
+  CR_DAY = _dayIsoFor(0);
+  accOpen('cashround');
+  // Отметили район «получил» — строка на «Финансах» узнает при следующем
+  // заходе, а не через минуту.
+  FB_CR_AT = 0;
+}
 async function fbHub(force){
   const box = document.getElementById('finBook'); if(!box) return;
+  fbCashLoad();
   FB.month = FB.month || fbMonthNow();
   const m = FB.month;
   if(!fbBook(m) || force){
@@ -18491,6 +18528,8 @@ function fbHubHtml(b, err){
       ${fbTile('Прибыль', 'np.days', b.np.days, {mode: 'neg', go: 'fbAnOpen()'})}
     </div>
     ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
+    ${fbGo('Сбор выручки', 'cr.done', FB_CR ? FB_CR.done : null, "fbOpenCash()",
+           {unit: !FB_CR ? 'районов' : FB_CR.need ? `из ${FB_CR.need} получил` : 'получать нечего'})}
   </div>
   <div class="sc fb-hub fb-safe">
     <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><em class="fb-chev r">${_SC_CHEV}</em></button>

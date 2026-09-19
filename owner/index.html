@@ -15004,8 +15004,8 @@ function stkValInner(reg){
     ${без ? `<button class="sc-r dn" onclick="accOpen('qr')"><span>QR код не внесён</span>
       <b>${fmtQty(без)}<u>бут</u></b><em>${_SC_CHEV}</em></button>` : ''}
     <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>
-    <button class="sc-r" onclick="accOpen('moves')"><span>Перемещения между районами</span>
-      ${MVO.open ? `<b>${MVO.open}<u>в работе</u></b>` : ''}<em>${_SC_CHEV}</em></button>`;
+    <button class="sc-r" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
+      ${MVO.open ? `<b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b>` : ''}<em>${_SC_CHEV}</em></button>`;
 }
 
 // Прежняя полоса остатка. Оставлена для экрана района, где стоимость не
@@ -16539,7 +16539,7 @@ function stkMoveChoose(){
       <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">Заявка на перемещение</span>
         <span class="stk-mv-pick-s">откуда, куда, что и сколько — отдающий водитель отсканирует, получатель примет</span></span>
       <em class="mvn-go">${_SC_CHEV}</em></button>
-    ${MVO.open ? `<button class="sc-r mvn-live" onclick="accOpen('moves')"><span>Перемещения в работе</span>
+    ${MVO.open ? `<button class="sc-r mvn-live" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
       <b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
 }
 
@@ -24504,7 +24504,7 @@ async function mvoLoad(){
 
 // Карточки перемещений на «Обзоре» больше нет (владелец, 20 сен 2026: «убери
 // перемещения из обзора, это была временная мера»). Заявки — в «Учёте», склад →
-// «Перемещения между районами»; MVO.open по-прежнему считает «в работе» для той строки.
+// «Незавершённые перемещения»; MVO.open по-прежнему считает районы для той строки.
 
 function mvoFold(key){
   MVO.fold.has(key) ? MVO.fold.delete(key) : MVO.fold.add(key);

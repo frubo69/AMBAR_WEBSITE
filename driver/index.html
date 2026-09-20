@@ -1080,6 +1080,7 @@ body.test-drv .wo-fix{display:none}
 .exc-sum{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:11px;
   border-top:1px solid rgba(201,169,110,.32)}
 .exc-sum u{text-decoration:none;font-size:12.5px;font-weight:700;color:var(--text)}
+.exc-vals{display:flex;align-items:baseline;justify-content:flex-end;flex-wrap:wrap;gap:4px 14px;min-width:0}
 .exc-sum b{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;line-height:1;letter-spacing:-.5px;
   color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
 .exc-sum b i{font-style:normal;font-size:14px;color:var(--gold2);margin-left:5px}
@@ -8989,10 +8990,11 @@ function expCashCard(total){
     ${h.bonus ? row('Бонус за допродажу · ваш', '−' + aed(h.bonus), 'minus') : ''}
     <div class="exc-sum${дирхамы < 0 ? ' dn' : ''}">
       <u>${дирхамы < 0 ? 'Старший вернёт вам' : 'Сдать старшему'}</u>
-      <b>${aed(дирхамы)}<i>AED</i></b>
+      <span class="exc-vals">
+        <b>${aed(дирхамы)}<i>AED</i></b>
+        ${fx.map(x => `<b>${esc(x.sym)}${fmt(x.amount)}</b>`).join('')}
+      </span>
     </div>
-    ${fx.length ? `<div class="exc-fx">и валютой, теми же купюрами: ${
-      fx.map(x => `${esc(x.sym)}${fmt(x.amount)}`).join(' · ')}</div>` : ''}
     ${дирхамы < 0 ? `<div class="exc-note">расходы наличными больше собранного — разницу добавит старший</div>` : ''}
     ${h.tea ? `<div class="exc-note">из них чай операторов ${fmt(h.tea)} AED — отдельной пачкой</div>` : ''}
     ${h.card_spent ? `<div class="exc-note">безналом ${fmt(h.card_spent)} AED — наличных не трогали</div>` : ''}

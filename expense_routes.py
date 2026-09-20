@@ -124,6 +124,53 @@ def asks_pay(kind: str) -> bool:
     return kind in EXTRA_KINDS and not EXTRA_KINDS[kind].get("nopay")
 
 
+def touches_cash(e: dict) -> bool:
+    """Двигает ли запись наличные водителя. Безнал — нет. И авто-запись по
+    заказу в долг — нет (nocash): денег по такому заказу никто не брал, он и
+    так посчитан в выручке дня, а «сдать» от него не меняется."""
+    return not is_card(e) and not bool((e or {}).get("nocash"))
+
+
+async def note_debt_order(order: dict, who: str = "") -> bool:
+    """Заказ в долг доставлен — пишем водителю «Нам должны» на сумму заказа и
+    отправляем старшему (владелец, 20 сен 2026: «когда такой клиент заказывает,
+    пусть автоматически заполняется „нам должны“ за этот заказ и отправляется
+    старшему»). Запись ждёт решения старшего, как любой расход водителя, но
+    наличных не трогает — nocash. Заказ «без оплаты» сюда не заходит вовсе:
+    «эти деньги вообще никуда учитывать не надо»."""
+    import bizday as _bizday
+    oid = str((order or {}).get("order_id") or (order or {}).get("_id") or "")
+    drv = str((order or {}).get("driver") or "").strip()
+    total = _amount((order or {}).get("total"))
+    # Только «в долг». «Без оплаты» — мимо учёта вовсе, тест-заказ — тем более.
+    if str((order or {}).get("payment_method") or "").lower() != "debt":
+        return False
+    if (order or {}).get("test") or not (oid and drv and total > 0):
+        return False
+    day = _bizday.order_day(order) or _bizday.biz_day()
+    имя = str((order or {}).get("customer_name") or "").strip()
+    await db.add_driver_expense(day, drv, {
+        "id": secrets.token_hex(6), "amount": total,
+        "comment": f"#{oid}" + (f" · {имя}" if имя else "") + " · заказ в долг",
+        "kind": "owed_us", "kind_t": EXTRA_KINDS["owed_us"]["t"], "plus": False,
+        "auto": True, "nocash": True, "order": oid,
+        "by": 0, "by_name": str(who or "").strip(), "status": "pending",
+        "at": datetime.now(timezone.utc).isoformat()})
+    log.info(f"[debt] «Нам должны» {total} AED водителю {drv} по заказу #{oid}")
+    return True
+
+
+async def drop_debt_order(order: dict) -> int:
+    """Заказ отменили или отметили недоставленным — снимаем авто-запись."""
+    import bizday as _bizday
+    oid = str((order or {}).get("order_id") or (order or {}).get("_id") or "")
+    drv = str((order or {}).get("driver") or "").strip()
+    if not (oid and drv):
+        return 0
+    day = _bizday.order_day(order) or _bizday.biz_day()
+    return await db.driver_expense_pull_order(day, drv, oid, "owed_us")
+
+
 def _signed(e: dict) -> int:
     """Сумма траты со знаком: возврат уменьшает расход дня, а не увеличивает."""
     a = _amount((e or {}).get("amount"))

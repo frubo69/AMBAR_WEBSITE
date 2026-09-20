@@ -4036,18 +4036,24 @@ async def _cash_amounts(day: str, orders: list) -> dict:
                 st = str(e.get("status") or "approved")
                 amt = _exp._signed(e)
                 card = _exp.is_card(e)
-                if st == "approved":
+                # Заказ в долг — строка видна старшему, но денег не двигает: по
+                # такому заказу наличных не брали, а в выручку дня он посчитан
+                # (владелец, 20 сен 2026). Поэтому и в «ждут решения» не идёт —
+                # сбор выручки из-за него не стоит.
+                мимо = bool(e.get("nocash"))
+                if st == "approved" and not мимо:
                     if card:
                         spend_card += amt
                     else:
                         spend += amt
-                elif st == "pending" and not card:
+                elif st == "pending" and not card and not мимо:
                     pending += amt
                 items.append({"id": e.get("id") or "", "kind": e.get("kind") or "other",
                               "kind_t": e.get("kind_t") or _exp._kind(e).get("t", "Что-то ещё"),
                               "who": d["name"], "amount": amt, "at": str(e.get("at") or ""),
                               "status": st, "note": str(e.get("comment") or "")[:80],
                               "pay": "card" if card else ("cash" if e.get("pay") == "cash" else ""),
+                              "nocash": мимо,
                               "photo": bool(e.get("photo") or e.get("thumb") or e.get("car_photo"))})
         # Питание — первой строкой, без времени: это плата за день, а не событие;
         # дальше траты по времени.

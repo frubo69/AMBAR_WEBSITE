@@ -1653,6 +1653,10 @@ async def _count_delivered(oid: str, order: dict):
             if await db.claim_debt_delivery(oid):
                 await db.add_debt(cid, total, order_id=oid, note="delivered")
                 log.info(f"[debt] +{total} AED to uid={cid} for #{oid}")
+                # И водителю в расходы дня — «Нам должны» на сумму заказа,
+                # старшему на решение (владелец, 20 сен 2026).
+                import expense_routes as _exp
+                await _exp.note_debt_order(order)
         except Exception as e:                          # noqa: BLE001
             log.error(f"[debt] increment failed for #{oid}: {e}")
 
@@ -1671,6 +1675,13 @@ async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
                                                (order.get("driver") or "").strip(), oid, "upsell")
         except Exception as e:                                   # noqa: BLE001
             log.warning(f"[pos] бонус за допродажу по #{oid} не снят: {e}")
+    # Отменённый заказ в долг никто не должен: снимаем и «Нам должны».
+    if order.get("payment_method") == "debt":
+        try:
+            import expense_routes as _exp
+            await _exp.drop_debt_order(order)
+        except Exception as e:                                   # noqa: BLE001
+            log.warning(f"[debt] «Нам должны» по #{oid} не снято: {e}")
     await notify_driver(order, "cancel")   # иначе водитель повезёт отменённый заказ
     await _refresh_cards(order)
     await _customer_card(oid)              # у телефонного заказа некому — молча выйдет
@@ -1768,6 +1779,8 @@ async def handle_undeliver(request):
         try:
             if await db.unclaim_debt_delivery(oid):
                 await db.add_debt(cid, -total, order_id=oid, note="delivery undone")
+                import expense_routes as _exp
+                await _exp.drop_debt_order(order)
         except Exception as e:
             log.error(f"[pos] debt rollback failed for #{oid}: {e}")
 

@@ -669,10 +669,13 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
     for x in extras:
         x["kind"] = _kind_of(x)
     plus_ = lambda x: bool(EXTRA_KINDS.get(x["kind"], {}).get("plus"))
-    spent = sum(int(x.get("amount") or 0) for x in extras if not plus_(x) and not is_card(x))
-    got = sum(int(x.get("amount") or 0) for x in extras if plus_(x) and not is_card(x))
-    spent_card = sum(int(x.get("amount") or 0) for x in extras if not plus_(x) and is_card(x))
-    got_card = sum(int(x.get("amount") or 0) for x in extras if plus_(x) and is_card(x))
+    # Записи «мимо наличных» (заказ в долг) в пачки не идут — ни в наличные,
+    # ни в безнал: денег по такому заказу не брали.
+    наличн = [x for x in extras if not x.get("nocash")]
+    spent = sum(int(x.get("amount") or 0) for x in наличн if not plus_(x) and not is_card(x))
+    got = sum(int(x.get("amount") or 0) for x in наличн if plus_(x) and not is_card(x))
+    spent_card = sum(int(x.get("amount") or 0) for x in наличн if not plus_(x) and is_card(x))
+    got_card = sum(int(x.get("amount") or 0) for x in наличн if plus_(x) and is_card(x))
     by_kind = [{"id": k, "t": v["t"], "plus": bool(v.get("plus")),
                 "aed": sum(int(x.get("amount") or 0) for x in extras if x["kind"] == k),
                 "n": sum(1 for x in extras if x["kind"] == k)}
@@ -2372,6 +2375,11 @@ async def handle_expense_add(request):
                 else next((x for x in extras if _kind_of(x) == kind), None))
         if ent_id and prev is None:
             return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+        # Запись, которую поставил сервер (заказ в долг, бонус за допродажу),
+        # водитель не правит: она про заказ, а не про его траты.
+        if prev is not None and prev.get("auto"):
+            return web.json_response({"error": "auto_only", "kind": kind},
+                                     status=400, headers=CORS_HEADERS)
 
     # Отклонённая запись заполняется заново: её снимки уже не доказательство,
     # и старшему нельзя подсунуть тот же чек с другой суммой.

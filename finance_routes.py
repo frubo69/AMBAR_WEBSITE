@@ -173,6 +173,10 @@ async def _spend(days: list[str]) -> dict:
         amt = meal
         for e in (r.get("extras") or []):
             st = str(e.get("status") or "approved")
+            # Заказ в долг уже посчитан в выручке дня, а деньги по нему у
+            # клиента: расходом он не становится (владелец, 20 сен 2026).
+            if e.get("nocash"):
+                continue
             if st == "approved":
                 amt += _exp._signed(e)
                 if _exp.is_card(e):

@@ -1642,6 +1642,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     if await db.claim_debt_delivery(oid):
                         await db.add_debt(cid, total, order_id=oid, note="delivered")
                         log.info(f"[debt] +{total} AED to uid={cid} for #{oid}")
+                        import expense_routes as _exp
+                        await _exp.note_debt_order(order)
                 except Exception as e:
                     log.error(f"[debt] increment failed for #{oid}: {e}")
             await update_customer_card(oid)

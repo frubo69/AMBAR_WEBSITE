@@ -153,6 +153,10 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
     gotk: dict = {}                     # приход по видам: «Нам вернули», «Мы должны»
     pending = 0
     for x in extras:
+        # Заказ в долг: денег по нему никто не брал, и «сдать» от него не
+        # меняется — такая запись мимо наличных (владелец, 20 сен 2026).
+        if x.get("nocash"):
+            continue
         kind = kind_of(x)
         a = int(_n(x.get("amount")))
         plus = bool(_exp.EXTRA_KINDS.get(kind, {}).get("plus"))

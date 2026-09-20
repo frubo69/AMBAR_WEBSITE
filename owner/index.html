@@ -12518,6 +12518,7 @@ function whPaint(listOnly){
                  name: r.gname !== undefined ? r.gname : r.name, rows: []}; группы.push(g); }
     g.rows.push(r);
   });
+  группы.sort(_byDistCode);
   document.getElementById('whList').innerHTML = (shown.length
     ? группы.map(g => {
         const живых = g.rows.filter(r => whState(r) === 'online').length;
@@ -28914,6 +28915,14 @@ function expHeldOpen(who){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
+// Районы везде идут B1…B5 (владелец, 20 сен 2026: «здесь в порядке b1-b5 всех
+// расставляй»). Списки людей приходят порядком реестра, поэтому район вставал
+// туда, где оказался его первый водитель. Всё, что без кода района (устройства,
+// старший), — после районов, своим порядком.
+function _byDistCode(a, b){
+  const н = v => { const m = /^B(\d+)$/i.exec(String(v || '').trim()); return m ? +m[1] : 99; };
+  return н(a.code) - н(b.code);
+}
 function renderExpenses(){
   const d = EXP.data; if(!d) return;
   const t = d.totals;
@@ -28958,6 +28967,7 @@ function renderExpenses(){
                  operator:r.operator, rows:[]}; groups.push(g); }
     g.rows.push(r);
   });
+  groups.sort(_byDistCode);
   // Шапка та же, что у района в «Команде»: код, название, сколько людей и
   // сколько район стоил за день. Итог здесь считается по строкам района, а не
   // приходит с сервера, — сумма ровно тех людей, что под ней и стоят.

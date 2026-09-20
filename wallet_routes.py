@@ -81,6 +81,12 @@ async def _view(address: str) -> dict:
         links = await db.wallet_links(ids)
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] привязки не подшились: {e}")
+    # Назначения платежей — из отчёта владельца кошелька (см. handle_report).
+    purposes = {}
+    try:
+        purposes = await db.wallet_purposes(ids)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] назначения не подшились: {e}")
 
     через = 0.0
     напрямую = 0.0
@@ -108,6 +114,8 @@ async def _view(address: str) -> dict:
             # нельзя: одно проверено блокчейном, второе — чьим-то решением.
             "linked": bool(link and not inv),
             "linked_by": (link or {}).get("by_name") or "",
+            "purpose": (purposes.get(tx) or {}).get("text") or "",
+            "purpose_by": (purposes.get(tx) or {}).get("by_name") or "",
         })
 
     # Строка в журнал: единственный способ проверить эти числа, не влезая в
@@ -132,7 +140,7 @@ async def _view(address: str) -> dict:
         "totals": {"app": round(через, 2), "direct": round(напрямую, 2),
                    "linked": round(привязано, 2),
                    "in": round(через + напрямую, 2), "out": round(ушло, 2),
-                   "n": len(rows)},
+                   "n": len(rows), "purposed": sum(1 for r in rows if r.get("purpose"))},
     }
 
 
@@ -511,6 +519,361 @@ async def handle_export(request):
     return web.json_response({"ok": True, "rows": n}, headers=CORS_HEADERS)
 
 
+# ── Отчёт владельца кошелька ────────────────────────────────────────────────
+# Владелец, 20 сен 2026: «тот человек, которому принадлежит криптокошелёк, раз
+# в неделю нам скидывает отчёт с назначениями платежей — добавь возможность
+# загружать эти отчёты в кошелёк, чтобы они автоматически сравнивались с
+# платежами и каждый платёж приобретал своё назначение».
+#
+# Формат отчёта заранее неизвестен и меняться будет не у нас, поэтому разбор
+# терпимый: xlsx, csv и просто текст; заголовок ищем по словам, а нет его —
+# читаем строку как «дата · сумма · назначение». Сверяем по хешу перевода,
+# если он в отчёте есть, иначе по сумме и дню. Спорное (две одинаковые суммы
+# в один день) не назначаем сами — отдаём человеку списком.
+_HEAD_DATE = ("дата", "date", "время", "time", "когда")
+_HEAD_SUM = ("сумма", "amount", "value", "usdt", "приход", "кредит", "credit")
+_HEAD_TEXT = ("назначен", "purpose", "описан", "description", "коммент", "comment",
+              "примечан", "note", "детал", "detail", "за что", "основание")
+_HEAD_TX = ("hash", "хеш", "txid", "tx", "транзак", "id перевода")
+# Вид операции: в отчёте владельца это колонка «Заказ» / «Расход» / «Операция».
+_HEAD_OP = ("операц", "заказ", "расход", "тип", "вид")
+
+
+def _num(v):
+    """Сумма из ячейки: «1 234,50», «1,234.50 USDT», «+120» — всё одно число."""
+    if isinstance(v, (int, float)):
+        return float(v)
+    t = str(v or "").strip().replace("\u00a0", " ")
+    t = "".join(c for c in t if c.isdigit() or c in ".,-+ ")
+    t = t.replace(" ", "")
+    if not t or t in ("-", "+"):
+        return None
+    if "," in t and "." in t:                     # 1,234.50 или 1.234,50
+        t = t.replace(",", "") if t.rfind(".") > t.rfind(",") else t.replace(".", "").replace(",", ".")
+    else:
+        t = t.replace(",", ".")
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def _when(v):
+    """Дата из ячейки — datetime или None. Час и минуты, если они есть."""
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=DUBAI)
+    t = str(v or "").strip()
+    if not t:
+        return None
+    t = t.replace("T", " ").replace("/", ".").replace("-", ".")
+    for f in ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y",
+              "%Y.%m.%d %H:%M:%S", "%Y.%m.%d %H:%M", "%Y.%m.%d",
+              "%d.%m.%y %H:%M", "%d.%m.%y"):
+        try:
+            return datetime.strptime(t[:len(f) + 4].strip(), f).replace(tzinfo=DUBAI)
+        except ValueError:
+            continue
+    return None
+
+
+def _tx(v):
+    t = "".join(str(v or "").split()).lower()
+    return t if len(t) >= 40 and all(c in "0123456789abcdef" for c in t) else ""
+
+
+# Куда шли деньги — по виду операции. Нужно только чтобы «Вывод USDT» не
+# прихватил чей-то приход той же суммы: строгого списка видов у отчёта нет,
+# поэтому это подсказка, а не закон. «Возврат расхода» — приход, хотя слово
+# «расход» в нём есть, поэтому приходные слова проверяем первыми.
+_WAY_IN = ("возврат", "пополнен", "приход", "заказ", "получен")
+_WAY_OUT = ("вывод", "снятие", "снял", "sim", "сим", "отправ", "перевод в", "списан")
+
+
+def _way(text: str):
+    """True — ушло с кошелька, False — пришло, None — не поняли.
+
+    Смотрим только на вид операции — то, что до точки: в описании «Вывод USDT ·
+    Пополнение VIP ENOC» слово «пополнение» говорит, куда ушли деньги, а не
+    откуда пришли, и по всему тексту вывод читался бы приходом."""
+    t = (text or "").split(" · ")[0].lower()
+    for w in _WAY_IN:
+        if w in t:
+            return False
+    for w in _WAY_OUT:
+        if w in t:
+            return True
+    return None
+
+
+def _cells(name: str, raw: bytes) -> list:
+    """Файл → листы, лист → строки ячеек. Каждый лист разбирается отдельно: в
+    отчёте владельца кошелька их семь, и заголовки у них разные."""
+    if name.lower().endswith((".xlsx", ".xlsm")):
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(raw), data_only=True, read_only=True)
+        листы = []
+        for ws in wb.worksheets:
+            rows = [list(r) for r in ws.iter_rows(values_only=True)
+                    if any(c is not None and str(c).strip() for c in r)]
+            if rows:
+                листы.append(rows)
+        return листы
+    txt = None
+    for enc in ("utf-8-sig", "utf-8", "cp1251"):
+        try:
+            txt = raw.decode(enc); break
+        except UnicodeDecodeError:
+            continue
+    if txt is None:
+        return []
+    lines = [l for l in txt.splitlines() if l.strip()]
+    if not lines:
+        return []
+    делитель = max((";", "\t", ","), key=lambda d: sum(l.count(d) for l in lines[:20]))
+    if sum(l.count(делитель) for l in lines[:20]) == 0:
+        return [[[l] for l in lines]]
+    return [[[c.strip().strip('"') for c in l.split(делитель)] for l in lines]]
+
+
+def _columns(rows: list) -> tuple:
+    """Ищем строку заголовка и номера колонок. Нет заголовка — (None, {}).
+
+    Смотрим глубже первых строк: в отчёте владельца кошелька шапка листа
+    «Заказы» стоит тринадцатой — над ней итоги по месяцам."""
+    for i, row in enumerate(rows[:30]):
+        имена = [str(c or "").strip().lower() for c in row]
+        col = {}
+        for j, h in enumerate(имена):
+            if not h:
+                continue
+            for ключ, слова in (("date", _HEAD_DATE), ("sum", _HEAD_SUM),
+                                ("text", _HEAD_TEXT), ("tx", _HEAD_TX)):
+                if ключ not in col and any(w in h for w in слова):
+                    col[ключ] = j
+        # Вид операции («Приход от клиента», «Вывод USDT») — слева от монеты;
+        # вместе с описанием из него и получается назначение платежа.
+        if "text" in col:
+            for j, h in enumerate(имена):
+                if j < col["text"] and any(w in h for w in _HEAD_OP):
+                    col["op"] = j
+                    break
+        if "text" in col and ("sum" in col or "tx" in col):
+            return i, col
+    return None, {}
+
+
+def _report_rows(name: str, raw: bytes) -> list:
+    """Отчёт → [{when, amount, text, txid}] — всё, что удалось прочитать.
+
+    Одна и та же операция в отчёте встречается дважды: на листе месяца и в
+    сводном листе «Заказы» или «Расходы». Повторы схлопываем — иначе половина
+    строк честно «не нашлась» бы просто потому, что перевод уже занят."""
+    out, seen = [], {}
+    for rows in _cells(name, raw):
+        head, col = _columns(rows)
+        for row in rows[(head + 1) if head is not None else 0:]:
+            row = list(row)
+            if col:
+                бери = lambda k: row[col[k]] if col.get(k) is not None and len(row) > col[k] else None
+                текст = " ".join(str(бери("text") or "").split())
+                вид = " ".join(str(бери("op") or "").split())
+                сумма = _num(бери("sum"))
+                когда = _when(бери("date"))
+                хеш = _tx(бери("tx"))
+                # Назначение — вид операции и описание вместе: «Вывод USDT ·
+                # снятие наличных», «Приход от клиента · заказ».
+                части = [ч for ч in (вид, текст) if ч]
+                if len(части) == 2 and части[0].lower() == части[1].lower():
+                    части = части[:1]
+                текст = " · ".join(части)
+            else:
+                хеш = next((_tx(c) for c in row if _tx(c)), "")
+                когда = next((_when(c) for c in row if _when(c)), None)
+                сумма = next((_num(c) for c in row if _num(c) is not None and not _tx(c)
+                              and _when(c) is None), None)
+                текст = " ".join(str(c).strip() for c in row
+                                 if str(c or "").strip() and _num(c) is None and _when(c) is None
+                                 and not _tx(c))[:200]
+            текст = " ".join(текст.split())[:200]
+            if not текст or (сумма is None and not хеш):
+                continue
+            # Строки итогов («Июнь 2026 (13 оп.)», «Смена #1») суммы и даты не
+            # имеют — они сюда и не попадают: без даты и без хеша не берём.
+            if когда is None and not хеш:
+                continue
+            ключ = (хеш or "", round(abs(сумма or 0), 2),
+                    когда.strftime("%Y%m%d%H%M") if когда else "", текст.lower())
+            if ключ in seen:
+                continue
+            seen[ключ] = True
+            out.append({"when": когда, "amount": сумма, "text": текст, "txid": хеш,
+                        "way": _way(текст)})
+    return out
+
+
+def _match(rows: list, transfers: list) -> tuple:
+    """Сводим строки отчёта с переводами: (нашли, спорные, не нашли).
+
+    Хеша в отчёте владельца кошелька нет, поэтому опора — сумма и время. Время
+    сходится минута в минуту, а сумма в отчёте округлена до копеек и бывает
+    меньше пришедшей на комиссию отправителя — около двух десятых процента.
+    Поэтому мерки две: строгая годится в любой день, широкая — только для
+    перевода в те же четверть часа, где и без копеек всё понятно.
+
+    Несколько кандидатов рядом — берём ближайший, и только если он ближе
+    второго больше чем на пять минут. Иначе строка спорная: решает человек."""
+    свободные = [t for t in transfers if t.get("txid")]
+    по_хешу = {t["txid"]: t for t in свободные}
+    занято, нашли, спорные, мимо = set(), [], [], []
+    строго = lambda t, s: abs(abs(t.get("amount") or 0) - s) <= max(0.02, s * 0.002)
+    широко = lambda t, s: abs(abs(t.get("amount") or 0) - s) <= max(0.10, s * 0.012)
+    сек = lambda t, w: abs((t.get("ts") or 0) / 1000 - w.timestamp())
+    день = lambda t: datetime.fromtimestamp((t.get("ts") or 0) / 1000, DUBAI).date()
+
+    def взять(r, t):
+        занято.add(t["txid"]); нашли.append((r, t))
+
+    def своим(пул, r):
+        """Приход к приходу, вывод к выводу — если такие вообще есть."""
+        if r.get("way") is None:
+            return пул
+        свои = [t for t in пул if bool(t.get("in")) != r["way"]]
+        return свои or пул
+
+    for r in rows:
+        if r["txid"] and r["txid"] in по_хешу and r["txid"] not in занято:
+            взять(r, по_хешу[r["txid"]]); continue
+        if r["amount"] is None:
+            мимо.append(r); continue
+        сумма = abs(r["amount"])
+        ок = [t for t in свободные if t["txid"] not in занято]
+        точные = своим([t for t in ок if строго(t, сумма)], r)
+        if not r["when"]:
+            if len(точные) == 1:
+                взять(r, точные[0])
+            elif точные:
+                спорные.append((r, точные[:6]))
+            else:
+                мимо.append(r)
+            continue
+        четверть = своим([t for t in ок if сек(t, r["when"]) <= 900
+                          and широко(t, сумма)], r)
+        четверть.sort(key=lambda t: сек(t, r["when"]))
+        if четверть:
+            if len(четверть) == 1 or сек(четверть[1], r["when"]) - сек(четверть[0], r["when"]) > 300:
+                взять(r, четверть[0])
+            else:
+                спорные.append((r, четверть[:6]))
+            continue
+        # Рядом никого — ищем по всему дню, потом в двух днях вокруг: время в
+        # отчёте иногда проставлено задним числом, а сумма всё та же.
+        точные.sort(key=lambda t: сек(t, r["when"]))
+        свой_день = r["when"].astimezone(DUBAI).date()
+        около = ([t for t in точные if день(t) == свой_день]
+                 or [t for t in точные if abs((день(t) - свой_день).days) <= 2])
+        if len(около) == 1:
+            взять(r, около[0])
+        elif около:
+            спорные.append((r, около[:6]))
+        else:
+            мимо.append(r)
+    return нашли, спорные, мимо
+
+
+def _row_out(r: dict) -> dict:
+    return {"text": r["text"], "amount": r["amount"], "txid": r["txid"],
+            "when": r["when"].strftime("%d.%m.%Y") if r["when"] else "",
+            "ts": int(r["when"].timestamp() * 1000) if r["when"] else 0,
+            "out": bool(r.get("way"))}
+
+
+@require_owner
+async def handle_report(request):
+    """POST {name, data(base64), as} — отчёт владельца кошелька с назначениями.
+
+    Разбираем, сверяем с переводами и проставляем назначение каждому, что
+    сошлось. Спорное и ненайденное возвращаем списком — это ответ человеку, а
+    не ошибка: отчёт может быть за другой период или с чужими строками."""
+    import base64
+    try:
+        body = await request.json()
+    except Exception:                            # noqa: BLE001
+        return web.json_response({"error": "bad_request"}, status=400, headers=CORS_HEADERS)
+    имя = str(body.get("name") or "отчёт")[:120]
+    try:
+        raw = base64.b64decode(str(body.get("data") or ""), validate=False)
+    except Exception:                            # noqa: BLE001
+        raw = b""
+    if not raw:
+        return web.json_response({"error": "empty"}, status=400, headers=CORS_HEADERS)
+    if len(raw) > 8 * 1024 * 1024:
+        return web.json_response({"error": "too_big"}, status=400, headers=CORS_HEADERS)
+    try:
+        rows = _report_rows(имя, raw)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] отчёт {имя} не разобран: {e}")
+        return web.json_response({"error": "unreadable"}, status=400, headers=CORS_HEADERS)
+    if not rows:
+        return web.json_response({"error": "no_rows"}, status=400, headers=CORS_HEADERS)
+    transfers = await _all_transfers()
+    if transfers is None:
+        return web.json_response({"error": "offline"}, status=502, headers=CORS_HEADERS)
+    нашли, спорные, мимо = _match(rows, transfers)
+    # Не нашли — это две разные вещи. Трата из остатка («снятие наличных с
+    # банкомата») перевода на кошельке и не оставляет: её не ищут, о ней
+    # сообщают. А вот платёж без перевода — повод посмотреть глазами.
+    траты = [r for r in мимо if r.get("way")]
+    платежи = [r for r in мимо if not r.get("way")]
+    who = str(body.get("as") or "").strip()[:60]
+    now = datetime.now(timezone.utc)
+    for r, t in нашли:
+        await db.wallet_purpose_set(t["txid"], {
+            "text": r["text"], "amount": t.get("amount"), "ts": t.get("ts"),
+            "src": "report", "report": имя, "by_name": who, "at": now})
+    _drop_cache()
+    await db.wallet_report_add({"at": now, "by_name": who, "name": имя,
+                                "rows": len(rows), "matched": len(нашли),
+                                "disputed": len(спорные), "missed": len(мимо),
+                                "spent": len(траты)})
+    log.info(f"[wallet] отчёт «{имя}»: строк {len(rows)} · назначено {len(нашли)} · "
+             f"спорных {len(спорные)} · трат без перевода {len(траты)} · "
+             f"платежей не нашли {len(платежи)} · {who or '—'}")
+    return web.json_response({
+        "ok": True, "rows": len(rows), "matched": len(нашли),
+        "disputed": [{**_row_out(r), "candidates": [
+            {"txid": t["txid"], "amount": t.get("amount"), "ts": t.get("ts")} for t in c[:4]]}
+            for r, c in спорные[:20]],
+        "missed": [_row_out(r) for r in платежи[:20]],
+        "spent": [_row_out(r) for r in траты[:20]],
+        "disputed_n": len(спорные), "missed_n": len(платежи),
+        "spent_n": len(траты),
+        "spent_sum": round(sum(abs(r["amount"] or 0) for r in траты), 2),
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_purpose(request):
+    """POST {txid, text, as} — назначение рукой: поправить или дописать то,
+    чего в отчёте не было. Пустой текст — снять."""
+    try:
+        body = await request.json()
+    except Exception:                            # noqa: BLE001
+        return web.json_response({"error": "bad_request"}, status=400, headers=CORS_HEADERS)
+    txid = str(body.get("txid") or "").strip()
+    text = " ".join(str(body.get("text") or "").split())[:200]
+    if not txid:
+        return web.json_response({"error": "no_txid"}, status=400, headers=CORS_HEADERS)
+    who = str(body.get("as") or "").strip()[:60]
+    if text:
+        await db.wallet_purpose_set(txid, {"text": text, "src": "hand", "by_name": who,
+                                           "at": datetime.now(timezone.utc)})
+    else:
+        await db.wallet_purpose_del(txid)
+    _drop_cache()
+    log.info(f"[wallet] назначение {txid[:10]}…: {text or '— снято'} · {who or '—'}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -527,4 +890,9 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/wallet/match", _opt)
     app.router.add_get("/api/owner/wallet/match", handle_match)
     app.router.add_post("/api/owner/wallet/match", handle_match)
+    # Отчёт владельца кошелька с назначениями платежей (20 сен 2026).
+    app.router.add_route("OPTIONS", "/api/owner/wallet/report", _opt)
+    app.router.add_post("/api/owner/wallet/report", handle_report)
+    app.router.add_route("OPTIONS", "/api/owner/wallet/purpose", _opt)
+    app.router.add_post("/api/owner/wallet/purpose", handle_purpose)
     log.info("[wallet] routes mounted")

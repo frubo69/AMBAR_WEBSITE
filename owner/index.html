@@ -4328,6 +4328,21 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .wal-link:active{transform:scale(.97)}
 /* Выбор заказа: тот же список, что и везде, но одной колонкой и без фильтров —
    вопрос здесь один, «какой это был заказ». */
+/* Заголовок группы внутри экрана — та же золотая полоса, что у карточек, но
+   сидит на списке: снизу к ней примыкает сама карточка. */
+.wal-g{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  min-height:50px;padding:0 16px;margin-top:14px;border-radius:15px 15px 0 0;
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:1.1px;line-height:1.15;text-transform:uppercase;color:var(--gold);
+  background:linear-gradient(180deg,rgba(201,169,110,.2),rgba(201,169,110,.08));
+  border:1px solid var(--border2);border-bottom-color:rgba(201,169,110,.34)}
+.wal-g i{font-style:normal;font-size:13px;font-weight:700;letter-spacing:.2px;
+  color:var(--sub);font-variant-numeric:tabular-nums}
+.wal-g + .wal-l,.wal-g + .wal-pick{margin-top:0;border-top:none;
+  border-radius:0 0 15px 15px}
+.wal-rep-q{padding:11px 0 3px;border-top:1px solid var(--border2)}
+.wal-rep-q:first-child{border-top:none}
+.wal-rep-q .wal-r{border-top:none;padding-top:0}
 .wal-pick{padding:4px 14px 14px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2)}
 .wal-po{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;
@@ -4358,6 +4373,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .wal-r-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;
   font-weight:700;color:var(--up);font-variant-numeric:tabular-nums}
 .wal-r-v.out{color:var(--dn)}
+/* Единица у суммы — подпись, а не часть числа: «+100USDT» читалось одним
+   словом и с подчёркиванием, будто ссылка. */
+.wal-r-v u{margin-left:5px;font-family:'DM Sans',sans-serif;font-size:10px;
+  font-weight:600;letter-spacing:.7px;text-decoration:none;color:var(--muted)}
 /* В сверке под строкой всё основание решения — сумма, курс, расхождение,
    разрыв во времени и клиент. В одну строку это не влезает, а обрезка
    многоточием прячет ровно то, по чему и принимают решение. */
@@ -26470,20 +26489,92 @@ async function walReportSend(file){
                    too_big: 'Файл больше 8 МБ'}[p.error] || 'Не удалось загрузить отчёт');
   }
   await walRefresh();
-  walReportDone(r);
+  walReportDone(r, file.name);
 }
 // Что вышло: сколько платежей получило назначение и что осталось человеку.
-function walReportDone(r){
-  const сп = (a, t) => (a && a.length) ? `<div class="wal-rep-h">${t}</div>` + a.map(x =>
-      `<div class="wal-rep-r"><span>${escS(x.text)}</span><b>${
-        x.amount != null ? fmtUsdt(x.amount) : ''}${x.when ? ' · ' + escS(x.when) : ''}</b></div>`).join('') : '';
-  const тело = `<div class="wal-rep">
-      <div class="wal-rep-n"><b>${r.matched}</b> ${pluralize(r.matched,'платёж получил','платежа получили','платежей получили')} назначение</div>
-      <div class="wal-rep-s">из ${r.rows} ${pluralize(r.rows,'строки','строк','строк')} отчёта</div>
-      ${сп(r.disputed, `Спорные — одинаковые суммы в один день, назначьте сами · ${r.disputed_n}`)}
-      ${сп(r.missed, `Не нашли в кошельке · ${r.missed_n}`)}
-    </div>`;
-  askDialog('Отчёт загружен', '', 'Понятно', '', '', тело);
+// Отдельным экраном, а не окошком: спорное здесь не читают, а разбирают —
+// у каждой такой строки надо выбрать перевод, и выбор должен быть под рукой.
+let WAL_REP = null;               // {name, rows, matched, disputed[], missed[], spent[]}
+
+function walReportDone(r, name){
+  WAL_REP = {...(r || {}), name: name || ''};
+  _setText('accTitle', 'Отчёт кошелька');
+  ACC_BACK = () => { WAL_REP = null; accWallet(); };
+  walReportBody();
+}
+
+function walReportBody(){
+  const r = WAL_REP || {}, спорные = r.disputed || [];
+  _setText('accSub', `${r.rows || 0} ${pluralize(r.rows || 0, 'строка', 'строки', 'строк')}${
+    r.name ? ' · ' + r.name : ''}`);
+  const строка = x => `<div class="wal-r">
+      <span class="wal-r-b"><span class="wal-r-t">${escS(x.text)}</span>
+        <span class="wal-r-s">${escS(x.when || '')}</span></span>
+      <span class="wal-r-v ${x.out ? 'out' : ''}">${x.out ? '−' : ''}${
+        fmtUsdt(Math.abs(x.amount || 0))}<u>USDT</u></span></div>`;
+  const список = (a, n, загл, справа, пояснение) => (a && a.length) ? `
+    <div class="wal-g"><span>${загл}</span><i>${справа}</i></div>
+    <div class="wal-l">${a.map(строка).join('')}</div>
+    <div class="wal-note" style="margin:6px 0 0">${пояснение}${
+      n > a.length ? ` · показаны первые ${a.length}` : ''}</div>` : '';
+  document.getElementById('accMid').innerHTML = `
+    <div class="wal-led">
+      <div><span>Платежей получили назначение</span><b>${r.matched || 0}</b></div>
+      ${спорные.length ? `<div><span>Спорных — выберите перевод</span><i>${
+        r.disputed_n || спорные.length}</i></div>` : ''}
+      ${r.spent_n ? `<div><span>Трат из остатка</span><i>${r.spent_n}</i></div>` : ''}
+      ${r.missed_n ? `<div><span>Платежей нет на кошельке</span><i>${r.missed_n}</i></div>` : ''}
+      <div class="rest"><span>Строк в отчёте</span><b>${r.rows || 0}</b></div>
+    </div>
+    ${спорные.length ? `
+      <div class="wal-g"><span>Спорные</span><i>${r.disputed_n || спорные.length}</i></div>
+      <div class="wal-pick">${спорные.map((x, i) => `
+        <div class="wal-rep-q">${строка(x)}
+          ${(x.candidates || []).map(c => `
+            <button class="wal-po" onclick="walReportPick(${i},'${escS(c.txid)}')">
+              <span class="wal-po-b"><span class="wal-po-t">${escS(_walWhen(c.ts))}</span>
+                <span class="wal-po-s">перевод на кошельке</span></span>
+              <span class="wal-po-v">${fmtUsdt(Math.abs(c.amount || 0))}</span>
+            </button>`).join('')}
+        </div>`).join('')}</div>` : ''}
+    ${список(r.spent, r.spent_n, 'Траты из остатка',
+             `${r.spent_n}${r.spent_sum ? ' · ' + fmtUsdt(r.spent_sum) + ' USDT' : ''}`,
+             'Это не переводы: деньги потрачены с остатка, на кошельке их не видно')}
+    ${список(r.missed, r.missed_n, 'Не нашли', String(r.missed_n || 0),
+             'Переводов на такую сумму в эти дни на кошельке нет')}`;
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap"><button class="qb" onclick="ACC_BACK()">Готово</button></div>`;
+}
+
+// Спорную строку назначает человек: выбрал перевод — назначение уходит ему,
+// строка из списка исчезает, а счётчик назначенных растёт.
+async function walReportPick(i, txid){
+  const r = WAL_REP || {}, x = (r.disputed || [])[i];
+  if(!x || !txid) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/wallet/purpose',
+      {method: 'POST', body: {txid, text: x.text, as: _meName()}});
+  }catch(e){ return _toast('Не удалось назначить'); }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  // Тот же перевод не может быть ответом дважды: убираем его из оставшихся
+  // спорных строк, иначе человек выберет его второй раз и перезапишет себе же.
+  const остаток = (r.disputed || []).filter((_, j) => j !== i).map(y => ({
+    ...y, candidates: (y.candidates || []).filter(c => c.txid !== txid)}));
+  // Строка, у которой забрали единственного кандидата, спорной уже не
+  // является: выбирать не из чего, и честнее показать её среди ненайденных.
+  const осиротели = остаток.filter(y => !(y.candidates || []).length);
+  r.disputed = остаток.filter(y => (y.candidates || []).length);
+  r.disputed_n = Math.max(0, (r.disputed_n || 1) - 1 - осиротели.length);
+  if(осиротели.length){
+    r.missed = осиротели.concat(r.missed || []);
+    r.missed_n = (r.missed_n || 0) + осиротели.length;
+  }
+  r.matched = (r.matched || 0) + 1;
+  walReportBody();
+  // Ленту обновляем молча: walRefresh перерисовал бы экран кошелька поверх
+  // разбора, а человек ещё не закончил с ним.
+  try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params: {fresh: 1}}); }
+  catch(e){}
 }
 
 // Файлом в чат: посмотреть можно и на экране, а свести с бухгалтерией,

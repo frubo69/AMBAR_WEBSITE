@@ -940,6 +940,9 @@ _DEFAULT_PREFS = {
     "orders.driver_done": True, "orders.reverted": True, "orders.edited": True,
     "orders.backfilled": True,
     "timing.late45": True, "timing.notAccepted5": True, "timing.enroute30": False,
+    # Клиент оформил заказ и завис на анкете верификации: заказ операторам не
+    # виден, пока он её не отправит (21 сен 2026).
+    "orders.verify_stuck": True,
     "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
     "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,
     "stock.low": True, "stock.out": True,

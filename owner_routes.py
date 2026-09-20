@@ -3638,6 +3638,11 @@ async def _monitor_pending_orders():
             for oid, o in all_orders.items():
                 if o.get("status") != "pending" or oid in _alerted:
                     continue
+                # Заказ, застрявший на анкете верификации, «не принят» не
+                # потому, что оператор проспал: его операторам и не показали.
+                # О таких говорит verify_nag — своим текстом и операторам тоже.
+                if o.get("pending_verification"):
+                    continue
                 ts = o.get("timestamp")
                 if not ts:
                     continue

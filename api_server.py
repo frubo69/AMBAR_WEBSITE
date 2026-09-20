@@ -152,6 +152,13 @@ async def on_startup(app):
         app["owner_sweep"] = asyncio.create_task(owner_sweep.loop(app))
     except Exception as e:
         log.warning(f"[owner-sweep] не запустился: {e}")
+    # Клиент оформил заказ и завис на анкете верификации: через две минуты о
+    # нём узнают операторы, и он сам — что остался один шаг (21 сен 2026).
+    try:
+        import verify_nag
+        app["verify_nag"] = asyncio.create_task(verify_nag.loop(app))
+    except Exception as e:
+        log.warning(f"[verify-nag] не запустился: {e}")
     # Водитель просит закрыть смену раньше, а оператор района молчит десять
     # минут — запрос уходит старшему в бот (18 сен 2026).
     try:

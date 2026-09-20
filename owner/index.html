@@ -8454,6 +8454,7 @@ button.exp-wait:active{transform:scale(.99)}
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Очень крупный заказ <span class="pill gold">≥ 1 000 AED</span></div><div class="nrow-s">Персональное внимание</div></div><label class="tg"><input type="checkbox" data-p="orders.new1000" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ доставлен</div><div class="nrow-s">После подтверждения курьером</div></div><label class="tg"><input type="checkbox" data-p="orders.delivered"><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Водитель привёз заказ</div><div class="nrow-s">Ждёт подтверждения оператора</div></div><label class="tg"><input type="checkbox" data-p="orders.driver_done" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Клиент застрял на верификации</div><div class="nrow-s">Операторам его не видно, пока он не заполнит анкету</div></div><label class="tg"><input type="checkbox" data-p="orders.verify_stuck" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ задним числом</div><div class="nrow-s">Смену заполнили позже — за какую дату и на сколько</div></div><label class="tg"><input type="checkbox" data-p="orders.backfilled" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Отмена клиентом</div><div class="nrow-s">С причиной отмены</div></div><label class="tg"><input type="checkbox" data-p="orders.cancelled" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Отклонён оператором</div><div class="nrow-s">Оператор не принял заказ</div></div><label class="tg"><input type="checkbox" data-p="orders.declined" checked><i></i></label></div>
@@ -32238,7 +32239,7 @@ function _buildAlerts(){
   try{
     const sevMap = {
       'orders.cancelled':'warn','orders.declined':'dn','orders.delivered':'info',
-      'orders.driver_done':'warn','orders.reverted':'warn','orders.edited':'info',
+      'orders.driver_done':'warn','orders.verify_stuck':'warn','orders.reverted':'warn','orders.edited':'info',
       'orders.backfilled':'info',
       'orders.new':'info','orders.new500':'info','orders.new1000':'info',
       'timing.late25':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
@@ -32254,7 +32255,7 @@ function _buildAlerts(){
     const icoMap = {
       'orders.new':IC('box'),'orders.new500':IC('coin'),'orders.new1000':IC('gem'),
       'orders.cancelled':IC('ban'),'orders.declined':IC('xmark'),'orders.delivered':IC('check'),
-      'orders.driver_done':IC('truck'),'orders.reverted':IC('revert'),'orders.edited':IC('edit'),
+      'orders.driver_done':IC('truck'),'orders.verify_stuck':IC('clock'),'orders.reverted':IC('revert'),'orders.edited':IC('edit'),
       'orders.backfilled':IC('cal'),
       'timing.late25':IC('clock'),'timing.notAccepted5':IC('timer'),'timing.enroute30':IC('car'),
       'reviews.bad3':IC('warn'),'reviews.good5':IC('star'),'reviews.comment':IC('chat'),

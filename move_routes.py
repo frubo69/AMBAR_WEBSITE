@@ -43,7 +43,7 @@ stock_routes.move_by_code, тот же, что у старшего.
 import json
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 
@@ -108,6 +108,18 @@ def _senior_of(g: dict) -> str:
     return ((g or {}).get("senior") or {}).get("name") or ""
 
 
+def _check_view(chk: dict):
+    """Проверка отложенного наружу. Числовой id проверявшего не отдаём: в
+    интерфейсе его быть не должно ни при каких условиях, а в истории он однажды
+    и вылез вместо имени."""
+    if not chk:
+        return None
+    return {"by_name": chk.get("by_name") or "", "at": _iso(chk.get("at")),
+            "seen": chk.get("seen"), "got": chk.get("got"),
+            "extra": int(chk.get("extra") or 0),
+            "missing": chk.get("missing") or [], "ok": bool(chk.get("ok"))}
+
+
 def _accept_view(g: dict) -> dict:
     # Проверка отложенного (20 сен 2026) — рядом с приёмом, но отдельно: она
     # ничего не решает, только говорит, кто пересчитал сканом и что вышло.
@@ -115,7 +127,7 @@ def _accept_view(g: dict) -> dict:
     return {"accepted_at": _iso(g.get("accepted_at")), "accepted_by": g.get("accepted_by") or "",
             "accept_ok": bool(g.get("accept_ok", True)) if g.get("accepted_at") else None,
             "accept_lines": g.get("accept_lines") or [], "accept_note": g.get("accept_note") or "",
-            "check": ({**chk, "at": _iso(chk.get("at"))} if chk else None)}
+            "check": _check_view(chk)}
 
 
 def _sources(lines: list, task: dict) -> list:
@@ -718,6 +730,106 @@ async def live(day: str = "") -> dict:
             "open": sum(1 for v in out if v["status"] not in ("done", "cancelled"))}
 
 
+def _at(v):
+    """Время события — datetime или None: в базе оно бывает и строкой."""
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(str(v))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+async def history(day: str = "", back: int = 30) -> dict:
+    """История перемещений: по дням, по районам и по обеим сторонам скана
+    (владелец, 21 сен 2026: «гораздо более информативная история — слайдер по
+    датам, чёткое зонирование по районам, когда именно перемещение было
+    отсканировано отдающей стороной и когда принимающей»).
+
+    День передачи — день её последнего события, а не день заявки: заявку
+    заводят вечером, а везут наутро, и человек ищет тот день, когда товар
+    реально поехал.
+
+    В историю попадает только то, что случилось: пара, где не отсканировали ни
+    одной бутылки, — это не перемещение, а несделанная задача, ей место в
+    активных. Переезды сканом мимо заявок (свободный переезд старшего или
+    водителя) идут отдельным списком: у них нет двух сторон, зато их можно
+    вернуть тем же крестиком, что и раньше."""
+    import bizday as _bizday
+    сегодня = sr._biz_day()
+    day = str(day or "").strip() or сегодня
+    назад = max(1, int(back or 30))
+    since = (datetime.strptime(сегодня, "%Y-%m-%d") - timedelta(days=назад - 1)).strftime("%Y-%m-%d")
+    пары, дни = [], {}
+    for doc in await db.move_orders_since(since):
+        mid = doc["_id"]
+        for to, t in (doc.get("tasks") or {}).items():
+            lines = t.get("lines") or []
+            give = t.get("give") or {}
+            for src in sorted({l.get("from") for l in lines} - {None}):
+                g = give.get(src) or {}
+                ls = [_line_view(l) for l in lines if l.get("from") == src]
+                need = sum(l["qty"] for l in ls)
+                got = sum(l["got"] for l in ls)
+                recv = sum(l["recv"] for l in ls)
+                if got <= 1e-9:
+                    continue                       # не начинали — это не история
+                когда = (_at(g.get("accepted_at")) or _at(g.get("recv_at")) or _at(g.get("at"))
+                         or _at(g.get("started_at")) or _at(t.get("at")) or _at(doc.get("at")))
+                d = _bizday.biz_day(когда) if когда else (doc.get("day") or сегодня)
+                chk = g.get("check") or None
+                пары.append({
+                    "mid": mid, "day": d,
+                    "to": to, "to_code": OFFICE_CODES.get(to, ""), "to_name": OFFICE_NAMES.get(to, to),
+                    "from": src, "from_code": OFFICE_CODES.get(src, ""),
+                    "from_name": OFFICE_NAMES.get(src, src),
+                    "status": _pair_status(t, g, need, got),
+                    "driver": g.get("driver") or "", "senior": _senior_of(g),
+                    # Отдающая сторона: когда поднесла к камере первую бутылку,
+                    # когда последнюю и когда закрыла передачу.
+                    "give_from": _iso(g.get("started_at")), "give_to": _iso(g.get("at")),
+                    "given_at": _iso(g.get("done_at")),
+                    # Принимающая: последний скан приёмки и сама отметка «принял».
+                    "recv_at": _iso(g.get("recv_at")), "accepted_at": _iso(g.get("accepted_at")),
+                    "accepted_by": g.get("accepted_by") or "",
+                    "accept_ok": bool(g.get("accept_ok", True)) if g.get("accepted_at") else None,
+                    "accept_note": g.get("accept_note") or "",
+                    "accept_lines": g.get("accept_lines") or [],
+                    "check": _check_view(chk),
+                    "cancelled_at": _iso(t.get("cancelled_at")),
+                    "qty": sr._num(need), "got": sr._num(got), "recv": sr._num(recv),
+                    "codes": len(g.get("codes") or []), "recv_codes": len(g.get("recv_codes") or []),
+                    "lines": [l for l in ls if l["got"] > 1e-9 or l["qty"] > 1e-9],
+                })
+                дни[d] = дни.get(d, 0) + 1
+    # Переезды сканом мимо заявок — тем же днём, одной строкой на позицию.
+    rows = await db.get_stock_transfers_since(since)
+    свободные = [r for r in sr.group_transfers([r for r in rows if r.get("by_kind") != "move"], назад)]
+    for r in свободные:
+        дни[str(r.get("day") or сегодня)] = дни.get(str(r.get("day") or сегодня), 0) + 1
+
+    по_району: dict = {}
+    for p in пары:
+        if p["day"] != day:
+            continue
+        r = по_району.setdefault(p["to"], {"id": p["to"], "code": p["to_code"],
+                                           "name": p["to_name"], "pairs": [], "qty": 0.0})
+        r["pairs"].append(p)
+        r["qty"] = sr._num(r["qty"] + p["got"])
+    for r in по_району.values():
+        r["pairs"].sort(key=lambda p: (p["accepted_at"] or p["give_to"] or ""), reverse=True)
+        r["from_n"] = len({p["from"] for p in r["pairs"]})
+    районы = sorted(по_району.values(), key=lambda r: r["code"])
+    вне = [r for r in свободные if str(r.get("day") or "") == day]
+    return {"day": day, "today": сегодня,
+            "days": [{"day": d, "n": n} for d, n in sorted(дни.items(), reverse=True)],
+            "districts": районы, "free": вне,
+            "n": sum(len(r["pairs"]) for r in районы) + len(вне)}
+
+
 async def pending_for_district(oid: str) -> list:
     """Незакрытые перемещения района — по ним не даём закрыть смену. Обе
     стороны: отдающий (side=give), пока не отсканировал всё, и получатель
@@ -1144,6 +1256,15 @@ async def handle_own_create(request):
 
 async def handle_own_live(request):
     return web.json_response(await live(request.query.get("day") or ""),
+                             headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+async def handle_own_history(request):
+    try:
+        back = int(request.query.get("days") or 30)
+    except ValueError:
+        back = 30
+    return web.json_response(await history(request.query.get("day") or "", back),
                              headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 

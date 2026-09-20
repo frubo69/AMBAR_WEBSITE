@@ -1115,6 +1115,66 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   font-size:11.5px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
   border:1px solid rgba(201,169,110,.45);text-transform:none;letter-spacing:0}
 .stk-unsel:active{transform:scale(.96)}
+/* ── История перемещений: день, районы, две стороны скана (21 сен 2026) ────
+   Заголовок района — та же золотая полоса, что у карточек, и список под ней
+   примыкает к нему. Внутри — передачи парами «откуда → куда» со своей
+   лентой событий: кто отдал и когда, кто принял и когда. */
+.mvh-g{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  min-height:50px;margin-top:14px;padding:0 16px;border-radius:15px 15px 0 0;
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:1.1px;line-height:1.15;text-transform:uppercase;color:var(--gold);
+  background:linear-gradient(180deg,rgba(201,169,110,.2),rgba(201,169,110,.08));
+  border:1px solid var(--border2);border-bottom-color:rgba(201,169,110,.34)}
+.mvh-g i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:11.5px;
+  font-weight:600;letter-spacing:.2px;text-transform:none;color:var(--sub);
+  font-variant-numeric:tabular-nums;text-align:right}
+.mvh-l{border:1px solid var(--border2);border-top:none;border-radius:0 0 15px 15px;
+  background:var(--card);overflow:hidden}
+.mvh-p{border-top:1px solid var(--border2)}
+.mvh-p:first-child{border-top:none}
+.mvh-h{display:flex;align-items:center;gap:11px;width:100%;padding:12px 14px 10px;
+  background:none;border:0;color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.mvh-h:active{background:rgba(255,255,255,.02)}
+.mvh-way{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:5px 9px;
+  border-radius:10px;background:var(--card2);border:1px solid var(--border2);
+  font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--gold2)}
+.mvh-way em{font-style:normal;color:var(--muted)}
+.mvh-hb{flex:1;min-width:0}
+.mvh-t{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.mvh-s{display:block;margin-top:2px;font-size:11.5px;color:var(--muted)}
+.mvh-st{flex:0 0 auto;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--sub);background:var(--card2)}
+.mvh-st.ok{color:var(--up);background:rgba(61,220,132,.1)}
+.mvh-st.wait{color:var(--gold2);background:var(--gold-soft)}
+.mvh-st.dn{color:var(--dn);background:rgba(255,107,107,.1)}
+.mvh-ch{flex:0 0 auto;display:flex;color:var(--dim);transform:rotate(90deg);
+  transition:transform .18s ease}
+.mvh-ch.on{transform:rotate(-90deg);color:var(--gold2)}
+/* Лента событий: точка, кто, когда. Пустое время — прочерк, а не пустота:
+   «принял —» отвечает на вопрос, а молчание нет. */
+.mvh-tl{padding:0 14px 12px}
+.mvh-tr{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;color:var(--sub)}
+.mvh-tr span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mvh-tr b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
+  font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.mvh-tr i.dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--gold2)}
+.mvh-tr i.dot.take{background:var(--up)}
+.mvh-tr i.dot.wait{background:none;border:1.5px solid var(--dim)}
+.mvh-tr i.dot.chk{background:var(--sub)}
+.mvh-tr.dim b{color:var(--muted);font-weight:600}
+.mvh-ls{padding:2px 14px 12px}
+.mvh-ln{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  padding:5px 0;font-size:12.5px;border-top:1px solid var(--border2)}
+.mvh-ln:first-child{border-top:none}
+.mvh-ln b{font-family:'Space Grotesk',sans-serif;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.mvh-ln b u{margin-left:3px;font-size:9.5px;font-weight:600;text-decoration:none;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.mvh-note{margin:0 14px 12px;padding:8px 10px;border-radius:10px;font-size:11.5px;
+  line-height:1.35;color:var(--gold2);background:rgba(201,169,110,.08)}
+.mvh-empty{margin:14px 0;padding:22px 16px;border-radius:15px;text-align:center;
+  font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border2)}
 .stk-grp2-a{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase;color:var(--gold2);cursor:pointer}
 .stk-grp2{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
@@ -11862,6 +11922,10 @@ function dpApply(){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     whDaySet(Math.max(0, Math.round((т - в) / 86400000)));
   }
+  if(dpTarget === 'mvhDay'){
+    const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
+    mvhDaySet(Math.max(0, Math.round((т - в) / 86400000)));
+  }
   if(dpTarget === 'ckDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     ckDaySet(Math.max(0, Math.round((т - в) / 86400000)));
@@ -15123,46 +15187,191 @@ function audDistRow(d, left, без, hist){
   </div>`;
 }
 
-// ── История перемещений: своя страница, по дням ─────────────────────────────
-// Сегодняшние строки можно убрать крестиком — как и раньше в списке за день.
-// Вчерашние стоят как есть: это уже запись, а не работа.
+// ── История перемещений ─────────────────────────────────────────────────────
+// Владелец, 21 сен 2026: «сделай гораздо более информативную историю: слайдер
+// по датам, чёткое зонирование по районам, когда именно перемещение было
+// отсканировано отдающей стороной и когда принимающей».
+//
+// День здесь — день события, а не день заявки: заявку заводят вечером, а везут
+// наутро, и человек ищет тот день, когда товар реально поехал. Район — тот,
+// КУДА привезли: история читается вопросом «что сегодня приехало в B1», а
+// стрелка «откуда» стоит в самой передаче. Переезды сканом мимо заявок — своим
+// списком внизу: у них нет двух сторон, зато их можно вернуть крестиком.
+let MVH = {off: 0, day: '', data: null, open: new Set(), busy: false};
+
+const MVH_ST = {
+  done:      ['принято', 'ok'],
+  diff:      ['расхождение', 'dn'],
+  given:     ['ждёт приёмки', 'wait'],
+  live:      ['отдают', 'wait'],
+  pause:     ['не довезли', 'wait'],
+  wait:      ['не начали', ''],
+  cancelled: ['снято', 'dn'],
+};
+
+// Время события: часы и минуты по Дубаю, а если событие случилось не в тот
+// день, который открыт, — с датой. Передача, начатая вечером и принятая утром,
+// иначе выглядит принятой раньше, чем отдана.
+function _mvhAt(iso, day){
+  if(!iso) return '';
+  const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z');
+  if(isNaN(d)) return '';
+  const дуб = new Date(d.toLocaleString('en-US', {timeZone: 'Asia/Dubai'}));
+  const свой = new Date(дуб.getTime());
+  if(свой.getHours() < SHIFT_START_HOUR) свой.setDate(свой.getDate() - 1);
+  const iso2 = свой.getFullYear() + '-' + String(свой.getMonth() + 1).padStart(2, '0')
+             + '-' + String(свой.getDate()).padStart(2, '0');
+  const чч = _hmDubai(iso);
+  return iso2 === day ? чч : `${дуб.getDate()}.${String(дуб.getMonth() + 1).padStart(2, '0')} ${чч}`;
+}
+// Отдавали не мгновение, а отрезок: первая бутылка и последняя. Совпали —
+// пишем один раз, иначе «17:54 → 18:11».
+function _mvhSpan(a, b, day){
+  const x = _mvhAt(a, day), y = _mvhAt(b, day);
+  if(!x && !y) return '—';
+  if(!x || x === y) return y || x;
+  if(!y) return x;
+  return `${x} → ${y}`;
+}
+
+function mvhDaySet(off){
+  MVH.off = Math.max(0, off | 0);
+  MVH.open = new Set();
+  mvhLoad();
+}
+function mvhFold(key){
+  MVH.open.has(key) ? MVH.open.delete(key) : MVH.open.add(key);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  mvhPaint();
+}
+
 async function stkMovesHist(){
   STK.view = 'moves-hist'; _setRail('stkRail', '');
+  MVH = {off: 0, day: '', data: null, open: new Set(), busy: false};
   _stkHead('История перемещений', 'загрузка…', false);
-  const box = document.getElementById('stkMid');
-  box.innerHTML = '<div class="stk-none">Загрузка…</div>';
-  let res;
-  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers', {params:{days: 30}}); }
-  catch(e){
-    box.innerHTML = loadFail();
+  mvhPaint();
+  mvhLoad();
+}
+
+async function mvhLoad(){
+  if(MVH.busy) return;
+  MVH.busy = true;
+  const day = _dayIsoFor(MVH.off);
+  mvhPaint();                                   // день в полосе меняется сразу
+  try{
+    const d = await ownerApi.ownerFetch('/api/owner/move/history', {params: {day, days: 60}});
+    if(STK.view !== 'moves-hist'){ MVH.busy = false; return; }
+    MVH.data = d; MVH.day = d.day || day;
+  }catch(e){
+    MVH.data = null;
+    if(STK.view === 'moves-hist')
+      document.getElementById('stkMid').innerHTML = loadFail('mvhLoad()');
+    MVH.busy = false;
     return;
   }
-  STK.moves = res.transfers || []; STK.moves30 = STK.moves;
-  const today = res.day || _dayIsoFor(0);
-  const n = STK.moves.length;
-  _stkHead('История перемещений', n
-    ? `${n} ${pluralize(n, 'перемещение', 'перемещения', 'перемещений')} за 30 дней`
-    : 'за 30 дней', false);
-  const days = [], by = {};
-  STK.moves.forEach((m, i) => {
-    const d = m.day || '';
-    if(!by[d]){ by[d] = []; days.push(d); }
-    by[d].push(i);
-  });
-  box.innerHTML = days.length ? days.map(d => `
-    <div class="stk-grp2"><span>${escS(d === today ? 'Сегодня' : _dayName(d))}</span></div>
-    <div class="stkd">${by[d].map(i => { const m = STK.moves[i]; return `
-      <div class="stk-dr" style="cursor:default">
-        <span class="stk-dr-b">
-          <span class="stk-dr-n">${escS(m.product_name || m.product_id || '')}</span>
-          <span class="stk-dr-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}${
-            m.bottles ? ' · сканом' : ''}${_mvWho(m)}</span>
-        </span>
-        <span class="stk-dr-v">${fmtQty(_mvAmt(m))}<i>${m.unit > 1 ? 'кор' : 'бут'}</i></span>
-        ${d === today || m.by_kind === 'driver'
-          ? `<button class="stk-mvr-x" title="Вернуть" onclick="stkMoveDel(${i})">✕</button>` : ''}
-      </div>`; }).join('')}</div>`).join('')
-    : '<div class="stk-empty">За 30 дней ничего не перевозили</div>';
+  MVH.busy = false;
+  mvhPaint();
+}
+
+function mvhPaint(){
+  const box = document.getElementById('stkMid'); if(!box) return;
+  const d = MVH.data, day = _dayIsoFor(MVH.off);
+  const полоса = dayBarHtml('mvhDay');
+  if(!d || MVH.day !== day){
+    box.innerHTML = полоса + '<div class="mvh-empty">Загрузка…</div>';
+    requestAnimationFrame(bindDayBars);
+    return;
+  }
+  const дней = (d.days || []).reduce((a, x) => a + (x.n || 0), 0);
+  _stkHead('История перемещений', d.n
+    ? `${d.n} ${pluralize(d.n, 'перемещение', 'перемещения', 'перемещений')} · ${
+        дней ? дней + ' за 60 дней' : ''}`.replace(/ · $/, '')
+    : `за 60 дней ${дней} ${pluralize(дней, 'перемещение', 'перемещения', 'перемещений')}`, false);
+  const районы = (d.districts || []).map(r => `
+    <div class="mvh-g"><span>${escS(r.code)} ${escS(r.name)}</span>
+      <i>привезли ${fmtQty(r.qty)} · ${r.pairs.length} ${
+        pluralize(r.pairs.length, 'передача', 'передачи', 'передач')}</i></div>
+    <div class="mvh-l">${r.pairs.map(p => mvhPair(p, d.day)).join('')}</div>`).join('');
+  // Переезды мимо заявок: свободный скан старшего или водителя. Сегодняшние и
+  // водительские можно вернуть — как и раньше в истории.
+  const сам = (d.free || []).length ? `
+    <div class="mvh-g"><span>Без заявки</span><i>${d.free.length} ${
+      pluralize(d.free.length, 'строка', 'строки', 'строк')}</i></div>
+    <div class="mvh-l">${d.free.map((m, i) => `
+      <div class="mvh-p"><div class="mvh-h" style="cursor:default">
+        <span class="mvh-way"><b>${escS(m.from_code || '')}</b><em>→</em><b>${escS(m.to_code || '')}</b></span>
+        <span class="mvh-hb"><span class="mvh-t">${escS(m.product_name || m.product_id || '')}</span>
+          <span class="mvh-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}${
+            m.bottles ? ' · сканом' : ''}${_mvWho(m)}</span></span>
+        <span class="mvh-st">${fmtQty(_mvAmt(m))} ${m.unit > 1 ? 'кор' : 'бут'}</span>
+        ${d.day === d.today || m.by_kind === 'driver'
+          ? `<button class="stk-mvr-x" title="Вернуть" onclick="mvhDel(${i})">✕</button>` : ''}
+      </div></div>`).join('')}</div>` : '';
+  box.innerHTML = полоса + (районы || сам
+    ? районы + сам
+    : `<div class="mvh-empty">${d.day === d.today
+        ? 'Сегодня ещё ничего не перевозили' : 'В этот день ничего не перевозили'}</div>`);
+  requestAnimationFrame(bindDayBars);
+}
+
+// Передача пары «откуда → куда»: шапка, лента событий и, по нажатию, позиции.
+function mvhPair(p, day){
+  const key = `${p.mid}:${p.to}:${p.from}`;
+  const открыт = MVH.open.has(key);
+  const [слово, кл] = MVH_ST[p.status] || ['', ''];
+  const кто = p.driver || p.senior || '—';
+  const принял = p.accepted_at;
+  const строк = (p.lines || []).length;
+  return `<div class="mvh-p">
+    <button class="mvh-h" onclick="mvhFold('${escS(key)}')">
+      <span class="mvh-way"><b>${escS(p.from_code)}</b><em>→</em><b>${escS(p.to_code)}</b></span>
+      <span class="mvh-hb">
+        <span class="mvh-t">${escS(p.from_name)} → ${escS(p.to_name)}</span>
+        <span class="mvh-s">${fmtQty(p.got)} ${pluralize(Math.round(p.got), 'единица', 'единицы', 'единиц')}
+          · ${строк} ${pluralize(строк, 'позиция', 'позиции', 'позиций')}</span>
+      </span>
+      <span class="mvh-st ${кл}">${слово}</span>
+      <em class="mvh-ch${открыт ? ' on' : ''}">${_SC_CHEV}</em>
+    </button>
+    <div class="mvh-tl">
+      <div class="mvh-tr"><i class="dot"></i>
+        <span>Отсканировал ${escS(кто)}${p.senior ? ' · из STAR' : ''}</span>
+        <b>${_mvhSpan(p.give_from, p.give_to, day)}</b></div>
+      <div class="mvh-tr${принял ? '' : ' dim'}">
+        <i class="dot ${принял ? 'take' : 'wait'}"></i>
+        <span>${принял ? 'Принял ' + escS(p.accepted_by || '—')
+                       : p.status === 'cancelled' ? 'Передачу сняли' : 'Ещё не приняли'}</span>
+        <b>${принял ? _mvhSpan(p.recv_at, p.accepted_at, day)
+                    : (p.cancelled_at ? _mvhAt(p.cancelled_at, day) : '—')}</b></div>
+      ${p.check ? `<div class="mvh-tr"><i class="dot chk"></i>
+        <span>Проверил ${escS(p.check.by_name || 'старший')} · ${
+          p.check.ok ? 'всё сошлось' : 'нашлось не всё'}</span>
+        <b>${_mvhAt(p.check.at, day)}</b></div>` : ''}
+    </div>
+    ${p.accept_ok === false ? `<div class="mvh-note">Приняли неровно: ${
+      (p.accept_lines || []).slice(0, 4).map(l => `${escS(l.name)} ${fmtQty(l.got)} из ${fmtQty(l.sent)}`).join(', ')
+      }${p.accept_note ? ` · «${escS(p.accept_note)}»` : ''}</div>` : ''}
+    ${открыт ? `<div class="mvh-ls">${(p.lines || []).map(l => `
+      <div class="mvh-ln"><span>${escS(l.name)}</span>
+        <b>${fmtQty(l.got)}${l.got < l.qty ? ` из ${fmtQty(l.qty)}` : ''}<u>${
+          l.unit > 1 ? 'кор' : 'бут'}</u></b></div>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+// Вернуть переезд без заявки — тем же путём, что и раньше: сервер снимает
+// поправку к остатку и запись в реестре кодов.
+async function mvhDel(i){
+  const m = ((MVH.data || {}).free || [])[i]; if(!m) return;
+  const ids = m.ids && m.ids.length ? m.ids : (m.id ? [m.id] : []);
+  if(!ids.length) return;
+  if(!await askDialog('Вернуть перемещение?',
+      `${m.product_name || ''} · ${m.from_name} → ${m.to_name}`, 'Вернуть', 'Оставить', 'no')) return;
+  try{
+    for(const id of ids)
+      await ownerApi.ownerFetch(`/api/owner/stock/transfer/${encodeURIComponent(id)}`, {method: 'DELETE'});
+  }catch(e){ _toast('Не удалось вернуть'); return; }
+  _toast('Перемещение возвращено');
+  mvhLoad();
 }
 
 // Сколько бутылок лежит на складе прямо сейчас — первое, что должен отвечать
@@ -17524,7 +17733,8 @@ let _dayDir = 0;
 // плашка раздела — жест и перекраска от формы не зависят.
 function dayBarOff(el){
   const own = el && el.dataset.day;
-  return own === 'ckl' ? CKL_OFF : own === 'wh' ? (WH.off || 0) : DAY_OFFSET;
+  return own === 'ckl' ? CKL_OFF : own === 'wh' ? (WH.off || 0)
+       : own === 'mvh' ? (MVH.off || 0) : DAY_OFFSET;
 }
 
 // Полоса рисуется один раз, дальше только перекрашивается. Заменять её узел на
@@ -17569,13 +17779,13 @@ function dayBarHtml(id){
       stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
       ><path d="${t}"/></svg>`;
   // Подпись сразу настоящая: полоса не должна показать чужой день даже на кадр.
-  const off = id === 'ckDay' ? CKL_OFF : DAY_OFFSET;
+  const off = id === 'ckDay' ? CKL_OFF : id === 'mvhDay' ? (MVH.off || 0) : DAY_OFFSET;
   const {имя, дата} = dayBarLabels(off);
   // Разметка встанет в страницу на следующем кадре — тогда и вешаем жест.
   requestAnimationFrame(bindDayBars);
   return `<div class="ck-daybar">
     <div class="dayslide${off ? ' back' : ''}" id="${id}"
-         data-day="${id === 'ckDay' ? 'ckl' : 'общий'}">
+         data-day="${id === 'ckDay' ? 'ckl' : id === 'mvhDay' ? 'mvh' : 'общий'}">
       <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
         >${стрелка('M15 5l-7 7 7 7')}</button>
       <div class="ds-win" onclick="dayBarHome(this)">
@@ -17653,6 +17863,7 @@ function dayBarStep(el, delta){
   _heroFlip(delta, el).then(() => {
     if(own === 'ckl') ckDaySet(next);
     else if(own === 'wh') whDaySet(next);
+    else if(own === 'mvh') mvhDaySet(next);
     else accDayGo(next);
     dayBarPaint(el);
   });
@@ -24490,8 +24701,15 @@ const SCAN = {
     this.stream = await navigator.mediaDevices.getUserMedia({
       video: {...VIDEO, facingMode:{ideal:'environment'}}, audio:false});
     // Второй заход: названия камер доступны только после первого доступа.
+    // Он нужен ровно там, где система отдала виртуальную камеру из нескольких
+    // линз (айфон: «Back Dual Wide», «Back Triple»). На обычной задней камере
+    // второй getUserMedia ничего не улучшает, а на андроиде стоит ещё одного
+    // запроса разрешения — и человек отвечает на него при каждом включении
+    // камеры (владелец, 21 сен 2026).
     try{
-      const id = await this._mainCameraId();
+      const cur0 = this.stream.getVideoTracks()[0];
+      const метка = (cur0 && cur0.label) || '';
+      const id = /dual|triple|wide|ultra|virtual/i.test(метка) ? await this._mainCameraId() : null;
       const cur = this.stream.getVideoTracks()[0];
       if(id && cur && cur.getSettings && cur.getSettings().deviceId !== id){
         this.stream.getTracks().forEach(t => t.stop());
@@ -28541,6 +28759,23 @@ async function rcvLine(pid){
   if(snd) snd.classList.toggle('muted', !SFX.on);
 }
 
+// Следующая позиция под работающей камерой: меняем подписи и счётчик, а
+// <video> и поток остаются теми же. Пересобрать разметку здесь нельзя — вместе
+// с ней умрёт камера.
+function rcvLineSwap(l){
+  if(!l) return rcvLineClose();
+  RCV_LINE = {...l};
+  RCV_ROWS = [];
+  _setText('accTitle', l.name);
+  const n = document.getElementById('rcvN');
+  if(n){ n.removeAttribute('data-v'); scanRoll('rcvN', fmtQty(l.left)); }
+  const h = document.getElementById('qrHint');
+  if(h) h.textContent = `Дальше: ${l.name}`;
+  const u = document.getElementById('rcvUndo'); if(u) u.disabled = true;
+  rcvFeed();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
 function rcvLineClose(){
   SCAN.stop();
   rcvHoldStop();
@@ -28642,11 +28877,22 @@ function rcvDone(err, r, job){
       }, 700);
       return;
     }
-    // Строка добрана — держать камеру включённой значит ждать лишнего действия.
+    // Позиция добрана — переходим к следующей ПОД ТОЙ ЖЕ камерой. Раньше тут
+    // закрывался сканер и человек открывал следующую позицию руками: экран
+    // чернел, камера включалась заново (на андроиде — с новым запросом
+    // разрешения на каждый код), а бутылка, оставшаяся в кадре, читалась
+    // второй раз и возвращалась плашкой «уже в реестре». На позициях по одной
+    // бутылке это повторялось после каждого скана (владелец, 21 сен 2026).
     if(r.left === 0){
       qrFlash('ok', 'всё, ' + r.need);
-      setTimeout(() => { if(RCV_LINE){ rcvLineClose();
-        _toast(`${r.name} — взято полностью`); } }, 700);
+      const след = ((RCV && RCV.lines) || [])
+        .filter(x => x.left > 0 && x.id !== ((RCV_LINE || {}).id))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
+      setTimeout(() => {
+        if(!RCV_LINE) return;
+        _toast(`${r.name} — взято полностью`);
+        if(след) rcvLineSwap(след); else rcvLineClose();
+      }, 700);
     }
     return;
   }

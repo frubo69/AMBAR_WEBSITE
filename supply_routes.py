@@ -2464,6 +2464,13 @@ async def handle_move_live(request):
 
 
 @require_owner
+async def handle_move_history(request):
+    """GET /api/owner/move/history?day=&days= — что и когда перевозили."""
+    import move_routes
+    return await move_routes.handle_own_history(request)
+
+
+@require_owner
 async def handle_move_board(request):
     """Что где лежит — для ручной заявки на перемещение в STAR (владелец,
     18 сен 2026: «две опции — свободное перемещение или создать заявку, как у
@@ -2565,6 +2572,7 @@ def setup(app):
         ("/api/owner/move/plan",                    handle_move_plan,    "GET"),
         ("/api/owner/move/board",                   handle_move_board,   "GET"),
         ("/api/owner/move/live",                    handle_move_live,    "GET"),
+        ("/api/owner/move/history",                 handle_move_history, "GET"),
         ("/api/owner/move/create",                  handle_move_create,  "POST"),
         ("/api/owner/move/{mid}/cancel",            handle_move_cancel,  "POST"),
         # Старший берёт на себя то, что надо забрать с района, и сканирует

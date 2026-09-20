@@ -9802,8 +9802,13 @@ const SCAN = {
     this.stream = await navigator.mediaDevices.getUserMedia({
       video: {...VIDEO, facingMode:{ideal:'environment'}}, audio:false});
     // Второй заход: названия камер доступны только после первого доступа.
+    // Нужен он там, где система отдала виртуальную камеру из нескольких линз
+    // (айфон: «Back Dual Wide»). На обычной задней камере он ничего не меняет,
+    // а на андроиде стоит ещё одного запроса разрешения (21 сен 2026).
     try{
-      const id = await this._mainCameraId();
+      const cur0 = this.stream.getVideoTracks()[0];
+      const метка = (cur0 && cur0.label) || '';
+      const id = /dual|triple|wide|ultra|virtual/i.test(метка) ? await this._mainCameraId() : null;
       const cur = this.stream.getVideoTracks()[0];
       if(id && cur && cur.getSettings && cur.getSettings().deviceId !== id){
         this.stream.getTracks().forEach(t => t.stop());
@@ -11160,6 +11165,24 @@ async function supLineOpen(pid){
   }
 }
 
+// Следующая позиция под работающей камерой: меняем подписи и счётчики, а
+// <video> и поток остаются теми же. Пересобрать разметку здесь нельзя — вместе
+// с ней умрёт камера.
+function supLineSwap(l){
+  if(!l) return supLineClose();
+  LINE = {...l};
+  SCAN_ROWS = [];
+  _setText('supT', l.name);
+  const v = document.getElementById('supV');
+  if(v) v.innerHTML = `${fmt(l.got)}<u> / ${fmt(l.need)}</u>`;
+  const left = document.getElementById('camLeft');
+  if(left) left.textContent = fmtQty(l.left);
+  const hint = document.getElementById('camHint');
+  if(hint) hint.textContent = `Дальше: ${l.name}`;
+  camFeed();
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
 function supLineClose(){
   SCAN.stop();
   holdStop();
@@ -11292,12 +11315,21 @@ SCANQ.onDone = (err, r, job) => {
       }, 700);
       return;
     }
-    // Строка добрана — водителю больше нечего здесь делать, и держать камеру
-    // включённой значит ждать от него лишнего действия.
+    // Позиция добрана — следующая открывается ПОД ТОЙ ЖЕ камерой. Закрывать
+    // сканер после каждой позиции значило гасить камеру и включать её заново:
+    // экран чернеет, андроид на каждом включении заново спрашивает разрешение,
+    // а бутылка, оставшаяся в кадре, читается второй раз и возвращается
+    // «уже в реестре» (владелец, 21 сен 2026).
     if(r.left === 0){
       camFlash('ok', 'всё, ' + r.need);
-      setTimeout(() => { if(LINE){ supLineClose();
-        toast(`${r.name} — взято полностью`); } }, 700);
+      const след = ((TASK && TASK.lines) || [])
+        .filter(x => x.left > 0 && x.id !== ((LINE || {}).id))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
+      setTimeout(() => {
+        if(!LINE) return;
+        toast(`${r.name} — взято полностью`);
+        if(след) supLineSwap(след); else supLineClose();
+      }, 700);
     }
     return;
   }

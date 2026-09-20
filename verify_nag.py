@@ -97,18 +97,23 @@ def _support_link() -> str:
     return f"https://t.me/{name}" if name else ""
 
 
+# Клиенту пишет не система, а люди: по имени, короткими словами и без слова
+# «верификация» — оно пугает и ничего не объясняет (владелец, 21 сен 2026:
+# «по-человечески и с теплом, менее роботизированно»).
 CLIENT_TEXT = (
-    "🍾 <b>Остался один шаг</b>\n\n"
-    "Заказ <b>#{oid}</b> на {total} AED уже собран. Осталось ответить, от кого вы о нас "
-    "узнали — минута, и один раз навсегда.\n\n"
-    "Не получается — напишите нам, поможем."
+    "🍾 <b>{hi}</b>\n\n"
+    "Ваш заказ <b>#{oid}</b> на {total} AED уже собран и ждёт — нам осталось только "
+    "познакомиться. Напишите, кто вас к нам привёл: это минута, и спросим мы об этом "
+    "один раз.\n\n"
+    "Что-то не открывается или хочется просто спросить — напишите нам, мы на связи. "
+    "Хорошего вечера 🙂"
 )
 
 OP_TEXT = (
-    "⏳ Клиент застрял на верификации · {mins} мин\n\n"
+    "⏳ Новому клиенту нужна помощь с верификацией · {mins} мин\n\n"
     "👤 {name}{phone}\n"
     "🆕 Заказ #{oid} · {total} AED{office}\n\n"
-    "Ответьте на это сообщение — он получит ваш ответ."
+    "Напишите ему ответом на это сообщение — он получит его в чате бота."
 )
 
 
@@ -122,12 +127,15 @@ async def _client_kb() -> dict | None:
     return {"inline_keyboard": строки} if строки else None
 
 
-async def _tell_client(uid: int, order: dict) -> bool:
+async def _tell_client(uid: int, order: dict, name: str = "") -> bool:
     """Клиенту — в основной бот: там он уже есть, и туда же придёт ответ."""
     token = os.getenv("BOT_TOKEN", "")
     if not token or not uid:
         return False
-    text = CLIENT_TEXT.format(oid=order.get("order_id", "—"),
+    # Имя знаем — здороваемся по имени; не знаем — просто «ваш заказ».
+    имя = " ".join(str(name or "").split())[:40]
+    text = CLIENT_TEXT.format(hi=f"{имя}, остался один шаг" if имя else "Остался один шаг",
+                              oid=order.get("order_id", "—"),
                               total=int(float(order.get("total") or 0)))
     payload = {"chat_id": uid, "text": text, "parse_mode": "HTML",
                "disable_web_page_preview": True}
@@ -242,7 +250,7 @@ async def once() -> int:
             continue
         order = {**o, "order_id": o.get("order_id") or oid}
         try:
-            дошло = await _tell_client(uid, order)
+            дошло = await _tell_client(uid, order, user.get("first_name") or user.get("name") or "")
             await _tell_operators(uid, user, order, mins)
             await _tell_owner(user, order, mins)
             сказали += 1

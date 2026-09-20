@@ -1083,6 +1083,8 @@ body.test-drv .wo-fix{display:none}
   text-overflow:ellipsis;white-space:nowrap}
 .exc-rows > b{padding:7px 0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;font-weight:700;
   text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:#EDEAF4;letter-spacing:-.2px}
+.exc-rows > b i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.3px;
+  color:rgba(201,169,110,.62);margin-left:5px}
 .exc-rows > b.minus{color:#E2A0A0}
 .exc-rows > b.plus{color:#8CCFAA}
 /* Валюта — теми же купюрами, в оправе: видно сразу и не спорит с дирхамами. */
@@ -9005,7 +9007,8 @@ function expCashCard(total){
   const строки = [];
   const пусто = fx.length ? '<i></i>' : '';
   const строка = (t, v, cls, хвост) =>
-    строки.push(`<span>${t}</span><b${cls ? ` class="${cls}"` : ''}>${v}</b>${хвост !== undefined ? хвост : пусто}`);
+    строки.push(`<span>${t}</span><b${cls ? ` class="${cls}"` : ''}>${v}<i>AED</i></b>${
+      хвост !== undefined ? хвост : пусто}`);
   строка(`Взял за заказы${h.orders_cash ? ' · ' + h.orders_cash : ''}`, aed(h.taken_aed), '',
          fx.length ? `<i>${fx.map(купюра).join('')}</i>` : '');
   if(h.got) строка(приход.length ? приход.join(' · ') : 'Вернули вам наличными', '+' + aed(h.got), 'plus');

@@ -1,5 +1,5 @@
 """Стенд книги учёта из настоящего owner/index.html: все <style> целиком (фишки .chip живут не в первых двух), блок
-книги (от «Финансы: книга учёта денег» до «Прайс: закупка и продажа») и
+книги (от «Финансы: книга учёта денег» до начала кошелька) и
 нужные ему функции панели — вырезаются регуляркой; остальное — заглушки.
 Запуск: python3 tools/fb_stand_gen.py <dir>  → <dir>/stand.html"""
 import os, re, shutil, sys
@@ -9,7 +9,9 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 src = open(os.path.join(ROOT, "owner", "index.html"), encoding="utf-8").read()
 
 styles = re.findall(r"<style>(.*?)</style>", src, re.S)
-fb_js = src[src.index("// ── Финансы: книга учёта денег"):src.index("// Прайс: закупка и продажа")]
+# конец блока — начало кошелька: карточка «Прайс» из «Финансов» убрана 19 сен 2026 (1586906),
+# и метка «Прайс: закупка и продажа», по которой резали раньше, со страницы ушла
+fb_js = src[src.index("// ── Финансы: книга учёта денег"):src.index("(function initWalBlock(){")]
 
 def fn(name):
     m = re.search(r"(?:async )?function " + re.escape(name) + r"\(.*?\n\}\n", src, re.S)
@@ -23,13 +25,15 @@ def const(name, end=r";\n"):
 
 parts = [
     "let DAY_OFFSET = 0; let _flipTimer; let ACC_BACK = null; let ACC_VIEW = null; const SHIFT_START_HOUR = 12;",
+    # кошелёк в стенде никуда не ходит: выдуманный остаток, чтобы строка «Крипта» рисовалась
+    "let ACC_WAL = {balance: {usdt: 1000}};",
     const("MONTHS_RU"), const("MONTHS_GEN"), const("ACC_WDF"), const("IC_P", r"\n\};\n"),
     const("_SC_CHEV", r"`;\n"),
     fn("IC"), fn("escS"), fn("_setText"), fn("_woFull"), fn("_bizToday"), fn("_dayIsoFor"), fn("accDay"),
     fn("accIsBack"), fn("accDayWord"), fn("dayBarOff"), fn("dayBarLabels"), fn("dayBarPaint"),
     fn("_dayNavFor"), fn("_dayNav"), fn("bindDayBars"), fn("daySwipe"), fn("dayBarStep"),
     fn("dayBarArrow"), fn("dayBarHome"), fn("_heroFlip"), fn("askDialog"), fn("closePinPop"),
-    fn("pluralize"), "let CREW = null;", fn("crewLoad"), fn("crewDrvCount"),
+    fn("pluralize"), fn("fmtUsdt"), "let CREW = null;", fn("crewLoad"), fn("crewDrvCount"),
 ]
 # календарь одной даты (платёж статьи): разметка и функции — настоящие
 _d0 = src.index('<div class="cmd-overlay" id="dateOverlay">')

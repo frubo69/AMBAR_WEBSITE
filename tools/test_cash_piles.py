@@ -7,6 +7,8 @@
   • «если есть валюта — сколько в валюте, сколько в дирхамах и сколько чай»;
   • «не забудь про бонус водителя, 5% с допродажи» — и питание: остаются у
     водителя, из выручки вычитаются.
+  • «в долг» (21 сен 2026): товар уехал, денег за него нет — сумма стоит
+    отдельной строкой и наличных не трогает.
 И то же — у старшего в «Сборе выручки»: выручка = наличные − чай − расход,
 чай отдельно, валюта строкой. Без базы, кроме «Сбора выручки» (mongomock)."""
 import asyncio, os, sys
@@ -74,6 +76,25 @@ eq("приход наличными +30, на карту — мимо; ждущ�
    (h["got"], h["card_got"], h["revenue"], h["pending"]), (30, 20, 990, 1))
 
 
+print("── заказ в долг: бутылки уехали, денег нет ──────────────────────")
+h = cm.piles([order(300), order(250, payment_method="debt", order_id="A-1042",
+                    customer_name="Ахмед", items=[{"id": TEA, "qty": 1}])],
+             [exp("fuel", 100)])
+eq("в наличные долг не попал", (h["taken"], h["orders_cash"]), (300, 1))
+eq("но посчитан отдельно", (h["debt"], h["debt_n"]), (250, 1))
+eq("и видно, чей он", [(x["id"], x["who"], x["aed"]) for x in h["debt_list"]],
+   [("A-1042", "Ахмед", 250.0)])
+# Наличных в руках ровно столько, сколько без долга: 300 взял, 100 потратил.
+# Чай с такого заказа операторам всё равно причитается — он выделен из этих же
+# денег, поэтому выручка на него меньше, а сумма двух пачек не меняется.
+h0 = cm.piles([order(300)], [exp("fuel", 100)])
+eq("в руках столько же, сколько без долга", (h["in_hand"], h0["in_hand"]), (200, 200))
+eq("две пачки в сумме те же 200", h["revenue"] + h["tea"], 200)
+eq("чай с долгового заказа — не с наличных", (h["tea"], h["tea_other"]), (50, 50))
+h2 = cm.piles([order(300), order(90, payment_method="free")], [])
+eq("«без оплаты» в долг не записывается", (h2["debt"], h2["debt_n"]), (0, 0))
+
+
 async def cash_round():
     print("── «Сбор выручки» у старшего — та же арифметика ───────────────")
     from mongomock_motor import AsyncMongoMockClient
@@ -82,7 +103,9 @@ async def cash_round():
     D = "2026-09-19"
     orders = {"1": order(1050, order_id="1", office_id="jvc", items=[{"id": TEA, "qty": 1}]),
               "2": order(367, order_id="2", office_id="jvc", pay_fx={"code": "USD", "rate": 3.67}),
-              "3": {"order_id": "3", "office_id": "jvc", "status": "delivered", "total": 90, "payment_method": "free"}}
+              "3": {"order_id": "3", "office_id": "jvc", "status": "delivered", "total": 90, "payment_method": "free"},
+              "4": {"order_id": "4", "office_id": "jvc", "status": "delivered", "total": 250,
+                    "payment_method": "debt", "customer_name": "Ахмед"}}
     async def orders_from(since): return orders
     async def checklist_get(day): return {}
     own.db.orders_from, own.db.checklist_get = orders_from, checklist_get
@@ -96,6 +119,7 @@ async def cash_round():
     eq("выручка = 1417 − чай 50 − расход 150 (картой 200 — мимо)", (j["net"], j["tips"], j["spend"], j["spend_card"]),
        (1217, 50, 150, 200))
     eq("валюта строкой", [(f["code"], f["amount"]) for f in j["fx"]], [("USD", 100.0)])
+    eq("долг стоит отдельно и в кассу не идёт", (j["debt"], j["debt_n"], j["cash"]), (250, 1, 1417))
 
 
 asyncio.run(cash_round())

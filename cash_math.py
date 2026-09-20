@@ -134,11 +134,21 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
     rates = tea_rates()
     aed_in, fx = 0.0, {}
     tea, tea_other, n_cash = 0, 0, 0
+    debt_list = []
     for o in orders:
         t = order_tea(o, rates)
         tea += t
         if not pays_cash(o):
             tea_other += t
+            # Заказ в долг мимо наличных, но не мимо глаз: товар уехал, денег
+            # за него водитель не брал, и без отдельной строки он не понимает,
+            # куда делись бутылки и почему сдавать за них нечего (владелец,
+            # 21 сен 2026). «Без оплаты» сюда не идёт — тот заказ не учитываем
+            # нигде.
+            if str(o.get("payment_method") or "").lower() == "debt":
+                debt_list.append({"id": str(o.get("order_id") or o.get("_id") or ""),
+                                  "who": str(o.get("customer_name") or "").strip(),
+                                  "aed": round(_n(o.get("total")), 2)})
             continue
         n_cash += 1
         m = order_money(o)
@@ -191,6 +201,9 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
         "got": got, "got_list": [{"t": k, "aed": v} for k, v in gotk.items()],
         "meal": int(meal or 0), "bonus": bonus,
         "card_spent": card_spent, "card_got": card_got, "pending": pending,
+        # В долг: сумма, сколько заказов и какие — для строки-объяснения.
+        "debt": r2(sum(x["aed"] for x in debt_list)), "debt_n": len(debt_list),
+        "debt_list": debt_list,
         # Сдать: выручка (дирхамы + валюта как есть) и чай — порознь.
         "revenue": r2(revenue), "revenue_aed": r2(revenue - fx_aed),
         # Остаётся у водителя: питание и бонус за допродажу.

@@ -1100,6 +1100,10 @@ body.test-drv .wo-fix{display:none}
   background:rgba(201,169,110,.14);color:var(--gold)}
 .exc-tot.dn .exc-big b{color:#E2A0A0}
 .exc-note{margin-top:9px;font-size:12px;line-height:1.35;color:var(--muted)}
+/* Долг объясняет, почему денег меньше, — его читают, а не пропускают. */
+.exc-note.debt{margin-top:11px;padding:9px 11px;border-radius:11px;font-size:12.5px;
+  color:var(--gold2);background:rgba(201,169,110,.09);border:1px solid rgba(201,169,110,.2)}
+.exc-note.debt b{font-weight:700;font-variant-numeric:tabular-nums}
 /* «Основные расходы» по макету владельца (14 сен 2026, экран 430, ≈3,3 px/pt):
    шапка раздела 19/700 с пилюлей-счётчиком «4/4 ✓» (золотая, когда всё
    заполнено), плитки 196×116 r12, квадрат значка 41 r9 нейтральный с тонким
@@ -3086,6 +3090,19 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 
 /* расходы: у бензина и мойки своё окно */
 .exp-card{padding:13px}
+/* Запись о заказе в долг: не трата водителя, а объяснение — поэтому без полей
+   и кнопок, с золотой подписью под суммой. Сумма в одну строку: перенос
+   «250 / AED» рядом со значком ожидания выглядел ошибкой. */
+.exp-debt .exp-hd{align-items:center}
+/* Номер заказа и имя — под названием и обычными буквами: заглавными имя
+   клиента выглядело криком, а в строку с названием не помещалось. */
+.exp-debt .exp-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.exp-debt .exp-t i{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;
+  letter-spacing:0;text-transform:none;color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.exp-debt .exp-sum{white-space:nowrap;align-self:flex-start;padding-top:1px}
+.exp-debt .exp-mk{padding:0 0 0 10px}
+.exp-dn{margin:0 16px;padding-bottom:2px;font-size:12.5px;line-height:1.4;color:var(--gold2)}
 .exp-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--gold2)}
 .exp-t{font-size:14px;font-weight:700;color:var(--text)}
 .exp-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
@@ -6264,7 +6281,7 @@ function shsPaintMid(){
         <div class="shs-pile tea">
           <i>Чай операторов</i>
           <b>${h ? aed(h.tea) : sk(70)}</b>
-          ${h && h.tea_other ? `<s>${fmt(h.tea_other)} из них — с оплаченных онлайн</s>` : ''}
+          ${h && h.tea_other ? `<s>${fmt(h.tea_other)} из них — с заказов, за которые вы денег не брали</s>` : ''}
         </div>
       </div>
       ${h && (h.tea_by || []).length ? `<div class="shs-s">чай: ${(h.tea_by || []).map(x => `${esc(x.who)} ${fmt(x.aed)}`).join(' · ')}</div>` : ''}
@@ -6300,6 +6317,8 @@ function shsPaintMid(){
     html += `<div class="dcard shs-card"><div class="shs-h">Заказы за смену</div>
       ${m.orders ? row(`Доставлено · ${m.orders}`, aed(m.gross), 'sum') : '<div class="shs-none">Заказов сегодня не было</div>'}
       ${pr('cash', 'Наличными')}${pr('app', 'Оплачено в приложении')}${pr('crypto', 'Крипта')}${pr('debt', 'В долг')}${pr('free', 'Без оплаты')}
+      ${p.debt && p.debt.n ? `<div class="shs-note">В долг — товар отдали, деньги остались у клиента:
+        сдавать за ${p.debt.n > 1 ? 'эти заказы' : 'этот заказ'} нечего, долг записан на клиента</div>` : ''}
     </div>
     <div class="dcard shs-card"><div class="shs-h">Расходы</div>
       ${m.exp_n ? row('Итого', (net < 0 ? '+' : '−') + aed(Math.abs(net)), 'sum') : '<div class="shs-none">Расходов не было</div>'}
@@ -7561,6 +7580,20 @@ const expMark = x => `<span class="exp-mk ${EXP_ST(x)}" title="${EXP_LBL[EXP_ST(
 // что, внутри сумма. Строчкой в общем списке он выглядел объедками.
 function otherBox(x){
   const k = 'o_' + x.id;
+  // Заказ в долг записался сам: водитель его не подавал и менять ему нечего.
+  // Карточка объясняет, куда делись бутылки и почему за них нечего сдавать
+  // (владелец, 21 сен 2026: «надо показывать, что был заказ в долг, поэтому у
+  // него нет ни бутылок, ни денег — максимально прозрачно и понятно»).
+  if(x.auto && x.order && x.kind === 'owed_us'){
+    const чей = String(x.comment || '').replace(/\s*·\s*заказ в долг\s*$/i, '').trim();
+    return `<div class="card exp-card exp-debt">
+      <div class="exp-hd">${svg(ICO.into, 17)}<span class="exp-t">Заказ в долг${
+        чей ? ` <i>${esc(чей)}</i>` : ''}</span>
+        <span class="exp-sum">${fmt(x.amount)} AED</span>${expMark(x)}</div>
+      <div class="exp-dn">Товар отдали, деньги остались у клиента — сдавать за этот заказ нечего.
+        Долг записан на клиента, со старшим он разберётся сам.</div>
+    </div>`;
+  }
   return `<div class="card exp-card">
     <div class="exp-hd">${svg(ICO[EXP_KIND_ICO[x.kind]] || ICO.note, 17)}<span class="exp-t">${
       esc(x.kind_t || 'Что-то ещё')}${
@@ -9021,6 +9054,10 @@ function expCashCard(total){
     ${дирхамы < 0 ? `<div class="exc-note">расходы наличными больше собранного — разницу добавит старший</div>` : ''}
     ${h.tea ? `<div class="exc-note">из них чай операторов ${fmt(h.tea)} AED — отдельной пачкой</div>` : ''}
     ${h.card_spent ? `<div class="exc-note">безналом ${fmt(h.card_spent)} AED — наличных не трогали</div>` : ''}
+    ${h.debt ? `<div class="exc-note debt">В долг · <b>${fmt(h.debt)} AED</b>${
+      h.debt_n > 1 ? ` · ${h.debt_n} ${plural(h.debt_n, 'заказ', 'заказа', 'заказов')}` : ''
+      } — товар отдали, деньги остались у клиента. Сдавать за ${
+      h.debt_n > 1 ? 'эти заказы' : 'этот заказ'} нечего</div>` : ''}
   </div>`;
 }
 function renderExpenses(){
@@ -9034,7 +9071,8 @@ function renderExpenses(){
   // Отклонённое не идёт: это не деньги, а отказ. Питание не идёт тоже — его
   // платят ему, а не он: «−80» в конце пустой смены читалось как долг.
   const live = (EXP.extras || []).filter(x => EXP_ST(x) !== 'rejected');
-  const total = live.reduce((a, x) => a + (x.amount || 0), 0);
+  // Заказ в долг денег не трогал — в сумму смены он не идёт.
+  const total = live.filter(x => !x.nocash).reduce((a, x) => a + (x.amount || 0), 0);
   const other = (EXP.extras || []).filter(x => x.kind !== 'fuel' && x.kind !== 'wash');
   const park = other.filter(x => x.kind === 'parking'), rest = other.filter(x => x.kind !== 'parking');
   const parkSum = park.filter(x => EXP_ST(x) !== 'rejected').reduce((a, x) => a + (x.amount || 0), 0);

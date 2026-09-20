@@ -18483,12 +18483,18 @@ function crToExp(){
 
 function crCard(x){
   const team = [x.operator, (x.drivers || []).join(', ')].filter(Boolean).join(' · ');
+  // Заказ в долг объясняет, почему денег меньше: товар уехал, а платить за
+  // него будут потом. У водителя эта же строка стоит в его расходах
+  // (владелец, 21 сен 2026).
+  const долг = x.debt ? `в долг <b>${fmt(x.debt)}</b>${x.debt_n > 1 ? ` за ${x.debt_n} ${
+    pluralize(x.debt_n, 'заказ', 'заказа', 'заказов')}` : ''} — деньги у клиента` : '';
   if(x.empty) return `<div class="cr-card empty" id="cr-${escS(x.id)}">
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
       <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
       <span class="cr-none">нечего получать</span>
     </div>
+    ${долг ? `<div class="cr-sub">${долг}</div>` : ''}
   </div>`;
   const open = CR_OPEN.has(x.id);
   const n = (x.items || []).length;
@@ -18535,7 +18541,8 @@ function crCard(x){
     <div class="cr-sub">наличные <b>${fmt(x.cash)}</b>${(x.fx || []).length ? ` (из них ${
       x.fx.map(f => `<b>${escS(f.sym)}${fmt(f.amount)}</b>`).join(', ')} валютой)` : ''} · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · чаевые <b>${fmt(x.tips)}</b> · расход <b>${fmt(x.spend)}</b> за смену${
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
-      x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}</div>
+      x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}${
+      долг ? ` · ${долг}` : ''}</div>
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>

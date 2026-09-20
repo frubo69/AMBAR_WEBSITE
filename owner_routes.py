@@ -4011,6 +4011,11 @@ async def _cash_amounts(day: str, orders: list) -> dict:
         # итогах смены водителя: cash_math).
         cash_orders = [o for o in dl if cash_math.pays_cash(o)]
         cash = int(round(sum(cash_math.order_money(o)["aed"] for o in cash_orders)))
+        # Заказы в долг: товар уехал, денег за них никто не брал. В кассу они
+        # не идут, но сумму сбора объясняют — иначе и старший, и водитель
+        # считают недостачу (владелец, 21 сен 2026).
+        долг = [o for o in dl if str(o.get("payment_method") or "").lower() == "debt"]
+        debt = int(round(sum(float(o.get("total") or 0) for o in долг)))
         tips = sum(cash_math.order_tea(o) for o in dl)
         fx: dict = {}
         for o in cash_orders:
@@ -4059,6 +4064,7 @@ async def _cash_amounts(day: str, orders: list) -> dict:
         # дальше траты по времени.
         items.sort(key=lambda x: (x["at"] != "", x["at"]))
         out[oid] = {"orders": len(dl), "cash": cash, "tips": tips, "spend": spend,
+                    "debt": debt, "debt_n": len(долг),
                     "spend_card": spend_card, "spend_pending": pending,
                     "fx": sorted(fx.values(), key=lambda v: v["code"]), "items": items,
                     "operator": (team[0].get("operator") if team else "") or "",
@@ -4172,6 +4178,7 @@ async def cash_round(day: str) -> dict:
         out.append({"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
                     "operator": a["operator"], "drivers": a["drivers"],
                     "orders": a["orders"], "cash": a["cash"], "tips": a["tips"], "spend": a["spend"],
+                    "debt": a["debt"], "debt_n": a["debt_n"],
                     "spend_card": a["spend_card"], "fx": a["fx"],
                     "spend_pending": a["spend_pending"], "net": a["net"], "items": a["items"],
                     "carry": carry, "carry_net": c_net, "carry_tips": c_tips,

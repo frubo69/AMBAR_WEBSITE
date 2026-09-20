@@ -676,9 +676,13 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
     got = sum(int(x.get("amount") or 0) for x in наличн if plus_(x) and not is_card(x))
     spent_card = sum(int(x.get("amount") or 0) for x in наличн if not plus_(x) and is_card(x))
     got_card = sum(int(x.get("amount") or 0) for x in наличн if plus_(x) and is_card(x))
+    # В «Расходах» итогов — только то, что двигало деньги. Заказ в долг деньги
+    # не двигал: строкой среди расходов он ломал сложение («итого» его не
+    # считает) и пугал водителя лишней суммой. Он объяснён там, где ему место,
+    # — среди заказов (владелец, 21 сен 2026).
     by_kind = [{"id": k, "t": v["t"], "plus": bool(v.get("plus")),
-                "aed": sum(int(x.get("amount") or 0) for x in extras if x["kind"] == k),
-                "n": sum(1 for x in extras if x["kind"] == k)}
+                "aed": sum(int(x.get("amount") or 0) for x in наличн if x["kind"] == k),
+                "n": sum(1 for x in наличн if x["kind"] == k)}
                for k, v in EXTRA_KINDS.items()]
     by_kind = [r for r in by_kind if r["n"]]
     try:
@@ -721,8 +725,8 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         "tips_by": [{"who": w, "aed": a} for w, a in sorted(by_op.items(), key=lambda x: -x[1]) if a],
         "orders": sum(v["n"] for k, v in pay.items() if k != "free"), "gross": gross,
         "pay": pay,
-        "expenses": by_kind, "exp_n": len(extras),
-        "exp_pending": sum(1 for x in extras if (x.get("status") or "approved") == "pending"),
+        "expenses": by_kind, "exp_n": len(наличн),
+        "exp_pending": sum(1 for x in наличн if (x.get("status") or "approved") == "pending"),
         "writeoffs": len(wos), "writeoff_qty": sum(float(w.get("qty") or 0) for w in wos),
     }
 

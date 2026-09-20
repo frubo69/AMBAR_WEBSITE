@@ -25,6 +25,10 @@ DAY = {"shift_open_at": None, "extras": [
   {"id": "b", "kind": "parking", "amount": 36, "status": "pending"},
   {"id": "c", "kind": "we_got", "amount": 30, "status": "approved"},
   {"id": "d", "kind": "other", "amount": 500, "status": "rejected"},
+  # Заказ в долг записался сам: денег по нему не брали, среди расходов ему не
+  # место, но водителю он объясняет, куда делись бутылки (21 сен 2026).
+  {"id": "e", "kind": "owed_us", "amount": 100, "status": "pending", "nocash": True,
+   "auto": True, "order": "5", "comment": "#5 · Ахмед · заказ в долг"},
 ]}
 async def get_driver_day(day, name): return DAY
 async def get_orders_in_range(a, b, *args, **kw): return ORDERS
@@ -48,11 +52,15 @@ async def main():
     eq("расходы по видам", [(x["id"], x["aed"], x["plus"]) for x in m["expenses"]],
        [("fuel", 150, False), ("parking", 36, False), ("we_got", 30, True)])
     eq("на согласовании", (m["exp_n"], m["exp_pending"]), (3, 1))
+    eq("заказ в долг — не расход: в списке его нет",
+       [x["id"] for x in m["expenses"] if x["id"] == "owed_us"], [])
     eq("списания (отклонённое не в счёт)", (m["writeoffs"], m["writeoff_qty"]), (1, 2))
     h = m["hand"]
     eq("две пачки: взято 360, чай со всех заказов 60 (из них не наличными 40)", (h["taken"], h["tea"], h["tea_other"]), (360, 60, 40))
     eq("выручка = 360 − чай 60 − расход 186 + приход 30", (h["revenue"], h["spent_sum"], h["got"]), (144, 186, 30))
     eq("в руках = выручка + чай (питания нет — не отмечен)", (h["in_hand"], h["keep"]), (204, 0))
+    eq("в долг — отдельной строкой, наличных не трогает",
+       (h["debt"], h["debt_n"], h["taken"]), (100, 1, 360))
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 asyncio.run(main())

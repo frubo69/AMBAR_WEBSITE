@@ -42,6 +42,11 @@ const ST_SUM = {day:'2026-09-14', opened_at:'2026-09-14T08:12:00+04:00', on_hand
         spent:[{t:'Заправка', aed:150}, {t:'Парковка', aed:36}, {t:'Охрана', aed:60}], spent_sum:246,
         got:30, got_list:[{t:'Нам вернули', aed:30}], meal:80, bonus:15, card_spent:0, card_got:0, pending:2,
         revenue:1619, revenue_aed:1514, keep:95, in_hand:1834}};
+// &debt=1 — в смене был заказ в долг: товар уехал, денег за него нет.
+if(ST_Q.get('debt')){
+  ST_SUM.pay.debt = {n:1, aed:250};
+  Object.assign(ST_SUM.hand, {debt:250, debt_n:1, debt_list:[{id:'AMB82300EB5', who:'Ахмед', aed:250}]});
+}
 const ST_LOG = []; function stLog(m){ ST_LOG.push(m); const e = document.getElementById('sterr'); if(e) e.textContent = ST_LOG.join('\n'); }
 window.onerror = (m, s, l, c) => stLog('ERROR ' + m + ' @' + l + ':' + c);
 const ST_NOW = new Date();
@@ -93,8 +98,10 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     kinds: [{id:'fuel',t:'Заправка',receipt:true},{id:'wash',t:'Мойка',receipt:true},{id:'parking',t:'Парковка',receipt:true},{id:'guard',t:'Охрана'},{id:'kfc',t:'KFC · премия'},{id:'we_gave',t:'Мы вернули'},{id:'owed_us',t:'Нам должны'},{id:'we_got',t:'Нам вернули',plus:true},{id:'we_owe',t:'Мы должны',plus:true},{id:'advance',t:'Аванс зарплаты',pay:false},{id:'advance_bonus',t:'Аванс премии',pay:false},{id:'other',t:'Что-то ещё'}],
     // &expdone=1 — как на макете «Основные расходы»: питание 80, бензин 2 AED, мойки и парковки не было;
     // &exp2=1 — второй макет: бензин 2 AED, мойка и парковка не заполнены (2/4)
-    extras: (ST_Q.get('expdone') || ST_Q.get('exp2')) ? [{id:'x1', kind:'fuel', amount:2, status:'approved', photo:'p', comment:''}]
-      : ST_Q.get('expfull') ? [{id:'x1', kind:'fuel', amount:120, status:'approved', photo:'p', comment:''}, {id:'x2', kind:'parking', kind_t:'Парковка', amount:25, status:'pending', comment:'Marina Mall'}] : [],
+    extras: ((ST_Q.get('expdone') || ST_Q.get('exp2')) ? [{id:'x1', kind:'fuel', amount:2, status:'approved', photo:'p', comment:''}]
+      : ST_Q.get('expfull') ? [{id:'x1', kind:'fuel', amount:120, status:'approved', photo:'p', comment:''}, {id:'x2', kind:'parking', kind_t:'Парковка', amount:25, status:'pending', comment:'Marina Mall'}] : [])
+      .concat(ST_Q.get('debt') ? [{id:'x9', kind:'owed_us', kind_t:'Нам должны', amount:250, status:'pending',
+        nocash:true, auto:true, order:'AMB82300EB5', comment:'#AMB82300EB5 · Ахмед · заказ в долг'}] : []),
     by_kind: (ST_Q.get('expdone') || ST_Q.get('exp2')) ? {fuel:{sum:2,count:1}} : ST_Q.get('expfull') ? {fuel:{sum:120,count:1}, parking:{sum:25,count:1}} : {},
     no_expense: (ST_Q.get('must') || ST_Q.get('exp2')) ? {} : (ST_Q.get('expdone') ? {wash: true, parking: true} : ST_Q.get('expfull') ? {wash: true} : {fuel: true, wash: true, parking: true}), pending_answer: ST_Q.get('must') ? ['fuel', 'wash', 'parking'] : ST_Q.get('exp2') ? ['wash', 'parking'] : []};
   // &supdyn=1 — район B1 свободен, на 3–4 опросе его берёт другой, потом отдаёт:

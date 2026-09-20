@@ -3727,15 +3727,33 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    «якорит» страницу — отматывает её в начало. Якорение на странице выключено,
    как в списках склада (.stk-mid). */
 #pg-finance{overflow-anchor:none}
-/* Обёртка держит место карточки в потоке: карточка внутри сжимается, а
-   страница под ней едет ровно за пальцем. */
-.fb-an-wrap{position:relative}
-.fb-an{position:sticky;top:var(--hero-top,124px);z-index:20;will-change:height;overflow-anchor:none}
+/* Обёртка держит место карточки в потоке: карточка вынута из потока
+   (position задаёт fbAnStick), обёртка хранит её полную высоту и свой нижний
+   отступ — иначе собственный margin карточки пропадал вместе с потоком и она
+   слипалась со следующей (владелец, 20 сен 2026: «эти две карточки как-то
+   прилипли друг к другу»). */
+.fb-an-wrap{position:relative;margin-bottom:10px}
+.fb-an{z-index:20;overflow-anchor:none}
+.fb-an.pin{box-shadow:0 18px 24px -12px rgba(0,0,0,.95),0 4px 10px rgba(0,0,0,.45)}
 /* Заголовок — крупный, по центру и золотом (владелец, 20 сен 2026: «аналитика
    месяца крупнее, отцентруй и сделай прям заголовком»; «сделай заголовок
    золотым»). */
 .fb-an-t{justify-content:center;min-height:52px;font-size:19px;letter-spacing:1.1px;
-  color:var(--gold2);overflow:hidden}
+  color:var(--gold2)}
+/* Шторки: у самой шторки нет ни полей, ни рамки — только высота. Поля живут
+   внутри, иначе в нуле от слоя остаётся его padding и карточка сжимается
+   быстрее прокрутки (на этом и разъезжался отступ до соседней карточки).
+   Заголовок уходит первым, дальше работает «сцена»: в ней лежат друг над
+   другом развёрнутое тело и свёрнутая полоса чисел. Сцена сжимается ровно на
+   прокрутку, тело в ней прижато к верху и снизу растворяется маской — поэтому
+   не видно, как его режет край, — а в конце пути тройка чисел сменяется
+   четвёркой. */
+.fb-an-th{overflow:hidden;padding:0;border:0;will-change:height,opacity}
+.fb-an-stage{position:relative;overflow:hidden;will-change:height}
+.fb-an-bodyclip{position:absolute;inset:0;overflow:hidden;will-change:opacity;
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 26px),transparent);
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 26px),transparent)}
+.fb-an-bodyclip.full{-webkit-mask-image:none;mask-image:none}
 /* Текст в шапке растянут на всю ширину (.sc-cap span{flex:1}) — поэтому
    центрируем сам текст, как в полосе месяца, а не только его блок. */
 .fb-an-t span{text-align:center}
@@ -3765,17 +3783,17 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 /* Свёрнутый вид — та же карточка, сжатая прокруткой: полоса из четырёх чисел
    лежит у нижнего края и проявляется по мере сжатия (владелец, 20 сен 2026:
    «она должна плавно сворачиваться по мере того, как я листаю»). */
-.fb-an-mini{position:absolute;left:0;right:0;bottom:0;display:grid;
-  grid-template-columns:repeat(4,1fr);gap:6px;padding:0 12px 11px;opacity:0;pointer-events:none}
-.fb-an-fade{will-change:opacity}
-.fb-an-mini span{min-width:0;text-align:center}
-.fb-an-mini i{display:block;font-style:normal;font-size:8.5px;font-weight:700;letter-spacing:.4px;
+.fb-an-minin{position:absolute;left:0;right:0;bottom:0;display:grid;
+  grid-template-columns:repeat(4,1fr);gap:6px;padding:9px 12px 11px;opacity:0;
+  pointer-events:none;will-change:opacity}
+.fb-an-minin span{min-width:0;text-align:center}
+.fb-an-minin i{display:block;font-style:normal;font-size:8.5px;font-weight:700;letter-spacing:.4px;
   text-transform:uppercase;color:var(--muted)}
-.fb-an-mini b{display:block;margin-top:3px;font-family:'Space Grotesk',sans-serif;font-size:14.5px;
+.fb-an-minin b{display:block;margin-top:3px;font-family:'Space Grotesk',sans-serif;font-size:14.5px;
   font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fb-an-mini b.dn{color:var(--dn)}
-.fb-an-mini u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;
+.fb-an-minin b.dn{color:var(--dn)}
+.fb-an-minin u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;
   color:var(--muted);margin-left:2px}
 
 /* ── Карточка «Ежедневный сбор и распределение выручки» ──
@@ -19256,11 +19274,11 @@ function fbAn(b){
 // красиво въедет и будет отличаться: заметно, но не нагромождено»): подпись,
 // крупный процент золотом и полоса — какая доля вала осталась прибылью.
 function fbAnRent(an){
-  if(!an) return `<div class="fb-an-rent fb-an-fade"><span class="fb-an-rent-l">Рентабельность</span>
+  if(!an) return `<div class="fb-an-rent"><span class="fb-an-rent-l">Рентабельность</span>
     <b class="fb-an-rent-v is-skel" style="min-width:56px">0000</b>
     <span class="fb-an-bar"><i style="width:0"></i></span></div>`;
   const w = Math.max(0, Math.min(100, an.margin));
-  return `<div class="fb-an-rent fb-an-fade${an.margin < 0 ? ' dn' : ''}">
+  return `<div class="fb-an-rent${an.margin < 0 ? ' dn' : ''}">
     <span class="fb-an-rent-l">Рентабельность</span>
     <b class="fb-an-rent-v" data-f="t.margin" data-fc="neg">${fbFmt(an.margin)}<u>%</u></b>
     <span class="fb-an-bar"><i style="width:${w}%"></i></span>
@@ -19346,66 +19364,130 @@ function fbAnFit(){
   });
 }
 // Карточка сжимается непрерывно, кадр в кадр (владелец, 20 сен 2026: «она
-// должна плавно сворачиваться по мере того, как я листаю»), как карточка
-// выручки на «Обзоре»: заголовок сходит на нет, плитки и полоса гаснут и
-// срезаются высотой карточки, а внизу проявляется полоса из четырёх чисел.
-// Развёрнутая и свёрнутая высоты меряются у самой карточки — стоит поменять
-// содержимое, и они пересчитываются (fbAnMeasure).
+// должна плавно сворачиваться по мере того, как я листаю»), и ровно на столько,
+// на сколько ушла страница: сосед снизу идёт за пальцем, держа постоянный
+// отступ, и только у края экрана уходит под закреплённую полосу.
+//
+// Карточка — три слоя над неподвижной полосой месяца:
+//   .fb-an-t     заголовок  — уходит первым, за первые ~50 px прокрутки;
+//   .fb-an-body  плитки, рентабельность, бюджет — следом;
+//   .fb-an-mini  четыре числа — вырастает снизу, когда тело почти ушло.
+// Высоты настоящие (не обрезка общей высоты), поэтому в свёрнутом виде полоса
+// занимает ровно свою высоту с полями и цифры не срезаются (владелец, 20 сен
+// 2026: «в свёрнутом состоянии цифры обрезаются сверху»).
+// Порядок пикселей: убрать надо (прокрутка + сколько заняла выросшая полоса),
+// берём сначала из заголовка, потом из тела — тогда сумма слоёв всегда равна
+// «полная высота минус прокрутка», без рывков на стыках.
 let _fbAnRaf = null;
+const _fbClamp = v => v < 0 ? 0 : v > 1 ? 1 : v;
+function _fbH(el, h){
+  if(!el) return;
+  const v = Math.max(0, h) + 'px';
+  if(el.style.height !== v){ el.style.height = v; el.style.minHeight = v; }
+}
+function _fbO(el, o){
+  if(!el) return;
+  const v = String(Math.round(_fbClamp(o) * 100) / 100);
+  if(el.style.opacity !== v) el.style.opacity = v;
+}
+// Тап по свёрнутой полосе возвращает карточку целиком: пролистывать вверх
+// пальцем ради этого не надо.
+function fbAnTop(){
+  try{ window.scrollTo({top: 0, behavior: 'smooth'}); }
+  catch(e){ window.scrollTo(0, 0); }
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbAnParts(card){
+  return {t: card.querySelector('.fb-an-th'), stage: card.querySelector('.fb-an-stage'),
+          clip: card.querySelector('.fb-an-bodyclip'), body: card.querySelector('.fb-an-bodyin'),
+          mini: card.querySelector('.fb-an-minin'), wrap: card.parentElement};
+}
+// Меряем карточку в её естественном виде — вернув в поток и сняв наши высоты.
+// Обёртка в этот момент сама берёт её высоту, и мы запоминаем ширину места.
 function fbAnMeasure(card){
-  const t = card.querySelector('.fb-an-t'), cap = card.querySelector('.sc-cap.fb-cap'),
-        mini = card.querySelector('.fb-an-mini'), wrap = card.parentElement;
-  card.style.height = ''; card.style.position = ''; card.style.left = ''; card.style.width = '';
-  if(t){ t.style.height = ''; t.style.minHeight = ''; }
+  const {t, stage, clip, body, mini, wrap} = fbAnParts(card);
+  card.style.position = ''; card.style.top = ''; card.style.left = ''; card.style.width = '';
+  card.classList.remove('pin');
   if(wrap) wrap.style.height = '';
-  card._tH = t ? t.offsetHeight : 0;
-  card._min = (cap ? cap.offsetHeight : 46) + (mini ? mini.offsetHeight : 44);
-  card._full = card.offsetHeight;
-  // Место в потоке не отдаём: карточка сжимается ровно на столько, на сколько
-  // ушла страница, и соседняя карточка идёт за пальцем — как будто поджимает
-  // её (владелец, 20 сен 2026: «нижнее окно заезжает под неё, хотя должно как
-  // бы толкать её и сворачивать»).
-  if(wrap) wrap.style.height = card._full + 'px';
+  if(t){ t.style.height = ''; t.style.minHeight = ''; t.style.opacity = ''; }
+  if(stage){ stage.style.height = ''; stage.style.minHeight = ''; }
+  if(clip){ clip.style.opacity = ''; clip.classList.add('full'); }
+  if(mini) mini.style.opacity = '';
+  // Высоты — дробные (getBoundingClientRect), а не округлённые offsetHeight:
+  // на округлении обёртка выходила на пару пикселей короче карточки, и отступ
+  // до соседней карточки съедался.
+  const H = el => el ? el.getBoundingClientRect().height : 0;
+  card._tH = H(t ? (t.firstElementChild || t) : null);
+  // Слои сцены лежат абсолютом друг над другом, поэтому своей высоты у неё нет:
+  // меряем содержимое и ставим сцене высоту тела — это и есть развёрнутый вид.
+  card._bH = H(body);
+  card._miniH = H(mini);
+  if(stage) stage.style.height = card._bH + 'px';
+  card._full = H(card);                                  // сцена во всю высоту тела
+  card._min = card._full - card._tH - card._bH + card._miniH;
+  card._run = Math.max(0, card._full - card._min);       // весь ход сжатия
+  if(wrap){
+    wrap.style.height = card._full + 'px';
+    card._w = Math.round(wrap.getBoundingClientRect().width);
+  }
+  card._top = card._left = card._wpx = null;             // положение зададим заново
 }
 function fbAnStick(){
   const card = document.getElementById('fbAnCard'); if(!card) return;
-  // Прилипает вплотную к шапке приложения: в зазор между нею и карточкой
-  // пролезал бы контент страницы. Меряем по самой шапке, а не константой.
+  const {t, stage, clip, mini, wrap} = fbAnParts(card); if(!wrap) return;
+  if(!wrap.offsetWidth) return;                          // раздел скрыт — мерить нечего
+  if(!card._full || card._w !== Math.round(wrap.getBoundingClientRect().width)) fbAnMeasure(card);
   const hdr = document.querySelector('.hdr');
-  const top = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 88;
-  if(card._top !== top){ card._top = top; card.style.top = top + 'px'; }
-  if(!card._full) fbAnMeasure(card);
-  const wrap = card.parentElement;
-  const ход = Math.max(0, card._full - card._min);          // сколько всего сжимается
-  const сжали = Math.max(0, Math.min(ход, window.scrollY)); // ровно на прокрутку
-  const p = ход ? сжали / ход : 0;
-  const title = card.querySelector('.fb-an-t');
-  if(title){
-    // min-height у заголовка своя, поэтому одной высоты мало — иначе он не
-    // сжимается и в свёрнутом виде закрывает месяц.
-    const th = (card._tH * (1 - Math.min(1, p * 1.25)));
-    title.style.height = th + 'px'; title.style.minHeight = th + 'px';
-    title.style.opacity = String(Math.max(0, 1 - p * 1.6));
+  const hb = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 66;
+  const box = wrap.getBoundingClientRect();
+  // Пока место карточки не дошло до шапки, она просто лежит в нём — своим
+  // потоком, без наших координат: так её не сдвинет поздняя перевёрстка
+  // (шрифты, картинки), от которой карточка once съезжала на пару пикселей и
+  // отступ до соседней съедался. Закрепляем ровно в тот миг, когда место
+  // дошло до шапки, — и тогда координаты совпадают, стыка не видно.
+  const px = v => (Math.round(v * 100) / 100) + 'px';
+  if(box.top > hb + .5){
+    if(card.style.position){ card.style.position = ''; card.style.top = ''; card.style.left = ''; card.style.width = '';
+                             card._top = card._left = card._wpx = null; }
+  }else{
+    if(card.style.position !== 'fixed') card.style.position = 'fixed';
+    if(card._top !== hb){ card._top = hb; card.style.top = px(hb); }
+    if(card._left !== box.left){ card._left = box.left; card.style.left = px(box.left); }
+    if(card._wpx !== box.width){ card._wpx = box.width; card.style.width = px(box.width); }
   }
-  card.style.height = (card._full - сжали) + 'px';
-  // Сжалась до полосы — дальше она закреплена сверху сама по себе: место
-  // обёртки к этому времени уезжает вверх, и липкая карточка ушла бы с ним.
-  if(wrap){
-    if(сжали >= ход - .5){
-      const box = wrap.getBoundingClientRect();
-      card.style.position = 'fixed';
-      card.style.left = Math.round(box.left) + 'px';
-      card.style.width = Math.round(box.width) + 'px';
-    }else if(card.style.position === 'fixed'){
-      card.style.position = ''; card.style.left = ''; card.style.width = '';
-    }
+  // Сжали ровно на то, насколько место карточки ушло под шапку: высота карточки
+  // всегда «полная минус прокрутка», поэтому соседняя карточка идёт за пальцем,
+  // держа свой отступ, и только у края экрана уходит под полосу.
+  const сжали = Math.max(0, Math.min(card._run, hb - box.top));
+  // 1. Заголовок — первые ~50 px пути.
+  const убрT = Math.min(card._tH, сжали);
+  _fbH(t, card._tH - убрT);
+  _fbO(t, card._tH ? 1 - убрT / card._tH : 1);
+  // 2. Сцена: сжимается от высоты тела до высоты полосы чисел.
+  const ходС = card._bH - card._miniH;
+  const u = ходС > 0 ? _fbClamp((сжали - card._tH) / ходС) : (сжали >= card._tH ? 1 : 0);
+  _fbH(stage, card._bH + (card._miniH - card._bH) * u);
+  // 3. Тело держится во всю силу почти до конца — его нижний край растворяет
+  //    маска, поэтому не видно, как строка режется краем карточки. Смена
+  //    тройки чисел на четвёрку — на последних пикселях пути и почти без
+  //    наложения: иначе на середине видно оба набора разом и они наезжают.
+  const оТело = _fbClamp(1 - (u - .80) / .12);
+  const оМини = _fbClamp((u - .88) / .12);
+  if(clip){
+    _fbO(clip, оТело);
+    clip.classList.toggle('full', u < .01);              // в покое края не трогаем
+    clip.style.pointerEvents = оТело > .5 ? '' : 'none';
   }
-  // Сначала гаснут плитки, и только потом проявляется полоса: иначе на
-  // середине пути два набора чисел видны разом и наезжают друг на друга.
-  const fade = String(Math.max(0, 1 - p * 1.8));
-  card.querySelectorAll('.fb-an-fade').forEach(el => { el.style.opacity = fade; });
-  const mini = card.querySelector('.fb-an-mini');
-  if(mini) mini.style.opacity = String(Math.max(0, Math.min(1, (p - .62) / .33)));
+  _fbO(mini, оМини);
+  // По свёрнутой полосе можно тапнуть — карточка разворачивается обратно.
+  if(mini) mini.style.pointerEvents = оМини > .6 ? 'auto' : 'none';
+  // Числа подъезжают снизу — так их приход читается как смена вида, а не как
+  // проявившаяся из ниоткуда надпись.
+  if(mini){
+    const сдвиг = ((1 - оМини) * 8).toFixed(1) + 'px';
+    if(mini._ty !== сдвиг){ mini._ty = сдвиг; mini.style.transform = 'translateY(' + сдвиг + ')'; }
+  }
+  card.classList.toggle('pin', card._run > 0 && сжали >= card._run - .5);
 }
 window.addEventListener('scroll', () => {
   if(_fbAnRaf) return;
@@ -19570,32 +19652,36 @@ async function fbHub(force){
 function fbHubHtml(b, err){
   const month = FB.month || fbMonthNow();
   if(!b) return `<div class="fb-an-wrap" id="fbAnWrap"><div class="sc fb-hub fb-an" id="fbAnCard">
-    <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
+    <div class="fb-an-th"><div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div></div>
     ${fbCap(month, true)}
-    <div class="aud-g fb-an-g fb-an-fade">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
-      fbTile('Чистая прибыль', 'econ', null)}</div>
-    ${fbAnRent(null)}
-    <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div></div></div>
+    <div class="fb-an-stage"><div class="fb-an-bodyclip full"><div class="fb-an-bodyin">
+      <div class="aud-g fb-an-g">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
+        fbTile('Чистая прибыль', 'econ', null)}</div>
+      ${fbAnRent(null)}
+      <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div>
+    </div></div></div></div></div>
     ${fbCrcHtml()}`;
   const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
   const wal = fbWal(b), all = fbSafeAll(b);
   const an = fbAn(b);
   return `<div class="fb-an-wrap" id="fbAnWrap"><div class="sc fb-hub fb-an" id="fbAnCard">
-    <div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div>
+    <div class="fb-an-th"><div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div></div>
     ${fbCap(month, true)}
-    <div class="aud-g fb-an-g fb-an-fade">
-      ${fbTile('Вал', 't.gross', t.gross, {go: 'fbAnOpen()'})}
-      ${fbTile('Расходы', 't.out_all', an.out, {go: 'fbAnOpen()'})}
-      ${fbTile('Чистая прибыль', 'econ', an.profit, {mode: 'neg', go: 'fbAnOpen()'})}
-    </div>
-    ${fbAnRent(an)}
-    <div class="fb-an-mini">
+    <div class="fb-an-stage"><div class="fb-an-bodyclip full"><div class="fb-an-bodyin">
+      <div class="aud-g fb-an-g">
+        ${fbTile('Вал', 't.gross', t.gross, {go: 'fbAnOpen()'})}
+        ${fbTile('Расходы', 't.out_all', an.out, {go: 'fbAnOpen()'})}
+        ${fbTile('Чистая прибыль', 'econ', an.profit, {mode: 'neg', go: 'fbAnOpen()'})}
+      </div>
+      ${fbAnRent(an)}
+      ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
+    </div></div>
+    <div class="fb-an-minin" onclick="fbAnTop()">
       <span><i>вал</i><b data-f="t.gross">${fbFmt(an.gross)}</b></span>
       <span><i>расходы</i><b data-f="t.out_all">${fbFmt(an.out)}</b></span>
       <span><i>ЧП</i><b data-f="econ" data-fc="neg"${an.profit < 0 ? ' class="dn"' : ''}>${fbFmt(an.profit)}</b></span>
       <span><i>рент.</i><b data-f="t.margin"${an.margin < 0 ? ' class="dn"' : ''}>${fbFmt(an.margin)}<u>%</u></b></span>
-    </div>
-    ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {cls: 'fb-an-fade', unit: bu.empty ? 'не заполнен' : 'в день'})}
+    </div></div>
   </div></div>
   ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">

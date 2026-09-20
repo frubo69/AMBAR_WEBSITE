@@ -1175,6 +1175,10 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   line-height:1.35;color:var(--gold2);background:rgba(201,169,110,.08)}
 .mvh-empty{margin:14px 0;padding:22px 16px;border-radius:15px;text-align:center;
   font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border2)}
+.mvh-jump{display:block;margin:13px auto 0;padding:9px 16px;border-radius:11px;
+  font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
+.mvh-jump:active{transform:scale(.98)}
 .stk-grp2-a{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase;color:var(--gold2);cursor:pointer}
 .stk-grp2{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
@@ -15282,11 +15286,14 @@ function mvhPaint(){
     requestAnimationFrame(bindDayBars);
     return;
   }
-  const дней = (d.days || []).reduce((a, x) => a + (x.n || 0), 0);
-  _stkHead('История перемещений', d.n
-    ? `${d.n} ${pluralize(d.n, 'перемещение', 'перемещения', 'перемещений')} · ${
-        дней ? дней + ' за 60 дней' : ''}`.replace(/ · $/, '')
-    : `за 60 дней ${дней} ${pluralize(дней, 'перемещение', 'перемещения', 'перемещений')}`, false);
+  const всего = (d.days || []).reduce((a, x) => a + (x.n || 0), 0);
+  const районов = (d.districts || []).length;
+  const передач = (d.districts || []).reduce((a, r) => a + r.pairs.length, 0);
+  _stkHead('История перемещений', передач || (d.free || []).length
+    ? [передач ? `${передач} ${pluralize(передач, 'передача', 'передачи', 'передач')}` : '',
+       районов ? `${районов} ${pluralize(районов, 'район', 'района', 'районов')}` : '',
+       (d.free || []).length ? `${d.free.length} без заявки` : ''].filter(Boolean).join(' · ')
+    : `за 60 дней — ${всего} ${pluralize(всего, 'перемещение', 'перемещения', 'перемещений')}`, false);
   const районы = (d.districts || []).map(r => `
     <div class="mvh-g"><span>${escS(r.code)} ${escS(r.name)}</span>
       <i>привезли ${fmtQty(r.qty)} · ${r.pairs.length} ${
@@ -15307,10 +15314,19 @@ function mvhPaint(){
         ${d.day === d.today || m.by_kind === 'driver'
           ? `<button class="stk-mvr-x" title="Вернуть" onclick="mvhDel(${i})">✕</button>` : ''}
       </div></div>`).join('')}</div>` : '';
+  // Пустой день посреди шестидесяти — повод не листать вслепую: говорим, где
+  // ближайшее перемещение, и уводим туда одним нажатием.
+  const был = (d.days || []).map(x => x.day);
+  const ближ = был.filter(x => x < d.day).sort().reverse()[0] || был.filter(x => x > d.day).sort()[0];
+  const сколько = ближ ? ((d.days || []).find(x => x.day === ближ) || {}).n || 0 : 0;
+  const шаг = ближ ? Math.max(0, Math.round((_bizToday() - new Date(ближ + 'T00:00:00')) / 86400000)) : 0;
   box.innerHTML = полоса + (районы || сам
     ? районы + сам
     : `<div class="mvh-empty">${d.day === d.today
-        ? 'Сегодня ещё ничего не перевозили' : 'В этот день ничего не перевозили'}</div>`);
+        ? 'Сегодня ещё ничего не перевозили' : 'В этот день ничего не перевозили'}
+      ${ближ ? `<button class="mvh-jump" onclick="mvhDaySet(${шаг})">${
+        escS(_dayName(ближ))} · ${сколько} ${
+        pluralize(сколько, 'перемещение', 'перемещения', 'перемещений')}</button>` : ''}</div>`);
   requestAnimationFrame(bindDayBars);
 }
 
@@ -15335,7 +15351,8 @@ function mvhPair(p, day){
     </button>
     <div class="mvh-tl">
       <div class="mvh-tr"><i class="dot"></i>
-        <span>Отсканировал ${escS(кто)}${p.senior ? ' · из STAR' : ''}</span>
+        <span>Отсканировал ${escS(кто)}${
+          p.senior && p.senior !== кто ? ' · за ' + escS(p.senior) : ''}</span>
         <b>${_mvhSpan(p.give_from, p.give_to, day)}</b></div>
       <div class="mvh-tr${принял ? '' : ' dim'}">
         <i class="dot ${принял ? 'take' : 'wait'}"></i>

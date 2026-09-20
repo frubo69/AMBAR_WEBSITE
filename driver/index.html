@@ -8814,7 +8814,7 @@ function xpZone(kind, what, sent, n){
 // должны) — так же: пришёл на карту — наличных не прибавилось.
 // Охране платят бутылкой или наличными, «нам должны» — не платёж вовсе:
 // там не спрашиваем (сервер отдаёт это полем pay у вида).
-const _PAY_NO = ['guard', 'owed_us', 'upsell'];
+const _PAY_NO = ['guard', 'owed_us', 'upsell', 'we_gave', 'we_got', 'we_owe'];
 function _asksPay(kind){
   const k = ((EXP || {}).kinds || []).find(x => x.id === kind);
   return k && typeof k.pay === 'boolean' ? k.pay : !_PAY_NO.includes(kind);

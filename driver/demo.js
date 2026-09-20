@@ -465,9 +465,9 @@ const KIND_T = {fuel: 'Заправка', wash: 'Мойка', parking: 'Парк
 // должны» — не платёж), как у боевого сервера.
 const KINDS = [{id: 'fuel', t: 'Заправка', receipt: true, pay: true}, {id: 'wash', t: 'Мойка', receipt: true, pay: true},
                {id: 'parking', t: 'Парковка', receipt: true, pay: true}, {id: 'guard', t: 'Охрана', pay: false},
-               {id: 'kfc', t: 'KFC · премия', pay: true}, {id: 'we_gave', t: 'Мы вернули', pay: true},
-               {id: 'owed_us', t: 'Нам должны', pay: false}, {id: 'we_got', t: 'Нам вернули', plus: true, pay: true},
-               {id: 'we_owe', t: 'Мы должны', plus: true, pay: true}, {id: 'other', t: 'Что-то ещё', pay: true}];
+               {id: 'kfc', t: 'KFC · премия', pay: true}, {id: 'we_gave', t: 'Мы вернули', pay: false},
+               {id: 'owed_us', t: 'Нам должны', pay: false}, {id: 'we_got', t: 'Нам вернули', plus: true, pay: false},
+               {id: 'we_owe', t: 'Мы должны', plus: true, pay: false}, {id: 'other', t: 'Что-то ещё', pay: true}];
 
 /* ═══ 5. Фальшивый сервер ═══════════════════════════════════════════════════
    Те же пути и те же ответы, что у боевого. Чего не знаем — отвечаем {ok},

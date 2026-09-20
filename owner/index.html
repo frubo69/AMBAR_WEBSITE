@@ -19577,12 +19577,14 @@ function fbHubHtml(b, err){
   ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">
     <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b>${wal ? `<span class="fb-safe-usdt">${fmtUsdt(wal.usdt)}<u>USDT</u></span>` : ''}<em class="fb-chev r">${_SC_CHEV}</em></button>
+    <!-- Порядок стопок: Барракуда, РП, Крипта, ЧП — и здесь, и на экране «Сейф»
+         (владелец, 20 сен 2026: «крипта в сейфе должна быть перед чп»). -->
     <div class="fb-safe-k">
       ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе'})}
       ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg'})}
-      ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
       ${fbGo('Крипта', 'safe.wal', wal ? wal.aed : null, "fbOpenWal()",
              {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT'})}
+      ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
     </div>
   </div>
   <div class="sc fb-hub">
@@ -20045,9 +20047,9 @@ async function accFinSafe(){
     <div class="aud-g fb-safe4">
       ${fbTile('Барракуда', 'safe.b', s.b)}
       ${fbTile('РП', 'safe.rp', s.rp, {mode: 'neg'})}
-      ${fbTile('ЧП', 'safe.np', s.np, {mode: 'neg'})}
       ${fbTile('Крипта', 'safe.wal', wal ? wal.aed : null,
                {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT', go: 'fbOpenWal(accFinSafe)'})}
+      ${fbTile('ЧП', 'safe.np', s.np, {mode: 'neg'})}
     </div>
     ${fbRow('Всего в сейфе', 'safe.all', fbSafeAll(b), {sum: true, sign: '=', mode: 'neg',
              unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'AED'})}

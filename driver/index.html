@@ -1065,10 +1065,8 @@ body.test-drv .wo-fix{display:none}
    (одна гарнитура, один кегль, табличные цифры), валюта — в золотой оправе,
    а итог отделён линией и стоит своей строкой под подписью. Цветом выделен
    только знак: приход зелёным, вычет приглушённо-красным, итог золотом. */
-.ex-cash{display:block;width:100%;padding:14px 16px 13px;border-radius:20px;text-align:left;font-family:inherit;
-  color:var(--text);cursor:pointer;border:1px solid rgba(201,169,110,.5);
+.ex-cash{padding:14px 16px 13px;border-radius:20px;border:1px solid rgba(201,169,110,.5);
   background:linear-gradient(160deg,rgba(201,169,110,.2),rgba(201,169,110,.04))}
-.ex-cash:active{background:linear-gradient(160deg,rgba(201,169,110,.26),rgba(201,169,110,.07))}
 .exc-h{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:1.6px;
   text-transform:uppercase;color:var(--gold2)}
 .exc-h span{flex:1;min-width:0}
@@ -8988,12 +8986,12 @@ function expPage(kind){
 // строкой теми же купюрами, без курса. Числа — с сервера (cash_math).
 function expCashCard(total){
   const h = HAND, aed = v => `${fmt(Math.abs(v))}`;
-  const шапка = `<div class="exc-h"><span>Наличные за смену</span><em>${svg(ICO.chevR, 15)}</em></div>`;
+  const шапка = `<div class="exc-h"><span>Наличные за смену</span></div>`;
   const купюра = x => `<span class="exc-cur">${esc(x.sym)}${fmt(x.amount)}</span>`;
-  if(!h) return `<button class="ex-cash" onclick="expGo('all')">${шапка}
+  if(!h) return `<div class="ex-cash">${шапка}
       <div class="exc-rows"><span>Взял за заказы</span><b>${skb(70, 14)}</b>
       ${total ? `<span>Расходы наличными</span><b class="minus">−${aed(total)}</b>` : ''}</div>
-      <div class="exc-tot"><u>Сдать старшему</u><div class="exc-big"><b>${skb(120, 30)}</b></div></div></button>`;
+      <div class="exc-tot"><u>Сдать старшему</u><div class="exc-big"><b>${skb(120, 30)}</b></div></div></div>`;
   const fx = h.fx || [];
   // Валюта идёт теми же купюрами и в строке «взял», и в итоге — рядом с
   // дирхамами (владелец, 20 сен 2026: «просто в ряд пиши дирхамы и доллары»).
@@ -9014,7 +9012,7 @@ function expCashCard(total){
   if(h.got) строка(приход.length ? приход.join(' · ') : 'Вернули вам наличными', '+' + aed(h.got), 'plus');
   if(h.spent_sum) строка('Расходы наличными', '−' + aed(h.spent_sum), 'minus');
   if(h.bonus) строка('Бонус за допродажу · ваш', '−' + aed(h.bonus), 'minus');
-  return `<button class="ex-cash" onclick="expGo('all')">${шапка}
+  return `<div class="ex-cash">${шапка}
     <div class="exc-rows${fx.length ? ' cur' : ''}">${строки.join('')}</div>
     <div class="exc-tot${дирхамы < 0 ? ' dn' : ''}">
       <u>${дирхамы < 0 ? 'Старший вернёт вам' : 'Сдать старшему'}</u>
@@ -9023,7 +9021,7 @@ function expCashCard(total){
     ${дирхамы < 0 ? `<div class="exc-note">расходы наличными больше собранного — разницу добавит старший</div>` : ''}
     ${h.tea ? `<div class="exc-note">из них чай операторов ${fmt(h.tea)} AED — отдельной пачкой</div>` : ''}
     ${h.card_spent ? `<div class="exc-note">безналом ${fmt(h.card_spent)} AED — наличных не трогали</div>` : ''}
-  </button>`;
+  </div>`;
 }
 function renderExpenses(){
   xpDraftFresh();

@@ -2500,6 +2500,18 @@ async def handle_move_scan(request):
 
 
 @require_owner
+async def handle_move_receive(request):
+    import move_routes
+    return await move_routes.handle_own_receive(request)
+
+
+@require_owner
+async def handle_move_accept(request):
+    import move_routes
+    return await move_routes.handle_own_accept(request)
+
+
+@require_owner
 async def handle_move_cancel(request):
     import move_routes
     return await move_routes.handle_own_cancel(request)
@@ -2548,6 +2560,9 @@ def setup(app):
         ("/api/owner/move/take",                    handle_move_take,    "POST"),
         ("/api/owner/move/drop",                    handle_move_drop,    "POST"),
         ("/api/owner/move/{mid}/scan",              handle_move_scan,    "POST"),
+        # Принимающая сторона тоже сканирует — и из STAR тоже (20 сен 2026).
+        ("/api/owner/move/{mid}/receive",           handle_move_receive, "POST"),
+        ("/api/owner/move/{mid}/accept",            handle_move_accept,  "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
         r.add_route(method, path, handler)   # любой метод: словарь из двух ронял петлю на DELETE

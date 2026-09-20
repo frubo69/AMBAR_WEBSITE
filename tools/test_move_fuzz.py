@@ -47,6 +47,19 @@ logging.disable(logging.CRITICAL)
 from mongomock_motor import AsyncMongoMockClient
 import db, stock_routes as SR, move_routes as MV
 from config_offices import OFFICE_IDS, OFFICE_CODES
+import json as _json
+from aiohttp.test_utils import make_mocked_request
+
+
+async def own_call(kind: str, mid: str, body: dict) -> dict:
+    """Тот же приём, но через ручку STAR (владелец, 20 сен 2026: «почему из
+    АМБАР СТАР нельзя отсканировать товар, который я принимаю?»): старший
+    принимает за район-получатель, своего района у него нет."""
+    r = make_mocked_request("POST", f"/api/owner/move/{mid}/{kind}", match_info={"mid": mid})
+    r["owner_id"] = 1
+    r._read_bytes = _json.dumps(body).encode()
+    h = MV.handle_own_receive if kind == "receive" else MV.handle_own_accept
+    return _json.loads((await h(r)).text)
 
 D = "2026-09-18"; T0 = datetime(2026, 9, 18, 0, 0, tzinfo=timezone.utc)
 SR._biz_day = lambda *a, **k: D
@@ -305,7 +318,12 @@ class World:
         who_d = to if r.random() < 0.85 else r.choice(OFFICE_IDS)
         name = r.choice(NAMES[who_d])
         g = MV.give_view(mid, doc, to, doc["tasks"][to], src)
-        if r.random() < 0.6:
+        if who_d == to and r.random() < 0.25:
+            # «Приехало не всё» из STAR — тот же путь, что у водителя.
+            res = await own_call("accept", mid, {"district": to, "from": src,
+                                                 "ok": r.random() < 0.5, "as": "Старший"})
+            stat("решение из STAR")
+        elif r.random() < 0.6:
             res = await MV.accept(mid, to, src, name, 1, who_d)
         else:
             lines = [{"id": l["id"], "got": max(0, l["got"] - r.choice([0, 0, 0.5, 1]))} for l in g["lines"]]
@@ -355,7 +373,12 @@ class World:
             c = r.choice(sorted(self.codes))                    # любая бутылка сети
         who_d = to if r.random() < 0.9 else r.choice(OFFICE_IDS)
         before = {k: x["district"] for k, x in self.codes.items()}
-        x = await MV.receive(mid, to, src, c, r.choice(NAMES[who_d]), 1, who_d)
+        # Треть приёмов — из STAR: старший приезжает и сканирует сам.
+        if who_d == to and r.random() < 0.34:
+            x = await own_call("receive", mid, {"district": to, "from": src, "code": c, "as": "Старший"})
+            stat("приём из STAR")
+        else:
+            x = await MV.receive(mid, to, src, c, r.choice(NAMES[who_d]), 1, who_d)
         stat("получатель: " + ("засчитан" if x.get("ok") else str(x.get("verdict"))))
         docs = {q["_id"]: q for q in await self.d.qr_codes.find({}).to_list(length=100000)}
         for k, dist in before.items():

@@ -10801,6 +10801,14 @@ body.safe-open .cvo-hdr{opacity:0}
 .mvo-acts{display:flex;gap:7px;margin:2px 6px 10px}
 .mvo-scan,.mvo-take,.mvo-back{padding:10px 12px;border-radius:11px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700}
 .mvo-scan{flex:1;color:#1a1408;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Приём сканом у принимающей стороны: строка «принято N из M» и две кнопки —
+   сканировать и «не всё пришло» (владелец, 20 сен 2026). */
+.mvo-recv{padding:2px 2px 10px}
+.mvo-recv-n{padding:0 2px 8px;font-size:12px;color:var(--muted)}
+.mvo-recv-b{display:flex;gap:8px}
+.mvo-recv-b > button{flex:1;padding:11px;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:700}
+.mvo-recv-b .ord-reset{flex:0 1 auto;white-space:nowrap}
 .mvo-take{flex:1;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.45)}
 .mvo-back{flex:0 0 auto;color:var(--sub);background:var(--card2);border:1px solid var(--border2)}
 .mvo-scan:active,.mvo-take:active,.mvo-back:active{transform:scale(.985)}
@@ -25193,12 +25201,28 @@ const MVT_NO = {
   not_taken:      () => 'сначала «Взять на себя»',
   senior_other:   r => `взял ${r.senior || 'другой'}`,
 };
-async function mvtOpen(mid, to, src){
+// Приём сканом — свои ответы: тут бутылка уже переехала, и вопрос другой —
+// та ли это бутылка из этой передачи (владелец, 20 сен 2026: «почему из АМБАР
+// СТАР нельзя отсканировать товар, который я принимаю?»).
+const MVR_NO = {
+  not_your_district: () => 'это район не ваш',
+  not_given:      r => `${r.from_code || 'отдающий'} ещё не отсканировал всё`,
+  accepted:       () => 'передачу уже приняли',
+  again:          () => 'уже приняли эту бутылку',
+  unknown:        () => 'кода нет в реестре',
+  not_scanned:    r => `${r.from_code || 'отдающий'} её не сканировал`,
+  not_in_transfer:() => 'ваша бутылка, не из передачи',
+  other_district: r => `числится на ${r.from_code || '—'}`,
+  not_in_task:    () => 'этой позиции нет в передаче',
+  full:           () => 'по этой позиции уже всё',
+  gone:           () => 'заявка закрыта',
+};
+async function mvtOpen(mid, to, src, приём){
   const x = (MVO.tasks || []).find(t => t.move_id === mid && t.district === to);
   const s = x && (x.sources || []).find(q => q.district === src);
   if(!s) return;
   mvoPollStop();
-  MVT = {mid, to, src, x, s, rows: [], busy: false,
+  MVT = {mid, to, src, x, s, rows: [], busy: false, recv: !!приём,
          lines: s.lines.map(l => ({...l}))};
   mvtCam();
   try{
@@ -25207,11 +25231,15 @@ async function mvtOpen(mid, to, src){
   const tb = document.getElementById('mvtTorch');
   if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
 }
-function mvtLeft(){ return (MVT.lines || []).reduce((a, l) => a + Math.max(0, (+l.qty || 0) - (+l.got || 0)), 0); }
+// При приёме считаем от того, что ОТДАЛИ (got), а не от плана: принять можно
+// ровно то, что отдающий отсканировал.
+const _mvtЦель = l => MVT && MVT.recv ? (+l.got || 0) : (+l.qty || 0);
+const _mvtЕсть = l => MVT && MVT.recv ? (+l.recv || 0) : (+l.got || 0);
+function mvtLeft(){ return (MVT.lines || []).reduce((a, l) => a + Math.max(0, _mvtЦель(l) - _mvtЕсть(l)), 0); }
 function mvtLeftTxt(){
-  const left = (MVT.lines || []).filter(l => (+l.got || 0) < (+l.qty || 0));
-  return left.length ? 'Осталось: ' + left.slice(0, 4).map(l => `${l.name} ${fmtQty(l.qty - l.got)}`).join(', ')
-    + (left.length > 4 ? '…' : '') : 'Всё отдали';
+  const left = (MVT.lines || []).filter(l => _mvtЕсть(l) < _mvtЦель(l));
+  return left.length ? 'Осталось: ' + left.slice(0, 4).map(l => `${l.name} ${fmtQty(_mvtЦель(l) - _mvtЕсть(l))}`).join(', ')
+    + (left.length > 4 ? '…' : '') : (MVT && MVT.recv ? 'Всё приняли' : 'Всё отдали');
 }
 function mvtCam(){
   const {x, s} = MVT;
@@ -25219,7 +25247,8 @@ function mvtCam(){
   _setRail('accRail', '');
   const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
   _setText('accTitle', `Из ${s.code} ${s.name}`);
-  _setText('accSub', `в ${x.district_code} ${x.district_name} · сканируйте, что отдаёте`);
+  _setText('accSub', MVT.recv ? `в ${x.district_code} ${x.district_name} · сканируйте, что забираете`
+                              : `в ${x.district_code} ${x.district_name} · сканируйте, что отдаёте`);
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
@@ -25256,7 +25285,7 @@ function mvtFeed(){
       <span class="scan-dot" style="background:${r.ok ? 'var(--up)' : 'var(--dn)'}"></span>
       <span class="scan-b"><span class="scan-code">${escS(r.name || r.code)}</span>
         <span class="scan-raw">${escS(r.sub || '')}</span></span>
-      <span class="scan-state" style="color:${r.ok ? 'var(--up)' : 'var(--dn)'}">${escS(r.ok ? 'отдана' : 'нет')}</span></div>`).join('');
+      <span class="scan-state" style="color:${r.ok ? 'var(--up)' : 'var(--dn)'}">${escS(r.ok ? (MVT && MVT.recv ? 'принята' : 'отдана') : 'нет')}</span></div>`).join('');
   const n = document.getElementById('mvtN'); if(n) n.textContent = fmtQty(mvtLeft());
   const h = document.getElementById('qrHint'); if(h) h.textContent = mvtLeftTxt();
 }
@@ -25265,25 +25294,31 @@ async function mvtScan(code){
   // Пока предыдущая бутылка у сервера, следующую не глотаем — её поднесут ещё раз.
   if(MVT.busy){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); return; }
   MVT.busy = true;
+  const приём = !!MVT.recv;
   let r = null;
   try{
-    r = await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(MVT.mid)}/scan`,
+    r = await ownerApi.ownerFetch(
+      `/api/owner/move/${encodeURIComponent(MVT.mid)}/${приём ? 'receive' : 'scan'}`,
       {method: 'POST', body: {district: MVT.to, from: MVT.src, code, as: _rcvMe()}});
   }catch(e){ r = null; }
   if(!MVT) return;
   MVT.busy = false;
   if(r && r.ok){
     if(r.task && r.task.lines) MVT.lines = r.task.lines;
-    MVT.rows.unshift({ok: true, code, name: r.name, sub: `${fmtQty(r.line.got)}/${fmtQty(r.line.qty)}`});
+    MVT.rows.unshift({ok: true, code, name: r.name, sub: приём
+      ? `${fmtQty(r.line.recv)}/${fmtQty(r.line.got)}`
+      : `${fmtQty(r.line.got)}/${fmtQty(r.line.qty)}`});
     qrFlash('ok', r.name);
     mvtFeed();
     if(r.finished){
-      _toast(`Всё отдали в ${MVT.x.district_code} — теперь водитель ${MVT.x.district_code} сканирует и принимает`);
+      _toast(приём ? `Приняли всё из ${MVT.s.code} — передача закрыта`
+                   : `Всё отдали в ${MVT.x.district_code} — теперь водитель ${MVT.x.district_code} сканирует и принимает`);
       return mvtClose();
     }
     return;
   }
-  const say = r ? ((MVT_NO[r.verdict] || (() => r.say || 'не из передачи'))(r)) : 'нет связи — поднесите ещё раз';
+  const словарь = приём ? MVR_NO : MVT_NO;
+  const say = r ? ((словарь[r.verdict] || (() => r.say || 'не из передачи'))(r)) : 'нет связи — поднесите ещё раз';
   if(!r){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); }
   MVT.rows.unshift({ok: false, code, name: (r && r.name) || code, sub: say});
   qrFlash('err', say);
@@ -25411,7 +25446,8 @@ function _mvoTakeHtml(tasks, я){
            <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
              _mvoСостав(s.lines)} · ${escS(how)}</span></span>
          <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
-         <span class="mvo-chev">${ICO_CHEV}</span></button>` + _mvoDiff(s) + _mvoLines(key, s.lines);
+         <span class="mvo-chev">${ICO_CHEV}</span></button>`
+       + _mvoRecv(x, s) + _mvoDiff(s) + _mvoLines(key, s.lines);
     }).join('');
     // Справа сверху — что сейчас происходит: кто отдаёт прямо сейчас, или
     // отдали и получатель сканирует, или никто не начинал.
@@ -25431,6 +25467,47 @@ function _mvoTakeHtml(tasks, я){
         `<button class="ord-reset mvo-x" onclick="mvoCancel('${escS(x.move_id)}','${escS(x.district)}')">Снять заявку района</button>`}
     </div>`;
   }).join('');
+}
+
+// Отдали всё — принимающая сторона сканирует, и из STAR тоже (владелец, 20 сен
+// 2026: «почему из АМБАР СТАР нельзя отсканировать товар, который я принимаю?
+// у нас же и принимающая, и отдающая сторона сканирует»). Кнопки появляются
+// ровно у той передачи, где отдающий закончил: раньше принимать нечего.
+function _mvoRecv(x, s){
+  if(s.status !== 'given') return '';
+  const принято = +s.recv || 0, отдано = +s.got || 0;
+  // Кнопка одна — «Принять — сканировать». «Приехало не всё» появляется, только
+  // если что-то уже отсканировано, но не всё (владелец, 20 сен 2026: «просто
+  // кнопку принять и сканировать, а приехало не всё — только если отсканировал
+  // не полностью»): пока не сканировал, закрывать с расхождением нечего.
+  const неполно = принято > 0 && принято < отдано - 1e-9;
+  return `<div class="mvo-recv">
+    <div class="mvo-recv-n">принято сканом ${fmtQty(принято)} из ${fmtQty(отдано)} ед</div>
+    <div class="mvo-recv-b">
+      <button class="mvo-scan" onclick="mvtOpen('${escS(x.move_id)}','${escS(x.district)}','${escS(s.district)}',true)">
+        Принять — сканировать</button>
+      ${неполно ? `<button class="ord-reset" onclick="mvoDiff('${escS(x.move_id)}','${escS(x.district)}','${escS(s.district)}')">
+        Приехало не всё</button>` : ''}
+    </div></div>`;
+}
+// «Не всё пришло» — то же, что у водителя: расхождение считается по сканам,
+// склад не двигается, решают старший и оператор.
+async function mvoDiff(mid, to, src){
+  const x = (MVO.tasks || []).find(t => t.move_id === mid && t.district === to);
+  const s = x && (x.sources || []).find(q => q.district === src);
+  if(!s) return;
+  const нет = Math.max(0, (+s.got || 0) - (+s.recv || 0));
+  const ok = await askDialog('Не всё пришло?',
+    `Из ${s.code} ${s.name} отдали ${fmtQty(s.got)} ед, вы отсканировали ${fmtQty(s.recv || 0)}.`
+    + (нет ? ` Закроем с расхождением ${fmtQty(нет)} ед: склад не двигаем, разбираются старший и оператор.` : ''),
+    'Закрыть с расхождением', 'Отмена');
+  if(!ok) return;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(mid)}/accept`,
+      {method: 'POST', body: {district: to, from: src, ok: false, as: _rcvMe()}});
+    _toast('Записали расхождение');
+  }catch(e){ _toast('Не удалось закрыть'); }
+  mvoLoad();
 }
 
 function mvoPaint(){

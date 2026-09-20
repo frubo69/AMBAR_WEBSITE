@@ -289,6 +289,48 @@ async def main():
     eq("смену никому не держит", [x for x in await MV.pending_for_district("jvc") if x["move_id"] == m5]
        + [x for o in ("bbay", "alguses", "silicon", "tecom") for x in await MV.pending_for_district(o) if x["move_id"] == m5], [])
 
+    # Приём сканом из STAR (владелец, 20 сен 2026: «почему из АМБАР СТАР нельзя
+    # отсканировать товар, который я принимаю? у нас же и принимающая, и
+    # отдающая сторона сканирует»). Старший принимает за район-получатель: свой
+    # район ему не нужен, правила те же, что у водителя.
+    print("── старший принимает сканом из STAR ───────────────────────────")
+    import json as _json
+    from aiohttp.test_utils import make_mocked_request
+    async def own(path, body, mid):
+        r = make_mocked_request("POST", path, match_info={"mid": mid})
+        r["owner_id"] = 1; r._read_bytes = _json.dumps(body).encode()
+        h = MV.handle_own_receive if path.endswith("receive") else MV.handle_own_accept
+        return _json.loads((await h(r)).text)
+
+    vod9 = "p1"
+    for i, c_ in enumerate(("s1", "s2")):
+        await code(d, c_, vod9, "jvc")
+    m9 = (await MV.create([{"from": "jvc", "to": "bbay", "id": vod9, "qty": 2}], by="STAR"))["move_id"]
+    await MV.give_start(m9, "bbay", "Худоба", 21, "jvc")
+    for c_ in ("s1", "s2"):
+        await MV.scan(m9, "bbay", c_, "Худоба", 21, "jvc")
+    r1 = await own(f"/api/owner/move/{m9}/receive", {"district": "bbay", "from": "jvc", "code": "s1", "as": "Старший"}, m9)
+    eq("старший отсканировал первую: принято 1 из 2", (r1["ok"], r1["task"]["recv"], r1["finished"]), (True, 1, False))
+    r2 = await own(f"/api/owner/move/{m9}/receive", {"district": "bbay", "from": "jvc", "code": "s2", "as": "Старший"}, m9)
+    eq("вторая закрывает передачу саму", (r2["ok"], r2["finished"], r2["task"]["status"]), (True, True, "done"))
+    r3 = await own(f"/api/owner/move/{m9}/receive", {"district": "bbay", "from": "jvc", "code": "s1", "as": "Старший"}, m9)
+    # Эта заявка была из одной пары — с её приёмом закрылась и она сама,
+    # поэтому повторный скан отвечает «заявка закрыта».
+    eq("повтор после приёма — больше не принимаем", (r3["ok"], r3["verdict"]), (False, "gone"))
+
+    # «Не всё пришло» из STAR: отдали две, старший отсканировал одну.
+    for c_ in ("s3", "s4"):
+        await code(d, c_, vod9, "jvc")
+    m10 = (await MV.create([{"from": "jvc", "to": "alguses", "id": vod9, "qty": 2}], by="STAR"))["move_id"]
+    await MV.give_start(m10, "alguses", "Худоба", 21, "jvc")
+    for c_ in ("s3", "s4"):
+        await MV.scan(m10, "alguses", c_, "Худоба", 21, "jvc")
+    await own(f"/api/owner/move/{m10}/receive", {"district": "alguses", "from": "jvc", "code": "s3", "as": "Старший"}, m10)
+    a = await own(f"/api/owner/move/{m10}/accept", {"district": "alguses", "from": "jvc", "ok": False, "as": "Старший"}, m10)
+    eq("«не всё пришло» из STAR: отдали 2, пришла 1",
+       (a["ok"], a["task"]["accept_lines"][0]["sent"], a["task"]["accept_lines"][0]["got"], a["task"]["status"]),
+       (True, 2, 1, "diff"))
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 

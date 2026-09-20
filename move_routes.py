@@ -1015,6 +1015,32 @@ async def handle_own_scan(request):
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
+async def handle_own_receive(request):
+    """POST {district, from, code, as} — старший принимает сканом то, что ему
+    отдали (владелец, 20 сен 2026: «почему из АМБАР СТАР нельзя отсканировать
+    товар, который я принимаю? у нас же и принимающая, и отдающая сторона
+    сканирует»). district — район-получатель: старший принимает за него, своего
+    района у него нет. Правила те же, что у водителя: засчитывается только
+    бутылка этой передачи, последний скан принимает её сам."""
+    b = await _body(request)
+    oid = str(b.get("district") or "")
+    r = await receive(request.match_info.get("mid") or "", oid, str(b.get("from") or ""),
+                      str(b.get("code") or ""), _own_name(request, b),
+                      int(request.get("owner_id") or 0), oid)
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+async def handle_own_accept(request):
+    """POST {district, from, ok, note, as} — «Принял» (когда отсканировано всё)
+    или «Не всё пришло» из STAR, за район-получатель."""
+    b = await _body(request)
+    oid = str(b.get("district") or "")
+    r = await accept(request.match_info.get("mid") or "", oid, str(b.get("from") or ""),
+                     _own_name(request, b), int(request.get("owner_id") or 0), oid,
+                     ok=b.get("ok") is not False, lines=[], note=str(b.get("note") or ""))
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
 async def handle_own_plan(request):
     return web.json_response(await plan(request.query.get("day") or ""),
                              headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))

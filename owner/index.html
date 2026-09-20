@@ -18277,7 +18277,12 @@ function crRender(){
   const d = CR; if(!d) return;
   _setText('accSub', d.day === d.today ? 'сегодня' : _dayName(d.day));
   const all = d.need > 0 && d.done >= d.need;
-  const list = [...d.districts].sort((a, b) => (a.empty - b.empty) || (a.done - b.done));
+  // Порядок районов от отметок не зависит (владелец, 20 сен 2026: «сделай так,
+  // чтобы когда нажал получил, в сборе выручки район не уходил вниз, пусть всё
+  // остаётся на своих местах»). Раньше полученные уезжали в конец, и карточка
+  // выпрыгивала из-под пальца. Внизу остаются только те, где получать нечего:
+  // это приходит с сервера и от нажатий не меняется.
+  const list = [...d.districts].sort((a, b) => a.empty - b.empty);
   const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
   const head = `<div class="ck-head cr-head${all ? ' all' : ''}">
     <div class="ck-h-l">Сбор выручки</div>

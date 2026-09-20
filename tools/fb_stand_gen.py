@@ -34,6 +34,9 @@ parts = [
     fn("_dayNavFor"), fn("_dayNav"), fn("bindDayBars"), fn("daySwipe"), fn("dayBarStep"),
     fn("dayBarArrow"), fn("dayBarHome"), fn("_heroFlip"), fn("askDialog"), fn("closePinPop"),
     fn("pluralize"), fn("fmtUsdt"), "let CREW = null;", fn("crewLoad"), fn("crewDrvCount"),
+    # время записи в отчёте ДДС — настоящий _hm (он многострочный, режем по краям)
+    src[src.index("const _hm = iso => {"):src.index("timeZone:'Asia/Dubai'}) : ''; };\n")
+        + len("timeZone:'Asia/Dubai'}) : ''; };\n")],
 ]
 # календарь одной даты (платёж статьи): разметка и функции — настоящие
 _d0 = src.index('<div class="cmd-overlay" id="dateOverlay">')
@@ -94,6 +97,7 @@ function accOpen(id){
   if(id === 'finrp') return accFinRP();
   if(id === 'finnp') return accFinNP();
   if(id === 'finsafe') return accFinSafe();
+  if(id === 'finddc') return accFinDdc();
   if(id === 'finbud') return accFinBud();
   if(id === 'finpay') return accFinPay();
   if(id === 'finperson') return accFinPerson();
@@ -108,7 +112,9 @@ function accDayGo(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === DAY_OFFSET) return;
   DAY_OFFSET = off;
-  if(document.getElementById('accOv').classList.contains('show') && document.getElementById('finDayCard')){ fbDayReload(); }
+  const on = document.getElementById('accOv').classList.contains('show');
+  if(on && document.getElementById('finDdcCard')){ fbDdcReload(); return; }
+  if(on && document.getElementById('finDayCard')){ fbDayReload(); }
 }
 // ── сценарий по параметрам ──
 const Q = new URLSearchParams(location.search);

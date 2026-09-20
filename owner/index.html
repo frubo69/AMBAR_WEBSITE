@@ -3227,6 +3227,23 @@ button.path:active{transform:scale(.995)}
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
 .fb-none{padding:13px 16px;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,.05)}
+/* Отчёт ДДС: движение — время, что это, сумма и остаток сейфа после неё. */
+.ddc-r{display:flex;align-items:center;gap:10px;min-height:46px;padding:7px 16px;
+  border-top:1px solid rgba(255,255,255,.05)}
+.ddc-r:first-child{border-top:0}
+.ddc-t{flex:0 0 38px;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
+  color:var(--dim);font-variant-numeric:tabular-nums}
+.ddc-b{flex:1;min-width:0}
+.ddc-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddc-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddc-v{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
+.ddc-v b{display:block;font-size:15px;font-weight:700;color:var(--dn);line-height:1}
+.ddc-r.up .ddc-v b{color:var(--up)}
+/* Неподтверждённый день: выручка в сейф ещё не легла — сумма тише и остаток не меняет. */
+.ddc-r.wait .ddc-v b{color:var(--muted)}
+.ddc-r.wait .ddc-b i{color:var(--warn)}
+.ddc-v i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--dim);margin-top:3px}
 /* Форма новой записи — под строкой «Добавить», пока не записали. */
 .fb-add{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 14px;
   border-top:1px solid rgba(255,255,255,.05)}
@@ -3697,6 +3714,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-safe-k{margin:0 12px 12px 16px;border-radius:13px;border:1px solid rgba(201,169,110,.2);background:rgba(201,169,110,.05);overflow:hidden}
 .fb-safe-k .fb-r{min-height:50px;padding:6px 8px 6px 14px;border-top:0}
 .fb-safe-k .fb-r + .fb-r{border-top:1px solid rgba(201,169,110,.14)}
+/* «Отчёт ДДС» низом карточки сейфа: это действие, а не ещё одна стопка, —
+   подпись золотом и без числа. */
+.fb-ddcgo{min-height:46px;border-top:1px solid rgba(255,255,255,.05)}
+.fb-ddcgo span{color:var(--gold2);font-weight:700;letter-spacing:.2px}
 .fb-safe-k .fb-r > span{font-size:14px}
 /* ── «Аналитика месяца» ──
    Закреплена сверху экрана: страница едет под ней, а сама карточка в
@@ -11745,7 +11766,8 @@ function dpApply(){
   // Полосы дня внутри разделов — расходы и склад. Из выбранного берём начало
   // и встаём на этот день, как в чек-листе: календарь тут способ уйти дальше,
   // чем удобно листать пальцем, а не выбрать отрезок.
-  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay' || dpTarget === 'shDay' || dpTarget === 'finDay'){
+  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay' || dpTarget === 'shDay'
+     || dpTarget === 'finDay' || dpTarget === 'ddcDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     const cal = document.querySelector(`.cal-btn[onclick*="'${dpTarget}'"]`);
     if(cal) cal.classList.remove('on');
@@ -17661,6 +17683,7 @@ function accDayGo(off){
   // списания и расходы стояли на месте. «Учёт» лежит поверх склада, поэтому
   // при обоих открытых он первый.
   const on = id => document.getElementById(id).classList.contains('show');
+  if(on('accOv') && document.getElementById('finDdcCard')){ fbDdcReload(); return; }
   if(on('accOv') && document.getElementById('finDayCard')){ fbDayReload(); return; }
   if(on('accOv') && document.getElementById('shDay')){
     daySkel('accMid'); accShifts(true); return;
@@ -19586,6 +19609,9 @@ function fbHubHtml(b, err){
              {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT'})}
       ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
     </div>
+    <!-- Отчёт ДДС — низом карточки сейфа (владелец, 20 сен 2026: «добавь сюда
+         вниз кнопку — отчёт ДДС»): весь день движений деньгами одной лентой. -->
+    <button class="sc-r fb-ddcgo" onclick="accOpen('finddc')"><span>Отчёт ДДС</span><em>${_SC_CHEV}</em></button>
   </div>
   <div class="sc fb-hub">
     ${fbCapT('Зарплаты/удержания')}
@@ -20088,6 +20114,142 @@ async function fbDayOk(day){
     if(ACC_VIEW === 'finday' || ACC_VIEW === 'finb') fbDayReload(); else fbRepaint();
   }catch(e){ _toast('Не удалось подтвердить'); }
 }
+// ── Отчёт ДДС ─────────────────────────────────────────────────────────────
+// Весь день сейфа одной лентой (владелец, 20 сен 2026: «отчёт за день, там
+// должны быть видны абсолютно все движения денег за день; сверху цифра
+// изначальная общая, а потом все минусы, плюс РП−, РП+, закупка на барракуда —
+// в общей сложности полная история и хронология движения средств»). Сверху
+// сколько было, дальше каждое движение со временем и остатком после него,
+// внизу сколько стало. Своей арифметики здесь нет: всё из той же книги, что и
+// «Касса дня», и сходится по построению — было + выручка + приход в фонд −
+// расходы − выплаты − оплата базе = стало (finance_calc.compute). Крипта лежит
+// на кошельке, а не в сейфе, поэтому оплаченное ею — в «Мимо сейфа».
+async function accFinDdc(){
+  _setText('accTitle', 'Отчёт ДДС');
+  _setText('accSub', accDayWord());
+  document.getElementById('accMid').innerHTML =
+    `<div class="exp-sum stk-bysum fb-daysum" id="finDdcCard" data-day="общий">${fbDdcCardInner(null)}</div>
+     <div id="finDdcBody"><div class="exp-empty">Загрузка…</div></div>`;
+  requestAnimationFrame(bindDayBars);
+  await fbDdcReload();
+}
+async function fbDdcReload(){
+  const day = accDay(), month = day.slice(0, 7);
+  _setText('accSub', accDayWord());
+  if(!fbBook(month)){
+    try{ await fbLoad(month); }
+    catch(e){
+      const body = document.getElementById('finDdcBody');
+      if(body) body.innerHTML = loadFail();
+      return;
+    }
+  }
+  else if(fbStale(month)) fbLoad(month).then(() => {
+    if(accDay() === day && ACC_VIEW === 'finddc') fbDdcPaint(); }).catch(() => {});
+  if(accDay() !== day) return;                  // листнули дальше, пока грузилось
+  fbDdcPaint();
+}
+function fbDdcPaint(){
+  const card = document.getElementById('finDdcCard'), body = document.getElementById('finDdcBody');
+  if(!card || !body) return;
+  const day = accDay(), b = fbBook(day.slice(0, 7));
+  if(!b) return;
+  const d = fbDayOf(b, day), start = fbDdcStart(b, day);
+  card.innerHTML = fbDdcCardInner(d, start);
+  dayBarPaint(card);
+  body.innerHTML = fbDdcBodyHtml(d, start);
+}
+function fbDdcCardInner(d, start){
+  const was = start ? start.all : null, now = d ? d.stack_total : null;
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+      <span class="exp-day-l"><span class="exp-day-t">Отчёт<i>ДДС</i></span></span>
+      ${_dayNav('ddcDay')}
+    </div>
+    <div class="aud-g">
+      ${fbTile('Было', 'ddc.was', was, {mode: 'neg'})}
+      ${fbTile('Движения', 'ddc.move', d && start ? now - was : null, {mode: 'pos'})}
+      ${fbTile('Стало', 'd.stack_total', now, {mode: 'neg'})}
+    </div>`;
+}
+// Сколько лежало в сейфе до этого дня: остаток прошлого дня, а у первого дня
+// месяца — переносы на начало месяца, те же три стопки.
+function fbDdcStart(b, day){
+  const days = b.days || [], i = days.findIndex(x => x.day === day);
+  const p = i > 0 ? days[i - 1] : null;
+  if(p) return {b: p.stack_b, rp: p.stack_rp, np: p.stack_np, all: p.stack_total};
+  const o = b.opening || {}, sb = +o.safe_b_open || 0, rp = +o.rp_open || 0, np = +o.np_open || 0;
+  return {b: sb, rp, np, all: sb + rp + np};
+}
+// Лента движений: со временем — записи книги, без времени — выручка (она
+// сверху) и оплата базе (она снизу); внутри времени порядок как писали.
+function fbDdcRows(d){
+  const n = v => +v || 0, rows = [];
+  if(n(d.base)) rows.push({first: true, name: 'Выручка сдана', wait: d.pending, v: n(d.base),
+    sub: d.pending ? 'день не подтверждён'
+       : `Барракуда ${fbFmt(d.aside)} · РП+ ${fbFmt(d.collected)} · ЧП+ ${fbFmt(d.np_plus)}`});
+  (d.ins || []).forEach(e => rows.push({at: e.at, v: n(e.amount),
+    name: e.comment || 'Приход в фонд', sub: ['РП+', e.who].filter(Boolean).join(' · ')}));
+  if(n(d.extra_manual)) rows.push({name: 'Доп. приход в фонд', sub: 'РП+ · вписан руками', v: n(d.extra_manual)});
+  (d.expenses || []).forEach(e => rows.push({at: e.at, v: -n(e.amount),
+    name: e.kind_t ? `${e.kind_t} · ${e.who || ''}`.trim() : (e.comment || 'Расход'),
+    sub: ['РП−', e.line_name || 'вне плана', e.kind_t ? e.comment : e.who].filter(Boolean).join(' · ')}));
+  (d.payouts || []).forEach(e => rows.push({at: e.at, v: -n(e.amount),
+    name: e.who || e.comment || 'Выплата',
+    sub: ['ЧП−', e.who && e.comment ? e.comment : ''].filter(Boolean).join(' · ')}));
+  if(n(d.pay)) rows.push({last: true, name: 'Оплата Барракуде', v: -n(d.pay),
+    sub: n(d.pay_b_extra) ? `из стопки Барракуды ${fbFmt(d.pay_b)} · из ЧП ${fbFmt(d.pay_b_extra)}`
+                          : 'из стопки Барракуды'});
+  const где = r => r.first ? 0 : r.at ? 1 : r.last ? 3 : 2;
+  return rows.sort((x, y) => (где(x) - где(y)) || String(x.at || '').localeCompare(String(y.at || '')));
+}
+function fbDdcBodyHtml(d, start){
+  if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
+  if(d.future) return '<div class="exp-empty">Этот день ещё не наступил</div>';
+  let run = start.all;
+  const list = fbDdcRows(d).map(r => {
+    if(!r.wait) run += r.v;                     // неподтверждённая выручка остаток не двигает
+    const plus = r.v > 0;
+    return `<div class="ddc-r${plus ? ' up' : ''}${r.wait ? ' wait' : ''}">
+      <span class="ddc-t">${escS((r.at && _hm(r.at)) || '·')}</span>
+      <span class="ddc-b"><b>${escS(r.name)}</b>${r.sub ? `<i>${escS(r.sub)}</i>` : ''}</span>
+      <span class="ddc-v"><b>${plus ? '+' : '−'}${fbFmt(Math.abs(r.v))}</b>${
+        r.wait ? '' : `<i>${fbFmt(run)}</i>`}</span>
+    </div>`;
+  }).join('');
+  // Лента и стопки считаются порознь: разошлись — молчать нельзя.
+  const diff = Math.round(run - (+d.stack_total || 0));
+  const side = [], add = (t, k, v) => { if(v) side.push(fbRow(t, k, v, {sub: true})); };
+  add('Чай водителям', 'd.tips_cash', d.tips_cash);
+  add('Расходы водителей', 'd.spend_cash', d.spend_cash);
+  add('Расходы водителей безналом', 'd.spend_card', d.spend_card);
+  add('Заказы картой', 'd.card', d.card);
+  add('Заказы криптой — на кошелёк', 'd.crypto', d.crypto);
+  add('Заказы в долг', 'd.debt', d.debt);
+  add('Заказали у Барракуды', 'd.ordered', d.ordered);
+  add('Закупили на других базах', 'd.ordered_extra', d.ordered_extra);
+  return `
+  <div class="sc fb-gut">
+    ${fbCapT('Было в сейфе')}
+    ${fbRow('Всего наличными', 'ddc.was', start.all, {sum: true, mode: 'neg'})}
+    ${fbRow('Барракуда', 'ddc.was_b', start.b, {sub: true})}
+    ${fbRow('РП', 'ddc.was_rp', start.rp, {sub: true, mode: 'neg'})}
+    ${fbRow('ЧП', 'ddc.was_np', start.np, {sub: true, mode: 'neg'})}
+  </div>
+  <div class="sc">
+    ${fbCapT('Движения за день')}
+    ${list || '<div class="fb-none">Денег в этот день не двигали</div>'}
+  </div>
+  <div class="sc fb-gut">
+    ${fbCapT('Стало в сейфе')}
+    ${fbRow('Барракуда', 'd.stack_b', d.stack_b)}
+    ${fbRow('РП', 'd.stack_rp', d.stack_rp, {mode: 'neg'})}
+    ${fbRow('ЧП', 'd.stack_np', d.stack_np, {mode: 'neg'})}
+    ${fbRow('Всего наличными', 'd.stack_total', d.stack_total, {sum: true, sign: '=', mode: 'neg'})}
+    ${diff ? fbRow('Лента и стопки разошлись', 'ddc.diff', diff, {sub: true, mode: 'diff'}) : ''}
+  </div>
+  ${side.length ? `<div class="sc fb-gut">${fbCapT('Мимо сейфа', 'в наличные не попало')}${side.join('')}</div>` : ''}`;
+}
+
 // ── РП+: сколько откладывали по дням ──────────────────────────────────────
 // Карточка над расходами: раскрывается на месте, размер окна строго задан —
 // все дни месяца листаются внутри него (владелец: «листать внутри карточки»).
@@ -22646,6 +22808,7 @@ function accOpen(id){
   if(id === 'finrp')    accFinRP();
   if(id === 'finnp')    accFinNP();
   if(id === 'finsafe')  accFinSafe();
+  if(id === 'finddc')   accFinDdc();
   if(id === 'finbud')   accFinBud();
   if(id === 'finpay')   accFinPay();
   if(id === 'finperson') accFinPerson();

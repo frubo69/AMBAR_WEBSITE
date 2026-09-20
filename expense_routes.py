@@ -104,6 +104,11 @@ EXTRA_KINDS = {
     # получает меньше на сумму аванса»). Способ оплаты не спрашиваем: это всегда
     # наличные из выручки смены. Согласование ставит запись в ведомость.
     "advance": {"t": "Аванс зарплаты", "nopay": True},
+    # И премию водитель тоже может взять наперёд (владелец, 20 сен 2026: «аванс
+    # премия тоже — не тот, что KFC премия, просто премия»). Считается так же:
+    # деньги вперёд, в ведомости удержание, в следующем месяце получит меньше;
+    # отдельным видом — чтобы и водитель, и старший видели, за что брали.
+    "advance_bonus": {"t": "Аванс премии", "nopay": True},
     # «Всё остальное» — последним: сначала то, что называется словом.
     # Раздел уже зовётся «Доп. расходы», и карточка «Доп. расход» внутри него
     # ничего не добавляла — владелец: «не доп расход, а что-то ещё».
@@ -129,6 +134,11 @@ def is_card(e: dict) -> bool:
 
 def asks_pay(kind: str) -> bool:
     return kind in EXTRA_KINDS and not EXTRA_KINDS[kind].get("nopay")
+
+
+# Что водитель берёт вперёд из наличных смены: и зарплату, и премию. Считается
+# одинаково — в ведомости удержание, в следующем месяце он получает меньше.
+ADVANCE_KINDS = {"advance": "Аванс зарплаты", "advance_bonus": "В счёт премии"}
 
 
 def touches_cash(e: dict) -> bool:
@@ -587,16 +597,23 @@ async def advance_apply(day: str, driver: str, item: dict, who: str = "") -> str
     расходом дня она уже стала сама, как любая согласованная трата. В ведомости
     это обычный аванс «часть зарплаты» с пометкой src=driver."""
     import finance_pay as pay
-    if str(item.get("kind") or "") != "advance" or item.get("pay_item"):
+    вид = str(item.get("kind") or "")
+    if вид not in ADVANCE_KINDS or item.get("pay_item"):
         return ""
     amount = _amount(item.get("amount"))
     if amount <= 0:
         return ""
+    # Пустой комментарий приложение заполняет названием вида — в ведомости оно
+    # ни о чём не говорит, там и так написано, что это аванс.
+    коммент = str(item.get("comment") or "").strip()
+    if коммент == EXTRA_KINDS.get(вид, {}).get("t"):
+        коммент = ""
     iid = secrets.token_hex(5)
     await db.fin_pay_item_add({
         "_id": iid, "name": driver, "kind": "advance", "amount": amount,
         "per_month": 0, "from": day[:7], "day": day, "mode": "part",
-        "note": (str(item.get("comment") or "").strip()[:80] or "из наличных смены"),
+        "note": ((ADVANCE_KINDS[вид] + " · " if вид != "advance" else "")
+                 + (коммент or "из наличных смены"))[:80],
         "entry": "", "src": "driver", "extra": item.get("id") or "",
         "by": who, "at": datetime.now(timezone.utc)})
     await db.set_driver_expense_fields(day, driver, item.get("id") or "", {"pay_item": iid})

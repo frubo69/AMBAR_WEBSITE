@@ -103,7 +103,7 @@ async def main():
     v = json.loads((await raw(dr.handle_expenses)(req)).text)
     eq("pay: спрашивать у всех, кроме охраны, «нам должны», бонуса, возвратов, долгов и аванса",
        sorted(k["id"] for k in v["kinds"] if not k["pay"]),
-       ["advance", "guard", "owed_us", "upsell", "we_gave", "we_got", "we_owe"])
+       ["advance", "advance_bonus", "guard", "owed_us", "upsell", "we_gave", "we_got", "we_owe"])
 
     print("── итоги смены: на руках только наличное ──────────────────────")
     # в дне: kfc 35 наличными, парковка 20 наличными, приход 50 наличными

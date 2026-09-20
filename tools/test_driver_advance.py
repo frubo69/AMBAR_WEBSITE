@@ -13,7 +13,10 @@ mongomock + настоящие ручки водителя, старшего и 
   • у водителя «сдать» уменьшилось ровно на аванс, у старшего «к сдаче» —
     столько же: обе стороны считают одинаково;
   • в зарплате за месяц аванс стоит в удержаниях, к выплате — меньше на него;
-  • отказ или стирание записи убирает аванс из ведомости."""
+  • отказ или стирание записи убирает аванс из ведомости;
+  • премию водитель тоже берёт вперёд — «Аванс премии» (владелец, 20 сен 2026:
+    «аванс премия тоже — не тот, что KFC премия, просто премия»): считается так
+    же, но в ведомости подписано, за что брали."""
 import asyncio, inspect, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("MONGO_URI", ""); os.environ.setdefault("AMBAR_OWNER_IDS", "1")
@@ -116,6 +119,29 @@ async def main():
     eq("отказали — аванс из ведомости ушёл", len(await db.fin_pay_items_get()), 0)
     e = (await extras())[0]
     eq("и запись об этом знает", (e.get("status"), e.get("pay_item")), ("rejected", ""))
+
+    print("── аванс премии — тем же путём ────────────────────────────────")
+    req = make_mocked_request("POST", "/x")
+    req["driver"] = {"name": DRV, "district": "jvc"}; req["tg"] = {"id": 7}
+    req._read_bytes = json.dumps({"kind": "advance_bonus", "amount": 250, "comment": ""}).encode()
+    resp = await raw(dr.handle_expense_add)(req)
+    b = next(x for x in await extras() if x["kind"] == "advance_bonus")
+    eq("запись премии создана и ждёт решения", (resp.status, b["amount"], b.get("status")),
+       (200, 250, "pending"))
+    dreq = make_mocked_request("POST", f"/x/{b['id']}/approve",
+                               match_info={"item_id": b["id"], "action": "approve"})
+    dreq["owner_id"] = 1
+    dreq._read_bytes = json.dumps({"day": D, "driver": DRV, "as": "Старший"}).encode()
+    await raw(exp.handle_extra_decide)(dreq)
+    it2 = next(x for x in await db.fin_pay_items_get() if x.get("amount") == 250)
+    eq("в ведомости — тот же аванс, но подписано «в счёт премии»",
+       (it2.get("kind"), it2.get("mode"), it2.get("src"), it2.get("entry"), it2.get("note")),
+       ("advance", "part", "driver", "", "В счёт премии · из наличных смены"))
+    m2 = pay.person_month({"name": DRV, "role": "driver"}, M,
+                          {"rate": 3000, "unit": "month", "cur": "AED", "bonus": 500},
+                          26, [dict(it2)], [], usd=3.677)
+    eq("премия 500 начислена, из неё 250 уже взято вперёд",
+       (m2["bonus_month"], m2["advance"], m2["to_pay"]), (500, 250, 3250))
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     return 1 if FAIL else 0

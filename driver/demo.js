@@ -468,7 +468,8 @@ const KINDS = [{id: 'fuel', t: 'Заправка', receipt: true, pay: true}, {i
                {id: 'kfc', t: 'KFC · премия', pay: true}, {id: 'we_gave', t: 'Мы вернули', pay: false},
                {id: 'owed_us', t: 'Нам должны', pay: false}, {id: 'we_got', t: 'Нам вернули', plus: true, pay: false},
                {id: 'we_owe', t: 'Мы должны', plus: true, pay: false},
-               {id: 'advance', t: 'Аванс зарплаты', pay: false}, {id: 'other', t: 'Что-то ещё', pay: true}];
+               {id: 'advance', t: 'Аванс зарплаты', pay: false},
+               {id: 'advance_bonus', t: 'Аванс премии', pay: false}, {id: 'other', t: 'Что-то ещё', pay: true}];
 
 /* ═══ 5. Фальшивый сервер ═══════════════════════════════════════════════════
    Те же пути и те же ответы, что у боевого. Чего не знаем — отвечаем {ok},

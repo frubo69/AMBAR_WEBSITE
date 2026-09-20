@@ -1582,6 +1582,50 @@ async def wallet_links(txids: list = None) -> dict:
     return out
 
 
+async def wallet_purpose_set(txid: str, doc: dict) -> bool:
+    """Назначение платежа по кошельку. Ключ — перевод: он приходит один раз.
+
+    Владелец кошелька раз в неделю присылает отчёт с назначениями (владелец,
+    20 сен 2026). Отчёт сверяется с переводами, и у каждого платежа появляется
+    своё назначение — здесь оно и лежит, рядом с привязкой к заказу, но
+    отдельно от неё: заказ и назначение отвечают на разные вопросы."""
+    db = _db_or_none()
+    if db is None or not txid: return False
+    await db.wallet_purposes.update_one({"_id": txid}, {"$set": doc}, upsert=True)
+    return True
+
+
+async def wallet_purpose_del(txid: str) -> bool:
+    db = _db_or_none()
+    if db is None or not txid: return False
+    r = await db.wallet_purposes.delete_one({"_id": txid})
+    return bool(r.deleted_count)
+
+
+async def wallet_purposes(txids: list = None) -> dict:
+    """{txid: назначение} — по списку переводов или все сразу."""
+    db = _db_or_none()
+    if db is None: return {}
+    q = {"_id": {"$in": [t for t in txids if t]}} if txids else {}
+    out = {}
+    async for d in db.wallet_purposes.find(q):
+        out[d.pop("_id")] = d
+    return out
+
+
+async def wallet_report_add(doc: dict) -> None:
+    """Загруженный отчёт — в историю: когда, кто, сколько строк и что сошлось."""
+    db = _db_or_none()
+    if db is None: return
+    await db.wallet_reports.insert_one(doc)
+
+
+async def wallet_reports(limit: int = 20) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.wallet_reports.find({}, {"rows_raw": 0}).sort("at", -1).to_list(length=limit)
+
+
 async def crypto_paid_totals() -> dict:
     """Сколько всего оплачено криптой по НАШИМ счетам — за всё время.
 
@@ -5811,6 +5855,17 @@ async def move_give_code(mid: str, district: str, src: str, code: str, qty) -> N
     g = f"tasks.{district}.give.{src}"
     await d.move_orders.update_one(
         {"_id": mid}, {"$addToSet": {f"{g}.codes": code}, "$inc": {f"{g}.codes_q": float(qty)}})
+
+
+async def move_give_check(mid: str, district: str, src: str, doc: dict) -> None:
+    """Старший пересчитал отложенное сканом и закрыл проверку (владелец, 20 сен
+    2026: «приехал старший и хочет проверить, что они всё правильно
+    отсканировали»). Это запись о проверке, а не о передаче: ни склад, ни
+    статусы она не двигает — только говорит, кто проверял и что вышло."""
+    d = _db_or_none()
+    if d is None: return
+    await d.move_orders.update_one(
+        {"_id": mid}, {"$set": {f"tasks.{district}.give.{src}.check": doc}})
 
 
 async def move_recv_add(mid: str, district: str, src: str, i: int, code: str, add, cap) -> bool:

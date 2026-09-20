@@ -331,6 +331,40 @@ async def main():
        (a["ok"], a["task"]["accept_lines"][0]["sent"], a["task"]["accept_lines"][0]["got"], a["task"]["status"]),
        (True, 2, 1, "diff"))
 
+    # Проверка отложенного (владелец, 20 сен 2026: «водители подготовили товар,
+    # отсканировали и отложили; приехал старший и хочет проверить, что всё
+    # правильно»). Скан проверки ничего не меняет — ни склад, ни строки.
+    print("── старший проверяет отложенное ───────────────────────────────")
+    for c_ in ("chk1", "chk2", "chk3"):
+        await code(d, c_, vod9, "jvc")
+    await code(d, "chk9", vod9, "bbay")                   # чужая: лежит уже в B2
+    m11 = (await MV.create([{"from": "jvc", "to": "tecom", "id": vod9, "qty": 3}], by="STAR"))["move_id"]
+    await MV.give_start(m11, "tecom", "Худоба", 21, "jvc")
+    for c_ in ("chk1", "chk2"):                           # отложили две из трёх
+        await MV.scan(m11, "tecom", c_, "Худоба", 21, "jvc")
+    полка = await shelf("jvc", vod9)
+    c1 = await MV.check_code(m11, "tecom", "jvc", "chk1")
+    eq("бутылка из отдачи — на месте", (c1["ok"], c1["verdict"], c1["pair"]["got"]), (True, "ok", 2))
+    c2 = await MV.check_code(m11, "tecom", "jvc", "chk3")
+    eq("не отсканированная — «не отложена», и видно где лежит",
+       (c2["ok"], c2["verdict"], c2["at_code"], c2["in_task"]), (False, "not_here", "B1", True))
+    c3 = await MV.check_code(m11, "tecom", "jvc", "chk9")
+    eq("чужая бутылка — тоже «не отсюда»", (c3["ok"], c3["verdict"], c3["at_code"]), (False, "not_here", "B2"))
+    c4 = await MV.check_code(m11, "tecom", "jvc", "нет-такого")
+    eq("кода нет в реестре", (c4["ok"], c4["verdict"]), (False, "unknown"))
+    eq("проверка ничего не сдвинула: полка та же", await shelf("jvc", vod9), полка)
+    doc11 = await db.move_order_get(m11)
+    g11 = MV.give_view(m11, doc11, "tecom", doc11["tasks"]["tecom"], "jvc")
+    # Проверять можно и недоотданное: две из трёх — передача ещё «отдают».
+    eq("и строки передачи те же", (g11["got"], g11["status"]), (2, "live"))
+    r11 = await MV.check_done(m11, "tecom", "jvc", "Старший", 1, 2, 1, [])
+    doc11 = await db.move_order_get(m11)
+    chk = ((doc11["tasks"]["tecom"].get("give") or {}).get("jvc") or {}).get("check") or {}
+    eq("запись о проверке: кто, сколько нашли, были лишние",
+       (r11["ok"], chk.get("by_name"), chk.get("seen"), chk.get("extra"), chk.get("ok")),
+       (True, "Старший", 2, 1, False))
+    eq("в паре она видна", (MV.give_view(m11, doc11, "tecom", doc11["tasks"]["tecom"], "jvc")["check"] or {}).get("seen"), 2)
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)
 

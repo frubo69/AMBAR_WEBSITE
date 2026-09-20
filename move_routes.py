@@ -109,9 +109,13 @@ def _senior_of(g: dict) -> str:
 
 
 def _accept_view(g: dict) -> dict:
+    # Проверка отложенного (20 сен 2026) — рядом с приёмом, но отдельно: она
+    # ничего не решает, только говорит, кто пересчитал сканом и что вышло.
+    chk = g.get("check") or None
     return {"accepted_at": _iso(g.get("accepted_at")), "accepted_by": g.get("accepted_by") or "",
             "accept_ok": bool(g.get("accept_ok", True)) if g.get("accepted_at") else None,
-            "accept_lines": g.get("accept_lines") or [], "accept_note": g.get("accept_note") or ""}
+            "accept_lines": g.get("accept_lines") or [], "accept_note": g.get("accept_note") or "",
+            "check": ({**chk, "at": _iso(chk.get("at"))} if chk else None)}
 
 
 def _sources(lines: list, task: dict) -> list:
@@ -1012,6 +1016,88 @@ async def handle_own_scan(request):
     r = await scan(request.match_info.get("mid") or "", str(b.get("district") or ""),
                    str(b.get("code") or ""), _own_name(request, b),
                    int(request.get("owner_id") or 0), str(b.get("from") or ""), senior=True)
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+async def check_code(mid: str, oid: str, src: str, code: str) -> dict:
+    """Проверка сканом: та ли бутылка лежит в отложенном (владелец, 20 сен 2026:
+    «водители подготовили товар на своём районе, отсканировали и отложили; но
+    приехал старший и хочет проверить, что они всё правильно отсканировали»).
+
+    Ничего не меняет — ни склад, ни строки, ни статусы: это сверка глазами
+    сканера. Отвечает одно из трёх: бутылка в этой отдаче, бутылка есть, но не
+    отсюда (и где она числится), кода нет в реестре."""
+    code = str(code or "").strip()
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid)
+    if not doc or not task or task.get("cancelled_at"):
+        return _res("gone")
+    lines = task.get("lines") or []
+    if not any(l.get("from") == src for l in lines):
+        return _res("gone")
+    g = give_view(mid, doc, oid, task, src)
+    пара = {"got": g["got"], "qty": g["need"], "status": g["status"], "from_code": g["from_code"],
+            "lines": [{"id": l["id"], "name": l["name"], "unit": l["unit"],
+                       "qty": l["qty"], "got": l["got"]} for l in g["lines"]]}
+    if not code:
+        return _res("empty", pair=пара)
+    gv = (task.get("give") or {}).get(src) or {}
+    codes = gv.get("codes") or []
+    qr = await db.qr_get(code)
+    if not qr:
+        return _res("unknown", code=code, pair=пара)
+    pid = str(qr.get("product_id") or "")
+    pname = qr.get("product_name") or ""
+    line = next((l for l in g["lines"] if l["id"] == pid), None)
+    if code in codes:
+        return _res("ok", code=code, name=pname, id=pid,
+                    qty=sr._num(float(qr.get("qty") or 1)),
+                    unit=(line or {}).get("unit") or 1, line=line, pair=пара)
+    # Не в этой отдаче. Говорим, где она сейчас: у отдающего (значит, её просто
+    # не отсканировали), у получателя или на третьем районе.
+    at = (qr.get("district") or "").strip()
+    return _res("not_here", code=code, name=pname, id=pid,
+                at=at, at_code=OFFICE_CODES.get(at, ""),
+                in_task=bool(line), pair=пара)
+
+
+async def check_done(mid: str, oid: str, src: str, name: str, by: int,
+                     seen, extra: int, missing: list) -> dict:
+    """Проверка закончена — записываем, кто проверял и что вышло."""
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid)
+    if not doc or not task:
+        return {"ok": False, "error": "gone"}
+    g = give_view(mid, doc, oid, task, src)
+    await db.move_give_check(mid, oid, src, {
+        "by": int(by or 0), "by_name": str(name or "")[:60], "at": _now(),
+        "seen": sr._num(float(seen or 0)), "got": g["got"],
+        "extra": int(extra or 0),
+        "missing": [{"id": str(m.get("id") or ""), "name": str(m.get("name") or "")[:60],
+                     "qty": sr._num(float(m.get("qty") or 0))} for m in (missing or [])][:40],
+        "ok": abs(float(seen or 0) - float(g["got"] or 0)) < 1e-9 and not extra,
+    })
+    log.info(f"[move] {mid}/{oid}: {name} проверил отдачу из {src} — "
+             f"{seen} из {g['got']}, лишних {extra}")
+    return {"ok": True, "task": g}
+
+
+async def handle_own_check(request):
+    """POST {district, from, code, as} — проверочный скан из STAR."""
+    b = await _body(request)
+    r = await check_code(request.match_info.get("mid") or "", str(b.get("district") or ""),
+                         str(b.get("from") or ""), str(b.get("code") or ""))
+    return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+async def handle_own_check_done(request):
+    """POST {district, from, seen, extra, missing, as} — закрыть проверку."""
+    b = await _body(request)
+    r = await check_done(request.match_info.get("mid") or "", str(b.get("district") or ""),
+                         str(b.get("from") or ""), _own_name(request, b),
+                         int(request.get("owner_id") or 0), b.get("seen") or 0,
+                         int(b.get("extra") or 0),
+                         b.get("missing") if isinstance(b.get("missing"), list) else [])
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 

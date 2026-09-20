@@ -4350,6 +4350,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .wal-r-t{display:block;font-size:13px;font-weight:600}
 .wal-r-s{display:block;margin-top:1px;font-size:11px;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Назначение платежа — из отчёта владельца кошелька (владелец, 20 сен 2026).
+   Золотом и в две строки: это ответ на вопрос «за что», ради которого отчёт и
+   грузят, а номер кошелька рядом — уже подробность. */
+.wal-r-p{display:block;margin-top:3px;font-size:12px;line-height:1.3;color:var(--gold2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .wal-r-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;
   font-weight:700;color:var(--up);font-variant-numeric:tabular-nums}
 .wal-r-v.out{color:var(--dn)}
@@ -10829,6 +10834,31 @@ body.safe-open .cvo-hdr{opacity:0}
 .mvo-acts{display:flex;gap:7px;margin:2px 6px 10px}
 .mvo-scan,.mvo-take,.mvo-back{padding:10px 12px;border-radius:11px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700}
 .mvo-scan{flex:1;color:#1a1408;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Проверка отложенного: кнопка у передачи и список позиций на экране проверки
+   (владелец, 20 сен 2026: «приехал старший и хочет проверить, что они всё
+   правильно отсканировали»). Ничего не меняет — поэтому спокойная, не золотая. */
+.mvo-chk{margin:0 6px 10px}
+.mvo-chk-n{padding:0 2px 6px;font-size:11.5px;color:var(--muted)}
+.mvo-chk-b{width:100%;padding:10px 12px;border-radius:11px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.35)}
+.mvo-chk-b:active{background:rgba(201,169,110,.16)}
+.mvc-toggle{align-self:flex-start;margin:0 0 8px;padding:7px 12px;border-radius:999px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;color:var(--gold2);
+  background:rgba(10,10,20,.72);border:1px solid rgba(201,169,110,.4);backdrop-filter:blur(6px)}
+.mvc-toggle.on{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2));border-color:transparent}
+.mvc-l{max-height:42vh;overflow:auto;margin:0 0 8px;border-radius:14px;
+  border:1px solid rgba(201,169,110,.3);background:rgba(10,10,20,.9);backdrop-filter:blur(8px)}
+.mvc-r{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:9px 13px;
+  font-size:13px;border-top:1px solid rgba(255,255,255,.06)}
+.mvc-r:first-child{border-top:0}
+.mvc-r span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)}
+.mvc-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.mvc-r b u{text-decoration:none;font-size:11px;color:var(--muted)}
+.mvc-r.ok b{color:var(--up)} .mvc-r.ok span{color:var(--text)}
+.mvc-r.part b{color:var(--gold2)}
+.mvc-r.warn b,.mvc-r.warn span{color:var(--warn)}
 /* Приём сканом у принимающей стороны: строка «принято N из M» и две кнопки —
    сканировать и «не всё пришло» (владелец, 20 сен 2026). */
 .mvo-recv{padding:2px 2px 10px}
@@ -25358,6 +25388,171 @@ function mvtClose(){
   mvoPaint(); mvoLoad(); mvoPollStart();
 }
 
+// ── Проверка отложенного ──────────────────────────────────────────────────
+// Старший приезжает на район и пересканирует то, что водители отложили. Этот
+// скан ничего не меняет: сервер только отвечает, та ли это бутылка. На экране
+// — сколько проверено по каждой позиции и что ещё не показали.
+let MVC = null;
+const MVC_NO = {
+  unknown:  () => 'кода нет в реестре',
+  not_here: r => r.in_task ? `эта бутылка не отложена${r.at_code ? ' · числится на ' + r.at_code : ''}`
+                           : `не из этой отдачи${r.at_code ? ' · числится на ' + r.at_code : ''}`,
+  gone:     () => 'заявки больше нет',
+};
+async function mvcOpen(mid, to, src){
+  const x = (MVO.tasks || []).find(t => t.move_id === mid && t.district === to);
+  const s = x && (x.sources || []).find(q => q.district === src);
+  if(!s) return;
+  mvoPollStop();
+  MVC = {mid, to, src, x, s, busy: false, rows: [], seen: {}, codes: new Set(), extra: 0,
+         lines: (s.lines || []).map(l => ({...l}))};
+  mvcCam();
+  try{
+    await SCAN.start(document.getElementById('mvcVideo'), mvcScan, qrIdle, () => qrFlash('again'), qrHold);
+  }catch(e){ _toast('Нет доступа к камере'); return mvcClose(); }
+  const tb = document.getElementById('mvcTorch');
+  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+}
+const _mvcНашли = () => Object.values((MVC || {}).seen || {}).reduce((a, v) => a + v, 0);
+const _mvcВсего = () => (MVC.lines || []).reduce((a, l) => a + (+l.got || 0), 0);
+function mvcLeftTxt(){
+  const нет = (MVC.lines || []).filter(l => (MVC.seen[l.id] || 0) < (+l.got || 0));
+  if(!нет.length) return 'Всё сошлось — проверено полностью';
+  return 'Не показали: ' + нет.slice(0, 4).map(l => `${l.name} ${fmtQty((+l.got || 0) - (MVC.seen[l.id] || 0))}`).join(', ')
+    + (нет.length > 4 ? '…' : '');
+}
+function mvcCam(){
+  const {x, s} = MVC;
+  ACC_BACK = mvcClose;
+  _setRail('accRail', '');
+  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
+  _setText('accTitle', `Проверка · ${s.code} ${s.name}`);
+  _setText('accSub', `отложено в ${x.district_code} ${x.district_name} · сканируйте, ничего не меняется`);
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
+    <div class="scan-cam" id="mvcCamBox">
+      <video id="mvcVideo" playsinline muted autoplay></video>
+      <div class="scan-frame" id="qrFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="qrBadge"></div>
+      </div>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="mvcN">0</b><span>из ${fmtQty(_mvcВсего())}</span></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="mvcTorch" onclick="qrTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="qrHint">${escS(mvcLeftTxt())}</div>
+        <div class="scan-hud-bot">
+          <!-- Позиции передачи — панелью поверх кадра, по кнопке: камера здесь
+               во весь экран, а список нужен не всё время, а когда спрашивают
+               «чего ещё не показали». -->
+          <div class="mvc-l" id="mvcList" hidden>${mvcListHtml()}</div>
+          <button class="mvc-toggle" id="mvcToggle" onclick="mvcList()">Позиции · ${
+            (MVC.lines || []).length}</button>
+          <div class="scan-strip" id="mvcFeed"></div>
+          <div class="scan-dockbar">
+            <button class="scan-go" onclick="mvcDone(this)">Проверка закончена</button>
+          </div>
+        </div>
+      </div>
+    </div></div>`;
+  scanLive('accOv');
+}
+// Позиции передачи и сколько по каждой уже проверено — ради этого списка
+// проверку и делают: видно не «сколько всего», а что именно не показали.
+function mvcListHtml(){
+  return (MVC.lines || []).map(l => {
+    const было = +l.got || 0, есть = MVC.seen[l.id] || 0;
+    const cls = есть >= было - 1e-9 ? ' ok' : есть ? ' part' : '';
+    return `<div class="mvc-r${cls}"><span>${escS(l.name)}</span>
+      <b>${fmtQty(есть)}<u> / ${fmtQty(было)}</u></b></div>`;
+  }).join('') + (MVC.extra ? `<div class="mvc-r warn"><span>Лишние бутылки — не из этой отдачи</span>
+      <b>${MVC.extra}</b></div>` : '');
+}
+// Панель позиций: открыта — видно все строки передачи и сколько по каждой
+// проверено; закрыта — не мешает камере.
+function mvcList(){
+  const l = document.getElementById('mvcList'), b = document.getElementById('mvcToggle');
+  if(!l) return;
+  l.hidden = !l.hidden;
+  if(b) b.classList.toggle('on', !l.hidden);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function mvcPaint(){
+  const n = document.getElementById('mvcN'); if(n) n.textContent = fmtQty(_mvcНашли());
+  const h = document.getElementById('qrHint'); if(h) h.textContent = mvcLeftTxt();
+  const l = document.getElementById('mvcList'); if(l) l.innerHTML = mvcListHtml();
+  const feed = document.getElementById('mvcFeed');
+  if(feed) feed.innerHTML = MVC.rows.slice(0, 40).map(r => `<div class="scan-row ${r.ok ? 'new' : 'err'}">
+      <span class="scan-dot" style="background:${r.ok ? 'var(--up)' : 'var(--dn)'}"></span>
+      <span class="scan-b"><span class="scan-code">${escS(r.name || r.code)}</span>
+        <span class="scan-raw">${escS(r.sub || '')}</span></span>
+      <span class="scan-state" style="color:${r.ok ? 'var(--up)' : 'var(--dn)'}">${
+        escS(r.ok ? 'на месте' : 'нет')}</span></div>`).join('');
+}
+async function mvcScan(code){
+  if(!MVC || MVC.busy){ if(MVC){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); } return; }
+  if(MVC.codes.has(code)){ qrFlash('again', 'уже проверили'); return; }
+  MVC.busy = true;
+  let r = null;
+  try{
+    r = await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(MVC.mid)}/check`,
+      {method: 'POST', body: {district: MVC.to, from: MVC.src, code, as: _rcvMe()}});
+  }catch(e){ r = null; }
+  if(!MVC) return;
+  MVC.busy = false;
+  if(r && r.ok){
+    MVC.codes.add(code);
+    if(r.pair && r.pair.lines) MVC.lines = r.pair.lines;
+    MVC.seen[r.id] = (MVC.seen[r.id] || 0) + (+r.qty || 1);
+    MVC.rows.unshift({ok: true, code, name: r.name,
+                      sub: `${fmtQty(MVC.seen[r.id])} / ${fmtQty((MVC.lines.find(l => l.id === r.id) || {}).got || 0)}`});
+    qrFlash('ok', r.name);
+    mvcPaint();
+    if(_mvcНашли() >= _mvcВсего() - 1e-9) _toast('Всё отложенное нашлось');
+    return;
+  }
+  if(!r){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); }
+  else if(r.verdict !== 'unknown'){ MVC.extra++; MVC.codes.add(code); }
+  const say = r ? ((MVC_NO[r.verdict] || (() => r.say || 'не из этой отдачи'))(r)) : 'нет связи — поднесите ещё раз';
+  MVC.rows.unshift({ok: false, code, name: (r && r.name) || code, sub: say});
+  qrFlash('err', say);
+  mvcPaint();
+}
+async function mvcDone(btn){
+  if(!MVC) return;
+  const нет = (MVC.lines || []).filter(l => (MVC.seen[l.id] || 0) < (+l.got || 0))
+    .map(l => ({id: l.id, name: l.name, qty: (+l.got || 0) - (MVC.seen[l.id] || 0)}));
+  const всё = !нет.length && !MVC.extra;
+  const ok = await askDialog(всё ? 'Всё сошлось' : 'Закончить проверку?',
+    всё ? `Нашли всё отложенное — ${fmtQty(_mvcНашли())} ед.`
+        : `Нашли ${fmtQty(_mvcНашли())} из ${fmtQty(_mvcВсего())} ед.`
+          + (нет.length ? ` Не показали: ${нет.slice(0, 3).map(l => l.name + ' ' + fmtQty(l.qty)).join(', ')}${нет.length > 3 ? '…' : ''}.` : '')
+          + (MVC.extra ? ` Лишних бутылок: ${MVC.extra}.` : '')
+          + ' Запишем как есть — передачу это не меняет.',
+    всё ? 'Записать' : 'Записать как есть', 'Ещё сканировать');
+  if(!ok) return;
+  if(btn){ btn.disabled = true; }
+  try{
+    await ownerApi.ownerFetch(`/api/owner/move/${encodeURIComponent(MVC.mid)}/check/done`,
+      {method: 'POST', body: {district: MVC.to, from: MVC.src, seen: _mvcНашли(),
+                              extra: MVC.extra, missing: нет, as: _rcvMe()}});
+    _toast(всё ? 'Проверка записана — всё сошлось' : 'Проверка записана с расхождением');
+  }catch(e){ _toast('Не удалось записать проверку'); if(btn) btn.disabled = false; return; }
+  mvcClose();
+}
+function mvcClose(){
+  try{ SCAN.stop(); }catch(e){}
+  MVC = null; ACC_BACK = null;
+  mvoPaint(); mvoLoad(); mvoPollStart();
+}
+
 // «13 позиций» и «0 / 23» — про разное: первое наименования, второе штуки.
 // Молчание об этом читается как ошибка, поэтому состав пишем словами склада.
 function _mvoСостав(ls){
@@ -25431,7 +25626,8 @@ function mvoGiveCards(){
            <span class="pk-slug">${s.lines.length} ${pluralize(s.lines.length,'позиция','позиции','позиций')} · ${
              _mvoСостав(s.lines)} · ${escS(how)}</span></span>
          <span class="pk-n">${fmtQty(s.got)}<u> / ${fmtQty(s.qty)}</u></span>
-         <span class="mvo-chev">${ICO_CHEV}</span></button>` + _mvoDiff(s) + _mvoLines(key, s.lines) + скан;
+         <span class="mvo-chev">${ICO_CHEV}</span></button>`
+         + _mvoDiff(s) + _mvoLines(key, s.lines) + _mvoCheck(x, s) + скан;
     }).join('');
     const куда = [...new Set(c.pairs.map(p => p.x.district))].length;
     return `<div class="rcv mvo-card">
@@ -25444,6 +25640,22 @@ function mvoGiveCards(){
       ${rows}
     </div>`;
   }).join('');
+}
+
+// Проверка отложенного (владелец, 20 сен 2026: «водители подготовили товар на
+// своём районе, отсканировали его и отложили в сторону; но приехал старший и
+// хочет проверить, что они всё правильно отсканировали — ему нужно заново
+// отсканировать чисто для проверки»). Кнопка стоит у каждой передачи, где уже
+// что-то отсканировано, и ничего не меняет: только сверяет.
+function _mvoCheck(x, s){
+  if(!(+s.got > 0)) return '';
+  const c = s.check;
+  const итог = c ? `<div class="mvo-chk-n">${c.ok ? 'проверено' : 'проверено с расхождением'}${
+    c.by_name ? ' · ' + escS(c.by_name) : ''}${
+    c.ok ? '' : ` · нашли ${fmtQty(c.seen)} из ${fmtQty(c.got)}${c.extra ? ', лишних ' + c.extra : ''}`}</div>` : '';
+  return `<div class="mvo-chk">${итог}
+    <button class="mvo-chk-b" onclick="mvcOpen('${escS(x.move_id)}','${escS(x.district)}','${escS(s.district)}')">
+      ${c ? 'Проверить ещё раз' : 'Проверить сканом'}</button></div>`;
 }
 
 // «Принять»: по районам, куда везут, — кто отдаёт, что принято, где неровно.
@@ -26178,6 +26390,9 @@ function walBody(d){
           <span class="wal-r-s">${escS(_walWhen(r.ts))}${
             r.peer ? ' · ' + escS(r.peer) : ''}${
             r.linked && r.linked_by ? ' · ' + escS(r.linked_by) : ''}</span>
+          <!-- Назначение платежа из отчёта владельца кошелька: за что эти
+               деньги. Пустое — строка не занимает места. -->
+          ${r.purpose ? `<span class="wal-r-p">${escS(r.purpose)}</span>` : ''}
         </span>
         <!-- Привязывать руками из ленты больше нечем: разносит сверка, а
              человек только разбирает спорное. Кнопка на каждой строке звала
@@ -26200,6 +26415,10 @@ function walBody(d){
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap qb-row">
       <button class="qb" onclick="walMatch(this)">Сверить с заказами</button>
+      <button class="qb qb-ico" onclick="walReport()" aria-label="Загрузить отчёт"
+        title="Отчёт с назначениями"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></button>
       <button class="qb qb-ico" onclick="walSend(this)" aria-label="Прислать файлом"
         title="Файлом в чат">${ICO_TG}</button>
       <button class="qb qb-ico" onclick="walRefresh(this)" aria-label="Обновить"
@@ -26207,6 +26426,64 @@ function walBody(d){
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
         stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
     </div>`;
+}
+
+// Отчёт владельца кошелька: раз в неделю он присылает файл с назначениями
+// платежей (владелец, 20 сен 2026). Файл уходит на сервер как есть, разбирает
+// и сводит его сервер — по хешу перевода, а нет его, то по сумме и дню.
+// Спорное (две одинаковые суммы в один день) он не назначает сам: показываем
+// такие строки человеку.
+let _walFile = null;
+function walReport(){
+  if(!_walFile){
+    _walFile = document.createElement('input');
+    _walFile.type = 'file';
+    _walFile.accept = '.csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain';
+    _walFile.style.display = 'none';
+    _walFile.onchange = () => { const f = _walFile.files && _walFile.files[0];
+                                _walFile.value = ''; if(f) walReportSend(f); };
+    document.body.appendChild(_walFile);
+  }
+  _walFile.click();
+}
+async function walReportSend(file){
+  if(file.size > 8 * 1024 * 1024) return _toast('Файл больше 8 МБ');
+  _toast('Читаю отчёт…');
+  let b64;
+  try{
+    b64 = await new Promise((ok, no) => {
+      const fr = new FileReader();
+      fr.onerror = () => no(new Error('read'));
+      fr.onload = () => ok(String(fr.result || '').split(',')[1] || '');
+      fr.readAsDataURL(file);
+    });
+  }catch(e){ return _toast('Файл не прочитался'); }
+  let r;
+  try{
+    r = await ownerApi.ownerFetch('/api/owner/wallet/report',
+      {method: 'POST', body: {name: file.name, data: b64, as: _meName()}});
+  }catch(e){
+    const p = (e && e.payload) || {};
+    return _toast({no_rows: 'В файле не нашлось строк с назначениями',
+                   unreadable: 'Не смог разобрать файл',
+                   offline: 'Сеть кошелька не ответила — попробуйте ещё раз',
+                   too_big: 'Файл больше 8 МБ'}[p.error] || 'Не удалось загрузить отчёт');
+  }
+  await walRefresh();
+  walReportDone(r);
+}
+// Что вышло: сколько платежей получило назначение и что осталось человеку.
+function walReportDone(r){
+  const сп = (a, t) => (a && a.length) ? `<div class="wal-rep-h">${t}</div>` + a.map(x =>
+      `<div class="wal-rep-r"><span>${escS(x.text)}</span><b>${
+        x.amount != null ? fmtUsdt(x.amount) : ''}${x.when ? ' · ' + escS(x.when) : ''}</b></div>`).join('') : '';
+  const тело = `<div class="wal-rep">
+      <div class="wal-rep-n"><b>${r.matched}</b> ${pluralize(r.matched,'платёж получил','платежа получили','платежей получили')} назначение</div>
+      <div class="wal-rep-s">из ${r.rows} ${pluralize(r.rows,'строки','строк','строк')} отчёта</div>
+      ${сп(r.disputed, `Спорные — одинаковые суммы в один день, назначьте сами · ${r.disputed_n}`)}
+      ${сп(r.missed, `Не нашли в кошельке · ${r.missed_n}`)}
+    </div>`;
+  askDialog('Отчёт загружен', '', 'Понятно', '', '', тело);
 }
 
 // Файлом в чат: посмотреть можно и на экране, а свести с бухгалтерией,

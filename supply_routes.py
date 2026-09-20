@@ -2500,6 +2500,18 @@ async def handle_move_scan(request):
 
 
 @require_owner
+async def handle_move_check(request):
+    import move_routes
+    return await move_routes.handle_own_check(request)
+
+
+@require_owner
+async def handle_move_check_done(request):
+    import move_routes
+    return await move_routes.handle_own_check_done(request)
+
+
+@require_owner
 async def handle_move_receive(request):
     import move_routes
     return await move_routes.handle_own_receive(request)
@@ -2562,6 +2574,9 @@ def setup(app):
         ("/api/owner/move/{mid}/scan",              handle_move_scan,    "POST"),
         # Принимающая сторона тоже сканирует — и из STAR тоже (20 сен 2026).
         ("/api/owner/move/{mid}/receive",           handle_move_receive, "POST"),
+        # Проверка отложенного сканом: ничего не меняет (20 сен 2026).
+        ("/api/owner/move/{mid}/check",             handle_move_check,   "POST"),
+        ("/api/owner/move/{mid}/check/done",        handle_move_check_done, "POST"),
         ("/api/owner/move/{mid}/accept",            handle_move_accept,  "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)

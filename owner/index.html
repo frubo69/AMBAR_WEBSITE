@@ -24434,7 +24434,7 @@ function scanLive(id){
 }
 
 const SCAN = {
-  stream:null, video:null, cv:null, ctx:null, raf:null,
+  stream:null, video:null, cv:null, ctx:null, raf:null, onLost:null,
   seen:new Set(),          // коды этой сессии
   seenAt:new Map(),        // код → когда его видели в кадре последний раз
   onCode:null, onIdle:null, onRepeat:null, onHold:null,
@@ -24472,7 +24472,7 @@ const SCAN = {
   async start(videoEl, onCode, onIdle, onRepeat, onHold){
     this.stop(true);          // свой же перезапуск, экран остаётся сканером
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
-    this.onRepeat = onRepeat; this.onHold = onHold;
+    this.onRepeat = onRepeat; this.onHold = onHold; this.onLost = null;
     this.seen = new Set(); this.seenAt = new Map();
     this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
@@ -24535,6 +24535,14 @@ const SCAN = {
 
   _loop(ts){
     if(!this.stream) return;
+    // Экран под камерой перерисовали — <video> оторвался от страницы. Человек
+    // уже не видит сканер, а камера всё снимает: греет телефон, держит память
+    // и через минуту приложение убивают. Замечаем и гасим сами.
+    if(this.video && !this.video.isConnected){
+      this.stop();
+      try{ if(this.onLost) this.onLost(); }catch(e){}
+      return;
+    }
     this.raf = requestAnimationFrame(t => this._loop(t));
     if(ts - this.lastDecode < this.DECODE_MS) return;
     this.lastDecode = ts;
@@ -25163,11 +25171,17 @@ const MVO_SRC = {wait: () => 'ждёт отдающего', pause: () => 'нач
                  done: s => `принял ${s.accepted_by || '—'}`, diff: s => `принял неровно · ${s.accepted_by || '—'}`,
                  cancelled: () => 'снято'};
 
+// Сканер занял раздел. Пока он открыт, ни рисовать список, ни ходить за
+// свежими заявками нельзя: перерисовка сносит <video> вместе с камерой, и
+// человек посреди скана оказывается на списке, а камера остаётся работать в
+// оторванном узле (владелец, 20 сен 2026: «посреди скана приложение вылетает»).
+const mvoСкан = () => !!(MVT || MVC);
+
 async function mvoLoad(){
-  if(HIDE) return;
+  if(HIDE || mvoСкан()) return;
   try{ const r = await ownerApi.ownerFetch('/api/owner/move/live'); MVO.tasks = r.tasks || []; MVO.open = r.open || 0; }
   catch(e){ return; }
-  if(ACC_VIEW === 'moves' && !MVT) mvoPaint();
+  if(ACC_VIEW === 'moves') mvoPaint();
 }
 
 // Карточки перемещений на «Обзоре» больше нет (владелец, 20 сен 2026: «убери
@@ -25191,9 +25205,10 @@ function mvoPollStart(){
 function mvoPollStop(){ if(MVO.poll){ clearInterval(MVO.poll); MVO.poll = null; } }
 
 async function mvoPlan(){
+  if(mvoСкан()) return;
   try{ MVO.plan = await ownerApi.ownerFetch('/api/owner/move/plan'); }
   catch(e){ MVO.plan = null; }
-  if(ACC_VIEW === 'moves' && !MVT) mvoPaint();
+  if(ACC_VIEW === 'moves') mvoPaint();
   if(STK.view === 'mvn') mvnPaint();          // расчёт живёт на экране создания
 }
 
@@ -25305,6 +25320,7 @@ async function mvtOpen(mid, to, src, приём){
   try{
     await SCAN.start(document.getElementById('mvtVideo'), mvtScan, qrIdle, () => qrFlash('again'), qrHold);
   }catch(e){ _toast('Нет доступа к камере'); return mvtClose(); }
+  SCAN.onLost = () => { if(MVT) mvtClose(); };
   const tb = document.getElementById('mvtTorch');
   if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
 }
@@ -25429,6 +25445,7 @@ async function mvcOpen(mid, to, src){
   try{
     await SCAN.start(document.getElementById('mvcVideo'), mvcScan, qrIdle, () => qrFlash('again'), qrHold);
   }catch(e){ _toast('Нет доступа к камере'); return mvcClose(); }
+  SCAN.onLost = () => { if(MVC) mvcClose(); };
   const tb = document.getElementById('mvcTorch');
   if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
 }
@@ -25770,6 +25787,7 @@ async function mvoDiff(mid, to, src){
 }
 
 function mvoPaint(){
+  if(mvoСкан()) return;                       // поверх камеры не рисуем — см. mvoСкан
   _setText('accTitle', 'Перемещения');
   _setText('accSub', MVO.open ? `${MVO.open} ${pluralize(MVO.open,'район','района','районов')} в работе`
                               : 'по районам');
@@ -25790,7 +25808,7 @@ function mvoPaint(){
 }
 
 setTimeout(mvoLoad, 2000);
-setInterval(() => { if(!document.hidden) mvoLoad(); }, 30000);
+setInterval(() => { if(!document.hidden && !mvoСкан()) mvoLoad(); }, 30000);
 
 let QR_CATF = 'all';
 // Серый треугольник справа у строки: видно, что нажимается и ведёт дальше.

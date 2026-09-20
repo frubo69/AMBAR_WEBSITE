@@ -1702,7 +1702,7 @@ async def handle_history(request):
 
 
 KIND_TITLE = {
-    "delivered": "отметил доставку",
+    "delivered": "привёз заказ",
     "cancel":    "просит отменить заказ",
     "edit":      "просит изменить состав",
     "note":      "сообщение по заказу",
@@ -1873,7 +1873,7 @@ async def handle_delivered(request):
     """«Доставил» — это пинг оператору, а не закрытие заказа.
 
     Закрывает заказ оператор: деньги, выручка и спорные ситуации на нём. Но
-    видно ему должно быть сразу и явно, что водитель уже отметил."""
+    видно ему должно быть сразу и явно, что водитель уже привёз."""
     oid = (request.match_info.get("oid") or "").strip()
     me = request["driver"]
     try:
@@ -1908,12 +1908,12 @@ async def handle_delivered(request):
     req = {"kind": "delivered", "text": "", "items": None, "diff": [], "total": None,
            "by": me["name"], "at": datetime.now(timezone.utc).isoformat(), "status": "open"}
     await db.update_order(oid, driver_req=req)
-    log.info(f"[driver] {me['name']} отметил доставку #{oid} — ждём оператора")
+    log.info(f"[driver] {me['name']} привёз заказ #{oid} — ждём оператора")
     await _notify_operators(oid, me, req, o)
     try:
         from owner_routes import notify_owners
         await notify_owners("orders.driver_done",
-            f"📦 *Водитель отметил доставку #{oid}*\n"
+            f"📦 *Водитель привёз заказ #{oid}*\n"
             f"{me['name']} ({me['district_code']}) · {o.get('total',0)} AED\n"
             f"_Ждёт подтверждения оператора._", test=bool(o.get("test")))
     except Exception as e:

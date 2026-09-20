@@ -1613,7 +1613,7 @@ async def _close_delivered(oid: str, order: dict, who: str, by_driver: str = "")
             "orders.delivered",
             f"✅ *Заказ доставлен #{oid}*\n"
             f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}"
-            + (f"\nОтметил водитель {by_driver}, подтвердил {who}" if by_driver else ""),
+            + (f"\nПривёз {by_driver}, подтвердил {who}" if by_driver else ""),
             test=bool(order.get("test")))
         # Сохраняем id уведомлений: возврат из доставленных их снимает.
         if sent:
@@ -1852,7 +1852,7 @@ def _late_by(o: dict) -> int:
 
 
 DRV_REQ_TITLE = {
-    "delivered": "водитель отметил доставку",
+    "delivered": "водитель привёз заказ",
     "cancel":    "водитель просит отменить",
     "edit":      "водитель просит правку",
     "note":      "сообщение от водителя",

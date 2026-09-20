@@ -1059,36 +1059,48 @@ body.test-drv .wo-fix{display:none}
 .ex-tot b{display:block;margin-top:2px;font-size:20px;font-weight:800;color:var(--gold2);letter-spacing:-.4px;font-variant-numeric:tabular-nums}
 .ex-c{flex:0 0 auto;display:flex;color:var(--gold2)}
 /* Наличные за смену (владелец, 20 сен 2026: «пиши не 2 дирхама, а сколько
-   денег наличными у него осталось: бери все наличные, что должны быть на
-   руках, вычитай расход и пиши, какую сумму он должен сдать; сделай это
-   наглядно»). Сверху — строки вычитания, внизу крупно то, что сдавать. Та же
-   арифметика, что в «Итогах смены» и у старшего в «Сборе выручки». */
-.ex-cash{display:block;width:100%;padding:13px 14px 12px;border-radius:18px;text-align:left;font-family:inherit;
+   денег наличными у него осталось… и сделай это наглядно»; «просто в ряд пиши
+   дирхамы и доллары»; «оформи эти цифры красиво, чтобы не смотрелись дёшево и
+   бардачно»). Квитанция: подписи слева, числа одной колонкой по правому краю
+   (одна гарнитура, один кегль, табличные цифры), валюта — в золотой оправе,
+   а итог отделён линией и стоит своей строкой под подписью. Цветом выделен
+   только знак: приход зелёным, вычет приглушённо-красным, итог золотом. */
+.ex-cash{display:block;width:100%;padding:14px 16px 13px;border-radius:20px;text-align:left;font-family:inherit;
   color:var(--text);cursor:pointer;border:1px solid rgba(201,169,110,.5);
   background:linear-gradient(160deg,rgba(201,169,110,.2),rgba(201,169,110,.04))}
 .ex-cash:active{background:linear-gradient(160deg,rgba(201,169,110,.26),rgba(201,169,110,.07))}
-.exc-h{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:1.5px;
+.exc-h{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:1.6px;
   text-transform:uppercase;color:var(--gold2)}
 .exc-h span{flex:1;min-width:0}
 .exc-h em{flex:0 0 auto;display:flex;color:var(--gold2)}
-.exc-r{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0 0}
-.exc-r span{font-size:13.5px;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.exc-r b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;white-space:nowrap;
-  font-variant-numeric:tabular-nums}
-/* Валюта в строке — теми же купюрами, рядом с дирхамами и тем же кеглем. */
-.exc-fxi{margin-left:10px;color:var(--gold2)}
-.exc-r.minus b{color:#E88C8C}
-.exc-r.plus b{color:var(--ok,#5BC489)}
-.exc-sum{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:11px;
-  border-top:1px solid rgba(201,169,110,.32)}
-.exc-sum u{text-decoration:none;font-size:12.5px;font-weight:700;color:var(--text)}
-.exc-vals{display:flex;align-items:baseline;justify-content:flex-end;flex-wrap:wrap;gap:4px 14px;min-width:0}
-.exc-sum b{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;line-height:1;letter-spacing:-.5px;
-  color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
-.exc-sum b i{font-style:normal;font-size:14px;color:var(--gold2);margin-left:5px}
-.exc-sum.dn b{color:#E88C8C}
-.exc-note{margin-top:7px;font-size:12px;line-height:1.35;color:var(--sub)}
-.exc-fx{margin-top:4px;font-size:12px;color:var(--gold2)}
+/* Одна сетка на все строки: числа стоят колонкой, а не каждое по своей ширине.
+   Валюте — своя колонка справа, иначе дирхамы в её строке уезжают влево и
+   правый край чисел рвётся. */
+.exc-rows{display:grid;grid-template-columns:1fr auto;column-gap:14px;align-items:baseline;margin-top:8px}
+.exc-rows.cur{grid-template-columns:1fr auto auto;column-gap:10px}
+.exc-rows > i{display:block;font-style:normal}
+.exc-rows > span{padding:7px 0;font-size:13.5px;color:var(--sub);min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.exc-rows > b{padding:7px 0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;font-weight:700;
+  text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:#EDEAF4;letter-spacing:-.2px}
+.exc-rows > b.minus{color:#E2A0A0}
+.exc-rows > b.plus{color:#8CCFAA}
+/* Валюта — теми же купюрами, в оправе: видно сразу и не спорит с дирхамами. */
+.exc-cur{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;
+  border:1px solid rgba(201,169,110,.45);background:rgba(201,169,110,.1);color:var(--gold2);
+  font-size:13px;font-weight:700;letter-spacing:.2px;vertical-align:1px}
+.exc-tot{margin-top:11px;padding-top:12px;border-top:1px solid rgba(201,169,110,.3)}
+.exc-tot u{display:block;text-decoration:none;font-size:10.5px;font-weight:700;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--gold2)}
+.exc-big{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;margin-top:8px}
+.exc-big b{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;
+  letter-spacing:-.8px;color:var(--gold);font-variant-numeric:tabular-nums}
+.exc-big b i{font-style:normal;font-size:14px;font-weight:700;color:rgba(201,169,110,.75);
+  margin-left:7px;letter-spacing:.4px}
+.exc-big .exc-cur{height:30px;margin-left:0;padding:0 12px;font-size:19px;border-color:rgba(201,169,110,.55);
+  background:rgba(201,169,110,.14);color:var(--gold)}
+.exc-tot.dn .exc-big b{color:#E2A0A0}
+.exc-note{margin-top:9px;font-size:12px;line-height:1.35;color:var(--muted)}
 /* «Основные расходы» по макету владельца (14 сен 2026, экран 430, ≈3,3 px/pt):
    шапка раздела 19/700 с пилюлей-счётчиком «4/4 ✓» (золотая, когда всё
    заполнено), плитки 196×116 r12, квадрат значка 41 r9 нейтральный с тонким
@@ -8974,35 +8986,36 @@ function expPage(kind){
 // строкой теми же купюрами, без курса. Числа — с сервера (cash_math).
 function expCashCard(total){
   const h = HAND, aed = v => `${fmt(Math.abs(v))}`;
-  const row = (t, v, cls) => `<div class="exc-r${cls ? ' ' + cls : ''}"><span>${t}</span><b>${v}</b></div>`;
   const шапка = `<div class="exc-h"><span>Наличные за смену</span><em>${svg(ICO.chevR, 15)}</em></div>`;
+  const купюра = x => `<span class="exc-cur">${esc(x.sym)}${fmt(x.amount)}</span>`;
   if(!h) return `<button class="ex-cash" onclick="expGo('all')">${шапка}
-      ${row('Взял за заказы', skb(70, 14))}
-      ${total ? row('Расходы наличными', '−' + aed(total), 'minus') : ''}
-      <div class="exc-sum"><u>Сдать старшему</u><b>${skb(110, 26)}</b></div></button>`;
+      <div class="exc-rows"><span>Взял за заказы</span><b>${skb(70, 14)}</b>
+      ${total ? `<span>Расходы наличными</span><b class="minus">−${aed(total)}</b>` : ''}</div>
+      <div class="exc-tot"><u>Сдать старшему</u><div class="exc-big"><b>${skb(120, 30)}</b></div></div></button>`;
   const fx = h.fx || [];
   // Валюта идёт теми же купюрами и в строке «взял», и в итоге — рядом с
   // дирхамами (владелец, 20 сен 2026: «просто в ряд пиши дирхамы и доллары»).
-  const купюры = fx.map(x => `<span class="exc-fxi">${esc(x.sym)}${fmt(x.amount)}</span>`).join('');
   // «Приход наличными» ни о чём не говорил (владелец: «что такое приход
-  // наличными? это не приход»): пишем, что именно вернули, — «Нам вернули»,
-  // «Мы должны». Видов несколько — перечисляем.
+  // наличными? это не приход»): пишем, что именно вернули, — «Нам вернули».
   const приход = (h.got_list || []).map(x => x.t).filter(Boolean);
   // Дирхамы: взял дирхамами + приход − расходы наличными − бонус. Питание не
   // вычитаем: этих денег у водителя на руках нет. Чай сидит в этой же сумме и
   // сдаётся второй пачкой — про него подпись ниже.
   const дирхамы = (h.taken_aed || 0) + (h.got || 0) - (h.spent_sum || 0) - (h.bonus || 0);
+  const строки = [];
+  const пусто = fx.length ? '<i></i>' : '';
+  const строка = (t, v, cls, хвост) =>
+    строки.push(`<span>${t}</span><b${cls ? ` class="${cls}"` : ''}>${v}</b>${хвост !== undefined ? хвост : пусто}`);
+  строка(`Взял за заказы${h.orders_cash ? ' · ' + h.orders_cash : ''}`, aed(h.taken_aed), '',
+         fx.length ? `<i>${fx.map(купюра).join('')}</i>` : '');
+  if(h.got) строка(приход.length ? приход.join(' · ') : 'Вернули вам наличными', '+' + aed(h.got), 'plus');
+  if(h.spent_sum) строка('Расходы наличными', '−' + aed(h.spent_sum), 'minus');
+  if(h.bonus) строка('Бонус за допродажу · ваш', '−' + aed(h.bonus), 'minus');
   return `<button class="ex-cash" onclick="expGo('all')">${шапка}
-    ${row(`Взял за заказы${h.orders_cash ? ' · ' + h.orders_cash : ''}`, aed(h.taken_aed) + купюры)}
-    ${h.got ? row(приход.length ? приход.join(' · ') : 'Вернули вам наличными', '+' + aed(h.got), 'plus') : ''}
-    ${h.spent_sum ? row('Расходы наличными', '−' + aed(h.spent_sum), 'minus') : ''}
-    ${h.bonus ? row('Бонус за допродажу · ваш', '−' + aed(h.bonus), 'minus') : ''}
-    <div class="exc-sum${дирхамы < 0 ? ' dn' : ''}">
+    <div class="exc-rows${fx.length ? ' cur' : ''}">${строки.join('')}</div>
+    <div class="exc-tot${дирхамы < 0 ? ' dn' : ''}">
       <u>${дирхамы < 0 ? 'Старший вернёт вам' : 'Сдать старшему'}</u>
-      <span class="exc-vals">
-        <b>${aed(дирхамы)}<i>AED</i></b>
-        ${fx.map(x => `<b>${esc(x.sym)}${fmt(x.amount)}</b>`).join('')}
-      </span>
+      <div class="exc-big"><b>${aed(дирхамы)}<i>AED</i></b>${fx.map(купюра).join('')}</div>
     </div>
     ${дирхамы < 0 ? `<div class="exc-note">расходы наличными больше собранного — разницу добавит старший</div>` : ''}
     ${h.tea ? `<div class="exc-note">из них чай операторов ${fmt(h.tea)} AED — отдельной пачкой</div>` : ''}

@@ -1058,6 +1058,34 @@ body.test-drv .wo-fix{display:none}
 .ex-tot u{display:block;text-decoration:none;font-size:12px;color:var(--muted)}
 .ex-tot b{display:block;margin-top:2px;font-size:20px;font-weight:800;color:var(--gold2);letter-spacing:-.4px;font-variant-numeric:tabular-nums}
 .ex-c{flex:0 0 auto;display:flex;color:var(--gold2)}
+/* Наличные за смену (владелец, 20 сен 2026: «пиши не 2 дирхама, а сколько
+   денег наличными у него осталось: бери все наличные, что должны быть на
+   руках, вычитай расход и пиши, какую сумму он должен сдать; сделай это
+   наглядно»). Сверху — строки вычитания, внизу крупно то, что сдавать. Та же
+   арифметика, что в «Итогах смены» и у старшего в «Сборе выручки». */
+.ex-cash{display:block;width:100%;padding:13px 14px 12px;border-radius:18px;text-align:left;font-family:inherit;
+  color:var(--text);cursor:pointer;border:1px solid rgba(201,169,110,.5);
+  background:linear-gradient(160deg,rgba(201,169,110,.2),rgba(201,169,110,.04))}
+.ex-cash:active{background:linear-gradient(160deg,rgba(201,169,110,.26),rgba(201,169,110,.07))}
+.exc-h{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--gold2)}
+.exc-h span{flex:1;min-width:0}
+.exc-h em{flex:0 0 auto;display:flex;color:var(--gold2)}
+.exc-r{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0 0}
+.exc-r span{font-size:13.5px;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exc-r b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.exc-r.minus b{color:#E88C8C}
+.exc-r.plus b{color:var(--ok,#5BC489)}
+.exc-sum{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:11px;
+  border-top:1px solid rgba(201,169,110,.32)}
+.exc-sum u{text-decoration:none;font-size:12.5px;font-weight:700;color:var(--text)}
+.exc-sum b{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;line-height:1;letter-spacing:-.5px;
+  color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.exc-sum b i{font-style:normal;font-size:14px;color:var(--gold2);margin-left:5px}
+.exc-sum.dn b{color:#E88C8C}
+.exc-note{margin-top:7px;font-size:12px;line-height:1.35;color:var(--sub)}
+.exc-fx{margin-top:4px;font-size:12px;color:var(--gold2)}
 /* «Основные расходы» по макету владельца (14 сен 2026, экран 430, ≈3,3 px/pt):
    шапка раздела 19/700 с пилюлей-счётчиком «4/4 ✓» (золотая, когда всё
    заполнено), плитки 196×116 r12, квадрат значка 41 r9 нейтральный с тонким
@@ -4784,6 +4812,12 @@ async function load(){
     // при запуске: между «включил» и «увидел» не должно быть перезапуска
     // приложения — в такую минуту его никто не делает.
     if(!!o.panic !== PANIC){ panicRemote(!!o.panic); return; }
+    // Расходы изменились (сохранили, отклонили, оператор отметил питание) —
+    // наличные пересчитываем сразу, не дожидаясь своего темпа.
+    const подпись = JSON.stringify([(e.extras || []).map(x => [x.id, x.amount, EXP_ST(x)]), e.working]);
+    if(_expSig !== null && подпись !== _expSig) _handAt = 0;
+    _expSig = подпись;
+    if(TAB === 'expenses') handLoad();          // наличные на руках — своим темпом
   }catch(err){ if(isLockOut(err) && !PANIC) lockOut(err); return; }
   // Заказ, который назначили и который водитель ещё не подтвердил, показываем
   // поверх всего. Первый в очереди — тот, что ждёт дольше.
@@ -4856,9 +4890,13 @@ function setTab(t){
   document.body.classList.remove('xp-on');
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'profile'){ profPaint(); profLoad(); }
+  else if(t === 'expenses'){ render(); handLoad(true); return _tabTail(); }
   else if(t === 'supply') supLoad();
   else if(t === 'shift'){ shPaint(); shLoad(); }
   else render();
+  _tabTail();
+}
+function _tabTail(){
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   window.scrollTo({top:0});
 }
@@ -6115,6 +6153,23 @@ async function shClose(){
 // SHS_VIEW — просмотр после закрытия (владелец, 15 сен 2026): те же итоги,
 // но без галочки и кнопки; за какой день — report_day из состояния смены.
 let SHS = null, SHS_OK = false, SHS_AT = 0, SHS_BUSY = false, SHS_VIEW = false;
+// Наличные на руках для карточки «Расходы за смену» — из тех же итогов смены
+// (cash_math на сервере), чтобы цифра совпадала с экраном закрытия и с тем,
+// что видит старший. Спрашиваем только на этой вкладке и не чаще раза в 12 с:
+// итоги считаются по всем заказам дня, каждые пять секунд их дёргать незачем.
+let HAND = null, _handAt = 0, _handBusy = false, _expSig = null;
+async function handLoad(force){
+  if(_handBusy || (!force && Date.now() - _handAt < 12000)) return;
+  _handBusy = true;
+  try{
+    const d = await drvApi.drvFetch('/api/driver/shift/summary');
+    _handAt = Date.now();
+    const было = JSON.stringify(HAND);
+    HAND = d && d.hand ? d.hand : null;
+    if(TAB === 'expenses' && !EXP_PAGE && JSON.stringify(HAND) !== было) render();
+  }catch(e){ _handAt = Date.now(); }
+  _handBusy = false;
+}
 function shsShown(){ return document.getElementById('shsScr').classList.contains('show'); }
 function shsQ(){ return SHS_VIEW && SH && SH.report_day ? `?day=${encodeURIComponent(SH.report_day)}` : ''; }
 function shsOpen(view){
@@ -8906,6 +8961,37 @@ function expPage(kind){
       ${yes && !btn.mode && !sent && !String(xpDraftGet(kind, 'sum') || '').replace(/\D/g, '') ? 'disabled' : ''} onclick="xpSave(this,'${kind}')">${btn.t}</button></div>
   </div>`;
 }
+// Карточка наличных: сколько взял, что из этого ушло и сколько сдавать.
+// Считает сервер (cash_math) — те же числа, что в «Итогах смены» и у старшего
+// в «Сборе выручки»; здесь только раскладка по строкам.
+function expCashCard(total){
+  const h = HAND, aed = v => `${fmt(Math.abs(v))}`;
+  const row = (t, v, cls) => `<div class="exc-r${cls ? ' ' + cls : ''}"><span>${t}</span><b>${v}</b></div>`;
+  const шапка = `<div class="exc-h"><span>Наличные за смену</span><em>${svg(ICO.chevR, 15)}</em></div>`;
+  if(!h) return `<button class="ex-cash" onclick="expGo('all')">${шапка}
+      ${row('Взял за заказы', skb(70, 14))}
+      ${total ? row('Расходы наличными', '−' + aed(total), 'minus') : ''}
+      <div class="exc-sum"><u>Сдать старшему</u><b>${skb(110, 26)}</b></div></button>`;
+  // Сдать — обе пачки: выручка и чай операторов. Остальное (питание, бонус)
+  // водитель оставляет себе, поэтому идёт строкой вычитания.
+  const сдать = (h.revenue || 0) + (h.tea || 0);
+  const свои = (h.meal || 0) + (h.bonus || 0);
+  const fx = (h.fx || []);
+  return `<button class="ex-cash" onclick="expGo('all')">${шапка}
+    ${row(`Взял за заказы${h.orders_cash ? ' · ' + h.orders_cash : ''}`, aed(h.taken))}
+    ${h.got ? row('Приход наличными', '+' + aed(h.got), 'plus') : ''}
+    ${h.spent_sum ? row('Расходы наличными', '−' + aed(h.spent_sum), 'minus') : ''}
+    ${свои ? row(h.bonus ? 'Питание и бонус · ваше' : 'Питание · ваше', '−' + aed(свои), 'minus') : ''}
+    <div class="exc-sum${сдать < 0 ? ' dn' : ''}">
+      <u>${сдать < 0 ? 'Старший вернёт вам' : 'Сдать старшему'}</u>
+      <b>${aed(сдать)}<i>AED</i></b>
+    </div>
+    ${сдать < 0 ? `<div class="exc-note">ваше питание${h.spent_sum ? ' и расходы' : ''} больше собранных наличных — разницу добавит старший</div>` : ''}
+    ${fx.length ? `<div class="exc-fx">в том числе валютой: ${fx.map(x => `${esc(x.sym)}${fmt(x.amount)}`).join(' · ')} — сдаются как есть</div>` : ''}
+    ${h.tea ? `<div class="exc-note">из них чай операторов ${fmt(h.tea)} AED — отдельной пачкой</div>` : ''}
+    ${h.card_spent ? `<div class="exc-note">безналом ${fmt(h.card_spent)} AED — наличных не трогали</div>` : ''}
+  </button>`;
+}
 function renderExpenses(){
   xpDraftFresh();
   const box = document.getElementById('body');
@@ -8960,11 +9046,7 @@ function renderExpenses(){
   document.body.classList.remove('xp-on');
   box.innerHTML = `
     <div class="ex-ttl">Расходы за смену</div>
-    <button class="ex-tot" onclick="expGo('all')">
-      <span class="ex-i">${svg(ICO.wallet, 19)}</span>
-      <div><u>Итого за смену</u><b>${fmt(total)} AED</b></div>
-      <em class="ex-c">${svg(ICO.chevR, 16)}</em>
-    </button>
+    ${expCashCard(total)}
     <div class="ex-sec">${svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M15 15h3M16.5 13.5v3"/><circle cx="17" cy="19.5" r="1.2"/>', 20)}<b>Основные расходы</b>
       <span class="ex-cnt${nDone === 4 ? ' ok' : ''}">${nDone}/4${nDone === 4 ? svg(OC_ICO.check, 14) : ''}</span>${
         late && nNeed ? `<span class="ex-hint">Заполните ещё ${nNeed} ${plural(nNeed, 'позицию', 'позиции', 'позиций')}</span>` : ''}</div>

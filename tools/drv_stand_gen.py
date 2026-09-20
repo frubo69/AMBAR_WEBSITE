@@ -33,7 +33,15 @@ const ST_SUM = {day:'2026-09-14', opened_at:'2026-09-14T08:12:00+04:00', on_hand
   orders:9, gross:3155, pay:{cash:{n:6, aed:2050}, app:{n:2, aed:705}, crypto:{n:1, aed:400}, debt:{n:0, aed:0}, free:{n:1, aed:95}},
   expenses:[{id:'fuel', t:'Заправка', plus:false, aed:150, n:1}, {id:'parking', t:'Парковка', plus:false, aed:36, n:2},
             {id:'guard', t:'Охрана', plus:false, aed:60, n:1}, {id:'we_got', t:'Нам вернули', plus:true, aed:30, n:1}],
-  exp_n:5, exp_pending:2, writeoffs:1, writeoff_qty:1};
+  exp_n:5, exp_pending:2, writeoffs:1, writeoff_qty:1,
+  // Две пачки и наличные на руках — как их считает cash_math на сервере
+  // (эти же числа показывает карточка «Наличные за смену» на «Расходах»).
+  hand:{taken:2050, taken_aed:1945, orders_cash:6,
+        fx:[{code:'USD', sym:'$', amount:30, aed:105}],
+        tea:120, tea_other:20, tea_by:[{who:'Али', aed:80}, {who:'Фарух', aed:40}],
+        spent:[{t:'Заправка', aed:150}, {t:'Парковка', aed:36}, {t:'Охрана', aed:60}], spent_sum:246,
+        got:30, meal:80, bonus:15, card_spent:0, card_got:0, pending:2,
+        revenue:1619, revenue_aed:1514, keep:95, in_hand:1834}};
 const ST_LOG = []; function stLog(m){ ST_LOG.push(m); const e = document.getElementById('sterr'); if(e) e.textContent = ST_LOG.join('\n'); }
 window.onerror = (m, s, l, c) => stLog('ERROR ' + m + ' @' + l + ':' + c);
 const ST_NOW = new Date();

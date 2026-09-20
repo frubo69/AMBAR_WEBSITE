@@ -712,9 +712,11 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-card{margin:2px 0 10px;border-radius:16px;overflow:hidden;
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28)}
-.aud-cap{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 16px;
-  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;
-  text-transform:uppercase;border-bottom:1px solid rgba(201,169,110,.14)}
+/* Заголовок карточки ревизии — тот же, что у всех (см. .sc-cap). */
+.aud-cap{display:flex;align-items:center;gap:10px;min-height:50px;padding:0 16px;
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:1.1px;
+  line-height:1.15;color:var(--gold2);
+  text-transform:uppercase;border-bottom:1px solid rgba(201,169,110,.22)}
 .aud-cap span{flex:1}
 .aud-cap i{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.2px;
   text-transform:none;color:var(--muted)}
@@ -810,9 +812,16 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .sc{margin:0 0 10px;border-radius:16px;overflow:hidden;
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28)}
-.sc-cap{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 16px;
-  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;
-  text-transform:uppercase;border-bottom:1px solid rgba(201,169,110,.14)}
+/* Заголовок карточки — один на всё приложение (владелец, 20 сен 2026: «все
+   заголовки должны быть одного шрифта, одного размера и выделены одинаково;
+   я бы выделил заголовки золотым и красивым выделяющимся шрифтом; сделай так,
+   чтобы было видно, что это заголовок, чтобы он отличался от всей остальной
+   карточки»). Space Grotesk, прописные, золото, своя разрядка — и тонкая
+   золотая линия под ним, отделяющая от содержимого. */
+.sc-cap{display:flex;align-items:center;gap:10px;min-height:50px;padding:0 16px;
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:1.1px;
+  line-height:1.15;color:var(--gold2);
+  text-transform:uppercase;border-bottom:1px solid rgba(201,169,110,.22)}
 .sc-cap span{flex:1}
 .sc-cap i{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.2px;
   text-transform:none;color:var(--muted)}
@@ -900,8 +909,11 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-bysum{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28);border-radius:16px;padding:12px 16px 14px}
 .stk-bysum .exp-day{margin:-3px 0 calc(10px * (1 - var(--fold,0)))}
-.stk-bysum .exp-day-t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
-  letter-spacing:.6px;color:var(--text);display:flex;align-items:baseline;gap:10px;min-width:0}
+/* Заголовок дневного экрана («Барракуда», «Касса», «Отчёт ДДС», «Остатки») —
+   такой же, как у карточек: тот же шрифт, кегль и золото (см. .sc-cap). */
+.stk-bysum .exp-day-t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:1.1px;text-transform:uppercase;color:var(--gold2);
+  display:flex;align-items:baseline;gap:10px;min-width:0}
 .stk-bysum .exp-day-t i{font-family:'DM Sans',sans-serif;font-style:normal;font-size:11px;
   font-weight:600;letter-spacing:.2px;text-transform:none;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis}
@@ -914,7 +926,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* «ОСТАТКИ» и под ним «всего»: в одну строку рядом с пилюлей дня не влезает.
    Заголовок не ужимается никогда; тесно — короче становится дата в пилюле. */
 .stk-valsum .exp-day-t{flex-direction:column;align-items:flex-start;gap:1px}
-.stk-valsum .exp-day-l{flex:1 0 auto}
+.stk-valsum .exp-day-l{flex:1 1 auto;min-width:0}
 .stk-valsum .exp-day-nav{flex:0 1 auto;min-width:0}
 .stk-valsum .exp-day .ds-txt i{text-overflow:ellipsis}
 .stk-valsum .aud-g{padding:2px 13px 13px}
@@ -3124,8 +3136,10 @@ button.path:active{transform:scale(.995)}
 .fin-sec-i{width:36px;height:36px;flex-shrink:0;border-radius:11px;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.25)}
 .fin-sec-b{flex:1;min-width:0}
-.fin-sec-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:700;
-  letter-spacing:.8px;text-transform:uppercase;line-height:1.2}
+/* Заголовок такой же, как у карточек (см. .sc-cap): золото, тот же шрифт и
+   кегль — у этих блоков он стоит рядом со значком, поэтому без рамки снизу. */
+.fin-sec-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:1.1px;text-transform:uppercase;line-height:1.15;color:var(--gold2)}
 .fin-sec-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fin-sec-go{flex-shrink:0;color:var(--muted);transition:transform .25s var(--e1)}
@@ -3540,7 +3554,8 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .exp-sum.fb-daysum{flex:0 0 auto;padding:12px 0 0;margin:0 0 10px}
 .fb-daysum .exp-day{margin:-3px 16px 4px}
 .fb-daysum .exp-day-t{flex-direction:column;align-items:flex-start;gap:1px}
-.fb-daysum .exp-day-l{flex:1 0 auto}
+/* Заголовок стал крупнее — даём ему ужиматься, чтобы дата рядом не обрезалась. */
+.fb-daysum .exp-day-l{flex:1 1 auto;min-width:0}
 .fb-daysum .exp-day-nav{flex:0 1 auto;min-width:0}
 .fb-daysum .exp-day .ds-txt i{text-overflow:ellipsis}
 .fb-daysum .aud-g{padding:2px 13px 13px}
@@ -3701,7 +3716,8 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-safe-h{display:flex;align-items:center;gap:10px;width:100%;min-height:68px;padding:10px 12px 8px 16px;
   border:0;background:none;color:inherit;text-align:left;cursor:pointer;font-family:inherit}
 .fb-safe-h:active{background:rgba(201,169,110,.05)}
-.fb-safe-t{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:.9px;text-transform:uppercase}
+.fb-safe-t{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:1.1px;text-transform:uppercase;color:var(--gold2)}
 .fb-safe-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;color:var(--gold2);letter-spacing:-.6px;
   font-variant-numeric:tabular-nums;margin-right:6px;line-height:1}
 .fb-safe-v.dn{color:var(--dn)}
@@ -3738,8 +3754,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 /* Заголовок — крупный, по центру и золотом (владелец, 20 сен 2026: «аналитика
    месяца крупнее, отцентруй и сделай прям заголовком»; «сделай заголовок
    золотым»). */
-.fb-an-t{justify-content:center;min-height:52px;font-size:19px;letter-spacing:1.1px;
-  color:var(--gold2)}
+.fb-an-t{justify-content:center;min-height:52px}
 /* Шторки: у самой шторки нет ни полей, ни рамки — только высота. Поля живут
    внутри, иначе в нуле от слоя остаётся его padding и карточка сжимается
    быстрее прокрутки (на этом и разъезжался отступ до соседней карточки).
@@ -3801,7 +3816,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    золотистой рамкой; районы — пять плиток, распределение — три; внизу одно
    следующее действие. Этап под замком — серый, цифры предложения тусклые. */
 .fb-crc-h{width:100%;min-height:58px;padding:12px 12px 12px 16px;border:0;
-  border-bottom:1px solid rgba(201,169,110,.14);background:none;color:inherit;text-align:left;
+  border-bottom:1px solid rgba(201,169,110,.22);background:none;text-align:left;
   cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fb-crc-h:active{background:rgba(201,169,110,.05)}
 .fb-crc-h > span{min-width:0;line-height:1.25}
@@ -4458,10 +4473,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 /* Заголовок над сводкой — заглавными, тем же шрифтом, что названия разделов. */
 /* Заголовок — шапка карточки, как у карточек районов: те же 16 по краям,
    та же высота строки, под ним волосок; три числа — тело карточки. */
-.ord-cap{display:flex;align-items:center;min-height:46px;padding:0 16px;
-  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
-  letter-spacing:.6px;text-transform:uppercase;line-height:1.2;
-  border-bottom:1px solid rgba(201,169,110,.14)}
+/* «Закупаем» — такой же заголовок карточки, как везде (см. .sc-cap). */
+.ord-cap{display:flex;align-items:center;min-height:50px;padding:0 16px;
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:1.1px;text-transform:uppercase;line-height:1.15;color:var(--gold2);
+  border-bottom:1px solid rgba(201,169,110,.22)}
 .ord-sumc{margin:0 0 10px;border-radius:16px;overflow:hidden;
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28)}

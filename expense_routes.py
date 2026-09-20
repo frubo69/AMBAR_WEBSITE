@@ -97,6 +97,13 @@ EXTRA_KINDS = {
     # само при одобрении правки оператором и остаётся у водителя из наличных —
     # поэтому это расход дня, а не отдельная книга. Руками не заводится.
     "upsell":  {"t": "Бонус за допродажу", "auto": True, "nopay": True},
+    # Аванс зарплаты (владелец, 20 сен 2026: «аванс зарплаты он сможет заполнять
+    # сам в расходах, потому что берёт из тех денег, что у него на руках; ушло
+    # на согласование старшему; если одобрил — у водителя правильно пишет,
+    # сколько он отдаёт, а в зарплате пишется, что в следующем месяце он
+    # получает меньше на сумму аванса»). Способ оплаты не спрашиваем: это всегда
+    # наличные из выручки смены. Согласование ставит запись в ведомость.
+    "advance": {"t": "Аванс зарплаты", "nopay": True},
     # «Всё остальное» — последним: сначала то, что называется словом.
     # Раздел уже зовётся «Доп. расходы», и карточка «Доп. расход» внутри него
     # ничего не добавляла — владелец: «не доп расход, а что-то ещё».
@@ -495,6 +502,11 @@ async def handle_extra_del(request):
     item_id = (request.match_info.get("item_id") or "").strip()
     day = (request.query.get("day") or "").strip() or _biz_day()
     driver = (request.query.get("driver") or "").strip()
+    # Стёрли запись — если это был согласованный аванс, он уходит и из ведомости.
+    старое = await db.get_driver_day(day, driver) or {}
+    было = next((e for e in (старое.get("extras") or []) if e.get("id") == item_id), None)
+    if было:
+        await advance_drop(day, driver, было)
     ok = await db.del_driver_expense(day, driver, item_id)
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
@@ -546,10 +558,14 @@ async def handle_extra_decide(request):
     # что у списаний. Пишем в две книги сразу: реестр кодов помечает бутылку
     # ушедшей, журнал списаний вычитает её там, где счёт идёт от пересчёта.
     # Одна книга без другой ломает остаток.
+    item = next((e for e in (saved or {}).get("extras", []) if e.get("id") == item_id), None)
     if action == "approve":
-        item = next((e for e in (saved or {}).get("extras", [])
-                     if e.get("id") == item_id), None)
         await _guard_bottle_gone(item, day, driver, request["owner_id"])
+        # Аванс зарплаты: согласовали — он сразу в ведомости, и в следующем
+        # месяце водитель получит меньше ровно на эту сумму.
+        await advance_apply(day, driver, item or {}, str(body.get("as") or ""))
+    else:
+        await advance_drop(day, driver, item or {})
 
     base = next((d for d in staff.drivers() if d["name"] == driver), None)
     item = next((e for e in (saved or {}).get("extras", []) if e.get("id") == item_id), None)
@@ -558,6 +574,55 @@ async def handle_extra_decide(request):
     return web.json_response(
         {"ok": True, "driver": _day_row(base, saved) if base else None},
         headers=CORS_HEADERS)
+
+
+async def advance_apply(day: str, driver: str, item: dict, who: str = "") -> str:
+    """Согласованный «Аванс зарплаты» — в ведомость (владелец, 20 сен 2026:
+    «если старший одобрил, то у водителя правильно пишет, сколько денег он
+    отдаёт, а в его зарплате пишется, что в следующем месяце он получает
+    меньше на сумму аванса»).
+
+    Деньги водитель взял из наличных смены, а не из фонда, — поэтому расхода
+    фонда (fin_entry) здесь нет: сейф просто получил на эту сумму меньше, и
+    расходом дня она уже стала сама, как любая согласованная трата. В ведомости
+    это обычный аванс «часть зарплаты» с пометкой src=driver."""
+    import finance_pay as pay
+    if str(item.get("kind") or "") != "advance" or item.get("pay_item"):
+        return ""
+    amount = _amount(item.get("amount"))
+    if amount <= 0:
+        return ""
+    iid = secrets.token_hex(5)
+    await db.fin_pay_item_add({
+        "_id": iid, "name": driver, "kind": "advance", "amount": amount,
+        "per_month": 0, "from": day[:7], "day": day, "mode": "part",
+        "note": (str(item.get("comment") or "").strip()[:80] or "из наличных смены"),
+        "entry": "", "src": "driver", "extra": item.get("id") or "",
+        "by": who, "at": datetime.now(timezone.utc)})
+    await db.set_driver_expense_fields(day, driver, item.get("id") or "", {"pay_item": iid})
+    try:
+        import pay_notify as _pn
+        await _pn.tell_safe(driver, _pn.added({"name": driver, "kind": "advance", "amount": amount,
+                                               "mode": "part", "from": day[:7], "day": day}, who))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[expenses] аванс: сообщение водителю не ушло: {e}")
+    log.info(f"[expenses] аванс {amount} AED водителю {driver} — в ведомость {iid}")
+    return iid
+
+
+async def advance_drop(day: str, driver: str, item: dict) -> bool:
+    """Отказали или стёрли запись — аванс из ведомости уходит."""
+    iid = str((item or {}).get("pay_item") or "")
+    if not iid:
+        return False
+    try:
+        await db.fin_pay_item_del(iid)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[expenses] аванс {iid} не снят: {e}")
+        return False
+    await db.set_driver_expense_fields(day, driver, (item or {}).get("id") or "", {"pay_item": ""})
+    log.info(f"[expenses] аванс {iid} снят: запись водителя {driver} отменена")
+    return True
 
 
 async def _tell_driver(driver: str, item: dict | None, approved: bool, note: str = ""):

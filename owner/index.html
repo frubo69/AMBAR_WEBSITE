@@ -22077,7 +22077,11 @@ function fbItemRows(rows, month, del){
     // Удержание по списанию (бой, брак, утеря) живёт на самом списании:
     // здесь оно только показывается, снять или поменять его — в «Списаниях».
     const wo = it.src === 'writeoff';
-    const sub = [wo ? 'по списанию' : '', `${fbFmt(it.amount)} всего`, it.per_month ? `по ${fbFmt(it.per_month)} в месяц` : '',
+    // Аванс, который водитель взял сам из наличных смены (владелец, 20 сен
+    // 2026): деньги не из сейфа — это надо видеть сразу, иначе кажется, что
+    // фонд выдал их дважды.
+    const свой = it.src === 'driver';
+    const sub = [wo ? 'по списанию' : '', свой ? 'из наличных смены' : '', `${fbFmt(it.amount)} всего`, it.per_month ? `по ${fbFmt(it.per_month)} в месяц` : '',
                  later ? `с ${fbMonthGen(it.start)}` : it.done ? 'закрыто' : it.after ? `останется ${fbFmt(it.after)}` : ''].filter(Boolean).join(' · ');
     return `<div class="fb-e">
       <span class="fb-e-b"><b>${it.t}${it.reason ? ' · ' + escS(it.reason) : ''}${it.note ? ' · ' + escS(it.note) : ''}</b><i>${sub}</i></span>

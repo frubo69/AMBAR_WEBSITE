@@ -4897,6 +4897,17 @@ async def set_driver_expense_status(day: str, driver: str, item_id: str,
     return bool(r.matched_count)
 
 
+async def set_driver_expense_fields(day: str, driver: str, item_id: str, fields: dict) -> bool:
+    """Дописать служебные поля у записи расхода — например, id аванса в
+    ведомости, чтобы при отказе снять ровно его."""
+    db = _db_or_none()
+    if db is None or not (day and driver and item_id and fields): return False
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver, "extras.id": item_id},
+        {"$set": {f"extras.$.{k}": v for k, v in fields.items()}})
+    return bool(r.matched_count)
+
+
 def expense_status_from_photos(item: dict) -> str:
     """Статус записи по ответам на её снимки: хоть один отклонён — отклонена;
     все, что есть, приняты — принята; иначе ждёт."""

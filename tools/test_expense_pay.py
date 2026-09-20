@@ -101,9 +101,9 @@ async def main():
     print("── виды для приложения ────────────────────────────────────────")
     req = make_mocked_request("GET", "/x"); req["driver"] = ME; req["tg"] = {"id": 1}
     v = json.loads((await raw(dr.handle_expenses)(req)).text)
-    eq("pay: спрашивать у всех, кроме охраны, «нам должны», бонуса, возвратов и долгов",
+    eq("pay: спрашивать у всех, кроме охраны, «нам должны», бонуса, возвратов, долгов и аванса",
        sorted(k["id"] for k in v["kinds"] if not k["pay"]),
-       ["guard", "owed_us", "upsell", "we_gave", "we_got", "we_owe"])
+       ["advance", "guard", "owed_us", "upsell", "we_gave", "we_got", "we_owe"])
 
     print("── итоги смены: на руках только наличное ──────────────────────")
     # в дне: kfc 35 наличными, парковка 20 наличными, приход 50 наличными

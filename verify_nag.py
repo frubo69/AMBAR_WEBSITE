@@ -22,7 +22,8 @@
   • владельцу — вместо «заказ не принят» честное «клиент застрял на
     верификации» (ключ orders.verify_stuck).
 
-Пишем один раз на заказ (verify_nag_at на самом заказе). Прошёл верификацию,
+Пишем один раз на заказ (verify_nag_at на самом заказе) и только в первые два
+часа: заказ, пролежавший дольше, человек давно закрыл. Прошёл верификацию,
 отменил, оформил — сторож молчит: он говорит только о живом заказе, который
 ждёт анкеты. Ночью тоже молчим — с часу до семи по Дубаю у операторов никого,
 а клиент к утру о заказе и сам вспомнит.
@@ -40,6 +41,10 @@ log = logging.getLogger("verify-nag")
 DUBAI_TZ = timezone(timedelta(hours=4))
 EVERY_SEC = 30                 # как часто смотрим
 AFTER_MIN = 2                  # через сколько минут молчания пишем
+# Позже этого времени не пишем вовсе: заказ, пролежавший два часа, человек
+# давно закрыл, и «остался один шаг» про него выглядит письмом из прошлого.
+# Сюда же попадают заказы, застрявшие, пока сторож не работал.
+BEFORE_MIN = 120
 QUIET_FROM, QUIET_TO = 1, 7    # часы по Дубаю, когда не пишем
 
 
@@ -221,7 +226,8 @@ async def once() -> int:
         if o.get("status") not in ("pending", None, ""):
             continue                                   # отменён или уже поехал
         placed = _dt(o.get("timestamp"))
-        if not placed or (now - placed) < timedelta(minutes=AFTER_MIN):
+        if not placed or not (timedelta(minutes=AFTER_MIN) <= (now - placed)
+                              <= timedelta(minutes=BEFORE_MIN)):
             continue
         uid = int(o.get("customer_id") or o.get("user_id") or 0)
         if not uid:

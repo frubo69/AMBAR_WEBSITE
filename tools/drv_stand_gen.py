@@ -40,7 +40,7 @@ const ST_SUM = {day:'2026-09-14', opened_at:'2026-09-14T08:12:00+04:00', on_hand
         fx:[{code:'USD', sym:'$', amount:30, aed:105}],
         tea:120, tea_other:20, tea_by:[{who:'Али', aed:80}, {who:'Фарух', aed:40}],
         spent:[{t:'Заправка', aed:150}, {t:'Парковка', aed:36}, {t:'Охрана', aed:60}], spent_sum:246,
-        got:30, meal:80, bonus:15, card_spent:0, card_got:0, pending:2,
+        got:30, got_list:[{t:'Нам вернули', aed:30}], meal:80, bonus:15, card_spent:0, card_got:0, pending:2,
         revenue:1619, revenue_aed:1514, keep:95, in_hand:1834}};
 const ST_LOG = []; function stLog(m){ ST_LOG.push(m); const e = document.getElementById('sterr'); if(e) e.textContent = ST_LOG.join('\n'); }
 window.onerror = (m, s, l, c) => stLog('ERROR ' + m + ' @' + l + ':' + c);

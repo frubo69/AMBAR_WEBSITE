@@ -1075,6 +1075,8 @@ body.test-drv .wo-fix{display:none}
 .exc-r span{font-size:13.5px;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .exc-r b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;white-space:nowrap;
   font-variant-numeric:tabular-nums}
+/* Валюта в строке — теми же купюрами, рядом с дирхамами и тем же кеглем. */
+.exc-fxi{margin-left:10px;color:var(--gold2)}
 .exc-r.minus b{color:#E88C8C}
 .exc-r.plus b{color:var(--ok,#5BC489)}
 .exc-sum{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:11px;
@@ -8979,13 +8981,20 @@ function expCashCard(total){
       ${total ? row('Расходы наличными', '−' + aed(total), 'minus') : ''}
       <div class="exc-sum"><u>Сдать старшему</u><b>${skb(110, 26)}</b></div></button>`;
   const fx = h.fx || [];
+  // Валюта идёт теми же купюрами и в строке «взял», и в итоге — рядом с
+  // дирхамами (владелец, 20 сен 2026: «просто в ряд пиши дирхамы и доллары»).
+  const купюры = fx.map(x => `<span class="exc-fxi">${esc(x.sym)}${fmt(x.amount)}</span>`).join('');
+  // «Приход наличными» ни о чём не говорил (владелец: «что такое приход
+  // наличными? это не приход»): пишем, что именно вернули, — «Нам вернули»,
+  // «Мы должны». Видов несколько — перечисляем.
+  const приход = (h.got_list || []).map(x => x.t).filter(Boolean);
   // Дирхамы: взял дирхамами + приход − расходы наличными − бонус. Питание не
   // вычитаем: этих денег у водителя на руках нет. Чай сидит в этой же сумме и
   // сдаётся второй пачкой — про него подпись ниже.
   const дирхамы = (h.taken_aed || 0) + (h.got || 0) - (h.spent_sum || 0) - (h.bonus || 0);
   return `<button class="ex-cash" onclick="expGo('all')">${шапка}
-    ${row(`Взял за заказы${h.orders_cash ? ' · ' + h.orders_cash : ''}`, aed(h.taken_aed))}
-    ${h.got ? row('Приход наличными', '+' + aed(h.got), 'plus') : ''}
+    ${row(`Взял за заказы${h.orders_cash ? ' · ' + h.orders_cash : ''}`, aed(h.taken_aed) + купюры)}
+    ${h.got ? row(приход.length ? приход.join(' · ') : 'Вернули вам наличными', '+' + aed(h.got), 'plus') : ''}
     ${h.spent_sum ? row('Расходы наличными', '−' + aed(h.spent_sum), 'minus') : ''}
     ${h.bonus ? row('Бонус за допродажу · ваш', '−' + aed(h.bonus), 'minus') : ''}
     <div class="exc-sum${дирхамы < 0 ? ' dn' : ''}">

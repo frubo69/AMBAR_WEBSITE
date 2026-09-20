@@ -150,6 +150,7 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
         else:
             aed_in += m["aed"]
     spent, got, bonus, card_spent, card_got = {}, 0, 0, 0, 0
+    gotk: dict = {}                     # приход по видам: «Нам вернули», «Мы должны»
     pending = 0
     for x in extras:
         kind = kind_of(x)
@@ -166,6 +167,8 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
             continue
         if plus:
             got += a
+            t_ = _exp.EXTRA_KINDS.get(kind, {}).get("t") or x.get("kind_t") or "Приход"
+            gotk[t_] = gotk.get(t_, 0) + a
         else:
             t_ = _exp.EXTRA_KINDS.get(kind, {}).get("t") or x.get("kind_t") or "Расход"
             spent[t_] = spent.get(t_, 0) + a
@@ -181,7 +184,8 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
         "fx": [{**v, "amount": r2(v["amount"]), "aed": r2(v["aed"])} for v in sorted(fx.values(), key=lambda v: v["code"])],
         "tea": tea, "tea_other": tea_other,
         "spent": [{"t": k, "aed": v} for k, v in spent.items()], "spent_sum": spent_sum,
-        "got": got, "meal": int(meal or 0), "bonus": bonus,
+        "got": got, "got_list": [{"t": k, "aed": v} for k, v in gotk.items()],
+        "meal": int(meal or 0), "bonus": bonus,
         "card_spent": card_spent, "card_got": card_got, "pending": pending,
         # Сдать: выручка (дирхамы + валюта как есть) и чай — порознь.
         "revenue": r2(revenue), "revenue_aed": r2(revenue - fx_aed),

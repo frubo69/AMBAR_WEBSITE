@@ -440,18 +440,21 @@ function demoHand(done){
     aed += s ? (+s.taken || 0) : o.total;
   });
   const live = S.exp.filter(e => e.status !== 'rejected');
-  const spent = {}; let got = 0, bonus = 0, cs = 0, cg = 0, pend = 0;
+  const spent = {}, gotk = {}; let got = 0, bonus = 0, cs = 0, cg = 0, pend = 0;
   live.forEach(function(e){
     if(e.kind === 'upsell'){ bonus += e.amount; return; }
     if(e.pay === 'card'){ if(e.plus) cg += e.amount; else cs += e.amount; return; }
-    if(e.plus) got += e.amount; else spent[KIND_T[e.kind] || 'Расход'] = (spent[KIND_T[e.kind] || 'Расход'] || 0) + e.amount;
+    const имя = KIND_T[e.kind] || 'Расход';
+    if(e.plus) { got += e.amount; gotk[имя] = (gotk[имя] || 0) + e.amount; }
+    else spent[имя] = (spent[имя] || 0) + e.amount;
     if(e.status === 'pending') pend++;
   });
   const fxs = Object.values(fx), fxAed = fxs.reduce((a, x) => a + x.aed, 0);
   const sp = Object.values(spent).reduce((a, v) => a + v, 0), meal = S.sh.opened ? 80 : 0, tea = 0;
   const taken = num(aed + fxAed), revenue = num(taken - tea - sp - meal - bonus + got);
   return {taken: taken, taken_aed: num(aed), orders_cash: n, fx: fxs, tea: tea, tea_other: 0, tea_by: [],
-          spent: Object.keys(spent).map(k => ({t: k, aed: spent[k]})), spent_sum: sp, got: got, meal: meal,
+          spent: Object.keys(spent).map(k => ({t: k, aed: spent[k]})), spent_sum: sp, got: got,
+          got_list: Object.keys(gotk).map(k => ({t: k, aed: gotk[k]})), meal: meal,
           bonus: bonus, card_spent: cs, card_got: cg, pending: pend, revenue: revenue,
           revenue_aed: num(revenue - fxAed), keep: meal + bonus, in_hand: num(revenue + tea + meal + bonus)};
 }

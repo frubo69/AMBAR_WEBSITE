@@ -37,6 +37,9 @@ log = logging.getLogger("supply")
 # сотрудник, и «Подтверждено» ему ничего не говорит.
 CODE_COL = "Code"          # служебная колонка, по ней идёт возврат
 TOTAL_COL = "Total"          # считается формулой, а не нами
+PRICE_COL = "Price, AED"     # наша закупочная цена за бутылку / коробку 24
+AMOUNT_COL = "Amount, AED"   # цена × Total, формулой
+MONEY = '#,##0.00;-#,##0.00;;@'     # деньги с копейками, ноль — пустая клетка
 
 # Ноль показываем пустой клеткой. В файле все позиции каталога, и лист, залитый
 # нулями, читать невозможно: глаз ищет числа, а видит шум.
@@ -176,9 +179,14 @@ async def _build_book(day: str):
     магазин всё равно смотрит в неё, а нам потом нужно знать, куда развозить —
     и два списка приходилось сверять глазами.
 
-    Позиции все, включая те, что сейчас не нужны. Магазину так проще: это
-    привычный ему прайс, в котором он правит числа, а не список из пятидесяти
-    строк, где не найти то, что он хочет предложить сверх заказа.
+    С ценами (владелец, 22 сен 2026): сразу после названия — «Price, AED»,
+    наша закупочная цена за бутылку или коробку 24 — та же, что оценивает
+    склад (stock_value.cost_map: рука владельца → лист config_cost → поставка);
+    справа от Total — «Amount, AED» = цена × количество. Под таблицей две
+    строки: TOTAL — количества по районам, итог растянут на Total и Amount;
+    ровно под ней AMOUNT — сумма каждого района (магазин бьёт закупку на пять
+    чеков, по чеку на район) и общий итог. Всё формулами: поправят цену или
+    количество — суммы пересчитаются сами.
 
     Total в строке — формула. Магазин правит числа по точкам, и переписанный
     руками итог разошёлся бы с ними в первый же раз."""
@@ -201,6 +209,19 @@ async def _build_book(day: str):
     # отсортированный по количеству, заставляет бегать по залу кругами.
     rows = sorted(src, key=lambda r: order_key(r["id"]))
     dist = [d["id"] for d in data["districts"]]
+    try:
+        import stock_value
+        costs = await stock_value.cost_map()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[supply] цены закупки для заявки: {e}")
+        costs = {}
+
+    def price_of(pid):
+        try:
+            v = float(costs.get(pid) or 0)
+        except (TypeError, ValueError):
+            return None
+        return round(v, 2) if v > 0 else None
 
     wb = Workbook()
     # Excel пересчитывает книгу при открытии: подставленные нами значения —
@@ -220,16 +241,20 @@ async def _build_book(day: str):
     band = PatternFill("solid", fgColor="FFEEECE1")
     sum_fill = PatternFill("solid", fgColor="FFFFFF00")     # итоги
     warn_fill = PatternFill("solid", fgColor="FFFF0000")    # просьба к магазину
+    price_fill = PatternFill("solid", fgColor="FFE8F1FB")   # цена — её не правят
     thin = Side(style="thin")
     med = Side(style="medium")
     box = Border(left=thin, right=thin, top=thin, bottom=thin)
     mid = Alignment(horizontal="center", vertical="center")
+    right = Alignment(horizontal="right", vertical="center")
 
     # Первая колонка пустая и широкая — поле, за которое лист приятно держать
     # глазами. Всё остальное начинается с B.
-    N, C, I, D0 = 2, 3, 4, 5                   # №, Code, Item, первая точка
+    N, C, I, PR, D0 = 2, 3, 4, 5, 6            # №, Code, Item, Price, первая точка
     LAST = D0 + len(dist) - 1                  # последняя точка
     TOT = LAST + 1                             # Total
+    AMT = TOT + 1                              # Amount
+    PL, TL, AL = get_column_letter(PR), get_column_letter(TOT), get_column_letter(AMT)
 
     ws.cell(row=1, column=N, value=f"AMBAR · purchase order · {data['day']}")
     ws.cell(row=1, column=N).font = Font(bold=True, size=16)
@@ -239,28 +264,32 @@ async def _build_book(day: str):
 
     ws.cell(row=2, column=N,
             value="Please correct the quantities you can supply and send the file back. "
-                  "The Total column adds up by itself. Do not change the Code column.")
-    ws.merge_cells(start_row=2, start_column=N, end_row=2, end_column=TOT)
-    for col in range(N, TOT + 1):
+                  "Price is our purchase price per bottle / per case of 24. "
+                  "Total and Amount add up by themselves. Do not change the Code and Price columns.")
+    ws.merge_cells(start_row=2, start_column=N, end_row=2, end_column=AMT)
+    for col in range(N, AMT + 1):
         c = ws.cell(row=2, column=col)
         c.fill = warn_fill; c.font = Font(bold=True, size=12)
-        c.alignment = mid
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         c.border = Border(left=med, right=med, top=med, bottom=med)
-    ws.row_dimensions[2].height = 33.6
+    ws.row_dimensions[2].height = 40
 
-    head = ["№", CODE_COL, "Item"] + \
+    head = ["№", CODE_COL, "Item", PRICE_COL] + \
            [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}" for o in dist] + \
-           [TOTAL_COL]
-    for i, title in enumerate(head):
-        c = ws.cell(row=3, column=N + i, value=title)
+           [TOTAL_COL, AMOUNT_COL]
+    for k, title in enumerate(head):
+        c = ws.cell(row=3, column=N + k, value=title)
         c.alignment = mid; c.border = box
-        if N + i == N:      c.fill = num_fill;  c.font = white
-        elif N + i == TOT:  c.fill = sum_fill;  c.font = bold
-        else:               c.fill = head_fill; c.font = white
+        if N + k == N:             c.fill = num_fill;  c.font = white
+        elif N + k in (TOT, AMT):  c.fill = sum_fill;  c.font = bold
+        else:                      c.fill = head_fill; c.font = white
     ws.row_dimensions[3].height = 15
 
     first = 4
     calc = {}                      # ссылка ячейки → посчитанный итог
+    d_units = [0] * len(dist)
+    d_money = [0.0] * len(dist)
+    money = 0.0
     for n, r in enumerate(rows, 1):
         i = first + n - 1
         ws.cell(row=i, column=N, value=n).alignment = mid
@@ -269,6 +298,10 @@ async def _build_book(day: str):
         nm.font = bold
         nm.alignment = Alignment(horizontal="left", vertical="center")
         stripe = (n % 2 == 0)          # полоса через строку — вести взгляд вдоль
+        price = price_of(r["id"])
+        pc = ws.cell(row=i, column=PR, value=price)
+        pc.number_format = MONEY; pc.alignment = right; pc.font = bold
+        pc.fill = band if stripe else price_fill
         for k, o in enumerate(dist):
             # Ноль не пишем вовсе: на листе из ста двадцати строк колонка нулей
             # мешает увидеть те несколько чисел, ради которых заявку и читают.
@@ -276,47 +309,78 @@ async def _build_book(day: str):
             c = ws.cell(row=i, column=D0 + k, value=need)
             c.fill = band if stripe else ask
             c.alignment = mid; c.number_format = ZERO_BLANK
+            d_units[k] += need or 0
+            if price and need:
+                d_money[k] += price * need
         # Итог строки считает сам файл: магазин правит числа по точкам, и
         # переписанная руками сумма разошлась бы с ними на первой же правке.
         rng = f"{get_column_letter(D0)}{i}:{get_column_letter(LAST)}{i}"
         t = ws.cell(row=i, column=TOT, value=f'=IF(SUM({rng})=0,"",SUM({rng}))')
-        calc[f"{get_column_letter(TOT)}{i}"] = r["need_total"] or ""
+        calc[f"{TL}{i}"] = r["need_total"] or ""
         t.fill = band if stripe else sum_fill
         t.font = bold
         t.alignment = mid; t.number_format = ZERO_BLANK
-        for col in range(N, TOT + 1):
+        a = ws.cell(row=i, column=AMT, value=f'=IF(OR({PL}{i}="",N({TL}{i})=0),"",{PL}{i}*{TL}{i})')
+        amt = round(price * r["need_total"], 2) if (price and r["need_total"]) else ""
+        calc[f"{AL}{i}"] = amt
+        money += amt or 0
+        a.fill = band if stripe else sum_fill
+        a.font = bold; a.alignment = right; a.number_format = MONEY
+        for col in range(N, AMT + 1):
             c = ws.cell(row=i, column=col)
             c.border = box
-            if stripe and col < D0:
+            if stripe and col < PR:
                 c.fill = band
         ws.row_dimensions[i].height = 17.4
 
     last = first + len(rows) - 1
-    i = last + 1
-    ws.cell(row=i, column=N, value="TOTAL")
-    ws.merge_cells(start_row=i, start_column=N, end_row=i, end_column=I)
-    for col in range(N, TOT + 1):
-        c = ws.cell(row=i, column=col)
-        if col >= D0:
-            L = get_column_letter(col)
-            c.value = f'=IF(SUM({L}{first}:{L}{last})=0,"",SUM({L}{first}:{L}{last}))'
-            c.number_format = ZERO_BLANK
-            calc[f"{L}{i}"] = (sum(r["need_total"] for r in rows) if col == TOT
-                               else sum((r["cells"].get(dist[col - D0]) or {}).get("need", 0)
-                                        for r in rows)) or ""
-        c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
 
-    _tail(ws, i, N)
+    def total_row(i, label, fmt, cells, big):
+        """Итоговая строка: подпись под №…Price, числа под районами, итог —
+        растянут на Total и Amount."""
+        ws.cell(row=i, column=N, value=label)
+        ws.merge_cells(start_row=i, start_column=N, end_row=i, end_column=PR)
+        for col in range(N, AMT + 1):
+            c = ws.cell(row=i, column=col)
+            c.fill = sum_fill; c.font = bold; c.border = box; c.alignment = mid
+        for k, (f, v) in enumerate(cells):
+            c = ws.cell(row=i, column=D0 + k, value=f)
+            c.number_format = fmt
+            calc[f"{get_column_letter(D0 + k)}{i}"] = v
+        f, v = big
+        c = ws.cell(row=i, column=TOT, value=f)
+        c.number_format = fmt; c.font = Font(bold=True, size=12)
+        calc[f"{TL}{i}"] = v
+        ws.merge_cells(start_row=i, start_column=TOT, end_row=i, end_column=AMT)
+        ws.row_dimensions[i].height = 20
+
+    # Количества — одной строкой; суммы по районам — ровно под ними: сколько
+    # стоит каждый из пяти чеков и вся закупка.
+    i = last + 1
+    col_of = lambda k: get_column_letter(D0 + k)
+    total_row(i, "TOTAL", ZERO_BLANK,
+              [(f'=IF(SUM({col_of(k)}{first}:{col_of(k)}{last})=0,"",SUM({col_of(k)}{first}:{col_of(k)}{last}))',
+                d_units[k] or "") for k in range(len(dist))],
+              (f'=IF(SUM({TL}{first}:{TL}{last})=0,"",SUM({TL}{first}:{TL}{last}))',
+               sum(r["need_total"] for r in rows) or ""))
+    total_row(i + 1, "AMOUNT, AED", MONEY,
+              [(f"=SUMPRODUCT(${PL}${first}:${PL}${last},{col_of(k)}{first}:{col_of(k)}{last})",
+                round(d_money[k], 2) or "") for k in range(len(dist))],
+              (f"=SUM({AL}{first}:{AL}{last})", round(money, 2) or ""))
+
+    _tail(ws, i + 1, N)
 
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
     ws.column_dimensions[get_column_letter(N)].width = 7.11
     ws.column_dimensions[get_column_letter(C)].width = 10
     ws.column_dimensions[get_column_letter(I)].width = 40
+    ws.column_dimensions[PL].width = 13
     for col in range(D0, LAST + 1):
         ws.column_dimensions[get_column_letter(col)].width = 15
-    ws.column_dimensions[get_column_letter(TOT)].width = 18.44
-    # Держим на виду номер, код и название: магазин листает вправо по точкам и
-    # без этого перестаёт понимать, в какой он строке.
+    ws.column_dimensions[TL].width = 12
+    ws.column_dimensions[AL].width = 16
+    # Держим на виду номер, код, название и цену: магазин листает вправо по
+    # точкам и без этого перестаёт понимать, в какой он строке.
     ws.freeze_panes = f"{get_column_letter(D0)}{first}"
 
     # Снимок того, что просили: в файле все позиции каталога, и вернувшийся ноль
@@ -334,7 +398,8 @@ async def _build_book(day: str):
     raw = _with_cached_values(buf.read(), calc)
     name = f"AMBAR-zayavka-{data['day']}.xlsx"
     log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
-             f"из них с потребностью {sum(1 for r in rows if r['need_total'])}")
+             f"из них с потребностью {sum(1 for r in rows if r['need_total'])}, "
+             f"на {money:,.2f} AED, без цены {sum(1 for r in rows if not price_of(r['id']))}")
     return raw, name
 
 

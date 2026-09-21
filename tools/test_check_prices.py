@@ -29,7 +29,7 @@ def eq(name, got, want):
     if not ok: FAIL.append(name)
 
 owner_auth.install_validator(lambda s: {"id": int(s)} if s.isdigit() else None)
-ABS, BEER, NOCOST = "p1", "p31", "p15"
+ABS, BEER, NOCOST = "p1", "p31", "p24"   # Chivas 25Y — в листе закупки клетка пустая (Ballantines с 22.09 с ценой)
 
 
 async def main():

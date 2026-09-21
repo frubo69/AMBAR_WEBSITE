@@ -2924,34 +2924,35 @@ async def handle_shift_open(request):
 
     crew = body.get("drivers") or {}
     names = list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
-    # Отмечены должны быть все: пропущенный водитель — это не «неизвестно», а
-    # человек без питания, который об этом узнает в конце месяца.
-    missing = [n for n in names if not isinstance(crew.get(n), bool)]
-    if missing:
-        return web.json_response({"error": "crew_incomplete", "missing": missing},
-                                 status=400, headers=CORS_HEADERS)
+    # Отмечать всех больше не обязательно (владелец, 22 сен 2026 — временно,
+    # пока не ведём по датам, кто когда уехал): кто в отъезде, того не трогаем
+    # вовсе — ни «на смене», ни «дома», ни питания, ни сообщения. Вышедший, но
+    # не отмеченный откроет смену сам, и это будет его отметкой.
+    marked = [n for n in names if isinstance(crew.get(n), bool)]
 
     day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
     ok = await db.shift_open(day, oid, {
         "opened_at": datetime.now(timezone.utc), "by": request.get("op_id") or 0,
         "by_name": who, "operator": next((d.get("operator", "") for d in districts
                                           if d["id"] == oid), ""),
-        "drivers": {n: bool(crew.get(n)) for n in names}})
+        "drivers": {n: crew[n] for n in marked}})
     if not ok:
         return web.json_response({"error": "already_open"}, status=409, headers=CORS_HEADERS)
     _opens_drop()
 
     # Питание считается по этой отметке — она же и есть факт выхода.
-    for n in names:
+    for n in marked:
         try:
-            await db.save_driver_day(day, n, {"working": bool(crew.get(n))})
+            await db.save_driver_day(day, n, {"working": crew[n]})
         except Exception as e:
             log.warning(f"[pos] выход {n} не сохранён: {e}")
     log.info(f"[pos] смена открыта: {oid} · {who} · "
-             f"вышли {sum(1 for n in names if crew.get(n))} из {len(names)}")
-    await _tell_crew(oid, names, crew, who)
+             f"вышли {sum(1 for n in marked if crew[n])} из {len(names)}"
+             f"{f', не отмечены {len(names) - len(marked)}' if len(marked) < len(names) else ''}")
+    await _tell_crew(oid, marked, crew, who)
     return web.json_response({"ok": True, "day": day, "district": oid,
-                              "drivers": {n: bool(crew.get(n)) for n in names}},
+                              "drivers": {n: crew[n] for n in marked},
+                              "unmarked": [n for n in names if n not in marked]},
                              headers=CORS_HEADERS)
 
 

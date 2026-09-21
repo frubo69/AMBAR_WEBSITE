@@ -54,6 +54,12 @@ INIT_DATA_MAX_AGE = 24 * 3600
 DUBAI_TZ = timezone(timedelta(hours=4))
 from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
 
+# Смену водитель открывает не позже 15:00 (владелец, 22 сен 2026: «это теперь
+# правило»). Открыть позже можно — заказы ждут, — но старшему и операторам
+# района сразу уходит оповещение. Сутки начинаются в 10:00, поэтому открытие
+# ночью — тоже позже 15:00 этих суток.
+SHIFT_LATE_HOUR = int(os.getenv("AMBAR_SHIFT_LATE_HOUR", "15"))
+
 
 def _biz_day(ref: datetime = None) -> str:
     ref = ref or datetime.now(DUBAI_TZ)
@@ -522,9 +528,56 @@ async def _intake_left(me: dict) -> list:
     return out
 
 
+def _shift_late(day: str, now: datetime) -> bool:
+    """Смена открыта позже SHIFT_LATE_HOUR учётных суток day."""
+    return now >= bizday.day_start(day).replace(hour=SHIFT_LATE_HOUR, minute=0)
+
+
+async def _district_open(me: dict, day: str) -> bool:
+    """Открыл ли оператор сегодня смену района водителя."""
+    try:
+        return bool(me.get("district")) and me["district"] in (await db.shift_opens_for_day(day))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] открытие смены района не прочиталось: {e}")
+        return False
+
+
+def _mde(s: str) -> str:
+    """Имя в Markdown-сообщении: служебные знаки — буквами."""
+    return re.sub(r"([_*`\[])", r"\\\1", str(s or ""))
+
+
+async def _late_alert(me: dict, now: datetime) -> None:
+    """Смену открыли позже 15:00 — старшему (STAR) и операторам района."""
+    import html as _html
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    oid = me.get("district") or ""
+    where = f"{OFFICE_CODES.get(oid, '')} {OFFICE_NAMES.get(oid, oid)}".strip()
+    at = now.astimezone(bizday.DUBAI_TZ).strftime("%H:%M")
+    name = me.get("name") or "—"
+    try:
+        from owner_routes import notify_owners
+        await notify_owners("driver.late_shift",
+                            f"⏰ *Поздно открыл смену* — {_mde(name)}, {_mde(where)}\n"
+                            f"Открыл в {at}, а правило — до {SHIFT_LATE_HOUR}:00.")
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] старшему о поздней смене не ушло: {e}")
+    try:
+        import op_route
+        await op_route.send(f"⏰ <b>Поздно открыл смену</b>: {_html.escape(name)}, {_html.escape(where)} — "
+                            f"в {at}. Правило — до {SHIFT_LATE_HOUR}:00.", district=oid, retry_plain=True)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] операторам о поздней смене не ушло: {e}")
+    log.info(f"[driver] {name}: смена открыта поздно, в {at}")
+
+
 async def _shift_view(me: dict) -> dict:
     day = _biz_day()
     d = await db.get_driver_day(day, me["name"]) or {}
+    # Оператор может открыть смену района, никого не отметив (владелец, 22 сен
+    # 2026 — временно, пока не ведём, кто когда уехал): тогда неотмеченный
+    # водитель открывает смену сам. Отмеченный «дома» — нет.
+    district_open = await _district_open(me, day)
     geo = await _geo_for(me)
     must = [] if _tq(me) else _must_left(d)
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
@@ -562,8 +615,10 @@ async def _shift_view(me: dict) -> dict:
         # Неотработанные перемещения района — отдать или забрать. Держат смену
         # так же, как приёмка: закрыть её сервер всё равно не даст.
         "moves": moves,
-        "can_open": (d.get("working") is True or _tq(me)) and geo["ok"]
-                    and not (opened and not closed) and not after,
+        "can_open": (d.get("working") is True or _tq(me) or (d.get("working") is None and district_open))
+                    and geo["ok"] and not (opened and not closed) and not after,
+        "district_open": district_open,
+        "late_hour": SHIFT_LATE_HOUR,
         # Смену закрывает сам водитель, когда отдал последний заказ и ответил
         # по расходам. Ждать закрытия дня оператором он не обязан: иначе смена
         # висела бы до утра, а «закрыть» упиралось в чужое действие.
@@ -765,18 +820,36 @@ async def handle_shift_open(request):
     if after:
         return web.json_response({"error": "after_close", "day": after["day"]},
                                  status=409, headers=CORS_HEADERS)
+    self_mark = False
     if d.get("working") is not True and not _tq(me):
-        return web.json_response({"error": "not_marked"}, status=409, headers=CORS_HEADERS)
+        # Отметка оператора больше не обязательна (владелец, 22 сен 2026,
+        # временно): район открыт, а водитель не отмечен — открывает смену сам,
+        # и это и есть его выход (питание рабочего дня). Отмечен «дома» — нет.
+        if d.get("working") is False:
+            return web.json_response({"error": "marked_off"}, status=409, headers=CORS_HEADERS)
+        if not await _district_open(me, day):
+            return web.json_response({"error": "not_marked"}, status=409, headers=CORS_HEADERS)
+        self_mark = True
     geo = await _geo_for(me)
     if not geo["ok"]:
         return web.json_response({"error": "no_geo", "geo": geo},
                                  status=409, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc)
     await db.save_driver_day(day, me["name"], {
-        "shift_open_at": datetime.now(timezone.utc), "shift_close_at": None,
+        "shift_open_at": now, "shift_close_at": None,
         # Тест-водителя на смену никто не отмечает — отмечается сам; метка test
         # держит его день подальше от отчётов.
-        **({"working": True, "test": True} if _tq(me) else {})})
-    log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин")
+        **({"working": True, "test": True} if _tq(me) else {}),
+        **({"working": True, "self_marked": True} if self_mark else {})})
+    if self_mark:
+        try:
+            await db.shift_crew_add(day, me.get("district") or "", me["name"])
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[driver] {me['name']}: в бригаду района не записан: {e}")
+    log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин"
+             + (" · без отметки оператора" if self_mark else ""))
+    if not _tq(me) and _shift_late(day, now):
+        await _late_alert(me, now)
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)
 
 

@@ -965,6 +965,8 @@ _DEFAULT_PREFS = {
     # Экстренная ситуация у водителя. Выключить нельзя по смыслу — здесь стоит
     # ради того, чтобы событие было в общем списке уведомлений.
     "driver.panic": True,
+    # Водитель открыл смену позже 15:00 (владелец, 22 сен 2026: «это правило»).
+    "driver.late_shift": True,
     "finance.revenueLow": True, "finance.avgDrop": True,
     "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,
     "support.new": False, "support.noreply": True, "support.complaint": True, "support.escalation": False,
@@ -3692,6 +3694,16 @@ async def shift_close(day: str, district: str, doc: dict) -> bool:
         return True
     except DuplicateKeyError:
         return False
+
+
+async def shift_crew_add(day: str, district: str, name: str) -> None:
+    """Водитель без отметки оператора сам открыл смену — он на смене: пишем в
+    бригаду района. Отметку, которую поставил оператор, не трогаем."""
+    db = _db_or_none()
+    if db is None or not district or not name: return
+    await db.shift_opens.update_one(
+        {"_id": f"{day}:{district}", f"drivers.{name}": {"$exists": False}},
+        {"$set": {f"drivers.{name}": True}})
 
 
 async def shift_open(day: str, district: str, doc: dict) -> bool:

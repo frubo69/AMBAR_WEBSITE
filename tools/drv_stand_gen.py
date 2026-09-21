@@ -223,6 +223,8 @@ if(ST_Q.get('route')) ST_SHIFT.in_route = ['AMB82300EB5'];
 if(ST_Q.get('intake')) ST_SHIFT.intake = [{sid: 'S1', district: 'jvc', code: 'JVC', name: 'JVC', need: 12, got: 7, left: 5, started: true}];
 if(ST_Q.get('must')){ ST_SHIFT.must = ['fuel', 'wash']; ST_SHIFT.must_names = ['Бензин', 'Мойка']; }
 if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
+// ?selfopen=1 — оператор открыл смену района, водителя не отметил: открывает сам (22 сен 2026)
+if(ST_Q.get('selfopen')){ ST_SHIFT.opened = false; ST_SHIFT.working = null; ST_SHIFT.district_open = true; ST_SHIFT.late_hour = 15; ST_SHIFT.can_open = true; }
 if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); ST_SHIFT.after_close = true; ST_SHIFT.report_day = ST_SHIFT.day; ST_SHIFT.report_closed_at = ST_SHIFT.closed_at; ST_SHIFT.can_open = false; }
 // ?prevday=1 — сутки сменились, вчерашняя смена закрыта, оператор новую ещё не открыл
 if(ST_Q.get('prevday')){ ST_SHIFT.opened = false; ST_SHIFT.closed = false; ST_SHIFT.after_close = true; ST_SHIFT.report_day = '2026-09-10'; ST_SHIFT.report_closed_at = '2026-09-10T22:40:00+04:00'; ST_SHIFT.can_open = false; }

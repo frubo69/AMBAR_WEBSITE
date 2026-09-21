@@ -1881,11 +1881,9 @@ body.safe-open .cvo-hdr{opacity:0}
   font-size:12px;font-weight:700;cursor:pointer;color:var(--gold);
   background:var(--gold-soft);border:1px solid var(--border)}
 .sh-all:active{transform:scale(.95)}
-/* Пока отмечены не все, открытие — не кнопка, а строка состояния: большой
-   золотой блок, на который нельзя нажать, читается как поломка. */
-.sh-left{margin-top:12px;padding:11px;border-radius:var(--r2);text-align:center;
-  font-size:12.5px;font-weight:600;color:var(--muted);background:var(--bg2);
-  border:1px dashed var(--border2)}
+/* Отмечены не все — открыть можно, под списком одна спокойная строка, почему
+   это нормально (кто в отъезде, того не отмечают). */
+.sh-note{margin:12px 4px 0;text-align:center;font-size:12px;font-weight:500;line-height:1.35;color:var(--muted)}
 /* Две кнопки, а не галочка: «не отмечен» и «не работает» — разные вещи, и
    различать их должно нажатие, а не его отсутствие. */
 .sh-ch{padding:6px 11px;border-radius:8px;font-family:inherit;font-size:12px;
@@ -6188,7 +6186,9 @@ function shiftPaint(){
 
 // Строка неоткрытого района: кто сегодня работает. Двумя кнопками, а не
 // галочкой: «не отмечен» и «не работает» — разные вещи, и различать их должен
-// не пропуск, а нажатие.
+// не пропуск, а нажатие. Отмечать всех не обязательно (владелец, 22 сен 2026 —
+// временно, пока не ведём, кто когда уехал): кто в отъезде, того не трогают,
+// а вышедший без отметки откроет смену сам.
 function shiftOpenRow(x){
   const names = x.drivers || [];
   const mark = SH_CREW[x.district] || (SH_CREW[x.district] = {});
@@ -6198,7 +6198,7 @@ function shiftOpenRow(x){
     <div class="sh-hd">
       <span class="sh-code">${_esc(x.code)}</span>
       <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
-        <span class="sh-s">смена не открыта · отметьте бригаду</span></span>
+        <span class="sh-s">смена не открыта</span></span>
       ${names.length ? `<button class="sh-all" onclick="shCrewAll('${x.district}')">
         ${allOn ? 'Снять' : 'Все на смене'}</button>` : ''}
     </div>
@@ -6213,9 +6213,10 @@ function shiftOpenRow(x){
         </span>
       </div>`).join('')}</div>`
       : '<div class="sh-none">В районе не назначено ни одного водителя</div>'}
-    ${left ? `<div class="sh-left">Осталось отметить ${left} ${
-        plural(left,'человека','человек','человек')}</div>`
-      : `<button class="sh-go wide" onclick="shiftDoOpen('${x.district}')">Открыть смену</button>`}
+    ${!names.length || !left ? ''
+      : `<div class="sh-note">${left === names.length ? 'Можно никого не отмечать'
+          : `Без отметки: ${left} — их не трогаем`}: кто в отъезде, остаётся без отметки, вышедший откроет смену сам</div>`}
+    <button class="sh-go wide" onclick="shiftDoOpen('${x.district}')">Открыть смену</button>
   </div>`;
 }
 
@@ -6247,7 +6248,7 @@ async function shiftDoOpen(oid){
       {method:'POST', body:{district: oid, as: curOp, drivers: SH_CREW[oid] || {}}});
     haptic('ok');
     const n = Object.values(r.drivers || {}).filter(Boolean).length;
-    toast(`Смена открыта · на смене ${n} ${plural(n,'водитель','водителя','водителей')}`, 'ok');
+    toast(n ? `Смена открыта · на смене ${n} ${plural(n,'водитель','водителя','водителей')}` : 'Смена открыта', 'ok');
     delete SH_CREW[oid];
     await shiftOpen();
     shiftPill();

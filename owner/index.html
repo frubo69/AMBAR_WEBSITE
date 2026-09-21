@@ -28687,11 +28687,11 @@ function rcvRender(){
   // кнопка внизу всегда одна и говорит, что делать дальше.
   const act = document.getElementById('accAct');
   const занято0 = !!(t.hold && t.hold.live);
+  // «Не всё привезли» теперь внизу, рядом с главной кнопкой (21 сен 2026) —
+  // в углу его не находили. В углу остаётся только «Вернуть район».
   if(act) act.innerHTML = занято0 ? '' : (t.got === 0 && !ns)
     ? `<button class="acc-act" onclick="rcvGiveBack()">Вернуть район</button>`
-    : (t.left > 0 && t.got > 0)
-      ? `<button class="acc-act dn" onclick="rcvFinOpen()">Завершить с недобором</button>`
-      : '';
+    : '';
 
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const занято = !!(t.hold && t.hold.live);
@@ -28733,6 +28733,7 @@ function rcvRender(){
     ? `<button class="qb" onclick="rcvFinOpen()">Завершить приёмку</button>`
     : `<div class="rcv-acts">
         <button class="qb" onclick="rcvNext()">${t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>
+        ${(t.got > 0 || !ns) ? `<button class="qb qb-ghost" onclick="rcvFinOpen()">Не всё привезли</button>` : ''}
         ${ns ? '' : `<button class="qb qb-ghost" onclick="rcvNoscanOpen()">Принять без сканирования</button>`}
       </div>`;
 }
@@ -29032,7 +29033,7 @@ function rcvFinOpen(){
   const gaps = (t.lines || []).filter(l => l.left > 0);
   _setText('rcvFinT', gaps.length ? 'Недобор' : 'Завершить приёмку');
   _setText('rcvFinS', gaps.length
-    ? `Не хватает ${fmt(t.left)} ${pluralize(t.left,'бутылки','бутылок','бутылок')}`
+    ? `Не хватает ${fmt(t.left)} ${pluralize(t.left,'бутылки','бутылок','бутылок')} · сначала отсканируйте всё, что привезли`
     : `Принято ${fmt(t.got)} из ${fmt(t.need)}`);
   document.getElementById('rcvFinGo').onclick = rcvFinSend;   // окно общее с «без сканирования»
   document.getElementById('rcvFinBody').innerHTML =

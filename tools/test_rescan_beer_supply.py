@@ -21,6 +21,11 @@ D = "2026-09-17"; T0 = datetime(2026, 9, 15, 5, 0, tzinfo=timezone.utc)
 async def notify(*a, **k): return None
 sr._notify_done = notify
 SR._biz_day = lambda *a, **k: D
+# Статус приёмок (intake_live) берёт учётные сутки у bizday напрямую и ищет
+# поставки с их начала минус три дня. Без этой строки тест жил до 20.09: потом
+# «сегодня» ушло дальше, и поставка 17-го выпадала из окна.
+import bizday
+bizday.biz_day = lambda *a, **k: D
 async def have(pid):
     SR.base_drop(); return (await SR._district_base(D))["bbay"]["have_exact"].get(pid, 0)
 async def main():

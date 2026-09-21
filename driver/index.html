@@ -11017,10 +11017,13 @@ function supRenderTask(){
   else if(t.got === 0 && !ns){
     act.textContent = 'Вернуть задачу'; act.className = 'sup-act';
     act.onclick = supGiveBack; act.style.display = '';
-  }else if(t.left > 0 && t.got > 0){
-    act.textContent = 'Завершить с недобором'; act.className = 'sup-act dn';
-    act.onclick = finOpen; act.style.display = '';
   }else act.style.display = 'none';
+  // «Не всё привезли» переехало из угла вниз, к главной кнопке (владелец,
+  // 21 сен 2026: «магазин обещал всё, приехали — половины нет, а заявка
+  // требует отсканировать всё, даже то, чего не дали»). Путь был и раньше —
+  // «Завершить с недобором» в углу, — но его не находили, и появлялся он лишь
+  // после первой бутылки. Теперь он внизу и доступен сразу: не дали ничего —
+  // это тоже недобор, а не «вернуть задачу».
   // Добранное уезжает вниз — так же, как его отдаёт сервер. Иначе строка,
   // закрытая минуту назад, остаётся посреди списка и водитель каждый раз
   // перечитывает её, ища следующую.
@@ -11079,6 +11082,7 @@ function supRenderTask(){
       ? `<button class="btn btn-pri" onclick="finOpen()">Завершить приёмку</button>`
       : `<button class="btn btn-pri" onclick="supNext()">${
            t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>${
+         (t.got > 0 || !ns) ? `<button class="btn btn-gh" onclick="finOpen()">Не всё привезли</button>` : ''}${
          ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}`}`;
 }
 
@@ -11440,8 +11444,11 @@ function finOpen(){
   const t = TASK; if(!t) return;
   const gaps = (t.lines || []).filter(l => l.left > 0);
   _setText('finT', gaps.length ? 'Недобор' : 'Завершить приёмку');
+  // Недобор — это всё, что не отсканировано. Отсканировать привезённое надо
+  // ДО этой кнопки: иначе привезённые бутылки запишутся в недовоз магазина и не
+  // попадут в реестр.
   _setText('finS', gaps.length
-    ? `Не хватает ${fmt(t.left)} ${plural(t.left,'бутылки','бутылок','бутылок')}`
+    ? `Не хватает ${fmt(t.left)} ${plural(t.left,'бутылки','бутылок','бутылок')} · сначала отсканируйте всё, что привезли`
     : `Принято ${fmt(t.got)} из ${fmt(t.need)}`);
   document.getElementById('finGo').onclick = finSend;    // окно общее с «без сканирования»
   document.getElementById('finBody').innerHTML =

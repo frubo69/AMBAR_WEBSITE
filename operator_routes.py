@@ -2027,6 +2027,36 @@ def _mv_json(obj, status=200):
                              dumps=lambda o: json.dumps(o, default=str, ensure_ascii=False))
 
 
+# ── заявка магазину: только правка ──────────────────────────────────────────
+# Владелец, 21 сен 2026: «могут ли операторы увидеть эту заявку и
+# отредактировать её, а старший утром откроет STAR и увидит уже
+# отредактированную. Им нужен только этот функционал — сугубо редактирование,
+# без контроля статуса и без загрузки ответа магазина».
+#
+# Ходим в те же обработчики склада, что и STAR, сняв с них охрану владельца:
+# правило правки одно на оба приложения, и расходиться им нельзя. Правка
+# ложится в ту же клетку «день × позиция × район», поэтому у старшего она
+# появляется сама, как только он откроет экран.
+def _без_охраны(h):
+    while hasattr(h, "__wrapped__"):
+        h = h.__wrapped__
+    return h
+
+
+@require_operator
+async def handle_op_order(request):
+    """GET ?day= — автоматически составленная заявка, та же, что у старшего."""
+    import stock_routes
+    return await _без_охраны(stock_routes.handle_order)(request)
+
+
+@require_operator
+async def handle_op_order_edit(request):
+    """POST {day, id, district, qty} — поправить одну клетку заявки."""
+    import stock_routes
+    return await _без_охраны(stock_routes.handle_order_edit)(request)
+
+
 @require_operator
 async def handle_move_board(request):
     """GET ?as= — что где лежит: остатки и коды по районам."""
@@ -3444,6 +3474,10 @@ def setup(app):
     r.add_get("/api/operator/orders", handle_list)
     r.add_route("OPTIONS", "/api/operator/close-request", _opt)
     r.add_post("/api/operator/close-request", handle_close_decide)
+    for _p in ("/api/operator/stock/order", "/api/operator/stock/order/edit"):
+        r.add_route("OPTIONS", _p, _opt)
+    r.add_get("/api/operator/stock/order", handle_op_order)
+    r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)

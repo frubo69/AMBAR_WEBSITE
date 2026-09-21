@@ -21131,6 +21131,16 @@ function fbBudRepaint(){
 // пиши серым „карта Макара“»).
 const FB_LINE_HINT = {'Бензин': 'карта Макара'};
 
+// Что это за карта — серым под именем, там же, где «курс 3,677» (владелец,
+// 21 сен 2026). Ключ — имя без регистра и лишних пробелов: в базе они
+// записаны прописными, а завести могут как угодно.
+const _fbKey = n => String(n || '').replace(/\s+/g, ' ').trim().toUpperCase();
+const FB_PERSON_SUB = {
+  'КАРТА СТАС': 'коммунальные услуги',
+  'КАРТА МАКАР': 'заправка', 'КАРТА МАКАРА': 'заправка',
+  'АМ': 'ЧП', 'AM': 'ЧП',
+};
+
 function fbFillRow(o){
   const editing = FB.edit && FB.edit.kind === o.kind && FB.edit.id === o.id;
   const hint = o.hint || FB_LINE_HINT[o.plain || ''] || '';
@@ -21337,7 +21347,7 @@ function fbGroupVal(g, key){
 // Зарплаты — люди по группам, как в «Зарплатах»: старшие (руководство),
 // старший оператор, операторы, водители (эти — по районам). Каждая группа —
 // карточка с заголовком и счётчиком; оклад у каждого — строкой с суммой.
-const FB_SAL_GROUPS = [['other', 'Старшие'], ['senior', 'Старший оператор'], ['operator', 'Операторы'], ['driver', 'Водители']];
+const FB_SAL_GROUPS = [['other', 'Офис'], ['senior', 'Старший оператор'], ['operator', 'Операторы'], ['driver', 'Водители']];
 function fbSalaryBody(b){
   const sal = (b.budget || {}).salary || {people: []};
   let out = '';
@@ -21372,7 +21382,8 @@ function fbPersonFillRow(p, sal){
   const editing = FB.edit && FB.edit.kind === 'rate' && FB.edit.id === p.name;
   const cur = editing ? (FB.editCur || p.cur) : p.cur;
   const sym = cur === 'USD' ? '$' : 'AED';
-  const sub = [p.unit === 'day' ? 'в день' : '', p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
+  const sub = [FB_PERSON_SUB[_fbKey(p.name)] || '', p.unit === 'day' ? 'в день' : '',
+               p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
   const head = `<span class="shl-code">${escS(fbIni(p.name))}</span><span class="shl-b"><b>${escS(p.name)}</b><i>${sub}</i></span>`;
   if(editing){
     return `<div class="shl-card fb-pc fb-editing">
@@ -22192,7 +22203,7 @@ function fbPeopleHtml(b){
     </div></div>`;
   return out;
 }
-const FB_ROLE_T = {other: 'Старшие', senior: 'Старший оператор', operator: 'Операторы', driver: 'Водители'};
+const FB_ROLE_T = {other: 'Офис', senior: 'Старший оператор', operator: 'Операторы', driver: 'Водители'};
 function fbRoleChips(){ return Object.keys(FB_ROLE_T).map(r => `<button class="chip${FB.role === r ? ' on' : ''}" onclick="fbRolePick('${r}')">${FB_ROLE_T[r]}</button>`).join(''); }
 function fbPersonRow(p){
   const sym = p.cur === 'USD' ? '$' : 'AED';

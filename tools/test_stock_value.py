@@ -15,6 +15,9 @@ CAT = {"p1": {"id": "p1", "name": "Absolut", "price_full": 100, "price": 100},
        "p31": {"id": "p31", "name": "Heineken can", "price_full": 100, "price_24_full": 250, "price": 100}}
 BASE = {"jvc": {"have": {"p1": 20, "p31": 3}, "have_exact": {"p1": 20, "p31": 3.5}}, "bbay": {"have": {"p1": 5}}, "silicon": {"have": {}}}
 SR._catalog = lambda: CAT
+# «Сегодня» — день карточки: прошедший день показывает склад на начало смены
+# (tools/test_stock_at.py), а здесь проверяется живая цифра.
+SR._biz_day = lambda *a, **k: "2026-09-16"
 SR.OFFICE_IDS = ["jvc", "bbay", "silicon"]; SR.OFFICE_CODES = {"jvc": "B1", "bbay": "B2", "silicon": "B3"}; SR.OFFICE_NAMES = dict(SR.OFFICE_CODES)
 async def base(day): return BASE
 SR._district_base = base

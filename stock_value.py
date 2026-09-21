@@ -162,9 +162,15 @@ async def build(day: str = "") -> dict:
     # День обязателен строкой: расчёт нормы разбирает его через strptime и на
     # пустой строке падает. Раньше это делала заявка, у которой мы брали
     # строки; теперь основу спрашиваем сами — значит и день готовим сами.
-    day = (day or "").strip() or stock_routes._biz_day()
+    today = stock_routes._biz_day()
+    day = (day or "").strip() or today
+    # Прошедший день — склад на начало его смены, сегодня — живая цифра.
+    # Раньше день двигал только норму, а остаток всегда был сегодняшний, и
+    # листать склад назад было незачем (владелец, 21 сен 2026: «какой толк от
+    # сегодня, вчера, если остаток остаётся таким же»).
+    past = day < today
     cat = stock_routes._catalog()
-    base = await stock_routes._district_base(day)
+    base = await (stock_routes.stock_at(day) if past else stock_routes._district_base(day))
     cost = await cost_map()
     src = _COST.get("src") or {}
     # Остаток — количественный: пересчёт + приход − продажи − списания.
@@ -176,8 +182,11 @@ async def build(day: str = "") -> dict:
     # сканируют (см. qr_routes.unscanned_by_district).
 
     ids = list(stock_routes.OFFICE_IDS)
+    # На прошедшее утро район без пересчёта — неизвестность, а не ноль: склад
+    # заведён пересчётом, и до него остатка просто нет.
+    known = {o: (not past) or bool((base.get(o) or {}).get("counted_at")) for o in ids}
     districts = [{"id": o, "code": stock_routes.OFFICE_CODES.get(o, ""),
-                  "name": stock_routes.OFFICE_NAMES.get(o, o)} for o in ids]
+                  "name": stock_routes.OFFICE_NAMES.get(o, o), "known": known[o]} for o in ids]
     zero = lambda: {"bottles": 0.0, "app": 0.0, "list": 0.0, "cost": 0.0,
                     "cost_bottles": 0.0}
     per = {o: zero() for o in ids}
@@ -196,6 +205,9 @@ async def build(day: str = "") -> dict:
                "have": {}, "bottles": 0.0, "known": False}
         for oid in ids:
             b = base.get(oid) or {}
+            if not known[oid]:
+                row["have"][oid] = None
+                continue
             имеет = b.get("have_exact") or b.get("have") or {}
             # Позиции нет ни в пересчёте, ни в приходе — про неё здесь ничего
             # не известно, и это не ноль. Внесённая руками бутылка в приходе
@@ -236,6 +248,10 @@ async def build(day: str = "") -> dict:
     с_остатком = sum(1 for r in items if r["bottles"] > 0)
     out = {
         "day": day,
+        # Живая цифра или склад на начало смены того дня — и на какой момент.
+        "live": not past,
+        "at": "" if not past else __import__("bizday").day_start(day).isoformat(),
+        "known": any(known.values()),
         "districts": districts,
         "totals": fix(total),
         "by_district": {k: fix(v) for k, v in per.items()},
@@ -245,7 +261,14 @@ async def build(day: str = "") -> dict:
         "items_total": len(items),
         "items_with_stock": с_остатком,
     }
-    log.info(f"[value] позиций {len(items)} (с остатком {с_остатком}) · "
+    if past and not out["known"]:
+        # Раньше первого пересчёта склада не было — скажем, с какого дня он есть.
+        try:
+            out["since"] = await db.stock_count_first()
+        except Exception as e:                      # noqa: BLE001
+            log.warning(f"[value] первый пересчёт не нашёлся: {e}")
+    log.info(f"[value] {day}{' на начало смены' if past else ''} · "
+             f"позиций {len(items)} (с остатком {с_остатком}) · "
              f"единиц {out['totals']['bottles']} (пиво коробками) · "
              f"прайс {out['totals']['list']:.0f} · приложение {out['totals']['app']:.0f} · "
              f"закупка {out['totals']['cost']:.0f} (покрытие {out['cost_cover']}%)")

@@ -931,11 +931,34 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* «ОСТАТКИ» и под ним «всего»: в одну строку рядом с пилюлей дня не влезает.
    Заголовок не ужимается никогда; тесно — короче становится дата в пилюле. */
 .stk-valsum .exp-day-t{flex-direction:column;align-items:flex-start;gap:1px}
-.stk-valsum .exp-day-l{flex:1 1 auto;min-width:0}
+/* Прошедший день на узком экране: у пилюли появляется кнопка «к сегодня», и
+   заголовок уезжал под неё. Заголовок не ужимается никогда, короче
+   становится дата в пилюле — многоточием, а не срезом с обеих сторон. */
+.stk-valsum .exp-day-l{flex:1 0 auto}
 .stk-valsum .exp-day-nav{flex:0 1 auto;min-width:0}
 .stk-valsum .exp-day .ds-txt i{text-overflow:ellipsis}
+/* Строки дня — во всю ширину пилюли: по центру длинная дата вылезала за
+   края с обеих сторон, и многоточие не срабатывало. */
+.stk-valsum .exp-day .ds-txt,#stkBySum .exp-day .ds-txt{align-items:stretch}
+#stkBySum .exp-day .ds-txt i{text-overflow:ellipsis}
+/* На «По районам» то же, но в одной клетке с заголовком лежит и число
+   полоски: ширину клетки задаёт только заголовок, а число занимает её всю
+   (width:0 + min-width:100%), иначе длинная подпись полоски отбирала бы
+   место у пилюли и в развёрнутой плашке. */
+/* Шестизначные суммы склада на узком телефоне не влезали в плитку и
+   обрезались («620 05…») — число подстраивается под ширину, как на «Анализе». */
+.stk-valsum .aud-tv,.stk-byg .aud-tv{font-size:clamp(18px,6.2vw,26px);white-space:nowrap}
+#stkBySum .exp-day-l{flex:1 0 auto}
+#stkBySum .exp-day-v{width:0;min-width:100%}
+#stkBySum .exp-day-nav{flex:0 1 auto;min-width:0}
 .stk-valsum .aud-g{padding:2px 13px 13px}
 .stk-valsum .sc-r:last-child{border-radius:0 0 15px 15px}
+/* Прошедший день раньше первого пересчёта: вместо нулей — одна строка. */
+.stk-valsum .stk-vnote{margin:-3px 16px 12px;font-size:12px;line-height:1.4;color:var(--muted)}
+/* «По районам» на прошедший день: под названием — «на начало смены» (и код
+   района), столбиком, как «всего» на карточке склада: в строку рядом с
+   пилюлей дня не влезает. */
+.stk-bysum .exp-day-t.two{flex-direction:column;align-items:flex-start;gap:1px}
 #stkByBody{padding-top:2px}
 /* ── История ревизий: строка одной ревизии ── */
 .hst-r{display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border:0;
@@ -15426,20 +15449,35 @@ function stkValueCard(reg){
   return `<div class="exp-sum stk-bysum stk-valsum" id="stkValCard" data-day="общий">${
     stkValInner(reg)}</div>`;
 }
+// Прошедший день на складе — это склад на начало его смены (10:00), а не
+// сегодняшний остаток под чужой датой: день двигал только норму, и листать
+// назад было незачем (владелец, 21 сен 2026: «очень важно листать и видеть,
+// какой остаток по районам был вчера в начале смены»). Сегодня — живая цифра.
+function stkPast(v){ return v ? v.live === false : DAY_OFFSET > 0; }
+// Раньше первого пересчёта склада не было: вместо нулей — с какого дня он есть.
+function stkNoStock(v){
+  const d = v && v.since ? new Date(v.since) : null;
+  return `Склад заведён пересчётом${d && !isNaN(d) ? ' ' + String(d.getDate()).padStart(2,'0')
+    + '.' + String(d.getMonth() + 1).padStart(2,'0') : ''} — на это утро остатков нет`;
+}
 function stkValInner(reg){
-  const v = STK.val, t = (v && v.totals) || null;
-  const bottles = t ? t.bottles : ((reg && reg.totals && reg.totals.left) || 0);
-  const без = (reg && reg.unscanned_total) || 0;
+  const v = STK.val, past = stkPast(v);
+  const нет = !!(v && v.known === false);
+  const t = (v && v.totals && !нет) ? v.totals : null;
+  // Реестр кодов — сегодняшний: подставлять его в прошедший день нельзя.
+  const bottles = t ? t.bottles : (past ? null : ((reg && reg.totals && reg.totals.left) || 0));
+  const без = past ? 0 : ((reg && reg.unscanned_total) || 0);
   // Три величины — три плитки той же анатомии, что в ревизии: подпись,
   // число, единица. Золото — на деньгах, количество белым. Цены — кнопки:
   // за ними закупочные цены по позициям.
   return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
-      <span class="exp-day-l"><span class="exp-day-t">Остатки<i>всего</i></span></span>
+      <span class="exp-day-l"><span class="exp-day-t">Остатки<i>${
+        past ? 'на начало смены' : 'всего'}</i></span></span>
       ${_dayNav('stkDay')}
     </div>
     <div class="aud-g">
       <div class="aud-t"><span class="aud-tl">Количество</span>
-        <b class="aud-tv">${fmtQty(bottles)}</b><span class="aud-tu">бут</span></div>
+        <b class="aud-tv">${bottles == null ? '—' : fmtQty(bottles)}</b><span class="aud-tu">бут</span></div>
       <button class="aud-t tap gold" onclick="ordPrices()" aria-label="Закупочные цены">
         <span class="aud-tl">Цена закупки</span>
         <b class="aud-tv">${t ? fmt(Math.round(t.cost)) : '—'}</b><span class="aud-tu">AED</span></button>
@@ -15447,11 +15485,12 @@ function stkValInner(reg){
         <span class="aud-tl">Цена продажи</span>
         <b class="aud-tv">${t ? fmt(Math.round(t.list)) : '—'}</b><span class="aud-tu">AED</span></button>
     </div>
+    ${нет ? `<div class="stk-vnote">${stkNoStock(v)}</div>` : ''}
     ${без ? `<button class="sc-r dn" onclick="accOpen('qr')"><span>QR код не внесён</span>
       <b>${fmtQty(без)}<u>бут</u></b><em>${_SC_CHEV}</em></button>` : ''}
     <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>
-    <button class="sc-r" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
-      ${MVO.open ? `<b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b>` : ''}<em>${_SC_CHEV}</em></button>`;
+    ${past ? '' : `<button class="sc-r" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
+      ${MVO.open ? `<b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b>` : ''}<em>${_SC_CHEV}</em></button>`}`;
 }
 
 // Прежняя полоса остатка. Оставлена для экрана района, где стоимость не
@@ -15669,14 +15708,25 @@ function stkByReload(){ STK.val = null; daySkel('stkMid'); stkByDistrict(true); 
 // карточки и чьи это числа, свёрнутая — на том же месте число выбранной
 // величины с подписью, что это и чьё. Меняются местами долей --fold, как на
 // плашке расходов.
+// Остатка на то утро нет вовсе (раньше первого пересчёта) или нет у
+// выбранного района — прочерк вместо нуля: ноль значит «считали, и пусто».
+function stkByNone(sel){
+  return !!(STK.val && STK.val.known === false) || !!(sel && sel.known === false);
+}
 function stkByDayL(src, sel){
-  const val = STK.by === 'qty' ? [fmtQty(src.bottles || 0), 'бут']
-    : [fmt(Math.round(STK.by === 'cost' ? (src.cost || 0) : (src.list || 0))), 'AED'];
-  const чьё = sel ? `${sel.code || ''} · ${sel.name || ''}` : 'все районы';
+  const нет = stkByNone(sel);
+  const val = STK.by === 'qty' ? [нет ? '—' : fmtQty(src.bottles || 0), 'бут']
+    : [нет ? '—' : fmt(Math.round(STK.by === 'cost' ? (src.cost || 0) : (src.list || 0))), 'AED'];
+  const past = stkPast(STK.val);
+  const чьё = (sel ? `${sel.code || ''} · ${sel.name || ''}` : 'все районы')
+    + (past ? ', на начало смены' : '');
   // В развёрнутой шапке рядом с названием только код выбранного района: и
   // «все районы», и имя района упирались в пилюлю дня и резались
-  // многоточием. Целиком, чьи это числа, написано в полоске.
-  return `<span class="exp-day-t">Остатки${sel ? `<i>${escS(sel.code || '')}</i>` : ''}</span>
+  // многоточием. Целиком, чьи это числа, написано в полоске. Прошедший день
+  // подписан под названием, как на карточке склада: иначе утренний остаток
+  // не отличить от сегодняшнего.
+  const под = [sel ? escS(sel.code || '') : '', past ? 'на начало смены' : ''].filter(Boolean).join(' · ');
+  return `<span class="exp-day-t${past ? ' two' : ''}">Остатки${под ? `<i>${под}</i>` : ''}</span>
     <span class="exp-day-v"><b>${val[0]}</b><i>${val[1]}</i>
       <span class="exp-day-p">
         <span><i>${escS(STK_BY[STK.by].t.toLowerCase())}</i></span>
@@ -15690,11 +15740,12 @@ function stkByDayRow(src, sel){
   </div>`;
 }
 // Три плитки — и они же переключатель, чем заполнена таблица.
-function stkByTiles(src){
+function stkByTiles(src, sel){
+  const нет = stkByNone(sel);
   const плитка = (k, val, u) => `<button class="aud-t tap${STK.by === k ? ' on' : ''}${
       k === 'qty' ? '' : ' gold'}" onclick="stkByMode('${k}')" aria-pressed="${STK.by === k}">
       <span class="aud-tl">${STK_BY[k].t}</span>
-      <b class="aud-tv">${val}</b><span class="aud-tu">${u}</span></button>`;
+      <b class="aud-tv">${нет ? '—' : val}</b><span class="aud-tu">${u}</span></button>`;
   return `<div class="aud-g stk-byg">
     ${плитка('qty', fmtQty(src.bottles || 0), 'бут')}
     ${плитка('cost', fmt(Math.round(src.cost || 0)), 'AED')}
@@ -15741,15 +15792,18 @@ async function stkByDistrict(тихо){
     pluralize(items.length,'позиция','позиции','позиций')}${
     v.items_with_stock != null ? `, с остатком ${v.items_with_stock}` : ''}`, false);
   const shown = sel ? [sel] : ds;
-  const числоРайона = c => STK.by === 'qty' ? fmtQty(c.bottles || 0)
+  // Район, которого на то утро ещё не считали, — прочерк, а не ноль.
+  const числоРайона = (c, d) => d && d.known === false ? '—'
+    : STK.by === 'qty' ? fmtQty(c.bottles || 0)
     : fmt(Math.round(STK.by === 'cost' ? (c.cost || 0) : (c.list || 0)));
-  const body = `
+  const body = `${v.known === false ? `<div class="stk-note" style="margin:0 2px 12px">${
+      stkNoStock(v)}</div>` : ''}
     <div class="stkbd-strip">${ds.map(d => {
       const c = колонка(d);
-      return `<button class="stkbd-d ${(STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
-        ? c.cost : c.list)) ? '' : 'z'}${STK.dsel === d.id ? ' on' : ''}" onclick="stkByDist('${escS(d.id)}')">
+      return `<button class="stkbd-d ${(d.known !== false && (STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
+        ? c.cost : c.list))) ? '' : 'z'}${STK.dsel === d.id ? ' on' : ''}" onclick="stkByDist('${escS(d.id)}')">
         <span class="stkbd-c">${escS(d.code || '')}</span>
-        <span class="stkbd-n">${числоРайона(c)}</span>
+        <span class="stkbd-n">${числоРайона(c, d)}</span>
       </button>`;
     }).join('')}</div>
     <div class="stk-grp2"><span>${sel ? 'Каталог · ' + escS(sel.code || '') : 'Каталог'}</span>${
@@ -15806,12 +15860,12 @@ async function stkByDistrict(тихо){
   if(sum){
     // Узел остаётся, содержимое — заново: так же живёт плашка расходов, и
     // кнопка возврата к сегодня появляется, как только день не сегодняшний.
-    sum.innerHTML = stkByDayRow(src, sel) + `<div class="exp-fold">${stkByTiles(src)}</div>`;
+    sum.innerHTML = stkByDayRow(src, sel) + `<div class="exp-fold">${stkByTiles(src, sel)}</div>`;
     document.getElementById('stkByBody').innerHTML = body;
   }else{
     mid.innerHTML = `<div class="exp-pin" id="stkByPin">
         <div class="exp-sum stk-bysum" id="stkBySum" data-day="общий">${stkByDayRow(src, sel)}
-          <div class="exp-fold">${stkByTiles(src)}</div>
+          <div class="exp-fold">${stkByTiles(src, sel)}</div>
         </div>
       </div>
       <div id="stkByBody">${body}</div>`;

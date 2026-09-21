@@ -1035,17 +1035,30 @@ async def handle_transfers(request):
 # ── заявка ───────────────────────────────────────────────────────────────────
 _BASE = {"key": None, "at": 0.0, "data": None}
 BASE_TTL = 60          # секунд
+# Склад на начало прошедших смен: день → (когда посчитали, основа). Прошлое
+# меняется редко — пересчётом или приёмкой задним числом, — а они и так
+# сбрасывают кэш через base_drop.
+_BASE_AT: dict = {}
+BASE_AT_TTL = 300
 
 
 def base_drop():
     """Забыть основу заявки: пересчитали склад или приняли товар."""
     _BASE["key"] = None
+    _BASE_AT.clear()
 
 
-async def _noscan_after(since: dict) -> dict:
+async def _noscan_after(since: dict, until: datetime | None = None) -> dict:
     """{район: {позиция: единиц}} — принято без сканирования после пересчёта
     района и ещё не отсканировано: need − got по открытым задачам с noscan_at
-    позже counted_at. Отменённые и закрытые задачи не в счёт."""
+    позже counted_at. Отменённые и закрытые задачи не в счёт.
+
+    until — то же самое на прошедший момент (склад на начало смены): задача,
+    которую тогда уже приняли без сканирования и ещё не закрыли, отдаёт
+    need − отсканированное к тому моменту, а закрыта она сейчас или нет,
+    неважно."""
+    if until is not None:
+        return await _noscan_at(since, until)
     out: dict = {}
     for sup in await db.supplies_with_open_tasks(limit=12):
         for oid, t in (sup.get("tasks") or {}).items():
@@ -1067,7 +1080,47 @@ async def _noscan_after(since: dict) -> dict:
     return out
 
 
-async def _moved_after(counts: dict, since: dict) -> dict:
+def _aware(v):
+    """Момент из задачи поставки: datetime из монги (бывает без пояса — это
+    UTC) или строка. Ничего — None."""
+    if not v:
+        return None
+    d = v if hasattr(v, "tzinfo") else _dt_of(str(v))
+    if d is not None and d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d
+
+
+async def _noscan_at(since: dict, until: datetime) -> dict:
+    """Принятое без сканирования на прошедший момент until. Задачи смотрим
+    любые, не только открытые: закрытую сегодня вчера утром ещё досканировали.
+    Сколько к тому моменту отсканировали — по кодам самой поставки."""
+    out: dict = {}
+    for sup in await db.supply_list(limit=40):
+        sid = sup.get("supply_id") or sup.get("_id")
+        for oid, t in (sup.get("tasks") or {}).items():
+            if oid not in OFFICE_IDS:
+                continue
+            ns = _aware(t.get("noscan_at"))
+            if ns is None or ns > until:
+                continue                    # тогда ещё сканировали или не начинали
+            done, cancel = _aware(t.get("done_at")), _aware(t.get("cancelled_at"))
+            if (done and done <= until) or (cancel and cancel <= until):
+                continue                    # к тому моменту уже закрыта
+            edge = since.get(oid)
+            if edge and ns <= edge:
+                continue                    # пересчёт после неё товар уже видел
+            got = await db.supply_codes_until(sid, oid, until)
+            for it in sup.get("items") or []:
+                pid = it.get("id")
+                need = float((it.get("by_district") or {}).get(oid) or 0)
+                rem = max(0.0, need - float(got.get(pid) or 0))
+                if rem and pid:
+                    out.setdefault(oid, {})[pid] = out.get(oid, {}).get(pid, 0) + rem
+    return out
+
+
+async def _moved_after(counts: dict, since: dict, until: datetime | None = None) -> dict:
     """{район: {позиция: [(момент, ±единиц), …]}} — переезды после пересчёта.
 
     Переезд после пересчёта района двигает его остаток: минус у отдающего,
@@ -1092,6 +1145,8 @@ async def _moved_after(counts: dict, since: dict) -> dict:
         at = _dt_of(m.get("at") or "")
         if not pid or not q or not at:
             continue
+        if until is not None and at > until:
+            continue                    # склад на прошедший момент: переезд позже
         day = str(m.get("day") or "")
         for oid, sign in ((m.get("from"), -1.0), (m.get("to"), 1.0)):
             if oid not in OFFICE_IDS:
@@ -1106,7 +1161,7 @@ async def _moved_after(counts: dict, since: dict) -> dict:
     return out
 
 
-async def _sold_after(since: dict) -> dict:
+async def _sold_after(since: dict, until: datetime | None = None) -> dict:
     """{район: {позиция: [(момент, продано в учётных единицах), …]}} после его
     пересчёта, по времени.
 
@@ -1132,7 +1187,7 @@ async def _sold_after(since: dict) -> dict:
         # пересчёт попадает; «вернули в доставку» снимает статус — и она
         # возвращается на склад сама, «доставлен» снова — снова списывается.
         ts = _dt_of(o.get("delivered_at") or o.get("timestamp") or "")
-        if not ts or ts <= edge:
+        if not ts or ts <= edge or (until is not None and ts > until):
             continue
         for it in (o.get("items") or []):
             pid, q = it.get("id"), _qty(it)
@@ -1168,6 +1223,50 @@ async def _district_base(day: str) -> dict:
     if (_BASE["key"] == day and _t.monotonic() - _BASE["at"] < BASE_TTL
             and (stamp is None or stamp == _BASE.get("stamp"))):
         return _BASE["data"]
+    out = await _base_calc(day)
+    _BASE.update(key=day, at=_t.monotonic(), data=out, stamp=stamp)
+    return out
+
+
+async def _count_at(oid: str, until: datetime) -> dict | None:
+    """Пересчёт района, от которого считался склад в момент until: из тех, что
+    к тому моменту уже сделали, — свежий по дню, как у живого остатка."""
+    for c in await db.get_stock_counts_recent(oid, limit=40):
+        at = _dt_of(c.get("counted_at") or "")
+        if at is not None and at <= until:
+            return c
+    return None
+
+
+async def stock_at(day: str) -> dict:
+    """Склад каждого района на начало смены дня day (10:00 Дубай).
+
+    Владелец, 21 сен 2026: «какой толк там от сегодня, вчера, если остаток
+    остаётся таким же… очень важно листать и видеть, какой остаток по районам
+    был вчера в начале смены». Полоса дня на складе двигала только норму, а
+    остаток всегда был сегодняшний.
+
+    Считаем тем же расчётом, что живой остаток, а не откатом от сегодняшнего:
+    пересчёт, сделанный до этого момента, плюс приход, минус продажи,
+    списания и переезды — только те, что случились до него. Откат назад от
+    сегодняшней цифры врал бы там, где продажа упиралась в ноль полки, и не
+    знал бы, что пересчёт после того утра всё перечеркнул."""
+    import time as _t
+    from bizday import day_start
+    hit = _BASE_AT.get(day)
+    if hit and _t.monotonic() - hit[0] < BASE_AT_TTL:
+        return hit[1]
+    out = await _base_calc(day, until=day_start(day).astimezone(timezone.utc))
+    if len(_BASE_AT) > 40:
+        _BASE_AT.clear()
+    _BASE_AT[day] = (_t.monotonic(), out)
+    return out
+
+
+async def _base_calc(day: str, until: datetime | None = None) -> dict:
+    """Основа склада по районам. until — на прошедший момент: пересчёт и все
+    события берутся только те, что были к нему; норма тогда не нужна и не
+    считается. Без until — сейчас, для заявки и живой цифры склада."""
     cat = _catalog()
     # Пересчёт — снимок на момент времени. Пока его не повторили, честный
     # остаток = снимок + приход − продажи. Оба слагаемых обязательны и по
@@ -1175,21 +1274,22 @@ async def _district_base(day: str) -> dict:
     # продаж — не закажет то, что уже продали. Второе дороже: это пустая полка.
     counts, since = {}, {}
     for oid in OFFICE_IDS:
-        counts[oid] = await db.get_last_stock_count(oid, before_day=None)
+        counts[oid] = (await db.get_last_stock_count(oid, before_day=None) if until is None
+                       else await _count_at(oid, until))
         since[oid] = _dt_of((counts[oid] or {}).get("counted_at") or "")
-    sold = await _sold_after(since)
+    sold = await _sold_after(since, until)
     try:
-        broken = await db.writeoff_since(since)
+        broken = await db.writeoff_since(since, until=until)
     except Exception as e:
         log.warning(f"[stock] списания не учтены: {e}")
         broken = {}
     try:
-        moved = await _moved_after(counts, since)
+        moved = await _moved_after(counts, since, until)
     except Exception as e:
         log.warning(f"[stock] переезды не учтены: {e}")
         moved = {}
     try:
-        noscan = await _noscan_after(since)
+        noscan = await _noscan_after(since, until)
     except Exception as e:
         log.warning(f"[stock] принятое без сканирования не учтено: {e}")
         noscan = {}
@@ -1203,7 +1303,7 @@ async def _district_base(day: str) -> dict:
         moves = moved.get(oid) or {}
         try:
             if since[oid]:
-                came = await db.intake_since(oid, since[oid])
+                came = await db.intake_since(oid, since[oid], until=until)
         except Exception as e:
             log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
         for pid, n in came.items():
@@ -1224,6 +1324,9 @@ async def _district_base(day: str) -> dict:
         try:
             manual = {pid: ats for pid, ats in (await db.qr_manual_events(oid, since[oid])).items()
                       if pid in cat}
+            if until is not None:           # внесённое после того момента тогда не лежало
+                manual = {pid: [e for e in ats if e[0] <= until] for pid, ats in manual.items()}
+                manual = {pid: ats for pid, ats in manual.items() if ats}
         except Exception as e:
             log.warning(f"[stock] внесённое руками не учтено ({oid}): {e}")
         if manual:
@@ -1259,14 +1362,18 @@ async def _district_base(day: str) -> dict:
                     # двенадцать банок, и карточке склада их терять нельзя;
                     # заявке хватает целых.
                     "have_exact": {k: round(float(v) * 2) / 2 for k, v in have.items()},
-                    "sug": await _suggested_norms(oid, day), "came": came,
+                    "sug": await _suggested_norms(oid, day) if until is None else {},
+                    "came": came,
                     "gone": gone, "lost": broken.get(oid) or {},
                     # Чистый итог переездов по позиции: приехало минус уехало.
                     "moved": {pid: _round_step(sum(q for _, q in ev))
                               for pid, ev in moves.items()
                               if _round_step(sum(q for _, q in ev))},
-                    "counted": (cnt or {}).get("day", "")}
-    _BASE.update(key=day, at=_t.monotonic(), data=out, stamp=stamp)
+                    "counted": (cnt or {}).get("day", ""),
+                    # Был ли пересчёт к тому моменту: без него остатка нет
+                    # вовсе — склад заведён пересчётом, до него пусто не
+                    # потому, что ничего не лежало, а потому, что не считали.
+                    "counted_at": (cnt or {}).get("counted_at", "")}
     return out
 
 

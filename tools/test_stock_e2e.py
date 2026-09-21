@@ -20,6 +20,9 @@ def eq(name, got, want):
     print(("  ok  " if ok else "  FAIL") + f" {name}: {got!r}" + ("" if ok else f" ≠ {want!r}"))
     if not ok: FAIL.append(name)
 D = "2026-09-16"; T0 = datetime(2026, 9, 16, 6, 0, tzinfo=timezone.utc)
+# День прогона — «сегодня»: карточка прошедшего дня — это склад на начало его
+# смены (tools/test_stock_at.py), а инварианты здесь про живую цифру.
+SR._biz_day = lambda *a, **k: D
 async def cost_map(): return {}
 SV.cost_map = cost_map
 async def notify(*a, **k): return None

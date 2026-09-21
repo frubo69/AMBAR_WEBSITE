@@ -2004,6 +2004,16 @@ async def get_last_stock_count(district: str, before_day: str | None = None) -> 
     return rows[0] if rows else None
 
 
+async def stock_count_first() -> str:
+    """Когда склад пересчитали впервые (counted_at самого раннего пересчёта):
+    раньше этого момента остатка нет — его не считали."""
+    db = _db_or_none()
+    if db is None: return ""
+    rows = await db.stock_counts.find({"counted_at": {"$nin": [None, ""]}}, {"_id": 0, "counted_at": 1}) \
+        .sort("counted_at", 1).limit(1).to_list(length=1)
+    return str(rows[0].get("counted_at") or "") if rows else ""
+
+
 async def get_stock_counts_recent(district: str, before_day: str | None = None,
                                   limit: int = 40) -> list:
     """Последние пересчёты района, свежие первыми — с позициями.
@@ -2871,12 +2881,13 @@ def _qn(v):
     return int(v) if v == int(v) else v
 
 
-async def intake_since(district: str, since) -> dict:
+async def intake_since(district: str, since, until=None) -> dict:
     """Сколько единиц принято на район после указанного момента: позиция →
     единиц (коды складываются по qty: бутылка 1, код пива 0.5).
 
     Нужно заявке: пересчёт был вчера, ночью пришла поставка, и без этого
-    программа завтра закажет то, что уже стоит на полке."""
+    программа завтра закажет то, что уже стоит на полке. until — не позже
+    этого момента: склад на начало прошедшей смены."""
     db = _db_or_none()
     if db is None or not since: return {}
     # По району ПРИХОДА (origin), а не по нынешнему: код, уехавший сканом в
@@ -2887,10 +2898,25 @@ async def intake_since(district: str, since) -> dict:
     # полкоробки, а коробка на складе осталась — её держит это поле, пока
     # район не пересчитают (код старше пересчёта сюда уже не попадает).
     cur = db.qr_codes.aggregate([
-        {"$match": {"src": "intake", "at": {"$gt": since},
+        {"$match": {"src": "intake", "at": {"$gt": since, **({"$lte": until} if until else {})},
                     "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]}},
         {"$group": {"_id": "$product_id",
                     "n": {"$sum": {"$add": [QR_QTY, {"$ifNull": ["$intake_extra", 0]}]}}}},
+    ])
+    return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=500) if d["_id"]}
+
+
+async def supply_codes_until(sid: str, district: str, until) -> dict:
+    """{позиция: единиц} — сколько по поставке отсканировали в район к моменту
+    until: сколько её было «got» тогда. Нужно складу на прошедший момент, когда
+    задачу приняли без сканирования и досканировали позже. Отменённый скан
+    стирает код целиком, поэтому здесь его и нет."""
+    db = _db_or_none()
+    if db is None or not sid: return {}
+    cur = db.qr_codes.aggregate([
+        {"$match": {"supply_id": sid, "src": {"$in": ["intake", "cover"]}, "at": {"$lte": until},
+                    "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]}},
+        {"$group": {"_id": "$product_id", "n": {"$sum": QR_QTY}}},
     ])
     return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=500) if d["_id"]}
 
@@ -3114,7 +3140,7 @@ async def writeoff_comps(who: str = "", limit: int = 2000) -> list:
 
 
 async def writeoff_since(since: dict, skip_coded: bool = False,
-                         skip_audit: bool = True) -> dict:
+                         skip_audit: bool = True, until=None) -> dict:
     """Сколько бутылок списано после пересчёта: {район: {позиция: шт}}.
 
     Тому же расчёту, что учитывает приход и продажи: разбитая бутылка ушла со
@@ -3125,14 +3151,17 @@ async def writeoff_since(since: dict, skip_coded: bool = False,
     уже сидит в самом пересчёте, которым ревизия закончилась, — фактический
     остаток записан без этих бутылок. Вычесть её ещё раз значит потерять
     бутылку дважды. Тот, кто считает ОТ РЕЕСТРА, наоборот, обязан её вычесть:
-    коды пропавших бутылок в реестре остались активными."""
+    коды пропавших бутылок в реестре остались активными.
+
+    until — не позже этого момента: склад на начало прошедшей смены."""
     db = _db_or_none()
     out = {}
     if db is None or not since: return out
     for district, dt in (since or {}).items():
         if not dt: continue
         cur = db.writeoffs.aggregate([
-            {"$match": {"district": district, "at": {"$gt": dt}, **WRITEOFF_COUNTED,
+            {"$match": {"district": district, "at": {"$gt": dt, **({"$lte": until} if until else {})},
+                        **WRITEOFF_COUNTED,
                         # Списанное сканом уже вышло из реестра: у той бутылки
                         # статус сменился, и она не считается активной. Тому,
                         # кто считает ОТ РЕЕСТРА, вычитать её второй раз нельзя;

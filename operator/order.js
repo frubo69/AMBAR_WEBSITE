@@ -65,8 +65,11 @@
 .ozv-head span{text-align:center}
 .ozv-head span:first-child{text-align:left}
 .ozv-r{padding:7px 2px;border-top:1px solid var(--border2)}
-.ozv-n{min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ozv-n i{display:block;font-style:normal;font-size:11px;color:var(--muted)}
+.ozv-n{display:flex;align-items:center;gap:10px;min-width:0}
+.ozv-img{flex:0 0 auto;width:34px;height:34px;border-radius:9px;object-fit:contain;
+  background:var(--card2);border:1px solid var(--border2);padding:2px}
+.ozv-nb{min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ozv-nb i{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--muted)}
 .ozv-c{position:relative;text-align:center}
 .ozv-c input{width:100%;height:34px;text-align:center;border-radius:9px;font-family:'Space Grotesk',sans-serif;
   font-size:14px;font-weight:700;color:var(--text);background:var(--card2);border:1px solid var(--border2)}
@@ -88,6 +91,8 @@
   .ozv-head,.ozv-r{grid-template-columns:minmax(0,1fr) repeat(var(--n),52px) 46px;gap:5px}
   .ozv-l{padding:8px 10px 14px}
   .ozv-c input{height:32px;font-size:13px}
+  .ozv-img{width:28px;height:28px}
+  .ozv-n{gap:7px}
 }`;
     document.head.appendChild(st);
     const ov = document.createElement('div');
@@ -158,7 +163,11 @@
   function стр(r) {
     const dist = O.d.districts || [];
     return `<div class="ozv-r" data-id="${esc(r.id)}">
-      <span class="ozv-n">${esc(r.name)}<i>${esc(r.unit_name || '')}</i></span>
+      <span class="ozv-n">
+        <img class="ozv-img" src="/products/${esc(r.id)}.webp" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">
+        <span class="ozv-nb">${esc(r.name)}<i>${esc(r.unit_name || '')}</i></span>
+      </span>
       ${dist.map(x => {
         const c = (r.cells || {})[x.id] || {};
         const n = +c.need || 0;

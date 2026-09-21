@@ -3743,6 +3743,19 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-edit2 .fb-num{flex:0 0 92px;width:92px} .fb-edit2 .fb-txt{flex:1 1 120px;min-width:0}
 .fb-lnk{border:0;background:none;color:var(--muted);font:600 12px 'DM Sans',sans-serif;padding:6px 4px;cursor:pointer}
 .fb-lnk.del{color:var(--dn)}
+/* На работе (периоды «вышел — уехал»): точка состояния, строки периодов, правка
+   периода на месте; человек, которого в этом месяце не было, — бледнее. */
+.fb-wk-st span{display:flex;align-items:center;gap:10px;white-space:normal;line-height:1.3}
+.fb-wk-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.fb-wk-dot.on{background:var(--up);box-shadow:0 0 0 3px var(--up-soft)}
+.sc-r.fb-wk-p{cursor:pointer}
+.sc-r.fb-wk-p span{font-weight:500}
+.sc-r.fb-wk-p.on{background:rgba(201,169,110,.06)}
+.sc-r b.fb-wk-v{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--sub)}
+.fb-wk-ed{background:rgba(201,169,110,.06)}
+.fb-wk-ed .sc-r{min-height:46px;padding-left:28px}
+.fb-wk-ed .fb-edit2{padding:4px 12px 10px 24px}
+.shl-card.fb-pc.fb-away{opacity:.5}
 .fb-inname{flex:1 1 auto;min-width:0} .fb-inname .fb-txt{width:100%;height:36px}
 .fb-editing .fb-e-b b{font-size:14px}
 /* Перетягивание людей: строка под пальцем — приподнятая копия, на месте —
@@ -11778,15 +11791,16 @@ let dpFuture = false;
 let dpSingle = false;
 function openDate(targetId){
   dpTarget = targetId;
-  dpSingle = targetId === 'fbNext';
+  dpSingle = targetId === 'fbNext' || targetId === 'fbWork';
   dpFuture = targetId === 'fbSpan';      // окно платежа: даты вперёд, две отметки
   dateOv.classList.toggle('single', dpSingle);
   const today = new Date();
   dpView = new Date(today.getFullYear(), today.getMonth(), 1);
   dpFrom = null;
   dpTo = null;
-  if((dpSingle || dpFuture) && FB.editNext){
-    const d = new Date(FB.editNext + 'T00:00:00');
+  const pre = targetId === 'fbWork' ? ((FB.workPick || {}).day || '') : FB.editNext;
+  if((dpSingle || dpFuture) && pre){
+    const d = new Date(pre + 'T00:00:00');
     if(!isNaN(d)){
       dpFrom = d;
       dpTo = new Date(d.getTime() + (dpFuture ? (FB.editSpan || 0) : 0) * 86400000);
@@ -11861,7 +11875,7 @@ function renderDp(){
 function pickDp(d){
   if(dpSingle){
     dpFrom = d; dpTo = d;
-    fbNextPick(_ymd(d));
+    if(dpTarget === 'fbWork') fbWorkPicked(_ymd(d)); else fbNextPick(_ymd(d));
     try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
     closeDate();
     return;
@@ -11880,7 +11894,8 @@ function pickDp(d){
 function updateDpLbl(){
   const lbl = document.getElementById('dpRangeLbl');
   const apply = document.getElementById('dpApplyBtn');
-  if(dpSingle){ if(lbl) lbl.innerHTML = `<span class="hint">Дата платежа</span>`; return; }
+  if(dpSingle){ if(lbl) lbl.innerHTML = `<span class="hint">${
+    dpTarget === 'fbWork' ? escS((FB.workPick || {}).lbl || 'Дата') : 'Дата платежа'}</span>`; return; }
   const days = dpFrom && dpTo ? Math.round((dpTo - dpFrom) / 86400000) + 1 : 0;
   if(apply){
     // Нечего применять — кнопка не должна выглядеть рабочей.
@@ -21447,9 +21462,13 @@ function fbPersonFillRow(p, sal){
   const editing = FB.edit && FB.edit.kind === 'rate' && FB.edit.id === p.name;
   const cur = editing ? (FB.editCur || p.cur) : p.cur;
   const sym = cur === 'USD' ? '$' : 'AED';
-  const sub = [FB_PERSON_SUB[_fbKey(p.name)] || '', p.unit === 'day' ? 'в день' : '',
+  // Сколько человек на работе в этом месяце («с 15.09», «до 20.09», «в
+  // отъезде») — в подписи; сумма в бюджете — за эти дни.
+  const wl = fbWorkLbl(p);
+  const sub = [FB_PERSON_SUB[_fbKey(p.name)] || '', wl, p.unit === 'day' ? 'в день' : '',
                p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
   const head = `<span class="shl-code">${escS(fbIni(p.name))}</span><span class="shl-b"><b>${escS(p.name)}</b><i>${sub}</i></span>`;
+  const part = p.work_set && p.unit !== 'day' && p.work_days < p.month_days;
   if(editing){
     return `<div class="shl-card fb-pc fb-editing">
       <div class="shl-h">${head}</div>
@@ -21462,10 +21481,12 @@ function fbPersonFillRow(p, sal){
     </div>`;
   }
   const empty = !(p.rate > 0);
-  return `<button class="shl-card fb-pc" data-drag="${escS(p.name)}" data-n="${escS(p.name)}" onclick="fbFillEdit('rate', this.dataset.n)">
+  return `<button class="shl-card fb-pc${p.work_set && !p.work_days ? ' fb-away' : ''}" data-drag="${escS(p.name)}" data-n="${escS(p.name)}" onclick="fbFillEdit('rate', this.dataset.n)">
     <div class="shl-h">${head}
       ${empty ? `<span class="shl-v fb-pv"><b class="fb-fill">Заполнить</b></span><em class="fb-fill-em">${_FB_PLUS}</em>`
-              : `<span class="shl-v fb-pv"><b class="fb-box">${fbFmt(p.rate)}<u>${sym}</u></b>${p.cur === 'USD' ? `<i class="fb-eq">= ${fbFmt(p.rate_aed)} AED</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em>`}
+              : `<span class="shl-v fb-pv"><b class="fb-box">${fbFmt(p.rate)}<u>${sym}</u></b>${
+                  part ? `<i class="fb-eq">за ${p.work_days} дн = ${fbFmt(p.plan)} AED</i>`
+                  : p.cur === 'USD' ? `<i class="fb-eq">= ${fbFmt(p.rate_aed)} AED</i>` : ''}</span><em class="fb-fill-em pen">${_FB_PEN}</em>`}
     </div></button>`;
 }
 // Список бюджета: «Зарплаты» и «Аренда офисов» — карточки-ссылки на свои
@@ -22272,8 +22293,11 @@ const FB_ROLE_T = {other: 'Офис', senior: 'Старший оператор',
 function fbRoleChips(){ return Object.keys(FB_ROLE_T).map(r => `<button class="chip${FB.role === r ? ' on' : ''}" onclick="fbRolePick('${r}')">${FB_ROLE_T[r]}</button>`).join(''); }
 function fbPersonRow(p){
   const sym = p.cur === 'USD' ? '$' : 'AED';
-  const sub = p.rate === null ? 'оклад не задан'
-    : [`${fbFmt(p.rate)} ${sym} ${p.unit === 'day' ? 'в день' : 'в месяц'}`, `${p.days} дн`,
+  // Дни: у оклада в месяц с периодами — сколько был на работе («с 15.09 · 16
+  // из 30 дн»), иначе — смены по приложению, как было.
+  const wl = p.unit !== 'day' ? fbWorkLbl(p, true) : '';
+  const sub = p.rate === null ? (wl || 'оклад не задан')
+    : [`${fbFmt(p.rate)} ${sym} ${p.unit === 'day' ? 'в день' : 'в месяц'}`, wl || `${p.days} дн`,
        p.minus ? `удержано ${fbFmt(p.minus)}` : '', p.plus ? `премия ${fbFmt(p.plus)}` : ''].filter(Boolean).join(' · ');
   const unit = p.left === 0 && p.paid ? 'выплачено' : 'к выплате';
   return `<button class="shl-card" data-n="${escS(p.name)}" onclick="fbPersonOpen(this.dataset.n)"><div class="shl-h">
@@ -22316,6 +22340,141 @@ async function fbPersonHide(name){
   }catch(e){ _toast('Не удалось убрать'); }
 }
 
+// ── На работе ─────────────────────────────────────────────────────────────
+// Владелец, 21 сен 2026: «весь персонал не круглый год работает: кто-то
+// уезжает, кто-то приезжает, а зарплата у всех первого числа; человек не
+// должен приехать 15-го и получить как за целый месяц — он должен получить
+// половину»; старшие Макар и Стас сменяют друг друга. У человека периоды
+// «вышел на работу — уехал» (последний день включительно); оклад в месяц
+// считается за дни на работе. Дату выбирают тем же календарём, что везде.
+const FB_WK_IN = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"
+  stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h11M10 7l5 5-5 5"/><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg>`;
+const FB_WK_OUT = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"
+  stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h11M16 7l5 5-5 5"/><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/></svg>`;
+FB.workEdit = -1;
+function fbWorkDay(ymd){
+  if(!ymd) return '';
+  const d = new Date(ymd + 'T12:00:00Z');
+  if(isNaN(d)) return ymd;
+  const y = d.getUTCFullYear() !== new Date().getFullYear() ? ` ${d.getUTCFullYear()}` : '';
+  return `${d.getUTCDate()} ${MONTHS_GEN[d.getUTCMonth()]}${y}`;
+}
+function fbWorkDm(ymd){ return ymd ? `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}` : ''; }
+// Период строкой: «15 сентября — сейчас», «1 — 31 августа», «до 20 октября».
+function fbWorkSpanT(w){
+  if(!w.from) return `до ${fbWorkDay(w.to)}`;
+  if(!w.to) return `${fbWorkDay(w.from)} — сейчас`;
+  if(w.from.slice(0, 7) === w.to.slice(0, 7)) return `${+w.from.slice(8, 10)} — ${fbWorkDay(w.to)}`;
+  return `${fbWorkDay(w.from)} — ${fbWorkDay(w.to)}`;
+}
+// Где он сегодня: работает с …, уехал …, выходит …
+function fbWorkNow(work){
+  const today = _dayIsoFor(0);
+  if(!work || !work.length) return {set: false, on: true};
+  const cur = work.find(w => (!w.from || w.from <= today) && (!w.to || today <= w.to));
+  if(cur) return {set: true, on: true, since: cur.from, until: cur.to};
+  const left = work.filter(w => w.to && w.to < today).map(w => w.to).sort().pop() || '';
+  const back = work.filter(w => w.from && w.from > today).map(w => w.from).sort()[0] || '';
+  return {set: true, on: false, left, back};
+}
+// Коротко для списков: «с 15.09», «до 20.09», «в отъезде»; весь месяц — пусто.
+function fbWorkLbl(p, days){
+  if(!p.work_set) return '';
+  if(!p.work_days) return 'в отъезде';
+  if(p.work_days >= p.month_days) return '';
+  const sp = p.work_spans || [];
+  let t = `${p.work_days} из ${p.month_days} дн`;
+  if(sp.length === 1){
+    const [a, b] = sp[0], m = a.slice(0, 7);
+    const last = `${m}-${String(new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate()).padStart(2, '0')}`;
+    t = a.endsWith('-01') ? `до ${fbWorkDm(b)}` : b === last ? `с ${fbWorkDm(a)}` : `${fbWorkDm(a)}–${fbWorkDm(b)}`;
+    if(days) t += ` · ${p.work_days} из ${p.month_days} дн`;
+  }
+  return t;
+}
+function fbWorkHtml(p){
+  const work = p.work || [], now = fbWorkNow(work);
+  const right = !p.work_set ? 'весь месяц' : `${p.work_days} из ${p.month_days} дн`;
+  const st = !now.set ? ''
+    : now.on ? (now.since ? `Работает с ${fbWorkDay(now.since)}` : 'Работает') + (now.until ? `, последний день ${fbWorkDay(now.until)}` : '')
+    : (now.left ? `Уехал ${fbWorkDay(now.left)}` : 'Не на работе') + (now.back ? `, выходит ${fbWorkDay(now.back)}` : '');
+  const rows = work.map((w, i) => {
+    if(FB.workEdit !== i) return `<button class="sc-r fb-r fb-wk-p" onclick="fbWorkEdit(${i})"><span>${escS(fbWorkSpanT(w))}</span><em class="fb-fill-em pen">${_FB_PEN}</em></button>`;
+    const last = i === work.length - 1;
+    return `<div class="sc-r fb-r fb-wk-p on"><span>${escS(fbWorkSpanT(w))}</span></div>
+      <div class="fb-wk-ed">
+        <button class="sc-r fb-r" onclick="fbWorkPick('from', ${i})"><span>Вышел на работу</span><b class="fb-wk-v">${w.from ? escS(fbWorkDay(w.from)) : 'не отмечено'}</b><em>${_SC_CHEV}</em></button>
+        <button class="sc-r fb-r" onclick="fbWorkPick('to', ${i})"><span>Последний день</span><b class="fb-wk-v">${w.to ? escS(fbWorkDay(w.to)) : 'работает'}</b><em>${_SC_CHEV}</em></button>
+        <div class="fb-edit2">${last && w.to ? `<button class="fb-lnk" onclick="fbWorkSet(${i}, 'to', '')">Ещё работает</button>` : ''}
+          <span class="fb-sp"></span>
+          <button class="fb-lnk del" onclick="fbWorkDel(${i})">Убрать период</button>
+          <button class="fb-lnk" onclick="fbWorkEdit(-1)">Готово</button></div>
+      </div>`;
+  }).join('');
+  // Действие — следующее по смыслу: работает — «Уехал», уехал — «Вышел на
+  // работу»; даты не отмечены — оба (новый человек вышел / старый уезжает).
+  const open = work.length && !work[work.length - 1].to;
+  const go = (act, t, ic) => `<button class="sc-r fb-plus" onclick="fbWorkAct('${act}')"><span>${t}</span><em>${ic}</em></button>`;
+  const acts = !work.length ? go('start', 'Вышел на работу', FB_WK_IN) + go('end', 'Уехал', FB_WK_OUT)
+    : open ? go('end', 'Уехал', FB_WK_OUT) : go('start', 'Вышел на работу', FB_WK_IN);
+  return `<div class="sc fb-gut" id="fbWork">
+    ${fbCapT('На работе', right)}
+    ${st ? `<div class="sc-r fb-r fb-wk-st"><span><i class="fb-wk-dot${now.on ? ' on' : ''}"></i>${escS(st)}</span></div>`
+         : `<div class="fb-none">Даты не отмечены — оклад считается за весь месяц</div>`}
+    ${rows}
+    ${acts}
+  </div>`;
+}
+function fbWorkPerson(){ return (fbCur(fbBook(FB.month)).people || []).find(x => x.name === FB.person); }
+function fbWorkEdit(i){
+  FB.workEdit = FB.workEdit === i ? -1 : i;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const box = document.getElementById('fbWork'), p = fbWorkPerson();
+  if(box && p) box.outerHTML = fbWorkHtml(p);
+}
+function fbWorkAct(action){
+  FB.workPick = {action, day: _dayIsoFor(0),
+                 lbl: action === 'start' ? `${FB.person} — вышел на работу` : `${FB.person} — последний день на работе`};
+  openDate('fbWork');
+}
+function fbWorkPick(field, i){
+  const w = ((fbWorkPerson() || {}).work || [])[i] || {};
+  FB.workPick = {action: 'set', field, i, day: w[field] || _dayIsoFor(0),
+                 lbl: field === 'from' ? 'Вышел на работу' : 'Последний день на работе'};
+  openDate('fbWork');
+}
+function fbWorkPicked(ymd){
+  const k = FB.workPick || {};
+  if(k.action === 'set') return fbWorkSet(k.i, k.field, ymd);
+  fbWorkSend({action: k.action, day: ymd});
+}
+function fbWorkSet(i, field, ymd){
+  const w = ((fbWorkPerson() || {}).work || [])[i]; if(!w) return;
+  fbWorkSend({action: 'set', i, from: field === 'from' ? ymd : w.from, to: field === 'to' ? ymd : w.to});
+}
+async function fbWorkDel(i){
+  const w = ((fbWorkPerson() || {}).work || [])[i]; if(!w) return;
+  if(!await askDialog('Убрать период?', `${FB.person}: ${fbWorkSpanT(w)}. Оклад за эти дни пересчитается.`,
+                      'Убрать', 'Оставить', 'bad')) return;
+  FB.workEdit = -1;
+  fbWorkSend({action: 'del', i});
+}
+const FB_WK_ERR = {already_on: 'Он уже на работе — сначала «Уехал»', not_on: 'Он уже уехал',
+                   end_before_start: 'Последний день раньше дня выхода', overlap: 'Периоды налезают друг на друга',
+                   bad_day: 'Не та дата', bad_period: 'Такого периода нет'};
+async function fbWorkSend(body){
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/work',
+      {method: 'POST', body: {...body, name: FB.person, month: FB.month, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(body.action !== 'set') FB.workEdit = -1;
+    if(res.book){ fbApply(res.book); accFinPerson(); }
+  }catch(e){
+    const code = ((e || {}).payload || {}).error;
+    _toast(FB_WK_ERR[code] || 'Не удалось сохранить');
+  }
+}
+
 // ── Экран человека ────────────────────────────────────────────────────────
 async function accFinPerson(){
   const b = await fbMonthScreen(FB.person || 'Зарплата'); if(!b) return;
@@ -22333,6 +22492,7 @@ async function accFinPerson(){
       ${fbTile('Удержано', 'p.minus', p.minus)}
     </div>
   </div>
+  ${fbWorkHtml(p)}
   <div class="sc fb-gut">
     ${fbCapT('Оклад')}
     ${fbIn('Оклад', 'rate', p.rate, sc, {ph: '0', unit: sym, eu: 'не задан'})}
@@ -22340,6 +22500,8 @@ async function accFinPerson(){
     <div class="sc-r fb-r"><span>Валюта</span>${fbSeg('cur', p.cur, [['AED', 'AED'], ['USD', '$']], 'fbPaySeg')}</div>
     ${fbIn('Дней', 'days', p.days_set ? p.days : null, sc, {ph: fbFmt(p.days_auto), phk: 'p.days_auto', eu: 'по сменам', unit: 'дн', im: 'numeric'})}
     ${fbRow('Курс доллара', 'pay.usd', fbCur(b).usd, {sub: true, dec: 1, show: 'p.usd_on', hide: p.cur !== 'USD'})}
+    ${p.work_set && p.unit !== 'day' && p.work_days < p.month_days
+      ? `<div class="sc-r fb-r sub"><span>Дней на работе</span><b>${p.work_days}<u>из ${p.month_days}</u></b></div>` : ''}
     ${fbRow('Начислено', 'p.accrued', p.accrued, {sum: true, sign: '='})}
     ${fbIn('Премия в месяц', 'bonus', p.bonus_set ? p.bonus_month : null, sc, {ph: '0', unit: 'AED', eu: 'нет', im: 'numeric'})}
   </div>
@@ -22390,7 +22552,7 @@ function fbAdvHtml(p, b){
   const opt = (mode, t, sub) => `<button class="fb-adv-o${FB_ADV.mode === mode ? ' on' : ''}" onclick="fbAdvPick('${mode}')">
       <span class="fb-adv-r">${FB_ADV.mode === mode ? IC('check', 13) : ''}</span>
       <span class="fb-adv-b"><b>${t}</b><i>${sub}</i></span></button>`;
-  const full = (p.accrued || 0) + (p.bonus_month || 0);
+  const full = (p.accrued || 0) + (p.bonus_due != null ? p.bonus_due : (p.bonus_month || 0));
   return `<div class="sc fb-gut" id="fbAdv">
     ${fbCapT('Аванс')}
     <div class="fb-adv">
@@ -22415,7 +22577,7 @@ function fbAdvAmt(p){
 // Сколько он получит — в этом месяце и в следующем, если выдать сейчас.
 function fbAdvPreview(p, b){
   const a = fbAdvAmt(p), m = b.month, nm = fbMonthAdd(m, 1);
-  const full = (p.accrued || 0) + (p.bonus_month || 0);
+  const full = (p.accrued || 0) + (p.bonus_due != null ? p.bonus_due : (p.bonus_month || 0));
   if(!(a > 0)) return `<i>Сейчас к выплате за ${fbMonthT(m).toLowerCase()}: <b>${fbFmt(p.to_pay)} AED</b></i>`;
   if(FB_ADV.mode === 'part') return `<i>За ${fbMonthT(m).toLowerCase()} к выплате станет <b>${fbFmt(p.to_pay - a)} AED</b> (${fbFmt(p.to_pay)} − ${fbFmt(a)})</i>`;
   if(FB_ADV.mode === 'ahead') return `<i>За ${fbMonthT(m).toLowerCase()} — как было, <b>${fbFmt(p.to_pay)} AED</b>; за ${fbMonthT(nm).toLowerCase()} — <b>${fbFmt(full - a)} AED</b> (оклад ${fbFmt(p.accrued)}${p.bonus_month ? ' + премия ' + fbFmt(p.bonus_month) : ''} − ${fbFmt(a)})</i>`;

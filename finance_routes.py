@@ -518,7 +518,7 @@ def _people(docs: list) -> list[dict]:
         if d.get("hidden"):
             return
         out.append(dict(name=name, role=d.get("role") or role, manual=bool(d.get("manual")),
-                        pnote=d.get("note") or "", **kw))
+                        pnote=d.get("note") or "", work=pay.work_clean(d.get("work")), **kw))
     # Сначала те, кого вписали руками (руководство, старший), в порядке
     # добавления; потом расписание: старшие операторы, операторы, водители.
     for d in docs:
@@ -564,7 +564,10 @@ async def _pay_plan(month: str, ndays: int, usd: float) -> dict:
         unit = eff.get("unit") if eff.get("unit") in pay.UNITS else "month"
         cur = eff.get("cur") if eff.get("cur") in pay.CURS else "AED"
         rate_aed = rate * (usd if cur == "USD" else 1.0)
-        plan = rate_aed if unit == "month" else rate_aed * ndays
+        # Оклад в месяц — за дни на работе (периоды «вышел — уехал»); ставка
+        # в день — на дни на работе, а без периодов на все дни месяца.
+        w = pay.work_in(p.get("work"), month)
+        plan = rate_aed * w["share"] if unit == "month" else rate_aed * (w["days"] if w["set"] else ndays)
         total += plan
         # водителю — его район: в бюджете водители лежат по районам, как везде
         dist = (p.get("districts") or [""])[0] if p["role"] == "driver" else ""
@@ -573,7 +576,9 @@ async def _pay_plan(month: str, ndays: int, usd: float) -> dict:
                            district=dist, district_code=OFFICE_CODES.get(dist, ""),
                            district_name=OFFICE_NAMES.get(dist, ""),
                            rate=None if eff.get("rate") is None else calc._i(rate),
-                           unit=unit, cur=cur, rate_aed=calc._i(rate_aed), plan=calc._i(plan)))
+                           unit=unit, cur=cur, rate_aed=calc._i(rate_aed), plan=calc._i(plan),
+                           work_set=w["set"], work_days=w["days"], month_days=w["of"],
+                           work_spans=w["spans"]))
     return dict(plan=calc._i(total), people=people, n=len(people),
                 set_n=sum(1 for x in people if x["rate"] is not None), usd=usd)
 
@@ -738,8 +743,12 @@ async def person_card(name: str, month: str) -> dict:
                usd=pay_.get("usd"), found=bool(p))
     for k in ("role", "rate", "rate_aed", "unit", "cur", "days", "days_auto", "days_set",
               "accrued", "plus", "minus", "to_pay", "paid", "left", "debt", "payouts",
-              "bonus_month", "bonus_once", "advance", "loan"):
+              "bonus_month", "bonus_due", "bonus_once", "advance", "loan",
+              "work_set", "work_days", "month_days", "work_spans"):
         out[k] = (p or {}).get(k)
+    # На работе ли сейчас и с какого числа — «Работает с …» в профиле; дальше
+    # к этому привяжется всё, что зависит от выхода на работу.
+    out["work_now"] = pay.work_now((p or {}).get("work"), _biz_day())
     # Авансы месяца — строками: «зарплата наперёд» или «часть зарплаты», когда
     # выдан и сколько снимается в этом месяце.
     out["advances"] = [dict(id=r.get("id"), t=r.get("t"), mode=r.get("mode") or "", amount=r.get("amount"),
@@ -1319,6 +1328,38 @@ async def handle_pay_person(request):
 
 
 @require_owner
+async def handle_pay_work(request):
+    """POST {name, action, day, i, from, to, month, as} — когда человек вышел на
+    работу и когда уехал (владелец, 21 сен 2026: «кто-то уезжает, кто-то
+    приезжает, а зарплата у всех первого числа; приехал 15-го — получает пол
+    зарплаты»). action: start — вышел с day; end — уехал, day — последний
+    день; set — поправить период i (from/to, пустое «to» — работает); del —
+    убрать период i. Оклад в месяц считается по дням на работе."""
+    try:
+        body = await request.json()
+        name = str(body.get("name") or "").strip()[:40]
+        action = str(body.get("action") or "")
+        if not name:
+            return _json({"error": "name_required"}, 400)
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+        day = str(body.get("day") or "")[:10]
+        i = int(body.get("i")) if str(body.get("i", "")).lstrip("-").isdigit() else -1
+        a, b = str(body.get("from") or "")[:10], str(body.get("to") or "")[:10]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    docs = {str(d.get("_id")): d for d in await db.fin_people_get()}
+    work, err = pay.work_apply((docs.get(name) or {}).get("work"), action, day, i, a, b)
+    if err:
+        return _json({"error": err}, 400)
+    who = _who(body)
+    await db.fin_person_set(name, {"work": work, "by": who})
+    log.info(f"[fin] на работе: {name} {action} {day or f'{a}…{b}'} → "
+             f"{', '.join((w['from'] or '…') + '–' + (w['to'] or 'сейчас') for w in work) or 'без периодов'}"
+             f" · {who or '—'}")
+    return _json({"ok": True, "book": await build(month)})
+
+
+@require_owner
 async def handle_pay_order(request):
     """POST {names: [...], month, as} — порядок людей в зарплатах: как
     перетянули, так и лежат (ord по номеру в списке)."""
@@ -1595,6 +1636,7 @@ def setup(app):
         ("/api/owner/finance/book/pay/person", handle_pay_person, "POST"),
         ("/api/owner/finance/book/pay/month", handle_pay_month_set, "POST"),
         ("/api/owner/finance/book/pay/order", handle_pay_order, "POST"),
+        ("/api/owner/finance/book/pay/work", handle_pay_work, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_add, "POST"),
         ("/api/owner/finance/book/pay/item", handle_pay_item_del, "DELETE"),
         ("/api/owner/finance/book/pay/item/edit", handle_pay_item_edit, "POST"),

@@ -603,6 +603,13 @@ async def handle_profile(request):
     since = doc.get("created") or doc.get("linked_at") or doc.get("at")
     card["since"] = str(since)[:10] if since else ""
     card["active"] = not bool(doc.get("hidden") or doc.get("blocked"))
+    # Когда вышел на работу — по периодам в «Зарплатах» (владелец, 21 сен
+    # 2026): «Работает с» — начало текущего периода, а не день, когда водителя
+    # завели в систему; уехал — «Не работает». Периодов нет — как было.
+    w = card.get("work_now") or {}
+    if w.get("set"):
+        card["since"] = w.get("since") or card["since"]
+        card["active"] = card["active"] and bool(w.get("on"))
     return web.json_response(card, headers=CORS_HEADERS)
 
 

@@ -25,8 +25,22 @@
 как оклад, — своя премия в месяц (bonus, в дирхамах): действует с месяца,
 в котором вписана, и дальше, пока её не поменяют; 0 — премии больше нет.
 Разовые премии — записями «Премия», как и были.
+
+Кто когда на работе (владелец, 21 сен 2026: «весь персонал не круглый год
+работает: кто-то уезжает, кто-то приезжает, а зарплата у всех первого
+числа; человек не должен приехать 15-го и получить как за целый месяц — он
+должен получить половину»; старшие Макар и Стас сменяют друг друга). У
+человека — периоды «вышел на работу → уехал»: с какого дня и по какой
+включительно; конец пуст — работает сейчас. Оклад в месяц (и премия в
+месяц) — за дни на работе: оклад × дни на работе / дни месяца. Вышел 15
+сентября — 16 из 30 дней. Ставка в день и так считается по сменам, её
+периоды не трогают. Периодов нет — человек на работе весь месяц, как было
+до них: оклады, которые уже платят, не меняются.
 """
 from __future__ import annotations
+
+import calendar
+from datetime import date, timedelta
 
 from finance_calc import _n, _i
 
@@ -47,6 +61,116 @@ CURS = ('AED', 'USD')
 def next_month(m: str) -> str:
     y, mm = int(m[:4]), int(m[5:7])
     return f"{y + 1:04d}-01" if mm == 12 else f"{y:04d}-{mm + 1:02d}"
+
+
+# ── периоды работы ──────────────────────────────────────────────────────────
+def month_len(month: str) -> int:
+    return calendar.monthrange(int(month[:4]), int(month[5:7]))[1]
+
+
+def _day(s) -> date | None:
+    try:
+        return date.fromisoformat(str(s or "")[:10])
+    except ValueError:
+        return None
+
+
+def work_clean(work) -> list:
+    """Периоды как они лежат у человека: [{from, to}], по порядку. Пустое
+    «с» — работал ещё до того, как начали отмечать; пустое «по» — работает."""
+    out = []
+    for p in work or []:
+        a = str((p or {}).get("from") or "")[:10]
+        b = str((p or {}).get("to") or "")[:10]
+        if (a and not _day(a)) or (b and not _day(b)) or not (a or b):
+            continue
+        out.append({"from": a, "to": b})
+    out.sort(key=lambda p: p["from"])
+    return out
+
+
+def work_error(work: list) -> str:
+    """Что не так с периодами: конец раньше начала, периоды налезают друг на
+    друга, незакрытый период не последний. Пустая строка — всё в порядке."""
+    prev_to = None
+    for i, p in enumerate(work):
+        a, b = p["from"], p["to"]
+        if a and b and b < a:
+            return "end_before_start"
+        if i and (prev_to == "" or (a and prev_to and a <= prev_to) or not a):
+            return "overlap"
+        prev_to = b
+    return ""
+
+
+def work_in(work, month: str) -> dict:
+    """Сколько дней человек на работе в месяце. Периодов нет — весь месяц."""
+    n = month_len(month)
+    work = work_clean(work)
+    if not work:
+        return dict(days=n, of=n, share=1.0, spans=[], set=False)
+    first, last = f"{month}-01", f"{month}-{n:02d}"
+    spans, days = [], 0
+    for p in work:
+        a, b = max(p["from"] or first, first), min(p["to"] or last, last)
+        if a <= b:
+            spans.append([a, b])
+            days += (_day(b) - _day(a)).days + 1
+    return dict(days=days, of=n, share=days / n, spans=spans, set=True)
+
+
+def work_now(work, day: str) -> dict:
+    """На работе ли человек в этот день и с какого числа — для приложения:
+    «Работает с …» в профиле водителя, а дальше — приёмка машины в первый
+    день и всё, что зависит от того, когда человек вышел. day_n — какой по
+    счёту это день на работе (1 — первый); 0 — начало не отмечено."""
+    work = work_clean(work)
+    if not work:
+        return dict(set=False, on=True, since="", until="", day_n=0, left="", back="")
+    for p in work:
+        a, b = p["from"], p["to"]
+        if (not a or a <= day) and (not b or day <= b):
+            n = (_day(day) - _day(a)).days + 1 if a else 0
+            return dict(set=True, on=True, since=a, until=b, day_n=n, left="", back="")
+    left = max((p["to"] for p in work if p["to"] and p["to"] < day), default="")
+    back = min((p["from"] for p in work if p["from"] and p["from"] > day), default="")
+    return dict(set=True, on=False, since="", until="", day_n=0, left=left, back=back)
+
+
+def work_apply(work, action: str, day: str = "", i: int = -1, a: str = "", b: str = "") -> tuple:
+    """Правка периодов: (новые периоды, ошибка).
+    start — вышел на работу с day; end — уехал, day — последний день;
+    set — поправить период i (a — с, b — по, пусто — работает); del — убрать i."""
+    work = work_clean(work)
+    if action == "start":
+        if not _day(day):
+            return work, "bad_day"
+        if work and not work[-1]["to"]:
+            return work, "already_on"
+        work = work + [{"from": day, "to": ""}]
+    elif action == "end":
+        if not _day(day):
+            return work, "bad_day"
+        if not work:                               # работал до того, как начали отмечать
+            work = [{"from": "", "to": day}]
+        elif work[-1]["to"]:
+            return work, "not_on"
+        elif work[-1]["from"] and day < work[-1]["from"]:
+            return work, "end_before_start"
+        else:
+            work = work[:-1] + [{"from": work[-1]["from"], "to": day}]
+    elif action == "set":
+        if not (0 <= i < len(work)) or (a and not _day(a)) or (b and not _day(b)) or not (a or b):
+            return work, "bad_period"
+        work = work[:i] + [{"from": a, "to": b}] + work[i + 1:]
+    elif action == "del":
+        if not (0 <= i < len(work)):
+            return work, "bad_period"
+        work = work[:i] + work[i + 1:]
+    else:
+        return work, "bad_action"
+    work = work_clean(work)
+    return work, work_error(work)
 
 
 def schedule(item: dict, month: str) -> dict:
@@ -89,10 +213,15 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
     cur = eff.get('cur') if eff.get('cur') in CURS else 'AED'
     rate_aed = rate * (usd if cur == 'USD' else 1.0)
     days = eff.get('days') if eff.get('days') is not None else days_auto
-    accrued = rate_aed if unit == 'month' else rate_aed * _n(days)
-    # Своя премия в месяц — как оклад: с месяца, где вписана, и дальше.
+    # Оклад в месяц — за дни на работе в этом месяце (периоды «вышел —
+    # уехал»); ставка в день и так считается по сменам.
+    w = work_in(p.get('work'), month)
+    accrued = rate_aed * w['share'] if unit == 'month' else rate_aed * _n(days)
+    # Своя премия в месяц — как оклад: с месяца, где вписана, и дальше; за
+    # неполный месяц — та же доля.
     bonus_month = max(0.0, _n(eff.get('bonus')))
-    rows, plus, minus, debt = [], bonus_month, 0.0, 0.0
+    bonus_due = bonus_month * w['share']
+    rows, plus, minus, debt = [], bonus_due, 0.0, 0.0
     parts = dict(bonus_once=0.0, fines=0.0, holds=0.0, advance=0.0, loan=0.0)
     for it in items:
         if it.get('cancelled_at'):             # отменённый штраф — только в истории
@@ -121,7 +250,9 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
         rate_month=eff.get('rate_month') or '', rate_aed=_i(rate_aed),
         days=_i(_n(days)), days_auto=_i(_n(days_auto)), days_set=eff.get('days') is not None,
         note=eff.get('note') or '', accrued=_i(accrued), plus=_i(plus), minus=_i(minus),
-        bonus_month=_i(bonus_month), bonus_set=eff.get('bonus') is not None,
+        bonus_month=_i(bonus_month), bonus_due=_i(bonus_due), bonus_set=eff.get('bonus') is not None,
+        work=work_clean(p.get('work')), work_set=w['set'], work_days=w['days'],
+        month_days=w['of'], work_spans=w['spans'],
         **{k: _i(v) for k, v in parts.items()},
         minus_other=_i(parts['fines'] + parts['holds'] + parts['loan']),
         to_pay=_i(to_pay), paid=_i(paid), left=_i(to_pay - paid), debt=_i(debt),

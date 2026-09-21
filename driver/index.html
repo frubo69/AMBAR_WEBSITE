@@ -5405,6 +5405,18 @@ function profItemHtml(){
 function profPayNotes(p){
   if(!p) return '';
   const rows = [];
+  // Оклад за неполный месяц — вышел на работу или уехал посреди месяца
+  // (владелец, 21 сен 2026: «приехал 15-го — получает половину»).
+  if(p.work_set && p.unit !== 'day' && p.month_days && p.work_days < p.month_days){
+    const sp = p.work_spans || [];
+    const a = sp.length === 1 ? sp[0][0] : '', b = sp.length === 1 ? sp[0][1] : '';
+    const dm = d => `${+d.slice(8)} ${PROF_MG[+d.slice(5, 7) - 1]}`;   // месяц и год — в шапке
+    const why = !a ? '' : a.endsWith('-01') ? `, последний день ${dm(b)}`
+      : +b.slice(8) === p.month_days ? `, с ${dm(a)}`
+      : `, с ${+a.slice(8)} по ${dm(b)}`;
+    rows.push(`${svg(ICO.cal, 13)}<span>Оклад за ${p.work_days} из ${p.month_days} ${
+      plural(p.month_days, 'дня', 'дней', 'дней')}${esc(why)}</span>`);
+  }
   (p.advances || []).forEach(a => rows.push(`${svg(ICO.cash, 13)}<span>${esc(a.t || 'Аванс')} — ${profSum(a.due)}${
       a.day ? `, выдан${a.mode === 'ahead' ? 'а' : ''} ${profDayT(a.day)}` : ''}</span>`));
   if(p.bonus_month) rows.push(`${svg(ICO.gift, 13)}<span>Премия ${profSum(p.bonus_month)} в месяц${

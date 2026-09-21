@@ -138,6 +138,9 @@ document.getElementById('phone').style.width = (Q.get('w') || 390) + 'px';
     if(Q.get('page') && Q.get('edit')){ const [k, ...r] = Q.get('edit').split(':'); fbFillEdit(k, r.join(':')); await new Promise(r => setTimeout(r, 200)); }
     if(Q.get('wheel')){ fbPillOpen(); await new Promise(r => setTimeout(r, 400)); }
     if(Q.get('cal')){ openDate(Q.get('cal') === 'span' ? 'fbSpan' : 'fbNext'); await new Promise(r => setTimeout(r, 300)); }
+    // «На работе» на странице человека: правка периода и календарь «вышел/уехал»
+    if(Q.get('wedit')){ fbWorkEdit(+Q.get('wedit')); await new Promise(r => setTimeout(r, 200)); }
+    if(Q.get('work')){ fbWorkAct(Q.get('work')); await new Promise(r => setTimeout(r, 300)); }
     if(Q.get('days')){ const [a1, b1] = Q.get('days').split('-').map(Number);   // отметить даты в календаре
       const cell = n => [...document.querySelectorAll('#dpGrid .dp-cell:not(.off)')].find(e => e.textContent === String(n));
       if(Q.get('fwd')) { [...document.querySelectorAll('.dp-month-hdr .dp-nav')].pop().click(); await new Promise(r => setTimeout(r, 150)); }

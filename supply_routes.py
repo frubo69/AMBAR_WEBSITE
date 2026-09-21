@@ -606,10 +606,16 @@ async def handle_list(request):
 FAST_MS = 1200
 FAST_LIMIT = 5
 
-# Отменить можно только что записанное — и не бесконечно. Без потолка отмена
-# превращается в лазейку: отсканировал двадцать три, закрыл задачу, вернул три.
-UNDO_SEC = 90
-UNDO_MAX = 3
+# Убрать бутылку из приёмки можно любую, пока район не закрыт (владелец,
+# 21 сен 2026: «камера цепляет бутылки, которые не надо было вносить, а
+# удалить её и сканировать правильную во время сканирования возможности нет»).
+# Раньше — только последнюю, полторы минуты и трижды за приёмку: камера ловила
+# соседнюю бутылку, строка закрывалась, лента обнулялась на следующей позиции,
+# и ошибку было уже не достать. Лазейки это не открывает: убрать бутылку — то
+# же самое, что её не сканировать, недобор остаётся недобором с причиной для
+# старшего, а каждое «убрано» записано в задачу и попадает в итог приёмки.
+# Если убирают много, старшему приходит отдельный сигнал.
+UNDO_ALERT = 3
 
 
 def _sig(code: str) -> str:
@@ -802,6 +808,10 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "lock_why": ("done" if task.get("done_at") else "noscan" if task.get("noscan_at")
                      else "scan" if task.get("started_at") else ""),
         "erev": int(task.get("erev") or 0),
+        # Версия строк (растёт с каждым сканом и «убрать»): ответы приходят не
+        # в том порядке, в каком сервер их обработал, и приложение берёт числа
+        # только из более свежего.
+        "rev": int(task.get("rev") or 0),
         # Товар забрали без кодов: задача открыта, но бутылки уже на полке.
         # Пока left > 0, это долг — досканировать.
         "noscan_at": str(task.get("noscan_at") or ""),
@@ -928,18 +938,27 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     import stock_routes as _sr
     qty = _sr.code_qty(_sr._catalog().get(pid) or {})
     got = _qn((item.get("got") or {}).get(oid) or 0)
-    if got + qty > need:
-        return {"ok": False, "verdict": "full", "need": need, "got": got,
-                "name": item.get("name", "")}
 
     # Бутылка уже в реестре — её записали раньше. Это не придирка: без такой
     # проверки бутылку с собственной полки можно «принять» второй раз.
+    # Проверяем раньше, чем «строка полна»: если это бутылка ЭТОЙ приёмки,
+    # записанная под другой позицией (камера поймала её, когда сканировали
+    # соседнюю), человеку надо сказать именно это — под чем она записана, —
+    # чтобы он убрал её оттуда и внёс сюда.
     old = await db.qr_get(code)
     if old:
+        ours = _code_ours(old, sid, oid)
         return {"ok": False, "verdict": "known", "name": item.get("name", ""),
                 "label": old.get("label") or "",
                 "district": old.get("district") or "",
-                "at": str(old.get("at") or ""), "need": need, "got": got}
+                "at": str(old.get("at") or ""), "need": need, "got": got,
+                "ours": ours,
+                "as_id": (old.get("product_id") or "") if ours else "",
+                "as_name": (old.get("product_name") or "") if ours else "",
+                "rev": int(task.get("rev") or 0)}
+    if got + qty > need:
+        return {"ok": False, "verdict": "full", "need": need, "got": got,
+                "name": item.get("name", ""), "rev": int(task.get("rev") or 0)}
 
     now = datetime.now(timezone.utc)
     await db.supply_task_start(sid, oid, now)
@@ -1029,43 +1048,69 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     return {"ok": True, "verdict": "taken", "label": label, "code": code,
             "name": item.get("name", ""), "need": need, "got": got, "qty": qty,
             "unit": _uof(pid), "left": _left_units(need, got), "flags": flags,
-            "task_got": int(t.get("scanned") or 0),
+            "task_got": int(t.get("scanned") or 0), "rev": int(t.get("rev") or 0),
             "finished": finished, "supply_done": supply_done}
+
+
+def _code_ours(doc: dict, sid: str, oid: str) -> bool:
+    """Код принят этой приёмкой в этот район и с тех пор лежит на месте: его
+    не продали, не перевезли и не списали. Только такой можно убрать из
+    приёмки — всё остальное уже чья-то другая запись."""
+    return (bool(doc) and doc.get("supply_id") == sid
+            and (doc.get("origin") or doc.get("district")) == oid
+            and doc.get("district") == oid
+            and doc.get("src") in ("intake", "cover")
+            and (doc.get("status") or "active") == "active")
 
 
 async def task_undo(sid: str, oid: str, code: str, me: str,
                     owner: bool = False) -> dict:
-    """Убрать последнюю бутылку — навёл камеру не на ту.
+    """Убрать бутылку из приёмки — камера поймала не ту.
 
-    Только свежую и только несколько раз за задачу: отмена без ограничений
-    даёт ровно ту дыру, ради которой всё остальное и делалось."""
+    Любую бутылку этой приёмки, пока район не закрыт (см. UNDO_ALERT). Код
+    освобождается целиком: бутылку, пойманную под чужой позицией, потом
+    вносят под своей, а место в строке снова свободно для правильной."""
     sup = await db.supply_get(sid)
     if not sup:
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
-    if not _can_touch(task, me, owner) or task.get("done_at"):
+    if task.get("done_at") or task.get("cancelled_at") or sup.get("status") != "open":
+        return {"ok": False, "verdict": "closed"}
+    if not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine"}
     hv = _hold_view(task, me)
     if hv["live"]:
         return {"ok": False, "verdict": "busy", "by": hv["who"], "kind": hv["kind"]}
-    if int(task.get("undo") or 0) >= UNDO_MAX:
-        return {"ok": False, "verdict": "undo_limit", "limit": UNDO_MAX}
     doc = await db.qr_get(code)
-    if not doc or doc.get("supply_id") != sid:
+    if not doc or doc.get("supply_id") != sid or (doc.get("origin") or doc.get("district")) != oid:
         return {"ok": False, "verdict": "not_ours"}
-    try:
-        age = (datetime.now(timezone.utc) - doc["at"]).total_seconds()
-    except Exception:
-        age = 0
-    if age > UNDO_SEC:
-        return {"ok": False, "verdict": "too_late", "sec": UNDO_SEC}
+    if not _code_ours(doc, sid, oid):
+        # Из этой приёмки, но с тех пор её продали, перевезли или списали —
+        # стирать код значило бы стереть и то, что с бутылкой было дальше.
+        return {"ok": False, "verdict": "moved"}
+    pid = doc.get("product_id") or ""
+    qty = float(doc.get("qty") or 1)
+    # Сначала место в строке, потом код: не снялось — код остаётся, и строка
+    # с реестром не расходятся.
+    if not await db.supply_untake(sid, oid, pid, qty):
+        return {"ok": False, "verdict": "not_ours"}
     await db.qr_remove(code)
-    await db.supply_untake(sid, oid, doc.get("product_id") or "", float(doc.get("qty") or 1))
     await db.supply_task_flag(sid, oid, {"kind": "undo", "code": code[:40],
                                          "product": doc.get("product_name", ""),
+                                         "product_id": pid, "by": me,
                                          "at": datetime.now(timezone.utc)})
-    log.info(f"[supply] {sid}/{oid}: {me} отменил {code[:30]}")
-    return {"ok": True, "code": code}
+    log.info(f"[supply] {sid}/{oid}: {me} убрал из приёмки {code[:30]} ({doc.get('product_name', '')})")
+    # Строка, из которой убрали, — ровно в том виде, в каком её теперь видит
+    # сервер: у пива код — полкоробки, и «минус одна» на экране врала бы.
+    sup = await db.supply_get(sid) or {}
+    item = next((i for i in (sup.get("items") or []) if i.get("id") == pid), {})
+    need = int((item.get("by_district") or {}).get(oid) or 0)
+    got = _qn((item.get("got") or {}).get(oid) or 0)
+    rev = int((((sup.get("tasks") or {}).get(oid) or {}).get("rev")) or 0)
+    return {"ok": True, "code": code, "product_id": pid,
+            "name": item.get("name") or doc.get("product_name", ""),
+            "label": doc.get("label") or "",
+            "need": need, "got": got, "left": _left_units(need, got), "rev": rev}
 
 
 async def task_finish(sid: str, oid: str, me: str, note: str = "",
@@ -1322,6 +1367,16 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
     head = f"📥 *Приёмка — {_md(where)}{base}*\n{_md(me)} · принято {took} из {need}{mins}"
     if task.get("noscan_at"):
         head += "\nБыло принято без сканирования — теперь коды на месте"
+    # Что убирали из приёмки — в самой сводке: это обычная правка (камера
+    # поймала не ту бутылку), но старший должен видеть, что именно убрали.
+    убрано = {}
+    for f in task.get("flags") or []:
+        if f.get("kind") == "undo":
+            n = f.get("product") or "—"
+            убрано[n] = убрано.get(n, 0) + 1
+    if убрано:
+        head += "\nУбрано из приёмки: " + ", ".join(
+            f"{_md(n)}{' ×' + str(k) if k > 1 else ''}" for n, k in убрано.items())
     if gaps:
         lst = "\n".join(f"• {_md(g['name'])} — {g['got']} из {g['need']}" for g in gaps[:8])
         more = f"\n…и ещё {len(gaps) - 8}" if len(gaps) > 8 else ""
@@ -1343,8 +1398,8 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
         parts.append(f"• {fast} сканов подряд быстрее {FAST_MS/1000:g} с")
     if shape:
         parts.append(f"• {len(shape)} кодов не похожи на остальные по этой позиции")
-    if undo:
-        parts.append(f"• отмен: {undo}")
+    if undo >= UNDO_ALERT:
+        parts.append(f"• убрано из приёмки: {undo} {_plural(undo, 'бутылка', 'бутылки', 'бутылок')}")
     if parts:
         await notify_owners_force(
             "supply.flag",

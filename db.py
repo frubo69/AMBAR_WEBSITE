@@ -2651,7 +2651,10 @@ async def supply_take(sid: str, district: str, product_id: str, room, now, qty=1
         {"_id": sid, "status": "open",
          "items": {"$elemMatch": {"id": product_id, f"got.{district}": {"$lte": room}}}},
         {"$inc": {f"items.$.got.{district}": qty, "items.$.scanned": 1,
-                  f"tasks.{district}.scanned": 1},
+                  f"tasks.{district}.scanned": 1,
+                  # Версия задачи района: растёт с каждым сканом и «убрать».
+                  # По ней приложение отличает свежий ответ от запоздавшего.
+                  f"tasks.{district}.rev": 1},
          "$set": {f"tasks.{district}.last_at": now}},
         return_document=ReturnDocument.AFTER)
 
@@ -2664,7 +2667,8 @@ async def supply_untake(sid: str, district: str, product_id: str, qty=1) -> bool
         {"_id": sid, "items": {"$elemMatch": {"id": product_id,
                                               f"got.{district}": {"$gte": qty}}}},
         {"$inc": {f"items.$.got.{district}": -qty, "items.$.scanned": -1,
-                  f"tasks.{district}.scanned": -1, f"tasks.{district}.undo": 1}})
+                  f"tasks.{district}.scanned": -1, f"tasks.{district}.undo": 1,
+                  f"tasks.{district}.rev": 1}})
     return r.modified_count > 0
 
 

@@ -5775,6 +5775,14 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .scan-undo:disabled{opacity:.4;pointer-events:none}
 .scan-undo:active{transform:scale(.97)}
+/* Убрать бутылку из приёмки: кнопка и рамка красным, в плашке вместо
+   «осталось» — что сейчас делаем, убранная в ленте зачёркнута. */
+.scan-undo.dn{color:#FF8A8A;border-color:rgba(255,122,122,.35)}
+#rcvCamBox.rm .scan-frame .c{border-color:#FF7A7A}
+.scan-pill.rm b{font-size:17px;color:#FF8A8A}
+.scan-strip .scan-row.gone{opacity:.55}
+.scan-strip .scan-row.gone .scan-code{text-decoration:line-through;text-decoration-color:rgba(255,255,255,.5)}
+.scan-strip .scan-del svg{display:block;margin:auto}
 .scan-go{flex:1;height:52px;border-radius:15px;border:0;cursor:pointer;
   font-family:inherit;font-size:15px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2));
@@ -24790,6 +24798,7 @@ const SCAN = {
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.onRepeat = onRepeat; this.onHold = onHold; this.onLost = null;
     this.seen = new Set(); this.seenAt = new Map();
+    this.lastCode = null; this.missed = true;
     this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
     // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
@@ -24902,19 +24911,28 @@ const SCAN = {
         // Камера всё ещё стоит на той же бутылке — это не повторная попытка,
         // а тот же самый скан, растянутый на секунду. Ругаться здесь значит
         // обвинять человека в том, чего он не делал.
+        // «Отвели и навели снова» — только если между ними был прочитанный
+        // кадр без этого кода. Одного времени мало: телефон подвис на
+        // секунду — кадров не было вовсе, а бутылка так и стояла перед
+        // камерой. В режиме «убрать бутылку» это стирало бы её без прицела
+        // (фаззер, 21 сен 2026).
         const gone = now - (this.seenAt.get(code) || 0);
+        const ушёл = this.lastCode !== code || this.missed;
         this.seenAt.set(code, now);
-        if(gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
+        this.lastCode = code; this.missed = false;
+        if(ушёл && gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
         // Код всё ещё перед камерой — экран должен держать подтверждение, а не
         // мигнуть им на треть секунды и погаснуть.
         else if(this.onHold) this.onHold(code);
         return;
       }
       this.seen.add(code); this.seenAt.set(code, now);
+      this.lastCode = code; this.missed = false;
       if(this.onHold) this.onHold(code);
       if(this.onCode) this.onCode(code);
       return;
     }
+    this.missed = true;
     if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
                                 Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
   },
@@ -25376,7 +25394,7 @@ function qrInNext(){
 // эту страницу, а с последней бутылкой — на первый экран.
 function qrInLine(ti, pid){
   const t = ((QR_IN && QR_IN.tasks) || [])[ti]; if(!t) return;
-  RCV = t; RCV_HOME = () => qrIntake(QR_IN.district); RCV_EXIT = () => qrHome();
+  RCV = null; RCV = rcvAdopt(t); RCV_HOME = () => qrIntake(QR_IN.district); RCV_EXIT = () => qrHome();
   qrPollStop();
   rcvLine(pid);
 }
@@ -28588,6 +28606,34 @@ async function supRelease(oid){
 // сервер тот же, документ тот же, и район, взятый отсюда, водители видят
 // занятым. Иначе двое поехали бы за одним ящиком.
 let RCV = null, RCV_LINE = null, RCV_ROWS = [], RCV_BUSY = false;
+// Версия строк задачи: сервер поднимает её на каждом скане и «убрать». Ответы
+// приходят не в том порядке, в каком он их обработал (скан отвечает дольше,
+// чем «убрать»), и запоздавший затирал свежее число: позиция выглядела
+// взятой полностью, когда не хватало полкоробки (фаззер, 21 сен 2026). Числа
+// строки берём только из ответа не старше последнего применённого.
+let RREV = {};
+function rcvRevOk(pid, rev){
+  if(rev == null || rev === '') return true;
+  rev = +rev;
+  if((RREV[pid] || 0) > rev) return false;
+  RREV[pid] = rev; return true;
+}
+// Снимок задачи с сервера. Та же задача — строки, по которым уже пришёл ответ
+// новее снимка, не откатываем; другая — версии с нуля.
+function rcvAdopt(t){
+  if(!t) return t;
+  if(!RCV || RCV.supply_id !== t.supply_id || RCV.district !== t.district) RREV = {};
+  const rv = +(t.rev || 0);
+  (t.lines || []).forEach(l => {
+    if((RREV[l.id] || 0) > rv){
+      const old = ((RCV && RCV.lines) || []).find(x => x.id === l.id);
+      if(old){ l.got = old.got; l.left = old.left; }
+    }else RREV[l.id] = rv;
+  });
+  t.got = (t.lines || []).reduce((a, x) => a + (+x.got || 0), 0);
+  t.left = Math.max(0, (+t.need || 0) - t.got);
+  return t;
+}
 // Откуда открыли камеру приёмки и куда уйти, когда приёмка закрылась сама:
 // со страницы района «Внести / удалить товар» — обратно на неё и на первый
 // экран; из приёмки закупки — как раньше, к списку районов.
@@ -28624,7 +28670,7 @@ async function rcvPollTick(){
   const sig = x => JSON.stringify([x.got, x.left, x.done_at, x.erev, !!(x.hold && x.hold.live), (x.hold || {}).who]);
   if(sig(t) === sig(RCV)) return;
   if(t.done_at){ _toast('Приёмка закрыта'); rcvBack(); return; }
-  RCV = t; rcvRender();
+  RCV = rcvAdopt(t); rcvRender();
 }
 
 // Имя, которым подписан старший. Совпадать оно должно с тем, что уходит в
@@ -28639,7 +28685,7 @@ async function rcvClaim(oid){
       `/api/owner/supply/${encodeURIComponent(SUP_ID)}/task/claim`,
       {method:'POST', body:{district: oid, as: _rcvMe()}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    RCV = t; RCV_LINE = null; RCV_ROWS = [];
+    RCV = null; RCV = rcvAdopt(t); RCV_LINE = null; RCV_ROWS = [];
     rcvRender();
   }catch(e){
     // Район успел взять водитель — это не сбой, а обычный исход: карточка
@@ -28710,7 +28756,7 @@ async function rcvOpen(oid){
     const r = await ownerApi.ownerFetch(
       `/api/owner/supply/${encodeURIComponent(SUP_ID)}/tasks`,
       {params:{as: _rcvMe()}});
-    RCV = (r.tasks || []).find(t => t.district === oid) || null;
+    RCV = null; RCV = rcvAdopt((r.tasks || []).find(t => t.district === oid) || null);
   }catch(e){ RCV = null; }
   if(!RCV) return _toast('Не удалось открыть');
   RCV_LINE = null; RCV_ROWS = []; RCV_HOME = null; RCV_EXIT = null;
@@ -28743,9 +28789,11 @@ function rcvRender(){
   const занято0 = !!(t.hold && t.hold.live);
   // «Не всё привезли» теперь внизу, рядом с главной кнопкой (21 сен 2026) —
   // в углу его не находили. В углу остаётся только «Вернуть район».
+  // Когда уже что-то принято — «Убрать бутылку»: лишнюю, которую поймала
+  // камера, убирают и отсюда, если сканер закрыт или её строка уже полна.
   if(act) act.innerHTML = занято0 ? '' : (t.got === 0 && !ns)
     ? `<button class="acc-act" onclick="rcvGiveBack()">Вернуть район</button>`
-    : '';
+    : t.got > 0 ? `<button class="acc-act dn" onclick="rcvRemoveOpen()">Убрать бутылку</button>` : '';
 
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const занято = !!(t.hold && t.hold.live);
@@ -28843,11 +28891,10 @@ async function rcvLine(pid){
     return (RCV_HOME || rcvRender)();
   }
   RCV_HOLD = setInterval(() => rcvHoldSend(true), 10000);
-  RCV_LINE = {...l}; RCV_ROWS = [];
+  RCV_LINE = {...l}; RCV_ROWS = []; RCV_RM = false; RCV_GONE = new Set();
   rcvCam();
   try{
-    await SCAN.start(document.getElementById('rcvVideo'), rcvScan, rcvIdle,
-                     () => qrFlash('again'), qrHold);
+    await SCAN.start(document.getElementById('rcvVideo'), rcvScan, rcvIdle, rcvRepeat, qrHold);
   }catch(e){
     _toast('Нет доступа к камере');
     return rcvLineClose();
@@ -28864,13 +28911,11 @@ async function rcvLine(pid){
 function rcvLineSwap(l){
   if(!l) return rcvLineClose();
   RCV_LINE = {...l};
-  RCV_ROWS = [];
-  _setText('accTitle', l.name);
-  const n = document.getElementById('rcvN');
-  if(n){ n.removeAttribute('data-v'); scanRoll('rcvN', fmtQty(l.left)); }
+  // Лента остаётся: последняя бутылка прошлой позиции могла быть не той, и
+  // убрать её крестиком нужно здесь же.
+  rcvPaint();
   const h = document.getElementById('qrHint');
-  if(h) h.textContent = `Дальше: ${l.name}`;
-  const u = document.getElementById('rcvUndo'); if(u) u.disabled = true;
+  if(h && !RCV_RM) h.textContent = `Дальше: ${l.name}`;
   rcvFeed();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -28878,18 +28923,16 @@ function rcvLineSwap(l){
 function rcvLineClose(){
   SCAN.stop();
   rcvHoldStop();
-  RCV_LINE = null; RCV_ROWS = [];
+  RCV_LINE = null; RCV_ROWS = []; RCV_RM = false;
   (RCV_HOME || rcvRender)();
 }
 
 // Разметка сканера — та же, что у кодов: одна камера в приложении, и второй её
 // вид означал бы, что человек у полки читает два разных экрана.
 function rcvCam(){
-  const l = RCV_LINE;
   ACC_BACK = rcvLineClose;
   _setRail('accRail', '');
   const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
-  _setText('accTitle', l.name);
   _setText('accSub', `${RCV.district_code} ${RCV.district_name} · приёмка`);
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
@@ -28902,7 +28945,7 @@ function rcvCam(){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="rcvN">${fmtQty(l.left)}</b><span>осталось</span></div>
+          <div class="scan-pill" id="rcvPill"></div>
           <div class="scan-tools">
             <button class="scan-tool" id="rcvSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -28919,22 +28962,59 @@ function rcvCam(){
         <div class="scan-hud-bot">
           <div class="scan-added" id="rcvAdded"></div>
           <div class="scan-strip" id="rcvFeed"></div>
-          <div class="scan-dockbar">
-            <button class="scan-undo" id="rcvUndo" onclick="rcvUndo()" disabled>Отменить</button>
-            <button class="scan-go" onclick="rcvLineClose()">К списку</button>
-          </div>
+          <div class="scan-dockbar" id="rcvDock"></div>
         </div>
       </div>
     </div></div>`;
   scanLive('accOv');
+  rcvPaint();
   rcvFeed();
 }
 
-function rcvIdle(sinceMs, frames, fps){ qrIdle(sinceMs, frames, fps); }
+// Подписи сканера по режиму: сканируем позицию или убираем бутылку. <video> не
+// трогаем — вместе с разметкой умерла бы камера; меняются заголовок, плашка и
+// кнопки.
+function rcvPaint(){
+  const box = document.getElementById('rcvCamBox');
+  if(box) box.classList.toggle('rm', RCV_RM);
+  const pill = document.getElementById('rcvPill');
+  const h = document.getElementById('qrHint');
+  if(RCV_RM){
+    _setText('accTitle', 'Убрать бутылку');
+    if(pill){ pill.classList.add('rm'); pill.innerHTML = '<b>Убрать</b><span>из приёмки</span>'; }
+    if(h) h.textContent = 'Наведите на бутылку, которую убрать';
+  }else if(RCV_LINE){
+    _setText('accTitle', RCV_LINE.name);
+    if(pill){
+      if(pill.classList.contains('rm') || !document.getElementById('rcvN')){
+        pill.classList.remove('rm');
+        pill.innerHTML = `<b id="rcvN"></b><span>осталось</span>`;
+      }
+      scanRoll('rcvN', fmtQty(RCV_LINE.left));
+    }
+    if(h && h.textContent === 'Наведите на бутылку, которую убрать') h.textContent = '';
+  }
+  const d = document.getElementById('rcvDock');
+  if(d) d.innerHTML = (RCV_RM
+      ? (RCV_LINE ? `<button class="scan-undo" onclick="rcvRmSet(false)">Сканировать дальше</button>` : '')
+      : `<button class="scan-undo dn" onclick="rcvRmSet(true)">Убрать бутылку</button>`)
+    + `<button class="scan-go" onclick="rcvLineClose()">К списку</button>`;
+}
+
+function rcvIdle(sinceMs, frames, fps){
+  qrIdle(sinceMs, frames, fps);
+  // В режиме «убрать» подсказка стоит всё время: без неё не понять, почему
+  // бутылки не принимаются.
+  if(RCV_RM){
+    const h = document.getElementById('qrHint');
+    if(h && !h.textContent) h.textContent = 'Наведите на бутылку, которую убрать';
+  }
+}
 
 // Скан не ждёт сервера: рука уже тянется к следующей бутылке. Зелёная вспышка
 // сразу, а возразит сервер — цвет сменится.
 function rcvScan(code){
+  if(RCV_RM) return rcvRemove(code);
   if(!RCV_LINE) return;
   RCV_ROWS.unshift({code, state:'sending', label:''});
   qrFlash('ok');
@@ -28956,11 +29036,16 @@ const RCV_MSG = {
 
 function rcvDone(err, r, job){
   const row = RCV_ROWS.find(x => x.code === job.code && x.state === 'sending');
-  if(err){ if(row){ row.state = 'fail'; qrFlash('err'); rcvFeed(); } return; }
+  // Скан так и не дошёл — неизвестно, принял ли его сервер до обрыва:
+  // перечитываем задачу, чтобы числа на экране не врали.
+  if(err){ if(row){ row.state = 'fail'; qrFlash('err'); rcvFeed(); } rcvResync(); return; }
+  // Ответ — про позицию, по которой сканировали, а не про ту, что сейчас на
+  // экране: пока шёл запрос, сканер мог перейти на следующую позицию.
+  const pid = (job.body || {}).product_id;
+  const своя = !!(RCV_LINE && RCV_LINE.id === pid);
   if(r.ok){
     if(row){ row.state = 'new'; row.label = r.label || ''; }
-    if(RCV_LINE){ RCV_LINE.got = r.got; RCV_LINE.left = r.left; }
-    rcvSync(r);
+    if(rcvRevOk(pid, r.rev)) rcvSync(r, pid);
     rcvFeed();
     // Последняя бутылка приёма без кодов — задача закрылась сама. Уходим
     // туда, откуда пришли: со страницы района — на первый экран.
@@ -28982,20 +29067,44 @@ function rcvDone(err, r, job){
     // разрешения на каждый код), а бутылка, оставшаяся в кадре, читалась
     // второй раз и возвращалась плашкой «уже в реестре». На позициях по одной
     // бутылке это повторялось после каждого скана (владелец, 21 сен 2026).
-    if(r.left === 0){
+    // Добрана ли позиция — по её числам после всех ответов, а не по этому:
+    // он мог прийти позже «убрать», обработанного сервером следом.
+    const стр = ((RCV && RCV.lines) || []).find(x => x.id === pid);
+    if(стр && стр.left === 0 && своя && !RCV_RM){
       qrFlash('ok', 'всё, ' + r.need);
       const след = ((RCV && RCV.lines) || [])
         .filter(x => x.left > 0 && x.id !== ((RCV_LINE || {}).id))
         .sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
       setTimeout(() => {
-        if(!RCV_LINE) return;
+        // За эти 700 мс могли уйти со сканера, перейти в «убрать» или на
+        // другую позицию — тогда никуда не переключаем.
+        if(!RCV_LINE || RCV_RM || RCV_LINE.id !== pid) return;
         _toast(`${r.name} — взято полностью`);
         if(след) rcvLineSwap(след); else rcvLineClose();
       }, 700);
     }
     return;
   }
-  if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }
+  if(row){
+    row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || '';
+    // Бутылка этой же приёмки: под какой позицией её записали. Под другой —
+    // её убирают крестиком в ленте и сразу вносят сюда.
+    row.ours = !!r.ours; row.asId = r.as_id || ''; row.asName = r.as_name || '';
+  }
+  // «Уже в реестре» и «по этой всё» тоже несут строку, как её видит сервер:
+  // ответ на прошлый скан мог потеряться в сети, и число на экране отстало.
+  if((r.verdict === 'known' || r.verdict === 'full') && r.need != null && r.got != null && rcvRevOk(pid, r.rev)){
+    rcvSync({got: +r.got, need: +r.need,
+             left: Math.max(0, Math.round((+r.need - +r.got) * 2) / 2)}, pid);
+  }
+  if(r.verdict === 'known' && r.ours && r.as_id && r.as_id !== pid){
+    qrFlash('dup', 'под другой позицией');
+    // Коротко: длинная подсказка резалась многоточием. Что делать — видно
+    // по самой плашке ленты: она жёлтая и с крестиком.
+    _toast(`Уже внесена как ${r.as_name}`);
+    rcvFeed();
+    return;
+  }
   // Задачу перехватил другой — камеру закрываем: дальше здесь только смотреть.
   if(r.verdict === 'busy'){
     SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
@@ -29012,59 +29121,173 @@ function rcvDone(err, r, job){
 }
 
 // Число на экране должно совпадать с базой, а не с нашим представлением о ней.
-function rcvSync(r){
+function rcvSync(r, pid){
   if(!RCV) return;
-  const l = (RCV.lines || []).find(x => x.id === (RCV_LINE && RCV_LINE.id));
+  pid = pid || (RCV_LINE && RCV_LINE.id);
+  const l = (RCV.lines || []).find(x => x.id === pid);
   if(l){ l.got = r.got; l.left = r.left; }
+  if(RCV_LINE && RCV_LINE.id === pid){
+    RCV_LINE.got = r.got; RCV_LINE.left = r.left; if(r.need != null) RCV_LINE.need = r.need;
+  }
   RCV.got = (RCV.lines || []).reduce((a, x) => a + x.got, 0);
   RCV.left = Math.max(0, RCV.need - RCV.got);
-  scanRoll('rcvN', r.left);
+  if(RCV_LINE && RCV_LINE.id === pid && !RCV_RM) scanRoll('rcvN', fmtQty(r.left));
 }
+
+const RCV_X = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+  stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
 function rcvFeed(){
   const взято = RCV_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
   const s = document.getElementById('rcvAdded');
   if(s) s.innerHTML = взято ? `<b>${взято}</b> принято` : '';
   const feed = document.getElementById('rcvFeed'); if(!feed) return;
-  feed.innerHTML = RCV_ROWS.slice(0, 40).map(r => {
-    const [txt, color] = QR_STATE[r.state === 'new' ? 'new' : r.state] || QR_STATE.sending;
-    const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
+  feed.innerHTML = RCV_ROWS.slice(0, 40).map((r, i) => {
+    let [txt, color] = r.state === 'gone' ? ['убрана', 'var(--muted)']
+      : (QR_STATE[r.state === 'new' ? 'new' : r.state] || QR_STATE.sending);
+    let raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
+    // «Уже в реестре» бывает двух родов: чужая бутылка — ничего не поделать;
+    // бутылка этой приёмки под другой позицией (камера поймала её, когда
+    // сканировали соседнюю) — её убирают крестиком и вносят сюда.
+    const чужая = r.state === 'dup' && r.ours && r.asId && r.asId !== (RCV_LINE && RCV_LINE.id);
+    if(r.state === 'dup' && r.ours){
+      txt = 'в приёмке'; color = 'var(--warn)';
+      if(чужая) raw = 'внесена как ' + r.asName;
+    }
+    const x = (r.state === 'new' || чужая)
+      ? `<button class="scan-del" onclick="event.stopPropagation();rcvDrop(${i})" aria-label="Убрать из приёмки">${RCV_X}</button>` : '';
     return `<div class="scan-row ${r.state}">
       <span class="scan-dot" style="background:${color}"></span>
       <span class="scan-b">
         <span class="scan-code">${escS(r.label || '…')}</span>
         <span class="scan-raw">${escS(raw)}</span>
       </span>
-      <span class="scan-state" style="color:${color}">${escS(txt)}</span></div>`;
+      <span class="scan-state" style="color:${color}">${escS(txt)}</span>${x}</div>`;
   }).join('');
-  const u = document.getElementById('rcvUndo');
-  if(u) u.disabled = !RCV_ROWS.some(r => r.state === 'new');
 }
 
-// Отмена — только что записанной и только несколько раз за приёмку. Правило
-// стоит на сервере, здесь лишь показываем его ответ.
-async function rcvUndo(){
-  const row = RCV_ROWS.find(r => r.state === 'new');
-  if(!row) return;
-  let r;
+// ── убрать бутылку из приёмки ──────────────────────────────────────────────
+// Камера иногда ловит соседнюю бутылку: её записывает под позицию, которую
+// сканируют, строка закрывается, и правильную уже не взять, а код лишней
+// занят не той позицией (владелец, 21 сен 2026: «удалить её и сканировать
+// правильную во время сканирования возможности нет»). Убрать можно любую
+// бутылку этой приёмки, пока район открыт: крестиком в ленте или наведя
+// камеру в режиме «Убрать бутылку». Код освобождается — бутылку потом вносят
+// под её позицией.
+let RCV_RM = false, RCV_GONE = new Set(), RCV_FREED = '', _rcvRmBusy = false;
+
+function rcvDrop(i){
+  const row = RCV_ROWS[i]; if(row) rcvRemove(row.code);
+}
+
+// Бутылка снова в кадре после того, как камера от неё отходила. В режиме
+// «убрать» это и есть прицел; в обычном — убранная бутылка, которую навели
+// заново: вносим её, как новую, под позицию на экране. Остальное — как было.
+function rcvRepeat(code){
+  if(RCV_RM) return rcvRemove(code);
+  if(RCV_GONE.has(code)){ RCV_GONE.delete(code); return rcvScan(code); }
+  qrFlash('again');
+}
+
+function rcvRmSet(on){
+  RCV_RM = !!on;
+  if(RCV_RM){
+    try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  }else if(!RCV_LINE || !RCV_LINE.left){
+    // Режим открыли со страницы района или позиция полна — дальше та, где
+    // освободилось место, иначе первая недобранная; нечего — к списку.
+    const open = ((RCV && RCV.lines) || []).filter(x => x.left > 0);
+    const l = open.find(x => x.id === RCV_FREED)
+      || open.sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
+    if(!l) return rcvLineClose();
+    RCV_LINE = {...l};
+  }
+  qrFlashClear();
+  rcvPaint(); rcvFeed();
+}
+
+async function rcvRemove(code){
+  if(_rcvRmBusy || !RCV) return;
+  _rcvRmBusy = true;
+  let r = null;
   try{ r = await ownerApi.ownerFetch(
     `/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/undo`,
-    {method:'POST', body:{district: RCV.district, code: row.code, as: _rcvMe()}}); }
-  catch(e){ return _toast('Не удалось отменить'); }
+    {method:'POST', body:{district: RCV.district, code, as: _rcvMe()}}); }
+  catch(e){ r = null; }
+  finally{ _rcvRmBusy = false; }
+  // Нет ответа — неизвестно, дошло ли: перечитываем задачу, числа сойдутся.
+  if(!r){ qrFlash('err', 'нет связи'); rcvResync(); return; }
   if(!r.ok){
-    const M = {undo_limit: `Отменить можно ${r.limit} раза за приёмку`,
-               too_late: 'Отменить можно сразу после скана',
-               not_ours: 'Эта бутылка не из приёмки'};
-    return _toast(M[r.verdict] || 'Не удалось отменить');
+    // Строку ленты мы считали своей, а сервер её не знает — значит, её уже
+    // убрали (ответ на прошлое «убрать» потерялся в сети).
+    const наша = RCV_ROWS.find(x => x.code === code && (x.state === 'new' || (x.state === 'dup' && x.ours)));
+    if(r.verdict === 'not_ours' && наша){
+      наша.state = 'gone'; RCV_GONE.add(code);
+      qrFlash('dup', 'уже убрана');
+      if(RCV_RM) rcvRmSet(false); else rcvFeed();
+      rcvResync();
+      return;
+    }
+    const M = {not_ours: 'не из этой приёмки', moved: 'уже продана или перевезена',
+               closed: 'приёмка закрыта', not_mine: 'район забрал другой',
+               busy: `вносит ${r.by || 'другой'}`};
+    qrFlash('err', M[r.verdict] || 'не убрана');
+    return;
   }
-  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
-  RCV_ROWS.splice(RCV_ROWS.indexOf(row), 1);
-  if(RCV_LINE){
-    RCV_LINE.got--; RCV_LINE.left++;
-    rcvSync({got: RCV_LINE.got, left: RCV_LINE.left, need: RCV_LINE.need});
+  // Код держим в «уже виденных», пока бутылка в кадре: иначе камера тут же
+  // прочтёт её снова и запишет обратно. Навели заново — внесётся (rcvRepeat).
+  RCV_GONE.add(r.code);
+  const row = RCV_ROWS.find(x => x.code === r.code && x.state !== 'gone');
+  if(row){ row.state = 'gone'; row.label = r.label || row.label; }
+  else RCV_ROWS.unshift({code: r.code, state: 'gone', label: r.label || ''});
+  if(rcvRevOk(r.product_id, r.rev)) rcvSync(r, r.product_id);
+  RCV_FREED = r.product_id;
+  qrFlash('dup', 'убрана');
+  _toast(`${r.name} — убрана из приёмки`);
+  // Убрали — сразу обратно к сканированию: оставленный режим «убрать» стёр бы
+  // следующую правильную бутылку.
+  if(RCV_RM) rcvRmSet(false); else { rcvPaint(); rcvFeed(); }
+}
+
+// Перечитать задачу, не трогая камеру: только числа строк.
+async function rcvResync(){
+  if(!RCV) return;
+  const sid = RCV.supply_id, oid = RCV.district;
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(sid)}/tasks`, {params:{as: _rcvMe()}});
+    const t = (r.tasks || []).find(x => x.district === oid);
+    if(!t || !RCV || RCV.supply_id !== sid) return;
+    const rv = +(t.rev || 0);
+    (t.lines || []).forEach(l => { if(rcvRevOk(l.id, rv)) rcvSync(l, l.id); });
+    rcvFeed();
+  }catch(e){}
+}
+
+// Лишнюю бутылку убирают и со страницы района: сканер закрыт, а строка, куда
+// её записало, полна и на неё камеру уже не открыть.
+async function rcvRemoveOpen(){
+  if(!RCV) return;
+  rcvPollStop();
+  const h = await rcvHoldSend(true);
+  if(h && !h.ok){
+    _toast(h.verdict === 'busy' ? `${h.by || 'Другой'} вносит сейчас`
+         : h.verdict === 'closed' ? 'Приёмка уже закрыта' : 'Не удалось начать');
+    return (RCV_HOME || rcvRender)();
   }
-  rcvFeed();
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  RCV_HOLD = setInterval(() => rcvHoldSend(true), 10000);
+  RCV_LINE = null; RCV_ROWS = []; RCV_RM = true; RCV_GONE = new Set(); RCV_FREED = '';
+  rcvCam();
+  try{
+    await SCAN.start(document.getElementById('rcvVideo'), rcvScan, rcvIdle, rcvRepeat, qrHold);
+  }catch(e){
+    _toast('Нет доступа к камере');
+    return rcvLineClose();
+  }
+  const tb = document.getElementById('rcvTorch');
+  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+  const snd = document.getElementById('rcvSound');
+  if(snd) snd.classList.toggle('muted', !SFX.on);
 }
 
 // ── возврат и закрытие ─────────────────────────────────────────────────────

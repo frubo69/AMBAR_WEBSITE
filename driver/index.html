@@ -3057,6 +3057,17 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .sc-st{font-size:11px;font-weight:600;flex-shrink:0}
 .sc-acts{display:flex;gap:8px;margin-top:4px}
 .sc-acts .btn{flex:1}
+/* Убрать бутылку из приёмки: крестик в строке ленты и режим камеры, где
+   рамка красная, а вместо «осталось» — что сейчас делаем. */
+.sc-x{flex-shrink:0;width:30px;height:30px;margin-right:-4px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;padding:0;cursor:pointer;
+  border:1px solid var(--border3);background:var(--card2);color:var(--muted)}
+.sc-x:active{background:var(--dn-soft);color:var(--dn);border-color:rgba(224,85,85,.35)}
+.sc-row.gone{opacity:.6}
+.sc-row.gone .sc-code{text-decoration:line-through;text-decoration-color:rgba(255,255,255,.45)}
+.cam.rm .cam-frame .c{border-color:#FF6B6B}
+.cam.rm .cam-left b{font-size:24px;letter-spacing:-.4px;line-height:1.1;color:#FF8A8A}
+.btn-gh.dn{color:var(--dn);border-color:rgba(224,85,85,.35)}
 .btn-gh{background:var(--card2);color:var(--sub);border:1px solid var(--border3)}
 .er-st button{width:30px;height:30px;border:none;background:none;color:var(--sub);cursor:pointer;
   border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0}
@@ -9793,6 +9804,7 @@ const SCAN = {
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.onRepeat = onRepeat; this.onHold = onHold;
     this.seen = new Set(); this.seenAt = new Map();
+    this.lastCode = null; this.missed = true;
     this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
     // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
@@ -9849,6 +9861,11 @@ const SCAN = {
 
   _loop(ts){
     if(!this.stream) return;
+    // Экран под камерой перерисовали — <video> оторвался от страницы. Человек
+    // уже не видит сканер, а камера всё снимает: греет телефон, держит память,
+    // и через минуту приложение убивают. Замечаем и гасим сами (так же
+    // сделано в STAR после «посреди скана приложение вылетает»).
+    if(this.video && !this.video.isConnected){ this.stop(); return; }
     this.raf = requestAnimationFrame(t => this._loop(t));
     if(ts - this.lastDecode < this.DECODE_MS) return;
     this.lastDecode = ts;
@@ -9885,19 +9902,28 @@ const SCAN = {
         // Камера всё ещё стоит на той же бутылке — это не повторная попытка,
         // а тот же самый скан, растянутый на секунду. Ругаться здесь значит
         // обвинять человека в том, чего он не делал.
+        // «Отвели и навели снова» — только если между ними был прочитанный
+        // кадр без этого кода. Одного времени мало: телефон подвис на
+        // секунду — кадров не было вовсе, а бутылка так и стояла перед
+        // камерой. В режиме «убрать бутылку» это стирало бы её без прицела
+        // (фаззер, 21 сен 2026).
         const gone = now - (this.seenAt.get(code) || 0);
+        const ушёл = this.lastCode !== code || this.missed;
         this.seenAt.set(code, now);
-        if(gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
+        this.lastCode = code; this.missed = false;
+        if(ушёл && gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
         // Код всё ещё перед камерой — экран должен держать подтверждение, а не
         // мигнуть им на треть секунды и погаснуть.
         else if(this.onHold) this.onHold(code);
         return;
       }
       this.seen.add(code); this.seenAt.set(code, now);
+      this.lastCode = code; this.missed = false;
       if(this.onHold) this.onHold(code);
       if(this.onCode) this.onCode(code);
       return;
     }
+    this.missed = true;
     if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
                                 Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
   },
@@ -9941,6 +9967,34 @@ const SCANQ = {
 // единицей стоит конкретная бутылка с конкретным кодом.
 let SUP = null;                 // {mine, free, taken}
 let TASK = null;                // открытая задача
+// Версия строк задачи: сервер поднимает её на каждом скане и «убрать». Ответы
+// приходят не в том порядке, в каком он их обработал (скан отвечает дольше,
+// чем «убрать»), и запоздавший затирал свежее число: позиция выглядела
+// взятой полностью, когда не хватало полкоробки (фаззер, 21 сен 2026). Числа
+// строки берём только из ответа не старше последнего применённого.
+var LREV = {};
+function revOk(pid, rev){
+  if(rev == null || rev === '') return true;
+  rev = +rev;
+  if((LREV[pid] || 0) > rev) return false;
+  LREV[pid] = rev; return true;
+}
+// Снимок задачи с сервера. Та же задача — строки, по которым уже пришёл ответ
+// новее снимка, не откатываем; другая — версии с нуля.
+function supAdopt(t){
+  if(!t) return t;
+  if(!TASK || TASK.supply_id !== t.supply_id || TASK.district !== t.district) LREV = {};
+  const rv = +(t.rev || 0);
+  (t.lines || []).forEach(l => {
+    if((LREV[l.id] || 0) > rv){
+      const old = ((TASK && TASK.lines) || []).find(x => x.id === l.id);
+      if(old){ l.got = old.got; l.left = old.left; }
+    }else LREV[l.id] = rv;
+  });
+  t.got = (t.lines || []).reduce((a, x) => a + (+x.got || 0), 0);
+  t.left = Math.max(0, (+t.need || 0) - t.got);
+  return t;
+}
 let LINE = null;                // позиция, которую считаем сейчас
 let SCAN_ROWS = [];             // лента текущей позиции
 let SUP_BUSY = false, _supAt = 0;
@@ -10826,11 +10880,12 @@ async function supClaim(sid, oid){
 
 // ── экран задачи ───────────────────────────────────────────────────────────
 async function supOpen(sid, oid, pre){
-  TASK = pre || null; TASK_UPD = null; PRICES_OPEN = false;
+  TASK = null; LREV = {};
+  TASK = supAdopt(pre || null); TASK_UPD = null; PRICES_OPEN = false;
   document.getElementById('supScr').classList.add('show');
   supRenderTask();
   if(!pre){
-    try{ TASK = await drvApi.drvFetch(`/api/driver/supply/${sid}`, {params:{district: oid}}); }
+    try{ TASK = supAdopt(await drvApi.drvFetch(`/api/driver/supply/${sid}`, {params:{district: oid}})); }
     catch(e){ toast('Не удалось открыть', 'err'); return supBack(); }
     supRenderTask();
   }
@@ -10838,7 +10893,7 @@ async function supOpen(sid, oid, pre){
 }
 
 function supBack(){
-  if(LINE) return supLineClose();          // из камеры — к списку позиций
+  if(LINE || RM) return supLineClose();    // из камеры — к списку позиций
   supPollStop();
   document.getElementById('supScr').classList.remove('show');
   TASK = null; TASK_UPD = null;
@@ -10883,14 +10938,18 @@ function supTaskDiff(a, b){
 }
 function supTaskApply(r){
   const changes = supTaskDiff(TASK, r);
-  TASK = r;
+  TASK = supAdopt(r);
   if(changes.length) TASK_UPD = {at: new Date(), changes};
+  // Камера открыта (позиция или «убрать бутылку») — разметку не трогаем:
+  // вместе с ней умерла бы камера (чёрный экран, на андроиде новый запрос
+  // разрешения). Меняем только числа.
+  const камера = !!document.getElementById('camV');
   if(LINE){
     const l = (r.lines || []).find(x => x.id === LINE.id);
     if(!l || !l.need){ toast('Эту позицию из заявки убрали', 'err'); supLineClose(); }
-    else { LINE.need = l.need; LINE.got = l.got; LINE.left = l.left; _setText('camLeft', fmtQty(l.left)); }
+    else { LINE.need = l.need; LINE.got = l.got; LINE.left = l.left; camNums(); }
   }
-  if(!LINE) supRenderTask();
+  if(!камера && !LINE) supRenderTask();
   if(changes.length){
     toast('Заявку обновили — проверьте список', 'err');
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
@@ -10958,7 +11017,7 @@ async function supPriceSave(pid, inp){
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/buy`,
       {method:'POST', body:{district: t.district, product_id: pid, price}});
-    if(r && r.lines) TASK = r;
+    if(r && r.lines) TASK = supAdopt(r);
     try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   }catch(e){ toast('Не удалось сохранить цену', 'err'); return; }
   supPricesRefresh();
@@ -11017,6 +11076,11 @@ function supRenderTask(){
   else if(t.got === 0 && !ns){
     act.textContent = 'Вернуть задачу'; act.className = 'sup-act';
     act.onclick = supGiveBack; act.style.display = '';
+  }else if(t.got > 0){
+    // Лишнюю бутылку убирают и отсюда — когда камера уже закрыта или строка,
+    // куда её записало, полна и сканер на неё не открывается.
+    act.textContent = 'Убрать бутылку'; act.className = 'sup-act dn';
+    act.onclick = supRemoveOpen; act.style.display = '';
   }else act.style.display = 'none';
   // «Не всё привезли» переехало из угла вниз, к главной кнопке (владелец,
   // 21 сен 2026: «магазин обещал всё, приехали — половины нет, а заявка
@@ -11127,7 +11191,7 @@ async function noscanSend(){
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/noscan`,
       {method:'POST', body:{district: t.district}});
     if(!r.ok && r.verdict === 'prices_needed'){
-      finClose(); if(r.task) TASK = r.task; PRICES_OPEN = true; supRenderTask();
+      finClose(); if(r.task) TASK = supAdopt(r.task); PRICES_OPEN = true; supRenderTask();
       toast('Сначала впишите цены', 'err'); return;
     }
     if(!r.ok) throw new Error(r.verdict);
@@ -11157,10 +11221,10 @@ async function supLineOpen(pid){
   }
   _holdT = setInterval(() => holdSend(true), 10000);
   LINE = {...l};
-  SCAN_ROWS = [];
+  SCAN_ROWS = []; RM = false; RM_GONE = new Set();
   supRenderCam();
   try{
-    await SCAN.start(document.getElementById('camV'), supScan, supIdle, null, camHold);
+    await SCAN.start(document.getElementById('camV'), supScan, supIdle, supRepeat, camHold);
     const tb = document.getElementById('camTorch');
     if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
   }catch(e){
@@ -11175,14 +11239,11 @@ async function supLineOpen(pid){
 function supLineSwap(l){
   if(!l) return supLineClose();
   LINE = {...l};
-  SCAN_ROWS = [];
-  _setText('supT', l.name);
-  const v = document.getElementById('supV');
-  if(v) v.innerHTML = `${fmt(l.got)}<u> / ${fmt(l.need)}</u>`;
-  const left = document.getElementById('camLeft');
-  if(left) left.textContent = fmtQty(l.left);
+  // Лента остаётся: последняя бутылка прошлой позиции могла быть не той, и
+  // убрать её крестиком нужно именно здесь, а не искать потом.
+  camPaint();
   const hint = document.getElementById('camHint');
-  if(hint) hint.textContent = `Дальше: ${l.name}`;
+  if(hint && !RM) hint.textContent = `Дальше: ${l.name}`;
   camFeed();
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -11190,20 +11251,15 @@ function supLineSwap(l){
 function supLineClose(){
   SCAN.stop();
   holdStop();
-  LINE = null; SCAN_ROWS = [];
+  LINE = null; SCAN_ROWS = []; RM = false;
   supRenderTask();
 }
 
 function supRenderCam(){
-  const l = LINE;
-  _setText('supT', l.name);
-  _setText('supS', 'Наводите на код каждой бутылки');
   // На камере справа — счёт по этой позиции, обходного пути тут нет.
   document.getElementById('supAct').style.display = 'none';
-  const v = document.getElementById('supV');
-  v.style.display = ''; v.innerHTML = `${fmt(l.got)}<u> / ${fmt(l.need)}</u>`;
   document.getElementById('supMid').innerHTML = `
-    <div class="cam">
+    <div class="cam${RM ? ' rm' : ''}" id="camBox">
       <video id="camV" playsinline muted autoplay></video>
       <div class="cam-tools">
         <button class="cam-t ${SFX.on ? '' : 'muted'}" onclick="camSound(this)" aria-label="Звук">
@@ -11223,17 +11279,53 @@ function supRenderCam(){
         <div class="cam-badge" id="camB"></div>
       </div>
       <div class="cam-left">
-        <b id="camLeft">${fmtQty(l.left)}</b><span>осталось</span>
-        <span class="cam-hint" id="camHint">Наведите на код</span>
+        <b id="camLeft"></b><span id="camLeftS"></span>
+        <span class="cam-hint" id="camHint"></span>
       </div>
     </div>
     <div id="camFeed"></div>`;
+  camPaint();
+  camFeed();
+}
+
+// Числа позиции на камере — без подписей и кнопок. В режиме «убрать» там
+// стоит «Убрать», и число его не перебивает.
+function camNums(){
+  if(RM || !LINE) return;
+  const v = document.getElementById('supV');
+  if(v) v.innerHTML = `${fmt(LINE.got)}<u> / ${fmt(LINE.need)}</u>`;
+  _setText('camLeft', fmtQty(LINE.left));
+}
+
+// Подписи камеры по режиму: сканируем позицию или убираем бутылку. Разметку не
+// пересобираем — вместе с ней умерла бы камера.
+function camPaint(){
+  const box = document.getElementById('camBox');
+  if(box) box.classList.toggle('rm', RM);
+  const v = document.getElementById('supV');
+  if(RM){
+    _setText('supT', 'Убрать бутылку');
+    _setText('supS', 'Наведите камеру на лишнюю бутылку');
+    if(v) v.style.display = 'none';
+    _setText('camLeft', 'Убрать');
+    _setText('camLeftS', 'из приёмки');
+    _setText('camHint', 'Наведите на бутылку, которую убрать');
+  }else if(LINE){
+    _setText('supT', LINE.name);
+    _setText('supS', 'Наводите на код каждой бутылки');
+    if(v){ v.style.display = ''; v.innerHTML = `${fmt(LINE.got)}<u> / ${fmt(LINE.need)}</u>`; }
+    _setText('camLeft', fmtQty(LINE.left));
+    _setText('camLeftS', 'осталось');
+    _setText('camHint', 'Наведите на код');
+  }
+  // Внизу — «Убрать бутылку» рядом с «К списку»; в режиме «убрать» на её
+  // месте возврат к сканированию (если есть что сканировать).
   document.getElementById('supBot').innerHTML = `
-    <div class="sc-acts">
-      <button class="btn btn-gh" id="camUndo" onclick="camUndo()" disabled>Отменить скан</button>
+    <div class="sc-acts">${RM
+      ? (LINE ? `<button class="btn btn-gh" onclick="camRmSet(false)">Сканировать дальше</button>` : '')
+      : `<button class="btn btn-gh dn" onclick="camRmSet(true)">Убрать бутылку</button>`}
       <button class="btn btn-pri" onclick="supLineClose()">К списку</button>
     </div>`;
-  camFeed();
 }
 
 function camSound(b){ b.classList.toggle('muted', !SFX.toggle()); }
@@ -11247,6 +11339,7 @@ const CAM_FLASH = {
   dup:  ['уже в реестре',  'warning'],
   full: ['по этой всё',    'warning'],
   err:  ['не сохранилось', 'error'],
+  rm:   ['убрана',         'warning'],
 };
 let _fOn = false, _fAt = 0, _hAt = 0, _fT = null;
 
@@ -11257,7 +11350,7 @@ function camFlash(kind, text){
   b.textContent = text || t;
   f.classList.remove('ok','dup','err');
   void f.offsetWidth;
-  f.classList.add(kind === 'full' ? 'dup' : kind === 'dup' ? 'dup' : kind);
+  f.classList.add(kind === 'full' || kind === 'rm' ? 'dup' : kind === 'dup' ? 'dup' : kind);
   _fOn = true; _fAt = Date.now(); _hAt = Date.now();
   try{ tg.HapticFeedback.notificationOccurred(hap); }catch(e){}
   if(kind === 'ok') SFX.ok(); else if(kind === 'err') SFX.err(); else SFX.warn();
@@ -11275,7 +11368,10 @@ function camHold(){ _hAt = Date.now(); }
 function supIdle(sinceMs, frames, fps){
   if(_fOn && Date.now() - _hAt > 350 && Date.now() - _fAt > 700) camFlashClear();
   const h = document.getElementById('camHint'); if(!h) return;
-  if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'cam-hint'; return; }
+  if(sinceMs < 2500){
+    h.textContent = RM ? 'Наведите на бутылку, которую убрать' : 'Наведите на код';
+    h.className = 'cam-hint'; return;
+  }
   if(!fps || fps < 4){ h.textContent = 'Телефон не успевает'; }
   else if(sinceMs > 8000){
     h.textContent = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Ближе, ровнее, включите фонарик';
@@ -11288,6 +11384,7 @@ function supIdle(sinceMs, frames, fps){
 // Сколько несёт код, решает сервер: у пива полкоробки (на коробке два кода),
 // у бутылки — бутылка; «осталось» приходит в ответе.
 function supScan(code){
+  if(RM) return camRemove(code);
   if(!LINE) return;
   SCAN_ROWS.unshift({code, state:'sending', label:''});
   camFlash('ok');
@@ -11299,11 +11396,16 @@ function supScan(code){
 
 SCANQ.onDone = (err, r, job) => {
   const row = SCAN_ROWS.find(x => x.code === job.code && x.state === 'sending');
-  if(err){ if(row){ row.state = 'fail'; camFlash('err'); camFeed(); } return; }
+  // Скан так и не дошёл — неизвестно, принял ли его сервер до обрыва:
+  // перечитываем задачу, чтобы числа на экране не врали.
+  if(err){ if(row){ row.state = 'fail'; camFlash('err'); camFeed(); } supResync(); return; }
+  // Ответ — про позицию, по которой сканировали, а не про ту, что сейчас на
+  // экране: пока шёл запрос, сканер мог перейти на следующую позицию.
+  const pid = (job.body || {}).product_id;
+  const своя = !!(LINE && LINE.id === pid);
   if(r.ok){
     if(row){ row.state = 'new'; row.label = r.label || ''; }
-    if(LINE){ LINE.got = r.got; LINE.left = r.left; }
-    supSyncLine(r);
+    if(revOk(pid, r.rev)) supSyncLine(r, pid);
     camFeed();
     // Последняя бутылка приёма без кодов — задача закрылась сама, у всех.
     if(r.finished){
@@ -11324,13 +11426,18 @@ SCANQ.onDone = (err, r, job) => {
     // экран чернеет, андроид на каждом включении заново спрашивает разрешение,
     // а бутылка, оставшаяся в кадре, читается второй раз и возвращается
     // «уже в реестре» (владелец, 21 сен 2026).
-    if(r.left === 0){
+    // Добрана ли позиция — по её числам после всех ответов, а не по этому:
+    // он мог прийти позже «убрать», обработанного сервером следом.
+    const стр = ((TASK && TASK.lines) || []).find(x => x.id === pid);
+    if(стр && стр.left === 0 && своя && !RM){
       camFlash('ok', 'всё, ' + r.need);
       const след = ((TASK && TASK.lines) || [])
-        .filter(x => x.left > 0 && x.id !== ((LINE || {}).id))
+        .filter(x => x.left > 0 && x.id !== pid)
         .sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
       setTimeout(() => {
-        if(!LINE) return;
+        // За эти 700 мс могли уйти со сканера, перейти в «убрать» или на
+        // другую позицию — тогда никуда не переключаем.
+        if(!LINE || RM || LINE.id !== pid) return;
         toast(`${r.name} — взято полностью`);
         if(след) supLineSwap(след); else supLineClose();
       }, 700);
@@ -11341,7 +11448,7 @@ SCANQ.onDone = (err, r, job) => {
   // поменялось, и отпускаем код — после «Понятно» её сканируют заново.
   if(r.verdict === 'prices_needed'){
     SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
-    if(r.task) TASK = r.task;
+    if(r.task) TASK = supAdopt(r.task);
     supLineClose(); PRICES_OPEN = true; supRenderTask();
     toast('Сначала впишите цены', 'err');
     return;
@@ -11354,14 +11461,33 @@ SCANQ.onDone = (err, r, job) => {
     camFeed();
     return;
   }
-  if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }
+  if(row){
+    row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || '';
+    // Бутылка этой же приёмки: под какой позицией её записали. Под другой —
+    // её можно убрать крестиком в этой строке и сразу внести сюда.
+    row.ours = !!r.ours; row.asId = r.as_id || ''; row.asName = r.as_name || '';
+  }
+  // «Уже в реестре» и «по этой всё» тоже несут строку, как её видит сервер:
+  // ответ на прошлый скан мог потеряться в сети, и число на экране отстало.
+  if((r.verdict === 'known' || r.verdict === 'full') && r.need != null && r.got != null && revOk(pid, r.rev)){
+    supSyncLine({got: +r.got, need: +r.need,
+                 left: Math.max(0, Math.round((+r.need - +r.got) * 2) / 2)}, pid);
+  }
+  if(r.verdict === 'known' && r.ours && r.as_id && r.as_id !== pid){
+    camFlash('dup', 'под другой позицией');
+    // Коротко: длинная подсказка резалась многоточием. Что делать — видно
+    // по самой строке ленты: она жёлтая и с крестиком.
+    toast(`Уже внесена как ${r.as_name}`, 'err');
+    camFeed();
+    return;
+  }
   // Задачу перехватил старший — камеру закрываем, дальше здесь только смотреть.
   if(r.verdict === 'busy'){
     SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
     camFlash('err', `вносит ${r.by || 'старший'}`);
     toast(`${r.by || 'Старший'} вносит сейчас`, 'err');
     camFeed();
-    if(r.task) TASK = r.task;
+    if(r.task) TASK = supAdopt(r.task);
     setTimeout(() => { if(LINE) supLineClose(); }, 600);
     return;
   }
@@ -11381,14 +11507,17 @@ SCANQ.onDone = (err, r, job) => {
 };
 
 // Число на экране должно совпадать с базой, а не с нашим представлением о ней.
-function supSyncLine(r){
+function supSyncLine(r, pid){
   if(!TASK) return;
-  const l = (TASK.lines || []).find(x => x.id === (LINE && LINE.id));
+  pid = pid || (LINE && LINE.id);
+  const l = (TASK.lines || []).find(x => x.id === pid);
   if(l){ l.got = r.got; l.left = r.left; }
   TASK.got = (TASK.lines || []).reduce((a, x) => a + x.got, 0);
   TASK.left = Math.max(0, TASK.need - TASK.got);
+  if(LINE && LINE.id === pid){ LINE.got = r.got; LINE.left = r.left; if(r.need != null) LINE.need = r.need; }
+  if(!LINE || LINE.id !== pid || RM) return;      // на экране другая позиция или «убрать»
   const v = document.getElementById('supV');
-  if(v && LINE) v.innerHTML = `${fmt(r.got)}<u> / ${fmt(r.need)}</u>`;
+  if(v) v.innerHTML = `${fmt(r.got)}<u> / ${fmt(r.need)}</u>`;
   _setText('camLeft', fmtQty(r.left));
 }
 
@@ -11397,44 +11526,149 @@ const SC_STATE = {
   new:     ['принята',      'var(--up)'],
   dup:     ['уже в реестре','var(--dn)'],
   fail:    ['не прошла',    'var(--dn)'],
+  gone:    ['убрана',       'var(--muted)'],
 };
+const SC_X = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+  stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
 function camFeed(){
   const f = document.getElementById('camFeed'); if(!f) return;
-  f.innerHTML = SCAN_ROWS.slice(0, 25).map(r => {
-    const [txt, color] = SC_STATE[r.state] || SC_STATE.sending;
-    const raw = r.code.length > 24 ? r.code.slice(0, 22) + '…' : r.code;
-    return `<div class="sc-row">
+  f.innerHTML = SCAN_ROWS.slice(0, 25).map((r, i) => {
+    let [txt, color] = SC_STATE[r.state] || SC_STATE.sending;
+    let raw = r.code.length > 24 ? r.code.slice(0, 22) + '…' : r.code;
+    // «Уже в реестре» бывает двух родов: чужая бутылка — тут ничего не
+    // поделать; бутылка этой приёмки под другой позицией (камера поймала её,
+    // когда сканировали соседнюю) — её убирают крестиком и вносят сюда.
+    const чужая = r.state === 'dup' && r.ours && r.asId && r.asId !== (LINE && LINE.id);
+    if(r.state === 'dup' && r.ours){
+      txt = 'в приёмке'; color = 'var(--warn)';
+      if(чужая) raw = 'внесена как ' + r.asName;
+    }
+    const x = (r.state === 'new' || чужая)
+      ? `<button class="sc-x" onclick="camDrop(${i})" aria-label="Убрать из приёмки">${SC_X}</button>` : '';
+    return `<div class="sc-row ${r.state === 'gone' ? 'gone' : ''}">
       <span class="sc-dot" style="background:${color}"></span>
       <span class="sc-b">
         <span class="sc-code">${esc(r.label || '…')}</span>
         <span class="sc-raw">${esc(raw)}</span>
       </span>
-      <span class="sc-st" style="color:${color}">${esc(txt)}</span></div>`;
+      <span class="sc-st" style="color:${color}">${esc(txt)}</span>${x}</div>`;
   }).join('');
-  const u = document.getElementById('camUndo');
-  if(u) u.disabled = !SCAN_ROWS.some(r => r.state === 'new');
 }
 
-// Отмена — только что записанной и только несколько раз за приёмку. Правило
-// стоит на сервере, здесь лишь показываем его ответ.
-async function camUndo(){
-  const row = SCAN_ROWS.find(r => r.state === 'new');
-  if(!row) return;
-  let r;
-  try{ r = await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}/undo`,
-    {method:'POST', body:{district: TASK.district, code: row.code}}); }
-  catch(e){ return toast('Не удалось отменить', 'err'); }
-  if(!r.ok){
-    const M = {undo_limit: `Отменить можно ${r.limit} раза за приёмку — дальше только к старшему`,
-               too_late: 'Отменить можно сразу после скана', not_ours: 'Эта бутылка не из приёмки'};
-    return toast(M[r.verdict] || 'Не удалось отменить', 'err');
+// ── убрать бутылку из приёмки ──────────────────────────────────────────────
+// Камера иногда ловит соседнюю бутылку: её записывает под позицию, которую
+// сканируют, строка закрывается, и правильную бутылку уже не взять, а код
+// лишней занят не той позицией (владелец, 21 сен 2026: «удалить её и
+// сканировать правильную во время сканирования возможности нет»). Убрать
+// можно любую бутылку этой приёмки, пока район открыт: крестиком в ленте или
+// наведя камеру в режиме «Убрать бутылку». Код освобождается — бутылку потом
+// вносят под её позицией.
+var RM = false, RM_GONE = new Set(), _rmBusy = false;
+
+function camDrop(i){
+  const row = SCAN_ROWS[i]; if(row) camRemove(row.code);
+}
+
+// Бутылка снова в кадре после того, как камера от неё отходила. В режиме
+// «убрать» это и есть прицел. В обычном — это убранная бутылка, которую
+// навели заново: вносим её, как новую (под ту позицию, что сейчас на экране).
+function supRepeat(code){
+  if(RM) return camRemove(code);
+  if(RM_GONE.has(code)){ RM_GONE.delete(code); supScan(code); }
+}
+
+function camRmSet(on){
+  RM = !!on;
+  if(RM){
+    try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  }else if(!LINE || !LINE.left){
+    // Режим открыли со списка или позиция полна — сканировать дальше ту, где
+    // освободилось место, иначе первую недобранную; нечего — к списку.
+    const open = (TASK && TASK.lines || []).filter(x => x.left > 0);
+    const l = open.find(x => x.id === RM_FREED) || open.sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
+    if(!l) return supLineClose();
+    LINE = {...l};
   }
-  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
-  SCAN_ROWS.splice(SCAN_ROWS.indexOf(row), 1);
-  if(LINE){ LINE.got--; LINE.left++; supSyncLine({got: LINE.got, left: LINE.left, need: LINE.need}); }
-  camFeed();
-  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  camFlashClear();
+  camPaint(); camFeed();
+}
+var RM_FREED = '';
+
+async function camRemove(code){
+  if(_rmBusy || !TASK) return;
+  _rmBusy = true;
+  let r = null;
+  try{ r = await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}/undo`,
+    {method:'POST', body:{district: TASK.district, code}}); }
+  catch(e){ r = null; }
+  finally{ _rmBusy = false; }
+  // Нет ответа — неизвестно, дошло ли: перечитываем задачу, числа сойдутся.
+  if(!r){ camFlash('err', 'нет связи'); supResync(); return; }
+  if(!r.ok){
+    // Строку ленты мы считали своей, а сервер её не знает — значит, её уже
+    // убрали (ответ на прошлое «убрать» потерялся в сети).
+    const наша = SCAN_ROWS.find(x => x.code === code && (x.state === 'new' || (x.state === 'dup' && x.ours)));
+    if(r.verdict === 'not_ours' && наша){
+      наша.state = 'gone'; RM_GONE.add(code);
+      camFlash('rm', 'уже убрана');
+      if(RM) camRmSet(false); else camFeed();
+      supResync();
+      return;
+    }
+    const M = {not_ours: 'не из этой приёмки', moved: 'уже продана или перевезена',
+               closed: 'приёмка закрыта', not_mine: 'задачу забрал другой',
+               busy: `вносит ${r.by || 'другой'}`};
+    camFlash('err', M[r.verdict] || 'не убрана');
+    return;
+  }
+  // Код держим в «уже виденных», пока бутылка в кадре: иначе камера тут же
+  // прочтёт её снова и запишет обратно. Навели заново — внесётся (supRepeat).
+  RM_GONE.add(r.code);
+  const row = SCAN_ROWS.find(x => x.code === r.code && x.state !== 'gone');
+  if(row){ row.state = 'gone'; row.label = r.label || row.label; }
+  else SCAN_ROWS.unshift({code: r.code, state: 'gone', label: r.label || ''});
+  if(revOk(r.product_id, r.rev)) supSyncLine(r, r.product_id);
+  RM_FREED = r.product_id;
+  camFlash('rm', 'убрана');
+  toast(`${r.name} — убрана из приёмки`);
+  // Убрали — сразу обратно к сканированию: оставленный режим «убрать» стёр бы
+  // следующую правильную бутылку.
+  if(RM) camRmSet(false); else { camPaint(); camFeed(); }
+}
+
+// Перечитать задачу, не трогая камеру: supTaskApply меняет только числа,
+// пока камера открыта.
+async function supResync(){
+  if(!TASK) return;
+  const sid = TASK.supply_id, oid = TASK.district;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${sid}`, {params:{district: oid}});
+    if(r && TASK && TASK.supply_id === sid && !r.done_at && !r.cancelled_at) supTaskApply(r);
+  }catch(e){}
+}
+
+// Лишнюю бутылку убирают и со списка: камера закрыта, а строка, куда её
+// записало, полна и на неё сканер уже не открыть.
+async function supRemoveOpen(){
+  if(!TASK) return;
+  const h = await holdSend(true);
+  if(h && !h.ok){
+    toast(h.verdict === 'busy' ? `${h.by || 'Старший'} вносит сейчас`
+        : h.verdict === 'closed' ? 'Приёмка уже закрыта' : 'Не удалось начать', 'err');
+    return;
+  }
+  _holdT = setInterval(() => holdSend(true), 10000);
+  LINE = null; SCAN_ROWS = []; RM = true; RM_GONE = new Set(); RM_FREED = '';
+  supRenderCam();
+  try{
+    await SCAN.start(document.getElementById('camV'), supScan, supIdle, supRepeat, camHold);
+    const tb = document.getElementById('camTorch');
+    if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
+  }catch(e){
+    toast('Нет доступа к камере', 'err');
+    supLineClose();
+  }
 }
 
 // ── завершение ─────────────────────────────────────────────────────────────

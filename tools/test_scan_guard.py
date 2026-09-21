@@ -89,5 +89,36 @@ ok("второй запрос камеры — только для виртуа�
    SRC.count("/dual|triple|wide|ultra|virtual/i.test(метка)") == 1
    and DRV.count("/dual|triple|wide|ultra|virtual/i.test(метка)") == 1)
 
+print("— «убрать бутылку»: сканер не стирает то, во что не целились (21 сен 2026)")
+# Фаззер поймал: «навели заново» решалось одним временем. Подвис телефон —
+# кадров нет, бутылка стоит в кадре, — и в режиме «убрать» её стирало без
+# прицела. Теперь нужен прочитанный кадр без этого кода.
+for имя, текст in (("STAR", SRC), ("водитель", DRV)):
+    ok(f"{имя}: повтор только после кадра без этого кода",
+       "const ушёл = this.lastCode !== code || this.missed;" in текст
+       and "if(ушёл && gone > this.GAP_MS && this.onRepeat)" in текст
+       and "this.missed = true;" in текст)
+ok("водитель: оторванная камера тоже гаснет сама",
+   "if(this.video && !this.video.isConnected){ this.stop(); return; }" in DRV)
+прим = тело("supTaskApply", 1200, DRV)
+ok("водитель: опрос задачи при открытой камере не пересобирает экран",
+   "const камера = !!document.getElementById('camV');" in прим and "if(!камера && !LINE) supRenderTask();" in прим)
+ok("водитель: «назад» из камеры «убрать» гасит её", "if(LINE || RM) return supLineClose();" in DRV)
+for имя, текст, убрать, режим in (("STAR", SRC, "rcvRemove", "if(RCV_RM) rcvRmSet(false)"),
+                                  ("водитель", DRV, "camRemove", "if(RM) camRmSet(false)")):
+    тело_убрать = тело(убрать, 3200, текст)
+    ok(f"{имя}: после «убрано» режим выключается сам", режим in тело_убрать)
+    ok(f"{имя}: убранная бутылка остаётся «виденной», пока в кадре",
+       ("RCV_GONE.add(r.code)" if имя == "STAR" else "RM_GONE.add(r.code)") in тело_убрать
+       and "SCAN.seen.delete" not in тело_убрать)
+for имя, текст, пейнт in (("STAR", SRC, "rcvPaint"), ("водитель", DRV, "camPaint")):
+    т = тело(пейнт, 2400, текст)
+    ok(f"{имя}: смена режима не трогает камеру",
+       "SCAN.start" not in т and "SCAN.stop" not in т and "accMid" not in т and "supMid" not in т)
+print("— числа строк только из свежего ответа (версия задачи)")
+ok("STAR: ответы на скан и «убрать» проверяют версию",
+   SRC.count("rcvRevOk(pid, r.rev)") == 2 and "rcvRevOk(r.product_id, r.rev)" in SRC)
+ok("водитель: так же", DRV.count("revOk(pid, r.rev)") == 2 and "revOk(r.product_id, r.rev)" in DRV)
+
 print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
 sys.exit(1 if FAIL else 0)

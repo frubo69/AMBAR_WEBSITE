@@ -2058,6 +2058,13 @@ async def handle_op_order_edit(request):
 
 
 @require_operator
+async def handle_op_order_reset(request):
+    """POST {day, id} — вернуть расчёт по позиции (или по всей заявке)."""
+    import stock_routes
+    return await _без_охраны(stock_routes.handle_order_reset)(request)
+
+
+@require_operator
 async def handle_move_board(request):
     """GET ?as= — что где лежит: остатки и коды по районам."""
     import move_routes
@@ -3474,10 +3481,12 @@ def setup(app):
     r.add_get("/api/operator/orders", handle_list)
     r.add_route("OPTIONS", "/api/operator/close-request", _opt)
     r.add_post("/api/operator/close-request", handle_close_decide)
-    for _p in ("/api/operator/stock/order", "/api/operator/stock/order/edit"):
+    for _p in ("/api/operator/stock/order", "/api/operator/stock/order/edit",
+               "/api/operator/stock/order/reset"):
         r.add_route("OPTIONS", _p, _opt)
     r.add_get("/api/operator/stock/order", handle_op_order)
     r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)
+    r.add_post("/api/operator/stock/order/reset", handle_op_order_reset)
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)

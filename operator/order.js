@@ -4,9 +4,10 @@
  * отредактировать её… им нужен только этот функционал, сугубо редактирование»;
  * и следом, про телефон: «сделай это ровно так же, как у старшего».
  *
- * Поэтому здесь не свой вид, а тот же самый: карточка района с кодом,
- * названием и суммой закупки, внутри строки позиций — номер, фото, название и
- * число; строка раскрывается в крупный счётчик «− N +» и «Вернуть расчёт».
+ * Поэтому здесь не свой вид, а тот же самый: список позиций, как «Общая
+ * заявка» у старшего. Строка — номер, фото, название и итог по всем районам;
+ * раскрывается в пять строк районов, у каждой «на полке N» и счётчик «− N +»,
+ * снизу «Вернуть расчёт».
  * Разметка и стили перенесены из STAR один в один и заперты внутри #ozvBox,
  * чтобы не задеть ничего в операторской.
  *
@@ -60,6 +61,10 @@
 .ozv-l{flex:1;min-height:0;overflow:auto;padding:14px 16px 18px}
 .ozv-ft{padding:11px 18px;border-top:1px solid var(--border2);font-size:12px;color:var(--muted)}
 .ozv-ft b{color:var(--sub);font-weight:600}
+#ozvBox #ozvRows > .ord-r{border-radius:16px;margin-bottom:8px;padding:0 14px;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+#ozvBox #ozvRows > .ord-r.open{border-color:rgba(201,169,110,.5)}
 @media (max-width:760px){
   .ozv-ov{padding:var(--safe-top) 0 0;align-items:stretch}
   .ozv{width:100vw;height:100%;border-radius:0;border:none}
@@ -218,63 +223,44 @@
           <input id="ozvQ" type="search" placeholder="Найти позицию" value="${esc(O.q || '')}"
                  oninput="opOrdFind(this.value)">
         </div>
-        ${районы(список, dist, q, ном)}
+        ${q ? `<div class="ord-grp">Найдено · ${список.length}</div>` : ''}
+        <div id="ozvRows">${список.length
+          ? список.map(r => строка(r, dist, ном[r.id])).join('')
+          : `<div class="exp-empty">${q ? 'Ничего не нашлось'
+              : 'Довозить нечего — остатков хватает'}</div>`}</div>
       </div>
       <div class="ozv-ft">Правки сохраняются сразу — старший увидит их у себя. <b id="ozvSave"></b></div>`;
   }
 
-  function районы(список, dist, q, ном) {
-    const карточки = dist.map(x => {
-      const rows = список.filter(r => q ? true : ((r.cells[x.id] || {}).need > 0));
-      if (!rows.length) return '';
-      const qty = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0), 0);
-      const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0) * (+r.cost || 0), 0);
-      const pos = rows.filter(r => (r.cells[x.id] || {}).need > 0).length;
-      const open = !!q || !!(O.fold || {})[x.id];
-      return `<div class="shl-card ord-dc${open ? ' open' : ''}">
-        <button class="shl-h ord-dh" onclick="opOrdFold('${esc(x.id)}')">
-          <span class="shl-code">${esc(x.code || '')}</span>
-          <span class="shl-b"><b>${esc(x.name || x.id)}</b>
-            <i>${pos} ${скл(pos, 'позиция', 'позиции', 'позиций')} / ${чис(qty)} ${
-              скл(qty, 'бутылка', 'бутылки', 'бутылок')}</i></span>
-          <span class="shl-v"><b>${чис(Math.round(aed))}<u>AED</u></b><i>закупка</i></span>
-          <span class="ord-dh-go">${ШЕВРОН}</span>
-        </button>
-        ${open ? `<div class="ord-dl">${rows.map(r => строка(r, x, ном[r.id])).join('')}</div>` : ''}
-      </div>`;
-    }).filter(Boolean);
-    return карточки.length
-      ? `<div class="ord-dists"><div class="ord-cap">Заявка по районам</div>${карточки.join('')}</div>`
-      : `<div class="exp-empty">${q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает'}</div>`;
-  }
-
-  function строка(r, x, num) {
-    const key = r.id + '|' + x.id;
-    const open = O.open === key;
-    const c = r.cells[x.id] || {};
-    return `<div class="ord-r${open ? ' open' : ''}${c.edited ? ' fixed' : ''}${
-        c.need ? '' : ' zero'}" data-id="${esc(key)}">
-      <button class="ord-r-h" onclick="opOrdRow('${esc(key)}')">
+  // Строка позиции: та же разметка, что в «Общей заявке» у старшего.
+  function строка(r, dist, num) {
+    const open = O.open === r.id;
+    const cells = dist.map(x => ({ x, c: r.cells[x.id] || {} }));
+    return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}${
+        r.need_total ? '' : ' zero'}" data-id="${esc(r.id)}">
+      <button class="ord-r-h" onclick="opOrdRow('${esc(r.id)}')">
         <span class="ord-r-i">${num || ''}</span>
         <span class="ord-r-img"><img src="/products/${esc(r.id)}.webp" alt="" loading="lazy"
           onerror="this.style.visibility='hidden'"></span>
         <span class="ord-r-n">${esc(r.name)}</span>
-        <span class="ord-r-d">${c.edited ? `расчёт ${чис(c.calc)}` : ''}</span>
-        <span class="ord-r-v${c.edited ? ' gold' : ''}">${чис(c.need || 0)}</span>
+        <span class="ord-r-v${r.edited ? ' gold' : ''}">${чис(r.need_total)}</span>
         <span class="ord-r-go">${open ? '⌄' : '›'}</span>
       </button>
       ${open ? `<div class="ord-r-b">
-        <div class="ord-c ord-c-big">
+        ${cells.map(o => `<div class="ord-c" data-d="${esc(o.x.id)}">
+          <span class="ord-c-n"><b>${esc(o.x.code)}</b> ${esc(o.x.name)}</span>
+          <span class="ord-c-calc">${o.c.edited ? `расчёт ${чис(o.c.calc)}`
+            : `на полке ${чис(o.c.have || 0)}`}</span>
           <span class="ord-st">
-            <button onclick="opOrdStep('${esc(r.id)}','${esc(x.id)}',-1)" aria-label="Меньше">−</button>
-            <input inputmode="numeric" value="${чис(c.need || 0)}"
-                   onchange="opOrdSet('${esc(r.id)}','${esc(x.id)}',this.value)"
-                   class="${c.edited ? 'fixed' : ''}">
-            <button onclick="opOrdStep('${esc(r.id)}','${esc(x.id)}',1)" aria-label="Больше">+</button>
+            <button onclick="opOrdStep('${esc(r.id)}','${esc(o.x.id)}',-1)" aria-label="Меньше">−</button>
+            <input inputmode="numeric" value="${чис(o.c.need || 0)}"
+                   onchange="opOrdSet('${esc(r.id)}','${esc(o.x.id)}',this.value)"
+                   class="${o.c.edited ? 'fixed' : ''}">
+            <button onclick="opOrdStep('${esc(r.id)}','${esc(o.x.id)}',1)" aria-label="Больше">+</button>
           </span>
-        </div>
-        ${c.edited ? `<button class="ord-reset" onclick="opOrdSet('${esc(r.id)}','${esc(x.id)}','${+c.calc || 0}')">
-          Вернуть расчёт · <b>${чис(c.calc || 0)}</b></button>` : ''}
+        </div>`).join('')}
+        <button class="ord-reset" onclick="opOrdReset('${esc(r.id)}')">
+          Вернуть расчёт · <b>${чис(r.calc_total)}</b></button>
       </div>` : ''}
     </div>`;
   }
@@ -300,6 +286,19 @@
     const c = r.cells[district] || {};
     set(id, district, (+c.need || 0) + d);
     try { tg.HapticFeedback.selectionChanged(); } catch (e) {}
+  }
+
+  async function reset(id) {
+    if (!O || !O.d) return;
+    Object.keys(O.pend).forEach(k => { if (k.startsWith(id + '|')) delete O.pend[k]; });
+    пометь('сохраняю…');
+    try {
+      await opApi.opFetch('/api/operator/stock/order/reset',
+        { method: 'POST', body: { day: O.d.day, id } });
+    } catch (e) { пометь('не сохранилось'); }
+    await загрузи(false);
+    пометь('сохранено');
+    setTimeout(() => пометь(''), 1500);
   }
 
   function пометь(t) { const el = $('ozvSave'); if (el) el.textContent = t || ''; }
@@ -347,14 +346,6 @@
     O = null;
   }
 
-  function opOrdFold(id) {
-    if (!O) return;
-    O.fold[id] = !O.fold[id];
-    O.open = null;
-    try { tg.HapticFeedback.selectionChanged(); } catch (e) {}
-    рисуй();
-  }
-
   function opOrdRow(key) {
     if (!O) return;
     O.open = O.open === key ? null : key;
@@ -373,9 +364,9 @@
 
   window.opOrdOpen = opOrdOpen;
   window.opOrdClose = opOrdClose;
-  window.opOrdFold = opOrdFold;
   window.opOrdRow = opOrdRow;
   window.opOrdFind = opOrdFind;
+  window.opOrdReset = reset;
   window.opOrdSet = set;
   window.opOrdStep = step;
 })();

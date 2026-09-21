@@ -106,17 +106,19 @@ async def main():
     i = src.index("async def handle_op_order_edit")
     eq("оператор ходит в обработчик склада, а не в свою копию",
        "stock_routes.handle_order_edit" in src[i:i + 500], True)
-    eq("обе ручки под охраной оператора",
-       len(re.findall(r"@require_operator\s+async def handle_op_order", src)), 2)
+    eq("все три ручки под охраной оператора",
+       len(re.findall(r"@require_operator\s+async def handle_op_order", src)), 3)
     eq("ручки зарегистрированы",
        ('r.add_get("/api/operator/stock/order", handle_op_order)' in src
-        and 'r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)' in src), True)
+        and 'r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)' in src
+        and 'r.add_post("/api/operator/stock/order/reset", handle_op_order_reset)' in src), True)
 
     print("── у операторов только правка, без остального ─────────────────")
     js = open(os.path.join(ROOT, "operator", "order.js"), encoding="utf-8").read()
-    eq("ходит только в свои две ручки",
+    eq("ходит только в свои три ручки",
        sorted(set(re.findall(r"/api/operator/[a-z/]+", js))),
-       ["/api/operator/stock/order", "/api/operator/stock/order/edit"])
+       ["/api/operator/stock/order", "/api/operator/stock/order/edit",
+        "/api/operator/stock/order/reset"])
     for чужое in ("supply", "status", "answer", "/api/owner"):
         eq(f"ничего про «{чужое}»", чужое in js, False)
 

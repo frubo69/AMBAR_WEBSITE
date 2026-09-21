@@ -85,14 +85,33 @@
   display:flex;align-items:center;gap:10px}
 .ozv-ft b{color:var(--sub)}
 .ozv-none{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+/* Телефон: пять колонок в строку не помещаются — названия ужимались до
+   «Abs…». Поэтому строка становится карточкой: сверху позиция и итог, снизу
+   районы в ряд, у каждого свой код над полем (владелец, 21 сен 2026: «на
+   телефоне приведи это в человеческий вид»). Шапку панели опускаем под
+   кнопки телеграма — safe-top. */
 @media (max-width:760px){
-  .ozv-ov{padding:0}
+  .ozv-ov{padding:var(--safe-top) 0 0;align-items:stretch}
   .ozv{width:100vw;height:100%;border-radius:0;border:none}
-  .ozv-head,.ozv-r{grid-template-columns:minmax(0,1fr) repeat(var(--n),52px) 46px;gap:5px}
-  .ozv-l{padding:8px 10px 14px}
-  .ozv-c input{height:32px;font-size:13px}
-  .ozv-img{width:28px;height:28px}
-  .ozv-n{gap:7px}
+  .ozv-hd{padding:12px 14px 10px}
+  .ozv-find{margin:10px 14px 0}
+  .ozv-l{padding:6px 14px 16px}
+  .ozv-head{display:none}
+  /* Сетка по числу районов: первая строка — название во всю ширину и итог
+     справа, вторая — сами клетки. Во flex они ужимались в одну строку и
+     цифры не помещались. */
+  .ozv-r{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:9px 7px;padding:11px 0 13px}
+  .ozv-n{grid-column:1 / -2;grid-row:1;align-self:center}
+  .ozv-t{grid-column:-2 / -1;grid-row:1;justify-self:end;align-self:center;font-size:15px}
+  .ozv-t::after{content:' ед';font-family:'DM Sans',sans-serif;font-size:10px;
+    font-weight:600;color:var(--muted)}
+  .ozv-c{grid-row:2;min-width:0}
+  .ozv-c::before{content:attr(data-code);display:block;margin-bottom:3px;font-size:9.5px;
+    font-weight:700;letter-spacing:.7px;color:var(--muted)}
+  .ozv-c input{height:38px;font-size:15px}
+  .ozv-back{font-size:9.5px}
+  .ozv-img{width:32px;height:32px}
+  .ozv-nb{font-size:13px}
 }`;
     document.head.appendChild(st);
     const ov = document.createElement('div');
@@ -171,7 +190,8 @@
       ${dist.map(x => {
         const c = (r.cells || {})[x.id] || {};
         const n = +c.need || 0;
-        return `<span class="ozv-c${c.edited ? ' e' : ''}${n ? '' : ' z'}" data-c="${esc(r.id)}|${esc(x.id)}">
+        return `<span class="ozv-c${c.edited ? ' e' : ''}${n ? '' : ' z'}" data-c="${esc(r.id)}|${esc(x.id)}"
+          data-code="${esc(x.code || x.id)}">
           <input class="ozv-in" inputmode="numeric" value="${чис(n)}"
                  onchange="opOrdSet('${esc(r.id)}','${esc(x.id)}',this.value)"
                  onfocus="this.select()">

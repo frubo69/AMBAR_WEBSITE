@@ -213,6 +213,7 @@ if(ST_Q.get('big')){ Object.assign(ST_PROF, {accrued: 15000, fines: 12500, holds
 // ?work=start|end|mid — оклад за неполный месяц: вышел 15-го, уехал 20-го, был с 5-го по 20-е
 const _wk = {start: [16, ['2026-09-15', '2026-09-30']], end: [20, ['2026-09-01', '2026-09-20']], mid: [16, ['2026-09-05', '2026-09-20']]}[ST_Q.get('work')];
 if(_wk){ Object.assign(ST_PROF, {name: 'Тест-водитель', work_set: true, work_days: _wk[0], month_days: 30, work_spans: [_wk[1]],
+  since: _wk[1][0], active: ST_Q.get('work') === 'start',          // как на сервере: «Работает с» — день выхода
   accrued: Math.round(5000 * _wk[0] / 30), to_pay: Math.round(5000 * _wk[0] / 30) - 1750, left: Math.round(5000 * _wk[0] / 30) - 1750}); }
 const ST_SHIFT = {day: '2026-09-11', working: true, opened: true, opened_at: _agoIso(134), closed: false, closed_at: '', geo: {ok: true, fresh: true, stream: true, watch_ok: true, lost: false, still_sec: 60, age_sec: 30, endless: true, left_min: 0}, must: [], must_names: [], in_route: [], can_open: false, can_close: true, geo_bot: ''};
 // состояния смены для стенда: ?route=1 — заказ в пути, ?must=1 — не отвечено про расходы,

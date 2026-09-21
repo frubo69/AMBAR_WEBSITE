@@ -226,7 +226,47 @@ async def staff(request):
         dict(id="tecom", code="B5", name="Тиком", operator="Умар", base="Умар", moved=False, drivers=["Файзуло", "Алишер"]),
     ], "drivers": [], "stars": ["Старший"]})
 
-app = web.Application()
+# FB_DEMO=1 — снимки для владельца: суммы здесь выдуманы, поэтому настоящие
+# имена в ответах меняются на тестовые, а в запросах — обратно (выдуманные
+# деньги на настоящем человеке владелец однажды принял за правду).
+import re
+DEMO = {"Макар": "Тест-старший 1", "Слон": "Тест-старший 2", "Парвиз": "Тест-старший 3", "АМ": "Демо",
+        "Умар": "Тест-оператор 1", "Фарух": "Тест-оператор 2", "Джанабиль": "Тест-оператор 3",
+        "Али": "Тест-водитель 1", "Худоба": "Тест-водитель 2", "Авазбек": "Тест-водитель 3",
+        "Баха": "Тест-водитель 4", "Файзуло": "Тест-водитель 5", "Алишер": "Тест-водитель 6"}
+_L = "А-Яа-яЁё"
+_FWD = re.compile(rf"(?<![{_L}])(" + "|".join(sorted(DEMO, key=len, reverse=True)) + rf")(?![{_L}])")
+_REV = re.compile("|".join(re.escape(v) for v in sorted(DEMO.values(), key=len, reverse=True)))
+_BACK = {v: k for k, v in DEMO.items()}
+
+
+@web.middleware
+async def demo_names(request, handler):
+    from urllib.parse import unquote, quote
+    if request.path.startswith("/api/"):
+        qs = unquote(request.query_string)
+        if _REV.search(qs):
+            request = request.clone(rel_url=request.path + "?" + quote(_REV.sub(lambda m: _BACK[m.group(0)], qs), safe="=&"))
+        if request.can_read_body:
+            raw = (await request.read()).decode("utf-8")
+            request._read_bytes = _REV.sub(lambda m: _BACK[m.group(0)], raw).encode("utf-8")
+    resp = await handler(request)
+    if request.path.startswith("/api/") and isinstance(resp, web.Response) and resp.body \
+            and (resp.content_type or "").endswith("json"):
+        # кириллица в ответах экранирована (\uXXXX) — меняем в разобранном JSON
+        def walk(o):
+            if isinstance(o, str):
+                return _FWD.sub(lambda m: DEMO[m.group(0)], o)
+            if isinstance(o, list):
+                return [walk(x) for x in o]
+            if isinstance(o, dict):
+                return {walk(k): walk(v) for k, v in o.items()}
+            return o
+        resp.body = json.dumps(walk(json.loads(resp.body)), ensure_ascii=False).encode("utf-8")
+    return resp
+
+
+app = web.Application(middlewares=[demo_names] if os.environ.get("FB_DEMO") else [])
 fr.setup(app)
 app.router.add_get("/api/owner/staff", staff)
 app.router.add_get("/", static)

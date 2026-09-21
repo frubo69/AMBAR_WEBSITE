@@ -3661,6 +3661,8 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-r.fb-hide span{color:var(--muted);font-weight:500}
 .fb-i .fb-num[data-dec]{width:88px}
 #fbList-items .fb-e-b i,#fbList-bud .fb-e-b i{white-space:normal;overflow:visible;text-overflow:clip}
+.fb-hint{margin-left:7px;font-style:normal;font-weight:600;font-size:12px;
+  letter-spacing:0;color:var(--muted);white-space:nowrap}
 .fb-fill{flex:0 0 auto;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:var(--gold2);margin-right:2px}
 .fb-bl .fb-fill-em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   color:var(--gold2);background:var(--gold-soft);font-style:normal}
@@ -21124,9 +21126,16 @@ function fbBudRepaint(){
 // Строка с суммой в трёх состояниях — так везде в бюджете: пусто — «Заполнить»
 // с плюсом; правка — поле и «Подтвердить»; заполнено — серое окошко с суммой и
 // карандаш справа. Правится одна строка за раз (FB.edit).
+// Чем платим по статье — серым сразу за названием: в бюджете должно быть
+// видно, с чьей карты идёт расход (владелец, 21 сен 2026: «после „Бензин“
+// пиши серым „карта Макара“»).
+const FB_LINE_HINT = {'Бензин': 'карта Макара'};
+
 function fbFillRow(o){
   const editing = FB.edit && FB.edit.kind === o.kind && FB.edit.id === o.id;
-  const head = `<span class="fb-e-b"><b>${o.name}</b><i>${o.sub || ''}</i></span>`;
+  const hint = o.hint || FB_LINE_HINT[o.plain || ''] || '';
+  const head = `<span class="fb-e-b"><b>${o.name}${
+    hint ? `<em class="fb-hint">${escS(hint)}</em>` : ''}</b><i>${o.sub || ''}</i></span>`;
   if(editing){
     return `<div class="fb-e fb-bl fb-editing${o.kid ? ' fb-kid' : ''}">${head}
       <b class="fb-inb"><input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFillIn" value="${o.value ? fbFmt(o.value) : ''}"
@@ -21200,7 +21209,8 @@ function fbLineRow(l, kid, nameHtml){
       l.group === 'ads' ? fbSeg('cur', FB.editCur || l.cur || 'AED', [['AED', 'AED'], ['USD', '$']], 'fbEditCur') : ''}
       <button class="fb-lnk del" onclick="fbBudDel('${l.id}')">Убрать</button></div>`;
   const usd = l.cur === 'USD';
-  return fbFillRow({kind: 'line', id: l.id, name: nameHtml || escS(l.name), sub: fbLineSub(l), value: l.plan, unit: usd ? '$' : 'AED', kid,
+  return fbFillRow({kind: 'line', id: l.id, name: nameHtml || escS(l.name), plain: l.name,
+                    sub: fbLineSub(l), value: l.plan, unit: usd ? '$' : 'AED', kid,
                     eq: usd && l.plan > 0 ? `= ${fbFmt(l.plan_aed)} AED` : '', cls: over ? 'dn' : ok ? 'ok' : '', extra});
 }
 // Здание в аренде: код района золотой таблеткой, как везде — «B1 JVC»; офис
@@ -21299,7 +21309,8 @@ function fbBudGroupExpand(t, sub, valueHtml, open, go, body){
 // календаря. Как учитывать по ней факт — владелец объяснит позже.
 function fbPoolRow(l, kid){
   const pm = l.plan_m || 0, over = pm > 0 && l.fact > pm, ok = pm > 0 && l.fact === pm;
-  return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), sub: fbLineSub(l), value: l.plan, unit: 'AED', kid: kid !== false,
+  return fbFillRow({kind: 'line', id: l.id, name: escS(l.name), plain: l.name, sub: fbLineSub(l),
+                    value: l.plan, unit: 'AED', kid: kid !== false,
                     cls: over ? 'dn' : ok ? 'ok' : ''});
 }
 // «Аренда» внутри «Расходов на автомобили»: сумма рентов в месяц, стрелка —
@@ -21313,7 +21324,8 @@ function fbLineListRow(l, kid){
   const empty = !(l.plan > 0), pm = l.plan_m || 0, per = l.period > 1;
   const over = !per && pm > 0 && l.fact > pm, ok = !per && pm > 0 && l.fact === pm;
   return `<button class="fb-e fb-bl${kid ? ' fb-kid' : ''}" data-l="${l.id}" onclick="fbPageOpen('line', this.dataset.l)">
-    <span class="fb-e-b"><b>${escS(l.name)}</b><i>${fbLineSub(l)}</i></span>
+    <span class="fb-e-b"><b>${escS(l.name)}${
+      FB_LINE_HINT[l.name] ? `<em class="fb-hint">${escS(FB_LINE_HINT[l.name])}</em>` : ''}</b><i>${fbLineSub(l)}</i></span>
     ${empty ? `<b class="fb-fill">Заполнить</b>` : `<b class="fb-box${over ? ' dn' : ok ? ' ok' : ''}">${fbFmt(l.plan)}<u>AED</u></b>`}<em class="fb-chev r">${_SC_CHEV}</em></button>`;
 }
 // У группы в списке — только сумма в месяц (сумма месячных долей всех её

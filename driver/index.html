@@ -9228,7 +9228,9 @@ let _rangFor = '', _rangOk = false, _incN = 0, _tries = 0;   // по каком�
 function _acUnlock(){
   try{
     if(!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
-    if(_ac.state === 'suspended') _ac.resume();
+    // Не только 'suspended': айфон после звонка и блокировки ставит
+    // 'interrupted', и контекст молчит, пока его не разбудят (как у сканера).
+    if(_ac.state !== 'running') _ac.resume();
   }catch(e){}
 }
 // Первое касание разблокирует звук и сразу подтягивает файл: к моменту заказа
@@ -9314,7 +9316,7 @@ function _siren(force){
   // касания, и resume асинхронный. Ждём его, а не бросаем сигнал в тишину.
   const ring = () => { if(_snd) return play(_snd);
     const p = _loadSound(); if(p) p.then(play); else _fallback(); };
-  if(_ac && _ac.state === 'suspended') _ac.resume().then(ring).catch(_fallback);
+  if(_ac && _ac.state !== 'running') _ac.resume().then(ring).catch(_fallback);
   else if(_ac) ring();
   else _fallback();
 }
@@ -9772,19 +9774,41 @@ async function sendDeliver(oid){
 const SFX = {
   ctx:null,
   on: localStorage.getItem('ambar_scan_sound') !== '0',
-  _ac(){
-    if(!this.ctx){
-      const C = window.AudioContext || window.webkitAudioContext;
-      if(!C) return null;
-      this.ctx = new C();
-    }
-    // На iOS звук разрешён только после касания — экран открывается тапом по
-    // позиции, так что момент подходящий.
-    if(this.ctx.state === 'suspended') this.ctx.resume().catch(()=>{});
+  dead:0,                  // сколько раз «пик» не смог прозвучать — уходит в диагностику
+  _new(){
+    const C = window.AudioContext || window.webkitAudioContext;
+    if(!C) return null;
+    try{ this.ctx = new C(); }catch(e){ this.ctx = null; }
     return this.ctx;
   },
+  // Разбудить звук. Зовём с касания — открытие сканера, кнопка звука: на
+  // айфоне контекст оживает только в обработчике касания, а из колбэка
+  // распознавателя resume молча отклоняют.
+  //
+  // Почему звук пропадал посреди смены: кроме 'suspended' у контекста бывает
+  // 'interrupted' — так айфон помечает его после входящего звонка, блокировки
+  // экрана и запуска камеры. Контекст жив, но молчит и сам не возвращается, а
+  // проверяли мы только 'suspended'. Теперь будим при любом состоянии, кроме
+  // 'running', а не ожил — закрываем и делаем новый: мёртвый не чинится.
+  wake(){
+    const ac = this.ctx || this._new();
+    if(!ac) return null;
+    if(ac.state !== 'running'){
+      const снова = () => {
+        try{ ac.close(); }catch(e){}
+        if(this.ctx === ac) this.ctx = null;
+        const n = this._new();
+        if(n && n.state !== 'running') n.resume().catch(() => {});
+      };
+      try{ const p = ac.resume(); if(p && p.catch) p.catch(снова); }catch(e){ снова(); }
+    }
+    return this.ctx;
+  },
+  _ac(){ return this.wake(); },
   _tone(freq, ms, vol, at, glide){
     const ac = this._ac(); if(!ac) return;
+    // Звук не прозвучит — это видно только здесь: считаем и расскажем.
+    if(ac.state !== 'running'){ this.dead++; if(this.onDead) this.onDead(ac.state); }
     const t = ac.currentTime + (at || 0);
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = 'sine';
@@ -9803,10 +9827,16 @@ const SFX = {
   toggle(){
     this.on = !this.on;
     localStorage.setItem('ambar_scan_sound', this.on ? '1' : '0');
+    this.wake();                   // касание — лучший момент оживить звук
     if(this.on) this.ok();
     return this.on;
   },
 };
+// Ушли в другое приложение и вернулись — звук мог остаться выключенным
+// системой. Возвращаемся на экран: будим, пока сканер ещё открыт.
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && SCAN.stream) try{ SFX.wake(); }catch(e){}
+});
 
 // ─── Сканер ─────────────────────────────────────────────────────────────────
 // Свой, а не телеграмовский: родной занимает весь экран, и счётчик «12 из 38»
@@ -9858,6 +9888,11 @@ const SCAN = {
 
   async start(videoEl, onCode, onIdle, onRepeat, onHold){
     this.stop();
+    // Звук будим здесь, до камеры: сюда приходят по касанию, а «пик» звучит
+    // из колбэка распознавателя — оттуда айфон звук включать уже не даёт.
+    // Камера вдобавок сама роняет контекст в 'interrupted', и после неё он
+    // молчит, если его не разбудить.
+    try{ SFX.wake(); }catch(e){}
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.onRepeat = onRepeat; this.onHold = onHold;
     this.seen = new Set(); this.seenAt = new Map();
@@ -11416,12 +11451,19 @@ function camTorchShow(b){
   camDiag();
 }
 
-function camDiag(){
+function camDiagSay(что, ключ){
   const день = new Date().toISOString().slice(0, 10);
-  try{ if(localStorage.getItem('ambar_cam_diag') === день) return;
-       localStorage.setItem('ambar_cam_diag', день); }catch(e){}
-  drvApi.drvFetch('/api/driver/ping', {params:{cam: AmbarTorch.diag(SCAN.track())}}).catch(() => {});
+  try{ if(localStorage.getItem(ключ) === день) return;
+       localStorage.setItem(ключ, день); }catch(e){}
+  drvApi.drvFetch('/api/driver/ping', {params:{cam: что}}).catch(() => {});
 }
+function camDiag(){
+  camDiagSay(AmbarTorch.diag(SCAN.track()) + ' · звук ' + ((SFX.ctx && SFX.ctx.state) || 'нет'),
+             'ambar_cam_diag');
+}
+// «Пик» не прозвучал — говорим об этом строкой в журнал, раз в день с телефона.
+// Иначе «у меня пропадает звук» так и остаётся рассказом, который не проверить.
+SFX.onDead = state => camDiagSay('звук не прозвучал — контекст ' + state, 'ambar_snd_diag');
 
 const CAM_FLASH = {
   ok:   ['принята',        'success'],
@@ -12960,7 +13002,7 @@ function callEvent(t, d){
     case 'ended':
     case 'failed': {
       callBuzz(false);
-      try{ if(_ac && _ac.state === 'suspended') _ac.resume(); }catch(e){}
+      try{ if(_ac && _ac.state !== 'running') _ac.resume(); }catch(e){}
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', prev = CALL_ST, who = CALL_WHO;
       // «Занят» о собственном наборе во время разговора — не конец звонка.

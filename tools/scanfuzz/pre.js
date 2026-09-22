@@ -47,6 +47,33 @@
             {kind: 'videoinput', label: 'Back Ultra Wide Camera', deviceId: 'cam-uw'},
             {kind: 'videoinput', label: 'Front Camera', deviceId: 'cam-front'}];
   };
+  // Звук стенда — обманка: настоящие тоны уходили бы в динамики, а нам нужно
+  // видеть, что приложение сыграло и в каком состоянии был контекст. Состояния
+  // задаёт стенд: 'running', 'suspended' и айфоновский 'interrupted'.
+  window.__SND = {ctxs: 0, tones: [], resumes: 0, closed: 0, state: 'running',
+                  born: 'running', failResume: false};
+  function FakeAC(){
+    __SND.ctxs++; __SND.state = __SND.born;
+    this.destination = {};
+    this.currentTime = 0;
+    Object.defineProperty(this, 'state', {get: () => __SND.state});
+    this.resume = () => {
+      __SND.resumes++;
+      if(__SND.failResume) return Promise.reject(new Error('контекст мёртв'));
+      __SND.state = 'running';
+      return Promise.resolve();
+    };
+    this.close = () => { __SND.closed++; return Promise.resolve(); };
+    this.createOscillator = () => {
+      const o = {type: '', _f: 0, connect(){}, stop(){},
+        frequency: {setValueAtTime: v => { o._f = v; }, exponentialRampToValueAtTime(){}},
+        start(t){ __SND.tones.push({f: o._f, t, state: __SND.state}); }};
+      return o;
+    };
+    this.createGain = () => ({gain: {setValueAtTime(){}, exponentialRampToValueAtTime(){}}, connect(){}});
+  }
+  window.AudioContext = window.webkitAudioContext = FakeAC;
+
   window.__FRAME = null;
   window.jsQR = () => (window.__FRAME ? {data: window.__FRAME} : null);
 })();

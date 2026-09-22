@@ -5474,7 +5474,9 @@ let _ac=null, _alarmT=null, _seenNew=null;
 function _acUnlock(){
   try{
     if(!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
-    if(_ac.state==='suspended') _ac.resume();
+    // Не только 'suspended': айфон после звонка и блокировки ставит
+    // 'interrupted', и контекст молчит, пока его не разбудят (как у сканера).
+    if(_ac.state !== 'running') _ac.resume();
   }catch(e){}
 }
 document.addEventListener('pointerdown', _acUnlock, {passive:true});

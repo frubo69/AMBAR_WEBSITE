@@ -214,7 +214,7 @@ PEND = [dict(_id=f"geo_off:{TODAY}:Худоба", kind="geo_off", name="Худо
              reason="Поздно открыл смену", note="открыл в 17:05, правило — до 15:00",
              status="assigned", decided_by="Макар", decided_at=_at(2), at=_at(2))]
 ITEMS.append(dict(_id="i5", name="Файзуло", kind="fine", amount=200, per_month=0, **{"from": MONTH}, day=_ago(3),
-                  reason="Отключил геолокацию", note="выключил в 20:15", entry="",
+                  reason="Отключение геолокации — в 20:15", note="", entry="",
                   auto="geo_off", by="Макар", at=_at(3)))
 async def fine_pending_add(doc):
     if any(x["_id"] == doc["_id"] for x in PEND): return False

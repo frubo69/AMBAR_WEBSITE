@@ -343,8 +343,26 @@ async def _driver(name: str, text: str) -> None:
 
 # ── штраф на решение ─────────────────────────────────────────────────────────
 # Владелец, 22 сен 2026: «по отключению геолокации — фиксированный штраф 200
-# дирхам, но его можно будет редактировать». На открытой смене выключилась —
-# штраф ждёт решения старшего в «Штрафах» (fines_auto.py), один за день.
+# дирхам, но его можно будет редактировать»; «у нас в принципе запрещено
+# отключать геолокацию». Выключилась — на смене или вне её — штраф ждёт
+# решения старшего в «Штрафах» (fines_auto.py), один за день.
+def text_off_duty(name: str) -> str:
+    return f"📍 *{_n(name)}*: выключил геопозицию\nНе на смене."
+
+
+async def _off_duty(name: str, utc: datetime, day: str) -> bool:
+    """Выключил вне смены (не вышел или смена закрыта). Раньше это было его
+    дело, но у нас в принципе запрещено отключать геолокацию (владелец,
+    22 сен 2026): штраф на решение и сообщение старшему — один раз за день.
+    Включение вне смены — не событие."""
+    line, kb = await _fine(name, utc, day)
+    if not line:
+        return False
+    await _owners(text_off_duty(name) + line, EVENT_OFF, reply_markup=kb, meta=geo_meta(name, False))
+    log.info(f"[geo-watch] {name}: выключил трансляцию вне смены — штраф на решение")
+    return True
+
+
 async def _fine(name: str, utc: datetime, day: str) -> tuple:
     """(строка к сообщению, кнопка) — если штраф записан впервые за день."""
     if staff.is_test_driver(name):
@@ -368,7 +386,8 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
     day = _biz_day(utc.astimezone(DUBAI_TZ))
     d = await db.get_driver_day(day, name) or {}
     if d.get("working") is not True:
-        return False                       # не на работе — его трансляция его дело
+        # не на работе: включил — не событие, выключил — штраф на решение
+        return False if on else await _off_duty(name, utc, day)
     st = await db.geo_watch_get(name)
     if st.get("locked_at"):
         return False
@@ -389,19 +408,18 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
         log.info(f"[geo-watch] {name}: включил трансляцию")
         return True
 
-    # Выключил. После закрытой смены это нормально — молчим; на открытой
-    # запоминаем минуту: с неё считается «не вернулась до конца смены».
+    # Выключил. После закрытой смены — как вне смены: штраф на решение; на
+    # открытой запоминаем минуту: с неё считается «не вернулась до конца смены».
     if d.get("shift_close_at"):
-        return False
+        return await _off_duty(name, utc, day)
     if off_since and st.get("off_why") == "stream":
         return False                       # уже сказали про это же
-    line, kb = "", None
     if opened:
         fields = {"day": day, "off_why": "stream"}
         if not off_since or st.get("off_why") == "still":
             fields["off_since"] = utc          # выключил — с этой минуты, а не с начала стоянки
         await db.geo_watch_set(name, fields)
-        line, kb = await _fine(name, utc, day)
+    line, kb = await _fine(name, utc, day)     # и до открытия смены — отключать нельзя вообще
     await _owners(text_stream_off(name, opened) + line, EVENT_OFF, reply_markup=kb, meta=geo_meta(name, False))
     log.info(f"[geo-watch] {name}: выключил трансляцию")
     return True

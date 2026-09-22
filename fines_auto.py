@@ -7,7 +7,8 @@
   • «за позднее открытие смены не ценовой штраф, а мы урезаем ему питание с
     80 до 40 принудительно; просто надо принять решение — урезаем или нет»;
   • «по отключению геолокации — фиксированный штраф 200 дирхам, но его можно
-    будет редактировать».
+    будет редактировать»; «не во время смены — у нас в принципе запрещено
+    отключать геолокацию».
 
 Запись (коллекция fine_pending):
   _id     — событие: «geo_off:2026-09-22:Худоба» — одно на человека, вид и
@@ -28,6 +29,7 @@
 import html
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
@@ -48,6 +50,36 @@ def action_of(kind: str) -> str:
     return (KINDS.get(kind) or {}).get("action") or "fine"
 
 
+def _times_word(n: int) -> str:
+    return "раза" if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else "раз"
+
+
+def full_text(d: dict) -> str:
+    """За что — одной фразой (владелец, 22 сен 2026: «не надо разделять и
+    раскидывать по странице — сразу полноценную формулировку штрафа; чтобы
+    было предельно понятно каждому, за что, и тем не менее выглядело
+    официально»). Её видят старший в «Штрафах», водитель в истории списаний и
+    в сообщении бота."""
+    kind = d.get("kind") or ""
+    nb = "\u00a0"                 # неразрывный: «2 раза», «в 19:40» и тире не рвутся по строкам
+    if kind == "geo_off":
+        t = [x for x in (d.get("times") or []) if x]
+        if len(t) > 1:
+            at = ", ".join(f"в{nb}{x}" if i == 0 else x for i, x in enumerate(t[:-1]))
+            return f"Отключение геолокации{nb}— {len(t)}{nb}{_times_word(len(t))}: {at} и{nb}{t[-1]}"
+        # Не «во время смены»: у нас в принципе запрещено отключать
+        # геолокацию (владелец, 22 сен 2026) — и на смене, и вне её.
+        return "Отключение геолокации" + (f"{nb}— в{nb}{t[0]}" if t else "")
+    if kind == "late_shift":
+        note = d.get("note") or ""
+        m = re.search(r"\b(\d{1,2}:\d{2})\b", note)
+        hm = d.get("hm") or (m.group(1) if m else "")
+        r = re.search(r"до (\d{1,2}):00", note)
+        rule = d.get("rule_hour") or (int(r.group(1)) if r else 15)
+        return f"Открытие смены позже {rule}:00" + (f"{nb}— смена открыта в{nb}{hm}" if hm else "")
+    return d.get("reason") or ""
+
+
 def _geo_note(times: list) -> str:
     t = [x for x in times if x]
     if not t:
@@ -61,7 +93,7 @@ async def late_shift(name: str, district: str, day: str, at_hm: str, rule_hour: 
     True — новая запись."""
     doc = {"_id": f"late_shift:{day}:{name}", "kind": "late_shift", "name": name,
            "district": district, "day": day, "reason": KINDS["late_shift"]["reason"],
-           "note": f"открыл в {at_hm}, правило — до {rule_hour}:00",
+           "note": f"открыл в {at_hm}, правило — до {rule_hour}:00", "hm": at_hm, "rule_hour": rule_hour,
            "status": "pending", "at": datetime.now(timezone.utc)}
     try:
         ok = await db.fine_pending_add(doc)
@@ -74,7 +106,8 @@ async def late_shift(name: str, district: str, day: str, at_hm: str, rule_hour: 
 
 
 async def geo_off(name: str, district: str, day: str, at_hm: str) -> bool:
-    """На смене выключилась геолокация — штраф 200 на решение, один за день:
+    """Выключилась геолокация — штраф 200 на решение, один за день (на смене
+    и вне её: отключать её запрещено вообще, владелец, 22 сен 2026):
     пока по нему не решили, новые выключения того же дня дописываются в
     подробности. True — новая запись (о ней и стоит сказать старшему)."""
     pid = f"geo_off:{day}:{name}"
@@ -98,7 +131,7 @@ def view(d: dict) -> dict:
     kind = d.get("kind") or ""
     return {"id": str(d.get("_id") or ""), "kind": kind, "action": action_of(kind),
             "name": d.get("name") or "", "district": d.get("district") or "", "day": d.get("day") or "",
-            "reason": d.get("reason") or "", "note": d.get("note") or "",
+            "reason": d.get("reason") or "", "note": d.get("note") or "", "text": full_text(d),
             "amount": int(float(d.get("amount") or 0)) or None,
             **({"meal_from": MEAL_FROM, "meal_to": MEAL_TO} if action_of(kind) == "meal" else {}),
             "status": d.get("status") or "pending", "by": d.get("decided_by") or ""}
@@ -150,7 +183,7 @@ async def for_person(name: str, limit: int = 60) -> list:
                     # во сколько было нарушение — в подробностях
                     "at": "",
                     "start": str(d.get("day") or "")[:7], "reason": d.get("reason") or "",
-                    "note": d.get("note") or "", "due": 0, "left": 0, "done": False,
+                    "note": d.get("note") or "", "text": full_text(d), "due": 0, "left": 0, "done": False,
                     "cancelled": False, "src": "", "wid": "", "auto": d.get("kind") or "",
                     "forgiven": d.get("status") == "declined", "meal": meal,
                     **({"meal_from": MEAL_FROM, "meal_to": MEAL_TO} if meal else {})})
@@ -161,9 +194,7 @@ def meal_cut_text(doc: dict, who: str) -> str:
     """Водителю — его ботом: за что и насколько урезано питание."""
     import pay_notify as _pn
     lines = [f"🍽 <b>Питание за {html.escape(_pn.day_t(doc.get('day') or ''))} — "
-             f"{MEAL_TO} AED вместо {MEAL_FROM}</b>", html.escape(doc.get("reason") or "")]
-    if doc.get("note"):
-        lines.append(f"<i>{html.escape(doc['note'])}</i>")
+             f"{MEAL_TO} AED вместо {MEAL_FROM}</b>", html.escape(full_text(doc))]
     if who:
         lines.append(f"Решил: {html.escape(who)}")
     return "\n".join(x for x in lines if x)

@@ -19,7 +19,13 @@ import db, fines_auto, geo_watch, driver_routes as dr, finance_routes as fr
 import config_staff as staff
 
 FAIL = []
+def _sp(v):
+    """Неразрывные пробелы формулировки — для сравнения как обычные."""
+    if isinstance(v, str): return v.replace("\u00a0", " ")
+    if isinstance(v, (list, tuple)): return type(v)(_sp(x) for x in v)
+    return v
 def eq(name, got, want):
+    got = _sp(got)
     ok = got == want
     print(("  ok  " if ok else "  FAIL") + f" {name}: {got!r}" + ("" if ok else f" ≠ {want!r}"))
     if not ok: FAIL.append(name)
@@ -79,6 +85,25 @@ async def main():
     eq("второй раз за день — та же запись, время дописано", (await d.fine_pending.count_documents({}), p["note"]),
        (1, "выключал 2 раза: 19:40, 21:05"))
     eq("и в сообщении про повтор — без строки о штрафе и без кнопки", ("Штраф" in GEO[0][0], GEO[0][1]), (False, None))
+    print("── вне смены — тоже нельзя («в принципе запрещено отключать») ──")
+    GEO.clear()
+    await geo_watch.on_stream("Сунат", False, now=at(11, 30).astimezone(timezone.utc))   # не вышел, дня нет
+    p = await d.fine_pending.find_one({"name": "Сунат"})
+    eq("не на смене выключил — штраф на решение", (p and p["kind"], p and p["amount"]), ("geo_off", 200))
+    eq("старшему — «выключил геопозицию · Не на смене», строка о штрафе и кнопка",
+       ("Не на смене." in GEO[0][0], "Штраф 200 AED ждёт решения" in GEO[0][0], bool(GEO[0][1])), (True, True, True))
+    GEO.clear()
+    await geo_watch.on_stream("Сунат", True, now=at(11, 40).astimezone(timezone.utc))
+    eq("включил вне смены — не событие", GEO, [])
+    await geo_watch.on_stream("Сунат", False, now=at(11, 50).astimezone(timezone.utc))
+    eq("второй раз за день — без нового сообщения, время дописано",
+       (GEO, (await d.fine_pending.find_one({"name": "Сунат"}))["times"]), ([], ["11:30", "11:50"]))
+    await db.save_driver_day(DAY, "Даврон", {"working": True, "shift_open_at": at(12, 0).astimezone(timezone.utc),
+                                             "shift_close_at": at(23, 0).astimezone(timezone.utc)})
+    await geo_watch.on_stream("Даврон", False, now=at(23, 30).astimezone(timezone.utc))
+    eq("после закрытой смены — тоже штраф на решение", (await d.fine_pending.count_documents({"name": "Даврон"}), "Не на смене." in GEO[-1][0]),
+       (1, True))
+    await d.fine_pending.delete_many({"name": {"$in": ["Сунат", "Даврон"]}})
     await db.save_driver_day(DAY, "Тест-водитель", {"working": True, "shift_open_at": at(12, 0).astimezone(timezone.utc)})
     await geo_watch.on_stream("Тест-водитель", False, now=at(20, 0).astimezone(timezone.utc))
     eq("тест-водителю — штрафа нет", await d.fine_pending.count_documents({"name": "Тест-водитель"}), 0)
@@ -104,7 +129,7 @@ async def main():
     it = await d.fin_pay_items.find_one({})
     eq("в зарплатах обычный штраф: 150, день нарушения, этот месяц, разом, за что",
        (it["kind"], it["amount"], it["day"], it["from"], it["per_month"], it["reason"], it["note"], it["auto"]),
-       ("fine", 150, DAY, "2026-09", 0, "Отключил геолокацию", "выключал 2 раза: 19:40, 21:05", "geo_off"))
+       ("fine", 150, DAY, "2026-09", 0, "Отключение геолокации — 2 раза: в 19:40 и 21:05", "", "geo_off"))
     eq("водителю — сообщение о штрафе", (TOLD[0][0], "Штраф 150 AED" in TOLD[0][1]), ("Худоба", True))
     TOLD.clear()
     st, b = await decide({"id": "late_shift:2026-09-22:Али", "decision": "assign", "month": "2026-09", "as": "Макар"})
@@ -114,7 +139,7 @@ async def main():
     eq("отпуск раньше конца смены с 80 — урезанное не перебивает", staff.meal_of({**day, "meal_rate": 80}), 40)
     eq("новой записи в зарплатах нет", await d.fin_pay_items.count_documents({}), 1)
     eq("водителю — сообщение: день, 40 вместо 80, за что", (TOLD[0][0], "40 AED вместо 80" in TOLD[0][1],
-       "22 сентября" in TOLD[0][1], "Поздно открыл смену" in TOLD[0][1]), ("Али", True, True, True))
+       "22 сентября" in TOLD[0][1], "Открытие смены позже 15:00 — смена открыта в 16:20" in _sp(TOLD[0][1])), ("Али", True, True, True))
     TOLD.clear()
     st, b = await decide({"id": "late_shift:2026-09-22:Баха", "decision": "skip", "as": "Слон"})
     eq("не урезал — питание не тронуто, водителю ничего",
@@ -136,7 +161,21 @@ async def main():
     h = fr._penalty_history(items, "2026-09", decided=await fines_auto.decided())
     f = next(x for x in h if x["name"] == "Файзуло")
     eq("«Не назначен» у штрафа — сумма, за что, кто решил", (f["declined"], f["meal"], f["amount"], f["reason"], f["by"]),
-       (True, False, 200, "Отключил геолокацию", "Слон"))
+       (True, False, 200, "Отключение геолокации — в 22:00", "Слон"))
+
+    print("── за что — одной официальной фразой ───────────────────────────")
+    # владелец: «не разделять — сразу полноценную формулировку; предельно
+    # понятно каждому, за что, и тем не менее официально»
+    eq("геолокация один раз", fines_auto.full_text({"kind": "geo_off", "times": ["22:00"]}),
+       "Отключение геолокации — в 22:00")
+    eq("геолокация три раза", fines_auto.full_text({"kind": "geo_off", "times": ["19:40", "21:05", "23:10"]}),
+       "Отключение геолокации — 3 раза: в 19:40, 21:05 и 23:10")
+    eq("поздняя смена по записи до нового поля (разбор подробностей)",
+       fines_auto.full_text({"kind": "late_shift", "note": "открыл в 17:57, правило — до 15:00"}),
+       "Открытие смены позже 15:00 — смена открыта в 17:57")
+    eq("в окошке у старшего — та же фраза",
+       fines_auto.view({"_id": "x", "kind": "geo_off", "times": ["22:00"], "status": "pending"})["text"],
+       "Отключение геолокации — в 22:00")
 
     print("── история водителя в его приложении ───────────────────────────")
     # владелец: «если решили не штрафовать — ему в его истории показывать как
@@ -146,18 +185,19 @@ async def main():
     card = lambda n: fr.person_card(n, "2026-09")
     it = [x for x in (await card("Баха"))["items"] if x.get("auto")]
     eq("Баха: питание не урезали — «прощено», из зарплаты ничего",
-       [(x["reason"], x["forgiven"], x["meal"], x["amount"], x["due"]) for x in it],
-       [("Поздно открыл смену", True, True, 40, 0)])
+       [(x["text"], x["forgiven"], x["meal"], x["amount"], x["due"]) for x in it],
+       [("Открытие смены позже 15:00 — смена открыта в 17:57", True, True, 40, 0)])
     it = [x for x in (await card("Али"))["items"] if x.get("auto")]
     eq("Али: питание урезано — строкой, не прощено",
        [(x["forgiven"], x["meal"], x["meal_from"], x["meal_to"]) for x in it], [(False, True, 80, 40)])
     it = [x for x in (await card("Файзуло"))["items"] if x.get("auto")]
     eq("Файзуло: штраф за геолокацию не назначили — «прощён», сумма и подробности",
-       [(x["reason"], x["forgiven"], x["meal"], x["amount"], x["note"]) for x in it],
-       [("Отключил геолокацию", True, False, 200, "выключил в 22:00")])
+       [(x["text"], x["forgiven"], x["meal"], x["amount"]) for x in it],
+       [("Отключение геолокации — в 22:00", True, False, 200)])
     c = await card("Худоба")
     eq("Худоба: назначенный штраф — обычной строкой, без двойника",
-       [(x["kind"], x["amount"], bool(x.get("forgiven"))) for x in c["items"]], [("fine", 150, False)])
+       [(x["kind"], x["amount"], bool(x.get("forgiven")), x.get("text")) for x in c["items"]],
+       [("fine", 150, False, "Отключение геолокации — 2 раза: в 19:40 и 21:05")])
     eq("и в сумме штрафов месяца — только назначенный", c["fines"], 150)
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")

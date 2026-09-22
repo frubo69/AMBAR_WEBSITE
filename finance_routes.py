@@ -741,7 +741,8 @@ async def person_card(name: str, month: str) -> dict:
                           start=str(it.get("from") or "")[:7],
                           reason=it.get("reason") or "", note=it.get("note") or "",
                           due=pay._i(due), left=0 if gone else sch["after"], done=False if gone else sch["done"],
-                          cancelled=gone, src=it.get("src") or "", wid=it.get("wid") or ""))
+                          cancelled=gone, src=it.get("src") or "", wid=it.get("wid") or "",
+                          **({"auto": it["auto"], "text": it.get("reason") or ""} if it.get("auto") else {})))
     # Решения по тому, что сформировала программа: прощённое и урезанное
     # питание — строками в той же истории (из зарплаты они не вычитаются).
     import fines_auto
@@ -802,7 +803,7 @@ def _penalty_history(items: list, month: str, limit: int = 60, decided: list | N
                             t=pay.KINDS["fine"], per_month=0, start="", day=it.get("day") or "",
                             amount=(fines_auto.MEAL_FROM - fines_auto.MEAL_TO) if meal
                             else pay._i(pay._n(it.get("amount"))),
-                            note=it.get("note") or "", reason=it.get("reason") or "",
+                            note="", reason=fines_auto.full_text(it),
                             by=it.get("decided_by") or "", cancelled=False, cancelled_by="",
                             cancelled_day="", revised=False, revised_by="", src="", wid="", was=None,
                             left=0, done=False, auto=it.get("kind") or "",
@@ -1579,9 +1580,10 @@ async def handle_fine_decide(request):
         return _json({"error": "decided", "book": await build(month)}, 409)
     day = str(doc.get("day") or "")[:10] or _biz_day()
     start = max(_biz_day()[:7], day[:7])              # снимается с зарплаты этого месяца
+    # За что — одной официальной фразой: её увидят и старший, и водитель, и бот.
     item = {"_id": iid, "name": doc.get("name") or "", "kind": "fine", "amount": amount,
-            "per_month": 0, "from": start, "day": day, "note": doc.get("note") or "",
-            "reason": doc.get("reason") or "", "entry": "", "by": who, "at": now,
+            "per_month": 0, "from": start, "day": day, "note": "",
+            "reason": fines_auto.full_text(doc), "entry": "", "by": who, "at": now,
             "auto": doc.get("kind") or "", "pending": pid}
     try:
         await db.fin_pay_item_add(item)

@@ -3617,6 +3617,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-pd-r{margin:0 0 10px;border-radius:16px;border:1px solid rgba(201,169,110,.3);background:#15152c;overflow:hidden}
 .fb-pd-top{display:flex;align-items:flex-start;gap:10px;padding:13px 11px 12px}
 .fb-pd-top .fb-ph-b s{white-space:normal}
+/* за что — одной фразой целиком, без обрезки на второй строке (владелец,
+   22 сен 2026: «сразу полноценную формулировку») */
+.fb-pd-r .fb-ph-b b,.fb-ph-r.auto .fb-ph-b b{display:block;-webkit-line-clamp:unset;overflow:visible}
 .fb-pd-amt{display:flex;align-items:center;justify-content:flex-end;gap:4px;height:36px;margin-top:6px;padding:0 9px 0 6px;
   border-radius:11px;border:1px solid rgba(201,169,110,.38);background:#101024;cursor:text}
 .fb-pd-amt input{width:100%;min-width:0;padding:0;border:0;background:none;color:var(--gold2);font-family:inherit;
@@ -22737,8 +22740,8 @@ function fbPendRow(p){
   return `<div class="fb-pd-r" data-id="${escS(p.id)}" data-name="${escS(p.name)}"${meal ? ' data-meal="1"' : ''}>
     <div class="fb-pd-top">
       <em class="fb-ph-i">${IC(FB_AUTO_IC[p.kind] || 'note', 22)}</em>
-      <span class="fb-ph-b"><b>${fbPenNb(escS(p.reason || 'Штраф'))}</b><i>${escS(p.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
-        p.note ? `<s>${escS(p.note)}</s>` : ''}</span>
+      <span class="fb-ph-b"><b>${fbPenNb(escS(p.text || p.reason || 'Штраф'))}</b><i>${escS(p.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
+        !p.text && p.note ? `<s>${escS(p.note)}</s>` : ''}</span>
       <span class="fb-ph-r2"><u>${escS(fbPenHistDay(p.day))}</u>${meal
         ? `<span class="fb-pd-meal"><i>питание</i><b>${p.meal_from} → ${p.meal_to}</b></span>`
         : `<label class="fb-pd-amt"><input type="text" inputmode="numeric" enterkeyhint="done" maxlength="6"
@@ -22822,14 +22825,14 @@ function fbPenHistRow(h, hide){
   if(h.declined || h.meal){
     const v = h.meal ? `${FB_MEAL_FROM} → ${FB_MEAL_TO} AED` : h.amount ? fbFmt(h.amount) + ' AED' : '—';
     const stT = h.declined ? (h.meal ? 'Не урезано' : FB_PH_ST.skip) : FB_PH_ST.cut;
-    return `<div class="fb-ph-r ${h.declined ? 'skip' : 'cut'}"${hide ? ' hidden' : ''}>
+    return `<div class="fb-ph-r auto ${h.declined ? 'skip' : 'cut'}"${hide ? ' hidden' : ''}>
       <em class="fb-ph-i">${icon}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
       <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${v}</b>
         <i class="fb-ph-st ${h.declined ? 'skip' : 'cut'}">${stT}</i></span></div>`;
   }
-  return `<button class="fb-ph-r${h.cancelled ? ' off' : ''}"${hide ? ' hidden' : ''} onclick="fbPenEdit('${escS(h.id)}')">
+  return `<button class="fb-ph-r${h.cancelled ? ' off' : ''}${h.auto ? ' auto' : ''}"${hide ? ' hidden' : ''} onclick="fbPenEdit('${escS(h.id)}')">
       <em class="fb-ph-i">${icon}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>

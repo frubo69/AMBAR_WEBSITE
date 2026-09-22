@@ -5200,7 +5200,9 @@ function profHdr(){
   }
   if(PROF_PAGE === 'item'){
     const it = hsItems().find(x => x.id === HS_ITEM);
-    return hdrPage(`${back}<b>${esc(it ? hsCut(it).head : 'Списание')}</b>`);
+    // В шапке — что это, за что — полной фразой в карточке ниже: половинки
+    // формулировки по разным углам страницы читались как две разные вещи.
+    return hdrPage(`${back}<b>${esc(it ? hsKind(it) : 'Списание')}</b>`);
   }
   hdrPage('');
 }
@@ -5298,6 +5300,8 @@ function hsOpen(id){ HS_ITEM = id; PROF_PAGE = 'item'; profPaint(); window.scrol
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
 function hsItems(){ return ((PROF && PROF.items) || []).filter(i => i.kind === 'fine' || i.kind === 'hold'); }
 function hsCut(it){
+  // Сформулированное программой — одной фразой, без разбивки (владелец, 22 сен 2026)
+  if(it.text) return {head: it.text, tail: ''};
   const r = String(it.reason || '').split('·').map(x => x.trim()).filter(Boolean);
   const head = r[0] || (it.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
   const tail = r.slice(1).join(' · ') || it.note || '';
@@ -5326,6 +5330,9 @@ function hsTag(it){
   if(it.meal) return 'Питание';
   return it.cancelled ? (k === 'hold' ? 'Отменено' : 'Амнистия') : (k === 'hold' ? 'Удержание' : 'Штраф');
 }
+function hsKind(it){ return it.meal ? 'Питание' : it.kind === 'hold' ? 'Удержание' : 'Штраф'; }
+// За что — полностью, одной строкой: «Превышение скорости · 71 – 100 км/ч»
+function hsFull(it){ const c = hsCut(it); return [c.head, c.tail].filter(Boolean).join(' · '); }
 function hsWhen(it){
   const d = profDayT(it.day), t = hhmm(it.at);
   return d ? (t ? `${d} · ${t}` : d) : '';
@@ -5399,7 +5406,7 @@ function profItemHtml(){
   const rows = [
     ['Вид', it.meal ? 'Питание за поздний выход' : k === 'hold' ? 'Удержание' : 'Штраф'],
     ['Когда', hsWhen(it) || '—'],
-    it.note && it.note !== c.tail ? ['Примечание', it.note] : null,
+    !it.text && it.note && it.note !== c.tail ? ['Примечание', it.note] : null,
     it.per_month ? ['Списывают', `по ${fmt(it.per_month)} AED в месяц`] : null,
     ['Состояние', it.forgiven ? (it.meal ? `Простили — питание за день ${it.meal_from} AED` : 'Простили — из зарплаты не вычитается')
       : it.meal ? `Питание за день ${it.meal_to} AED вместо ${it.meal_from}`
@@ -5408,7 +5415,7 @@ function profItemHtml(){
   ].filter(Boolean);
   return `<div class="hs-one">
       <div class="hs-one-h hs-r ${k}"><span class="hs-i">${svg(hsIco(it), 22)}</span>
-        <div><b>${esc(c.tail || c.head)}</b><i>${esc(hsWhen(it))}</i></div></div>
+        <div><b>${esc(hsFull(it))}</b><i>${esc(hsWhen(it))}</i></div></div>
       <div class="hs-one-am ${k}${it.cancelled || it.forgiven ? ' off' : ''}"><u>${it.forgiven ? (it.meal ? 'Питание не урезали' : 'Штраф прощён')
         : it.meal ? 'Питание урезано' : it.cancelled ? (k === 'hold' ? 'Удержание отменено' : 'Амнистия на штраф') : 'Списано из зарплаты'}</u>
         <b>${profSum(it.amount, 'down')}</b></div>

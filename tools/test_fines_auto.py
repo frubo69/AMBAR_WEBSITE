@@ -170,6 +170,19 @@ async def main():
        "Отключение геолокации — в 22:00")
     eq("геолокация три раза", fines_auto.full_text({"kind": "geo_off", "times": ["19:40", "21:05", "23:10"]}),
        "Отключение геолокации — 3 раза: в 19:40, 21:05 и 23:10")
+    eq("пропажу заметил сторож (телефон молчит) — называется иначе",
+       fines_auto.full_text({"kind": "geo_off", "times": ["04:36"], "self": False}),
+       "Геолокация не передаётся — с 04:36")
+    await db.save_driver_day(DAY, "Азиз", {"working": True, "shift_open_at": at(12, 0).astimezone(timezone.utc)})
+    await fines_auto.geo_off("Азиз", "silicon", DAY, "04:36", by_signal=False)
+    p2 = await d.fine_pending.find_one({"name": "Азиз"})
+    eq("заметили проходом — так и записано", (p2["self"], fines_auto.view(p2)["text"]),
+       (False, "Геолокация не передаётся — с 04:36"))
+    await fines_auto.geo_off("Азиз", "silicon", DAY, "05:10")
+    p2 = await d.fine_pending.find_one({"name": "Азиз"})
+    eq("потом пришёл сигнал с телефона — уже выключение", (p2["self"], fines_auto.view(p2)["text"]),
+       (True, "Отключение геолокации — 2 раза: в 04:36 и 05:10"))
+    await d.fine_pending.delete_many({"name": "Азиз"})
     eq("поздняя смена по записи до нового поля (разбор подробностей)",
        fines_auto.full_text({"kind": "late_shift", "note": "открыл в 17:57, правило — до 15:00"}),
        "Открытие смены позже 15:00 — смена открыта в 17:57")

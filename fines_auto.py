@@ -64,6 +64,11 @@ def full_text(d: dict) -> str:
     nb = "\u00a0"                 # неразрывный: «2 раза», «в 19:40» и тире не рвутся по строкам
     if kind == "geo_off":
         t = [x for x in (d.get("times") or []) if x]
+        # Сам выключил (сигнал телеграма с телефона) или связь пропала и это
+        # заметил сторож — разные вещи, и называются по-разному: у выключенного
+        # или разряженного телефона сигнала нет вовсе (владелец, 22 сен 2026).
+        if not d.get("self", True):
+            return "Геолокация не передаётся" + (f"{nb}— с {t[0]}" if t else "")
         if len(t) > 1:
             at = ", ".join(f"в{nb}{x}" if i == 0 else x for i, x in enumerate(t[:-1]))
             return f"Отключение геолокации{nb}— {len(t)}{nb}{_times_word(len(t))}: {at} и{nb}{t[-1]}"
@@ -105,7 +110,7 @@ async def late_shift(name: str, district: str, day: str, at_hm: str, rule_hour: 
     return ok
 
 
-async def geo_off(name: str, district: str, day: str, at_hm: str) -> bool:
+async def geo_off(name: str, district: str, day: str, at_hm: str, by_signal: bool = True) -> bool:
     """Выключилась геолокация — штраф 200 на решение, один за день (на смене
     и вне её: отключать её запрещено вообще, владелец, 22 сен 2026):
     пока по нему не решили, новые выключения того же дня дописываются в
@@ -113,7 +118,8 @@ async def geo_off(name: str, district: str, day: str, at_hm: str) -> bool:
     pid = f"geo_off:{day}:{name}"
     doc = {"_id": pid, "kind": "geo_off", "name": name, "district": district, "day": day,
            "reason": KINDS["geo_off"]["reason"], "times": [at_hm], "note": _geo_note([at_hm]),
-           "amount": GEO_OFF_FINE, "status": "pending", "at": datetime.now(timezone.utc)}
+           "self": bool(by_signal), "amount": GEO_OFF_FINE, "status": "pending",
+           "at": datetime.now(timezone.utc)}
     try:
         if await db.fine_pending_add(doc):
             log.info(f"[fines] на решение: {name} — выключил геолокацию {day} в {at_hm}")
@@ -121,7 +127,12 @@ async def geo_off(name: str, district: str, day: str, at_hm: str) -> bool:
         cur = await db.fine_pending_get(pid)
         if cur and cur.get("status") == "pending" and at_hm not in (cur.get("times") or []):
             times = list(cur.get("times") or []) + [at_hm]
-            await db.fine_pending_update(pid, {"times": times, "note": _geo_note(times)})
+            # Сначала заметили пропажу, потом пришёл сигнал с телефона — это уже
+            # выключение: запись называется по самому сильному из того, что было.
+            fields = {"times": times, "note": _geo_note(times)}
+            if by_signal and not cur.get("self", True):
+                fields["self"] = True
+            await db.fine_pending_update(pid, fields)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[fines] {name}: штраф за геолокацию не записан: {e}")
     return False

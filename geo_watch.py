@@ -363,13 +363,15 @@ async def _off_duty(name: str, utc: datetime, day: str) -> bool:
     return True
 
 
-async def _fine(name: str, utc: datetime, day: str) -> tuple:
-    """(строка к сообщению, кнопка) — если штраф записан впервые за день."""
+async def _fine(name: str, utc: datetime, day: str, by_signal: bool = True) -> tuple:
+    """(строка к сообщению, кнопка) — если штраф записан впервые за день.
+    by_signal: сигнал пришёл с телефона (выключил сам) или пропажу заметил
+    проход — в штрафе это называется по-разному."""
     if staff.is_test_driver(name):
         return "", None
     import fines_auto
     district = geo_meta(name, False).get("district") or ""
-    if not await fines_auto.geo_off(name, district, day, _hhmm(utc)):
+    if not await fines_auto.geo_off(name, district, day, _hhmm(utc), by_signal=by_signal):
         return "", None
     return (f"\nШтраф {fines_auto.GEO_OFF_FINE} AED ждёт решения — в «Штрафах».",
             fines_auto.open_button("Решить по штрафу"))
@@ -518,7 +520,7 @@ async def tick(now: datetime = None) -> dict:
                 # здесь оно ловится, только если бот водителя в тот момент
                 # лежал или у трансляции вышел срок.
                 await db.geo_watch_set(name, {"day": day, "off_since": utc, "off_why": "stream"})
-                line, kb = await _fine(name, utc, day)
+                line, kb = await _fine(name, utc, day, by_signal=False)
                 await _owners(text_gone(name) + line, EVENT_OFF, reply_markup=kb,
                               meta=geo_meta(name, False, self_=False))
                 log.info(f"[geo-watch] {name}: геопозиция выключена")

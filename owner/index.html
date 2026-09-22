@@ -1936,6 +1936,9 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .az-list{gap:0}
 .az-hdr{font-size:11px;font-weight:700;color:var(--gold2);letter-spacing:3px;padding:14px 4px 6px;border-bottom:1px solid rgba(201,169,110,.1);margin-bottom:4px}
 .az-hdr:first-child{padding-top:2px}
+/* Заголовок дня — не буква: разрядка в три пункта растягивает «21 сентября»
+   в строку, которую читать невозможно, и заглавные тут ни к чему. */
+.az-hdr.day{letter-spacing:.4px;text-transform:none;font-size:11.5px}
 .az-list .lrow{padding:10px 13px}
 
 /* Top-10 horizontal scroll cards */
@@ -7903,7 +7906,7 @@ button.exp-wait:active{transform:scale(.99)}
         <span class="ch-m-v" id="chVip">—</span><span class="ch-m-l">VIP</span></button>
       <button class="ch-m" onclick="event.stopPropagation();_custJump('debt')">
         <span class="ch-m-v" id="chDebt">—</span><span class="ch-m-l">должники</span></button>
-      <button class="ch-m" onclick="event.stopPropagation();_custJump('top')">
+      <button class="ch-m" onclick="event.stopPropagation();openNewClients()">
         <span class="ch-m-v" id="chNew">—</span><span class="ch-m-l">новых за 30 дней</span></button>
     </div>
   </div>
@@ -9182,6 +9185,9 @@ button.exp-wait:active{transform:scale(.99)}
           <input type="text" id="acSearch" placeholder="Имя · @username · телефон" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="search"/>
           <button class="cust-x" id="acSearchClear" aria-label="Очистить">✕</button>
         </div>
+        <button class="ac-filter-btn" id="acSortBtn" aria-label="Порядок">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M4 6h10M4 12h7M4 18h4"/><path d="M17 5v14M20 16l-3 3-3-3"/></svg>
+        </button>
         <button class="ac-filter-btn" id="acFilterBtn" aria-label="Фильтр">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           <span class="ac-filter-dot" id="acFilterDot"></span>
@@ -32277,27 +32283,78 @@ function _custJump(what){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
+// Порядок в «Всех клиентах». Владелец, 23 сен 2026: «дай возможность
+// посмотреть, какие именно клиенты у нас присоединились — сверху вниз от новых
+// к старым». Алфавит отвечает на вопрос «найди человека», а этот порядок — на
+// «кто пришёл»: заголовки становятся днями, и видно, сколько народу в какой
+// день завелось. Буквенная лесенка справа в этом порядке не нужна.
+let AC_SORT = 'az';                            // az | new
+
+function acSort(режим){
+  AC_SORT = режим === 'new' ? 'new' : 'az';
+  const b = document.getElementById('acSortBtn');
+  if(b) b.classList.toggle('on', AC_SORT === 'new');
+  if(_customersCache) renderAllClientsList(_customersCache);
+  const inp = document.getElementById('acSearch');
+  filterAllClients(inp ? inp.value : '');
+}
+
+// Плитка «новых за 30 дней» ведёт к людям, а не к числу.
+function openNewClients(){ acSort('new'); openAllClients(); }
+
+function _acOrderName(){ return AC_SORT === 'new' ? 'новые сверху' : 'А → Я'; }
+
+// Заголовок группы: сегодня и вчера — словами, свой год — числом и месяцем,
+// прошлые годы — с годом, иначе «12 сентября» окажется сразу в двух местах.
+function _acDayHdr(ts){
+  if(!ts) return 'Когда пришли — неизвестно';
+  // День считаем по Дубаю, а не по часовому поясу телефона: «сегодня» — это
+  // наш день, даже если приложение открыли из другой страны.
+  const ключ = x => new Intl.DateTimeFormat('en-CA', {year: 'numeric', month: '2-digit',
+    day: '2-digit', timeZone: 'Asia/Dubai'}).format(x);
+  const k = ключ(new Date(ts)), сегодня = ключ(new Date()), вчера = ключ(new Date(Date.now() - 86400000));
+  if(k === сегодня) return 'Сегодня';
+  if(k === вчера) return 'Вчера';
+  const opt = {day: 'numeric', month: 'long', timeZone: 'Asia/Dubai'};
+  if(k.slice(0, 4) !== сегодня.slice(0, 4)) opt.year = 'numeric';
+  return new Intl.DateTimeFormat('ru-RU', opt).format(new Date(ts));
+}
+
 function renderAllClientsList(customers){
   const body = document.getElementById('acBody');
   if(!body) return;
   const sub = document.getElementById('acSubtitle');
-  if(sub) sub.textContent = `${customers.length} человек · А → Я`;
-  const sorted = [...customers].sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ru'));
+  if(sub) sub.textContent = `${customers.length} человек · ${_acOrderName()}`;
+  const датой = AC_SORT === 'new';
+  const _ms = c => c.first_seen ? new Date(c.first_seen).getTime() : 0;
+  const sorted = датой
+    ? [...customers].sort((a,b)=>_ms(b)-_ms(a))
+    : [...customers].sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ru'));
   let html = '<div class="az-list">';
   let lastLetter = '';
   sorted.forEach(c=>{
     const name = c.full_name || 'Без имени';
-    const letter = (name[0]||'?').toUpperCase();
+    const letter = датой ? _acDayHdr(_ms(c)) : (name[0]||'?').toUpperCase();
     if(letter !== lastLetter){
       lastLetter = letter;
-      html += `<div class="az-hdr">${letter}</div>`;
+      html += `<div class="az-hdr${датой ? ' day' : ''}">${letter}</div>`;
     }
     const avSt = _cardAvStyle(c.card_type);
     const tag = c.card_label ? ` <span class="lrow-tag ${_cardClass(c.card_type)}">${c.card_label}</span>` : '';
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     const _fs=c.first_seen?new Date(c.first_seen).getTime():0;
+    // В порядке по дате под именем — время и откуда пришёл: день уже написан
+    // в заголовке, а вот «из рекламы» отвечает на следующий вопрос сразу.
+    const _via = String(c.invited_via||'');
+    const откуда = _via.startsWith('post_') ? 'из рекламы'
+                 : _via.startsWith('chat_') ? 'из бота рекламы'
+                 : _via.startsWith('biz') ? 'из лички' : '';
+    const пришёл = датой && _fs
+      ? new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Dubai'}).format(new Date(_fs))
+      : '';
     const _ls=c.last_seen?new Date(c.last_seen).getTime():0;
-    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-pverified="${c.phone_verified?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}" data-via="${escS(c.invited_via||'')}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
+    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-pverified="${c.phone_verified?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}" data-via="${escS(c.invited_via||'')}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname}${датой ? (пришёл ? ' · '+пришёл : '') + (откуда ? ' · '+откуда : '')
+        : ' · '+_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
   });
   html += '</div>';
   body.innerHTML = html;
@@ -33797,6 +33854,9 @@ function initAzIndex(){
   const body = document.getElementById('acBody');
   const idx = document.getElementById('azIndex');
   if(!body || !idx) return;
+  // Лесенка ищет по первой букве — в порядке по дате искать ей нечего.
+  idx.style.display = AC_SORT === 'new' ? 'none' : '';
+  if(AC_SORT === 'new'){ idx.innerHTML = ''; return; }
   const existing = new Set([...body.querySelectorAll('.az-hdr')].map(h=>h.textContent.trim()));
   idx.innerHTML = '';
   RU_ALPHA.forEach(L=>{
@@ -34070,7 +34130,7 @@ function filterAllClients(q){
     const _fNames={hasOrders:'с заказами',returning:'повторные',vip:'VIP',banned:'забаненные',hasReferrals:'с рефералами',hasPhone:'с номером',phoneVerified:'номер подтверждён',new7d:'новые 7д',inactive:'неактивные',topSpent:'по тратам ↓',fromPost:'из постов',fromChat:'из ответов бота'};
     const fLabel = _fNames[_acActiveFilter]||'';
     if(_acActiveFilter || needle) sub.textContent = `${visCount} из ${total}${fLabel?' · '+fLabel:''}`;
-    else sub.textContent = `${total} человек · А → Я`;
+    else sub.textContent = `${total} человек · ${_acOrderName()}`;
   }
   initAzIndex();
 }
@@ -34083,6 +34143,14 @@ function filterAllClients(q){
     inp.value = '';
     filterAllClients('');
     inp.focus();
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
+(function initAcSort(){
+  const b = document.getElementById('acSortBtn');
+  if(!b) return;
+  b.addEventListener('click', () => {
+    acSort(AC_SORT === 'new' ? 'az' : 'new');
     try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
   });
 })();

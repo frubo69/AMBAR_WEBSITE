@@ -37,6 +37,7 @@ html.kb .stk-mid{padding-bottom:50vh}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
+<script src="/vendor/ambar-torch.js?v=1"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script src="/vendor/ambar-fail.js?v=1"></script>
@@ -16741,7 +16742,7 @@ async function audScanOpen(){
     return;
   }
   const t = document.getElementById('qrTorch');
-  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(t);
 }
 
 // Уезжаем вниз тем же ходом; список под слоем перечитывается, пока он едет.
@@ -17439,7 +17440,7 @@ async function stkMoveCam(){
     return;
   }
   const t = document.getElementById('qrTorch');
-  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(t);
 }
 
 async function movSave(code){
@@ -25114,18 +25115,17 @@ const SCAN = {
   },
 
   // Фонарик: крышки бликуют и часто лежат в тени полки.
+  // Ступени света — общие, vendor/ambar-torch.js: у самой вспышки яркости нет,
+  // убавляется свет в кадре.
+  track(){ return (this.stream && this.stream.getVideoTracks()[0]) || null; },
   async torch(on){
-    const tr = this.stream && this.stream.getVideoTracks()[0];
-    if(!tr || !tr.getCapabilities) return false;
-    if(!(tr.getCapabilities().torch)) return false;
-    try{ await tr.applyConstraints({advanced:[{torch:!!on}]});
-         this.torchOn = !!on; return true; }
-    catch(e){ return false; }
+    const tr = this.track();
+    if(!tr || !AmbarTorch.has(tr)) return false;
+    if(!(await AmbarTorch.apply(tr, on))) return false;
+    this.torchOn = !!on;
+    return true;
   },
-  hasTorch(){
-    const tr = this.stream && this.stream.getVideoTracks()[0];
-    return !!(tr && tr.getCapabilities && tr.getCapabilities().torch);
-  },
+  hasTorch(){ return AmbarTorch.has(this.track()); },
 
   _loop(ts){
     if(!this.stream) return;
@@ -25925,7 +25925,7 @@ async function mvtOpen(mid, to, src, приём){
   }catch(e){ _toast('Нет доступа к камере'); return mvtClose(); }
   SCAN.onLost = () => { if(MVT) mvtClose(); };
   const tb = document.getElementById('mvtTorch');
-  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(tb);
 }
 // При приёме считаем от того, что ОТДАЛИ (got), а не от плана: принять можно
 // ровно то, что отдающий отсканировал.
@@ -26050,7 +26050,7 @@ async function mvcOpen(mid, to, src){
   }catch(e){ _toast('Нет доступа к камере'); return mvcClose(); }
   SCAN.onLost = () => { if(MVC) mvcClose(); };
   const tb = document.getElementById('mvcTorch');
-  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(tb);
 }
 const _mvcНашли = () => Object.values((MVC || {}).seen || {}).reduce((a, v) => a + v, 0);
 const _mvcВсего = () => (MVC.lines || []).reduce((a, l) => a + (+l.got || 0), 0);
@@ -26563,7 +26563,7 @@ async function qrStart(pid){
     return;
   }
   const t = document.getElementById('qrTorch');
-  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(t);
   const snd = document.getElementById('qrSound');
   if(snd) snd.classList.toggle('muted', !SFX.on);
 }
@@ -26728,8 +26728,33 @@ async function qrLoadExisting(){
 }
 
 async function qrTorch(btn){
-  const on = btn.classList.toggle('on');
-  if(!(await SCAN.torch(on))) btn.classList.toggle('on', !on);
+  const on = !SCAN.torchOn;
+  btn.classList.toggle('on', on);
+  if(!(await SCAN.torch(on))) return btn.classList.toggle('on', !on);
+  if(on) AmbarTorch.peek(btn, SCAN.track());
+}
+
+// Кнопка фонарика: показываем, только если вспышка есть, и тут же вешаем
+// ступени. Тянуть по кнопке вверх-вниз — убавить свет в кадре (линейка
+// появится, если камера это даёт); короткое нажатие как было включением, так
+// им и осталось.
+function qrTorchShow(btn){
+  if(!btn) return;
+  const есть = SCAN.hasTorch && SCAN.hasTorch();
+  btn.style.display = есть ? '' : 'none';
+  if(!есть) return;
+  AmbarTorch.attach(btn, {
+    track:  () => SCAN.track(),
+    on:     () => !!SCAN.torchOn,
+    light:  () => qrTorch(btn),
+    toggle: () => qrTorch(btn),
+    hap:    _hap,
+  });
+}
+
+// Блик от вспышки: если ступени есть — убавить свет, а не гасить всё.
+function qrGlare(){
+  return AmbarTorch.dimmable(SCAN.track()) ? 'Блик — убавьте свет' : 'Блик — выключите фонарик';
 }
 
 // Пока код не пойман — подсказываем, но не сразу: первые секунды человек просто
@@ -26742,7 +26767,7 @@ function qrIdle(sinceMs, frames, fps){
   // Текста на экране минимум: пока сканируется — пусто, вмешиваемся только
   // когда код не читается несколько секунд, и то в два-три слова.
   let t = '', warn = false;
-  if(sinceMs > 7000){ t = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Не вижу код'; warn = true; }
+  if(sinceMs > 7000){ t = SCAN.torchOn ? qrGlare() : 'Не вижу код'; warn = true; }
   else if(sinceMs > 3500){ t = 'Ищу код…'; }
   h.textContent = t;
   h.className = 'scan-tip' + (warn ? ' warn' : '');
@@ -27393,7 +27418,7 @@ async function qrDelStart(){
     return;
   }
   const t = document.getElementById('qrTorch');
-  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(t);
   const snd = document.getElementById('qrSound');
   if(snd) snd.classList.toggle('muted', !SFX.on);
 }
@@ -29162,7 +29187,7 @@ async function rcvLine(pid){
     return rcvLineClose();
   }
   const tb = document.getElementById('rcvTorch');
-  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(tb);
   const snd = document.getElementById('rcvSound');
   if(snd) snd.classList.toggle('muted', !SFX.on);
 }
@@ -29547,7 +29572,7 @@ async function rcvRemoveOpen(){
     return rcvLineClose();
   }
   const tb = document.getElementById('rcvTorch');
-  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(tb);
   const snd = document.getElementById('rcvSound');
   if(snd) snd.classList.toggle('muted', !SFX.on);
 }
@@ -35020,7 +35045,7 @@ async function woScanStart(){
     return;
   }
   const t = document.getElementById('qrTorch');
-  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(t);
 }
 
 function wosSave(code){
@@ -35587,7 +35612,7 @@ async function chkCam(){
     if(deny) deny.classList.add('show');
   }
   const t = document.getElementById('chkTorch');
-  if(t) t.style.display = SCAN.hasTorch && SCAN.hasTorch() ? '' : 'none';
+  qrTorchShow(t);
 }
 
 function chkRetry(){ chkCam(); }
@@ -35639,11 +35664,7 @@ function chkScreen(){
   scanLive('accOv');
 }
 
-async function chkTorch(btn){
-  const on = !SCAN.torchOn;
-  if(!(await SCAN.torch(on))) btn.classList.toggle('on', !on);
-  else btn.classList.toggle('on', on);
-}
+async function chkTorch(btn){ qrTorch(btn); }
 
 async function chkScan(code){
   let r;
@@ -39957,12 +39978,22 @@ function _hap(вид){
   }catch(e){}
 }
 // Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
-// дальше кольцо шире и плотнее. У задней камеры ступеней нет: вспышкой браузер
-// умеет только «гореть» и «не гореть», и притворяться тут нечем.
+// дальше кольцо шире и плотнее. У задней камеры линейка та же, но управляет она
+// не вспышкой: вспышку браузер умеет только «жечь» и «не жечь», ступеней у неё
+// нет ни на одном телефоне. Сзади ступени убавляют свет в кадре — то самое, ради
+// чего фонарик и включают (общий vendor/ambar-torch.js, он же у сканера).
 const LAMP_W = [38, 48, 59, 70, 82, 95, 109, 124];    // плотная часть, px
 const LAMP_B = [70, 82, 94, 106, 120, 134, 148, 164];  // затухание, px
 const LAMP_A = [.50, .55, .60, .65, .70, .75, .80, .85];
 let CALL_LAMP_LVL = 1;
+
+// Спереди ступенями заведует экранный ореол, сзади — общий фонарик. Ступени
+// сзади есть не у всякой камеры: не даёт — линейки нет вовсе, кнопка работает
+// как раньше. Лучше никакой регулировки, чем линейка, которая ничего не двигает.
+const lampFlash = () => !!(CALL && CALL.facing === 'environment');
+const lampSteps = () => !lampFlash() ||
+  !!(window.AmbarTorch && AmbarTorch.dimmable(CALL.torchTrack && CALL.torchTrack()));
+const lampLvl = () => lampFlash() ? AmbarTorch.level : CALL_LAMP_LVL;
 
 function lampGlowSet(){
   const g = document.getElementById('cvGlow');
@@ -39977,7 +40008,7 @@ function lampDialPaint(){
   const d = document.getElementById('cvDial');
   if(!d) return;
   [...d.children].forEach((штрих, k) => {
-    const далеко = Math.abs(k + 1 - CALL_LAMP_LVL);
+    const далеко = Math.abs(k + 1 - lampLvl());
     штрих.className = далеко === 0 ? 'now' : далеко === 1 ? 'near' : '';
   });
 }
@@ -40001,6 +40032,11 @@ function lampDial(показать){
 }
 
 function lampLevel(n){
+  if(lampFlash()){                // сзади ступень убавляет свет в кадре, не сам диод
+    AmbarTorch.set(n, {track: () => CALL.torchTrack(), hap: _hap});
+    lampDialPaint();
+    return;
+  }
   const было = CALL_LAMP_LVL;
   CALL_LAMP_LVL = Math.max(1, Math.min(LAMP_W.length, n));
   if(CALL_LAMP_LVL === было) return;
@@ -40018,20 +40054,20 @@ function lampDrag(){
   const сзади = () => !!(CALL && CALL.facing === 'environment');
   const начало = y => {
     кн._ptr = true;
-    y0 = y; было = CALL_LAMP_LVL; поехали = false;
-    // У вспышки яркости нет — значит нет и линейки. Но само нажатие обязано
-    // дойти: раньше здесь стоял выход, и на задней камере кнопка не делала
-    // вообще ничего — ни света, ни честного отказа.
-    if(!сзади()) lampDial(true);
+    y0 = y; было = lampLvl(); поехали = false;
+    // Камера ступеней не даёт — линейки нет. Но само нажатие обязано дойти:
+    // раньше здесь стоял выход, и на задней камере кнопка не делала вообще
+    // ничего — ни света, ни честного отказа.
+    if(lampSteps()) lampDial(true);
   };
   const ход = y => {
     if(y0 === null) return;
     const d = y0 - y;
-    if(сзади()) return;                       // яркость есть только у экрана
+    if(!lampSteps()) return;                  // эта камера ступеней не даёт
     if(!поехали){
       if(Math.abs(d) < 8) return;             // это ещё нажатие, а не движение
       поехали = true;
-      if(!CALL_LAMP){ CALL_LAMP = true; lampPaint(); }
+      if(!CALL_LAMP) callLamp();              // потянули при погашенном — зажигаем
       lampDial(true);
     }
     lampLevel(было + Math.round(d / 22));
@@ -40067,7 +40103,7 @@ function lampDrag(){
   }
   // Колесо — для проверки на настольном браузере, на телефоне его нет.
   кн.addEventListener('wheel', e => {
-    if(!CALL_LAMP || сзади()) return;
+    if(!CALL_LAMP || !lampSteps()) return;
     lampLevel(CALL_LAMP_LVL + (e.deltaY < 0 ? 1 : -1));
   }, {passive: true});
   // Если указателей в браузере нет вовсе, кнопка обязана работать по-старому.

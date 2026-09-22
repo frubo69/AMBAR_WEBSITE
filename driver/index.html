@@ -4495,6 +4495,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
+<script src="/vendor/ambar-torch.js?v=1"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script src="/vendor/ambar-fail.js?v=1"></script>
@@ -9901,19 +9902,17 @@ const SCAN = {
     if(this.video) this.video.srcObject = null;
   },
 
-  // Фонарик: крышки бликуют и часто лежат в тени полки.
+  // Фонарик: крышки бликуют и часто лежат в тени полки. Ступени — общие,
+  // vendor/ambar-torch.js: у самой вспышки яркости нет, убавляется свет в кадре.
+  track(){ return (this.stream && this.stream.getVideoTracks()[0]) || null; },
   async torch(on){
-    const tr = this.stream && this.stream.getVideoTracks()[0];
-    if(!tr || !tr.getCapabilities) return false;
-    if(!(tr.getCapabilities().torch)) return false;
-    try{ await tr.applyConstraints({advanced:[{torch:!!on}]});
-         this.torchOn = !!on; return true; }
-    catch(e){ return false; }
+    const tr = this.track();
+    if(!tr || !AmbarTorch.has(tr)) return false;
+    if(!(await AmbarTorch.apply(tr, on))) return false;
+    this.torchOn = !!on;
+    return true;
   },
-  hasTorch(){
-    const tr = this.stream && this.stream.getVideoTracks()[0];
-    return !!(tr && tr.getCapabilities && tr.getCapabilities().torch);
-  },
+  hasTorch(){ return AmbarTorch.has(this.track()); },
 
   _loop(ts){
     if(!this.stream) return;
@@ -10659,7 +10658,7 @@ async function audCamOpen(){
     await SCAN.start(document.getElementById('audVid'), audScan, audIdle,
                      () => audFlash('dup', 'уже посчитана'), camHold);
     const tb = document.getElementById('audTorch');
-    if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
+    camTorchShow(tb);
   }catch(e){
     toast('Нет доступа к камере', 'err');
     audCamClose();
@@ -10773,7 +10772,7 @@ function audIdle(sinceMs, frames, fps){
   const h = document.getElementById('audHint'); if(!h) return;
   if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'cam-hint'; return; }
   if(!fps || fps < 4) h.textContent = 'Телефон не успевает';
-  else if(sinceMs > 8000) h.textContent = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Ближе, ровнее, включите фонарик';
+  else if(sinceMs > 8000) h.textContent = SCAN.torchOn ? camGlare() : 'Ближе, ровнее, включите фонарик';
   else h.textContent = 'Ищу код…';
   h.className = 'cam-hint warn';
 }
@@ -11282,7 +11281,7 @@ async function supLineOpen(pid){
   try{
     await SCAN.start(document.getElementById('camV'), supScan, supIdle, supRepeat, camHold);
     const tb = document.getElementById('camTorch');
-    if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
+    camTorchShow(tb);
   }catch(e){
     toast('Нет доступа к камере', 'err');
     supLineClose();
@@ -11385,9 +11384,43 @@ function camPaint(){
 }
 
 function camSound(b){ b.classList.toggle('muted', !SFX.toggle()); }
-async function camTorch(b){
-  const on = b.classList.toggle('on');
-  if(!(await SCAN.torch(on))) b.classList.toggle('on', !on);
+async function camTorchSet(b, on){
+  b.classList.toggle('on', on);
+  if(!(await SCAN.torch(on))) return b.classList.toggle('on', !on);
+  if(on) AmbarTorch.peek(b, SCAN.track());
+}
+
+// Блик от вспышки: если ступени есть — убавить свет, а не гасить всё.
+function camGlare(){
+  return AmbarTorch.dimmable(SCAN.track()) ? 'Блик — убавьте свет' : 'Блик — выключите фонарик';
+}
+function camTorch(b){ camTorchSet(b, !SCAN.torchOn); }
+
+// Кнопка фонарика: показываем, только если вспышка есть, и тут же вешаем
+// ступени. Тянуть по кнопке вверх-вниз — убавить свет в кадре (линейка
+// появится, если камера это даёт); короткое нажатие как было включением, так
+// им и осталось. Заодно раз в день говорим серверу, что умеет эта камера:
+// иначе «почему у него ступени есть, а у меня нет» остаётся догадкой.
+function camTorchShow(b){
+  if(!b) return;
+  const есть = SCAN.hasTorch();
+  b.style.display = есть ? 'flex' : 'none';
+  if(!есть) return;
+  AmbarTorch.attach(b, {
+    track:  () => SCAN.track(),
+    on:     () => !!SCAN.torchOn,
+    light:  () => camTorchSet(b, true),
+    toggle: () => camTorch(b),
+    hap:    _hap,
+  });
+  camDiag();
+}
+
+function camDiag(){
+  const день = new Date().toISOString().slice(0, 10);
+  try{ if(localStorage.getItem('ambar_cam_diag') === день) return;
+       localStorage.setItem('ambar_cam_diag', день); }catch(e){}
+  drvApi.drvFetch('/api/driver/ping', {params:{cam: AmbarTorch.diag(SCAN.track())}}).catch(() => {});
 }
 
 const CAM_FLASH = {
@@ -11430,7 +11463,7 @@ function supIdle(sinceMs, frames, fps){
   }
   if(!fps || fps < 4){ h.textContent = 'Телефон не успевает'; }
   else if(sinceMs > 8000){
-    h.textContent = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Ближе, ровнее, включите фонарик';
+    h.textContent = SCAN.torchOn ? camGlare() : 'Ближе, ровнее, включите фонарик';
   }else{ h.textContent = 'Ищу код…'; }
   h.className = 'cam-hint warn';
 }
@@ -11720,7 +11753,7 @@ async function supRemoveOpen(){
   try{
     await SCAN.start(document.getElementById('camV'), supScan, supIdle, supRepeat, camHold);
     const tb = document.getElementById('camTorch');
-    if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
+    camTorchShow(tb);
   }catch(e){
     toast('Нет доступа к камере', 'err');
     supLineClose();
@@ -13308,12 +13341,22 @@ function callVideoPaint(){
 }
 
 // Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
-// дальше кольцо шире и плотнее. У задней камеры ступеней нет: вспышкой браузер
-// умеет только «гореть» и «не гореть», и притворяться тут нечем.
+// дальше кольцо шире и плотнее. У задней камеры линейка та же, но управляет она
+// не вспышкой: вспышку браузер умеет только «жечь» и «не жечь», ступеней у неё
+// нет ни на одном телефоне. Сзади ступени убавляют свет в кадре — то самое, ради
+// чего фонарик и включают (общий vendor/ambar-torch.js, он же у сканера).
 const LAMP_W = [38, 48, 59, 70, 82, 95, 109, 124];    // плотная часть, px
 const LAMP_B = [70, 82, 94, 106, 120, 134, 148, 164];  // затухание, px
 const LAMP_A = [.50, .55, .60, .65, .70, .75, .80, .85];
 let CALL_LAMP_LVL = 1;
+
+// Спереди ступенями заведует экранный ореол, сзади — общий фонарик. Ступени
+// сзади есть не у всякой камеры: не даёт — линейки нет вовсе, кнопка работает
+// как раньше. Лучше никакой регулировки, чем линейка, которая ничего не двигает.
+const lampFlash = () => !!(CALL && CALL.facing === 'environment');
+const lampSteps = () => !lampFlash() ||
+  !!(window.AmbarTorch && AmbarTorch.dimmable(CALL.torchTrack && CALL.torchTrack()));
+const lampLvl = () => lampFlash() ? AmbarTorch.level : CALL_LAMP_LVL;
 
 function lampGlowSet(){
   const g = cel('csGlow');
@@ -13328,7 +13371,7 @@ function lampDialPaint(){
   const d = cel('csDial');
   if(!d) return;
   [...d.children].forEach((штрих, k) => {
-    const далеко = Math.abs(k + 1 - CALL_LAMP_LVL);
+    const далеко = Math.abs(k + 1 - lampLvl());
     штрих.className = далеко === 0 ? 'now' : далеко === 1 ? 'near' : '';
   });
 }
@@ -13352,6 +13395,11 @@ function lampDial(показать){
 }
 
 function lampLevel(n){
+  if(lampFlash()){                // сзади ступень убавляет свет в кадре, не сам диод
+    AmbarTorch.set(n, {track: () => CALL.torchTrack(), hap: _hap});
+    lampDialPaint();
+    return;
+  }
   const было = CALL_LAMP_LVL;
   CALL_LAMP_LVL = Math.max(1, Math.min(LAMP_W.length, n));
   if(CALL_LAMP_LVL === было) return;
@@ -13369,20 +13417,20 @@ function lampDrag(){
   const сзади = () => !!(CALL && CALL.facing === 'environment');
   const начало = y => {
     кн._ptr = true;
-    y0 = y; было = CALL_LAMP_LVL; поехали = false;
-    // У вспышки яркости нет — значит нет и линейки. Но само нажатие обязано
-    // дойти: раньше здесь стоял выход, и на задней камере кнопка не делала
-    // вообще ничего — ни света, ни честного отказа.
-    if(!сзади()) lampDial(true);
+    y0 = y; было = lampLvl(); поехали = false;
+    // Камера ступеней не даёт — линейки нет. Но само нажатие обязано дойти:
+    // раньше здесь стоял выход, и на задней камере кнопка не делала вообще
+    // ничего — ни света, ни честного отказа.
+    if(lampSteps()) lampDial(true);
   };
   const ход = y => {
     if(y0 === null) return;
     const d = y0 - y;
-    if(сзади()) return;                       // яркость есть только у экрана
+    if(!lampSteps()) return;                  // эта камера ступеней не даёт
     if(!поехали){
       if(Math.abs(d) < 8) return;             // это ещё нажатие, а не движение
       поехали = true;
-      if(!CALL_LAMP){ CALL_LAMP = true; lampPaint(); }
+      if(!CALL_LAMP) callLamp();              // потянули при погашенном — зажигаем
       lampDial(true);
     }
     lampLevel(было + Math.round(d / 22));
@@ -13418,7 +13466,7 @@ function lampDrag(){
   }
   // Колесо — для проверки на настольном браузере, на телефоне его нет.
   кн.addEventListener('wheel', e => {
-    if(!CALL_LAMP || сзади()) return;
+    if(!CALL_LAMP || !lampSteps()) return;
     lampLevel(CALL_LAMP_LVL + (e.deltaY < 0 ? 1 : -1));
   }, {passive: true});
   // Если указателей в браузере нет вовсе, кнопка обязана работать по-старому.

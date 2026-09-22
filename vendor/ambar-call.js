@@ -922,11 +922,23 @@
     } catch (e) { return false; }
   };
 
+  AmbarCall.prototype.torchTrack = function () {
+    try { return (this.cam && this.cam.getVideoTracks()[0]) || null; } catch (e) { return null; }
+  };
+
   AmbarCall.prototype.torch = function (on) {
-    var t = this.cam && this.cam.getVideoTracks()[0];
+    var t = this.torchTrack();
     if (!t || !t.applyConstraints) return Promise.reject(new Error('нет дорожки'));
     // Гасить можно всегда: погасить то, чего нет, — не ошибка.
     if (on && !this.torchOk()) return Promise.reject(new Error('нет вспышки'));
+    // Ступени у света общие со сканером (vendor/ambar-torch.js): у самой
+    // вспышки яркости нет, убавляется свет в кадре.
+    if (window.AmbarTorch) {
+      return window.AmbarTorch.apply(t, on).then(function (ok) {
+        if (!ok) throw new Error('вспышка не отозвалась');
+        return !!on;
+      });
+    }
     return t.applyConstraints({advanced: [{torch: !!on}]}).then(function () { return !!on; });
   };
 

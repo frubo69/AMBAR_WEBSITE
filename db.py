@@ -965,7 +965,8 @@ _DEFAULT_PREFS = {
     # Экстренная ситуация у водителя. Выключить нельзя по смыслу — здесь стоит
     # ради того, чтобы событие было в общем списке уведомлений.
     "driver.panic": True,
-    # Водитель открыл смену позже 15:00 (владелец, 22 сен 2026: «это правило»).
+    # Водитель открыл смену позже 18:00 (владелец, 22 сен 2026: «это правило»,
+    # с 15:00 переделано на 18:00 тем же днём).
     "driver.late_shift": True,
     "finance.revenueLow": True, "finance.avgDrop": True,
     "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,

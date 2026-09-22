@@ -80,7 +80,7 @@ def full_text(d: dict) -> str:
         m = re.search(r"\b(\d{1,2}:\d{2})\b", note)
         hm = d.get("hm") or (m.group(1) if m else "")
         r = re.search(r"до (\d{1,2}):00", note)
-        rule = d.get("rule_hour") or (int(r.group(1)) if r else 15)
+        rule = d.get("rule_hour") or (int(r.group(1)) if r else 18)
         return f"Открытие смены позже {rule}:00" + (f"{nb}— смена открыта в{nb}{hm}" if hm else "")
     return d.get("reason") or ""
 

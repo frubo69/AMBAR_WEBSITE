@@ -6896,8 +6896,8 @@ button.exp-wait:active{transform:scale(.99)}
   font-variant-numeric:tabular-nums}
 
 /* ── Курс валют ───────────────────────────────────────────────────────────
-   Только обменник (Al Ansari): крупно — сколько он даст за единицу валюты,
-   ниже — почём продаёт. Рынка на экране нет (владелец, 19 сен 2026). */
+   Только обменник (Al Ansari): крупно — почём он продаёт единицу валюты.
+   Рынка на экране нет (владелец, 19 сен 2026). */
 .fx-q{width:100%;height:40px;margin:2px 0 10px;padding:0 13px;border-radius:12px;
   border:1px solid var(--border2);background:var(--card2);color:var(--text);
   font-family:inherit;font-size:13px}
@@ -6916,11 +6916,6 @@ button.exp-wait:active{transform:scale(.99)}
   color:var(--up);line-height:1.25;margin-top:2px}
 .fx-v i.none{color:var(--dim);font-weight:500}
 .fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
-/* Под числом обменника — почём он же продаёт: сдать и купить — две цены, и
-   разница между ними и есть его заработок. */
-.fx-strip s{display:block;margin-top:5px;text-decoration:none;font-size:10.5px;font-weight:600;
-  color:var(--muted);font-variant-numeric:tabular-nums}
-.fx-strip s:empty{display:none}
 /* Наш курс для клиентов (владелец, 19 сен 2026): по нему водитель называет
    клиенту сумму в валюте. Плитки под курсом обменника, правка — в раскрытом
    разделе; тап по плитке раскрывает и ставит курсор в её поле. */
@@ -7987,9 +7982,9 @@ button.exp-wait:active{transform:scale(.99)}
       <svg class="fin-sec-go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <div class="fin-strip fx-strip">
-      <div><b class="is-skel" id="fxUsd">0000</b><i>Доллар</i><s id="fxUsdB"></s></div>
-      <div><b class="is-skel" id="fxEur">0000</b><i>Евро</i><s id="fxEurB"></s></div>
-      <div><b class="is-skel" id="fxRub">0000</b><i>Рубль</i><s id="fxRubB"></s></div>
+      <div><b class="is-skel" id="fxUsd">0000</b><i>Доллар</i></div>
+      <div><b class="is-skel" id="fxEur">0000</b><i>Евро</i></div>
+      <div><b class="is-skel" id="fxRub">0000</b><i>Рубль</i></div>
     </div>
     <div class="fx-take-cap">Наш курс для клиентов</div>
     <div class="fin-strip fx-strip four" id="fxTake"></div>
@@ -19342,11 +19337,13 @@ function walBlockRender(){
 }
 
 // ── Курс валют ────────────────────────────────────────────────────────────
-// С 19 сен 2026 — только обменник Al Ansari, прямо с его сайта (rates.py):
-// сколько он даст за единицу валюты (по этой цене водитель меняет привезённые
-// наличные) и почём продаёт (по этой — зарплата в долларах, если курс месяца
-// не вписан руками). Валют, которых он не меняет, и рыночного курса на экране
-// нет — владелец: «то, что обменник не меняет, убирай», «убери рынок».
+// С 19 сен 2026 — только обменник Al Ansari, прямо с его сайта (rates.py).
+// На экране почём он ПРОДАЁТ валюту (владелец, 23 сен 2026: «поменяй их
+// местами, верхнее убери»): по этой цене мы у него покупаем и по ней же
+// считается зарплата в долларах. Курс, по которому он покупает у нас, остался
+// в ответе сервера и у водителя — он по нему сдаёт наличные. Валют, которых
+// обменник не меняет, и рыночного курса здесь нет — владелец: «то, что
+// обменник не меняет, убирай», «убери рынок».
 let FX = null;
 
 async function fxLoad(){
@@ -19364,23 +19361,30 @@ function _fxWhen(ms){
        : `${d.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'})}, ${hh}`;
 }
 
-// Дирхам за единицу: у дорогих валют два знака, у дешёвых четыре — иначе
-// рубль и сум превращаются в ноль.
-function _fxN(v){ return v >= 1 ? v.toFixed(3) : v.toFixed(4); }
+// Дирхам за единицу. Владелец, 23 сен 2026: «не пиши тысячные — даже не
+// округляй, просто пиши с точностью до сотых»: 3.677 → 3.67. Округлили бы —
+// вышло 3.68, цена, которой в обменнике нет. У дешёвых валют знаков
+// по-прежнему четыре: рубль и сум на сотых превратились бы в ноль.
+// Считаем от четырёх знаков курса: 3.67 в двоичном виде это 3.66999…, и
+// «просто отбросить» превратило бы её в 3.66.
+function _fxN(v){
+  if(v < 1) return (+v).toFixed(4);
+  return (Math.floor(Math.round(v * 10000) / 100 + 1e-9) / 100).toFixed(2);
+}
 
 function fxRender(){
   const box = document.getElementById('fxList'); if(!box) return;
   const rows = (FX && FX.rates) || [];
-  // Крупно — сколько дирхамов даст обменник за единицу (он у нас покупает):
-  // по этой цене меняют наличные с заказов. Ниже — почём он продаёт. Рынка
-  // здесь нет (владелец, 19 сен 2026: «убери рынок») — только обменник.
+  // Крупно — почём обменник ПРОДАЁТ единицу валюты: по этой цене мы у него
+  // покупаем, по ней же считается зарплата в долларах. Владелец, 23 сен 2026:
+  // «поменяй их местами, а верхнее вообще убери» — того, по чему он покупает
+  // у нас, на плитках больше нет. Рынка здесь нет и не было.
   const put = (id, c) => {
     const el = document.getElementById(id); if(!el) return;
     const r = rows.find(x => x.code === c);
     el.classList.remove('is-skel');
-    el.textContent = !r || !r.cash_aed ? '—' : _fxN(r.cash_aed);
-    const sub = document.getElementById(id + 'B');
-    if(sub) sub.textContent = r && r.cash_buy_aed ? `продаёт ${_fxN(r.cash_buy_aed)}` : '';
+    const v = r && (r.cash_buy_aed || r.cash_aed);
+    el.textContent = v ? _fxN(v) : '—';
   };
   put('fxUsd','USD'); put('fxEur','EUR'); put('fxRub','RUB');
   fxTakeRender();
@@ -19401,14 +19405,15 @@ function fxRender(){
       <span class="fx-c">${escS(r.code)}</span>
       <span class="fx-n">${escS(r.name || r.code)}</span>
       <span class="fx-v">
-        <b>${_fxN(r.cash_aed)} AED</b>
-        <i>обменник${r.cash_buy_aed ? ' · продаёт ' + _fxN(r.cash_buy_aed) : ''}</i>
+        <b>${_fxN(r.cash_buy_aed || r.cash_aed)} AED</b>
+        <i${r.cash_buy_aed ? '' : ' class="none"'}>обменник ${r.cash_buy_aed ? 'продаёт' : 'покупает'}</i>
       </span>
     </div>`).join('')
     : '<div class="cat-block-empty">Ничего не нашлось</div>';
   _setText('fxNote', !FX ? '' :
-    `Крупное число — сколько дирхамов даст ${FX.source || 'обменник'} за единицу валюты `
-    + `наличными (курс с его сайта, обновляется раз в час), рядом — почём он её продаёт. `
+    `Крупное число — почём ${FX.source || 'обменник'} продаёт единицу валюты наличными `
+    + `(курс с его сайта, обновляется раз в час). Валюту, которую он только покупает у нас, `
+    + `видно по подписи «покупает» — продажи такой у него нет. `
     + `Здесь только то, что он меняет наличными: `
     + `${FX.cash_n || rows.length} ${pluralize(FX.cash_n || rows.length,'валюта','валюты','валют')}.`);
 }
@@ -19432,7 +19437,8 @@ function fxTakeRender(){
       <i>дирхамов за единицу — по нему водитель называет клиенту сумму в валюте</i></div>${
     take.map(t => {
       const ex = rows.find(r => r.code === t.code);
-      const sub = [ex && ex.cash_aed ? `обменник даёт ${_fxN(ex.cash_aed)}` : '',
+      const sub = [ex && (ex.cash_buy_aed || ex.cash_aed)
+                     ? `обменник ${ex.cash_buy_aed ? 'продаёт' : 'даёт'} ${_fxN(ex.cash_buy_aed || ex.cash_aed)}` : '',
                    t.by_name ? `изменил ${t.by_name}` : ''].filter(Boolean).join(' · ');
       return `<div class="fx-take-r">
         <span class="fx-c">${escS(t.code)}</span>

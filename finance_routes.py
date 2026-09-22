@@ -653,7 +653,7 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     # «Штрафы, требующие решения», не назначенные — в историю с исходом.
     import fines_auto
     res["pending"] = await fines_auto.pending()
-    res["history"] = _penalty_history(items, month, declined=await fines_auto.declined())
+    res["history"] = _penalty_history(items, month, decided=await fines_auto.decided())
     return res
 
 
@@ -779,24 +779,29 @@ async def person_card(name: str, month: str) -> dict:
     return out
 
 
-def _penalty_history(items: list, month: str, limit: int = 60, declined: list | None = None) -> list:
+def _penalty_history(items: list, month: str, limit: int = 60, decided: list | None = None) -> list:
     """История штрафов и удержаний для «Штрафов/авансов/долгов»: последние
     сверху, отменённые и пересмотренные — с пометкой. От людей не зависит: кого
-    убрали из зарплат, того штрафы тоже видно. declined — штрафы программы,
-    которые решили не назначать (fines_auto): в истории они с исходом «Не
-    назначен», в зарплатах их нет."""
+    убрали из зарплат, того штрафы тоже видно. decided — решения по тому, что
+    сформировала программа (fines_auto), у которых нет записи в зарплатах:
+    «не назначать / не урезать» (declined) и «урезать питание» (meal) — в
+    истории они с исходом."""
+    import fines_auto
     out = []
-    # «Не назначен» стоит в истории по времени решения, как штраф — по времени записи
-    skip = [dict(d, _skip=True, at=d.get("decided_at") or d.get("at")) for d in (declined or [])]
-    for it in sorted(list(items) + skip, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
-        if it.get("_skip"):
+    # решение стоит в истории по времени решения, как штраф — по времени записи
+    dec = [dict(d, _dec=True, at=d.get("decided_at") or d.get("at")) for d in (decided or [])]
+    for it in sorted(list(items) + dec, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
+        if it.get("_dec"):
+            meal = fines_auto.action_of(it.get("kind") or "") == "meal"
             out.append(dict(id="auto:" + str(it.get("_id")), name=it.get("name") or "", kind="fine",
-                            t=pay.KINDS["fine"], amount=pay._i(pay._n(it.get("amount"))), per_month=0,
-                            start="", day=it.get("day") or "", note=it.get("note") or "",
-                            reason=it.get("reason") or "", by=it.get("decided_by") or "",
-                            cancelled=False, cancelled_by="", cancelled_day="", revised=False,
-                            revised_by="", src="", wid="", was=None, left=0, done=False,
-                            auto=it.get("kind") or "", declined=True))
+                            t=pay.KINDS["fine"], per_month=0, start="", day=it.get("day") or "",
+                            amount=(fines_auto.MEAL_FROM - fines_auto.MEAL_TO) if meal
+                            else pay._i(pay._n(it.get("amount"))),
+                            note=it.get("note") or "", reason=it.get("reason") or "",
+                            by=it.get("decided_by") or "", cancelled=False, cancelled_by="",
+                            cancelled_day="", revised=False, revised_by="", src="", wid="", was=None,
+                            left=0, done=False, auto=it.get("kind") or "",
+                            declined=it.get("status") == "declined", meal=meal))
             if len(out) >= limit:
                 break
             continue
@@ -814,7 +819,7 @@ def _penalty_history(items: list, month: str, limit: int = 60, declined: list | 
                         src=it.get("src") or "", wid=it.get("wid") or "",
                         was=None if it.get("was") is None else pay._i(pay._n(it.get("was"))),
                         left=0 if gone else s["after"], done=False if gone else s["done"],
-                        auto=it.get("auto") or "", declined=False))
+                        auto=it.get("auto") or "", declined=False, meal=False))
         if len(out) >= limit:
             break
     return out
@@ -1510,12 +1515,14 @@ async def handle_pay_item_add(request):
 
 @require_owner
 async def handle_fine_decide(request):
-    """POST {id, decision: assign|skip, amount, month, as} — решение по штрафу,
-    который сформировала программа (fines_auto.py). «Назначить» — обычный штраф
-    в зарплатах: с этого месяца, разом, день — день нарушения; водителю — то же
-    сообщение, что о любом штрафе. «Не назначать» — только исход в истории.
-    Решают один раз: второе нажатие или второй старший получают 409 и свежую
-    книгу, где этого штрафа среди ждущих уже нет."""
+    """POST {id, decision: assign|skip, amount, month, as} — решение по тому,
+    что сформировала программа (fines_auto.py). У штрафа «Назначить» — обычный
+    штраф в зарплатах: с этого месяца, разом, день — день нарушения; водителю —
+    то же сообщение, что о любом штрафе. У питания «Урезать» (тот же assign) —
+    питание за тот день 40 вместо 80 и сообщение водителю. «Не назначать / не
+    урезать» — только исход в истории. Решают один раз: второе нажатие или
+    второй старший получают 409 и свежую книгу, где этого среди ждущих нет."""
+    import fines_auto
     try:
         body = await request.json()
         pid = str(body.get("id") or "").strip()
@@ -1523,19 +1530,42 @@ async def handle_fine_decide(request):
         month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
         if not pid or decision not in ("assign", "skip"):
             return _json({"error": "bad_request"}, 400)
-        amount = _num(body.get("amount")) if decision == "assign" else None
-        if decision == "assign" and (amount is None or amount <= 0):
-            return _json({"error": "bad_amount"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
+    cur = await db.fine_pending_get(pid)
+    if not cur or cur.get("status") != "pending":
+        return _json({"error": "decided", "book": await build(month)}, 409)
+    meal = fines_auto.action_of(cur.get("kind") or "") == "meal"
+    amount = None
+    if decision == "assign" and not meal:
+        amount = _num(body.get("amount"))
+        if amount is None or amount <= 0:
+            return _json({"error": "bad_amount"}, 400)
     who = _who(body)
     now = datetime.now(timezone.utc)
+    if decision == "assign" and meal:
+        doc = await db.fine_pending_decide(pid, {"status": "assigned", "decided_by": who, "decided_at": now})
+        if not doc:
+            return _json({"error": "decided", "book": await build(month)}, 409)
+        day = str(doc.get("day") or "")[:10] or _biz_day()
+        try:
+            # Та же отметка, что у отпуска раньше конца смены: meal_of её и читает.
+            await db.save_driver_day(day, doc.get("name") or "", {"meal_rate": fines_auto.MEAL_TO, "meal_cut": pid})
+        except Exception as e:                    # noqa: BLE001
+            log.warning(f"[fin] питание {pid}: не урезано, возвращаю в ждущие: {e}")
+            await db.fine_pending_undo(pid, {"decided_by": "", "decided_at": ""})
+            return _json({"error": "save_failed"}, 500)
+        await _touch(day[:7])
+        await _pn.tell_safe(doc.get("name") or "", fines_auto.meal_cut_text(doc, who))
+        log.info(f"[fin] решение: {doc.get('name')} — {doc.get('reason')} {day}: питание "
+                 f"{fines_auto.MEAL_TO} вместо {fines_auto.MEAL_FROM} · {who or '—'}")
+        return _json({"ok": True, "book": await build(month)})
     if decision == "skip":
         doc = await db.fine_pending_decide(pid, {"status": "declined", "decided_by": who, "decided_at": now})
         if not doc:
             return _json({"error": "decided", "book": await build(month)}, 409)
-        log.info(f"[fin] штраф на решение: {doc.get('name')} — {doc.get('reason')} {doc.get('day')} "
-                 f"не назначен · {who or '—'}")
+        log.info(f"[fin] решение: {doc.get('name')} — {doc.get('reason')} {doc.get('day')}: "
+                 f"{'не урезано' if meal else 'не назначен'} · {who or '—'}")
         return _json({"ok": True, "book": await build(month)})
     iid = secrets.token_hex(5)
     doc = await db.fine_pending_decide(pid, {"status": "assigned", "decided_by": who, "decided_at": now,

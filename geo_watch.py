@@ -341,6 +341,22 @@ async def _driver(name: str, text: str) -> None:
         log.debug(f"[geo-watch] реестр водителя: {e}")
 
 
+# ── штраф на решение ─────────────────────────────────────────────────────────
+# Владелец, 22 сен 2026: «по отключению геолокации — фиксированный штраф 200
+# дирхам, но его можно будет редактировать». На открытой смене выключилась —
+# штраф ждёт решения старшего в «Штрафах» (fines_auto.py), один за день.
+async def _fine(name: str, utc: datetime, day: str) -> tuple:
+    """(строка к сообщению, кнопка) — если штраф записан впервые за день."""
+    if staff.is_test_driver(name):
+        return "", None
+    import fines_auto
+    district = geo_meta(name, False).get("district") or ""
+    if not await fines_auto.geo_off(name, district, day, _hhmm(utc)):
+        return "", None
+    return (f"\nШтраф {fines_auto.GEO_OFF_FINE} AED ждёт решения — в «Штрафах».",
+            fines_auto.open_button("Решить по штрафу"))
+
+
 # ── мгновенный путь: сигнал телеграма ────────────────────────────────────────
 async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
     """Телеграм сказал: трансляцию включили (on) или выключили.
@@ -379,12 +395,14 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
         return False
     if off_since and st.get("off_why") == "stream":
         return False                       # уже сказали про это же
+    line, kb = "", None
     if opened:
         fields = {"day": day, "off_why": "stream"}
         if not off_since or st.get("off_why") == "still":
             fields["off_since"] = utc          # выключил — с этой минуты, а не с начала стоянки
         await db.geo_watch_set(name, fields)
-    await _owners(text_stream_off(name, opened), EVENT_OFF, meta=geo_meta(name, False))
+        line, kb = await _fine(name, utc, day)
+    await _owners(text_stream_off(name, opened) + line, EVENT_OFF, reply_markup=kb, meta=geo_meta(name, False))
     log.info(f"[geo-watch] {name}: выключил трансляцию")
     return True
 
@@ -482,7 +500,9 @@ async def tick(now: datetime = None) -> dict:
                 # здесь оно ловится, только если бот водителя в тот момент
                 # лежал или у трансляции вышел срок.
                 await db.geo_watch_set(name, {"day": day, "off_since": utc, "off_why": "stream"})
-                await _owners(text_gone(name), EVENT_OFF, meta=geo_meta(name, False, self_=False))
+                line, kb = await _fine(name, utc, day)
+                await _owners(text_gone(name) + line, EVENT_OFF, reply_markup=kb,
+                              meta=geo_meta(name, False, self_=False))
                 log.info(f"[geo-watch] {name}: геопозиция выключена")
                 out["off"].append(name)
             elif g["stream"] and off_since:

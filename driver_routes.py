@@ -549,8 +549,9 @@ def _mde(s: str) -> str:
 
 async def _late_alert(me: dict, now: datetime, day: str) -> None:
     """Смену открыли позже 15:00 — старшему (STAR) и операторам района; в STAR
-    — штраф на решение (владелец, 22 сен 2026: «туда автоматически уходит
-    сформированный штраф с двумя кнопками — назначить или не назначать»)."""
+    — на решение, урезать ли питание с 80 до 40 (владелец, 22 сен 2026: «за
+    позднее открытие смены не ценовой штраф, а урезаем питание до 40
+    принудительно; просто надо принять решение — урезаем или нет»)."""
     import html as _html
     from config_offices import OFFICE_CODES, OFFICE_NAMES
     import fines_auto
@@ -564,8 +565,9 @@ async def _late_alert(me: dict, now: datetime, day: str) -> None:
         await notify_owners("driver.late_shift",
                             f"⏰ *Поздно открыл смену* — {_mde(name)}, {_mde(where)}\n"
                             f"Открыл в {at}, а правило — до {SHIFT_LATE_HOUR}:00."
-                            + ("\nШтраф ждёт решения — в «Штрафах»." if fine else ""),
-                            reply_markup=fines_auto.open_button() if fine else None)
+                            + (f"\nНа решение в «Штрафах»: урезать питание с {fines_auto.MEAL_FROM} "
+                               f"до {fines_auto.MEAL_TO}?" if fine else ""),
+                            reply_markup=fines_auto.open_button("Решить по питанию") if fine else None)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] старшему о поздней смене не ушло: {e}")
     try:

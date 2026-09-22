@@ -5678,6 +5678,20 @@ async def fine_pending_add(doc: dict) -> bool:
         return False
 
 
+async def fine_pending_get(pid: str) -> dict | None:
+    d = _db_or_none()
+    if d is None: return None
+    return await d.fine_pending.find_one({"_id": pid})
+
+
+async def fine_pending_update(pid: str, fields: dict) -> bool:
+    """Дописать подробности, пока по записи не решили."""
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.fine_pending.update_one({"_id": pid, "status": "pending"}, {"$set": fields})
+    return bool(r.matched_count)
+
+
 async def fine_pending_list(status: str = "", kind: str = "", limit: int = 200) -> list:
     """Свежие сверху. status: pending | assigned | declined; пусто — все."""
     d = _db_or_none()
@@ -6111,4 +6125,4 @@ async def close_reqs_of_day(day: str) -> list:
     return await db.driver_days.find(
         {"day": day, "close_req": {"$exists": True}},
         {"_id": 0, "driver": 1, "day": 1, "close_req": 1, "shift_open_at": 1,
-         "shift_close_at": 1, "meal_rate": 1}).to_list(length=200)
+         "shift_close_at": 1, "meal_rate": 1, "meal_cut": 1}).to_list(length=200)

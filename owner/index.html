@@ -3605,6 +3605,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-ph-r.skip{cursor:default}
 .fb-ph-r.skip .fb-ph-b,.fb-ph-r.skip .fb-ph-i{opacity:.6}
 .fb-ph-r.skip .fb-ph-r2 b{color:#8A8A97;text-decoration:line-through}
+.fb-ph-r.cut{cursor:default}
+.fb-ph-st.cut{color:#EFD09B;background:rgba(201,169,110,.16);border:1px solid rgba(201,169,110,.4)}
+.fb-pd-meal{display:flex;flex-direction:column;align-items:flex-end;margin-top:6px}
+.fb-pd-meal i{font-style:normal;font-size:10px;color:#8A8A97}
+.fb-pd-meal b{margin-top:2px;font-size:15px;font-weight:800;color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
 /* штрафы, требующие решения: строка истории + сумма справа и две кнопки */
 .fb-pd-n{margin-left:auto;min-width:26px;height:26px;padding:0 8px;border-radius:999px;display:flex;
   align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#1a1408;
@@ -22709,11 +22714,14 @@ function fbItemsHtml(b){
   ${fbPenHistHtml(b)}`;
 }
 // ── Штрафы, требующие решения ──────────────────────────────────────────────
-// Владелец, 22 сен 2026: их формирует программа — например, смену открыли
-// позже 15:00 (fines_auto.py на сервере). У каждого две кнопки: назначить или
-// не назначать; любое решение уходит в историю штрафов с исходом. Сумма — та,
-// с которой этот вид назначили в прошлый раз; её можно поменять прямо здесь.
-const FB_AUTO_IC = {late_shift: 'clock'};
+// Владелец, 22 сен 2026: их формирует программа (fines_auto.py на сервере), у
+// каждого две кнопки, любое решение уходит в историю с исходом:
+//   • геолокация выключилась на смене — штраф 200 AED, сумму можно поменять
+//     прямо в строке: «Назначить» / «Не назначать»;
+//   • смену открыли позже 15:00 — не деньги, а питание: «Урезать питание»
+//     (40 вместо 80 за тот день) / «Не урезать».
+const FB_AUTO_IC = {late_shift: 'clock', geo_off: 'pin'};
+const FB_MEAL_FROM = 80, FB_MEAL_TO = 40;
 function fbPendHtml(b){
   const list = fbCur(b).pending || [];
   return `<div class="sc fb-ph fb-pd" id="fbPend">
@@ -22723,27 +22731,28 @@ function fbPendHtml(b){
   </div>`;
 }
 function fbPendRow(p){
-  const sub = fbPenSubOf(p.name, true);
-  return `<div class="fb-pd-r" data-id="${escS(p.id)}" data-name="${escS(p.name)}">
+  const sub = fbPenSubOf(p.name, true), meal = p.action === 'meal';
+  return `<div class="fb-pd-r" data-id="${escS(p.id)}" data-name="${escS(p.name)}"${meal ? ' data-meal="1"' : ''}>
     <div class="fb-pd-top">
       <em class="fb-ph-i">${IC(FB_AUTO_IC[p.kind] || 'note', 22)}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(p.reason || 'Штраф'))}</b><i>${escS(p.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         p.note ? `<s>${escS(p.note)}</s>` : ''}</span>
-      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(p.day))}</u>
-        <label class="fb-pd-amt"><input type="text" inputmode="numeric" enterkeyhint="done" maxlength="6"
-          value="${p.amount || ''}" placeholder="сумма" aria-label="Сумма штрафа"><i>AED</i></label></span>
+      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(p.day))}</u>${meal
+        ? `<span class="fb-pd-meal"><i>питание</i><b>${p.meal_from} → ${p.meal_to}</b></span>`
+        : `<label class="fb-pd-amt"><input type="text" inputmode="numeric" enterkeyhint="done" maxlength="6"
+          value="${p.amount || ''}" placeholder="сумма" aria-label="Сумма штрафа"><i>AED</i></label>`}</span>
     </div>
     <div class="aud-act fb-pd-act">
-      <button class="aud-b soft dn" onclick="fbPendDo(this,'skip')">Не назначать</button>
-      <button class="aud-b go" onclick="fbPendDo(this,'assign')">Назначить</button>
+      <button class="aud-b soft dn" onclick="fbPendDo(this,'skip')">${meal ? 'Не урезать' : 'Не назначать'}</button>
+      <button class="aud-b go" onclick="fbPendDo(this,'assign')">${meal ? 'Урезать питание' : 'Назначить'}</button>
     </div>
   </div>`;
 }
 async function fbPendDo(btn, decision){
   const row = btn.closest('.fb-pd-r'); if(!row || row.dataset.busy) return;
-  const inp = row.querySelector('input'), name = row.dataset.name || '';
-  const amount = Math.round(parseFloat(String(inp.value || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0);
-  if(decision === 'assign' && !(amount > 0)){ _toast('Впишите сумму штрафа'); inp.focus(); return; }
+  const inp = row.querySelector('input'), name = row.dataset.name || '', meal = !!row.dataset.meal;
+  const amount = inp ? Math.round(parseFloat(String(inp.value || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0) : 0;
+  if(decision === 'assign' && !meal && !(amount > 0)){ _toast('Впишите сумму штрафа'); inp.focus(); return; }
   row.dataset.busy = '1';
   row.querySelectorAll('button').forEach(x => { x.disabled = true; });
   try{
@@ -22751,7 +22760,8 @@ async function fbPendDo(btn, decision){
       id: row.dataset.id, decision, amount: decision === 'assign' ? amount : 0, month: FB.month, as: _meName()}});
     if(res.book) fbApply(res.book);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    _toast(decision === 'assign' ? `Штраф назначен · ${name}` : `Не назначен · ${name}`);
+    _toast(meal ? (decision === 'assign' ? `Питание урезано · ${name}` : `Не урезано · ${name}`)
+                : (decision === 'assign' ? `Штраф назначен · ${name}` : `Не назначен · ${name}`));
   }catch(e){
     if(e && e.status === 409 && e.payload && e.payload.book){
       fbApply(e.payload.book);
@@ -22769,14 +22779,16 @@ async function fbPendDo(btn, decision){
 // История штрафов и удержаний: последние сверху, десять сразу, дальше «Показать ещё».
 // Нажал на штраф — «Пересмотреть»: сумма, способ, комментарий или отмена.
 // Отменённый остаётся в истории зачёркнутым и не нажимается.
-const FB_PH_F = {all: 'Все', live: 'Снимаются', paid: 'Оплаченные', wait: 'Ждут', off: 'Отменённые', skip: 'Не назначены'};
-const FB_PH_ST = {live: 'Снимается', paid: 'Оплачен', wait: 'Ждёт', off: 'Отменён', skip: 'Не назначен'};
+const FB_PH_F = {all: 'Все', live: 'Снимаются', paid: 'Оплаченные', wait: 'Ждут', off: 'Отменённые',
+                 skip: 'Не назначены', cut: 'Питание урезано'};
+const FB_PH_ST = {live: 'Снимается', paid: 'Оплачен', wait: 'Ждёт', off: 'Отменён', skip: 'Не назначен', cut: 'Урезано'};
 // Штраф в истории: пока снимается с зарплаты — «Снимается», снялся весь —
 // «Оплачен», начнётся со следующего месяца — «Ждёт», сняли — «Амнистия»
 // (удержание — «Отменено»).
 function fbPenHistSt(h){
-  // штраф программы, который решили не назначать (fbPendHtml), — исход, не штраф
+  // решения по тому, что сформировала программа (fbPendHtml), — исход, не штраф
   if(h.declined) return 'skip';
+  if(h.meal) return 'cut';
   return h.cancelled ? 'off' : (h.start && h.start > FB.month) ? 'wait' : h.done ? 'paid' : 'live';
 }
 function fbPenHistHtml(b){
@@ -22803,13 +22815,18 @@ function fbPenHistRow(h, hide){
   const title = parts[0] || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
   const det = [parts.slice(1).join(' · '), h.note].filter(Boolean).join(' · ');
   const sub = fbPenSubOf(h.name, true);
-  // «Не назначен» — только исход: пересматривать нечего, строка не нажимается
-  if(h.declined) return `<div class="fb-ph-r skip"${hide ? ' hidden' : ''}>
+  // Решение программы без записи в зарплатах — только исход: «Не назначен»,
+  // «Не урезано» или «Урезано» (питание). Пересматривать нечего, строка не нажимается.
+  if(h.declined || h.meal){
+    const v = h.meal ? `${FB_MEAL_FROM} → ${FB_MEAL_TO} AED` : h.amount ? fbFmt(h.amount) + ' AED' : '—';
+    const stT = h.declined ? (h.meal ? 'Не урезано' : FB_PH_ST.skip) : FB_PH_ST.cut;
+    return `<div class="fb-ph-r ${h.declined ? 'skip' : 'cut'}"${hide ? ' hidden' : ''}>
       <em class="fb-ph-i">${icon}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
-      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${h.amount ? fbFmt(h.amount) + ' AED' : '—'}</b>
-        <i class="fb-ph-st skip">${FB_PH_ST.skip}</i></span></div>`;
+      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${v}</b>
+        <i class="fb-ph-st ${h.declined ? 'skip' : 'cut'}">${stT}</i></span></div>`;
+  }
   return `<button class="fb-ph-r${h.cancelled ? ' off' : ''}"${hide ? ' hidden' : ''} onclick="fbPenEdit('${escS(h.id)}')">
       <em class="fb-ph-i">${icon}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${

@@ -22765,8 +22765,8 @@ async function fbPendDo(btn, decision){
       id: row.dataset.id, decision, amount: decision === 'assign' ? amount : 0, month: FB.month, as: _meName()}});
     if(res.book) fbApply(res.book);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    _toast(meal ? (decision === 'assign' ? `Питание урезано · ${name}` : `Не урезано · ${name}`)
-                : (decision === 'assign' ? `Штраф назначен · ${name}` : `Не назначен · ${name}`));
+    _toast(decision === 'skip' ? `Амнистия · ${name}`
+           : meal ? `Питание урезано · ${name}` : `Штраф назначен · ${name}`);
   }catch(e){
     if(e && e.status === 409 && e.payload && e.payload.book){
       fbApply(e.payload.book);
@@ -22784,15 +22784,17 @@ async function fbPendDo(btn, decision){
 // История штрафов и удержаний: последние сверху, десять сразу, дальше «Показать ещё».
 // Нажал на штраф — «Пересмотреть»: сумма, способ, комментарий или отмена.
 // Отменённый остаётся в истории зачёркнутым и не нажимается.
-const FB_PH_F = {all: 'Все', live: 'Снимаются', paid: 'Оплаченные', wait: 'Ждут', off: 'Отменённые',
-                 skip: 'Не назначены', cut: 'Питание урезано'};
-const FB_PH_ST = {live: 'Снимается', paid: 'Оплачен', wait: 'Ждёт', off: 'Отменён', skip: 'Не назначен', cut: 'Урезано'};
+// Слово одно на всё: простили штраф — «Амнистия» (владелец, 22 сен 2026),
+// и неважно, сняли его после назначения или решили не назначать вовсе.
+const FB_PH_F = {all: 'Все', live: 'Снимаются', paid: 'Оплаченные', wait: 'Ждут',
+                 off: 'Амнистия', cut: 'Питание урезано'};
+const FB_PH_ST = {live: 'Снимается', paid: 'Оплачен', wait: 'Ждёт', off: 'Амнистия', cut: 'Урезано'};
 // Штраф в истории: пока снимается с зарплаты — «Снимается», снялся весь —
 // «Оплачен», начнётся со следующего месяца — «Ждёт», сняли — «Амнистия»
 // (удержание — «Отменено»).
 function fbPenHistSt(h){
   // решения по тому, что сформировала программа (fbPendHtml), — исход, не штраф
-  if(h.declined) return 'skip';
+  if(h.declined) return 'off';          // простили — та же амнистия
   if(h.meal) return 'cut';
   return h.cancelled ? 'off' : (h.start && h.start > FB.month) ? 'wait' : h.done ? 'paid' : 'live';
 }
@@ -22824,13 +22826,13 @@ function fbPenHistRow(h, hide){
   // «Не урезано» или «Урезано» (питание). Пересматривать нечего, строка не нажимается.
   if(h.declined || h.meal){
     const v = h.meal ? `${FB_MEAL_FROM} → ${FB_MEAL_TO} AED` : h.amount ? fbFmt(h.amount) + ' AED' : '—';
-    const stT = h.declined ? (h.meal ? 'Не урезано' : FB_PH_ST.skip) : FB_PH_ST.cut;
+    const stT = h.declined ? FB_PH_ST.off : FB_PH_ST.cut;
     return `<div class="fb-ph-r auto ${h.declined ? 'skip' : 'cut'}"${hide ? ' hidden' : ''}>
       <em class="fb-ph-i">${icon}</em>
       <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
         det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
       <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${v}</b>
-        <i class="fb-ph-st ${h.declined ? 'skip' : 'cut'}">${stT}</i></span></div>`;
+        <i class="fb-ph-st ${h.declined ? 'off' : 'cut'}">${stT}</i></span></div>`;
   }
   return `<button class="fb-ph-r${h.cancelled ? ' off' : ''}${h.auto ? ' auto' : ''}"${hide ? ' hidden' : ''} onclick="fbPenEdit('${escS(h.id)}')">
       <em class="fb-ph-i">${icon}</em>

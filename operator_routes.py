@@ -3443,6 +3443,53 @@ async def handle_drv_panic(request):
                              headers=CORS_HEADERS)
 
 
+# ── чай оператора ────────────────────────────────────────────────────────────
+# Владелец, 22 сен 2026: «чтобы операторы у себя в приложении видели свой чай,
+# который они заработали». Как считается и кому засчитывается — op_tea.py.
+@require_operator
+async def handle_tea(request):
+    """GET ?as=&month=YYYY-MM[&op=][&brief=1] — чай: сегодня, по дням месяца и
+    по заказам. Телефон, закреплённый за человеком, видит только его чай, за
+    планшетом — выбранного; старший — всех районных операторов строками и
+    любого из них по op. brief=1 — одна сегодняшняя сумма, для кнопки в шапке."""
+    import op_tea
+    districts = await _fresh_districts()
+    people = _people_for(request, districts)
+    test = _tflag(request)
+    pinned = TEST_PERSON if test else _staff_mod.operator_by_tg(request["op_user"].get("id"))
+    who = pinned or str(request.query.get("as") or "").strip()
+    me = next((p for p in people if p["name"] == who), None)
+    if not me:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    today = _bizday.biz_day()
+    month = str(request.query.get("month") or "")
+    if not (len(month) == 7 and month[4] == "-" and (month[:4] + month[5:]).isdigit()
+            and "2026-01" <= month <= today[:7] and 1 <= int(month[5:]) <= 12):
+        month = today[:7]
+    data = await op_tea.month(month, test=test)
+    ops = [p for p in people if not p["senior"]]
+    target = me
+    if me["senior"]:
+        # Тест-оператор один за всех: его чай — со всех тест-заказов.
+        target = (None if test else
+                  next((p for p in ops if p["name"] == str(request.query.get("op") or "").strip()), None))
+        if target is None and not test:
+            v = op_tea.summary(data, ops)
+            if request.query.get("brief") == "1":
+                return web.json_response({"who": who, "senior": True, "day": v["day"]},
+                                         headers=CORS_HEADERS)
+            return web.json_response({"who": who, "senior": True, **v}, headers=CORS_HEADERS)
+    v = op_tea.person(data, target["name"] if target else None)
+    if request.query.get("brief") == "1":
+        return web.json_response({"who": who, "senior": me["senior"], "day": v["day"]},
+                                 headers=CORS_HEADERS)
+    of = target or me
+    return web.json_response({
+        "who": who, "senior": me["senior"], "of": of["name"],
+        "codes": sorted(OFFICE_CODES.get(d, "") for d in of.get("districts") or []), **v},
+        headers=CORS_HEADERS)
+
+
 def setup(app):
     """Mount operator POS routes. Called from api_server.main()."""
     r = app.router
@@ -3456,6 +3503,8 @@ def setup(app):
     r.add_get("/api/operator/shift", handle_shift)
     r.add_route("OPTIONS", "/api/operator/shift/log", _opt)
     r.add_get("/api/operator/shift/log", handle_shift_log)
+    r.add_route("OPTIONS", "/api/operator/tea", _opt)
+    r.add_get("/api/operator/tea", handle_tea)
     r.add_route("OPTIONS", "/api/operator/shift/open", _opt)
     r.add_post("/api/operator/shift/open", handle_shift_open)
     r.add_route("OPTIONS", "/api/operator/shift/close", _opt)

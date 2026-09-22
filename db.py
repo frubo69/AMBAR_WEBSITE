@@ -3764,6 +3764,16 @@ async def shift_opens_for_day(day: str) -> dict:
     return {d["district"]: d async for d in cur}
 
 
+async def shift_opens_between(day_from: str, day_to: str) -> dict:
+    """Открытия смен районов за дни [day_from, day_to]: {(день, район): документ}.
+    Одним запросом — чаю операторов за месяц нужен оператор каждого дня."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.shift_opens.find({"day": {"$gte": day_from, "$lte": day_to}, "district": {"$ne": "*"}},
+                              {"_id": 0, "day": 1, "district": 1, "operator": 1})
+    return {(d["day"], d["district"]): d async for d in cur}
+
+
 async def shift_opened_after(at, district: str = "") -> bool:
     """Открывал ли оператор смену после момента at (района, если задан).
 

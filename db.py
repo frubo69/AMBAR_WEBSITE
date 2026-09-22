@@ -5664,6 +5664,45 @@ async def fin_pay_item_get(iid: str) -> dict | None:
     return await d.fin_pay_items.find_one({"_id": iid})
 
 
+# ── штрафы на решение (fines_auto.py) ────────────────────────────────────────
+async def fine_pending_add(doc: dict) -> bool:
+    """Штраф, который сформировала программа, — ждёт решения старшего. Одно
+    событие — одна запись (_id): повтор того же события второй не даёт."""
+    d = _db_or_none()
+    if d is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await d.fine_pending.insert_one(doc)
+        return True
+    except DuplicateKeyError:
+        return False
+
+
+async def fine_pending_list(status: str = "", kind: str = "", limit: int = 200) -> list:
+    """Свежие сверху. status: pending | assigned | declined; пусто — все."""
+    d = _db_or_none()
+    if d is None: return []
+    q = {**({"status": status} if status else {}), **({"kind": kind} if kind else {})}
+    return await d.fine_pending.find(q).sort([("day", -1), ("at", -1)]).to_list(limit)
+
+
+async def fine_pending_decide(pid: str, fields: dict) -> dict | None:
+    """Решение — только из «ждёт»: второй раз его не принять (двойное нажатие,
+    два старших разом). None — записи нет или по ней уже решили."""
+    d = _db_or_none()
+    if d is None: return None
+    from pymongo import ReturnDocument
+    return await d.fine_pending.find_one_and_update(
+        {"_id": pid, "status": "pending"}, {"$set": fields}, return_document=ReturnDocument.AFTER)
+
+
+async def fine_pending_undo(pid: str, fields: dict) -> None:
+    """Вернуть «ждёт», если штраф по решению записать не удалось."""
+    d = _db_or_none()
+    if d is None: return
+    await d.fine_pending.update_one({"_id": pid}, {"$set": {"status": "pending"}, "$unset": fields})
+
+
 async def fx_day_set(day: str, rates: dict) -> None:
     """Курсы на конец дня — чтобы назавтра было с чем сравнить: источник отдаёт
     только сегодняшнее число, истории у него нет."""

@@ -649,7 +649,11 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     for r in res["people"]:
         p = next((x for x in people if x["name"] == r["name"]), {})
         r["pnote"] = p.get("pnote", "")
-    res["history"] = _penalty_history(items, month)
+    # Штрафы, которые сформировала программа (fines_auto): ждущие — в окошко
+    # «Штрафы, требующие решения», не назначенные — в историю с исходом.
+    import fines_auto
+    res["pending"] = await fines_auto.pending()
+    res["history"] = _penalty_history(items, month, declined=await fines_auto.declined())
     return res
 
 
@@ -775,12 +779,27 @@ async def person_card(name: str, month: str) -> dict:
     return out
 
 
-def _penalty_history(items: list, month: str, limit: int = 60) -> list:
+def _penalty_history(items: list, month: str, limit: int = 60, declined: list | None = None) -> list:
     """История штрафов и удержаний для «Штрафов/авансов/долгов»: последние
     сверху, отменённые и пересмотренные — с пометкой. От людей не зависит: кого
-    убрали из зарплат, того штрафы тоже видно."""
+    убрали из зарплат, того штрафы тоже видно. declined — штрафы программы,
+    которые решили не назначать (fines_auto): в истории они с исходом «Не
+    назначен», в зарплатах их нет."""
     out = []
-    for it in sorted(items, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
+    # «Не назначен» стоит в истории по времени решения, как штраф — по времени записи
+    skip = [dict(d, _skip=True, at=d.get("decided_at") or d.get("at")) for d in (declined or [])]
+    for it in sorted(list(items) + skip, key=lambda x: str(x.get("at") or x.get("day") or ""), reverse=True):
+        if it.get("_skip"):
+            out.append(dict(id="auto:" + str(it.get("_id")), name=it.get("name") or "", kind="fine",
+                            t=pay.KINDS["fine"], amount=pay._i(pay._n(it.get("amount"))), per_month=0,
+                            start="", day=it.get("day") or "", note=it.get("note") or "",
+                            reason=it.get("reason") or "", by=it.get("decided_by") or "",
+                            cancelled=False, cancelled_by="", cancelled_day="", revised=False,
+                            revised_by="", src="", wid="", was=None, left=0, done=False,
+                            auto=it.get("kind") or "", declined=True))
+            if len(out) >= limit:
+                break
+            continue
         if it.get("kind") not in pay.PENALTY_KINDS:
             continue
         s = pay.schedule(it, month)
@@ -794,7 +813,8 @@ def _penalty_history(items: list, month: str, limit: int = 60) -> list:
                         revised=bool(it.get("revised_at")), revised_by=it.get("revised_by") or "",
                         src=it.get("src") or "", wid=it.get("wid") or "",
                         was=None if it.get("was") is None else pay._i(pay._n(it.get("was"))),
-                        left=0 if gone else s["after"], done=False if gone else s["done"]))
+                        left=0 if gone else s["after"], done=False if gone else s["done"],
+                        auto=it.get("auto") or "", declined=False))
         if len(out) >= limit:
             break
     return out
@@ -1489,6 +1509,60 @@ async def handle_pay_item_add(request):
 
 
 @require_owner
+async def handle_fine_decide(request):
+    """POST {id, decision: assign|skip, amount, month, as} — решение по штрафу,
+    который сформировала программа (fines_auto.py). «Назначить» — обычный штраф
+    в зарплатах: с этого месяца, разом, день — день нарушения; водителю — то же
+    сообщение, что о любом штрафе. «Не назначать» — только исход в истории.
+    Решают один раз: второе нажатие или второй старший получают 409 и свежую
+    книгу, где этого штрафа среди ждущих уже нет."""
+    try:
+        body = await request.json()
+        pid = str(body.get("id") or "").strip()
+        decision = str(body.get("decision") or "")
+        month = _month_arg(body.get("month")) if body.get("month") else _biz_day()[:7]
+        if not pid or decision not in ("assign", "skip"):
+            return _json({"error": "bad_request"}, 400)
+        amount = _num(body.get("amount")) if decision == "assign" else None
+        if decision == "assign" and (amount is None or amount <= 0):
+            return _json({"error": "bad_amount"}, 400)
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    now = datetime.now(timezone.utc)
+    if decision == "skip":
+        doc = await db.fine_pending_decide(pid, {"status": "declined", "decided_by": who, "decided_at": now})
+        if not doc:
+            return _json({"error": "decided", "book": await build(month)}, 409)
+        log.info(f"[fin] штраф на решение: {doc.get('name')} — {doc.get('reason')} {doc.get('day')} "
+                 f"не назначен · {who or '—'}")
+        return _json({"ok": True, "book": await build(month)})
+    iid = secrets.token_hex(5)
+    doc = await db.fine_pending_decide(pid, {"status": "assigned", "decided_by": who, "decided_at": now,
+                                             "amount": amount, "item": iid})
+    if not doc:
+        return _json({"error": "decided", "book": await build(month)}, 409)
+    day = str(doc.get("day") or "")[:10] or _biz_day()
+    start = max(_biz_day()[:7], day[:7])              # снимается с зарплаты этого месяца
+    item = {"_id": iid, "name": doc.get("name") or "", "kind": "fine", "amount": amount,
+            "per_month": 0, "from": start, "day": day, "note": doc.get("note") or "",
+            "reason": doc.get("reason") or "", "entry": "", "by": who, "at": now,
+            "auto": doc.get("kind") or "", "pending": pid}
+    try:
+        await db.fin_pay_item_add(item)
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] штраф на решение {pid}: не записан, возвращаю в ждущие: {e}")
+        await db.fine_pending_undo(pid, {"decided_by": "", "decided_at": "", "item": ""})
+        return _json({"error": "save_failed"}, 500)
+    await _touch(min(start, day[:7]))
+    # Водителю — тем же днём, в его бот: как о любом штрафе.
+    await _pn.tell_safe(item["name"], _pn.added(item, who))
+    log.info(f"[fin] штраф на решение: {item['name']} — {item['reason']} {day} назначен {amount} "
+             f"с {start} · {who or '—'}")
+    return _json({"ok": True, "id": iid, "book": await build(month)})
+
+
+@require_owner
 async def handle_pay_item_del(request):
     """DELETE {id, month, as} — убрать удержание; выданные деньги уходят из
     расходов вместе с ним."""
@@ -1641,6 +1715,7 @@ def setup(app):
         ("/api/owner/finance/book/pay/item", handle_pay_item_del, "DELETE"),
         ("/api/owner/finance/book/pay/item/edit", handle_pay_item_edit, "POST"),
         ("/api/owner/finance/book/pay/item/restore", handle_pay_item_restore, "POST"),
+        ("/api/owner/finance/fines/decide", handle_fine_decide, "POST"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),
     )
     seen = set()

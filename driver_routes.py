@@ -547,19 +547,25 @@ def _mde(s: str) -> str:
     return re.sub(r"([_*`\[])", r"\\\1", str(s or ""))
 
 
-async def _late_alert(me: dict, now: datetime) -> None:
-    """Смену открыли позже 15:00 — старшему (STAR) и операторам района."""
+async def _late_alert(me: dict, now: datetime, day: str) -> None:
+    """Смену открыли позже 15:00 — старшему (STAR) и операторам района; в STAR
+    — штраф на решение (владелец, 22 сен 2026: «туда автоматически уходит
+    сформированный штраф с двумя кнопками — назначить или не назначать»)."""
     import html as _html
     from config_offices import OFFICE_CODES, OFFICE_NAMES
+    import fines_auto
     oid = me.get("district") or ""
     where = f"{OFFICE_CODES.get(oid, '')} {OFFICE_NAMES.get(oid, oid)}".strip()
     at = now.astimezone(bizday.DUBAI_TZ).strftime("%H:%M")
     name = me.get("name") or "—"
+    fine = await fines_auto.late_shift(name, oid, day, at, SHIFT_LATE_HOUR)
     try:
         from owner_routes import notify_owners
         await notify_owners("driver.late_shift",
                             f"⏰ *Поздно открыл смену* — {_mde(name)}, {_mde(where)}\n"
-                            f"Открыл в {at}, а правило — до {SHIFT_LATE_HOUR}:00.")
+                            f"Открыл в {at}, а правило — до {SHIFT_LATE_HOUR}:00."
+                            + ("\nШтраф ждёт решения — в «Штрафах»." if fine else ""),
+                            reply_markup=fines_auto.open_button() if fine else None)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] старшему о поздней смене не ушло: {e}")
     try:
@@ -849,7 +855,7 @@ async def handle_shift_open(request):
     log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин"
              + (" · без отметки оператора" if self_mark else ""))
     if not _tq(me) and _shift_late(day, now):
-        await _late_alert(me, now)
+        await _late_alert(me, now, day)
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)
 
 

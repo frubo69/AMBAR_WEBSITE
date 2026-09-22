@@ -197,6 +197,44 @@ for n_, f in dict(fin_budget_get=fin_budget_get, fin_budget_line_get=fin_budget_
                   fin_pay_item_del=fin_pay_item_del, fin_pay_item_set=fin_pay_item_set, shift_days_worked=shift_days_worked,
                   fin_entries_where=fin_entries_where, fin_carry_invalidate=fin_carry_invalidate).items():
     setattr(db, n_, f)
+# Штрафы, требующие решения (fines_auto): двое ждут, один не назначен, один
+# назначен — чтобы на стенде были видны окошко и оба исхода в истории.
+_ago = lambda n: (datetime.strptime(TODAY, "%Y-%m-%d") - timedelta(days=n)).strftime("%Y-%m-%d")
+_at = lambda n: datetime.now(timezone.utc) - timedelta(days=n)
+PEND = [dict(_id=f"late_shift:{TODAY}:Худоба", kind="late_shift", name="Худоба", district="jvc", day=TODAY,
+             reason="Поздно открыл смену", note="открыл в 16:20, правило — до 15:00", amount=None,
+             status="pending", at=_at(0)),
+        dict(_id=f"late_shift:{_ago(1)}:Али", kind="late_shift", name="Али", district="jbr", day=_ago(1),
+             reason="Поздно открыл смену", note="открыл в 15:40, правило — до 15:00", amount=100,
+             status="pending", at=_at(1)),
+        dict(_id=f"late_shift:{_ago(2)}:Баха", kind="late_shift", name="Баха", district="bbay", day=_ago(2),
+             reason="Поздно открыл смену", note="открыл в 17:05, правило — до 15:00", amount=100,
+             status="declined", decided_by="Макар", decided_at=_at(2), at=_at(2))]
+ITEMS.append(dict(_id="i5", name="Файзуло", kind="fine", amount=100, per_month=0, **{"from": MONTH}, day=_ago(3),
+                  reason="Поздно открыл смену", note="открыл в 15:25, правило — до 15:00", entry="",
+                  auto="late_shift", by="Макар", at=_at(3)))
+async def fine_pending_add(doc):
+    if any(x["_id"] == doc["_id"] for x in PEND): return False
+    PEND.append(dict(doc)); return True
+async def fine_pending_list(status="", kind="", limit=200):
+    rows = [dict(x) for x in PEND if (not status or x["status"] == status) and (not kind or x["kind"] == kind)]
+    return sorted(rows, key=lambda x: (x["day"], str(x.get("at"))), reverse=True)[:limit]
+async def fine_pending_decide(pid, fields):
+    for x in PEND:
+        if x["_id"] == pid and x["status"] == "pending": x.update(fields); return dict(x)
+    return None
+async def fine_pending_undo(pid, fields):
+    for x in PEND:
+        if x["_id"] == pid:
+            x["status"] = "pending"
+            for k in fields: x.pop(k, None)
+for n_, f in dict(fine_pending_add=fine_pending_add, fine_pending_list=fine_pending_list,
+                  fine_pending_decide=fine_pending_decide, fine_pending_undo=fine_pending_undo).items():
+    setattr(db, n_, f)
+import pay_notify
+async def _tell_safe(name, text, parse_mode="HTML"): return 0      # стенд: водителям не пишем
+pay_notify.tell_safe = _tell_safe
+
 import types
 _rates = types.ModuleType("rates")
 async def _get_rates(force=False): return {"rates": [{"code": "USD", "aed": 3.6725, "cash_aed": 3.67}]}

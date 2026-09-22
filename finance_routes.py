@@ -742,6 +742,11 @@ async def person_card(name: str, month: str) -> dict:
                           reason=it.get("reason") or "", note=it.get("note") or "",
                           due=pay._i(due), left=0 if gone else sch["after"], done=False if gone else sch["done"],
                           cancelled=gone, src=it.get("src") or "", wid=it.get("wid") or ""))
+    # Решения по тому, что сформировала программа: прощённое и урезанное
+    # питание — строками в той же истории (из зарплаты они не вычитаются).
+    import fines_auto
+    items = sorted(items + await fines_auto.for_person(name), key=lambda x: str(x.get("at") or x.get("day") or ""),
+                   reverse=True)
     out = dict(month=month, name=name, fines=pay._i(fines), holds=pay._i(holds),
                month_total=pay._i(fines + holds), month_count=cnt, items=items,
                usd=pay_.get("usd"), found=bool(p))

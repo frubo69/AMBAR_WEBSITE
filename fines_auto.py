@@ -127,6 +127,36 @@ async def decided(limit: int = 60) -> list:
         return []
 
 
+async def for_person(name: str, limit: int = 60) -> list:
+    """Решения по одному человеку, у которых нет записи в зарплатах, — в его
+    историю списаний в приложении водителя (владелец, 22 сен 2026: «если
+    принимается решение водителя не штрафовать, ему в истории штрафов надо
+    показывать — как тот, который ему решили простить»): прощённый штраф,
+    прощённое и урезанное питание. Назначенный штраф он и так видит записью."""
+    try:
+        rows = await db.fine_pending_list(status="declined", limit=limit, name=name)
+        rows += [d for d in await db.fine_pending_list(status="assigned", limit=limit, name=name)
+                 if action_of(d.get("kind") or "") == "meal"]
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[fines] решения по {name} не прочитаны: {e}")
+        return []
+    out = []
+    for d in rows:
+        meal = action_of(d.get("kind") or "") == "meal"
+        out.append({"id": "auto:" + str(d.get("_id") or ""), "kind": "fine", "t": "Штраф",
+                    "amount": (MEAL_FROM - MEAL_TO) if meal else int(float(d.get("amount") or 0)),
+                    "per_month": 0, "day": d.get("day") or "",
+                    # часа не даём: у решения он свой, а день — день нарушения;
+                    # во сколько было нарушение — в подробностях
+                    "at": "",
+                    "start": str(d.get("day") or "")[:7], "reason": d.get("reason") or "",
+                    "note": d.get("note") or "", "due": 0, "left": 0, "done": False,
+                    "cancelled": False, "src": "", "wid": "", "auto": d.get("kind") or "",
+                    "forgiven": d.get("status") == "declined", "meal": meal,
+                    **({"meal_from": MEAL_FROM, "meal_to": MEAL_TO} if meal else {})})
+    return out
+
+
 def meal_cut_text(doc: dict, who: str) -> str:
     """Водителю — его ботом: за что и насколько урезано питание."""
     import pay_notify as _pn

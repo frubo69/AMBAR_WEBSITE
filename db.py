@@ -5692,11 +5692,12 @@ async def fine_pending_update(pid: str, fields: dict) -> bool:
     return bool(r.matched_count)
 
 
-async def fine_pending_list(status: str = "", kind: str = "", limit: int = 200) -> list:
+async def fine_pending_list(status: str = "", kind: str = "", limit: int = 200, name: str = "") -> list:
     """Свежие сверху. status: pending | assigned | declined; пусто — все."""
     d = _db_or_none()
     if d is None: return []
-    q = {**({"status": status} if status else {}), **({"kind": kind} if kind else {})}
+    q = {**({"status": status} if status else {}), **({"kind": kind} if kind else {}),
+         **({"name": name} if name else {})}
     return await d.fine_pending.find(q).sort([("day", -1), ("at", -1)]).to_list(limit)
 
 

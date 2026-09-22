@@ -199,6 +199,10 @@ const ST_PROF = {month: '2026-09', name: 'Худоба', role: 'driver', role_t:
   accrued: 5000, plus: 0, minus: 1750, fines: 1350, holds: 400, to_pay: 3250, paid: 0, left: 3250, debt: 0,
   month_total: 1750, month_count: 5,
   items: [
+    // решения старшего по тому, что сформировала программа (22 сен 2026): прощённое и урезанное питание
+    {id: 'auto:late_shift:2026-09-13', kind: 'fine', t: 'Штраф', amount: 40, per_month: 0, day: '2026-09-13', at: '', reason: 'Поздно открыл смену', note: 'открыл в 17:57, правило — до 15:00', due: 0, left: 0, done: false, cancelled: false, auto: 'late_shift', forgiven: true, meal: true, meal_from: 80, meal_to: 40},
+    {id: 'auto:geo_off:2026-09-13', kind: 'fine', t: 'Штраф', amount: 200, per_month: 0, day: '2026-09-13', at: '', reason: 'Отключил геолокацию', note: 'выключил в 22:00', due: 0, left: 0, done: false, cancelled: false, auto: 'geo_off', forgiven: true, meal: false},
+    {id: 'auto:late_shift:2026-09-12', kind: 'fine', t: 'Штраф', amount: 40, per_month: 0, day: '2026-09-12', at: '', reason: 'Поздно открыл смену', note: 'открыл в 16:20, правило — до 15:00', due: 0, left: 0, done: false, cancelled: false, auto: 'late_shift', forgiven: false, meal: true, meal_from: 80, meal_to: 40},
     {id: 'p1', kind: 'fine', t: 'Штраф', amount: 1000, per_month: 0, day: '2026-09-12', at: '2026-09-12T10:23:00', reason: 'Превышение скорости · 71 – 100 км/ч', note: 'Превышение скорости на E311', due: 1000, left: 0, done: true, cancelled: false},
     {id: 'p2', kind: 'hold', t: 'Удержание', amount: 400, per_month: 0, day: '2026-09-08', at: '2026-09-08T06:12:00', reason: '', note: 'Аванс за топливо', due: 400, left: 0, done: true, cancelled: false},
     {id: 'p3', kind: 'fine', t: 'Штраф', amount: 350, per_month: 0, day: '2026-09-05', at: '2026-09-05T12:45:00', reason: 'Использование телефона за рулём · Во время движения', note: 'Использование телефона за рулем', due: 350, left: 0, done: true, cancelled: false},
@@ -270,6 +274,8 @@ async function standBoot(){
   if(ST_Q.get('open') === 'chat') caseOpen(ST_ORDER.order_id);
   if(ST_Q.get('open') && ST_Q.get('open').indexOf('exp:') === 0){ await new Promise(r => setTimeout(r, 150)); expGo(ST_Q.get('open').slice(4)); }
   if(ST_Q.get('open') === 'orders'){ await new Promise(r => setTimeout(r, 150)); profOrders(); }
+  // ?open=hist — история списаний в профиле; &item=<id> — сразу одна запись
+  if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 400)); profHist(); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); }
   if(ST_Q.get('open') === 'ordhist'){ await new Promise(r => setTimeout(r, 150)); ordHist(); }   // история из ленты заказов
   if(ST_Q.get('open') === 'shs'){ await new Promise(r => setTimeout(r, 150)); shsOpen(!!(ST_Q.get('shclosed') || ST_Q.get('prevday'))); }   // итоги смены: перед закрытием или просмотр после
   if(ST_Q.get('open') === 'supx'){ await new Promise(r => setTimeout(r, 300)); supOpen('s2', 'jvc'); }   // задача доп. заявки

@@ -138,6 +138,28 @@ async def main():
     eq("«Не назначен» у штрафа — сумма, за что, кто решил", (f["declined"], f["meal"], f["amount"], f["reason"], f["by"]),
        (True, False, 200, "Отключил геолокацию", "Слон"))
 
+    print("── история водителя в его приложении ───────────────────────────")
+    # владелец: «если решили не штрафовать — ему в его истории показывать как
+    # тот, который ему решили простить»
+    async def pay_month(m): return {"people": []}
+    fr.pay_month = pay_month
+    card = lambda n: fr.person_card(n, "2026-09")
+    it = [x for x in (await card("Баха"))["items"] if x.get("auto")]
+    eq("Баха: питание не урезали — «прощено», из зарплаты ничего",
+       [(x["reason"], x["forgiven"], x["meal"], x["amount"], x["due"]) for x in it],
+       [("Поздно открыл смену", True, True, 40, 0)])
+    it = [x for x in (await card("Али"))["items"] if x.get("auto")]
+    eq("Али: питание урезано — строкой, не прощено",
+       [(x["forgiven"], x["meal"], x["meal_from"], x["meal_to"]) for x in it], [(False, True, 80, 40)])
+    it = [x for x in (await card("Файзуло"))["items"] if x.get("auto")]
+    eq("Файзуло: штраф за геолокацию не назначили — «прощён», сумма и подробности",
+       [(x["reason"], x["forgiven"], x["meal"], x["amount"], x["note"]) for x in it],
+       [("Отключил геолокацию", True, False, 200, "выключил в 22:00")])
+    c = await card("Худоба")
+    eq("Худоба: назначенный штраф — обычной строкой, без двойника",
+       [(x["kind"], x["amount"], bool(x.get("forgiven"))) for x in c["items"]], [("fine", 150, False)])
+    eq("и в сумме штрафов месяца — только назначенный", c["fines"], 150)
+
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     return 1 if FAIL else 0
 

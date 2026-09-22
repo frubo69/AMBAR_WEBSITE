@@ -3610,6 +3610,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .hs-r.fine .hs-am{color:#E8746F}
 .hs-r.hold .hs-am{color:var(--gold2)}
 .hs-r.off .hs-am{color:var(--dim);text-decoration:line-through}
+/* прощённое старшим — зелёная метка, сумма зачёркнута; урезанное питание — янтарём */
+.hs-r.forg .hs-tag{background:rgba(76,175,125,.16);color:#6FD79B}
+.hs-r.forg .hs-am{color:var(--dim);text-decoration:line-through}
+.hs-r.meal .hs-tag{background:rgba(243,180,74,.16);color:#F3B44A}
 .hs-c{flex:0 0 auto;margin-left:5px;color:var(--muted);display:flex}
 .hs-none{padding:22px 12px;text-align:center;font-size:12.5px;color:var(--muted)}
 /* Итог: слева крупно «К выплате», справа из чего сложилось */
@@ -5301,6 +5305,7 @@ function hsCut(it){
 }
 function hsIco(it){
   const t = (String(it.reason || '') + ' ' + String(it.note || '')).toLowerCase();
+  if(/геолокац/.test(t)) return ICO.pin;
   if(/скорост/.test(t)) return ICO.car;
   if(/телефон/.test(t)) return ICO.mobile;
   if(/парков/.test(t)) return ICO.nopark;
@@ -5311,6 +5316,15 @@ function hsIco(it){
   if(/мойк/.test(t)) return ICO.wash;
   if(/^(бой|брак|просрочк|потер|недостач)/.test(t)) return ICO.warn;   // удержание по списанию
   return it.kind === 'hold' ? ICO.wallet : ICO.car;
+}
+// Решение старшего по тому, что сформировала программа (владелец, 22 сен
+// 2026): не наказали — «Прощён» («Прощено» у питания), урезали питание за
+// поздний выход — «Питание». Из зарплаты ни то ни другое не вычитается.
+function hsTag(it){
+  const k = it.kind === 'hold' ? 'hold' : 'fine';
+  if(it.forgiven) return it.meal ? 'Прощено' : 'Прощён';
+  if(it.meal) return 'Питание';
+  return it.cancelled ? (k === 'hold' ? 'Отменено' : 'Амнистия') : (k === 'hold' ? 'Удержание' : 'Штраф');
 }
 function hsWhen(it){
   const d = profDayT(it.day), t = hhmm(it.at);
@@ -5332,10 +5346,10 @@ function hsRows(){
   if(!list.length) return `<div class="hs-none">${hsItems().length ? 'В этом отборе пусто' : 'Списаний не было'}</div>`;
   return list.map(it => {
     const c = hsCut(it), k = it.kind === 'hold' ? 'hold' : 'fine';
-    return `<button class="hs-r ${k}${it.cancelled ? ' off' : ''}" onclick="hsOpen('${esc(it.id)}')">
+    return `<button class="hs-r ${k}${it.cancelled ? ' off' : ''}${it.forgiven ? ' forg' : ''}${it.meal && !it.forgiven ? ' meal' : ''}" onclick="hsOpen('${esc(it.id)}')">
       <span class="hs-i">${svg(hsIco(it), 17)}</span>
       <span class="hs-b"><b>${esc(c.head)}</b>${c.tail ? `<i>${esc(c.tail)}</i>` : ''}<u>${esc(hsWhen(it))}</u></span>
-      <span class="hs-tag ${k}">${it.cancelled ? (k === 'hold' ? 'Отменено' : 'Амнистия') : (k === 'hold' ? 'Удержание' : 'Штраф')}</span>
+      <span class="hs-tag ${k}">${hsTag(it)}</span>
       <span class="hs-am">−${profSum(it.amount, 'down')}</span>
       <em class="hs-c">${svg(ICO.chevR, 12)}</em>
     </button>`;
@@ -5383,17 +5397,20 @@ function profItemHtml(){
   if(!it) return profHistHtml();
   const c = hsCut(it), k = it.kind === 'hold' ? 'hold' : 'fine';
   const rows = [
-    ['Вид', k === 'hold' ? 'Удержание' : 'Штраф'],
+    ['Вид', it.meal ? 'Питание за поздний выход' : k === 'hold' ? 'Удержание' : 'Штраф'],
     ['Когда', hsWhen(it) || '—'],
     it.note && it.note !== c.tail ? ['Примечание', it.note] : null,
     it.per_month ? ['Списывают', `по ${fmt(it.per_month)} AED в месяц`] : null,
-    ['Состояние', it.cancelled ? `${k === 'hold' ? 'Отменено' : 'Амнистия'} — из зарплаты не вычитается`
+    ['Состояние', it.forgiven ? (it.meal ? `Простили — питание за день ${it.meal_from} AED` : 'Простили — из зарплаты не вычитается')
+      : it.meal ? `Питание за день ${it.meal_to} AED вместо ${it.meal_from}`
+      : it.cancelled ? `${k === 'hold' ? 'Отменено' : 'Амнистия'} — из зарплаты не вычитается`
       : (it.done ? 'Списано полностью' : (it.left ? `Осталось ${profSum(it.left, 'down')}` : 'В этом месяце'))],
   ].filter(Boolean);
   return `<div class="hs-one">
       <div class="hs-one-h hs-r ${k}"><span class="hs-i">${svg(hsIco(it), 22)}</span>
         <div><b>${esc(c.tail || c.head)}</b><i>${esc(hsWhen(it))}</i></div></div>
-      <div class="hs-one-am ${k}${it.cancelled ? ' off' : ''}"><u>${it.cancelled ? (k === 'hold' ? 'Удержание отменено' : 'Амнистия на штраф') : 'Списано из зарплаты'}</u>
+      <div class="hs-one-am ${k}${it.cancelled || it.forgiven ? ' off' : ''}"><u>${it.forgiven ? (it.meal ? 'Питание не урезали' : 'Штраф прощён')
+        : it.meal ? 'Питание урезано' : it.cancelled ? (k === 'hold' ? 'Удержание отменено' : 'Амнистия на штраф') : 'Списано из зарплаты'}</u>
         <b>${profSum(it.amount, 'down')}</b></div>
       <div class="hs-one-l">${rows.map(([u, b]) => `<div><u>${esc(u)}</u><b>${esc(b)}</b></div>`).join('')}</div>
     </div>

@@ -4353,6 +4353,7 @@ CHK_PLAN = [
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
     ("costs",       12.0, 12.0, False),   # позиции без закупочной цены — пока они есть
+    ("fines",       12.0, 12.0, False),   # штрафы на решение (fines_auto) — пока они есть
 ]
 # Смена — одна задача с двумя половинами. Днём спрашивается «открыты ли», под
 # утро — «закрыты ли»: это одно и то же дело в разных концах суток, и держать
@@ -4678,6 +4679,28 @@ async def handle_checklist(request):
                        f"{n} {_pl_positions(n)} без закупочной цены",
                        False, now, day, plan, go="prices", n=n)
         row.update({"state": "late", "due": "", "late_min": 0})
+        rows.append(row)
+
+    # Штрафы, требующие решения (владелец, 22 сен 2026: «в чек-листе
+    # обязательно, если требуется внимание на принятие решения по штрафу»):
+    # строка есть, пока ждёт хоть один, горит с минуты, как его сформировала
+    # программа, и ведёт прямо в окошко «Штрафы, требующие решения».
+    try:
+        import fines_auto
+        wait = await db.fine_pending_list(status="pending")
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] штрафы на решение не прочитаны: {e}")
+        wait = []
+    if wait:
+        what = {"meal": "питание", "fine": "штраф"}
+        hint = " · ".join(f"{x.get('name') or '—'} — {what.get(fines_auto.action_of(x.get('kind') or ''), 'штраф')}"
+                          for x in wait[:4]) + (f" · ещё {len(wait) - 4}" if len(wait) > 4 else "")
+        row = _chk_row("fines", "Решения по штрафам", hint, False, now, day, plan, go="fines", n=len(wait))
+        first = min((_geo_dt(x.get("at")) for x in wait if _geo_dt(x.get("at"))), default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ)).total_seconds() // 60))
+                    if first else 0})
         rows.append(row)
 
     # Порядок задан планом и не пляшет по цвету: список должен читаться как

@@ -4021,7 +4021,7 @@ function teaPaint(){
           <span class="tea-v">${_num(d.aed)}</span>${_TEA_CH}</button>`
         + (open ? `<div class="tea-os">${d.orders.map(o => `<div class="tea-o">
             <span class="tea-ob"><b>${o.lines.map(l => _esc(l.name) + (l.qty > 1 ? '\u00a0×\u00a0' + l.qty : '')).join(', ')}</b><i>${
-              [o.code, _hmDubai(o.at)].filter(Boolean).map(_esc).join(' · ')}</i></span>
+              [o.code, o.driver].filter(Boolean).map(_esc).join(' · ')}</i></span>
             <span class="tea-ov">${_num(o.aed)}</span></div>`).join('')}</div>` : '');
     }).join('');
   }

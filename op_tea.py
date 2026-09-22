@@ -29,7 +29,7 @@ from config_offices import OFFICE_CODES
 # Из заказа нужно только это: месяц заказов целиком — полмегабайта адресов и
 # переписки, которые экрану чая ни к чему.
 FIELDS = ["order_id", "timestamp", "confirmed_at", "delivered_at", "day", "status",
-          "office_id", "items.id", "items.name", "items.qty", "tip", "dispatch_operator"]
+          "office_id", "items.id", "items.name", "items.qty", "tip", "dispatch_operator", "driver"]
 
 # Панель спрашивает чай раз в минуту с каждого устройства; месяц заказов на
 # всех один. Прошлые месяцы не меняются — держим дольше.
@@ -60,9 +60,13 @@ def _order_view(o: dict, rates: dict) -> dict:
     tip = int(cash_math._n(o.get("tip")))
     if tip > 0:
         lines.append({"name": "Чаевые клиента", "qty": 0, "aed": tip})
-    at = o.get("delivered_at") or o.get("confirmed_at") or o.get("timestamp") or ""
+    # Узнают заказ по району и водителю. Часа не показываем: телефонные заказы
+    # вносят пачкой под утро (замер 22 сен: 81 из 89 чайных заказов принят в
+    # 05:xx), и час внесения ничего не говорит; по нему только сортируем.
+    at = o.get("confirmed_at") or o.get("timestamp") or o.get("delivered_at") or ""
     return {"id": str(o.get("order_id") or ""), "code": OFFICE_CODES.get(o.get("office_id") or "", ""),
-            "at": str(at), "lines": lines, "bottles": bottles, "aed": sum(x["aed"] for x in lines)}
+            "driver": str(o.get("driver") or "").strip(), "at": str(at),
+            "lines": lines, "bottles": bottles, "aed": sum(x["aed"] for x in lines)}
 
 
 async def month(month: str, test: bool = False) -> dict:
@@ -115,7 +119,7 @@ def person(data: dict, name: str | None) -> dict:
         d = days.setdefault(r["day"], {"day": r["day"], "aed": 0, "bottles": 0, "orders": []})
         d["aed"] += r["aed"]
         d["bottles"] += r["bottles"]
-        d["orders"].append({k: r[k] for k in ("id", "code", "at", "lines", "bottles", "aed")})
+        d["orders"].append({k: r[k] for k in ("id", "code", "driver", "at", "lines", "bottles", "aed")})
     for d in days.values():
         d["orders"].sort(key=lambda x: x["at"], reverse=True)
     today = days.get(data["today"]) or {"aed": 0, "bottles": 0, "orders": []}

@@ -4325,6 +4325,66 @@ async def audit_scan_counts(district: str, day: str) -> dict:
     return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=800) if d["_id"]}
 
 
+async def audit_scan_times(district: str, day: str) -> dict:
+    """{позиция: когда её начали считать} — первый скан каждой позиции.
+
+    Ревизия — не мгновение, а часы: к одной полке человек подошёл в шесть
+    вечера, к другой в девять. Сравнивать обе с остатком «сейчас» нельзя —
+    ночная продажа превратится в излишек, а утренняя поставка в недостачу.
+    Берём первый скан позиции: это и есть момент, когда её посчитали."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.audit_scans.aggregate([
+        {"$match": {"district": district, "day": day, "product_id": {"$ne": ""}}},
+        {"$group": {"_id": "$product_id", "at": {"$min": "$at"}}}])
+    out = {}
+    for d in await cur.to_list(length=800):
+        at = d.get("at")
+        if d["_id"] and isinstance(at, datetime):
+            out[d["_id"]] = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+    return out
+
+
+async def intake_events(district: str, since) -> dict:
+    """{позиция: [(момент, единиц), …]} — приёмка по кодам после момента.
+    То же, что intake_since, но со временем: ревизии нужно знать, приехала
+    бутылка до того, как полку посчитали, или после."""
+    db = _db_or_none()
+    if db is None or not since: return {}
+    out: dict = {}
+    async for d in db.qr_codes.find(
+            {"src": "intake", "at": {"$gt": since},
+             "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]},
+            {"_id": 0, "product_id": 1, "at": 1, "qty": 1, "intake_extra": 1}):
+        pid, at = d.get("product_id") or "", d.get("at")
+        if not pid or not isinstance(at, datetime):
+            continue
+        q = (_qn(d.get("qty") or 1) or 1) + _qn(d.get("intake_extra") or 0)
+        out.setdefault(pid, []).append((at if at.tzinfo else at.replace(tzinfo=timezone.utc), q))
+    for ev in out.values():
+        ev.sort(key=lambda e: e[0])
+    return out
+
+
+async def writeoff_events(district: str, since) -> dict:
+    """{позиция: [(момент, единиц), …]} — списания после момента, со временем.
+    Недостачу самой ревизии (src=audit) не берём: она уже в её пересчёте."""
+    db = _db_or_none()
+    if db is None or not since: return {}
+    out: dict = {}
+    async for w in db.writeoffs.find(
+            {"district": district, "at": {"$gt": since}, "src": {"$ne": "audit"},
+             **WRITEOFF_COUNTED}, {"_id": 0, "item": 1, "at": 1, "qty": 1}):
+        pid, at = w.get("item") or "", w.get("at")
+        if not pid or not isinstance(at, datetime):
+            continue
+        out.setdefault(pid, []).append(
+            (at if at.tzinfo else at.replace(tzinfo=timezone.utc), _qn(w.get("qty") or 0)))
+    for ev in out.values():
+        ev.sort(key=lambda e: e[0])
+    return out
+
+
 async def audit_scan_odd(district: str, day: str, limit: int = 60) -> list:
     """Всё, на что стоит посмотреть глазами: коды не из реестра, бутылки с
     чужой точки и уже списанные. Каждая такая — вопрос, а не ошибка скана."""

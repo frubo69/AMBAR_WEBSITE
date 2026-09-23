@@ -127,7 +127,13 @@ async def main():
     eq("ревизия: Absolut числится 7, кодовых 3 (a2, c0, c1), без кодов 4", (r1["p1"]["expected"], r1["p1"]["coded"], r1["p1"]["noqr"]), (7, 3, 4))
     eq("ревизия: Heineken числится 2,5, кодовых 1,5, без кодов 1", (r1["p31"]["expected"], r1["p31"]["coded"], r1["p31"]["noqr"]), (2.5, 1.5, 1))
     for code, pid, q in (("a2", "p1", 1), ("c0", "p1", 1), ("b1", "p31", 0.5), ("b2", "p31", 0.5), ("b3", "p31", 0.5)):
-        await db.audit_scan_add("jvc", D, code, {"at": T(170), "by": 1, "product_id": pid, "verdict": "ok", "qty": q})
+        # Считаем ПОСЛЕ всего, что было со складом: часть событий здесь пишет
+        # настоящий путь и штампует их настоящим временем, а не выдуманным
+        # T(…). Ревизия сравнивает позицию с остатком на момент её подсчёта
+        # (см. tools/test_audit_time.py), и сканы обязаны быть последними —
+        # иначе тест спорил бы сам с собой, а не с программой.
+        await db.audit_scan_add("jvc", D, code, {"at": datetime.now(timezone.utc),
+                                                 "by": 1, "product_id": pid, "verdict": "ok", "qty": q})
     lines, _ = await SR._audit_lines("jvc", D); r1 = {l["id"]: l for l in lines}
     eq("камера увидела 2 из 3 кодовых Absolut → недостача 1; пиво сошлось", (r1["p1"]["actual"], r1["p1"]["diff"], r1["p31"]["actual"], r1["p31"]["diff"]), (2, 1, 1.5, 0))
     snap = SR._audit_snapshot_lines(lines); s1 = {l["id"]: l for l in snap}

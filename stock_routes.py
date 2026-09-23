@@ -1956,16 +1956,108 @@ async def _audit_expected(district: str, day: str) -> tuple:
     return exp, noqr, False
 
 
+async def _audit_after(district: str, since_dt) -> dict:
+    """{позиция: [(момент, ±единиц), …]} — всё, что случилось с полкой района
+    ПОСЛЕ момента: продажи (−), приёмка по кодам (+), внесённое руками (+),
+    переезды (±), списания (−).
+
+    Нужно ревизии, чтобы отмотать остаток назад к моменту подсчёта."""
+    if not since_dt:
+        return {}
+    ev: dict = {}
+    def add(pid, at, dq):
+        if pid and at and dq:
+            ev.setdefault(pid, []).append((at, float(dq)))
+    cat = _catalog()
+    try:
+        # Момент продажи берём по ЗАКАЗУ, а не по отметке «доставлен»: бутылку
+        # снимают с полки, когда заказ приняли, а галочку водитель ставит
+        # когда придётся — бывает, что через час. Отмотай мы по галочке, и
+        # бутылка, уехавшая до подсчёта, вернулась бы в «числится» и стала
+        # выдуманной недостачей. По заказу этого не случается: продажа,
+        # начатая ДО подсчёта, назад не отматывается.
+        since_iso = since_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "")
+        for o in await db.sold_since(since_iso):
+            if (o.get("office_id") or "") != district:
+                continue
+            ts = min([x for x in (_dt_of(o.get("timestamp") or ""),
+                                  _dt_of(o.get("delivered_at") or "")) if x] or [None])
+            if not ts:
+                continue
+            for it in (o.get("items") or []):
+                pid, q = it.get("id"), _qty(it)
+                if pid and q:
+                    add(pid, ts, -q / _unit(cat.get(pid) or {}))
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] продажи после подсчёта не прочитаны ({district}): {e}")
+    try:
+        for pid, rows in (await db.intake_events(district, since_dt)).items():
+            for at, q in rows:
+                add(pid, at, q)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] приёмка после подсчёта не прочитана ({district}): {e}")
+    try:
+        for pid, rows in (await db.qr_manual_events(district, since_dt)).items():
+            for at, q in rows:
+                add(pid, at, q)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] внесённое руками после подсчёта не прочитано ({district}): {e}")
+    try:
+        counts = {district: await db.get_last_stock_count(district, before_day=None)}
+        moved = await _moved_after(counts, {district: since_dt})
+        for pid, rows in (moved.get(district) or {}).items():
+            for at, q in rows:
+                add(pid, at, q)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] переезды после подсчёта не прочитаны ({district}): {e}")
+    try:
+        for pid, rows in (await db.writeoff_events(district, since_dt)).items():
+            for at, q in rows:
+                add(pid, at, -q)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] списания после подсчёта не прочитаны ({district}): {e}")
+    for rows in ev.values():
+        rows.sort(key=lambda e: e[0])
+    return ev
+
+
+def _roll_back(now_qty: float, events: list, t) -> float:
+    """Сколько числилось в момент t: от сегодняшней цифры отматываем назад всё,
+    что случилось после него. Ниже нуля не уходим — столько на полке и не было."""
+    v = float(now_qty or 0)
+    for at, dq in events or ():
+        if at > t:
+            v -= dq
+    return max(0.0, v)
+
+
 async def _audit_lines(district: str, day: str) -> tuple:
-    """Строки ревизии: ожидается / увидела камера / разница — в бутылках."""
+    """Строки ревизии: ожидается / увидела камера / разница — в бутылках.
+
+    Ревизия идёт часами, а иногда и сутками: начали вечером, дописали утром
+    (владелец, 23 сен 2026: «он начал ревизию вчера, закончил сегодня… теперь
+    программа пишет недостачу, хотя этот товар же уже продали»). Поэтому
+    каждую позицию сравниваем не с остатком «сейчас», а с тем, что числилось
+    в момент, когда её считали: продажи и поставки после этого момента
+    отматываются назад. Иначе ночная продажа даёт излишек, а утренняя
+    поставка — недостачу, и обе выдумки стоят денег.
+
+    Позицию, которую не сканировали вовсе, отматывать не от чего — она
+    сравнивается с сегодняшним остатком, как и раньше."""
     exp, noqr, counted = await _audit_expected(district, day)
     counts = await db.audit_scan_counts(district, day)
+    when = await db.audit_scan_times(district, day)
+    after = await _audit_after(district, min(when.values())) if when else {}
     cat = _catalog()
     await _loss_load()
     lines = []
     for pid, p in cat.items():
         e = _num(exp.get(pid) or 0)                    # числится всего, единиц
+        t = when.get(pid)
+        if t:                                          # считали её в этот момент
+            e = _num(_roll_back(e, after.get(pid), t))
         q = _num(noqr.get(pid) or 0)                   # из них без кодов
+        q = _num(min(q, e))                            # без кодов не больше, чем всего
         c = _num(max(0, e - q))                        # видимых камере
         a = _num(counts.get(pid) or 0)                 # увидела камера (коды по qty)
         # Разница — только по кодовым бутылкам: те, что без кодов, камера

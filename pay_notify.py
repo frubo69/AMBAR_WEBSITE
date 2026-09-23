@@ -103,6 +103,19 @@ def added(item: dict, who: str) -> str:
                 f" — выдан {day_t(item.get('day') or '')}")
     elif kind in pay.CASH_KINDS:
         head += f" — {'выдан' if kind == 'advance' else 'записан'} {day_t(item.get('day') or '')}"
+    elif kind == "bonus" and item.get("tenure"):
+        # Премия за стаж — это поздравление, а не строка учёта (владелец,
+        # 23 сен 2026: «приходило сообщение обязательно о том, что поздравляем,
+        # вам была начислена премия»).
+        мес = int(item.get("tenure") or 0) * 6
+        ост = мес % 100
+        слово = ("месяцев" if 10 < ост < 20 else
+                 "месяца" if мес % 10 in (2, 3, 4) else
+                 "месяц" if мес % 10 == 1 else "месяцев")
+        return (f"🎉 <b>Поздравляем! Премия за стаж {_aed(item.get('amount'))}</b>"
+                f"\nВы работаете с нами {мес} {слово} — это ваша премия за стаж."
+                # Заметку не повторяем: она о том же самом, что и строка выше.
+                + _tail({**item, "note": ""}, "Начислил", who))
     elif kind == "bonus":
         head += f" за {month_t(str(item.get('from') or item.get('day') or '')[:7])}"
     return f"{ICON.get(kind, '•')} <b>{head}</b>" + _tail(item, "Назначил", who)

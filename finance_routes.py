@@ -22,6 +22,7 @@ from __future__ import annotations
 import calendar
 import logging
 import math
+import asyncio
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -48,6 +49,8 @@ MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
 BOOKS = ('rp', 'np', 'in')
 ENTRY_KINDS = ('', 'salary', 'advance', 'loan')
 PAY_FIELDS = ('rate', 'unit', 'cur', 'days', 'note', 'bonus')
+# Премию за стаж выплачивают из двух рук сразу — считаем и пишем по очереди.
+_TENURE_LOCK = asyncio.Lock()
 
 
 def _biz_day(ref: datetime = None) -> str:
@@ -815,6 +818,16 @@ async def person_card(name: str, month: str) -> dict:
     out = dict(month=month, name=name, fines=pay._i(fines), holds=pay._i(holds),
                month_total=pay._i(fines + holds), month_count=cnt, items=items,
                usd=pay_.get("usd"), found=bool(p))
+    # Премия за стаж — человеку в его же приложении: сколько он наработал,
+    # что уже получил и когда будет следующая (владелец, 23 сен 2026: «это всё
+    # ещё надо подвязать к водителям, чтобы они видели, когда у них какая
+    # премия»). Чужого здесь нет: только он сам.
+    try:
+        import tenure
+        if p and (p.get("role") or "") in tenure.ROLES:
+            out["tenure"] = tenure.driver_view(tenure.state(p, raw, _biz_day()))
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] премия за стаж {name} не посчитана: {e}")
     for k in ("role", "rate", "rate_aed", "unit", "cur", "days", "days_auto", "days_set",
               "accrued", "plus", "minus", "to_pay", "paid", "left", "debt", "payouts",
               "bonus_month", "bonus_due", "bonus_once", "advance", "loan",
@@ -1583,6 +1596,65 @@ async def handle_pay_item_add(request):
     return _json({"ok": True, "id": iid, "book": await build(month)})
 
 
+async def _tenure_list(today: str = "") -> dict:
+    """Лист премий за стаж: кто сколько наработал и кому сколько причитается."""
+    import tenure
+    try:
+        docs = await db.fin_people_get()
+        items = await db.fin_pay_items_get()
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] лист премий не прочитан: {e}")
+        docs, items = [], []
+    rows = tenure.list_for(_people(docs), items, today or _biz_day())
+    return {"people": rows, "step_aed": tenure.STEP_AED, "step_months": tenure.STEP_MONTHS,
+            "due": sum(r["due"] for r in rows),
+            "ready": sum(1 for r in rows if r["due"] > 0)}
+
+
+@require_owner
+async def handle_tenure(request):
+    """Лист премий — список людей, стаж и что кому причитается."""
+    return _json(await _tenure_list())
+
+
+@require_owner
+async def handle_tenure_pay(request):
+    """POST {name, as} — выплатить премию за стаж.
+
+    Сумму считаем сами: столько, сколько человек наработал и ещё не получил.
+    Нажали дважды (или вдвоём) — второй получит 409: премия уже выплачена, и
+    вторая тысяча из воздуха не возьмётся."""
+    import tenure
+    try:
+        body = await request.json()
+        name = str(body.get("name") or "").strip()[:60]
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if not name:
+        return _json({"error": "bad_request"}, 400)
+    who = _who(body)
+    day = _biz_day()
+    async with _TENURE_LOCK:
+        лист = await _tenure_list(day)
+        st = next((r for r in лист["people"] if r["name"] == name), None)
+        if not st:
+            return _json({"error": "unknown_person"}, 404)
+        if st["due"] <= 0:
+            return _json({"error": "not_yet", "bonus": лист}, 409)
+        iid = secrets.token_hex(5)
+        item = {"_id": iid, **tenure.pay_item(st, day, who), "at": datetime.now(timezone.utc)}
+        await db.fin_pay_item_add(item)
+    await _touch(day[:7])
+    # Водителю — поздравление в его бот тем же днём (владелец, 23 сен 2026:
+    # «обязательно чтобы приходило сообщение — поздравляем, вам начислена
+    # премия»). В приложении он увидит её в своей истории начислений.
+    await _pn.tell_safe(name, _pn.added(item, who))
+    log.info(f"[fin] премия за стаж: {name} {item['amount']} AED "
+             f"({st['months']} мес) · {who or '—'}")
+    return _json({"ok": True, "id": iid, "bonus": await _tenure_list(day),
+                  "book": await build(day[:7])})
+
+
 @require_owner
 async def handle_fine_decide(request):
     """POST {id, decision: assign|skip, amount, month, as} — решение по тому,
@@ -1817,6 +1889,8 @@ def setup(app):
         ("/api/owner/finance/book/pay/item/edit", handle_pay_item_edit, "POST"),
         ("/api/owner/finance/book/pay/item/restore", handle_pay_item_restore, "POST"),
         ("/api/owner/finance/fines/decide", handle_fine_decide, "POST"),
+        ("/api/owner/finance/bonus",        handle_tenure,     "GET"),
+        ("/api/owner/finance/bonus/pay",    handle_tenure_pay, "POST"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),
     )
     seen = set()

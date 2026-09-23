@@ -3449,6 +3449,11 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .pf-tile{display:flex;align-items:center;gap:9px;padding:11px 8px;border-radius:13px;background:#12122a;
   border:1px solid rgba(255,255,255,.06);min-width:0}
 .pf-tile > div{min-width:0}
+/* Заработанная премия — золотом: это единственная плитка, которая говорит
+   «тебе должны», и от остальных она обязана отличаться. */
+.pf-tile.pf-ten{background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));
+  border-color:rgba(201,169,110,.32)}
+.pf-tile.pf-ten b{color:var(--gold2)}
 .pf-tile span{flex:0 0 auto;width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;
   color:var(--gold2);background:var(--gold-soft)}
 .pf-tile u{display:block;min-height:23px;text-decoration:none;font-size:9.5px;line-height:1.15;color:var(--muted);letter-spacing:-.1px}
@@ -5465,6 +5470,24 @@ function profPayNotes(p){
 }
 // Следующий месяц: сколько он получит, если часть или всю зарплату уже выдали
 // наперёд (владелец, 19 сен 2026).
+// Премия за стаж — водителю в его же приложении (владелец, 23 сен 2026: «надо
+// подвязать к водителям, чтобы они видели, когда у них какая премия»). Считает
+// сервер (tenure.py): ступень — полгода работы, ступень 1000 AED, не забрал —
+// копится. Выплачивает старший, здесь только видно.
+function profTenureTile(p){
+  if(!p) return `<div class="pf-tile"><span>${svg(ICO.gift, 17)}</span><div><u>Премия за стаж</u><b>${skb(58, 14)}</b><i>${skb(64, 9)}</i></div></div>`;
+  const t = p.tenure;
+  if(!t) return '';
+  const мес = n => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'месяц'
+    : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'месяца' : 'месяцев'}`;
+  if(t.why) return `<div class="pf-tile"><span>${svg(ICO.gift, 17)}</span>
+      <div><u>Премия за стаж</u><b>—</b><i>${esc(t.why.toLowerCase())}</i></div></div>`;
+  const есть = t.due > 0;
+  return `<div class="pf-tile${есть ? ' pf-ten' : ''}"><span>${svg(ICO.gift, 17)}</span>
+      <div><u>Премия за стаж</u><b>${есть ? fmt(t.due) : esc(мес(t.months))}</b>
+        <i>${есть ? 'заработана · ждёт выплаты' : `следующая ${esc(profDayT(t.next_at))}`}</i></div></div>`;
+}
+
 function profNextTile(p){
   const n = p && p.next;
   if(!p) return `<div class="pf-tile"><span>${svg(ICO.cal, 17)}</span><div><u>Следующий месяц</u><b>${skb(58, 14)}</b><i>${skb(64, 9)}</i></div></div>`;

@@ -3792,6 +3792,21 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .sc-r.fb-wk-f:active{background:transparent}
 .sc-r.fb-wk-f:active > b{border-color:rgba(201,169,110,.55);background:var(--card)}
 .shl-card.fb-pc.fb-away{opacity:.5}
+/* ── Лист премий ── карточка человека: слева кто и сколько наработал, справа
+   сумма, снизу кнопка во всю ширину. Заработавшие — золотой рамкой, ждущие —
+   обычной: разница видна раньше, чем читаешь цифры. */
+.ten-c{display:block;padding-bottom:10px}
+.ten-c.on{border-color:rgba(201,169,110,.4);background:linear-gradient(135deg,rgba(201,169,110,.08),transparent)}
+.ten-c .shl-h{gap:12px;min-height:52px}
+.ten-c b.ten-due{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ten-c b.ten-due u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;
+  color:var(--muted);margin-left:4px}
+.ten-c b.ten-wait{flex:0 0 auto;font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.ten-pay{margin:0 14px;width:calc(100% - 28px);font-size:13px;padding:11px 10px}
+.ten-pay.off{background:var(--card3);color:var(--muted);cursor:default}
+.ten-pay:disabled{opacity:.75}
+.fb-note{margin:10px 16px 4px;font-size:11px;line-height:1.55;color:var(--dim)}
 /* Одно имя на двоих: карточка та же, но красным — это не строка зарплаты, а
    сообщение о человеке, которого в ведомости нет. */
 .shl-card.fb-pc.fb-dupe{border-color:rgba(224,85,85,.35);background:rgba(224,85,85,.05)}
@@ -20201,6 +20216,8 @@ function fbHubHtml(b, err){
     ${fbCapT('Зарплаты/удержания')}
     ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
     ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
+    ${fbGo('Лист премий', 'bonus.due', (TEN && TEN.due) || 0, "accOpen('finbonus')",
+           {unit: TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек', 'человека', 'человек')} ждёт` : 'за стаж'})}
   </div>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
@@ -20248,9 +20265,12 @@ async function fbMonthStep(d){
 // Перерисовать всё, что смотрит на месяц: карточку на странице и открытый
 // месячный экран. Экран дня месяц не листает — у него свой день.
 const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => accFinNP(), finsafe: () => accFinSafe(),
-                  finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson(), finitems: () => accFinItems()};
+                  finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson(), finitems: () => accFinItems(), finbonus: () => accFinBonus()};
 function fbRepaint(){
   const box = document.getElementById('finBook');
+  // Лист премий считается отдельной ручкой — дотягиваем его один раз, чтобы
+  // на карточке стояло число, а не прочерк.
+  if(!TEN && !_tenBusy && window.ownerApi) tenLoad(true);
   if(box) box.innerHTML = fbHubHtml(fbBook(FB.month));
   if(!document.getElementById('accOv').classList.contains('show')) return;
   // открыта страница расхода (статья, аренда, зарплаты, история) — месяц
@@ -22747,6 +22767,107 @@ function fbItemRows(rows, month, del){
     </div>`;
   }).join('');
 }
+// ── Лист премий ──────────────────────────────────────────────────────────
+// Владелец, 23 сен 2026: «кто полгода работает — получает премию 1000 дирхам,
+// год — 2 тысячи»; «пока водитель не наработал полгода — кнопка серая,
+// наработал — стала активной»; «на самой кнопке нужно писать дату, когда она
+// станет доступной». Считает tenure.py: ступень — полгода, ступень 1000,
+// выплаченное вычитается, отъезд обнуляет отсчёт.
+let TEN = null, _tenBusy = null;
+
+async function tenLoad(тихо){
+  if(!window.ownerApi) return null;          // ещё не поднялись — попросим позже
+  if(_tenBusy) return _tenBusy;
+  _tenBusy = ownerApi.ownerFetch('/api/owner/finance/bonus')
+    .then(d => { TEN = d; })
+    .catch(() => {})
+    .finally(() => { _tenBusy = null; if(!тихо) tenPaint(); fbRepaint(); });
+  return _tenBusy;
+}
+
+function tenPaint(){
+  if(ACC_VIEW !== 'finbonus') return;
+  const mid = document.getElementById('accMid');
+  if(mid) mid.innerHTML = tenHtml();
+}
+
+// «9 месяцев» — как человек это скажет: полгода, год, полтора года.
+function tenStaj(m){
+  if(!m) return 'меньше месяца';
+  const г = Math.floor(m / 12), ост = m % 12;
+  const части = [];
+  if(г) части.push(`${г} ${pluralize(г, 'год', 'года', 'лет')}`);
+  if(ост) части.push(`${ост} ${pluralize(ост, 'месяц', 'месяца', 'месяцев')}`);
+  return части.join(' ');
+}
+
+function tenRow(p){
+  const ждёт = p.due > 0;
+  const дата = p.next_at ? _audDayT(p.next_at) : '';
+  const низ = p.why ? p.why
+    : `на работе с ${_audDayT(p.start)} · ${tenStaj(p.months)}`;
+  // Что уже накоплено — золотом, чтобы было видно без счёта в уме.
+  const сумма = ждёт ? `<b class="ten-due">${fmt(p.due)}<u>AED</u></b>`
+    : `<b class="ten-wait">${p.earned ? fmt(p.earned) + ' получено' : 'копится'}</b>`;
+  const кнопка = ждёт
+    ? `<button class="aud-b go ten-pay" data-n="${escS(p.name)}" onclick="tenPay(this.dataset.n)">Выплатить ${fmt(p.due)}</button>`
+    : `<button class="aud-b ten-pay off" disabled>${p.why ? 'Нет даты приезда'
+        : дата ? `Будет ${дата}` : 'Ждёт стажа'}</button>`;
+  return `<div class="shl-card fb-pc ten-c${ждёт ? ' on' : ''}">
+    <div class="shl-h">
+      <span class="shl-code">${escS(fbIni(p.title))}</span>
+      <span class="shl-b"><b>${escS(p.title)}</b><i>${escS(низ)}</i></span>
+      ${сумма}
+    </div>
+    ${кнопка}
+  </div>`;
+}
+
+function tenHtml(){
+  if(!TEN) return '<div class="exp-empty">Загрузка…</div>';
+  const люди = TEN.people || [];
+  if(!люди.length) return '<div class="exp-empty">Некому — ни водителей, ни операторов</div>';
+  const ждут = люди.filter(p => p.due > 0), прочие = люди.filter(p => !(p.due > 0));
+  const блок = (т, сп) => сп.length ? `<div class="sc">${fbCapT(т, String(сп.length))}
+      <div class="ord-dists fb-days">${сп.map(tenRow).join('')}</div></div>` : '';
+  return блок('Премия заработана', ждут) + блок('Стаж идёт', прочие)
+    + `<div class="fb-note">Премия за стаж — ${fmt(TEN.step_aed)} AED за каждые
+       ${TEN.step_months} месяцев работы. Не забрал — копится. Уехал — отсчёт
+       начинается заново с дня возвращения.</div>`;
+}
+
+async function accFinBonus(){
+  _setText('accTitle', 'Лист премий');
+  _setText('accSub', 'за стаж работы');
+  const mid = document.getElementById('accMid');
+  if(mid && !TEN) mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  await tenLoad(true);
+  tenPaint();
+}
+
+async function tenPay(name){
+  const p = ((TEN || {}).people || []).find(x => x.name === name);
+  if(!p || p.due <= 0) return;
+  if(!await askDialog(`Выплатить премию ${fmt(p.due)} AED?`,
+      `${p.title} — ${tenStaj(p.months)} работы. Премия попадёт в зарплатную ведомость, `
+      + `а ему уйдёт поздравление в бот.`, 'Выплатить', 'Вернуться назад')) return;
+  const b = document.querySelector(`.ten-pay[data-n="${CSS.escape(name)}"]`);
+  if(b) b.disabled = true;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/finance/bonus/pay',
+      {method: 'POST', body: {name, as: _meName()}});
+    TEN = r.bonus || TEN;
+    if(r.book) fbApply(r.book);        // ведомость сразу с новой премией
+  }catch(e){
+    if(b) b.disabled = false;
+    _toast(((e || {}).payload || {}).error === 'not_yet' ? 'Премия уже выплачена' : 'Не удалось выплатить');
+    await tenLoad(true);
+  }
+  tenPaint(); fbRepaint();
+  _audHap('ok');
+  _toast('Премия выплачена — водителю ушло поздравление');
+}
+
 // ── Экран «Штрафы/авансы/долги» ──────────────────────────────────────────
 // Три числа сверху — сколько снимается в этом месяце штрафами, авансами и
 // долгами. Ниже одна карточка «Штрафы и удержания»: в штраф попадают только
@@ -23649,6 +23770,7 @@ function accOpen(id){
   if(id === 'finpay')   accFinPay();
   if(id === 'finperson') accFinPerson();
   if(id === 'finitems') accFinItems();
+  if(id === 'finbonus') accFinBonus();
   if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
 

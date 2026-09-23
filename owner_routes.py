@@ -2416,15 +2416,20 @@ async def handle_office(request):
             e["aed"] += int(it.get("line_total") or (it.get("price", 0) or 0) * (it.get("qty", 1) or 1))
     top_items = sorted(items_agg.values(), key=lambda x: -x["aed"])[:8]
 
-    # водители (по ручным заказам района)
+    # водители (по ручным заказам района). Рядом со счётом — сами заказы:
+    # владелец, 23 сен 2026: «сделай возможность, нажимая на водителя, смотреть,
+    # какие конкретно заказы он за смену доставил». Список тот же, каким район
+    # показывает «Последние заказы», — и выглядит он так же.
     drv_agg = {}
-    for _, o in curr:
+    for dt_, o in sorted(curr, key=lambda pr: pr[0], reverse=True):
         nm = (o.get("driver") or "").strip()
         if not nm:
             continue
-        e = drv_agg.setdefault(nm, {"name": nm, "orders": 0, "aed": 0})
+        e = drv_agg.setdefault(nm, {"name": nm, "orders": 0, "aed": 0, "list": []})
         e["orders"] += 1
         e["aed"] += int(o.get("total", 0) or 0)
+        if len(e["list"]) < 60:            # больше шестидесяти за смену не бывает
+            e["list"].append(_order_summary(o))
     drivers = sorted(drv_agg.values(), key=lambda x: -x["aed"])
 
     ds = _delivery_stats(curr)

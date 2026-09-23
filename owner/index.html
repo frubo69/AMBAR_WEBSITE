@@ -14779,6 +14779,10 @@ function renderPaySplit(bm){
 
 // Детальный разрез района: /api/owner/office за выбранный на странице период.
 // Ничего не выдумываем — блок не рисуется, если данных за период нет.
+// Заказы водителей открытого района: кладём их при отрисовке карточки, чтобы
+// раскрытие строки не ходило на сервер второй раз за тем же самым.
+let DRVD = {};
+
 async function _officeLoad(id){
   const key = 'office:' + id;
   const p = document.querySelector('#officePeriod button.on')?.dataset?.p
@@ -14858,6 +14862,7 @@ async function _officeLoad(id){
   let teamHtml = '';
   if(team.operator || roster.length){
     const dMax = Math.max(1, ...roster.map(x => x.aed || 0));
+  DRVD = {};                       // заказы водителей этого района за это окно
     teamHtml = `<div class="dt-sect">Команда</div><div class="dt-card">`;
     if(team.operator){
       teamHtml += person(team.operator.name, 'оператор района', '',
@@ -14874,7 +14879,12 @@ async function _officeLoad(id){
         x.has_login === false ? 'не заходил в приложение' : '',
       ].filter(Boolean).join(' \u00b7 ');
       const val = `<div class="ofd-p-v${x.aed ? '' : ' dim'}">${x.aed ? money(x.aed) : '—'}</div>`;
-      teamHtml += person(x.name, sub, val, {line: Math.round((x.aed || 0) / dMax * 100)});
+      // Привёз хоть один заказ — строка открывается: видно, какие именно
+      // (владелец, 23 сен 2026). Без доставок открывать нечего.
+      if((x.list || []).length) DRVD[x.name] = {name: x.name, when, district: d.name,
+                                                orders: x.orders, aed: x.aed, list: x.list};
+      teamHtml += person(x.name, sub, val, {line: Math.round((x.aed || 0) / dMax * 100),
+        detail: (x.list || []).length ? 'drvorders:' + x.name : ''});
     });
     teamHtml += `</div>`;
   }
@@ -37613,6 +37623,22 @@ window.orderRows = (list)=>{
 const DETAIL = {
   // Детальный разрез района. openDetail синхронный → рисуем скелет,
   // _officeLoad() наполняет его данными с /api/owner/office.
+  // Заказы одного водителя за смену — из того же ответа района, что и всё
+  // остальное: лишнего запроса нет, а строки те же, что в «Последних заказах».
+  drvorders: name=>{
+    const d = DRVD[name];
+    if(!d) return {title: `<div><div class="dt-tit-name">${escS(name)}</div></div>`,
+                   body: '<div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Заказов не нашлось</div></div></div></div>'};
+    const сумма = `<span data-aed="${d.aed || 0}">${d.aed || 0}</span> AED`;
+    return {
+      title: `<div class="dt-tit-av plain">${escS(String(name).trim().charAt(0).toUpperCase())}</div>
+        <div><div class="dt-tit-name">${escS(name)}</div>
+          <div class="dt-sub">${escS(d.district)} · ${escS(d.when)} · ${d.orders} ${
+            pluralize(d.orders,'заказ','заказа','заказов')} · ${сумма}</div></div>`,
+      body: `<div class="dt-card">${orderRows(d.list)}</div>`,
+      foot: ''
+    };
+  },
   office: id=>{
     _officeLoad(id);
     const tone = OFF_TONES[id] || 'var(--gold2)';

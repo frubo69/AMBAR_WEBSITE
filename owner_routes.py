@@ -403,6 +403,12 @@ async def handle_ping(request):
     """Cheap health + identity check. Returns the authenticated owner's id
     plus capability flags so the UI can hide/show owner-only sections."""
     uid = request["owner_id"]
+    # Что умеет камера этого телефона: ступени света у фонарика одни телефоны
+    # дают, другие нет, и «у меня линейки нет» иначе не проверить. Раз в день
+    # строкой в журнал — в базу не ложится и никого, кроме отладки, не касается.
+    cam = (request.query.get("cam") or "").strip()
+    if cam:
+        log.info(f"[owner] камера — {cam[:200]}")
     return web.json_response(
         {
             "ok": True,

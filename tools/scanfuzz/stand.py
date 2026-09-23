@@ -126,7 +126,7 @@ async def run(app: str, js: str, *, port: int, dbg: int, tag: str, shot: str = "
 
 def report(app: str, rows: list) -> int:
     """Напечатать строки проверок и вернуть число провалов."""
-    print(f"\n{'водитель' if app == 'driver' else 'STAR'}:")
+    print(f"\n{ {'driver': 'водитель', 'owner': 'STAR'}.get(app, app) }:")
     плохо = 0
     for имя, дали, ждём, ок in rows:
         print(("  ok  " if ок else "  FAIL") + f" {имя}: {дали}" + ("" if ок else f" ≠ {ждём}"))

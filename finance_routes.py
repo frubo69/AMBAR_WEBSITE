@@ -510,19 +510,38 @@ async def _usd(mdoc: dict) -> dict:
     return dict(usd=auto or USD_FALLBACK, usd_auto=auto, usd_set=False)
 
 
-def _people(docs: list) -> list[dict]:
-    """Кто получает зарплату: люди из расписания плюс вписанные руками."""
+ROLE_RU = {"senior": "старший оператор", "operator": "оператор",
+           "driver": "водитель", "other": "вписан руками"}
+
+
+def _people(docs: list, dupes: list | None = None) -> list[dict]:
+    """Кто получает зарплату: люди из расписания плюс вписанные руками.
+
+    Человек здесь — это его имя: и оклад, и штрафы, и авансы лежат под именем.
+    Поэтому два РАЗНЫХ человека с одним именем в ведомость не помещаются:
+    второй молча исчезал (владелец, 23 сен 2026: «где водитель Парвиз? не
+    старший оператор, а водитель» — у нас Парвиз и старший, и водитель на
+    Бизнес Бей, и Фарух оператор и водитель на JVC, всё это разные люди).
+    Молчать об этом нельзя: пропавший человек — это человек без зарплаты.
+    Кого не поместили — складываем в dupes, и STAR говорит о нём красным."""
     import config_staff as staff
     from config_offices import OFFICE_IDS
     docs = sorted(docs, key=lambda d: str(d.get("created") or d.get("at") or ""))
     by_name = {str(d.get("_id")): d for d in docs}
-    out, seen = [], set()
+    out, seen = [], {}
 
     def add(name, role, **kw):
-        if not name or name in seen:
+        if not name:
             return
-        seen.add(name)
+        if name in seen:
+            if dupes is not None and seen[name] != role \
+                    and not any(x["name"] == name and x["lost"] == role for x in dupes):
+                dupes.append({"name": name, "kept": seen[name], "lost": role,
+                              "kept_ru": ROLE_RU.get(seen[name], seen[name]),
+                              "lost_ru": ROLE_RU.get(role, role)})
+            return
         d = by_name.get(name) or {}
+        seen[name] = d.get("role") or role
         if d.get("hidden"):
             return
         out.append(dict(name=name, role=d.get("role") or role, manual=bool(d.get("manual")),
@@ -627,7 +646,8 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] зарплаты не прочитаны: {e}")
         docs, mdocs, items, shifts = [], [], [], []
-    people = _people(docs)
+    dupes: list = []
+    people = _people(docs, dupes)
     by_name: dict = {}
     for d in mdocs:
         by_name.setdefault(str(d.get("name")), []).append(d)
@@ -660,6 +680,9 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     # Штрафы, которые сформировала программа (fines_auto): ждущие — в окошко
     # «Штрафы, требующие решения», не назначенные — в историю с исходом.
     import fines_auto
+    # Одно имя на двоих — красной строкой в ведомости: человек, которого в ней
+    # нет, зарплату не получит, а штраф однофамильца упадёт на чужую строку.
+    res["dupes"] = dupes
     res["pending"] = await fines_auto.pending()
     res["history"] = _penalty_history(items, month, decided=await fines_auto.decided())
     return res

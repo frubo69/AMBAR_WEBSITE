@@ -3785,6 +3785,12 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .sc-r.fb-wk-f:active{background:transparent}
 .sc-r.fb-wk-f:active > b{border-color:rgba(201,169,110,.55);background:var(--card)}
 .shl-card.fb-pc.fb-away{opacity:.5}
+/* Одно имя на двоих: карточка та же, но красным — это не строка зарплаты, а
+   сообщение о человеке, которого в ведомости нет. */
+.shl-card.fb-pc.fb-dupe{border-color:rgba(224,85,85,.35);background:rgba(224,85,85,.05)}
+.fb-dupe .shl-code.dn{background:rgba(224,85,85,.16);color:var(--dn);font-size:17px}
+.fb-dupe .shl-b i{white-space:normal;line-height:1.45;color:var(--sub)}
+.fb-dupe-f{padding:0 14px 11px;font-size:11.5px;color:var(--dn)}
 .fb-inname{flex:1 1 auto;min-width:0} .fb-inname .fb-txt{width:100%;height:36px}
 .fb-editing .fb-e-b b{font-size:14px}
 /* Перетягивание людей: строка под пальцем — приподнятая копия, на месте —
@@ -22336,7 +22342,8 @@ async function accFinPay(){
 }
 function fbPeopleHtml(b){
   const pay = fbCur(b);
-  let out = (pay.roles || []).map(r => {
+  let out = fbDupesHtml(pay.dupes);
+  out += (pay.roles || []).map(r => {
     const rows = (pay.people || []).filter(p => p.role === r.id);
     if(!rows.length) return '';
     return `<div class="sc">${fbCapT(r.t, String(rows.length))}<div class="ord-dists fb-days">${rows.map(fbPersonRow).join('')}</div></div>`;
@@ -22349,6 +22356,25 @@ function fbPeopleHtml(b){
       <button class="aud-b go" onclick="fbPersonAdd()">Добавить</button>
     </div></div>`;
   return out;
+}
+// Одно имя на двоих. В ведомости человек — это его имя: под именем лежат и
+// оклад, и штрафы, и авансы. Поэтому второй человек с тем же именем в неё не
+// помещается и раньше исчезал молча (владелец, 23 сен 2026: «где водитель
+// Парвиз? не старший оператор, а водитель»). Молчать нельзя: пропавший — это
+// человек без зарплаты, а штраф однофамильца упадёт на чужую строку.
+function fbDupesHtml(dupes){
+  const d = dupes || [];
+  if(!d.length) return '';
+  return `<div class="sc">${fbCapT('Одно имя на двоих', String(d.length))}
+    <div class="ord-dists fb-days">${d.map(x => `
+      <div class="shl-card fb-pc fb-dupe">
+        <div class="shl-h"><span class="shl-code dn">!</span><span class="shl-b">
+          <b>${escS(x.name)}</b>
+          <i>${escS(x.kept_ru)} и ${escS(x.lost_ru)} — это разные люди, а имя одно.
+             В ведомости остался ${escS(x.kept_ru)}: ${escS(x.lost_ru)} зарплату не получит.</i>
+        </span></div>
+        <div class="fb-dupe-f">Переименуйте одного из них в «Водителях» — и оба встанут в ведомость.</div>
+      </div>`).join('')}</div></div>`;
 }
 const FB_ROLE_T = {other: 'Офис', senior: 'Старший оператор', operator: 'Операторы', driver: 'Водители'};
 function fbRoleChips(){ return Object.keys(FB_ROLE_T).map(r => `<button class="chip${FB.role === r ? ' on' : ''}" onclick="fbRolePick('${r}')">${FB_ROLE_T[r]}</button>`).join(''); }
@@ -26794,7 +26820,19 @@ function qrTorchShow(btn){
     light:  () => qrTorch(btn),
     toggle: () => qrTorch(btn),
     hap:    _hap,
+    nope:   () => _toast('Этот телефон яркость фонарика не отдаёт'),
   });
+  qrCamDiag();
+}
+
+// Раз в день говорим серверу строкой в журнал, что умеет камера этого
+// телефона: ступени света есть не у всех, и проверить это можно только так.
+function qrCamDiag(){
+  const день = new Date().toISOString().slice(0, 10);
+  try{ if(localStorage.getItem('ambar_cam_diag') === день) return;
+       localStorage.setItem('ambar_cam_diag', день); }catch(e){}
+  ownerApi.ownerFetch('/api/owner/ping?cam=' + encodeURIComponent(AmbarTorch.diag(SCAN.track())))
+    .catch(() => {});
 }
 
 // Блик от вспышки: если ступени есть — убавить свет, а не гасить всё.

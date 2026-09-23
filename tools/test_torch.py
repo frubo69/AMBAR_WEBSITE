@@ -15,7 +15,7 @@ __CAM.applied — по нему и видно, куда встал свет. П�
 
     python3 tools/test_torch.py [driver|owner …]
 """
-import asyncio, os, sys
+import asyncio, io, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scanfuzz"))
 from stand import Stands, run, report                        # noqa: E402
 
@@ -109,8 +109,34 @@ JS = """(async () => {
   return out;
 })()"""
 
+def все_кнопки():
+    """Каждая кнопка фонарика — через общий показ со ступенями.
+
+    Экранов со сканером много (у старшего их восемь: приёмка, перемещения,
+    проверка, свободная проверка…), и забыть один — значит оставить там кнопку
+    без регулировки, о чём узнаешь только от человека (владелец, 23 сен 2026:
+    «в свободной проверке тоже реализуй»). Проверяем исходник: у каждой кнопки
+    с id …Torch рядом стоит camTorchShow/qrTorchShow.
+    """
+    import re
+    rows = []
+    for путь, показ in (("driver/index.html", "camTorchShow"), ("owner/index.html", "qrTorchShow")):
+        src = io.open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), путь),
+                      encoding="utf-8").read()
+        lines = src.split("\n")
+        ids = sorted(set(re.findall(r'id="(\w*Torch)"', src)))
+        забыли = []
+        for i in ids:
+            места = [n for n, l in enumerate(lines) if f"getElementById('{i}')" in l]
+            if not места or not any(показ + "(" in "\n".join(lines[n:n + 3]) for n in места):
+                забыли.append(i)
+        rows.append((f"{путь}: кнопок фонарика {len(ids)}, все со ступенями",
+                     f"забыли: {забыли}" if забыли else "все", "все", not забыли))
+    return rows
+
+
 async def main():
-    провалы = 0
+    провалы = report("исходник", все_кнопки())
     with Stands(PORT, TAG):
         for i, app in enumerate(APPS):
             провалы += report(app, await run(app, JS, port=PORT, dbg=DBG + i, tag=TAG))

@@ -512,6 +512,8 @@ async def _usd(mdoc: dict) -> dict:
 
 ROLE_RU = {"senior": "старший оператор", "operator": "оператор",
            "driver": "водитель", "other": "вписан руками"}
+# Чем уточняем имя оператора, у которого есть тёзка-водитель.
+ROLE_KEY = {"senior": "старший", "operator": "оператор"}
 
 
 def _people(docs: list, dupes: list | None = None) -> list[dict]:
@@ -529,22 +531,51 @@ def _people(docs: list, dupes: list | None = None) -> list[dict]:
     docs = sorted(docs, key=lambda d: str(d.get("created") or d.get("at") or ""))
     by_name = {str(d.get("_id")): d for d in docs}
     out, seen = [], {}
+    try:
+        водители = {str(d.get("name")) for d in staff.drivers() if d.get("name")}
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] водители не прочитаны: {e}")
+        водители = set()
 
-    def add(name, role, **kw):
+    def ключ(name, role):
+        """Под каким именем человек живёт в ведомости.
+
+        Имя отдаём ВОДИТЕЛЮ: по имени водителя ходит вся автоматика — смены,
+        штрафы, урезанное питание, чай, удержания за бой. У оператора и
+        старшего автоматики нет, только вписанное руками, поэтому тёзка-
+        оператор живёт под уточнённым ключом: «Парвиз · старший». На экране
+        он всё равно «Парвиз» — роль и так написана над списком.
+
+        Уже заведённый ключ не меняем, даже если тёзка-водитель уволится:
+        иначе оклад и авансы повисли бы в пустоте."""
+        if role not in ROLE_KEY or not name:
+            return name
+        q = f"{name} · {ROLE_KEY[role]}"
+        if q in by_name:
+            return q
+        return q if name in водители else name
+
+    def add(name, role, title=None, roster=False, **kw):
         if not name:
             return
         if name in seen:
-            if dupes is not None and seen[name] != role \
+            # Жалуемся только на двоих ИЗ РАСПИСАНИЯ: это разные живые люди с
+            # одним именем, и второму деньги считать негде. Повтор из карточек
+            # (человека вписали руками, а потом он появился в расписании) —
+            # тот же самый человек, и говорить не о чем.
+            было = seen[name]
+            if dupes is not None and roster and было["roster"] \
                     and not any(x["name"] == name and x["lost"] == role for x in dupes):
-                dupes.append({"name": name, "kept": seen[name], "lost": role,
-                              "kept_ru": ROLE_RU.get(seen[name], seen[name]),
+                dupes.append({"name": name, "kept": было["role"], "lost": role,
+                              "kept_ru": ROLE_RU.get(было["role"], было["role"]),
                               "lost_ru": ROLE_RU.get(role, role)})
             return
         d = by_name.get(name) or {}
-        seen[name] = d.get("role") or role
+        seen[name] = {"role": d.get("role") or role, "roster": roster}
         if d.get("hidden"):
             return
-        out.append(dict(name=name, role=d.get("role") or role, manual=bool(d.get("manual")),
+        out.append(dict(name=name, title=title or name, role=d.get("role") or role,
+                        manual=bool(d.get("manual")),
                         pnote=d.get("note") or "", work=pay.work_clean(d.get("work")), **kw))
     # Сначала те, кого вписали руками (руководство, старший), в порядке
     # добавления; потом расписание: старшие операторы, операторы, водители.
@@ -553,12 +584,14 @@ def _people(docs: list, dupes: list | None = None) -> list[dict]:
             add(str(d.get("_id")), d.get("role") or "other", districts=[])
     try:
         for s in staff.SENIOR_OPERATORS:
-            add(s.get("name"), "senior", districts=list(OFFICE_IDS))
+            add(ключ(s.get("name"), "senior"), "senior", title=s.get("name"),
+                roster=True, districts=list(OFFICE_IDS))
         for o in staff.operators():
             if not o.get("senior"):
-                add(o.get("name"), "operator", districts=list(o.get("districts") or []))
+                add(ключ(o.get("name"), "operator"), "operator", title=o.get("name"),
+                    roster=True, districts=list(o.get("districts") or []))
         for d in staff.drivers():
-            add(d.get("name"), "driver", districts=[d.get("district") or ""])
+            add(d.get("name"), "driver", roster=True, districts=[d.get("district") or ""])
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] расписание не прочитано: {e}")
     for d in docs:

@@ -21564,7 +21564,7 @@ function fbPersonFillRow(p, sal){
   const wl = fbWorkLbl(p);
   const sub = [FB_PERSON_SUB[_fbKey(p.name)] || '', wl, p.unit === 'day' ? 'в день' : '',
                p.cur === 'USD' && p.rate ? `курс ${fbFmtN(sal.usd, 1)}` : ''].filter(Boolean).join(' · ');
-  const head = `<span class="shl-code">${escS(fbIni(p.name))}</span><span class="shl-b"><b>${escS(p.name)}</b><i>${sub}</i></span>`;
+  const head = `<span class="shl-code">${escS(fbIni(p.title || p.name))}</span><span class="shl-b"><b>${escS(p.title || p.name)}</b><i>${sub}</i></span>`;
   const part = p.work_set && p.unit !== 'day' && p.work_days < p.month_days;
   if(editing){
     return `<div class="shl-card fb-pc fb-editing">
@@ -21988,7 +21988,7 @@ function fbSalRow(p){
   // платить нечего (оклад не задан) — и кнопки нет, чтобы не жать впустую
   const btn = done ? `<button class="fb-paybtn undo" data-n="${escS(p.name)}" onclick="fbSalUndo(this.dataset.n)">Отменить</button>`
             : sum ? `<button class="aud-b go fb-paybtn" data-n="${escS(p.name)}" onclick="fbPayOut(this.dataset.n)">Оплатил</button>` : '';
-  return `<div class="fb-e fb-bl fb-pay"><span class="fb-e-b"><b>${escS(p.name)}</b><i>${sub}</i></span>
+  return `<div class="fb-e fb-bl fb-pay"><span class="fb-e-b"><b>${escS(p.title || p.name)}</b><i>${sub}</i></span>
     <span class="fb-boxcol fb-paycol">${sum ? `<b class="fb-box${done ? ' ok' : ''}">${fbFmt(sum)}<u>AED</u></b>` : ''}${btn}</span></div>`;
 }
 // Отменить выплату: уходит последняя запись зарплаты этого человека за месяц
@@ -22418,8 +22418,8 @@ function fbPersonRow(p){
        p.minus ? `удержано ${fbFmt(p.minus)}` : '', p.plus ? `премия ${fbFmt(p.plus)}` : ''].filter(Boolean).join(' · ');
   const unit = p.left === 0 && p.paid ? 'выплачено' : 'к выплате';
   return `<button class="shl-card" data-n="${escS(p.name)}" onclick="fbPersonOpen(this.dataset.n)"><div class="shl-h">
-    <span class="shl-code">${escS(fbIni(p.name))}</span>
-    <span class="shl-b"><b>${escS(p.name)}</b><i>${sub}</i></span>
+    <span class="shl-code">${escS(fbIni(p.title || p.name))}</span>
+    <span class="shl-b"><b>${escS(p.title || p.name)}</b><i>${sub}</i></span>
     <span class="shl-v"><b${p.left < 0 ? ' class="dn"' : p.left === 0 && p.paid ? ' class="up"' : ''}>${fbFmt(p.left === 0 && p.paid ? p.paid : p.left)}</b><i>${unit}</i></span></div></button>`;
 }
 FB.role = 'other';
@@ -22520,7 +22520,7 @@ function fbWorkPerson(){ return (fbCur(fbBook(FB.month)).people || []).find(x =>
 function fbWorkPick(field){
   const work = (fbWorkPerson() || {}).work || [], i = fbWorkIdx(work, FB.month), w = work[i] || {};
   FB.workPick = {field, i, day: w[field] || _dayIsoFor(0), has: !!w[field],
-                 lbl: `${FB.person} — ${field === 'from' ? 'вышел на работу' : 'последний день на работе'}`};
+                 lbl: `${(fbWorkPerson() || {}).title || FB.person} — ${field === 'from' ? 'вышел на работу' : 'последний день на работе'}`};
   openDate('fbWork');
 }
 function fbWorkPicked(ymd){
@@ -22558,8 +22558,13 @@ async function fbWorkSend(body){
 
 // ── Экран человека ────────────────────────────────────────────────────────
 async function accFinPerson(){
-  const b = await fbMonthScreen(FB.person || 'Зарплата'); if(!b) return;
+  // Заголовок — по имени человека, а не по ключу ведомости: у оператора с
+  // тёзкой-водителем ключ уточнён, а зовут его по-прежнему.
+  const _p0 = (fbCur(fbBook(FB.month) || {}) || {}).people;
+  const _t = (_p0 || []).find(x => x.name === FB.person);
+  const b = await fbMonthScreen((_t && _t.title) || FB.person || 'Зарплата'); if(!b) return;
   const p = (fbCur(b).people || []).find(x => x.name === FB.person);
+  if(p && p.title && p.title !== p.name) _setText('accTitle', p.title);
   if(!p){ document.getElementById('accMid').innerHTML = '<div class="exp-empty">В этом месяце его нет в списке</div>'; return; }
   ACC_BACK = () => accOpen(FB.personFrom || 'finpay');
   const sc = `data-month="${b.month}" data-name="${escS(p.name)}"`;

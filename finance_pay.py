@@ -245,7 +245,11 @@ def person_month(p: dict, month: str, eff: dict, days_auto, items: list,
     to_pay = accrued + plus - minus
     paid = sum(_n(e.get('amount')) for e in payouts)
     return dict(
-        name=p.get('name'), role=p.get('role') or 'other', manual=bool(p.get('manual')),
+        name=p.get('name'),
+        # Как звать на экране. Обычно то же имя; у оператора с тёзкой-водителем
+        # ключ уточнён («Парвиз · старший»), а зовут его по-прежнему Парвизом.
+        title=p.get('title') or p.get('name'),
+        role=p.get('role') or 'other', manual=bool(p.get('manual')),
         rate=None if eff.get('rate') is None else _i(rate), unit=unit, cur=cur,
         rate_month=eff.get('rate_month') or '', rate_aed=_i(rate_aed),
         days=_i(_n(days)), days_auto=_i(_n(days_auto)), days_set=eff.get('days') is not None,

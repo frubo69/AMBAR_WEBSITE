@@ -123,6 +123,38 @@
                                                     function () { return false; });
   }
 
+  // ── запасной путь: гасим не свет, а картинку ─────────────────────────────
+  // Владелец, 23 сен 2026: «у меня не работает, сделай так, чтобы вообще на
+  // любом телефоне работало». На его телефоне камера не отдаёт ни одного
+  // диапазона света (в журнале: «вспышка есть · ступеней нет»), и управлять
+  // там нечем — это предел браузера, а не наша лень.
+  //
+  // Что можно честно: приглушить то, что человек видит на экране. Сам
+  // светодиод при этом светит как светил — и мы об этом прямо говорим, а не
+  // делаем вид, что крутим вспышку. Фильтр висит ТОЛЬКО на картинке: сканер
+  // читает исходный кадр, поэтому читаться хуже не станет.
+  var screenEl = null, screenSaid = false;
+
+  function screenSet(el) {
+    if (screenEl && screenEl !== el) screenEl.style.filter = '';
+    screenEl = el || null;
+  }
+
+  // Чем эта камера умеет убавлять свет: 'cam' — по-настоящему, экспозицией;
+  // 'screen' — только картинкой; null — нечем вовсе.
+  function modeOf(t) {
+    if (t && dimOf(t)) return 'cam';
+    return screenEl ? 'screen' : null;
+  }
+
+  function screenPaint(on) {
+    if (!screenEl) return;
+    if (!on) { screenEl.style.filter = ''; return; }
+    // Нижняя ступень — 45%: темнее уже не разглядеть, куда наводить.
+    var k = 0.45 + 0.55 * (Math.max(1, Math.min(STEPS, level)) - 1) / (STEPS - 1);
+    screenEl.style.filter = k >= 0.999 ? '' : 'brightness(' + k.toFixed(2) + ')';
+  }
+
   // ── линейка ───────────────────────────────────────────────────────────────
   // Одна на всё приложение и висит поверх всего: кнопки фонарика живут и в
   // полосе сканера, и в углу кадра, и у каждой свои обрезки по краям. Своя
@@ -193,7 +225,7 @@
 
     var можно = function () {
       var t = o.track && o.track();
-      return !!(t && dimOf(t));
+      return !!modeOf(t);
     };
 
     var начало = function (y) {
@@ -270,7 +302,13 @@
     if (o && o.hap) o.hap('sel');                    // щелчок на каждой ступени
     dialPaint();
     var t = o && o.track && o.track();
-    if (t) push(function () { return dimApply(t, level); });
+    if (t && dimOf(t)) push(function () { return dimApply(t, level); });
+    else {
+      screenPaint(true);
+      // Сказать один раз, что именно убавляется: человек тянет за «яркость
+      // фонарика», а гаснет картинка — молчать об этом нечестно.
+      if (o && o.dimOnly && !screenSaid) { screenSaid = true; o.dimOnly(); }
+    }
   }
 
   global.AmbarTorch = {
@@ -288,12 +326,16 @@
     apply: function (t, on) {
       if (!t || !t.applyConstraints) return Promise.resolve(false);
       return t.applyConstraints({advanced: [{torch: !!on}]}).then(function () {
-        if (on) push(function () { return dimApply(t, level); });
-        else push(function () { return dimReset(t); });
+        if (dimOf(t)) push(function () { return on ? dimApply(t, level) : dimReset(t); });
+        else screenPaint(!!on);      // погас фонарик — вернули картинку как была
         return true;
       }, function () { return false; });
     },
     attach: attach,
+    // Куда смотрит человек: этот <video> и приглушаем, когда камера своего
+    // диапазона не даёт. Зовётся при запуске сканера и при его остановке.
+    screen: screenSet,
+    mode: modeOf,
     hide: function () { if (dial) dial.classList.remove('on'); },
     // Зажгли фонарик — линейка на секунду показывается сама. Так человек
     // узнаёт, что ступени есть, не читая никаких подсказок: спрятанный жест,

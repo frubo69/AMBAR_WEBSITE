@@ -25159,6 +25159,9 @@ const SCAN = {
     // Камера вдобавок сама роняет контекст в 'interrupted', и после неё он
     // молчит, если его не разбудить.
     try{ SFX.wake(); }catch(e){}
+    // Куда смотрит человек: если камера не даёт убавить свет по-настоящему,
+    // регулятор приглушит эту картинку (vendor/ambar-torch.js).
+    try{ AmbarTorch.screen(videoEl); }catch(e){}
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.onRepeat = onRepeat; this.onHold = onHold; this.onLost = null;
     this.seen = new Set(); this.seenAt = new Map();
@@ -25205,6 +25208,9 @@ const SCAN = {
   stop(свой){
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
     if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    // Камеры нет — снимаем и приглушение картинки: иначе тёмный кадр застынет
+    // на экране и будет выглядеть поломкой.
+    try{ AmbarTorch.screen(null); }catch(e){}
     if(this.video) this.video.srcObject = null;
     if(свой) return;
     // Сканер ушёл — раздел снова обычный экран со своей шапкой и фоном.
@@ -26854,6 +26860,10 @@ function qrTorchShow(btn){
     // при открытии она иногда отвечает не всё, а тут уже минуту как снимает.
     nope:   () => { _toast('Этот телефон яркость фонарика не отдаёт');
                     qrCamSay('тянули за яркость · ' + AmbarTorch.diag(SCAN.track()), 'ambar_cam_nope'); },
+    // Телефон убавить свет не даёт — приглушаем картинку. Говорим об этом
+    // один раз: человек тянет за фонарик, а темнеет экран.
+    dimOnly:() => { _toast('Телефон не даёт убавить сам фонарик — гашу картинку');
+                    qrCamSay('только картинка · ' + AmbarTorch.diag(SCAN.track()), 'ambar_cam_dim'); },
   });
   qrCamDiag();
 }

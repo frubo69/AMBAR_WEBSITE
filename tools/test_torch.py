@@ -99,15 +99,76 @@ JS = """(async () => {
   eq('зажгли снова — ступень запомнилась', [вспышка(), свет(), AmbarTorch.level], [true, -0.3, 7]);
   await тык();
 
-  // Телефон без диапазона: регулировать нечего — линейки нет, кнопка прежняя.
+  // Телефон без диапазона: НАСТОЯЩИХ ступеней у него нет — это и должно быть
+  // видно (линейка там всё равно будет, но гасит она картинку; см. JS_SCREEN).
   __CAM.dim = false;
   const s2 = await navigator.mediaDevices.getUserMedia({video: true});
   const t2 = s2.getVideoTracks()[0];
-  eq('камера ступеней не даёт — и линейки не будет', AmbarTorch.dimmable(t2), false);
+  eq('у такой камеры настоящих ступеней нет', AmbarTorch.dimmable(t2), false);
   eq('…а фонарик включается как раньше', await AmbarTorch.apply(t2, true), true);
   s2.getTracks().forEach(t => t.stop());
   return out;
 })()"""
+
+# Телефон, который убавлять свет не умеет (у владельца такой: в журнале
+# «вспышка есть · ступеней нет»). Регулятор обязан работать и там — только
+# гасит он картинку на экране, а не сам светодиод, и говорит об этом.
+JS_SCREEN = """(async () => {
+  const out = [];
+  const eq = (имя, дали, ждём) => out.push([имя, JSON.stringify(дали), JSON.stringify(ждём),
+                                            JSON.stringify(дали) === JSON.stringify(ждём)]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const M = window.__M;
+  try{ localStorage.removeItem('ambar_torch_lvl'); }catch(e){}
+  __CAM.torch = true; __CAM.dim = false;          // вспышка есть, ступеней нет
+  let сказали = '';
+  const _t = window.toast || window._toast;
+  (window.toast ? window : window).toast = m => { сказали = m; };
+  window._toast = m => { сказали = m; };
+
+  const id = await (async () => { %ENTER% })();
+  let b = null;
+  for(let i = 0; i < 80 && !(b && b.offsetParent); i++){ await sleep(100); b = document.getElementById(id); }
+  eq('кнопка фонарика видна и без ступеней у камеры', !!(b && b.offsetParent), true);
+  if(!b) return out;
+  const v = SCAN.video;
+
+  const тач = 'ontouchstart' in window;
+  const точка = y => new Touch({identifier: 1, target: b, clientX: 10, clientY: y});
+  const жест = (что, y) => {
+    if(тач){
+      const имя = {down: 'touchstart', move: 'touchmove', up: 'touchend'}[что];
+      b.dispatchEvent(new TouchEvent(имя, {bubbles: true, cancelable: true,
+        touches: что === 'up' ? [] : [точка(y)], changedTouches: [точка(y)]}));
+    }else{
+      const имя = {down: 'pointerdown', move: 'pointermove', up: 'pointerup'}[что];
+      b.dispatchEvent(new PointerEvent(имя, {bubbles: true, cancelable: true, clientY: y, pointerId: 1}));
+    }
+  };
+  const тык = async () => { жест('down', 300); жест('up', 300); await sleep(300); };
+
+  await тык();
+  eq('фонарик включился', b.classList.contains('on'), true);
+
+  жест('down', 300);
+  for(let k = 1; k <= 3; k++) жест('move', 300 + 22 * k);
+  await sleep(150);
+  const влинейке = document.querySelector('.atl-dial')?.classList.contains('on');
+  жест('up', 300 + 66); await sleep(250);
+  eq('линейка есть и на таком телефоне', влинейке, true);
+  eq('ступень уехала на три вниз', AmbarTorch.level, 5);
+  eq('приглушилась картинка', /brightness\(0\.\d+\)/.test(v.style.filter || ''), true);
+  eq('и человеку сказали, что гаснет именно картинка', /картинк/i.test(сказали), true);
+
+  const было = v.style.filter;
+  жест('down', 300); жест('move', 300 - 44); await sleep(120); жест('up', 300 - 44); await sleep(250);
+  eq('вверх — светлее', v.style.filter !== было && AmbarTorch.level === 7, true);
+
+  await тык();
+  eq('погасили фонарик — картинка вернулась как была', v.style.filter || '', '');
+  return out;
+})()"""
+
 
 def все_кнопки():
     """Каждая кнопка фонарика — через общий показ со ступенями.
@@ -140,6 +201,8 @@ async def main():
     with Stands(PORT, TAG):
         for i, app in enumerate(APPS):
             провалы += report(app, await run(app, JS, port=PORT, dbg=DBG + i, tag=TAG))
+            провалы += report(app + " · камера ступеней не даёт",
+                              await run(app, JS_SCREEN, port=PORT, dbg=DBG + 10 + i, tag=TAG))
     print("\nИТОГ:", "все прошли" if not провалы else f"провалено {провалы}")
     return 1 if провалы else 0
 

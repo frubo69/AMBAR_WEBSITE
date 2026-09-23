@@ -3792,20 +3792,19 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .sc-r.fb-wk-f:active{background:transparent}
 .sc-r.fb-wk-f:active > b{border-color:rgba(201,169,110,.55);background:var(--card)}
 .shl-card.fb-pc.fb-away{opacity:.5}
-/* ── Лист премий ── карточка человека: слева кто и сколько наработал, справа
-   сумма, снизу кнопка во всю ширину. Заработавшие — золотой рамкой, ждущие —
-   обычной: разница видна раньше, чем читаешь цифры. */
-.ten-c{display:block;padding-bottom:10px}
-.ten-c.on{border-color:rgba(201,169,110,.4);background:linear-gradient(135deg,rgba(201,169,110,.08),transparent)}
-.ten-c .shl-h{gap:12px;min-height:52px}
-.ten-c b.ten-due{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
-  color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
-.ten-c b.ten-due u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;
-  color:var(--muted);margin-left:4px}
-.ten-c b.ten-wait{flex:0 0 auto;font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
-.ten-pay{margin:0 14px;width:calc(100% - 28px);font-size:13px;padding:11px 10px}
-.ten-pay.off{background:var(--card3);color:var(--muted);cursor:default}
-.ten-pay:disabled{opacity:.75}
+/* ── Лист премий ── строки те же, что в зарплатной ведомости; своё здесь
+   только серая кнопка с датой, когда премия откроется. */
+.fb-list{display:flex;flex-direction:column}
+/* Строка премии: слева имя и стаж, справа в одну линию сумма и кнопка. Ставить
+   их столбиком (как у выплат зарплаты) здесь незачем — сумма тут короткая. */
+.ten-e{min-height:54px;align-items:center}
+.ten-v{flex:0 0 auto;display:flex;align-items:center;gap:10px}
+.ten-sum{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.ten-sum u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:3px}
+.fb-paybtn.ten-off{background:none;border:1px solid var(--border2);color:var(--muted);
+  cursor:default;min-width:92px}
 .fb-note{margin:10px 16px 4px;font-size:11px;line-height:1.55;color:var(--dim)}
 /* Одно имя на двоих: карточка та же, но красным — это не строка зарплаты, а
    сообщение о человеке, которого в ведомости нет. */
@@ -20217,7 +20216,7 @@ function fbHubHtml(b, err){
     ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
     ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
     ${fbGo('Лист премий', 'bonus.due', (TEN && TEN.due) || 0, "accOpen('finbonus')",
-           {unit: TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек', 'человека', 'человек')} ждёт` : 'за стаж'})}
+           {unit: TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек ждёт', 'человека ждут', 'человек ждут')}` : 'за стаж'})}
   </div>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
@@ -22795,45 +22794,51 @@ function tenPaint(){
 function tenStaj(m){
   if(!m) return 'меньше месяца';
   const г = Math.floor(m / 12), ост = m % 12;
-  const части = [];
-  if(г) части.push(`${г} ${pluralize(г, 'год', 'года', 'лет')}`);
-  if(ост) части.push(`${ост} ${pluralize(ост, 'месяц', 'месяца', 'месяцев')}`);
-  return части.join(' ');
+  // Коротко: строка и так несёт дату приезда, и «1 год 6 месяцев» её обрезало.
+  return [г ? `${г} г` : '', ост ? `${ост} мес` : ''].filter(Boolean).join(' ');
 }
 
+// Строка человека — такая же, как в зарплатной ведомости: имя, под ним стаж,
+// справа сумма и кнопка. Своей вёрстки у листа нет намеренно: это тот же
+// список людей, и выглядеть он должен так же.
 function tenRow(p){
   const ждёт = p.due > 0;
-  const дата = p.next_at ? _audDayT(p.next_at) : '';
+  // Когда премия ждёт — строка про стаж и всё: сумма и так справа, а «получено»
+  // её только обрезало. Когда не ждёт — «получено» объясняет, почему пусто.
   const низ = p.why ? p.why
-    : `на работе с ${_audDayT(p.start)} · ${tenStaj(p.months)}`;
-  // Что уже накоплено — золотом, чтобы было видно без счёта в уме.
-  const сумма = ждёт ? `<b class="ten-due">${fmt(p.due)}<u>AED</u></b>`
-    : `<b class="ten-wait">${p.earned ? fmt(p.earned) + ' получено' : 'копится'}</b>`;
+    : [`с ${_audDayT(p.start)}`, tenStaj(p.months),
+       !ждёт && p.paid ? `получено ${fmt(p.paid)}` : ''].filter(Boolean).join(' · ');
   const кнопка = ждёт
-    ? `<button class="aud-b go ten-pay" data-n="${escS(p.name)}" onclick="tenPay(this.dataset.n)">Выплатить ${fmt(p.due)}</button>`
-    : `<button class="aud-b ten-pay off" disabled>${p.why ? 'Нет даты приезда'
-        : дата ? `Будет ${дата}` : 'Ждёт стажа'}</button>`;
-  return `<div class="shl-card fb-pc ten-c${ждёт ? ' on' : ''}">
-    <div class="shl-h">
-      <span class="shl-code">${escS(fbIni(p.title))}</span>
-      <span class="shl-b"><b>${escS(p.title)}</b><i>${escS(низ)}</i></span>
-      ${сумма}
-    </div>
-    ${кнопка}
-  </div>`;
+    ? `<button class="aud-b go fb-paybtn" data-n="${escS(p.name)}" onclick="tenPay(this.dataset.n)">Выплатить</button>`
+    : `<button class="fb-paybtn ten-off" disabled>${p.why ? '—' : _audDayT(p.next_at)}</button>`;
+  return `<div class="fb-e ten-e"><span class="fb-e-b"><b>${escS(p.title)}</b><i>${escS(низ)}</i></span>
+    <span class="ten-v">${ждёт ? `<b class="ten-sum">${fmt(p.due)}<u>AED</u></b>` : ''}${кнопка}</span></div>`;
 }
 
 function tenHtml(){
   if(!TEN) return '<div class="exp-empty">Загрузка…</div>';
   const люди = TEN.people || [];
   if(!люди.length) return '<div class="exp-empty">Некому — ни водителей, ни операторов</div>';
-  const ждут = люди.filter(p => p.due > 0), прочие = люди.filter(p => !(p.due > 0));
-  const блок = (т, сп) => сп.length ? `<div class="sc">${fbCapT(т, String(сп.length))}
-      <div class="ord-dists fb-days">${сп.map(tenRow).join('')}</div></div>` : '';
-  return блок('Премия заработана', ждут) + блок('Стаж идёт', прочие)
-    + `<div class="fb-note">Премия за стаж — ${fmt(TEN.step_aed)} AED за каждые
-       ${TEN.step_months} месяцев работы. Не забрал — копится. Уехал — отсчёт
-       начинается заново с дня возвращения.</div>`;
+  // Один список в том же порядке, что люди стоят везде: сверху операторы,
+  // потом водители по районам (владелец, 23 сен 2026). Порядок задаёт сервер,
+  // здесь только расставляем шапки, когда меняется район.
+  let out = '', шапка = null;
+  люди.forEach(p => {
+    const своя = p.role === 'driver'
+      ? (p.district_code ? `${p.district_code} ${p.district_name}` : 'Без района')
+      : 'Операторы';
+    if(своя !== шапка){
+      if(шапка !== null) out += '</div></div>';
+      const n = люди.filter(x => (x.role === 'driver'
+        ? (x.district_code ? `${x.district_code} ${x.district_name}` : 'Без района') : 'Операторы') === своя).length;
+      out += `<div class="sc">${fbCapT(своя, String(n))}<div class="fb-list">`;
+      шапка = своя;
+    }
+    out += tenRow(p);
+  });
+  if(шапка !== null) out += '</div></div>';
+  return out + `<div class="fb-note">${fmt(TEN.step_aed)} AED за каждые ${TEN.step_months} месяцев
+    работы. Не забрал — копится. Уехал — отсчёт начинается заново с дня возвращения.</div>`;
 }
 
 async function accFinBonus(){

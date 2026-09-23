@@ -119,13 +119,30 @@ def state(person: dict, items: list, today: str = "") -> dict:
 
 
 def list_for(people: list, items: list, today: str = "") -> list:
-    """Лист премий: операторы и водители, у кого больше наработано — выше."""
+    """Лист премий одним списком, в том же порядке, что люди стоят везде:
+    сначала операторы, потом водители по районам (владелец, 23 сен 2026: «не
+    надо всех с премиями наверх; единый список по порядку, билдингам тоже —
+    сверху операторы, потом водители по районам»)."""
+    from config_offices import OFFICE_CODES, OFFICE_IDS, OFFICE_NAMES
     by_name: dict = {}
     for it in items or ():
         by_name.setdefault(str(it.get("name") or ""), []).append(it)
-    out = [state(p, by_name.get(p.get("name") or "") or [], today)
-           for p in people if (p.get("role") or "") in ROLES]
-    out.sort(key=lambda r: (-r["due"], -r["months"], r["title"]))
+    порядок = {"senior": 0, "operator": 1, "driver": 2}
+    out = []
+    for p in people:
+        role = p.get("role") or ""
+        if role not in ROLES:
+            continue
+        st = state(p, by_name.get(p.get("name") or "") or [], today)
+        oid = next((d for d in (p.get("districts") or []) if d in OFFICE_IDS), "")
+        st["district"] = oid
+        st["district_code"] = OFFICE_CODES.get(oid, "")
+        st["district_name"] = OFFICE_NAMES.get(oid, "")
+        st["_o"] = (порядок.get(role, 3),
+                    OFFICE_IDS.index(oid) if oid in OFFICE_IDS else len(OFFICE_IDS),
+                    st["title"])
+        out.append(st)
+    out.sort(key=lambda r: r.pop("_o"))
     return out
 
 

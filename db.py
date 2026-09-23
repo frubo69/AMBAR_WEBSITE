@@ -1355,12 +1355,20 @@ async def upsert_access_block(telegram_id: int, by: int = 0, hint: dict = None) 
     return doc or {}
 
 
+# Клиент — это человек с телеграм-аккаунтом. Запись с telegram_id 0 человеком
+# не является: под этим номером идут телефонные заказы, у которых клиента в
+# боте нет, и такую запись однажды завёл сквозной тест (tools/e2e.py). В
+# списке она выглядела клиентом с 755 заказами и 8 645 потраченными (владелец,
+# 24 сен 2026: «это что такое»). Ни в список, ни в счётчик её не пускаем.
+CUSTOMER_Q = {"telegram_id": {"$gt": 0}}
+
+
 async def customers_count() -> int:
     """Размер базы одним числом — для живого счётчика в STAR: опрашивать
     полный список ради одной цифры раз в пять секунд было бы расточительно."""
     db = _db_or_none()
     if db is None: return 0
-    return int(await db.users.count_documents({}))
+    return int(await db.users.count_documents(CUSTOMER_Q))
 
 
 async def get_all_customers() -> list:
@@ -1370,7 +1378,7 @@ async def get_all_customers() -> list:
     # Потолок высокий не для красоты: по этому списку идёт рассылка, и клиент,
     # не попавший в выборку, молча её не получит. База растёт сотнями в месяц,
     # и прежние 2000 однажды отрезали бы хвост без единого следа в счётчиках.
-    cursor = db.users.find({}, {"_id": 0}).sort("first_seen", -1)
+    cursor = db.users.find(CUSTOMER_Q, {"_id": 0}).sort("first_seen", -1)
     return await cursor.to_list(length=100000)
 
 

@@ -161,8 +161,15 @@ async def main():
             await db._db_or_none().orders.delete_one({"order_id": oid})
             gone = await db.get_order(oid) is None
             check("тестовый заказ убран", gone)
+        # Заказ заводится «оператором» с id 0, и по дороге заводится запись
+        # клиента с тем же нулём. Она пережила прогон 14 сен и полтора месяца
+        # висела в «Клиентах» человеком с 755 заказами: под нулевым id лежат
+        # все телефонные заказы (владелец, 24 сен 2026: «это что такое»).
+        # Убираем за собой и её — но только если это наша, без телеграма.
+        await db._db_or_none().users.delete_one({"telegram_id": 0, "full_name": "e2e"})
         left = await db._db_or_none().orders.count_documents({"e2e": True})
-        check("следов в базе не осталось", left == 0, left)
+        призрак = await db._db_or_none().users.count_documents({"telegram_id": {"$lte": 0}})
+        check("следов в базе не осталось", left == 0 and призрак == 0, f"{left} зак, {призрак} клиентов")
 
     print(f"\nитог: {len(OK)} ✓ · {len(BAD)} ✗")
     if BAD:

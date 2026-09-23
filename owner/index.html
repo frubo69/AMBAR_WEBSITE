@@ -898,7 +898,14 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-dr-h em{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
 .stk-dr-h em svg{width:11px;height:11px}
-.qd-page > .stk-drs > .stk-drw{flex:1 1 0;min-height:106px;max-height:186px}
+/* 77 (район со строкой состояния) + 42 (история) = 119. Стояло 106: пока места
+   хватало, карточки и так были выше, а как только соседние подросли — эти
+   сжались, и «История» обрезалась у них. */
+.qd-page > .stk-drs > .stk-drw{flex:1 1 0;min-height:120px;max-height:186px}
+/* С полкой «Не завершена» полок три, а не две: 77 + 42 + 42 = 161 (замерено в
+   браузере, не на глаз). Без этого карточка оставалась прежней высоты, и
+   «История» уезжала под соседнюю. */
+.qd-page > .stk-drs > .stk-drw.aud-open{min-height:162px;max-height:242px}
 .qd-page .stk-dr-h{padding-left:18px}
 /* ── По районам: плитки и есть переключатель ── */
 .stk-byg .aud-t{transition:border-color .2s var(--e1),background-color .2s var(--e1)}
@@ -15289,7 +15296,7 @@ function audDistRow(d, left, без, hist){
       ? (d.short_aed ? [`недостача <u>${fmt(d.short_aed)} AED</u>`, 'dn'] : ['закрыта · всё сошлось', 'ok'])
     : b ? [`QR код не внесён <u>${fmt(b)}</u>`, 'warn'] : ['не начата', 'idle'];
   const k = hist.length;
-  return `<div class="stk-drw">
+  return `<div class="stk-drw${о ? ' aud-open' : ''}">
     <button class="stk-dr" onclick="stkAuditGo('${d.id}')">
       <span class="stk-dr-c">${escS(d.code || '')}</span>
       <span class="stk-dr-b">

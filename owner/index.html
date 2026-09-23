@@ -15268,9 +15268,21 @@ async function stkAuditPick(){
 // что снизу, открывает общую историю уже на этом районе.
 // Справа у строки только стрелка: число бутылок по реестру там стояло
 // («1 бут») и владелец его снял — «вообще не должно быть никакого текста».
+// «2026-09-22» → «22 сентября»; сегодня и вчера — словами. День смены, а не
+// календарный: _dayIsoFor знает, что до десяти утра идёт вчерашний.
+function _audDayT(day){
+  if(!day) return '';
+  if(day === _dayIsoFor(0)) return 'сегодня';
+  if(day === _dayIsoFor(1)) return 'вчера';
+  return `${+day.slice(8, 10)} ${MONTHS_GEN[+day.slice(5, 7) - 1]}`;
+}
+
 function audDistRow(d, left, без, hist){
   const b = (без || {})[d.id] || 0;
   hist = hist || [];
+  // Незавершённая с прошлых дней: сканы целы, просто день другой. Строкой
+  // ниже — чтобы её было видно и чтобы открыть именно её, а не начать новую.
+  const о = d.audit_open;
   const [sub, cls] = d.audit === 'running' ? ['идёт ревизия', 'run']
     : d.audit === 'pending' ? ['ждёт решения', 'dn']
     : d.audit === 'closed'
@@ -15286,6 +15298,10 @@ function audDistRow(d, left, без, hist){
       </span>
       <span class="stk-dr-go">›</span>
     </button>
+    ${о ? `<button class="stk-dr-h aud-back-row" onclick="stkAuditGo('${d.id}', '${escS(о.day)}')">
+      <span>Не завершена ${escS(_audDayT(о.day))}</span>
+      <b>${fmt(о.scans || 0)}<u>${pluralize(о.scans || 0, 'бутылка', 'бутылки', 'бутылок')}</u></b>
+      <em>${_SC_CHEV}</em></button>` : ''}
     <button class="stk-dr-h" onclick="stkAudits('${d.id}', 'pick')">
       <span>История</span>${k
         ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>`
@@ -16101,14 +16117,18 @@ async function stkLoadContext(){
 }
 
 // ── страница района ─────────────────────────────────────────────────────────
-async function stkAuditGo(id){
+async function stkAuditGo(id, day){
   distRemember('stk', id);
   _audHap('sel');
-  await audOpen(id);
+  await audOpen(id, false, day);
 }
 
-async function audOpen(district, тихо){
+async function audOpen(district, тихо, day){
   STK.district = district; STK.audit = true;
+  // День ревизии. Обычно сегодняшний — его называет сервер. Но незавершённую
+  // со вчера открываем ЕЁ днём: считали вчера, значит и сверять надо со
+  // вчерашним складом, иначе ночные заказы превратятся в излишки.
+  if(day !== undefined) STK.auditDay = day || '';
   const d0 = (STK.districts || []).find(x => x.id === district);
   STK.view = 'sheet';
   // Название района встаёт в шапку сразу, до ответа сервера: лист считается не
@@ -16122,7 +16142,7 @@ async function audOpen(district, тихо){
   // День ревизии — всегда сегодняшний (владелец: «перемещение и ревизия не
   // относятся к дате сверху»); какой именно, говорит сервер (sh.day).
   try{ sh = await ownerApi.ownerFetch('/api/owner/stock/audit/sheet',
-        {params:{district}}); }
+        {params: STK.auditDay ? {district, day: STK.auditDay} : {district}}); }
   catch(e){ _toast('Не удалось загрузить'); return stkAuditPick(); }
   if(STK.view !== 'sheet' || STK.district !== district) return;   // пока ехало — ушли
   STK.sheet = sh;
@@ -16133,7 +16153,7 @@ async function audOpen(district, тихо){
 // Перерисовать страницу на месте: после камеры и после «Внести / удалить
 // товар» числа другие, а прокрутку и внимание человека терять незачем.
 async function audRefresh(){
-  if(STK.view === 'sheet' && STK.district && STK.audit) await audOpen(STK.district, true);
+  if(STK.view === 'sheet' && STK.district && STK.audit) await audOpen(STK.district, true, STK.auditDay);
   // Отчёт: внесли коды не из реестра — сервер уже сверил и, может быть, закрыл.
   else if(STK.view === 'report' && STK.report){
     try{
@@ -16215,9 +16235,12 @@ function audPage(){
   const sh = STK.sheet; if(!sh) return;
   const box = document.getElementById('stkMid');
   const a = sh.audit || {}, st = a.state || 'idle';
-  const sub = st === 'running' ? `идёт с ${fmtHM(a.started_at)}${a.started_by ? ' · ' + a.started_by : ''}`
+  // Не сегодняшнюю подписываем днём: иначе человек не поймёт, почему числа
+  // другие, и решит, что склад врёт.
+  const чужой = sh.day && sh.day !== _dayIsoFor(0) ? ` · за ${_audDayT(sh.day)}` : '';
+  const sub = st === 'running' ? `идёт с ${fmtHM(a.started_at)}${чужой || (a.started_by ? ' · ' + a.started_by : '')}`
             : st === 'pending' ? 'ждёт решения'
-            : st === 'closed'  ? `закрыта ${fmtHM(a.closed_at)}` : 'ревизия';
+            : st === 'closed'  ? `закрыта ${fmtHM(a.closed_at)}` : 'ревизия' + чужой;
   _stkHead(`${sh.district_code} ${sh.district_name}`, sub, false);
   const rows = (sh.rows || []).slice().sort((x, y) => (x.no || 999) - (y.no || 999));
   // Что лежит или должно лежать — сверху; чего на этом складе нет — сложено

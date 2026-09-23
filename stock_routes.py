@@ -1646,11 +1646,31 @@ async def handle_status(request):
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[audit] состояние не сверено: {e}")
     auds = await db.audits_by_day(day)
+    # Ревизия привязана ко дню, и начатая вчера сегодня пропадала бы с экрана
+    # вместе со всеми сканами (владелец, 23 сен 2026). Говорим о ней здесь же:
+    # район покажет её отдельной строкой и откроет ТЕМ ЖЕ днём — считали вчера,
+    # значит и сверять надо со вчерашним складом.
+    try:
+        old = await db.audits_unfinished(day)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] незавершённые не прочитаны: {e}")
+        old = {}
+    scans = {}
+    for oid, a in old.items():
+        try:
+            scans[oid] = (await db.audit_scan_stats(oid, a.get("day", ""))).get("total", 0)
+        except Exception:                            # noqa: BLE001
+            scans[oid] = 0
     districts = [{
         "id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
         "done": oid in by_d,
         # Ревизия за этот день: idle / running / pending / closed.
         "audit": _audit_view(auds.get(oid))["state"] if auds.get(oid) else "idle",
+        # Незавершённая с прошлых дней — когда начали и сколько уже насчитали.
+        **({"audit_open": {"day": old[oid].get("day", ""),
+                           "started_at": old[oid].get("started_at", ""),
+                           "scans": scans.get(oid, 0)}}
+           if oid in old and oid not in auds else {}),
         "first_time": bool((by_d.get(oid) or {}).get("first_time")),
         "short_qty": int((by_d.get(oid) or {}).get("short_qty") or 0),
         "short_aed": int((by_d.get(oid) or {}).get("short_aed") or 0),

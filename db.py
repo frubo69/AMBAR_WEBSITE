@@ -4430,6 +4430,25 @@ async def audits_by_day(day: str) -> dict:
     return {r.get("district"): r for r in rows}
 
 
+async def audits_unfinished(before_day: str, limit: int = 20) -> dict:
+    """{район: ревизия} — начатые в прошлые дни и не завершённые.
+
+    Ревизия привязана ко дню: начали вчера, не нажали «Завершить» — сегодня
+    экран спрашивает сегодняшний день, и вчерашняя со всеми сканами исчезает
+    с глаз (владелец, 23 сен 2026: «вчера проводилась ревизия, не завершена,
+    сегодня исчезла — можешь вернуть, чтобы я её закончил»). Ничего не
+    терялось: вот она. На район берём самую свежую."""
+    db = _db_or_none()
+    if db is None: return {}
+    rows = await db.stock_audits.find(
+        {"day": {"$lt": before_day}, "finished_at": {"$exists": False}},
+        {"_id": 0}).sort("day", -1).limit(int(limit)).to_list(length=int(limit))
+    out: dict = {}
+    for r in rows:
+        out.setdefault(r.get("district"), r)
+    return out
+
+
 async def audits_pending() -> list:
     """Завершённые, но не закрытые: недостача или излишек ждут решения."""
     db = _db_or_none()

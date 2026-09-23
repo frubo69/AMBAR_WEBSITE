@@ -50,6 +50,33 @@ def _plural(n, one, few, many) -> str:
     return many
 
 
+def _count_note(districts: list, day: str) -> str:
+    """Когда районы считали руками в последний раз.
+
+    Остаток у нас больше не «то, что насчитали в последний раз»: от пересчёта
+    он ведётся событиями — продажи, перемещения, внесённое руками, бой (с 16
+    по 21 сен 2026). Поэтому старая строка «заявка посчитана по старым
+    остаткам» неправда: заявка посчитана по сегодняшнему остатку. Правда в
+    другом — чем дольше без пересчёта, тем сильнее расчёт расходится с тем,
+    что реально стоит на полке, и вот об этом и говорим.
+    """
+    import pay_notify as _pn
+    было = [(d.get("code") or "", d.get("counted") or "") for d in districts]
+    if not было or all(c == day for _, c in было):
+        return ""
+    дни = {c for _, c in было if c}
+    if not дни:
+        return "\n\n⚠️ Районы ни разу не пересчитывали — заявка идёт от того, что внесли руками."
+    # Одна дата на всех — не разводим список из пяти одинаковых строк.
+    кто = (f"Последний пересчёт складов — {_md(_pn.day_t(дни.pop()))}"
+           if len(дни) == 1 and len([1 for _, c in было if not c]) == 0
+           else "Последний пересчёт: " + ", ".join(
+               f"{_md(c)} — {_md(_pn.day_t(cnt)) if cnt else 'не делали'}" for c, cnt in было))
+    return (f"\n\n📋 {кто}. Остаток с тех пор ведётся сам: продажи, перемещения "
+            f"и списания учтены. Но чем дольше без пересчёта, тем сильнее он "
+            f"расходится с полкой.")
+
+
 async def on_all_closed(day: str, state: dict) -> bool:
     """Последний район закрылся. True — мы собрали заявку (или уточнили её).
 
@@ -109,13 +136,18 @@ async def on_all_closed(day: str, state: dict) -> bool:
         import supply_routes
         raw, name = await supply_routes._build_book(day)
         data = await supply_routes._order_rows(day)
-        stale = [d for d in data.get("districts", []) if d.get("counted") != day]
-        if stale:
-            file_note = "\n\n⚠️ " + ", ".join(
-                f"{_md(d['code'])}: пересчёт {_md(d.get('counted') or 'не делали')}"
-                for d in stale) + "\nПо этим районам заявка посчитана по старым остаткам."
-        head += (f"\n\n*Заявка собрана:* {data.get('total_qty', 0)} бутылок · "
-                 f"{_fmt(data.get('total_aed', 0))} AED{file_note}")
+        file_note = _count_note(data.get("districts", []), day)
+        qty = int(data.get("total_qty", 0) or 0)
+        # Сумма — закупочная, та же, что в самом файле (AMOUNT под таблицей).
+        # Раньше здесь стояла сумма по НАШЕМУ прайсу: на те же 424 бутылки файл
+        # говорил 36 957, а подпись под ним — 86 450, и заявка выглядела
+        # посчитанной дважды по-разному (владелец, 23 сен 2026: «почему они
+        # разные»). Магазину мы платим закупку — её и пишем.
+        head += (f"\n\n*Заявка собрана:* {qty} "
+                 f"{_plural(qty, 'бутылка', 'бутылки', 'бутылок')} · "
+                 f"{len(data.get('rows') or [])} "
+                 f"{_plural(len(data.get('rows') or []), 'позиция', 'позиции', 'позиций')} · "
+                 f"закупка {_fmt(data.get('total_cost', 0))} AED{file_note}")
     except Exception as e:
         log.error(f"[shift] заявка не собралась: {e}")
         head += "\n\n⚠️ Заявку собрать не удалось — соберите вручную в «Учёте»."

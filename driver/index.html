@@ -11447,7 +11447,10 @@ function camTorchShow(b){
     light:  () => camTorchSet(b, true),
     toggle: () => camTorch(b),
     hap:    _hap,
-    nope:   () => toast('Этот телефон яркость фонарика не отдаёт'),
+    // Потянули, а ступеней нет — самый честный момент спросить камеру ещё раз:
+    // при открытии она иногда отвечает не всё, а тут уже минуту как снимает.
+    nope:   () => { toast('Этот телефон яркость фонарика не отдаёт');
+                    camDiagSay('тянули за яркость · ' + AmbarTorch.diag(SCAN.track()), 'ambar_cam_nope'); },
   });
   camDiag();
 }

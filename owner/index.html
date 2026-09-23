@@ -26850,20 +26850,23 @@ function qrTorchShow(btn){
     light:  () => qrTorch(btn),
     toggle: () => qrTorch(btn),
     hap:    _hap,
-    nope:   () => _toast('Этот телефон яркость фонарика не отдаёт'),
+    // Потянули, а ступеней нет — самый честный момент спросить камеру ещё раз:
+    // при открытии она иногда отвечает не всё, а тут уже минуту как снимает.
+    nope:   () => { _toast('Этот телефон яркость фонарика не отдаёт');
+                    qrCamSay('тянули за яркость · ' + AmbarTorch.diag(SCAN.track()), 'ambar_cam_nope'); },
   });
   qrCamDiag();
 }
 
 // Раз в день говорим серверу строкой в журнал, что умеет камера этого
 // телефона: ступени света есть не у всех, и проверить это можно только так.
-function qrCamDiag(){
+function qrCamSay(что, ключ){
   const день = new Date().toISOString().slice(0, 10);
-  try{ if(localStorage.getItem('ambar_cam_diag') === день) return;
-       localStorage.setItem('ambar_cam_diag', день); }catch(e){}
-  ownerApi.ownerFetch('/api/owner/ping?cam=' + encodeURIComponent(AmbarTorch.diag(SCAN.track())))
-    .catch(() => {});
+  try{ if(localStorage.getItem(ключ) === день) return;
+       localStorage.setItem(ключ, день); }catch(e){}
+  ownerApi.ownerFetch('/api/owner/ping?cam=' + encodeURIComponent(что)).catch(() => {});
 }
+function qrCamDiag(){ qrCamSay(AmbarTorch.diag(SCAN.track()), 'ambar_cam_diag'); }
 
 // Блик от вспышки: если ступени есть — убавить свет, а не гасить всё.
 function qrGlare(){

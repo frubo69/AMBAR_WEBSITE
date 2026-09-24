@@ -16273,13 +16273,20 @@ function audMissing(pid){
   const r = (sh.rows || []).find(x => x.id === pid); if(!r || !(r.missing || []).length) return;
   const u = _audU(r);
   const нет = fmtQty((r.diff || 0) / u);
+  // Кандидатов ровно столько, сколько не хватает, — значит это именно они.
+  // Больше — у части кодов бутылки уже проданы, и кто из них пропал, по
+  // реестру не скажешь: тогда это список для поиска, и так и написано.
+  const точно = r.missing.length === Math.round(r.diff || 0);
   scanInfo(r.name, `не хватает ${нет}`, 'bad',
-    [_siRow('Не поднесли к камере', `${r.missing.length} ${pluralize(r.missing.length, 'бутылка', 'бутылки', 'бутылок')}`)]
+    [_siRow(точно ? 'Не нашли именно эти' : 'Кандидаты — искать среди них',
+            точно ? `${r.missing.length} ${pluralize(r.missing.length, 'бутылка', 'бутылки', 'бутылок')}`
+                  : `${r.missing.length} не поднесли к камере, а не хватает ${нет}`)]
     .concat(r.missing.map(m => _siRow(
       escS(m.label || m.code),
       escS(m.from_code ? `приехала с ${m.from_code}${m.moved_at ? ' · ' + _audDayT(String(m.moved_at).slice(0, 10)) : ''}`
                        : (m.at ? 'внесена ' + _audDayT(String(m.at).slice(0, 10)) : '')), 'mono')))
-    .concat([_siRow('Если бутылка на полке', 'отсканируйте её — недостача уйдёт сама'),
+    .concat([_siRow('Почему их больше', точно ? '' : 'у проданной бутылки код из реестра не исчезает'),
+             _siRow('Если бутылка на полке', 'отсканируйте её — недостача уйдёт сама'),
              _siRow('Если её нет', 'закройте ревизию: недостача станет списанием')]));
 }
 

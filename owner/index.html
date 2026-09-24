@@ -3798,6 +3798,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .sc-r.fb-wk-f > b svg{flex:0 0 auto;color:var(--muted)}
 .sc-r.fb-wk-f > b.ph{color:var(--dim);font-weight:600}
 .sc-r.fb-wk-f:active{background:transparent}
+.fb-wk-note{margin:6px 2px 0;font-size:11px;line-height:1.35;color:var(--muted)}
 .sc-r.fb-wk-f:active > b{border-color:rgba(201,169,110,.55);background:var(--card)}
 .shl-card.fb-pc.fb-away{opacity:.5}
 /* ── Лист премий ── строки те же, что в зарплатной ведомости; своё здесь
@@ -22607,13 +22608,26 @@ function fbWorkIdx(work, m){
   if(i < 0) work.forEach((w, k) => { if(w.to && w.to < first) i = k; });
   return i < 0 ? 0 : i;
 }
+// День со сдвигом: «уезжает 24-го» значит, что последний рабочий — 23-е.
+function fbDayShift(day, n){
+  const d = new Date(String(day) + 'T12:00:00');
+  if(isNaN(d)) return day;
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 const FB_WK_CAL = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
   stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>`;
 function fbWorkRows(p, m){
   const work = p.work || [], w = work[fbWorkIdx(work, m)] || {};
   const row = (field, t, v, ph) => `<button class="sc-r fb-r fb-wk-f" onclick="fbWorkPick('${field}')"><span>${t}</span><b${
     v ? '' : ' class="ph"'}>${FB_WK_CAL}${v ? escS(fbWorkDay(v)) : ph}</b></button>`;
-  return row('from', 'Вышел на работу', w.from, 'не указано') + row('to', 'Уехал', w.to, 'ещё работает');
+  // «День отъезда» — а не «последний рабочий»: владелец 24 сен 2026 — «то, что
+  // показывает 24 сентября, значит, что он сегодня не выходит на смену, он
+  // уезжает». В этот день его уже нет ни в бригаде, ни в оплаченных днях.
+  return row('from', 'Вышел на работу', w.from, 'не указано')
+       + row('to', 'Уезжает', w.to, 'ещё работает')
+       + (w.to ? `<div class="fb-wk-note">В день отъезда уже не работает: последний рабочий — ${
+            escS(fbWorkDay(fbDayShift(w.to, -1)))}</div>` : '');
 }
 function fbWorkPerson(){ return (fbCur(fbBook(FB.month)).people || []).find(x => x.name === FB.person); }
 function fbWorkPick(field){

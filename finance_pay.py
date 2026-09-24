@@ -91,20 +91,35 @@ def work_clean(work) -> list:
 
 def work_error(work: list) -> str:
     """Что не так с периодами: конец раньше начала, периоды налезают друг на
-    друга, незакрытый период не последний. Пустая строка — всё в порядке."""
+    друга, незакрытый период не последний. Пустая строка — всё в порядке.
+
+    Дата отъезда — день, когда человек уже не работает, поэтому новый период,
+    начинающийся ровно в этот день, — не наложение, а пересменка: один уехал,
+    второй вышел в тот же день."""
     prev_to = None
     for i, p in enumerate(work):
         a, b = p["from"], p["to"]
         if a and b and b < a:
             return "end_before_start"
-        if i and (prev_to == "" or (a and prev_to and a <= prev_to) or not a):
+        if i and (prev_to == "" or (a and prev_to and a < prev_to) or not a):
             return "overlap"
         prev_to = b
     return ""
 
 
+def _last_day(to: str) -> str:
+    """Последний РАБОЧИЙ день периода по дате отъезда.
+
+    Владелец, 24 сен 2026: «то, что у них показывает 24 сентября, — это значит,
+    что он сегодня не выходит на смену, он уезжает». Значит, дата в «Уехал» —
+    день отъезда, а не последний рабочий: работал он по день до неё."""
+    d = _day(to)
+    return (d - timedelta(days=1)).isoformat() if d else ""
+
+
 def work_in(work, month: str) -> dict:
-    """Сколько дней человек на работе в месяце. Периодов нет — весь месяц."""
+    """Сколько дней человек на работе в месяце. Периодов нет — весь месяц.
+    День отъезда не работает и не оплачивается (см. _last_day)."""
     n = month_len(month)
     work = work_clean(work)
     if not work:
@@ -112,7 +127,8 @@ def work_in(work, month: str) -> dict:
     first, last = f"{month}-01", f"{month}-{n:02d}"
     spans, days = [], 0
     for p in work:
-        a, b = max(p["from"] or first, first), min(p["to"] or last, last)
+        конец = _last_day(p["to"]) if p["to"] else last
+        a, b = max(p["from"] or first, first), min(конец, last)
         if a <= b:
             spans.append([a, b])
             days += (_day(b) - _day(a)).days + 1
@@ -129,17 +145,19 @@ def work_now(work, day: str) -> dict:
         return dict(set=False, on=True, since="", until="", day_n=0, left="", back="")
     for p in work:
         a, b = p["from"], p["to"]
-        if (not a or a <= day) and (not b or day <= b):
+        # День отъезда — уже не рабочий: человек в этот день не выходит.
+        if (not a or a <= day) and (not b or day < b):
             n = (_day(day) - _day(a)).days + 1 if a else 0
             return dict(set=True, on=True, since=a, until=b, day_n=n, left="", back="")
-    left = max((p["to"] for p in work if p["to"] and p["to"] < day), default="")
+    left = max((p["to"] for p in work if p["to"] and p["to"] <= day), default="")
     back = min((p["from"] for p in work if p["from"] and p["from"] > day), default="")
     return dict(set=True, on=False, since="", until="", day_n=0, left=left, back=back)
 
 
 def work_apply(work, action: str, day: str = "", i: int = -1, a: str = "", b: str = "") -> tuple:
     """Правка периодов: (новые периоды, ошибка).
-    start — вышел на работу с day; end — уехал, day — последний день;
+    start — вышел на работу с day; end — уехал в день day (в этот день он уже
+    не работает: владелец, 24 сен 2026);
     set — поправить период i (a — с, b — по, пусто — работает); del — убрать i."""
     work = work_clean(work)
     if action == "start":

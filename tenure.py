@@ -103,8 +103,12 @@ def state(person: dict, items: list, today: str = "") -> dict:
         # выдумывать дату нельзя — деньги.
         out["why"] = "Дата приезда не указана"
         return out
-    # Уехал — стаж замер на дне отъезда: дни в отъезде не идут в счёт.
-    к = left if (left and left < t) else t
+    # Уехал — стаж замер: дни в отъезде не идут в счёт. Дата отъезда — день,
+    # когда человек уже не работает (владелец, 24 сен 2026), поэтому считаем
+    # по день до неё.
+    from datetime import timedelta as _td
+    ушёл = (left - _td(days=1)) if left else None
+    к = ушёл if (ушёл and ушёл < t) else t
     months = _months_between(start, к)
     steps = months // STEP_MONTHS
     paid = paid_in(items, p.get("from") or "")
@@ -113,7 +117,7 @@ def state(person: dict, items: list, today: str = "") -> dict:
                due=max(0, earned - int(paid)),
                next_step=steps + 1,
                next_at=_plus_months(start, (steps + 1) * STEP_MONTHS).isoformat())
-    if left and left < t:
+    if left and left <= t:
         out["why"] = "Уехал — стаж не идёт"
     return out
 

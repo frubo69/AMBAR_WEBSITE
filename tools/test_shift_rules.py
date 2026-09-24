@@ -222,6 +222,16 @@ async def main():
     st, b = await бригада({"Али": False})
     eq("закрывшего смену — можно", (st, b["drivers"].get("Али")), (200, False))
 
+    print("── край: в районе никого нет в Дубае ───────────────────────────")
+    opr._staff_mod.DISTRICT_DRIVERS["tecom"] = ["Улетел"]
+    opr._scope = lambda people_, who, ds: {"jvc", "tecom"}
+    opr._here_drop()
+    eq("отмечать некого", await opr._crew_names("tecom", DAY), [])
+    st, b = await открыть({"Улетел": True}, oid="tecom")
+    eq("и смену такого района не открыть — сперва отметить приезд в «Зарплатах»",
+       (st, b.get("error"), b.get("drivers")), (400, "no_crew", []))
+    opr._scope = lambda people_, who, ds: {"jvc"}
+
     st, b = await бригада({"Парвиз": True}, oid="bbay")
     eq("чужой район — отказ", (st, b.get("error")), (403, "not_yours"))
     OPENS_OP.pop("jvc")

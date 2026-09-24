@@ -5154,7 +5154,7 @@ async function crqSend(ok){
 // работающего. Спрашиваем один раз: это решение видит и водитель.
 async function undoRelease(name){
   if(!curOp){ toast('Выберите оператора','err'); return; }
-  if(!confirm(`Вернуть ${name} в смену? Ему снова можно назначать заказы.`)) return;
+  if(!await askYesOp(`Вернуть ${name} в смену? Ему снова можно назначать заказы.`)) return;
   try{
     await opApi.opFetch('/api/operator/close-request/undo', {method:'POST', body:{as:curOp, driver:name}});
     toast(`${name} снова в смене`, 'ok'); haptic('heavy');

@@ -3551,7 +3551,8 @@ def setup(app):
     r.add_post("/api/operator/customer/{cid}/act", handle_customer_act)
     r.add_route("OPTIONS", "/api/operator/orders", _opt)
     r.add_get("/api/operator/orders", handle_list)
-    r.add_route("OPTIONS", "/api/operator/close-request", _opt)
+    for _p in ("/api/operator/close-request", "/api/operator/close-request/undo"):
+        r.add_route("OPTIONS", _p, _opt)
     r.add_post("/api/operator/close-request", handle_close_decide)
     r.add_post("/api/operator/close-request/undo", handle_close_undo)
     for _p in ("/api/operator/stock/order", "/api/operator/stock/order/edit",

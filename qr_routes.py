@@ -981,7 +981,8 @@ async def handle_drivers(request):
     return web.json_response({
         "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
                        "name": OFFICE_NAMES.get(d, d),
-                       "drivers": list(staff.DISTRICT_DRIVERS.get(d, []))}
+                       # Проверять машину уехавшего незачем — его тут нет.
+                       "drivers": staff.here(staff.DISTRICT_DRIVERS.get(d, []))}
                       for d in OFFICE_IDS],
     }, headers=CORS_HEADERS)
 

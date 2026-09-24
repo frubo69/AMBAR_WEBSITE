@@ -4948,6 +4948,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .crw-lk-d{display:flex;gap:6px;padding:0 10px 10px}
 .pin-pop .crw-lk-dd{flex:1;width:auto;height:38px;margin:0;padding:0;border-radius:10px;border:1px solid var(--border2);background:var(--card);color:var(--sub);font-weight:700;font-size:12px;letter-spacing:1px;cursor:pointer;font-family:inherit;text-align:center;justify-content:center}
 .pin-pop .crw-lk-dd.on{border-color:var(--gold);color:var(--gold)}
+/* Уехал и пока не вернулся: из команды не убираем — тускло и с датой
+   (владелец, 24 сен 2026). */
+.crw-p.gone{opacity:.45}
+.crw-p.gone .crw-p-car{color:var(--muted)}
 .crw-none{font-size:12px;color:var(--muted);padding:4px 2px}
 
 
@@ -36329,12 +36333,16 @@ function crewRender(){
       const v = drvOf(n);
       const home = dOf(v.base);
       const car = crewCarLine(v.car);
-      return `<button class="crw-p${v.moved ? ' moved' : ''}${car ? ' has-car' : ''}"
+      // Уехавший остаётся в команде, но серым и с датой отъезда (владелец,
+      // 24 сен 2026: «оставляй их в команде, просто пиши серым, что уехал»).
+      const уехал = (d.away || {})[n];
+      return `<button class="crw-p${v.moved ? ' moved' : ''}${car ? ' has-car' : ''}${уехал ? ' gone' : ''}"
                       onclick="crewPickD('${escS(n)}')">
         <span class="crw-p-a">${IC('car', 15)}</span>
         <span class="crw-p-t"><span class="crw-p-n">${escS(n)}</span>${
-          car ? `<span class="crw-p-car">${escS(car)}</span>` : ''}</span>
-        ${v.moved ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
+          уехал ? `<span class="crw-p-car">уехал ${escS(fbWorkDay(уехал))}</span>`
+                : (car ? `<span class="crw-p-car">${escS(car)}</span>` : '')}</span>
+        ${v.moved && !уехал ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
       </button>`;
     }).join('') : '<span class="crw-none">никого нет</span>';
     return `<div class="crw-c${d.moved ? ' moved' : ''}">

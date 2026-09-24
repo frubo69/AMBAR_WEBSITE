@@ -2739,7 +2739,7 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
                                         for o in mine if _lane(o) == "work"} - {""}),
             "orders": len(done),
             "revenue": sum(int(o.get("total") or 0) for o in done),
-            "silent": [n for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])
+            "silent": [n for n in _staff_mod.here(_staff_mod.DISTRICT_DRIVERS.get(d["id"], []))
                        if silent.get(n)],
             "crew_shift": {n: crew_shift.get(n) or {"open": False, "closed": False}
                            for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])},
@@ -2892,7 +2892,7 @@ async def handle_where(request):
     districts = await _fresh_districts()
     names = []
     for d in districts:
-        names += list(_staff_mod.DISTRICT_DRIVERS.get(d["id"]) or [])
+        names += _staff_mod.here(_staff_mod.DISTRICT_DRIVERS.get(d["id"]) or [])
     data = await drivers_live(names, _biz_date(datetime.now(DUBAI_TZ)),
                               (request.query.get("track") or "").strip())
     # К каждому — район и оператор: на карте пять точек, и без подписи они
@@ -2936,18 +2936,16 @@ def _here_drop():
 
 
 async def _here_names(day: str) -> dict:
-    """{имя: на работе ли} — по периодам работы, с коротким кэшем."""
+    """{имя: на работе ли} — один ответ на всю систему (config_staff.AWAY)."""
     import time as _t
     if _t.time() - _HERE["at"] < 60 and _HERE["by_name"]:
         return _HERE["by_name"]
-    out: dict = {}
     try:
-        import finance_pay as _pay
-        for p in await db.fin_people_get():
-            out[str(p.get("_id") or "")] = bool(_pay.work_now(p.get("work"), day).get("on", True))
+        await _staff_mod.sync_away(day)
     except Exception as e:                                   # noqa: BLE001
-        log.warning(f"[pos] периоды работы не прочитаны: {e}")
+        log.warning(f"[pos] кто уехал — не прочитано: {e}")
         return {}
+    out = {n: False for n in _staff_mod.AWAY}
     _HERE.update(at=_t.time(), by_name=out)
     return out
 

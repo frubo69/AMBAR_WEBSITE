@@ -763,6 +763,10 @@ async def handle_finance(request):
             "operator_id":  staff._slug(staff.DISTRICT_OPERATOR[_oid])
                             if staff.DISTRICT_OPERATOR.get(_oid) else "",
             "drivers":      list(staff.DISTRICT_DRIVERS.get(_oid, [])),
+            # Уехавших из команды не выкидываем — показываем серыми, с датой
+            # отъезда (владелец, 24 сен 2026).
+            "away":         {n: staff.away_since(n)
+                             for n in staff.DISTRICT_DRIVERS.get(_oid, []) if staff.is_away(n)},
             # Телефон точки — там же, где имена: карточку района открывают в
             # том числе чтобы позвонить туда, а не искать номер отдельно.
             "phones":       _offices.phones_for(_oid),
@@ -1073,7 +1077,9 @@ async def handle_where(request):
         log.warning(f"[where] перестановка не прочитана: {e}")
     names, who = [], {}
     for oid in OFFICE_IDS:
-        for n in (staff.DISTRICT_DRIVERS.get(oid) or []):
+        # Уехавшего на карте нет: его телефон молчит не потому, что что-то
+        # случилось (владелец, 24 сен 2026).
+        for n in staff.here(staff.DISTRICT_DRIVERS.get(oid) or []):
             names.append(n)
             who[n] = {"district": oid, "code": OFFICE_CODES.get(oid, ""),
                       "name": OFFICE_NAMES.get(oid, oid)}
@@ -1710,7 +1716,10 @@ async def _staff_payload() -> dict:
                        "operator": staff.DISTRICT_OPERATOR.get(d, ""),
                        "base": staff.base_operator(d),
                        "moved": bool(moves.get(d)),
-                       "drivers": list(staff.DISTRICT_DRIVERS.get(d, []))}
+                       "drivers": list(staff.DISTRICT_DRIVERS.get(d, [])),
+                       # Кто уехал — остаётся в списке серым, с датой.
+                       "away": {n: staff.away_since(n)
+                                for n in staff.DISTRICT_DRIVERS.get(d, []) if staff.is_away(n)}}
                       for d in OFFICE_IDS],
         # Тест-район — отдельно от районов: без оператора и без перестановок,
         # в нём тест-водители из базы. Операторам и чек-листу он не виден.
@@ -2472,7 +2481,8 @@ async def handle_office(request):
                          # Есть ли у него вход в приложение водителя: без id он
                          # в системе только именем, и заказ ему не назначить.
                          "has_login": bool(staff.DRIVER_IDS.get(n))}
-                        for n in staff.DISTRICT_DRIVERS.get(oid, [])],
+                        # Уехавшему заказ не назначить — его в выборе нет.
+                        for n in staff.here(staff.DISTRICT_DRIVERS.get(oid, []))],
         },
         "recent": [_order_summary(o) for o in recent],
     }, headers=CORS_HEADERS)
@@ -3944,7 +3954,7 @@ async def _chk_shift(day: str):
         # Кого ждём: отмеченные при открытии смены и отмеченные рабочими в
         # дне водителя из состава района. Отмеченный домашним — не ждём.
         need = {n for n, w in (op.get("drivers") or {}).items() if w}
-        for n in staff.DISTRICT_DRIVERS.get(o) or []:
+        for n in staff.here(staff.DISTRICT_DRIVERS.get(o) or []):
             if (days.get(n) or {}).get("working") is True:
                 need.add(n)
         need = {n for n in need if (days.get(n) or {}).get("working") is not False}

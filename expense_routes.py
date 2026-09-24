@@ -274,7 +274,10 @@ async def handle_day(request):
     """GET /api/owner/expenses?day= — расходы за день по каждому водителю."""
     day = (request.query.get("day") or "").strip() or _biz_day()
     saved = {r.get("driver"): r for r in await db.get_driver_days(day)}
-    rows = [_day_row(d, saved.get(d["name"])) for d in staff.drivers()]
+    # Улетевших в расходах смены нет вовсе (владелец, 24 сен 2026: «в расходы
+    # смены его даже включать не надо»): питания за день у него нет, а строка
+    # с нулями только путает — «кто на месте, кто нет».
+    rows = [_day_row(d, saved.get(d["name"])) for d in staff.drivers() if not d.get("away")]
     held = await _held(day, day)
     return web.json_response({
         "day": day,

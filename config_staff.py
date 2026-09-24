@@ -297,6 +297,52 @@ def meal_of(day_doc: dict | None) -> int:
     return MEAL_WORKING if w is True else (MEAL_OFF if w is False else 0)
 
 
+# ── кто сейчас в Дубае ───────────────────────────────────────────────────────
+# Владелец, 24 сен 2026: «они улетели — так что они должны отовсюду исчезать,
+# пока снова не прилетели… естественно, оставляй их в команде, просто пиши
+# серым, что он уехал; но в расходы смены его даже включать не надо».
+#
+# Кто где — знают периоды работы из «Зарплат» (день отъезда уже не рабочий,
+# finance_pay.work_now). Периодов нет — человек на месте: выдумывать отъезд по
+# молчанию нельзя. Список живёт рядом с реестром и обновляется тем же sync(),
+# поэтому один и тот же ответ у всех служб — панели, ботов и сторожей.
+AWAY: dict = {}          # {имя: день отъезда}
+
+
+def is_away(name: str) -> bool:
+    """Улетел и пока не вернулся."""
+    return str(name or "") in AWAY
+
+
+def here(names) -> list:
+    """Те же имена без уехавших — для любых рабочих списков."""
+    return [n for n in (names or []) if n not in AWAY]
+
+
+def away_since(name: str) -> str:
+    """С какого дня человека нет (день отъезда). Пусто — он здесь."""
+    return AWAY.get(str(name or ""), "")
+
+
+async def sync_away(day: str = ""):
+    """Перечитать, кого сейчас нет. Отдельно от реестра: периоды живут в
+    «Зарплатах», и читать их каждому потребителю самому — значит развести
+    пять разных ответов на один вопрос."""
+    import db
+    import finance_pay as _pay
+    if not day:
+        import bizday as _bd
+        day = _bd.biz_day()
+    out = {}
+    for p in await db.fin_people_get():
+        имя = str(p.get("_id") or "")
+        w = _pay.work_now(p.get("work"), day)
+        if имя and w.get("set") and not w.get("on"):
+            out[имя] = str(w.get("left") or "")
+    AWAY.clear()
+    AWAY.update(out)
+
+
 def drivers() -> list:
     """Все водители с их районом и оператором, в порядке районов B1…B5."""
     from config_offices import OFFICE_CODES, OFFICE_NAMES
@@ -313,6 +359,10 @@ def drivers() -> list:
                 "district_name": OFFICE_NAMES.get(st["district"], st["district"]),
                 "operator": st["operator"],
                 "telegram_id": DRIVER_IDS.get(name),
+                # Улетел и пока не вернулся: из рабочих списков его убирают, в
+                # команде он остаётся — серым, с датой отъезда.
+                "away": name in AWAY,
+                "away_since": AWAY.get(name, ""),
             })
     return out
 
@@ -406,6 +456,11 @@ async def sync(force: bool = False, min_age: float = 3.0):
     moves, dm = await db.staff_map_get(), await db.driver_map_get()
     apply_moves(moves, dm)
     apply_roster(rows)
+    try:
+        await sync_away()
+    except Exception as e:                           # noqa: BLE001
+        import logging as _lg
+        _lg.getLogger("staff").warning(f"[staff] кто уехал — не прочитано: {e}")
     _ROSTER["at"] = _t.monotonic()
 
 

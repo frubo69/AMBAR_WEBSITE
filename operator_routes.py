@@ -2150,6 +2150,28 @@ async def handle_close_decide(request):
     return web.json_response(res, status=code, headers=CORS_HEADERS)
 
 
+@require_operator
+async def handle_close_undo(request):
+    """POST {as, driver} — вернуть отпущенного водителя в смену.
+
+    Отпустили, а он ещё работает (владелец, 24 сен 2026: «смена-то не
+    закончилась, а оператор его не может выбрать»). Возвращаем — и заказы ему
+    снова назначаются."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    districts = await _fresh_districts()
+    people = _people_for(request, districts)
+    who = str(body.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    if not scope:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    code, res = await close_req.undo(day, str(body.get("driver") or "").strip(), who, set(scope))
+    return web.json_response(res, status=code, headers=CORS_HEADERS)
+
+
 # ── просьбы водителя ─────────────────────────────────────────────────────────
 # Водитель ничего не решает сам: «доставил», «поменять состав», «отменить» —
 # это просьбы. Оператор соглашается в одно нажатие, отклоняет, либо правит
@@ -3531,12 +3553,17 @@ def setup(app):
     r.add_get("/api/operator/orders", handle_list)
     r.add_route("OPTIONS", "/api/operator/close-request", _opt)
     r.add_post("/api/operator/close-request", handle_close_decide)
+    r.add_post("/api/operator/close-request/undo", handle_close_undo)
     for _p in ("/api/operator/stock/order", "/api/operator/stock/order/edit",
                "/api/operator/stock/order/reset"):
         r.add_route("OPTIONS", _p, _opt)
     r.add_get("/api/operator/stock/order", handle_op_order)
     r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)
     r.add_post("/api/operator/stock/order/reset", handle_op_order_reset)
+    r.add_route("OPTIONS", "/api/operator/supply/open", _opt)
+    r.add_get("/api/operator/supply/open", handle_op_supply_open)
+    r.add_route("OPTIONS", "/api/operator/supply/{sid}/short", _opt)
+    r.add_post("/api/operator/supply/{sid}/short", handle_op_supply_short)
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)

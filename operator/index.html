@@ -321,7 +321,8 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 }
 /* Отпущенный раньше водитель (18 сен 2026): виден, но не выбирается — новый
    заказ ему назначать нельзя, он уже закрывает смену. */
-.dchip.off{opacity:.5;cursor:default;border-style:dashed}
+.dchip.off{opacity:.5;cursor:pointer;border-style:dashed}
+.dchip.off:active{opacity:.75;transform:scale(.97)}
 .dchip.off i{display:block;font-style:normal;font-size:9px;font-weight:600;opacity:.85;margin-top:1px}
 /* Просьба водителя закрыть смену раньше: полоса над очередью и окно решения.
    Причина и питание выбираются строками, как в бюджете, а не чипами. */
@@ -3650,7 +3651,11 @@ function renderDrivers(){
   const alien = curDriver && !list.includes(curDriver) ? curDriver : '';
   const rel = _crqRel();
   dv.innerHTML = list.map(n=>rel.has(n)
-      ? `<button class="dchip off" disabled title="Отпущен раньше — заказы ему не назначаются">${_esc(n)}<i>отпущен</i></button>`
+      // Отпущенный — не тупик: он мог передумать (билет позже, машина ещё у
+      // него), и смена не закрыта. Нажатие возвращает его в смену, и заказы
+      // снова можно назначать (владелец, 24 сен 2026).
+      ? `<button class="dchip off" onclick="undoRelease('${_esc(n)}')"
+          title="Отпущен раньше — нажмите, чтобы вернуть в смену">${_esc(n)}<i>отпущен · вернуть</i></button>`
       : `<button class="dchip ${n===curDriver?'on':''}"
       onclick="pickDriver('${_esc(n)}')">${_esc(n)}</button>`).join('')
     + (alien ? `<button class="dchip on alien" onclick="pickDriver('${_esc(alien)}')"
@@ -5143,6 +5148,24 @@ async function crqSend(ok){
   }
   CRQ.busy=false; crqClose();
   await loadQueue(); try{ loadFeed(); }catch(e){}
+}
+
+// Вернуть отпущенного в смену: заказы ему снова назначаются, питание — как у
+// работающего. Спрашиваем один раз: это решение видит и водитель.
+async function undoRelease(name){
+  if(!curOp){ toast('Выберите оператора','err'); return; }
+  if(!confirm(`Вернуть ${name} в смену? Ему снова можно назначать заказы.`)) return;
+  try{
+    await opApi.opFetch('/api/operator/close-request/undo', {method:'POST', body:{as:curOp, driver:name}});
+    toast(`${name} снова в смене`, 'ok'); haptic('heavy');
+  }catch(e){
+    const d=(e && e.payload) || {};
+    toast(d.error==='already_closed' ? `${name} уже закрыл смену`
+        : d.error==='not_released' ? 'Он и так в смене'
+        : d.error==='not_yours' ? 'Этот водитель не из ваших районов'
+        : 'Не получилось — повторите', 'err');
+  }
+  await loadQueue(); renderDrivers();
 }
 
 // ── приём: водитель и время одним действием ──

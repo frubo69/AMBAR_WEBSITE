@@ -166,6 +166,45 @@ async def withdraw(day: str, name: str, doc: dict | None) -> tuple:
     return 200, {"ok": True}
 
 
+async def undo(day: str, driver: str, by: str, scope: set) -> tuple:
+    """Вернуть отпущенного в смену. (код, ответ).
+
+    Владелец, 24 сен 2026: «водитель уезжает 24-го, но он же ещё сейчас
+    работает, смена не закончилась, а оператор его не может выбрать, чтобы
+    заказ ему выдать». Отпустили — и новых заказов ему не назначают; передумал
+    (билет позже, машина ещё у него) — вернуть было нечем, кроме базы.
+
+    Возвращаем всё как было до решения: запрос снова открыт, питание — рабочее
+    (отпуск раньше времени его резал), и водителю говорим об этом."""
+    card = driver_card(driver)
+    if not card or card.get("district") not in scope:
+        return 403, {"error": "not_yours"}
+    doc = await db.get_driver_day(day, driver) or {}
+    cur = (doc or {}).get("close_req") or {}
+    if cur.get("status") != "ok":
+        return 409, {"error": "not_released", "status": cur.get("status") or ""}
+    if doc.get("shift_close_at"):
+        return 409, {"error": "already_closed"}
+    # only_open=False: мы как раз и меняем УЖЕ решённый запрос — иначе условие
+    # «менять только открытые» не пустит нас к отпущенному.
+    got = await db.close_req_set(day, driver, cur.get("id") or "",
+                                 {"status": "open", "by": "", "decided_at": None,
+                                  "meal": None, "note": cur.get("note") or "",
+                                  "undone_by": by, "undone_at": _now()},
+                                 {"meal_rate": staff.MEAL_WORKING}, only_open=False)
+    _drop_cache()
+    if not got:
+        return 409, {"error": "gone"}
+    log.info(f"[close] {by}: {driver} возвращён в смену")
+    try:
+        from operator_routes import tell_driver
+        await tell_driver(driver, f"{html.escape(by)} вернул вас в смену — "
+                                  "заказы снова могут прийти. Питание за сегодня прежнее.")
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[close] сообщение водителю {driver}: {e}")
+    return 200, {"ok": True, "status": "open"}
+
+
 def released_names(rows: list) -> set:
     """Кого сегодня отпустили — им новых заказов не назначают."""
     return {d.get("driver") for d in rows if (d.get("close_req") or {}).get("status") == "ok"}

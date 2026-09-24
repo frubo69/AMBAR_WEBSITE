@@ -2855,6 +2855,12 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
             "online": streaming,
             # Когда выключил — по сигналу телеграма; только сегодняшнее.
             "off_at": stopped.isoformat() if (stopped and not streaming and stopped >= day_start) else "",
+            # И чем кончилась: «self» — выключил руками, «expired» — вышел
+            # срок трансляции, который он выбрал при включении. Второе — не
+            # его вина, и говорить о нём надо другими словами (владелец,
+            # 24 сен 2026: «мы же с айпада не выключали геопозицию»).
+            "off_why": (r.get("stopped_why") or "self")
+                       if (stopped and not streaming and stopped >= day_start) else "",
             # Сколько минут трансляции осталось: у неё потолок в восемь часов,
             # и знать, что она кончится через двадцать минут, полезнее, чем
             # узнать это по погасшей метке. Считаем здесь — на телефоне часы

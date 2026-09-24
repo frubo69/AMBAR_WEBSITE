@@ -12710,7 +12710,11 @@ function whState(r){
 // Почему выключена: выключил во столько-то (сигнал телеграма), была сегодня
 // и кончилась, или сегодня не включал вовсе.
 function whOffWhy(r){
-  if(r.off_at) return 'выключил в ' + _hmDubai(r.off_at);
+  // Телеграм присылает одну и ту же правку и когда нажали «Стоп», и когда у
+  // трансляции вышел срок. Второе — не его вина, и словами это разное
+  // (владелец, 24 сен 2026: «мы же с айпада не выключали геопозицию»).
+  if(r.off_at) return (r.off_why === 'expired' ? 'срок трансляции вышел в ' : 'выключил в ')
+                      + _hmDubai(r.off_at);
   if(r.has && r.day && r.day === ((WH.data || {}).day)) return 'последняя точка в ' + whAtTime(r.age);
   return 'сегодня не включал';
 }
@@ -12744,7 +12748,7 @@ function whRow(r, trackOn){
   // каждого имени, он занимал место и ничего не добавлял.
   const state = st === 'online'
     ? `<b>в сети</b>${r.still >= 300 ? ` <i>· стоит на месте ${whDur(r.still)}</i>` : _whLeft(r.left)}`
-    : `геолокация выключена <i>· ${whOffWhy(r)}</i>`;
+    : `${r.off_why === 'expired' || !r.off_at ? 'геопозиции не видно' : 'геолокация выключена'} <i>· ${whOffWhy(r)}</i>`;
   return `<button class="wh-r ${cls}${WH.sel === r.driver ? ' on' : ''}"
           onclick="whPick('${escS(r.driver)}')">
     <span class="wh-i">${st === 'online' ? IC_LIVE : IC_OFF}</span>
@@ -12982,7 +12986,8 @@ function whCard(){
   if(st === 'online'){ head = 'в сети'; sub = r.still >= 300
       ? `стоит на месте ${whDur(r.still)}${left ? ' · трансляция ' + left : ''}`
       : `в движении${left ? ' · трансляция ' + left : ''} · точка ${когда}`; }
-  else { head = 'геолокация выключена'; sub = whOffWhy(r); }
+  else { head = (r.off_why === 'expired' || !r.off_at) ? 'геопозиции не видно' : 'геолокация выключена';
+         sub = whOffWhy(r); }
 
   const _body = document.getElementById('whList'), _scroll = _body.scrollTop;
   _body.innerHTML = `

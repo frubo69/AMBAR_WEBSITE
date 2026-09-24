@@ -90,23 +90,32 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     period = getattr(loc, "live_period", None)
     until = now + timedelta(seconds=int(period)) if period else None
     stop = bool(update.edited_message and not period)
+    why = ""
     try:
-        await db.driver_pos_set(geo_watch.DEVICE_PREFIX + label, geo_watch._biz_day(),
-                                loc.latitude, loc.longitude, now, until=until,
-                                stop_live=stop, acc=getattr(loc, "horizontal_accuracy", None))
+        why = await db.driver_pos_set(geo_watch.DEVICE_PREFIX + label, geo_watch._biz_day(),
+                                      loc.latitude, loc.longitude, now, until=until,
+                                      stop_live=stop, acc=getattr(loc, "horizontal_accuracy", None))
     except Exception as e:                   # noqa: BLE001
         log.warning(f"точка {label} не записана: {e}")
         return
     started = bool(update.message and period)
     if started:
+        срочная = period and period <= 86400
         log.info(f"трансляция включена: {label} · "
-                 + ("бессрочно" if period > 86400 else f"{period // 3600} ч"))
-        await _say(update, ctx, f"{label} · трансляция идёт. Больше здесь ничего делать "
-                                "не нужно — чат можно убрать в архив.")
+                 + ("бессрочно" if not срочная else f"{period // 3600} ч"))
+        await _say(update, ctx, f"{label} · трансляция идёт. "
+                   + (f"Но включена на {max(1, period // 3600)} ч — она кончится сама, "
+                      "и устройство пропадёт с карты. Лучше включить заново и выбрать "
+                      "«Пока не выключу»." if срочная else
+                      "Больше здесь ничего делать не нужно — чат можно убрать в архив."))
     elif stop:
-        log.info(f"трансляция выключена: {label}")
-        await _say(update, ctx, f"{label} · трансляция выключена. Чтобы устройство снова "
-                                f"было видно, включите её заново:\n\n{HOW}")
+        срок = why == "expired"
+        log.info(f"трансляция кончилась: {label} · " + ("вышел срок" if срок else "выключили"))
+        await _say(update, ctx, f"{label} · трансляция "
+                   + ("кончилась — вышел срок, который выбрали при включении."
+                      if срок else "выключена.")
+                   + f" Чтобы устройство снова было видно, включите её заново "
+                     f"и выберите «Пока не выключу»:\n\n{HOW}")
     elif update.message:
         await _say(update, ctx, f"{label} · точка принята, но это разовая точка, она "
                                 f"погаснет. Нужна трансляция:\n\n{HOW}")

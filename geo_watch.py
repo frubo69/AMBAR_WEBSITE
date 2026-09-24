@@ -212,6 +212,18 @@ def text_stream_off(name: str, opened: bool) -> str:
     return f"📍 *{_n(name)}*: выключил геопозицию\n{tail}"
 
 
+def text_stream_expired(name: str, opened: bool) -> str:
+    """У трансляции вышел срок — человек её не выключал.
+
+    Владелец, 24 сен 2026: «мы же с айпада не выключали геопозицию, а он всё
+    равно пишет „геолокация выключена“… как нам ругать водителей, будучи
+    неуверенным, что они сами её отключили». Поэтому отдельные слова и
+    никакого штрафа: телеграм сам гасит трансляцию, включённую на срок."""
+    tail = "Оператор его не видит." if opened else "Смена у него не открыта."
+    return (f"📍 *{_n(name)}*: трансляция кончилась — вышел срок\n{tail}\n"
+            f"Он её не выключал. Попросите включить заново и выбрать «Пока не выключу».")
+
+
 def text_stream_on(name: str, gone_sec: float = 0) -> str:
     return (f"📍 *{_n(name)}*: включил геопозицию"
             + (f"\nНе было {_dur(gone_sec)}." if gone_sec else ""))
@@ -220,7 +232,8 @@ def text_stream_on(name: str, gone_sec: float = 0) -> str:
 def text_gone(name: str) -> str:
     """Трансляции нет, а сигнала телеграма мы не получили (бот лежал, срок
     вышел): не «выключил» — мы не знаем, он ли."""
-    return f"📍 *{_n(name)}*: геопозиция выключена\nОператор его не видит."
+    return (f"📍 *{_n(name)}*: трансляции нет\nОператор его не видит. "
+            f"Мы не знаем, выключил он её или она кончилась сама, — поэтому без штрафа.")
 
 
 def text_lock(name: str, since: datetime, why: str = "") -> str:
@@ -350,11 +363,18 @@ def text_off_duty(name: str) -> str:
     return f"📍 *{_n(name)}*: выключил геопозицию\nНе на смене."
 
 
-async def _off_duty(name: str, utc: datetime, day: str) -> bool:
+async def _off_duty(name: str, utc: datetime, day: str, why: str = "") -> bool:
     """Выключил вне смены (не вышел или смена закрыта). Раньше это было его
     дело, но у нас в принципе запрещено отключать геолокацию (владелец,
     22 сен 2026): штраф на решение и сообщение старшему — один раз за день.
-    Включение вне смены — не событие."""
+    Включение вне смены — не событие.
+
+    Вышел срок трансляции — не его вина и не штраф (24 сен 2026)."""
+    if why == "expired":
+        await _owners(text_stream_expired(name, False), EVENT_OFF,
+                      meta=geo_meta(name, False))
+        log.info(f"[geo-watch] {name}: срок трансляции вышел вне смены — без штрафа")
+        return True
     line, kb = await _fine(name, utc, day)
     if not line:
         return False
@@ -378,18 +398,24 @@ async def _fine(name: str, utc: datetime, day: str, by_signal: bool = True) -> t
 
 
 # ── мгновенный путь: сигнал телеграма ────────────────────────────────────────
-async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
-    """Телеграм сказал: трансляцию включили (on) или выключили.
+async def on_stream(name: str, on: bool, now: datetime = None, why: str = "") -> bool:
+    """Телеграм сказал: трансляцию включили (on) или она кончилась.
 
     Зовёт бот водителя из обработчика точки — в ту же секунду, что и сигнал.
     Отсрочки после старта здесь нет: это не догадка по свежести точек, а
-    прямое слово телеграма. Возвращает, ушло ли что-то старшему."""
+    прямое слово телеграма. Возвращает, ушло ли что-то старшему.
+
+    why — чем кончилась: «self» (выключил руками) или «expired» (вышел срок,
+    который он выбрал при включении). Штраф — только за первое: за срок,
+    который человек не продлевал, наказывать не за что (владелец, 24 сен
+    2026: «как нам теперь это делать, будучи неуверенным в том, что они сами
+    её отключили»)."""
     utc = now or datetime.now(timezone.utc)
     day = _biz_day(utc.astimezone(DUBAI_TZ))
     d = await db.get_driver_day(day, name) or {}
     if d.get("working") is not True:
         # не на работе: включил — не событие, выключил — штраф на решение
-        return False if on else await _off_duty(name, utc, day)
+        return False if on else await _off_duty(name, utc, day, why=why)
     st = await db.geo_watch_get(name)
     if st.get("locked_at"):
         return False
@@ -413,7 +439,7 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
     # Выключил. После закрытой смены — как вне смены: штраф на решение; на
     # открытой запоминаем минуту: с неё считается «не вернулась до конца смены».
     if d.get("shift_close_at"):
-        return await _off_duty(name, utc, day)
+        return await _off_duty(name, utc, day, why=why)
     if off_since and st.get("off_why") == "stream":
         return False                       # уже сказали про это же
     if opened:
@@ -421,9 +447,13 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
         if not off_since or st.get("off_why") == "still":
             fields["off_since"] = utc          # выключил — с этой минуты, а не с начала стоянки
         await db.geo_watch_set(name, fields)
-    line, kb = await _fine(name, utc, day)     # и до открытия смены — отключать нельзя вообще
-    await _owners(text_stream_off(name, opened) + line, EVENT_OFF, reply_markup=kb, meta=geo_meta(name, False))
-    log.info(f"[geo-watch] {name}: выключил трансляцию")
+    срок = why == "expired"
+    # Штраф — только за выключение руками. Вышел срок трансляции — это наша
+    # недоработка, а не его: говорим и просим включить «пока не выключу».
+    line, kb = ("", None) if срок else await _fine(name, utc, day)
+    await _owners((text_stream_expired(name, opened) if срок else text_stream_off(name, opened)) + line,
+                  EVENT_OFF, reply_markup=kb, meta=geo_meta(name, False))
+    log.info(f"[geo-watch] {name}: " + ("у трансляции вышел срок" if срок else "выключил трансляцию"))
     return True
 
 
@@ -520,10 +550,13 @@ async def tick(now: datetime = None) -> dict:
                 # здесь оно ловится, только если бот водителя в тот момент
                 # лежал или у трансляции вышел срок.
                 await db.geo_watch_set(name, {"day": day, "off_since": utc, "off_why": "stream"})
-                line, kb = await _fine(name, utc, day, by_signal=False)
-                await _owners(text_gone(name) + line, EVENT_OFF, reply_markup=kb,
+                # Штрафа здесь больше нет (владелец, 24 сен 2026). Проход видит
+                # только «трансляции нет», а почему — не знает: вышел срок,
+                # телефон уснул, чат удалён. Наказывать по догадке нельзя;
+                # штраф ставится, лишь когда телеграм прямо сказал «выключил».
+                await _owners(text_gone(name), EVENT_OFF,
                               meta=geo_meta(name, False, self_=False))
-                log.info(f"[geo-watch] {name}: геопозиция выключена")
+                log.info(f"[geo-watch] {name}: трансляции нет (без сигнала — без штрафа)")
                 out["off"].append(name)
             elif g["stream"] and off_since:
                 await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])

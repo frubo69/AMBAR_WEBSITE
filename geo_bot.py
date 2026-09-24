@@ -172,11 +172,12 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if stop and await geo_watch.old_stream_end(key, chat, mid):
         log.info(f"прежняя трансляция кончилась, новая идёт: {name}")
         return
+    why = ""
     try:
-        await db.driver_pos_set(key, geo_watch._biz_day(), loc.latitude, loc.longitude,
-                                now, until=until, stop_live=stop,
-                                acc=getattr(loc, "horizontal_accuracy", None),
-                                live=(chat, mid) if period else None)
+        why = await db.driver_pos_set(key, geo_watch._biz_day(), loc.latitude, loc.longitude,
+                                      now, until=until, stop_live=stop,
+                                      acc=getattr(loc, "horizontal_accuracy", None),
+                                      live=(chat, mid) if period else None)
     except Exception as e:                   # noqa: BLE001
         log.warning(f"точка {name} не записана: {e}")
         return
@@ -184,7 +185,7 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if started or stop:
         try:
             if kind == "driver":
-                await geo_watch.on_stream(name, on=started, now=now)
+                await geo_watch.on_stream(name, on=started, now=now, why=why)
             else:
                 await geo_watch.on_senior_stream(name, on=started, now=now)
         except Exception as e:               # noqa: BLE001
@@ -192,6 +193,13 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if started:
         log.info(f"трансляция включена: {name} · "
                  + ("бессрочно" if period > 86400 else f"{period // 3600} ч"))
+        # Срочная трансляция кончится сама, и человек об этом не узнает —
+        # а оператор потеряет его из виду (владелец, 24 сен 2026). Говорим
+        # сразу, пока он держит телефон в руках.
+        if period and period <= 86400:
+            await _say(update, ctx, f"Трансляция включена на {max(1, period // 3600)} ч — "
+                       "она кончится сама, и вас перестанут видеть. Включите заново и "
+                       "выберите «Пока не выключу».")
         if kind == "driver":
             # Владелец, 15 сен 2026: водителю в ответ — не короткое «идёт», а
             # очень длинная история LEGO по-английски, частями: точка с картой
@@ -203,7 +211,8 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await _say(update, ctx, f"{name} · трансляция идёт. Больше здесь ничего делать "
                                     "не нужно — чат можно убрать в архив.")
     elif stop:
-        log.info(f"трансляция выключена: {name}")
+        log.info(f"трансляция кончилась: {name} · "
+                 + ("вышел срок" if why == "expired" else "выключил"))
         if kind != "driver":
             await _say(update, ctx, f"{name} · трансляция выключена. Чтобы вас снова видели, "
                                     f"включите её заново:\n\n{HOW}")

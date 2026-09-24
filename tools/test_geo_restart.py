@@ -23,7 +23,11 @@ async def pos_set(name, day, lat, lon, at, until=None, acc=None, stop_live=False
 async def pos_live(name):
     d = POS.get(name) or {}
     return {"chat": d.get("live_chat"), "mid": d["live_mid"]} if d.get("live_mid") else None
-async def on_stream(name, on, now=None): EVENTS.append(("stream", name, "on" if on else "off")); return True
+async def on_stream(name, on, now=None, why=""):
+    # why — чем кончилась трансляция: выключили руками или вышел срок
+    # (24 сен 2026). Записываем и его: путь сигнала должен доносить причину.
+    EVENTS.append(("stream", name, ("on" if on else (why or "off"))))
+    return True
 async def noop(*a, **k): return None
 db.driver_pos_set = pos_set; db.driver_pos_live = pos_live
 geo_watch.on_stream = on_stream

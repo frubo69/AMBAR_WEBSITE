@@ -3393,6 +3393,12 @@ def geo_moved(prev: dict | None, lat: float, lon: float, acc, day: str) -> bool:
         return True
 
 
+# Насколько близко к концу срока должна прийти правка, чтобы считать её концом
+# трансляции, а не выключением руками. Телеграм присылает её с точностью до
+# нескольких секунд; берём минуту с запасом.
+STOP_EDGE_SEC = 90
+
+
 async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
                          until=None, acc=None, stop_live: bool = False,
                          live=None, keepalive=None) -> None:
@@ -3426,9 +3432,20 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
             pu = pu.replace(tzinfo=timezone.utc)
         cand = at + timedelta(seconds=int(keepalive))
         until = cand if (pu is None or pu < cand) else pu
+    stop_why = ""
     if stop_live:
+        # Телеграм присылает одну и ту же правку и когда человек нажал «Стоп»,
+        # и когда у трансляции просто вышел срок. Различаем по сроку: правка
+        # пришла на его конце — значит трансляция кончилась сама, и человека
+        # за это винить нельзя (владелец, 24 сен 2026: «мы же с айпада не
+        # выключали геопозицию, а он всё равно пишет „выключена“»).
+        pu = (prev or {}).get("until")
+        if pu is not None and getattr(pu, "tzinfo", None) is None:
+            pu = pu.replace(tzinfo=timezone.utc)
+        stop_why = "expired" if (pu and abs((at - pu).total_seconds()) <= STOP_EDGE_SEC) else "self"
         doc["$unset"] = {"until": ""}
         doc["$set"]["stopped_at"] = at
+        doc["$set"]["stopped_why"] = stop_why
     elif until is not None:
         doc["$set"]["until"] = until
     if live:
@@ -3453,6 +3470,10 @@ async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
     except Exception as e:                       # noqa: BLE001
         import logging as _lg
         _lg.getLogger("db").warning(f"маршрут дня не записан ({name}): {e}")
+    # Чем кончилась трансляция, если кончилась: «self» — выключили руками,
+    # «expired» — вышел срок. Звонящему это нужно, чтобы не назвать вторым
+    # первое (штраф ставится только за первое).
+    return stop_why
 
 
 # ── трекер-приложения (15 сен 2026) ──────────────────────────────────────────

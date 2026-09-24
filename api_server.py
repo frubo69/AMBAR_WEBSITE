@@ -96,8 +96,36 @@ def _fmt_aed(v) -> str:
 
 
 # ── DB lifecycle ──────────────────────────────────────────────────────────────
+# Ручки, которые не встали при запуске. Ночь на 24 сен 2026: в коммит уехала
+# регистрация ручки, тела которой на сервере не было; setup() упал на NameError,
+# и всё, что регистрируется ниже, не появилось — оператор получал 405 на
+# создании заказа. Ошибка лежала в журнале, но журнал никто не читал. Теперь
+# служба ещё и говорит об этом владельцу в бот: половина API молчком — хуже,
+# чем не поднявшаяся служба.
+_SETUP_FAILED: list = []
+
+
+def _setup_failed(имя: str, e: Exception):
+    log.exception(f"{имя} routes setup failed: {e}")
+    _SETUP_FAILED.append((имя, f"{type(e).__name__}: {e}"))
+
+
+async def _tell_owners_setup_failed():
+    if not _SETUP_FAILED:
+        return
+    строки = "\n".join(f"· {имя} — {why}" for имя, why in _SETUP_FAILED)
+    log.error(f"[boot] API поднялся без части ручек:\n{строки}")
+    try:
+        from driver_bot import _tell_owners
+        await _tell_owners("API поднялся без части ручек — кнопки, которые их "
+                           f"зовут, будут отвечать ошибкой:\n{строки}")
+    except Exception as e:                    # noqa: BLE001
+        log.warning(f"[boot] владельцам не ушло: {e}")
+
+
 async def on_startup(app):
     await db.connect()
+    await _tell_owners_setup_failed()
     # Реестр водителей из базы — во все ручки этой службы, и дальше по кругу.
     try:
         import config_staff as _staff
@@ -2911,43 +2939,43 @@ def main():
         import broadcast_routes
         broadcast_routes.setup(app)
     except Exception as e:
-        log.error(f"broadcast routes setup failed: {e}")
+        _setup_failed("broadcast", e)
     # Склад: пересчёт, перемещения, заявка, норма — тоже owner-only.
     try:
         import stock_routes
         stock_routes.setup(app)
     except Exception as e:
-        log.error(f"stock routes setup failed: {e}")
+        _setup_failed("stock", e)
     # Расходы по водителям: питание и разовые траты — owner-only.
     try:
         import expense_routes
         expense_routes.setup(app)
     except Exception as e:
-        log.error(f"expense routes setup failed: {e}")
+        _setup_failed("expense", e)
     # AMBAR STOCK: реестр QR-кодов на бутылках — owner-only.
     try:
         import qr_routes
         qr_routes.setup(app)
     except Exception as e:
-        log.error(f"qr routes setup failed: {e}")
+        _setup_failed("qr", e)
     # Кошелёк USDT: баланс и переводы, только чтение.
     try:
         import wallet_routes
         wallet_routes.setup(app)
     except Exception as e:
-        log.error(f"wallet routes setup failed: {e}")
+        _setup_failed("wallet", e)
     # Сколько склад стоит: бутылки, закупка и выручка по двум ценам.
     try:
         import stock_value
         stock_value.setup(app)
     except Exception as e:
-        log.error(f"stock value routes setup failed: {e}")
+        _setup_failed("stock value", e)
     # Книга учёта денег: касса дня, Баракуда, фонд расходов, чистая прибыль.
     try:
         import finance_routes
         finance_routes.setup(app)
     except Exception as e:
-        log.error(f"finance routes setup failed: {e}")
+        _setup_failed("finance", e)
     # Курс валют: рыночный по всем и курс наличных обменника там, где он есть.
     # Зарплаты равняются на доллар, а водители привозят наличные — старшему
     # нужно видеть, по какой цене эти деньги на самом деле поменяются.
@@ -2955,39 +2983,39 @@ def main():
         import rates
         rates.setup(app)
     except Exception as e:
-        log.error(f"rates routes setup failed: {e}")
+        _setup_failed("rates", e)
     # Заявка в магазин: Excel туда, Excel обратно, поставка на забор.
     try:
         import supply_routes
         supply_routes.setup(app)
     except Exception as e:
-        log.error(f"supply routes setup failed: {e}")
+        _setup_failed("supply", e)
     # Приложение водителя: те же initData операторского бота, но пускает только
     # тех, кто вписан в AMBAR_DRIVER_IDS.
     try:
         import driver_routes
         driver_routes.setup(app)
     except Exception as e:
-        log.error(f"driver routes setup failed: {e}")
+        _setup_failed("driver", e)
     # Точки от трекер-приложений на телефонах (Traccar Client, OwnTracks):
     # без initData, по личному ключу.
     try:
         import track_routes
         track_routes.setup(app)
     except Exception as e:
-        log.error(f"track routes setup failed: {e}")
+        _setup_failed("track", e)
     # Цифры для рамки Divoom: голый текст по ключу, без initData.
     try:
         import pixoo_routes
         pixoo_routes.setup(app)
     except Exception as e:
-        log.error(f"pixoo routes setup failed: {e}")
+        _setup_failed("pixoo", e)
     # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
     try:
         import operator_routes
         operator_routes.setup(app)
     except Exception as e:
-        log.error(f"operator routes setup failed: {e}")
+        _setup_failed("operator", e)
 
     # Голосовая связь водителя с оператором. Ставим до статики: вебсокет живёт
     # на своём пути, а «/{path:.+}» ниже забирает всё подряд.
@@ -2995,14 +3023,14 @@ def main():
         import call_routes
         call_routes.setup(app)
     except Exception as e:
-        log.error(f"call routes setup failed: {e}")
+        _setup_failed("call", e)
 
     # Комната на двоих: своя ссылка, свой сокет, ничего амбаровского.
     try:
         import room_routes
         room_routes.setup(app)
     except Exception as e:
-        log.error(f"room routes setup failed: {e}")
+        _setup_failed("room", e)
 
     # Демо приложения водителя: /demo — тот же driver/index.html с заглушками
     # вместо телеграма и сервера. Ставим до статики: «/{path:.+}» забирает всё.
@@ -3010,7 +3038,7 @@ def main():
         import demo_page
         demo_page.setup(app)
     except Exception as e:
-        log.error(f"demo page setup failed: {e}")
+        _setup_failed("demo", e)
 
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)

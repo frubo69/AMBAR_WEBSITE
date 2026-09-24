@@ -136,7 +136,11 @@ async def on_all_closed(day: str, state: dict) -> bool:
         import supply_routes
         raw, name = await supply_routes._build_book(day)
         data = await supply_routes._order_rows(day)
-        file_note = _count_note(data.get("districts", []), day)
+        # Выключенные руками районы в заявку не идут — и в подписи о них
+        # говорим отдельно, чтобы файл без них не выглядел ошибкой.
+        везём = [d for d in data.get("districts", []) if not d.get("off")]
+        мимо = [d for d in data.get("districts", []) if d.get("off")]
+        file_note = _count_note(везём, day)
         qty = int(data.get("total_qty", 0) or 0)
         # Сумма — закупочная, та же, что в самом файле (AMOUNT под таблицей).
         # Раньше здесь стояла сумма по НАШЕМУ прайсу: на те же 424 бутылки файл
@@ -148,6 +152,10 @@ async def on_all_closed(day: str, state: dict) -> bool:
                  f"{len(data.get('rows') or [])} "
                  f"{_plural(len(data.get('rows') or []), 'позиция', 'позиции', 'позиций')} · "
                  f"закупка {_fmt(data.get('total_cost', 0))} AED{file_note}")
+        if мимо:
+            head += ("\n_Не везём: "
+                     + ", ".join(f"{_md(d.get('code') or '')} {_md(d.get('name') or '')}" for d in мимо)
+                     + " — районы выключены из заявки вручную._")
     except Exception as e:
         log.error(f"[shift] заявка не собралась: {e}")
         head += "\n\n⚠️ Заявку собрать не удалось — соберите вручную в «Учёте»."

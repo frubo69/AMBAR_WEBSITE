@@ -2499,12 +2499,33 @@ async def zayavka_edit_set(day: str, pid: str, district: str, qty):
 
 
 async def zayavka_edit_clear(day: str, pid: str = None):
+    """Снять правки количеств. Выключенные районы (off) это не трогает: их
+    выключают отдельным решением, и «снять правки» его не отменяет."""
     db = _db_or_none()
     if db is None: return
-    if pid:
-        await db.zayavka_edits.update_one({"_id": day}, {"$unset": {f"by.{pid}": ""}})
-    else:
-        await db.zayavka_edits.delete_one({"_id": day})
+    key = f"by.{pid}" if pid else "by"
+    await db.zayavka_edits.update_one({"_id": day}, {"$unset": {key: ""}})
+
+
+async def zayavka_off_set(day: str, district: str, off: bool) -> None:
+    """Район не едет в эту заявку (или снова едет).
+
+    Владелец, 24 сен 2026: «закупка нужна честно прям именно на один билдинг,
+    дай все остальные вручную отменить и отправить на Барракуду». Решение —
+    на день: назавтра заявка собирается заново и просит всё, что нужно."""
+    db = _db_or_none()
+    if db is None: return
+    upd = {"$addToSet" if off else "$pull": {"off": district}}
+    upd["$set"] = {"at": datetime.now(timezone.utc)}
+    await db.zayavka_edits.update_one({"_id": day}, upd, upsert=True)
+
+
+async def zayavka_off(day: str) -> list:
+    """Районы, выключенные из заявки этого дня."""
+    db = _db_or_none()
+    if db is None: return []
+    doc = await db.zayavka_edits.find_one({"_id": day}, {"off": 1})
+    return list((doc or {}).get("off") or [])
 
 
 async def zayavka_edits(day: str) -> dict:

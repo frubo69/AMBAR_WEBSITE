@@ -4717,6 +4717,15 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .ord-dh-go{flex:0 0 auto;display:flex;color:var(--muted);margin-left:-2px;
   transition:transform .18s var(--e1)}
 .ord-dc.open .ord-dh-go{transform:rotate(90deg)}
+/* Район, который в эту заявку не едет: карточка на месте — её видно и можно
+   вернуть, — но тусклая и без списка позиций. */
+.ord-dc-off{opacity:.55}
+.ord-dc-off .shl-v b{color:var(--muted)}
+.ord-dc-b{display:block;width:100%;padding:10px 14px;border:none;border-top:1px solid var(--border2);
+  font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.02em;cursor:pointer;
+  color:var(--gold2);background:transparent;text-align:left}
+.ord-dc-b:active{background:rgba(255,255,255,.04)}
+.ord-dc-off .ord-dc-b{color:var(--muted)}
 .ord-r-img{flex:0 0 auto;width:32px;height:32px;border-radius:9px;overflow:hidden;
   background:var(--card2);border:1px solid var(--border2)}
 .ord-r-img img{width:100%;height:100%;object-fit:cover;display:block}
@@ -24580,26 +24589,33 @@ function ordRender(){
 function ordDistricts(list, dist, q){
   const num = {}; (ORD.d.all_rows || ORD.d.rows || []).forEach((r, i) => { num[r.id] = i + 1; });
   const cards = dist.map(x => {
-    const rows = list.filter(r => q ? true : ((r.cells[x.id] || {}).need > 0));
-    const qty = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0), 0);
+    // Выключенный район считаем по расчёту, а не по «нужно»: у него нужно —
+    // ноль, и карточка иначе просто исчезла бы, а её надо видеть и вернуть
+    // (владелец, 24 сен 2026: «дай все остальные вручную отменить»).
+    const поле = x.off ? 'calc' : 'need';
+    const rows = list.filter(r => q ? true : (((r.cells[x.id] || {})[поле] || 0) > 0));
+    const qty = rows.reduce((a, r) => a + ((r.cells[x.id] || {})[поле] || 0), 0);
     // Деньги района — закупочные, как и в шапке «Закупаем». Прайс продажи тут
     // сбивал: сверху 46 631 «закупка», а под ней районы по 20 850 «прайс» —
     // читается как ошибка (владелец, 18 сен 2026).
-    const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0) * (r.cost || 0), 0);
-    const pos = rows.filter(r => (r.cells[x.id] || {}).need > 0).length;
-    if(!rows.length) return '';
+    const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {})[поле] || 0) * (r.cost || 0), 0);
+    const pos = rows.filter(r => ((r.cells[x.id] || {})[поле] || 0) > 0).length;
+    if(!rows.length && !x.off) return '';
     // Свёрнутая карточка отвечает на главный вопрос — сколько и на сколько —
     // без ста строк под ней; список раскрывают, когда надо править. Поиск
     // раскрывает все: искали позицию — её надо увидеть.
-    const open = !!q || !!(ORD.fold || {})[x.id];
-    return `<div class="shl-card ord-dc${open ? ' open' : ''}" data-fold="ordd-${escS(x.id)}">
+    const open = (!!q || !!(ORD.fold || {})[x.id]) && !x.off;
+    return `<div class="shl-card ord-dc${open ? ' open' : ''}${x.off ? ' ord-dc-off' : ''}" data-fold="ordd-${escS(x.id)}">
       <button class="shl-h ord-dh" onclick="ordFold('${x.id}')">
         <span class="shl-code">${escS(x.code || '')}</span>
         <span class="shl-b"><b>${escS(x.name || x.id)}</b>
-          <i>${pos} ${pluralize(pos,'позиция','позиции','позиций')} / ${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}</i></span>
-        <span class="shl-v"><b>${fmt(Math.round(aed))}<u>AED</u></b><i>закупка</i></span>
+          <i>${x.off ? `не везём · по расчёту было ${fmt(qty)} бут`
+                     : `${pos} ${pluralize(pos,'позиция','позиции','позиций')} / ${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}`}</i></span>
+        <span class="shl-v"><b>${x.off ? '—' : fmt(Math.round(aed)) + '<u>AED</u>'}</b><i>${x.off ? 'выключен' : 'закупка'}</i></span>
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button>
+      <button class="ord-dc-b" onclick="ordDistOff('${x.id}', ${x.off ? 'false' : 'true'})">${
+        x.off ? 'Вернуть в заявку' : 'Не везём сюда'}</button>
       ${open ? `<div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${
         foldEnd(rows.length, `ordFold('${x.id}', 1)`)}</div>` : ''}
     </div>`;
@@ -24610,6 +24626,31 @@ function ordDistricts(list, dist, q){
   // разных вещей, а это один список. Шапка у карточки та же, что у сводки
   // «Закупаем» сверху: заглавными, на всю ширину, под ней волосок.
   return `<div class="ord-dists"><div class="ord-cap">Заявка по районам</div>${cards.join('')}</div>`;
+}
+
+// Район выключают, когда закупка нужна не всем: «честно прям именно на один
+// билдинг» (владелец, 24 сен 2026). Решение живёт один день — назавтра заявка
+// собирается заново и просит всё, что нужно. Последний район выключить нельзя:
+// пустая заявка магазину не заявка.
+async function ordDistOff(id, off){
+  if(ORD.busy) return;
+  ORD.busy = true;
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/order/district',
+      {method:'POST', body:{day: (ORD.d || {}).day || '', district: id, off}});
+    // Клетки считает сервер — перечитываем заявку целиком, иначе строки
+    // останутся с прежними числами.
+    ORD.d = await ownerApi.ownerFetch('/api/owner/stock/order',
+      {params: (ORD.d || {}).day ? {day: ORD.d.day} : {}});
+    const x = (ORD.d.districts || []).find(y => y.id === id) || {};
+    _toast(off ? `${x.name || id} — не везём` : `${x.name || id} снова в заявке`);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){
+    _toast(((e && e.payload) || {}).error === 'last_district'
+      ? 'Нельзя выключить все районы' : 'Не получилось — повторите');
+  }
+  ORD.busy = false;
+  ordRender();
 }
 
 function ordFold(id, снизу){

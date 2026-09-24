@@ -1426,6 +1426,11 @@ async def order_rows(day: str = "") -> dict:
         log.warning(f"[stock] правило норм не прочитано: {e}")
         norm_rule = {}
     edits = await db.zayavka_edits(day)      # ручные правки поверх расчёта
+    # Районы, выключенные из заявки руками (владелец, 24 сен 2026: «закупка
+    # нужна честно прям именно на один билдинг, дай все остальные вручную
+    # отменить»). Расчёт по ним остаётся виден — чтобы было понятно, от чего
+    # отказались, — но в заявку, в итоги и в файл магазину они не идут.
+    off = set(await db.zayavka_off(day))
     # Что уже едет к району по открытой заявке на перемещение. Это такой же
     # приход, как товар от магазина, только бесплатный: просить его купить —
     # значит купить дважды (владелец, 18 сен 2026). И обратное: что район
@@ -1478,10 +1483,12 @@ async def order_rows(day: str = "") -> dict:
             need = max(0, int(round(float(fix)))) if fix is not None else calc
             if fix is not None and need != calc:
                 row_edited = True
+            if oid in off:
+                need = 0                             # район выключен — не везём
             moving_qty += везут
             leaving_qty += уйдёт
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
-                          "need": need, "calc": calc,
+                          "need": need, "calc": calc, "off": oid in off,
                           # Сколько едет к району от соседа по заявке на
                           # перемещение: заявка это уже вычла, и видно почему.
                           "moving": везут,
@@ -1532,7 +1539,11 @@ async def order_rows(day: str = "") -> dict:
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
                        "name": OFFICE_NAMES.get(o, o),
                        "counted": per_district[o]["counted"],
+                       # Выключенный район остаётся в списке — его видно и
+                       # можно вернуть, — но в заявку и в файл не идёт.
+                       "off": o in off,
                        "came": sum(per_district[o]["came"].values())} for o in OFFICE_IDS],
+        "off": sorted(off),
         "total_qty": total_qty, "total_aed": total_aed,
         "total_cost": round(total_cost), "moving_qty": _num(moving_qty),
         "leaving_qty": _num(leaving_qty), "leaving_need": leaving_need,
@@ -2923,6 +2934,37 @@ async def handle_order_edit(request):
 
 
 @require_owner
+async def handle_order_district(request):
+    """Выключить район из заявки или вернуть. body: {day?, district, off}
+
+    Владелец, 24 сен 2026: «закупка нужна честно прям именно на один билдинг,
+    дай все остальные вручную отменить и отправить на Барракуду». Решение
+    живёт один день: назавтра заявка собирается заново."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    day = (body.get("day") or "").strip() or _biz_day()
+    district = (body.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    off = bool(body.get("off"))
+    было = set(await db.zayavka_off(day))
+    if off and len(было | {district}) >= len(OFFICE_IDS):
+        # Пустая заявка — это не заявка: магазину нечего везти, а файл всё
+        # равно уйдёт. Последний район выключить не даём.
+        return web.json_response({"error": "last_district"}, status=409, headers=CORS_HEADERS)
+    await db.zayavka_off_set(day, district, off)
+    log.info(f"[stock] заявка {day}: район {district} " + ("выключен" if off else "возвращён"))
+    data = await order_rows(day)
+    return web.json_response({"ok": True, "off": data["off"], "districts": data["districts"],
+                              "total_qty": data["total_qty"], "total_aed": data["total_aed"],
+                              "total_cost": data["total_cost"],
+                              "rows_count": len(data["rows"])},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_order_reset(request):
     """Снять правки: по одной позиции или по всей заявке."""
     try:
@@ -3706,6 +3748,7 @@ def setup(app):
         ("/api/owner/stock/result",    handle_result,    "GET"),
         ("/api/owner/stock/order",     handle_order,     "GET"),
         ("/api/owner/stock/order/edit",  handle_order_edit,  "POST"),
+        ("/api/owner/stock/order/district", handle_order_district, "POST"),
         ("/api/owner/stock/order/reset", handle_order_reset, "POST"),
         ("/api/owner/stock/transfers", handle_transfers, "GET"),
         ("/api/owner/stock/audits",    handle_audits,    "GET"),

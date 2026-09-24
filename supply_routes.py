@@ -208,7 +208,9 @@ async def _build_book(day: str):
     # Порядок как в их таблице: заявку собирают, идя вдоль полок, и список,
     # отсортированный по количеству, заставляет бегать по залу кругами.
     rows = sorted(src, key=lambda r: order_key(r["id"]))
-    dist = [d["id"] for d in data["districts"]]
+    # Выключенный район в файл не едет вовсе: магазину не нужна колонка с
+    # нулями, а нам — вопрос «а сюда сколько?» (владелец, 24 сен 2026).
+    dist = [d["id"] for d in data["districts"] if not d.get("off")]
     try:
         import stock_value
         costs = await stock_value.cost_map()

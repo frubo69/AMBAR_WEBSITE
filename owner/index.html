@@ -1204,6 +1204,10 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .mvh-note{margin:0 14px 12px;padding:8px 10px;border-radius:10px;font-size:11.5px;
   line-height:1.35;color:var(--gold2);background:rgba(201,169,110,.08)}
+.aud-r.find{width:100%;text-align:left;font-family:inherit;cursor:pointer;
+  background:var(--card);border:none;border-bottom:1px solid var(--border2)}
+.aud-r.find:active{transform:scale(.995)}
+.aud-r-s.find{display:inline-flex;align-items:center;gap:2px;color:var(--gold2)}
 .mvh-even{display:block;margin:7px 0 0;padding:7px 12px;border-radius:9px;
   font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--gold2);
   background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
@@ -16245,13 +16249,38 @@ function audRow(r){
   // остальное нейтрально: бутылки без кодов камера увидеть не может.
   const cls = dim ? 'dim' : r.actual === r.expected ? 'ok' : r.actual > c ? 'over' : '';
   const sub = r.noqr ? `<span class="aud-r-s dn">QR код не внесён · ${fmtQty(r.noqr / u)}</span>` : '';
-  return `<div class="aud-r${dim ? ' dim' : ''}">
+  // Не хватает — значит есть что искать: строка открывает список бутылок,
+  // которых камера не видела (владелец, 24 сен 2026: «что теперь с
+  // недостачей?»). Без списка «не хватает 1» идти к полке не с чем.
+  const ищем = (r.missing || []).length;
+  const найти = ищем ? `<span class="aud-r-s find">не поднесли к камере · ${ищем}${_CHEV}</span>` : '';
+  const tag = ищем ? 'button' : 'div';
+  return `<${tag} class="aud-r${dim ? ' dim' : ''}${ищем ? ' find' : ''}"${
+      ищем ? ` onclick="audMissing('${escS(r.id)}')"` : ''}>
     <span class="ord-r-i">${r.no || ''}</span>
     <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
       onerror="this.style.visibility='hidden'"></span>
-    <span class="ord-r-n">${escS(r.name)}${sub}</span>
+    <span class="ord-r-n">${escS(r.name)}${sub}${найти}</span>
     <span class="aud-n"><b class="${cls}">${fmtQty((r.actual || 0) / u)}</b><i>/ ${fmtQty((r.expected || 0) / u)}</i></span>
-  </div>`;
+  </${tag}>`;
+}
+
+// Список бутылок, которых камера не видела. Их бывает больше, чем недостача:
+// у проданной бутылки код из реестра не исчезает — поэтому это кандидаты на
+// поиск, а не приговор, и так и написано.
+function audMissing(pid){
+  const sh = STK.sheet; if(!sh) return;
+  const r = (sh.rows || []).find(x => x.id === pid); if(!r || !(r.missing || []).length) return;
+  const u = _audU(r);
+  const нет = fmtQty((r.diff || 0) / u);
+  scanInfo(r.name, `не хватает ${нет}`, 'bad',
+    [_siRow('Не поднесли к камере', `${r.missing.length} ${pluralize(r.missing.length, 'бутылка', 'бутылки', 'бутылок')}`)]
+    .concat(r.missing.map(m => _siRow(
+      escS(m.label || m.code),
+      escS(m.from_code ? `приехала с ${m.from_code}${m.moved_at ? ' · ' + _audDayT(String(m.moved_at).slice(0, 10)) : ''}`
+                       : (m.at ? 'внесена ' + _audDayT(String(m.at).slice(0, 10)) : '')), 'mono')))
+    .concat([_siRow('Если бутылка на полке', 'отсканируйте её — недостача уйдёт сама'),
+             _siRow('Если её нет', 'закройте ревизию: недостача станет списанием')]));
 }
 
 // Карточка итога. До старта числа расхождений не показываем: «не хватает

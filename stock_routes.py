@@ -2118,6 +2118,18 @@ async def _audit_lines(district: str, day: str) -> tuple:
             "due": _sale_of(pid, d) if d > 0 else 0,
         })
     lines.sort(key=lambda r: r["no"])
+    # Каких именно бутылок не видела камера — по строкам с недостачей. Без
+    # этого «не хватает 1» не с чем идти к полке (владелец, 24 сен 2026).
+    нехватка = [l["id"] for l in lines if l["diff"] > 0]
+    if нехватка:
+        try:
+            кандидаты = await db.audit_unscanned(district, day, нехватка)
+            for l in lines:
+                if l["id"] in кандидаты:
+                    l["missing"] = [{**c, "from_code": OFFICE_CODES.get(c["from"], "")}
+                                    for c in кандидаты[l["id"]]]
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[audit] не составить список ненайденных ({district}): {e}")
     return lines, counted
 
 

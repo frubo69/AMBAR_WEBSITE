@@ -4723,6 +4723,38 @@ async def qr_locks(now) -> list:
     return rows
 
 
+async def audit_unscanned(district: str, day: str, pids: list, limit: int = 12) -> dict:
+    """{позиция: [бутылки, которых камера на этой ревизии не видела]}.
+
+    «Не хватает одной» у полки бесполезно: искать нечего, если не сказать —
+    какой (владелец, 24 сен 2026: «что теперь с недостачей?»). Отдаём коды с
+    этикеткой, датой и тем, откуда бутылка приехала. Их бывает больше, чем
+    недостача: у проданной бутылки код из реестра не исчезает, — поэтому это
+    кандидаты на поиск, а не приговор."""
+    d = _db_or_none()
+    if d is None or not pids: return {}
+    видели = {str(s["code"]) async for s in d.audit_scans.find(
+        {"district": district, "day": day}, {"code": 1})}
+    out: dict = {}
+    for pid in pids:
+        строки = []
+        async for q in d.qr_codes.find(
+                {"product_id": pid, "district": district, "status": "active"}).sort("at", -1):
+            c = str(q["_id"])
+            if c in видели:
+                continue
+            ходы = q.get("moves") or []
+            строки.append({"code": c, "label": q.get("label") or "",
+                           "at": str(q.get("at") or "")[:19],
+                           "from": (ходы[-1].get("from") if ходы else "") or "",
+                           "moved_at": str(ходы[-1].get("at") or "")[:19] if ходы else ""})
+            if len(строки) >= limit:
+                break
+        if строки:
+            out[pid] = строки
+    return out
+
+
 async def qr_list(product_id: str, district: str, limit: int = 500) -> list:
     """Бутылки этой позиции на этой точке — новые сверху."""
     db = _db_or_none()

@@ -6097,6 +6097,31 @@ async def move_give_accept(mid: str, district: str, src: str, rec: dict) -> bool
     return r.modified_count > 0
 
 
+async def stock_transfer_mark(tid: str, fields: dict) -> bool:
+    """Дописать переезду пометку: чей он и почему. Возврат непринятого выглядит
+    в книге как обычный переезд, и без пометки его не отличить от того, что
+    водитель просто увёз бутылку обратно."""
+    from bson import ObjectId
+    d = _db_or_none()
+    if d is None or not tid: return False
+    try:
+        oid = ObjectId(tid)
+    except Exception:                                # noqa: BLE001
+        oid = tid
+    r = await d.stock_transfers.update_one({"_id": oid}, {"$set": dict(fields)})
+    return r.modified_count > 0
+
+
+async def move_give_back(mid: str, district: str, src: str, fields: dict) -> bool:
+    """Отметка о возврате непринятого отдающему: что именно вернулось и когда."""
+    d = _db_or_none()
+    if d is None: return False
+    k = f"tasks.{district}.give.{src}"
+    r = await d.move_orders.update_one(
+        {"_id": mid}, {"$set": {f"{k}.{f}": v for f, v in fields.items()}})
+    return r.modified_count > 0
+
+
 async def move_accept_even(mid: str, district: str, src: str, lines: list, sets: dict) -> bool:
     """Расхождение при приёме оказалось ошибкой: товар пришёл весь.
 

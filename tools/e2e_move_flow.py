@@ -197,8 +197,11 @@ async def main():
     eq("заявка закрылась", (await db.move_order_get(mid))["status"], "done")
     SR.base_drop()
     o = await SR.order_rows(D)
-    eq("заявка закупки ничего не просит: всё привезли от соседей",
-       [r["id"] for r in o["all_rows"] if r["cells"]["jvc"]["calc"]], [])
+    # Полкоробки пива до JVC не доехали и уехали обратно в Алгусес (владелец,
+    # 24 сен 2026): значит, этого пива у JVC нет — и заявка закупки его просит.
+    # Остальное привезли от соседей, и его в заявке нет.
+    eq("заявка просит только недоехавшее пиво",
+       [r["id"] for r in o["all_rows"] if r["cells"]["jvc"]["calc"]], [BEER])
     eq("и «в пути» обнулилось", (o["moving_qty"], o["leaving_qty"]), (0, 0))
     v = await MV.tasks_for_driver("Худоба", "jvc")
     eq("у водителей чисто", (v["take"], v["give"]), ([], []))
@@ -209,8 +212,12 @@ async def main():
        ("done", True, [("B2", "done", "Худоба"), ("B3", "done", "Худоба"), ("B4", "diff", "Фарух")]))
     tr = await d.stock_transfers.find({"by_kind": "move"}).to_list(length=100)
     свои = {"bbay": {"Парвиз", "Баха"}, "silicon": {"Фаредун"}, "alguses": {"Даврон"}}
+    сканы = [x for x in tr if not x.get("move_back")]
     eq("в книге переездов — семь сканов, каждый записан на отдающего своего района",
-       (len(tr), all(x["to"] == "jvc" and x["by_name"] in свои.get(x["from"], ()) for x in tr)), (7, True))
+       (len(сканы), all(x["to"] == "jvc" and x["by_name"] in свои.get(x["from"], ()) for x in сканы)), (7, True))
+    eq("и восьмая строка — возврат недоехавшего в Алгусес",
+       [(x["from"], x["to"], x["qty"], x["by_name"]) for x in tr if x.get("move_back")],
+       [("jvc", "alguses", 0.5, "Фарух")])
 
     print("\n── 7. сутки сменились ────────────────────────────────────────────")
     r7 = await MV.create([{"from": "bbay", "to": "tecom", "id": VODKA, "qty": 1}], by="STAR")

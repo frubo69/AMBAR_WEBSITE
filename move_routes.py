@@ -352,6 +352,67 @@ async def give_start(mid: str, oid: str, name: str, tgid: int, district: str) ->
     return {"ok": True, "task": give_view(mid, doc, oid, task, district, name)}
 
 
+async def _return_short(mid: str, oid: str, src: str, by: str, tgid: int = 0) -> dict:
+    """Непринятое возвращаем на район отдающего.
+
+    Владелец, 24 сен 2026: «если водитель пишет, что принял неровно и какой-то
+    товар не доехал — где логика?». Логики и не было. Бутылка переезжает в
+    момент скана ОТДАЮЩЕГО, а «принял неровно» оставалось запиской: недоехавшее
+    продолжало числиться за получателем и вылезало недостачей на ЕГО ревизии —
+    за чужой товар, которого он не видел.
+
+    Теперь оно возвращается туда, откуда уехало: пока никто не разобрался, за
+    непринятое отвечает отдающий район, и недостача, если товар и правда
+    пропал, вылезет у него. Возвращаем поимённо — те коды, которых получатель
+    не отсканировал; чего не хватило кодами (передачи до 20 сен их не писали),
+    добираем числом по позициям."""
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid) or {}
+    g = (task.get("give") or {}).get(src) or {}
+    нужно: dict = {}
+    for l in task.get("lines") or []:
+        if l.get("from") != src:
+            continue
+        d = float(l.get("got") or 0) - float(l.get("recv") or 0)
+        if d > 1e-9:
+            нужно[l.get("id")] = нужно.get(l.get("id"), 0.0) + d
+    if not нужно:
+        return {}
+    приняты = {str(c) for c in (g.get("recv_codes") or [])}
+    коды, числом = [], []
+    for c in [str(x) for x in (g.get("codes") or [])]:
+        if c in приняты:
+            continue
+        q = await db.qr_get(c)
+        pid = str((q or {}).get("product_id") or "")
+        if нужно.get(pid, 0) <= 1e-9:
+            continue
+        r = await sr.move_by_code(c, src, tgid or 0, by, "move", "", expect_from=oid)
+        if not r.get("ok"):
+            # Бутылку успели продать, увезти дальше или списать — вернуть
+            # нечего. Останется числом: район-то всё равно её не принимал.
+            log.info(f"[move] вернуть {c} на {src} не вышло: {r.get('verdict')}")
+            continue
+        нужно[pid] = нужно.get(pid, 0) - float(r.get("qty") or 1)
+        await db.stock_transfer_mark(r.get("transfer_id") or "",
+                                     {"move_id": mid, "move_back": True})
+        коды.append(c)
+    for pid, q in нужно.items():
+        if q <= 1e-9:
+            continue
+        p = sr._catalog().get(pid) or {}
+        await db.add_stock_transfer({
+            "day": sr._biz_day(), "from": oid, "to": src, "product_id": pid,
+            "product_name": p.get("name", ""), "qty": sr._num(q), "src": "move_back",
+            "by": tgid or 0, "by_name": str(by or "")[:60], "by_kind": "move",
+            "move_id": mid, "at": _now()})
+        числом.append({"id": pid, "name": p.get("name", ""), "qty": sr._num(q)})
+    sr.base_drop()
+    log.info(f"[move] {mid}/{oid}: непринятое вернулось в {src} — "
+             f"кодов {len(коды)}, числом {len(числом)}")
+    return {"back_codes": коды, "back_qty": числом, "back_at": _now()}
+
+
 async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: str,
                  ok: bool = True, lines: list = None, note: str = "") -> dict:
     """Получатель принял передачу src → oid. «Принял» — всё сошлось; «Принял
@@ -397,6 +458,12 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
         doc = await db.move_order_get(mid)
         task = (doc.get("tasks") or {}).get(oid) or {}
         return {"ok": True, "already": True, "task": give_view(mid, doc, oid, task, src, name)}
+    if not ok:
+        # Недоехавшее — обратно отдающему, чтобы недостача не села на того,
+        # кто товар не видел (владелец, 24 сен 2026).
+        back = await _return_short(mid, oid, src, name, tgid)
+        if back:
+            await db.move_give_back(mid, oid, src, back)
     doc = await db.move_order_get(mid)
     task = (doc.get("tasks") or {}).get(oid) or {}
     srcs = {l.get("from") for l in task.get("lines") or []}
@@ -798,6 +865,10 @@ async def history(day: str = "", back: int = 30) -> dict:
                     "accept_ok": bool(g.get("accept_ok", True)) if g.get("accepted_at") else None,
                     "accept_note": g.get("accept_note") or "",
                     "accept_lines": g.get("accept_lines") or [],
+                    # Сколько единиц непринятого уехало обратно к отдающему:
+                    # за них с этого момента отвечает его район.
+                    "back_n": sr._num(len(g.get("back_codes") or [])
+                                      + sum(float(x.get("qty") or 0) for x in (g.get("back_qty") or []))),
                     "check": _check_view(chk),
                     "cancelled_at": _iso(t.get("cancelled_at")),
                     "qty": sr._num(need), "got": sr._num(got), "recv": sr._num(recv),
@@ -1102,6 +1173,37 @@ def _own_name(request, b) -> str:
     return str((b or {}).get("as") or "").strip()[:60] or "старший"
 
 
+async def _send_back_again(mid: str, oid: str, src: str, g: dict, by: str, tgid: int) -> dict:
+    """Вернуть получателю то, что ушло обратно отдающему при «принял неровно».
+
+    Зеркало `_return_short`: раз товар всё-таки приехал, бутылки снова
+    переезжают к получателю — теми же кодами, а что возвращалось числом,
+    возвращается числом."""
+    коды = [str(c) for c in (g.get("back_codes") or [])]
+    числом = list(g.get("back_qty") or [])
+    if not коды and not числом:
+        return {}
+    ушло = []
+    for c in коды:
+        r = await sr.move_by_code(c, oid, tgid or 0, by, "move", "", expect_from=src)
+        if r.get("ok"):
+            await db.stock_transfer_mark(r.get("transfer_id") or "",
+                                         {"move_id": mid, "move_back_undo": True})
+            ушло.append(c)
+        else:
+            log.info(f"[move] вернуть {c} получателю не вышло: {r.get('verdict')}")
+    for x in числом:
+        p = sr._catalog().get(x.get("id")) or {}
+        await db.add_stock_transfer({
+            "day": sr._biz_day(), "from": src, "to": oid, "product_id": x.get("id"),
+            "product_name": p.get("name", "") or x.get("name", ""), "qty": x.get("qty"),
+            "src": "move_back_undo", "by": tgid or 0, "by_name": str(by or "")[:60],
+            "by_kind": "move", "move_id": mid, "at": _now()})
+    sr.base_drop()
+    log.info(f"[move] {mid}/{oid}: возврат отменён — кодов {len(ушло)}, числом {len(числом)}")
+    return {"codes": ушло, "qty": числом, "at": _now()}
+
+
 async def accept_even(mid: str, oid: str, src: str, by: str, tgid: int = 0) -> dict:
     """«Приняли неровно» оказалось ошибкой приёма: товар пришёл весь.
 
@@ -1123,11 +1225,17 @@ async def accept_even(mid: str, oid: str, src: str, by: str, tgid: int = 0) -> d
         return {"ok": False, "error": "not_accepted"}
     if g.get("accept_ok", True):
         return {"ok": False, "error": "not_diff"}
+    # Непринятое мы вернули отдающему — раз пришло всё, отправляем обратно тем
+    # же путём: сначала поимённо кодами, потом числом. Иначе «расхождения нет»
+    # оставило бы товар на чужом районе.
+    вернулось = await _send_back_again(mid, oid, src, g, by, tgid)
     lines = [dict(l) for l in (task.get("lines") or [])]
     for l in lines:
         if l.get("from") == src:
             l["recv"] = l.get("got") or 0
     sets = {"accept_ok": True, "accept_lines": [],
+            "back_codes": [], "back_qty": [], "back_at": None,
+            "back_undone": вернулось or None,
             "accept_lines_was": g.get("accept_lines") or [],
             "recv_codes": list(g.get("codes") or []),
             "evened_by": str(by or "")[:60], "evened_by_id": int(tgid or 0),

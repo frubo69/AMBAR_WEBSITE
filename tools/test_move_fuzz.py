@@ -346,6 +346,26 @@ class World:
                     ln = next(l for l in g["lines"] if l["id"] == dl["id"])
                     ok(abs(float(dl["got"]) - float(ln["recv"])) < 1e-9 and abs(float(dl["sent"]) - float(ln["got"])) < 1e-9,
                        f"«не всё пришло» не по сканам: {dl} при {ln}")
+                # Непринятое уезжает обратно к отдающему (владелец, 24 сен
+                # 2026). Ждём поимённо те же коды, что считаем сами: отдающий
+                # отсканировал, получатель — нет, бутылка цела и ещё у него.
+                grec = ((doc.get("tasks") or {})[to].get("give") or {}).get(src) or {}
+                принял = {str(c) for c in (grec.get("recv_codes") or [])}
+                нужно = {l["id"]: float(l["got"]) - float(l["recv"]) for l in g["lines"]}
+                ждём = []
+                for c in [str(x) for x in (grec.get("codes") or [])]:
+                    m = self.codes.get(c)
+                    if c in принял or not m or m["district"] != to or m["status"] != "active":
+                        continue
+                    if нужно.get(m["pid"], 0) <= 1e-9:
+                        continue
+                    нужно[m["pid"]] -= float(m["qty"])
+                    ждём.append(c)
+                back = ((await db.move_order_get(mid))["tasks"][to]["give"][src].get("back_codes")) or []
+                ok(sorted(back) == sorted(ждём),
+                   f"вернулось не то: {sorted(back)} вместо {sorted(ждём)}")
+                for c in ждём:
+                    self.codes[c]["district"] = src
         elif g["recv_left"] > 1e-9 and res.get("error") not in ("gone",):
             ok(res.get("error") in ("scan_all", "diff_empty"), f"«Принял» без сканов не отбит словом: {res}")
 
@@ -532,7 +552,8 @@ class World:
         trs = [x async for x in d.stock_transfers.find({})]
         by_code = {}
         for tr in trs:
-            by_code.setdefault(tr["code"], []).append(tr)
+            if tr.get("code"):                       # возврат числом кода не имеет
+                by_code.setdefault(tr["code"], []).append(tr)
         for cid, x in self.codes.items():
             doc = docs[cid]
             ok(doc["district"] == x["district"], f"код {cid}: в базе {doc['district']}, по сканам {x['district']}")
@@ -618,8 +639,14 @@ class World:
                 ok(all_closed, f"{mid}: заявка закрыта при живых задачах")
             if doc["status"] == "open":
                 ok(not all_closed, f"{mid}: все задачи закрыты, а заявка открыта")
-        moved = sum(float(tr["qty"]) for tr in trs if tr.get("by_kind") == "move")
+        # Отданное строками = переезды заявки. Возврат непринятого и его отмена
+        # считаются отдельно: это движение обратно, а не отдача (24 сен 2026).
+        moved = sum(float(tr["qty"]) for tr in trs if tr.get("by_kind") == "move"
+                    and not tr.get("move_back") and not tr.get("move_back_undo"))
         ok(abs(sum_got - moved) < 1e-9, f"строки {sum_got} ≠ переездов по заявке {moved}")
+        back = sum(float(tr["qty"]) for tr in trs if tr.get("move_back"))
+        undone = sum(float(tr["qty"]) for tr in trs if tr.get("move_back_undo"))
+        ok(back >= undone - 1e-9, f"вернули меньше, чем отменили возвратов: {back} < {undone}")
         ok(abs(self.moves_qty - moved) < 1e-9, f"удачных сканов {self.moves_qty} ≠ книга {moved}")
         # I7: «в пути» — неотданный остаток, в обе стороны.
         pi, po = await MV.pending_qty()

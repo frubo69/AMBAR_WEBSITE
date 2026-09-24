@@ -284,8 +284,11 @@ async def main():
     doc = await db.move_order_get(m5)
     eq("заявка закрыта, B4 — «принято неровно»",
        (doc["status"], MV.task_view(m5, doc, "alguses", doc["tasks"]["alguses"], "")["diff"]), ("done", True))
-    eq("склад: из JVC ушло 8, в каждый район по 2",
-       tuple([await shelf(o, vod3) - base[o] for o in ("jvc", "bbay", "alguses", "silicon", "tecom")]), (-8, 2, 2, 2, 2))
+    # B4 принял одну из двух — непринятая уехала обратно в JVC (владелец,
+    # 24 сен 2026). Общий склад сходится: 7 ушло, 7 пришло, восьмая дома.
+    eq("склад: в B4 легла только принятая, непринятая вернулась в JVC",
+       tuple([await shelf(o, vod3) - base[o] for o in ("jvc", "bbay", "alguses", "silicon", "tecom")]),
+       (-7, 2, 1, 2, 2))
     eq("смену никому не держит", [x for x in await MV.pending_for_district("jvc") if x["move_id"] == m5]
        + [x for o in ("bbay", "alguses", "silicon", "tecom") for x in await MV.pending_for_district(o) if x["move_id"] == m5], [])
 

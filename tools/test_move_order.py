@@ -201,7 +201,11 @@ async def main():
     eq("«Не всё пришло»: расхождение — по сканам получателя",
        (a2["task"]["status"], a2["task"]["accept_lines"][0]["sent"], a2["task"]["accept_lines"][0]["got"],
         a2["task"]["accept_note"], a2["task_done"]), ("diff", 1, 0.5, "одна упаковка порвана", True))
-    eq("расхождение склад не двигает: коды уже у JVC", (await shelf("jvc", beer), await shelf("silicon", beer)), (1, 0))
+    # Владелец, 24 сен 2026: «если водитель пишет, что принял неровно и какой-то
+    # товар не доехал — где логика?». Непринятое возвращается тому, кто отдавал:
+    # получатель не должен отвечать за товар, которого не видел.
+    eq("непринятое вернулось Силикону, принятое осталось у JVC",
+       (await shelf("jvc", beer), await shelf("silicon", beer)), (0.5, 0.5))
     doc = await db.move_order_get(mid)
     eq("задача JVC закрыта; заявка ждёт Тиком", (bool(doc["tasks"]["jvc"]["done_at"]), doc["status"]), (True, "open"))
     lv = await MV.live(D)

@@ -178,7 +178,13 @@ async def main():
         st, x = await drv(102, "POST", f"/api/driver/move/{mid}/scan", {"district": "jvc", "code": "v2"})
         eq("в закрытую заявку не отсканировать", x["verdict"], "gone")
         tr = await d.stock_transfers.find({"by_kind": "move"}).to_list(length=10)
-        eq("в книге переездов — два, на имена отдающих", sorted(x_["by_name"] for x_ in tr), ["Бахадыр", "Парвиз"])
+        eq("в книге переездов — два переезда на имена отдающих",
+           sorted(x_["by_name"] for x_ in tr if not x_.get("move_back")), ["Бахадыр", "Парвиз"])
+        # «Принял неровно» — непринятая бутылка уехала обратно, и это видно
+        # отдельной строкой с пометкой (владелец, 24 сен 2026).
+        eq("и третья строка — возврат непринятого, с пометкой и заявкой",
+           [(x_["by_name"], x_["from"], x_["to"], x_["move_id"] == mid) for x_ in tr if x_.get("move_back")],
+           [("Худоба", "jvc", "bbay", True)])
 
         print("── STAR: «Взять на себя» район и скан по передаче ─────────────────")
         await d.qr_codes.insert_one({"_id": "v9", "status": "active", "product_id": "p1",

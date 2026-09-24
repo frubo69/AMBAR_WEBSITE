@@ -10396,7 +10396,7 @@ function mvqDiffOpen(mid, district, from){
   MVD_DIFF = {mid, district, from, busy: false,
               lines: (t.lines || []).map(l => ({id: l.id, name: l.name, unit: l.unit, sent: +l.got || 0, got: +l.recv || 0}))};
   document.getElementById('mvdS').textContent = `Из ${t.from_code} ${t.from_name}: отсканировано ${
-    fmtQty(+t.recv || 0)} из ${fmtQty(+t.got || 0)}. Чего нет — увидят старший и оператор`;
+    fmtQty(+t.recv || 0)} из ${fmtQty(+t.got || 0)}. Непришедшее вернётся на ${t.from_code} — на вашем районе оно не останется`;
   document.getElementById('mvdNote').value = '';
   mvdPaint();
   document.getElementById('mvdSheet').classList.add('show');

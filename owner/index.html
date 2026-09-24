@@ -15521,7 +15521,8 @@ function mvhPair(p, day){
     </div>
     ${p.accept_ok === false ? `<div class="mvh-note">Приняли неровно: ${
       (p.accept_lines || []).slice(0, 4).map(l => `${escS(l.name)} ${fmtQty(l.got)} из ${fmtQty(l.sent)}`).join(', ')
-      }${p.accept_note ? ` · «${escS(p.accept_note)}»` : ''}
+      }${p.accept_note ? ` · «${escS(p.accept_note)}»` : ''}${
+        p.back_n ? `<br>Непринятое вернулось в ${escS(p.from_code)}: ${fmtQty(p.back_n)} — за него отвечает отдающий` : ''}
       <button class="mvh-even" onclick="mvhEven('${escS(p.mid)}','${escS(p.to)}','${escS(p.from)}')"
         >Пришло всё — расхождения нет</button></div>` : ''}
     ${открыт ? `<div class="mvh-ls">${(p.lines || []).map(l => `
@@ -15538,8 +15539,8 @@ function mvhPair(p, day){
 // товар, то что здесь написано это ошибка»). Склад от этого не двигается —
 // бутылка переехала сканом отдающего, — снимается только вывод в истории.
 async function mvhEven(mid, to, from){
-  if(!await askDialog('Пришло всё?', 'Расхождение снимется: передача станет принятой ровно. '
-      + 'Остатки районов это не меняет — товар переехал в момент скана отдающего.',
+  if(!await askDialog('Пришло всё?', 'Расхождение снимется, и непринятое вернётся с района '
+      + 'отдающего обратно получателю — туда, где товар лежит на самом деле.',
       'Пришло всё', 'Оставить', 'go')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/move/accept-even',

@@ -3715,6 +3715,17 @@ async def shift_crew_add(day: str, district: str, name: str) -> None:
         {"$set": {f"drivers.{name}": True}})
 
 
+async def shift_crew_set(day: str, district: str, drivers: dict) -> bool:
+    """Переписать бригаду открытой смены района. False — смену не открывали."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.shift_opens.update_one(
+        {"_id": f"{day}:{district}"},
+        {"$set": {"drivers": {str(k): bool(v) for k, v in (drivers or {}).items()},
+                  "crew_at": datetime.now(timezone.utc)}})
+    return r.matched_count > 0
+
+
 async def shift_open(day: str, district: str, doc: dict) -> bool:
     """Открыть смену района. False — её уже открывали сегодня.
 

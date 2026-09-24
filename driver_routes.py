@@ -828,16 +828,15 @@ async def handle_shift_open(request):
     if after:
         return web.json_response({"error": "after_close", "day": after["day"]},
                                  status=409, headers=CORS_HEADERS)
-    self_mark = False
     if d.get("working") is not True and not _tq(me):
-        # Отметка оператора больше не обязательна (владелец, 22 сен 2026,
-        # временно): район открыт, а водитель не отмечен — открывает смену сам,
-        # и это и есть его выход (питание рабочего дня). Отмечен «дома» — нет.
-        if d.get("working") is False:
-            return web.json_response({"error": "marked_off"}, status=409, headers=CORS_HEADERS)
-        if not await _district_open(me, day):
-            return web.json_response({"error": "not_marked"}, status=409, headers=CORS_HEADERS)
-        self_mark = True
+        # Отметка оператора снова обязательна (владелец, 24 сен 2026). Послабление
+        # от 22 сен — «вышедший откроет смену сам» — дало кашу: район открыли без
+        # бригады, и четверо водителей отметили себя сами. Теперь на смену
+        # выпускает оператор, а добавить человека он может в любой момент
+        # (POST /api/operator/shift/crew).
+        return web.json_response(
+            {"error": "marked_off" if d.get("working") is False else "not_marked"},
+            status=409, headers=CORS_HEADERS)
     geo = await _geo_for(me)
     if not geo["ok"]:
         return web.json_response({"error": "no_geo", "geo": geo},
@@ -847,15 +846,8 @@ async def handle_shift_open(request):
         "shift_open_at": now, "shift_close_at": None,
         # Тест-водителя на смену никто не отмечает — отмечается сам; метка test
         # держит его день подальше от отчётов.
-        **({"working": True, "test": True} if _tq(me) else {}),
-        **({"working": True, "self_marked": True} if self_mark else {})})
-    if self_mark:
-        try:
-            await db.shift_crew_add(day, me.get("district") or "", me["name"])
-        except Exception as e:                               # noqa: BLE001
-            log.warning(f"[driver] {me['name']}: в бригаду района не записан: {e}")
-    log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин"
-             + (" · без отметки оператора" if self_mark else ""))
+        **({"working": True, "test": True} if _tq(me) else {})})
+    log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин")
     if not _tq(me) and _shift_late(day, now):
         await _late_alert(me, now, day)
     return web.json_response(await _shift_view(me), headers=CORS_HEADERS)

@@ -1893,6 +1893,12 @@ body.safe-open .cvo-hdr{opacity:0}
 .sh-ch:active{transform:scale(.94)}
 .sh-ch.on{color:#0f2e1c;background:#3ddc84}
 .sh-ch.off{color:var(--text);background:var(--card3)}
+.sh-drv-s{display:block;margin-top:2px;font-size:10.5px;font-weight:600;
+  font-style:normal;color:var(--muted)}
+.sh-crew-b{margin-right:8px;padding:8px 12px;border-radius:10px;font-family:inherit;
+  font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);background:var(--card3);
+  border:none;white-space:nowrap}
+.sh-crew-b:active{transform:scale(.96)}
 .sh-none{margin-top:10px;font-size:12px;color:var(--muted)}
 /* Выбор дня: строка на день, подпись слева, день недели справа. Список ровный,
    без чипов разной ширины и без дат, повторяющих сами себя. */
@@ -2944,6 +2950,12 @@ html.kb body{padding-bottom:40vh}
 <!-- Просьба водителя закрыть смену раньше: контекст и решение (18 сен 2026). -->
 <div class="ov" id="crqOv" onclick="if(event.target===this)crqClose()">
   <div class="sheet" id="crqSheet"></div>
+</div>
+
+<!-- Бригада открытой смены: добавить вышедшего позже, отправить домой того,
+     кто не приехал (shCrewOpen). -->
+<div class="ov" id="shCrewOv" onclick="if(event.target===this)shCrewHide()">
+  <div class="sheet" id="shCrewSheet"></div>
 </div>
 
 <!-- Чай оператора: сегодня, месяц по дням, заказы дня (teaOpen). -->
@@ -6466,10 +6478,16 @@ function shiftPaint(){
       : notOpen.length ? `<span class="sh-s warn">не открыли смену: ${_esc(notOpen.join(', '))}</span>`
       : gone.length ? `<span class="sh-s">закрыли смену: ${_esc(gone.join(', '))}</span>`
       : `<span class="sh-s">на смене ${on.length} ${plural(on.length,'водитель','водителя','водителей')}</span>`;
+    // Бригаду правят в открытой смене сколько угодно раз (владелец, 24 сен
+    // 2026): человек вышел позже, кого-то отпустили — это обычный ход дня, а
+    // не повод закрывать район и открывать заново.
+    const crewBtn = x.closed ? '' : `<button class="sh-crew-b"
+        onclick="shCrewOpen('${x.district}')">Бригада</button>`;
     return `<div class="sh-r ${x.closed ? 'off' : ''}">
       <span class="sh-code">${_esc(x.code)}</span>
       <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
         <span class="sh-s">${sub}</span>${crewLine}</span>
+      ${crewBtn}
       <button class="sh-go ${x.closed ? 'ghost' : ''}"
         onclick="${x.closed ? `shiftReopen('${x.district}')` : `shiftClose('${x.district}')`}">
         ${x.closed ? 'Открыть' : 'Закрыть'}</button>
@@ -6479,14 +6497,16 @@ function shiftPaint(){
 
 // Строка неоткрытого района: кто сегодня работает. Двумя кнопками, а не
 // галочкой: «не отмечен» и «не работает» — разные вещи, и различать их должен
-// не пропуск, а нажатие. Отмечать всех не обязательно (владелец, 22 сен 2026 —
-// временно, пока не ведём, кто когда уехал): кто в отъезде, того не трогают,
-// а вышедший без отметки откроет смену сам.
+// не пропуск, а нажатие. Без единого вышедшего смену не открыть (владелец,
+// 24 сен 2026): район без бригады — это тот самый случай, когда водители
+// начинают отмечать себя сами. В списке только те, кто в Дубае: улетевших
+// сервер сюда не присылает.
 function shiftOpenRow(x){
   const names = x.drivers || [];
   const mark = SH_CREW[x.district] || (SH_CREW[x.district] = {});
   const left = names.filter(n => typeof mark[n] !== 'boolean').length;
   const allOn = names.length && names.every(n => mark[n] === true);
+  const anyOn = names.some(n => mark[n] === true);
   return `<div class="sh-r sh-open">
     <div class="sh-hd">
       <span class="sh-code">${_esc(x.code)}</span>
@@ -6506,11 +6526,76 @@ function shiftOpenRow(x){
         </span>
       </div>`).join('')}</div>`
       : '<div class="sh-none">В районе не назначено ни одного водителя</div>'}
-    ${!names.length || !left ? ''
-      : `<div class="sh-note">${left === names.length ? 'Можно никого не отмечать'
-          : `Без отметки: ${left} — их не трогаем`}: кто в отъезде, остаётся без отметки, вышедший откроет смену сам</div>`}
-    <button class="sh-go wide" onclick="shiftDoOpen('${x.district}')">Открыть смену</button>
+    ${!names.length ? ''
+      : `<div class="sh-note">${anyOn
+          ? (left ? `Без отметки: ${left} — они останутся дома` : 'Отмечены все')
+          : 'Отметьте хотя бы одного — без бригады смену не открыть'}</div>`}
+    <button class="sh-go wide" ${anyOn ? '' : 'disabled'}
+      onclick="shiftDoOpen('${x.district}')">Открыть смену</button>
   </div>`;
+}
+
+// Бригада открытой смены. Правится сколько угодно раз: человек вышел позже,
+// кто-то не приехал (владелец, 24 сен 2026). Двух вещей окно не делает —
+// сервер их и не позволит: не оставляет район совсем без водителей и не
+// отправляет домой того, кто уже открыл свою смену.
+let SH_EDIT = null;
+
+function shCrewOpen(oid){
+  const x = (SHIFT.districts || []).find(d => d.district === oid); if(!x) return;
+  SH_EDIT = {oid, busy: false};
+  shCrewPaint(); showOv('shCrewOv'); haptic('medium');
+}
+function shCrewHide(){ hideOv('shCrewOv'); SH_EDIT = null; }
+
+function shCrewPaint(){
+  const E = SH_EDIT; if(!E) return;
+  const x = (SHIFT.districts || []).find(d => d.district === E.oid);
+  if(!x){ shCrewHide(); return; }
+  const crew = x.crew || {}, cs = x.crew_shift || {};
+  const names = x.drivers || [];
+  const on = names.filter(n => crew[n] === true).length;
+  $('shCrewSheet').innerHTML = `<div class="t sh-t"><span>Бригада · ${_esc(x.code)} ${_esc(x.name)}</span>
+      <button class="oc-x" onclick="shCrewHide()" aria-label="Закрыть"><svg viewBox="0 0 24 24" width="15" height="15"
+        fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="s">на смене ${on} ${plural(on,'водитель','водителя','водителей')} · меняйте сколько нужно</div>
+    ${names.length ? `<div class="sh-crew">${names.map(n => {
+      const своя = (cs[n] || {}).open, ушёл = (cs[n] || {}).closed;
+      const под = своя ? 'смена открыта' : ушёл ? 'смену закрыл' : '';
+      return `<div class="sh-drv">
+        <span class="sh-drv-n">${_esc(n)}${под ? `<i class="sh-drv-s">${под}</i>` : ''}</span>
+        <span class="sh-drv-b">
+          <button class="sh-ch ${crew[n] === true ? 'on' : ''}" ${E.busy ? 'disabled' : ''}
+            onclick="shCrewSet('${_esc(n)}',true)">На смене</button>
+          <button class="sh-ch ${crew[n] === false ? 'off' : ''}" ${E.busy || своя ? 'disabled' : ''}
+            onclick="shCrewSet('${_esc(n)}',false)">Дома</button>
+        </span>
+      </div>`; }).join('')}</div>`
+      : '<div class="sh-none">В районе нет водителей, которые сейчас в Дубае</div>'}
+    <div class="sh-note">Кто уже открыл свою смену, домой не отправляется: он уходит через «Закрыть смену раньше»</div>`;
+}
+
+async function shCrewSet(name, val){
+  const E = SH_EDIT; if(!E || E.busy) return;
+  const x = (SHIFT.districts || []).find(d => d.district === E.oid); if(!x) return;
+  if((x.crew || {})[name] === val) return;
+  E.busy = true; shCrewPaint();
+  try{
+    const r = await opApi.opFetch('/api/operator/shift/crew',
+      {method:'POST', body:{district: E.oid, as: curOp, drivers: {[name]: val}}});
+    x.crew = r.drivers || x.crew;
+    haptic('ok');
+    toast(val ? `${name} на смене` : `${name} — дома`, 'ok');
+  }catch(e){
+    const err = (e.payload || {}).error;
+    toast(err === 'last_driver' ? 'Нельзя оставить смену без водителей'
+        : err === 'shift_open' ? `${name} уже открыл смену — отпустите его через просьбу`
+        : err === 'not_open' ? 'Смена района не открыта'
+        : 'Не получилось — повторите', 'err');
+  }
+  E.busy = false;
+  shCrewPaint();
+  await shiftOpen();
 }
 
 // Отметить всех разом. Второе нажатие снимает: оператор мог ткнуть не в тот
@@ -6546,8 +6631,10 @@ async function shiftDoOpen(oid){
     await shiftOpen();
     shiftPill();
   }catch(e){
-    toast((e.payload || {}).error === 'crew_incomplete' ? 'Отметьте всех водителей'
-          : (e.payload || {}).error === 'already_open' ? 'Смена уже открыта'
+    const err = (e.payload || {}).error;
+    toast(err === 'no_crew' ? 'Отметьте хотя бы одного водителя'
+          : err === 'crew_incomplete' ? 'Отметьте всех водителей'
+          : err === 'already_open' ? 'Смена уже открыта'
           : 'Не удалось открыть', 'err');
   }
   finally{ SHIFT_BUSY = false; }

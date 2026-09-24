@@ -6181,7 +6181,7 @@ async function shOpen(){
     if(e.payload) SH = {...SH, ...(e.payload.geo ? {geo: e.payload.geo} : {})};
     toast(err === 'no_geo' ? 'Сначала включите трансляцию геопозиции'
         : err === 'after_close' ? 'Смена закрыта — следующую откроет оператор'
-        : err === 'not_marked' ? 'Оператор ещё не открыл смену района'
+        : err === 'not_marked' ? 'Оператор ещё не отметил вас на смене'
         : err === 'marked_off' ? 'Сегодня вы отмечены как выходной — напишите оператору'
         : 'Не получилось — повторите', 'err');
     await shLoad();

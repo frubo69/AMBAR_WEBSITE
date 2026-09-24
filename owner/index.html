@@ -12823,7 +12823,11 @@ function whPaint(listOnly){
                  name: r.gname !== undefined ? r.gname : r.name, rows: []}; группы.push(g); }
     g.rows.push(r);
   });
-  группы.sort(_byDistCode);
+  // STAR — первым: это тот, кто смотрит (владелец, 24 сен 2026: «почему STAR
+  // последний? сделай его первым»). Дальше районы по коду, устройства — в
+  // самом низу: они не люди и в вопросе «кто где» отвечают последними.
+  const вес = g => g.id === 'senior' ? -1 : g.id === 'devices' ? 1 : 0;
+  группы.sort((a, b) => вес(a) - вес(b) || _byDistCode(a, b));
   document.getElementById('whList').innerHTML = (shown.length
     ? группы.map(g => {
         const живых = g.rows.filter(r => whState(r) === 'online').length;

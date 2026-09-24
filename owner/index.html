@@ -1207,7 +1207,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-r.find{width:100%;text-align:left;font-family:inherit;cursor:pointer;
   background:var(--card);border:none;border-bottom:1px solid var(--border2)}
 .aud-r.find:active{transform:scale(.995)}
-.aud-r-s.find{display:inline-flex;align-items:center;gap:2px;color:var(--gold2)}
+.aud-r-s.find{display:flex;align-items:center;gap:2px;color:var(--gold2)}
 .mvh-even{display:block;margin:7px 0 0;padding:7px 12px;border-radius:9px;
   font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--gold2);
   background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
@@ -5728,9 +5728,15 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   background:rgba(255,255,255,.04)}
 .si-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
   padding:12px 14px;background:rgba(255,255,255,.02)}
+.si-row.tap{width:100%;font-family:inherit;text-align:left;cursor:pointer;border:none}
+.si-row.tap:active{background:rgba(255,255,255,.06)}
+.si-row.tap .v{color:var(--gold2)}
 .si-row .k{font-size:12.5px;color:rgba(255,255,255,.5)}
 .si-row .v{font-size:13.5px;font-weight:600;color:#fff;text-align:right;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Подсказки в карточке — целиком: обрезанное многоточием «отсканируйте её —
+   недоста…» не объясняет ничего. */
+.si-row .v.wrap{white-space:normal;overflow:visible;line-height:1.35}
 .si-row .v.mono{font-family:'Space Grotesk',sans-serif;letter-spacing:.3px;
   font-size:12.5px;color:rgba(255,255,255,.8)}
 .si-row .v.mute{font-weight:500;color:rgba(255,255,255,.4)}
@@ -13801,6 +13807,10 @@ function _siRow(k, v, cls){
   if(v === undefined || v === null || v === '') return '';
   return `<div class="si-row"><span class="k">${k}</span><span class="v ${cls||''}">${v}</span></div>`;
 }
+function _siTap(k, v, onclick){
+  return `<button class="si-row tap" onclick="${onclick}"><span class="k">${k}</span>
+    <span class="v">${v}</span></button>`;
+}
 function scanInfo(name, tagText, tagCls, rows, icon){
   const b = document.getElementById('scanInfoBody'); if(!b) return;
   b.innerHTML = `<div class="si-top">
@@ -16280,14 +16290,15 @@ function audMissing(pid){
   scanInfo(r.name, `не хватает ${нет}`, 'bad',
     [_siRow(точно ? 'Не нашли именно эти' : 'Кандидаты — искать среди них',
             точно ? `${r.missing.length} ${pluralize(r.missing.length, 'бутылка', 'бутылки', 'бутылок')}`
-                  : `${r.missing.length} не поднесли к камере, а не хватает ${нет}`)]
-    .concat(r.missing.map(m => _siRow(
+                  : `${r.missing.length} не поднесли к камере, а не хватает ${нет}`, 'wrap')]
+    .concat(r.missing.map(m => _siTap(
       escS(m.label || m.code),
       escS(m.from_code ? `приехала с ${m.from_code}${m.moved_at ? ' · ' + _audDayT(String(m.moved_at).slice(0, 10)) : ''}`
-                       : (m.at ? 'внесена ' + _audDayT(String(m.at).slice(0, 10)) : '')), 'mono')))
-    .concat([_siRow('Почему их больше', точно ? '' : 'у проданной бутылки код из реестра не исчезает'),
-             _siRow('Если бутылка на полке', 'отсканируйте её — недостача уйдёт сама'),
-             _siRow('Если её нет', 'закройте ревизию: недостача станет списанием')]));
+                       : (m.at ? 'внесена ' + _audDayT(String(m.at).slice(0, 10)) : '')) + _CHEV,
+      `audBottle('${escS(m.code)}','${escS(pid)}')`)))
+    .concat([_siRow('Почему их больше', точно ? '' : 'у проданной бутылки код из реестра не исчезает', 'wrap'),
+             _siRow('Если бутылка на полке', 'отсканируйте её — недостача уйдёт сама', 'wrap'),
+             _siRow('Если её нет', 'закройте ревизию: недостача станет списанием', 'wrap')]));
 }
 
 // Карточка итога. До старта числа расхождений не показываем: «не хватает
@@ -27850,6 +27861,40 @@ function qrDelRowInfo(i){
     escS(e.what || ''),
     [_when(e.at), e.who, e.where].filter(Boolean).map(escS).join(' · '))));
   scanInfo(r.name || r.label, st[0], st[1], rows);
+}
+
+// Бутылка, которую не нашли на ревизии, — та же карточка, что при проверке
+// бутылки: что за позиция, где числится, метка и код, и вся её жизнь с
+// сервера — заведена, переезды, проверки, списание (владелец, 24 сен 2026:
+// «он сможет просмотреть информацию о бутылке, которую не нашёл? что должна
+// быть такая-то бутылка, она была внесена тогда-то — как при проверке»).
+async function audBottle(code, pid){
+  scanInfo('Бутылка ' + code, 'смотрю…', 'warn', [_siRow('Код', escS(code), 'mono')]);
+  let d = null;
+  try{ d = await ownerApi.ownerFetch('/api/owner/qr/code/' + encodeURIComponent(code)); }
+  catch(e){
+    scanInfo('Бутылка ' + code, e && e.status === 404 ? 'нет в реестре' : 'не открылась', 'bad',
+      [_siTap('‹ Назад', 'к списку ненайденных', `audMissing('${escS(pid)}')`)]);
+    return;
+  }
+  const где = d.district ? _distName(d.district) : '';
+  const ст = {active:['числится на складе','ok'], written:['списана','bad'],
+              sold:['ушла с заказом','warn'], deleted:['убрана из реестра','bad']}[d.status || 'active']
+           || ['', ''];
+  const rows = [
+    _siTap('‹ Назад', 'к списку ненайденных', `audMissing('${escS(pid)}')`),
+    _siRow('Позиция', escS(d.product_name || '')),
+    _siRow('Район', escS(где)),
+    _siRow('Метка', escS(d.label || ''), 'mono'),
+    _siRow('Код', escS(code), 'mono'),
+  ];
+  // В истории районы приходят ключами базы: показываем их так же, как везде.
+  const место = w => String(w || '').split('→').map(x => _distName(x.trim()) || x.trim()).join(' → ');
+  (d.story || []).forEach(e => rows.push(_siRow(
+    escS(e.what || ''),
+    [_when(e.at), e.who, место(e.where)].filter(Boolean).map(escS).join(' · '))));
+  rows.push(_siRow('Камера её не видела', 'на этой ревизии'));
+  scanInfo(d.product_name || d.label || code, ст[0], ст[1], rows);
 }
 
 // ─── Поставка ───────────────────────────────────────────────────────────────

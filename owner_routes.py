@@ -1710,6 +1710,8 @@ async def _staff_payload() -> dict:
     await _staff_fresh()
     moves = await db.staff_map_get()
     cars, car_by = await _fleet_view()
+    # Наш телефон на руках у водителя — такая же выданная вещь, как машина.
+    gear = {str(r.get("name") or ""): r for r in staff.roster_rows()}
     return {
         "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
                        "name": OFFICE_NAMES.get(d, d),

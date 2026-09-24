@@ -2621,6 +2621,13 @@ async def handle_move_drop(request):
 
 
 @require_owner
+async def handle_move_accept_even(request):
+    """Расхождение при приёме — ошибка: товар пришёл весь (владелец, 24 сен 2026)."""
+    import move_routes
+    return await move_routes.handle_own_accept_even(request)
+
+
+@require_owner
 async def handle_move_scan(request):
     import move_routes
     return await move_routes.handle_own_scan(request)
@@ -2699,6 +2706,7 @@ def setup(app):
         # сам — по каждому району, куда везёт (18 сен 2026).
         ("/api/owner/move/take",                    handle_move_take,    "POST"),
         ("/api/owner/move/drop",                    handle_move_drop,    "POST"),
+        ("/api/owner/move/accept-even",             handle_move_accept_even, "POST"),
         ("/api/owner/move/{mid}/scan",              handle_move_scan,    "POST"),
         # Принимающая сторона тоже сканирует — и из STAR тоже (20 сен 2026).
         ("/api/owner/move/{mid}/receive",           handle_move_receive, "POST"),

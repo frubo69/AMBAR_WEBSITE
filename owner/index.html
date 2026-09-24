@@ -1204,6 +1204,10 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .mvh-note{margin:0 14px 12px;padding:8px 10px;border-radius:10px;font-size:11.5px;
   line-height:1.35;color:var(--gold2);background:rgba(201,169,110,.08)}
+.mvh-even{display:block;margin:7px 0 0;padding:7px 12px;border-radius:9px;
+  font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
+.mvh-even:active{transform:scale(.98)}
 .mvh-empty{margin:14px 0;padding:22px 16px;border-radius:15px;text-align:center;
   font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border2)}
 .mvh-jump{display:block;margin:13px auto 0;padding:9px 16px;border-radius:11px;
@@ -15517,7 +15521,9 @@ function mvhPair(p, day){
     </div>
     ${p.accept_ok === false ? `<div class="mvh-note">Приняли неровно: ${
       (p.accept_lines || []).slice(0, 4).map(l => `${escS(l.name)} ${fmtQty(l.got)} из ${fmtQty(l.sent)}`).join(', ')
-      }${p.accept_note ? ` · «${escS(p.accept_note)}»` : ''}</div>` : ''}
+      }${p.accept_note ? ` · «${escS(p.accept_note)}»` : ''}
+      <button class="mvh-even" onclick="mvhEven('${escS(p.mid)}','${escS(p.to)}','${escS(p.from)}')"
+        >Пришло всё — расхождения нет</button></div>` : ''}
     ${открыт ? `<div class="mvh-ls">${(p.lines || []).map(l => `
       <div class="mvh-ln"><span>${escS(l.name)}</span>
         <b>${fmtQty(l.got)}${l.got < l.qty ? ` из ${fmtQty(l.qty)}` : ''}<u>${
@@ -15527,6 +15533,22 @@ function mvhPair(p, day){
 
 // Вернуть переезд без заявки — тем же путём, что и раньше: сервер снимает
 // поправку к остатку и запись в реестре кодов.
+// Расхождение при приёме бывает ошибкой самого приёма: бутылку привезли, а к
+// камере не поднесли (владелец, 24 сен 2026: «при перемещении приняли весь
+// товар, то что здесь написано это ошибка»). Склад от этого не двигается —
+// бутылка переехала сканом отдающего, — снимается только вывод в истории.
+async function mvhEven(mid, to, from){
+  if(!await askDialog('Пришло всё?', 'Расхождение снимется: передача станет принятой ровно. '
+      + 'Остатки районов это не меняет — товар переехал в момент скана отдающего.',
+      'Пришло всё', 'Оставить', 'go')) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/move/accept-even',
+      {method: 'POST', body: {move_id: mid, to, from}});
+  }catch(e){ _toast('Не удалось снять расхождение'); return; }
+  _toast('Принято ровно');
+  mvhLoad();
+}
+
 async function mvhDel(i){
   const m = ((MVH.data || {}).free || [])[i]; if(!m) return;
   const ids = m.ids && m.ids.length ? m.ids : (m.id ? [m.id] : []);

@@ -6097,6 +6097,21 @@ async def move_give_accept(mid: str, district: str, src: str, rec: dict) -> bool
     return r.modified_count > 0
 
 
+async def move_accept_even(mid: str, district: str, src: str, lines: list, sets: dict) -> bool:
+    """Расхождение при приёме оказалось ошибкой: товар пришёл весь.
+
+    Пишем один раз — «расхождение ещё стоит» проверяется в самом фильтре. По
+    статусу заявки не фильтруем: неровно принятая передача чаще всего лежит в
+    уже закрытой заявке, и именно её и приходится править."""
+    d = _db_or_none()
+    if d is None: return False
+    k = f"tasks.{district}.give.{src}"
+    upd = {f"{k}.{f}": v for f, v in sets.items()}
+    upd[f"tasks.{district}.lines"] = lines
+    r = await d.move_orders.update_one({"_id": mid, f"{k}.accept_ok": False}, {"$set": upd})
+    return r.modified_count > 0
+
+
 async def move_pair_senior(mid: str, district: str, src: str, name: str, by: int, now) -> bool:
     """Старший берёт передачу src → district на себя. Достаётся одному:
     условие «никто не взял или взял этот же» стоит в самом фильтре; принятую и

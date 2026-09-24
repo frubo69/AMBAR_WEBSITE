@@ -1102,6 +1102,54 @@ def _own_name(request, b) -> str:
     return str((b or {}).get("as") or "").strip()[:60] or "старший"
 
 
+async def accept_even(mid: str, oid: str, src: str, by: str, tgid: int = 0) -> dict:
+    """«Приняли неровно» оказалось ошибкой приёма: товар пришёл весь.
+
+    Владелец, 24 сен 2026: «при перемещении приняли весь товар, то что здесь
+    написано это ошибка». Так и было: четыре бутылки той передачи получатель
+    просто не поднёс к камере, а через два дня отсканировал их же на своей
+    ревизии — значит, они у него.
+
+    Склад это не двигает и двигать не должно: бутылка переезжает в тот момент,
+    когда её сканирует ОТДАЮЩИЙ, — расхождение жило только записью в истории и
+    красной плашкой. Прежние цифры кладём рядом (`accept_lines_was`): что приём
+    шёл неровно, из истории не стираем, снимаем только вывод."""
+    doc = await db.move_order_get(mid)
+    task = ((doc or {}).get("tasks") or {}).get(oid)
+    if not doc or not task:
+        return {"ok": False, "error": "gone"}
+    g = (task.get("give") or {}).get(src) or {}
+    if not g.get("accepted_at"):
+        return {"ok": False, "error": "not_accepted"}
+    if g.get("accept_ok", True):
+        return {"ok": False, "error": "not_diff"}
+    lines = [dict(l) for l in (task.get("lines") or [])]
+    for l in lines:
+        if l.get("from") == src:
+            l["recv"] = l.get("got") or 0
+    sets = {"accept_ok": True, "accept_lines": [],
+            "accept_lines_was": g.get("accept_lines") or [],
+            "recv_codes": list(g.get("codes") or []),
+            "evened_by": str(by or "")[:60], "evened_by_id": int(tgid or 0),
+            "evened_at": _now()}
+    if not await db.move_accept_even(mid, oid, src, lines, sets):
+        return {"ok": False, "error": "not_diff"}
+    log.info(f"[move] {by}: расхождение снято, принято ровно · {src} → {oid} ({mid})")
+    doc = await db.move_order_get(mid)
+    task = (doc.get("tasks") or {}).get(oid) or {}
+    return {"ok": True, "task": give_view(mid, doc, oid, task, src, by)}
+
+
+async def handle_own_accept_even(request):
+    """POST {move_id, to, from, as} — снять расхождение: приняли всё."""
+    b = await _body(request)
+    r = await accept_even(str(b.get("move_id") or ""), str(b.get("to") or ""),
+                          str(b.get("from") or ""), _own_name(request, b),
+                          int(request.get("owner_id") or 0))
+    return web.json_response(r, status=200 if r.get("ok") else 409, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
 async def handle_own_take(request):
     """POST {from, to?, move_id?, as} — старший берёт на себя передачу
     «from → to» (или все с района from, если to не задан)."""

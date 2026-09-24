@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["MONGO_URI"] = ""; os.environ.setdefault("AMBAR_OWNER_IDS", "1")
 import logging; logging.disable(logging.WARNING)
 from aiohttp import web                                      # noqa: E402
-import driver_routes, operator_routes                         # noqa: E402
+import driver_routes, operator_routes, supply_routes, stock_routes   # noqa: E402
 
 FAIL = []
 def eq(имя, дали, ждём):
@@ -37,6 +37,12 @@ def eq(имя, дали, ждём):
                  ("POST", "/api/operator/orders/{oid}/accept"),
                  ("POST", "/api/operator/close-request"),   # отпустить водителя
                  ("POST", "/api/operator/close-request/undo")],
+    "владелец": [("POST", "/api/owner/move/accept-even"),   # снять расхождение приёма
+                 ("GET", "/api/owner/move/history"),
+                 ("POST", "/api/owner/move/create")],
+    "склад":    [("POST", "/api/owner/stock/transfer"),     # переезд между районами
+                 ("POST", "/api/owner/stock/audit/scan"),   # ревизия камерой
+                 ("GET", "/api/owner/stock/status")],
     "водитель": [("POST", "/api/driver/shift/open"),
                  ("POST", "/api/driver/shift/close"),
                  ("POST", "/api/driver/shift/close-request"),
@@ -56,7 +62,8 @@ def таблица(модуль) -> dict:
 
 
 def main():
-    for имя, модуль in (("оператор", operator_routes), ("водитель", driver_routes)):
+    for имя, модуль in (("оператор", operator_routes), ("водитель", driver_routes),
+                        ("владелец", supply_routes), ("склад", stock_routes)):
         try:
             таб = таблица(модуль)
         except Exception as e:                               # noqa: BLE001

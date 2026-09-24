@@ -186,6 +186,28 @@ def _qty(it: dict) -> int:
     return q * (pcs if pcs else 1)
 
 
+def sale_item(it: dict, cat: dict) -> tuple:
+    """Строка заказа складскими словами: (позиция, сколько ушло в учётных
+    единицах).
+
+    Пачка пива из бота оператора приходит СВОИМ id — «p31_12» (двенадцать
+    банок Heineken): у неё своя цена, и в каталоге такой позиции нет. Без
+    разбора этого id склад продажу не видел вовсе: списывалось «p31_12»,
+    которого на полке нет, а сам Heineken оставался нетронутым (найдено
+    ревизией 24 сен 2026 — десять таких продаж с апреля). Пачку раскладываем
+    на базовую позицию и число бутылок; мини-аппа для того же шлёт `pcs`.
+    """
+    pid = it.get("id")
+    q = _qty(it)
+    if not pid or not q:
+        return "", 0.0
+    if pid not in cat and "_" in str(pid):
+        base, _, хвост = str(pid).rpartition("_")
+        if base in cat and хвост.isdigit() and int(хвост) > 0 and not it.get("pcs"):
+            pid, q = base, q * int(хвост)
+    return pid, q / _unit(cat.get(pid) or {})
+
+
 async def _registry_was(district: str, day: str) -> dict:
     """Сколько лежит на точке по реестру кодов — на начало пересчитываемых суток.
 
@@ -210,9 +232,9 @@ async def _registry_was(district: str, day: str) -> dict:
         if ts < since_iso or ts >= start:
             continue
         for it in (o.get("items") or []):
-            pid, q = it.get("id"), _qty(it)
+            pid, q = sale_item(it, cat)
             if pid in out and q:
-                out[pid] -= q / _unit(cat.get(pid) or {})
+                out[pid] -= q
     try:
         # skip_coded: считаем ОТ РЕЕСТРА, а списанная сканом бутылка из него
         # уже вышла — вычитать её ещё раз значит потерять её дважды.
@@ -257,10 +279,9 @@ async def _sold(day: str, district: str | None = None, days: int = 1) -> dict:
         if district and (o.get("office_id") or "") != district:
             continue
         for it in (o.get("items") or []):
-            pid = it.get("id")
-            q = _qty(it)
+            pid, q = sale_item(it, cat)
             if pid and q:
-                out[pid] = out.get(pid, 0) + q / _unit(cat.get(pid) or {})
+                out[pid] = out.get(pid, 0) + q
     return {k: _round_step(v) for k, v in out.items()}
 
 
@@ -367,11 +388,11 @@ async def _demand(day: str, days: int = NORM_HIST_DAYS) -> dict:
             continue
         dist = o.get("office_id") or ""
         for it in (o.get("items") or []):
-            pid, q = it.get("id"), _qty(it)
+            pid, q = sale_item(it, cat)
             if not pid or not q:
                 continue
             row = per.setdefault(dist, {}).setdefault(pid, [0.0] * days)
-            row[i] += q / _unit(cat.get(pid) or {})
+            row[i] += q
 
     data = {"days": days, "wd": wd, "per": per, "from": _active_from(per, days)}
     _DEMAND.update(key=key, at=_t.time(), data=data)
@@ -1190,11 +1211,10 @@ async def _sold_after(since: dict, until: datetime | None = None) -> dict:
         if not ts or ts <= edge or (until is not None and ts > until):
             continue
         for it in (o.get("items") or []):
-            pid, q = it.get("id"), _qty(it)
+            pid, q = sale_item(it, cat)
             if not pid or not q:
                 continue
-            out.setdefault(oid, {}).setdefault(pid, []).append(
-                (ts, q / _unit(cat.get(pid) or {})))
+            out.setdefault(oid, {}).setdefault(pid, []).append((ts, q))
     for rows in out.values():
         for ev in rows.values():
             ev.sort(key=lambda e: e[0])
@@ -1985,9 +2005,9 @@ async def _audit_after(district: str, since_dt) -> dict:
             if not ts:
                 continue
             for it in (o.get("items") or []):
-                pid, q = it.get("id"), _qty(it)
+                pid, q = sale_item(it, cat)
                 if pid and q:
-                    add(pid, ts, -q / _unit(cat.get(pid) or {}))
+                    add(pid, ts, -q)
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[audit] продажи после подсчёта не прочитаны ({district}): {e}")
     try:

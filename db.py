@@ -2226,6 +2226,21 @@ async def cars_import_from_drivers() -> int:
     return n
 
 
+async def driver_gear_set(name: str, ours_phone: bool, by: int = 0) -> bool:
+    """Наш телефон у водителя — или он его вернул.
+
+    Владелец, 24 сен 2026: «отметь у Муина, что у него наш телефон, он его
+    должен вернуть». Живёт в реестре водителей рядом с машиной: это такая же
+    выданная вещь, и спрашивают о ней там же, где «кто на каком районе»."""
+    d = _db_or_none()
+    if d is None: return False
+    upd = ({"$set": {"ours_phone": True, "ours_phone_at": datetime.now(timezone.utc),
+                     "ours_phone_by": int(by or 0)}} if ours_phone
+           else {"$unset": {"ours_phone": "", "ours_phone_at": "", "ours_phone_by": ""}})
+    r = await d.drivers.update_one({"name": name}, upd)
+    return r.matched_count > 0
+
+
 async def driver_adopt(name: str, telegram_id: int, by: int = 0) -> None:
     """Перенос уже работающего водителя из .env в базу: телефон известен,
     привязывать заново его не просим."""

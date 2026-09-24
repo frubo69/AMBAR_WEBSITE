@@ -4948,6 +4948,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .crw-lk-d{display:flex;gap:6px;padding:0 10px 10px}
 .pin-pop .crw-lk-dd{flex:1;width:auto;height:38px;margin:0;padding:0;border-radius:10px;border:1px solid var(--border2);background:var(--card);color:var(--sub);font-weight:700;font-size:12px;letter-spacing:1px;cursor:pointer;font-family:inherit;text-align:center;justify-content:center}
 .pin-pop .crw-lk-dd.on{border-color:var(--gold);color:var(--gold)}
+/* Наш телефон на руках у водителя: красной строкой под именем, пока не вернёт. */
+.crw-p-ph{display:flex;align-items:center;gap:4px;margin-top:2px;font-size:10.5px;
+  font-weight:700;color:var(--dn)}
+.crw-p-ph svg{flex:0 0 auto}
+.crw-p.ours-ph{border-color:rgba(226,106,106,.45)}
 /* Уехал и пока не вернулся: из команды не убираем — тускло и с датой
    (владелец, 24 сен 2026). */
 .crw-p.gone{opacity:.45}
@@ -36340,12 +36345,16 @@ function crewRender(){
       // Уехавший остаётся в команде, но серым и с датой отъезда (владелец,
       // 24 сен 2026: «оставляй их в команде, просто пиши серым, что уехал»).
       const уехал = (d.away || {})[n];
-      return `<button class="crw-p${v.moved ? ' moved' : ''}${car ? ' has-car' : ''}${уехал ? ' gone' : ''}"
+      // Наш телефон на руках — красным под именем: его надо вернуть
+      // (владелец, 24 сен 2026).
+      const трубка = v.ours_phone ? `<span class="crw-p-ph">${IC('phone', 12)}наш телефон</span>` : '';
+      return `<button class="crw-p${v.moved ? ' moved' : ''}${car ? ' has-car' : ''}${уехал ? ' gone' : ''}${
+                        v.ours_phone ? ' ours-ph' : ''}"
                       onclick="crewPickD('${escS(n)}')">
         <span class="crw-p-a">${IC('car', 15)}</span>
         <span class="crw-p-t"><span class="crw-p-n">${escS(n)}</span>${
           уехал ? `<span class="crw-p-car">уехал ${escS(fbWorkDay(уехал))}</span>`
-                : (car ? `<span class="crw-p-car">${escS(car)}</span>` : '')}</span>
+                : (car ? `<span class="crw-p-car">${escS(car)}</span>` : '')}${трубка}</span>
         ${v.moved && !уехал ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
       </button>`;
     }).join('') : '<span class="crw-none">никого нет</span>';
@@ -36836,12 +36845,28 @@ function crewPickD(name){
   _crewPop(CREW_CAR_AT, `<div class="crw-lk-h">${escS(name)}</div>
     <button onclick="crewCars('${esc}')">${IC('car', 15)}<span>Машина<span class="pin-s">${
       v.car ? escS(crewCarLine(v.car)) : 'не закреплена'}</span></span></button>
+    <button onclick="crewPhone('${esc}', ${v.ours_phone ? 'false' : 'true'})">${IC('phone', 15)}<span>Наш телефон<span class="pin-s">${
+      v.ours_phone ? 'у него — нажмите, когда вернёт' : 'не выдавали'}</span></span></button>
     <div class="crw-lk-h">Район</div>` + S.districts.map(d => `
     <button onclick="crewSetD('${esc}','${d.id}')">
       <span>${escS(d.code)} ${escS(d.name)}${
         d.id === v.base ? '<span class="pin-s">как обычно</span>' : ''}</span>
       ${d.id === v.district ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
     </button>`).join(''));
+}
+
+// Выданный телефон — такая же вещь на руках, как машина: отметили, что у
+// него, и сняли, когда вернул (владелец, 24 сен 2026: «он его должен вернуть»).
+async function crewPhone(name, on){
+  closePinPop();
+  try{
+    CREW = await ownerApi.ownerFetch('/api/owner/staff/gear',
+      {method:'POST', body:{driver: name, phone: on}});
+    CREW_D = _copy(CREW);
+    _toast(on ? `${name} — наш телефон у него` : `${name} вернул телефон`);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ _toast('Не получилось — повторите'); }
+  crewRender();
 }
 
 function crewSet(did, name){

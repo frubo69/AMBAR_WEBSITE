@@ -1747,7 +1747,11 @@ async def _staff_payload() -> dict:
                                     if n in staff.DISTRICT_DRIVERS.get(d, [])), "")
                               != staff.base_district(n),
                      # Машина водителя — видна под именем (18 сен 2026).
-                     "car": car_by.get(n)}
+                     "car": car_by.get(n),
+                     # Наш телефон у него на руках — и его надо вернуть
+                     # (владелец, 24 сен 2026).
+                     "ours_phone": bool((gear.get(n) or {}).get("ours_phone")),
+                     "ours_phone_at": _iso_dt((gear.get(n) or {}).get("ours_phone_at"))}
                     for n in staff.driver_names()],
     }
 
@@ -2132,6 +2136,29 @@ async def handle_staff_set(request):
     await db.staff_map_set(district, name if name != staff.base_operator(district) else "")
     await _staff_fresh()
     log.info(f"[staff] {OFFICE_CODES.get(district)} → {name or staff.base_operator(district)}")
+    return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_staff_gear(request):
+    """Наш телефон у водителя. body: {driver, phone: bool}
+
+    Владелец, 24 сен 2026: «отметь у Муина, что у него наш телефон, он его
+    должен вернуть». Отметка стоит в реестре и видна там же, где команда."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = (body.get("driver") or "").strip()
+    if name not in staff.driver_names():
+        return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
+    on = bool(body.get("phone"))
+    if not await db.driver_gear_set(name, on, request.get("owner_id") or 0):
+        return web.json_response({"error": "not_in_roster"}, status=409, headers=CORS_HEADERS)
+    # Реестр в памяти обновляем силой: у обычного sync() есть выдержка в пару
+    # секунд, и ответ вернулся бы с прежней отметкой.
+    await staff.sync(force=True)
+    log.info(f"[staff] {name}: наш телефон " + ("на руках" if on else "вернул"))
     return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
@@ -4960,6 +4987,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/staff", handle_staff)
     app.router.add_route("OPTIONS", "/api/owner/staff/set", handle_staff_set)
     app.router.add_post(            "/api/owner/staff/set", handle_staff_set)
+    app.router.add_route("OPTIONS", "/api/owner/staff/gear", handle_staff_gear)
+    app.router.add_post(            "/api/owner/staff/gear", handle_staff_gear)
     app.router.add_route("OPTIONS", "/api/owner/staff/reset", handle_staff_reset)
     app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
     for _p, _h in (("/api/owner/drivers/add", handle_drivers_add),

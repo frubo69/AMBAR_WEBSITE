@@ -3561,10 +3561,6 @@ def setup(app):
     r.add_get("/api/operator/stock/order", handle_op_order)
     r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)
     r.add_post("/api/operator/stock/order/reset", handle_op_order_reset)
-    r.add_route("OPTIONS", "/api/operator/supply/open", _opt)
-    r.add_get("/api/operator/supply/open", handle_op_supply_open)
-    r.add_route("OPTIONS", "/api/operator/supply/{sid}/short", _opt)
-    r.add_post("/api/operator/supply/{sid}/short", handle_op_supply_short)
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)

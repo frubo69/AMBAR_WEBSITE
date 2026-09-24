@@ -56,12 +56,17 @@ async def main():
 
     СКАЗАНО.clear()
     код, r = await close_req.undo(ДЕНЬ, ВОДИТЕЛЬ, "Фарух", СКОУП)
-    eq("вернули в смену", (код, r.get("status")), (200, "open"))
+    eq("вернули в смену", (код, r.get("status")), (200, "undone"))
     rows = await close_req.day_rows(ДЕНЬ)
     eq("и заказы снова можно назначать", ВОДИТЕЛЬ in close_req.released_names(rows), False)
     d = await db.get_driver_day(ДЕНЬ, ВОДИТЕЛЬ)
     eq("питание вернулось рабочим", d.get("meal_rate"), staff.MEAL_WORKING)
     eq("кто вернул — записано", (d.get("close_req") or {}).get("undone_by"), "Фарух")
+    eq("просьба снята, а не открыта заново: оператору не звонит",
+       [x["driver"] for x in close_req.panel_rows(rows)] if hasattr(close_req, "panel_rows") else
+       [x.get("driver") for x in rows if (x.get("close_req") or {}).get("status") == "open"], [])
+    eq("и старшему её уже не передать", (d.get("close_req") or {}).get("status"), "undone")
+
     eq("водителю сказали", ("вернул вас в смену" in (СКАЗАНО[0][1] if СКАЗАНО else "")), True)
 
     код, r = await close_req.undo(ДЕНЬ, ВОДИТЕЛЬ, "Фарух", СКОУП)
@@ -69,8 +74,18 @@ async def main():
     код, r = await close_req.undo(ДЕНЬ, ВОДИТЕЛЬ, "Фарух", {"jvc"})
     eq("чужого водителя не вернуть", (код, r.get("error")), (403, "not_yours"))
 
+    # Водитель всё-таки уезжает — может попросить снова, без ожидания.
+    код, _ = await close_req.ask(ДЕНЬ, {"name": ВОДИТЕЛЬ, "district": "silicon"},
+                                 await db.get_driver_day(ДЕНЬ, ВОДИТЕЛЬ),
+                                 "other", "Всё-таки пора", [], False)
+    eq("попросить снова можно сразу", код, 200)
+    d = await db.get_driver_day(ДЕНЬ, ВОДИТЕЛЬ)
+    rid = (d.get("close_req") or {}).get("id")
+    eq("снятая просьба ушла в историю", len(d.get("close_hist") or []), 1)
+    код, _ = await close_req.decide(ДЕНЬ, ВОДИТЕЛЬ, rid, True, staff.MEAL_WORKING, "", "", "Фарух", СКОУП)
+    eq("и отпустить по ней можно", код, 200)
+
     # Смену уже закрыли — возвращать поздно: день посчитан.
-    код, _ = await close_req.decide(ДЕНЬ, ВОДИТЕЛЬ, rid, True, staff.MEAL_OFF, "", "", "Фарух", СКОУП)
     await db.save_driver_day(ДЕНЬ, ВОДИТЕЛЬ, {"shift_close_at": datetime.now(timezone.utc)})
     код, r = await close_req.undo(ДЕНЬ, ВОДИТЕЛЬ, "Фарух", СКОУП)
     eq("смена закрыта — возврата нет", (код, r.get("error")), (409, "already_closed"))

@@ -174,8 +174,11 @@ async def undo(day: str, driver: str, by: str, scope: set) -> tuple:
     заказ ему выдать». Отпустили — и новых заказов ему не назначают; передумал
     (билет позже, машина ещё у него) — вернуть было нечем, кроме базы.
 
-    Возвращаем всё как было до решения: запрос снова открыт, питание — рабочее
-    (отпуск раньше времени его резал), и водителю говорим об этом."""
+    Просьбу при этом СНИМАЕМ, а не открываем заново: открытая снова зазвонит
+    оператору, через десять минут уйдёт старшему, и водителя отпустят по
+    второму кругу — так и случилось в ночь на 24 сен. Водитель остаётся в
+    смене; захочет уехать — попросит снова, кнопка у него живая. Питание
+    возвращаем рабочим (отпуск раньше времени его резал)."""
     card = driver_card(driver)
     if not card or card.get("district") not in scope:
         return 403, {"error": "not_yours"}
@@ -188,7 +191,7 @@ async def undo(day: str, driver: str, by: str, scope: set) -> tuple:
     # only_open=False: мы как раз и меняем УЖЕ решённый запрос — иначе условие
     # «менять только открытые» не пустит нас к отпущенному.
     got = await db.close_req_set(day, driver, cur.get("id") or "",
-                                 {"status": "open", "by": "", "decided_at": None,
+                                 {"status": "undone", "by": "", "decided_at": None,
                                   "meal": None, "note": cur.get("note") or "",
                                   "undone_by": by, "undone_at": _now()},
                                  {"meal_rate": staff.MEAL_WORKING}, only_open=False)
@@ -202,7 +205,7 @@ async def undo(day: str, driver: str, by: str, scope: set) -> tuple:
                                   "заказы снова могут прийти. Питание за сегодня прежнее.")
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[close] сообщение водителю {driver}: {e}")
-    return 200, {"ok": True, "status": "open"}
+    return 200, {"ok": True, "status": "undone"}
 
 
 def released_names(rows: list) -> set:

@@ -11,7 +11,10 @@
   • у обязательных видов ничего не поменялось: парковка без чека — 400;
   • приложение узнаёт про необязательный чек по флагу receipt_opt, и он стоит
     ровно у «что-то ещё»; receipt — у бензина, мойки и парковки;
-  • MUST_RECEIPT (что сервер требует) «что-то ещё» не включает.
+  • MUST_RECEIPT (что сервер требует) «что-то ещё» не включает;
+  • то же в STAR: там свой список видов и своя карточка — вынимаем их из
+    owner/index.html и прогоняем узлом, чтобы плитка и подпись проверялись
+    исполнением, а не чтением.
 """
 import asyncio, base64, inspect, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,6 +53,54 @@ async def post(body):
     req["driver"] = ME; req["tg"] = {"id": 1}
     r = await raw(dr.handle_expense_add)(req)
     return r.status, json.loads(r.text)
+
+
+def star():
+    """То же самое в STAR: там свой список видов и своя карточка расхода.
+
+    Проверяем не глазами, а исполнением: вынимаем из owner/index.html сам
+    список EXP_KINDS и само выражение, которое решает, рисовать ли плитку,
+    и прогоняем их узлом с заглушками."""
+    import re, subprocess, tempfile
+    print("── STAR: тот же чек по желанию ────────────────────────────────")
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src = open(os.path.join(root, "owner", "index.html"), encoding="utf-8").read()
+    kinds = re.search(r"const EXP_KINDS = \[.*?\n\];", src, re.S)
+    плитка = re.search(r"    // Где чек по желанию.*?\n        : '';", src, re.S)
+    if not kinds or not плитка:
+        eq("нашли в owner/index.html список видов и плитку", (bool(kinds), bool(плитка)), (True, True))
+        return
+    js = """
+%s
+const EXP_SHOT = {kind:'', photo:'', thumb:''};
+const xsvg = () => '', XE_ICO = {cam:'', note:''}, XE_QR = '';
+const escS = s => s, fmt = v => String(v), n = 'Худоба';
+function зона(k){ const снят = false, бут = null;
+%s
+  return плитка; }
+const o = EXP_KINDS.find(k => k.id === 'other');
+console.log(JSON.stringify({
+  вид: {receipt_opt: !!o.receipt_opt, receipt: !!o.receipt},
+  у_другого: EXP_KINDS.filter(k => k.receipt_opt).map(k => k.id),
+  плитка_other: зона(o).includes('rcp-other'),
+  подпись_other: (зона(o).match(/xe-tile-c">([^<]*)/) || [])[1] || '',
+  подпись_fuel: (зона(EXP_KINDS.find(k => k.id === 'fuel')).match(/xe-tile-c">([^<]*)/) || [])[1] || '',
+  плитки_нет_у_kfc: зона(EXP_KINDS.find(k => k.id === 'kfc')) === ''}));
+""" % (kinds.group(0), плитка.group(0))
+    f = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    f.write(js); f.close()
+    r = subprocess.run(["node", f.name], capture_output=True, text=True)
+    os.unlink(f.name)
+    if r.returncode:
+        eq("узел выполнил код STAR", r.stderr.strip()[:200], "")
+        return
+    v = json.loads(r.stdout)
+    eq("в STAR у «что-то ещё» чек по желанию", v["вид"], {"receipt_opt": True, "receipt": False})
+    eq("и больше ни у кого", v["у_другого"], ["other"])
+    eq("плитка для чека рисуется", v["плитка_other"], True)
+    eq("подпись — «Чек, если есть»", v["подпись_other"], "Чек, если есть")
+    eq("у бензина подпись прежняя", v["подпись_fuel"], "Чек")
+    eq("там, где чека не спрашивают, плитки нет", v["плитки_нет_у_kfc"], True)
 
 
 async def main():
@@ -91,6 +142,7 @@ async def main():
     eq("в таблице видов — тоже по желанию",
        (EXTRA_KINDS["other"].get("receipt_opt"), EXTRA_KINDS["other"].get("receipt")), (True, None))
 
+    star()
     print(("\nПРОВАЛЫ: " + ", ".join(FAIL)) if FAIL else "\nвсё сошлось")
     return 1 if FAIL else 0
 

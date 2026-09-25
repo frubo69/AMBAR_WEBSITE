@@ -31439,7 +31439,10 @@ const EXP_KINDS = [
   // при одобрении правки; в выборе для ручной записи не показывается.
   {id:'upsell',  t:'Бонус за допродажу', auto:true},
   // «Всё остальное» — последним, как у водителя: сначала то, что зовётся словом.
-  {id:'other',   t:'Что-то ещё',    hint:'комментарий'},
+  // Чек тут по желанию (receipt_opt), а не обязателен: под «что-то ещё» пишут и
+  // запчасть с чеком, и возврат долга, где чека нет в природе. Плитка есть,
+  // отправку она не держит — в отличие от receipt у бензина, мойки и парковки.
+  {id:'other',   t:'Что-то ещё',    receipt_opt:true, hint:'комментарий'},
 ];
 
 let EXP_SHOT = {kind:'', photo:'', thumb:''};
@@ -31499,12 +31502,15 @@ function expAddList(r){
       : `<div class="xe-field"><input class="amt" id="amt-${k.id}" type="text" inputmode="numeric"
            placeholder="${k.scan ? 'AED наличными' : 'AED'}" autocomplete="off" oninput="xeTyped('${k.id}')"
            onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')"></div>`;
-    const плитка = k.receipt
+    // Где чек по желанию — подпись так и говорит, иначе плитка читается как
+    // требование и заставляет искать чек, которого не было.
+    const чек = k.receipt_opt ? 'Чек, если есть' : 'Чек';
+    const плитка = (k.receipt || k.receipt_opt)
       ? `<div class="xe-tiles"><button class="xe-tile${снят ? ' set' : ''}" id="rcp-${k.id}"
-           onclick="expShotFor('${k.id}')" aria-label="Чек">
+           onclick="expShotFor('${k.id}')" aria-label="${чек}">
            ${снят ? `<img src="${EXP_SHOT.thumb}" alt=""><span class="xe-pin">${xsvg(XE_ICO.cam, 15)}</span>`
                   : `<span class="xe-tile-ico">${xsvg(XE_ICO.cam, 30)}</span>`}
-           <span class="xe-tile-c">Чек</span></button></div>`
+           <span class="xe-tile-c">${чек}</span></button></div>`
       : k.scan
         ? `<div class="xe-tiles">${бут
           ? `<button class="xe-tile set txt" onclick="gdClear()" aria-label="Бутылка">

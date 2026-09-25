@@ -13,6 +13,10 @@
   • второй раз — не ошибка, отвечаем «уже убрана»;
   • чужой район и несуществующая ревизия — отказ, а не тихое «ок».
 
+Там же — код не из реестра, попавший в итог по ошибке: его выкидывают, а не
+вносят товаром (иначе склад вырастет на пустом месте). Убрали последний такой
+код — ревизия закрывается, если недостача и излишек уже решены.
+
     python3 tools/test_audit_drop.py
 """
 import asyncio, inspect, json, os, sys
@@ -34,6 +38,14 @@ def eq(имя, дали, ждём):
 РАЙОН = "tecom"
 
 
+async def скан(district, day, code, verdict):
+    """Скан тем же ключом, что кладёт приложение: удаление идёт по _id."""
+    await db._db.audit_scans.insert_one(
+        {"_id": f"{district}:{day}:{code}", "district": district, "day": day, "code": code,
+         "at": datetime.now(timezone.utc).isoformat(), "verdict": verdict, "qty": 1.0,
+         "product_id": "" if verdict == "alien" else "p1"})
+
+
 def raw(h):
     while True:
         cl = inspect.getclosurevars(h).nonlocals
@@ -41,6 +53,14 @@ def raw(h):
         if not nxt:
             return h
         h = nxt
+
+
+async def alien_drop(district, day, code):
+    req = make_mocked_request("POST", "/x")
+    req._read_bytes = json.dumps({"district": district, "day": day, "code": code, "as": "STAR"}).encode()
+    req["owner_id"] = 1
+    r = await raw(sr.handle_audit_alien_drop)(req)
+    return r.status, json.loads(r.text)
 
 
 async def drop(district, day):
@@ -58,8 +78,7 @@ async def main():
     # брошенный заход с сотней сканов и завершённая ревизия следующего дня
     await db.audit_set(РАЙОН, БРОШЕН, {"started_at": now, "started_by": 1, "started_by_name": "STAR"})
     for i in range(100):
-        await db._db.audit_scans.insert_one(
-            {"district": РАЙОН, "day": БРОШЕН, "code": f"c{i}", "at": now, "verdict": "ok"})
+        await скан(РАЙОН, БРОШЕН, f"c{i}", "ok")
     await db.audit_set(РАЙОН, ГОТОВ, {"started_at": now, "finished_at": now, "finished_by": 1})
 
     print("── до того, как убрали ────────────────────────────────────────")
@@ -92,8 +111,48 @@ async def main():
     await db.audit_unset(РАЙОН, БРОШЕН, ["dropped_at", "dropped_by", "dropped_by_name"])
     eq("снова видна", sorted(await db.audits_unfinished(СЕГОДНЯ)), [РАЙОН])
 
+    await ошибочный_код()
     print(("\nПРОВАЛЫ: " + ", ".join(FAIL)) if FAIL else "\nвсё сошлось")
     return 1 if FAIL else 0
+
+
+async def ошибочный_код():
+    """Код не из реестра держит ревизию открытой; убрали — закрылась."""
+    print("\n── код не из реестра, попавший в итог по ошибке ───────────────")
+    db._db = AsyncMongoMockClient()["ambar_audit_alien"]
+    now = datetime.now(timezone.utc).isoformat()
+    ДЕНЬ = "2026-09-22"
+    await db.audit_set(РАЙОН, ДЕНЬ, {"started_at": now, "finished_at": now, "finished_by": 1,
+                                     "alien": 1, "over": {"qty": 1, "resolved_at": now}})
+    # одна настоящая бутылка и один выдуманный код
+    await db._db.qr_codes.insert_one({"_id": "77", "status": "active", "district": РАЙОН,
+                                      "product_id": "p1", "product_name": "Absolut 1 ltr"})
+    for код, вердикт in (("77", "ok"), ("14330", "alien")):
+        await скан(РАЙОН, ДЕНЬ, код, вердикт)
+
+    st, r = await alien_drop(РАЙОН, ДЕНЬ, "77")
+    eq("наш код так не убрать — 409", (st, r.get("error")), (409, "not_alien"))
+    st, r = await alien_drop(РАЙОН, ДЕНЬ, "нет-такого")
+    eq("скана нет — 404", (st, r.get("error")), (404, "no_scan"))
+    eq("до уборки ревизия не закрыта", bool((await db.audit_get(РАЙОН, ДЕНЬ)).get("closed_at")), False)
+
+    st, r = await alien_drop(РАЙОН, ДЕНЬ, "14330")
+    eq("ошибочный убран", (st, r.get("ok"), r.get("alien_left")), (200, True, 0))
+    eq("и ревизия закрылась сама", (r.get("closed"),
+       bool((await db.audit_get(РАЙОН, ДЕНЬ)).get("closed_at"))), (True, True))
+    eq("счётчик чужих обнулён", (await db.audit_get(РАЙОН, ДЕНЬ)).get("alien"), 0)
+    eq("наш скан не тронут", await db._db.audit_scans.count_documents(
+       {"district": РАЙОН, "day": ДЕНЬ}), 1)
+
+    print("── код, который успели внести в реестр ────────────────────────")
+    await db.audit_set(РАЙОН, ДЕНЬ, {"alien": 1})
+    await скан(РАЙОН, ДЕНЬ, "99", "alien")
+    await db._db.qr_codes.insert_one({"_id": "99", "status": "active", "district": РАЙОН,
+                                      "product_id": "p1", "product_name": "Absolut 1 ltr"})
+    st, r = await alien_drop(РАЙОН, ДЕНЬ, "99")
+    eq("внесённый в реестр убирать отсюда нельзя — 409", (st, r.get("error")), (409, "code_known"))
+    eq("скан на месте", await db._db.audit_scans.count_documents(
+       {"district": РАЙОН, "day": ДЕНЬ, "code": "99"}), 1)
 
 
 sys.exit(asyncio.run(main()))

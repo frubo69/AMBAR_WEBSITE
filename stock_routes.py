@@ -2329,6 +2329,62 @@ async def handle_audit_drop(request):
 
 
 @require_owner
+async def handle_audit_alien_drop(request):
+    """Убрать код не из реестра из итога ревизии. body: {district, day, code, as?}
+
+    У раздела «QR код не внесён» был один выход — «Внести товар»: бутылка на
+    полке есть, в учёте нет, значит заводим. Но код попадает туда и по ошибке:
+    наклейка с чужой коробки, случайный штрихкод, пробный код (владелец,
+    25 сен 2026: «это код, который по ошибке внесён в систему, убирай его из
+    итога ревизии»). Вносить такую «бутылку» в реестр нельзя — она придумана,
+    и склад вырастет на пустом месте.
+
+    Поэтому второй выход: выкинуть скан. В счёт он и так не шёл (alien
+    приписать некуда), он только держал ревизию незакрытой. Убрали последний —
+    ревизия закрывается здесь же, если недостача и излишек уже решены.
+
+    Код, который УЖЕ внесли в реестр, так не убрать: это не ошибка, а решённая
+    строка, и трогать её надо разбором реестра, а не итогом ревизии.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    code = audit_code(body.get("code"))
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day)
+    if not a:
+        return web.json_response({"error": "no_audit"}, status=404, headers=CORS_HEADERS)
+    скан = next((c for c in await db.audit_scan_codes(district, day)
+                 if (c.get("code") or "") == code), None)
+    if not скан:
+        return web.json_response({"error": "no_scan"}, status=404, headers=CORS_HEADERS)
+    if (скан.get("verdict") or "") != "alien":
+        return web.json_response({"error": "not_alien"}, status=409, headers=CORS_HEADERS)
+    doc = await db.qr_get(code)
+    if doc and (doc.get("status") or "active") != "deleted":
+        return web.json_response({"error": "code_known"}, status=409, headers=CORS_HEADERS)
+
+    await db.audit_scan_del(district, day, code)
+    осталось = len([c for c in await db.audit_scan_codes(district, day)
+                    if (c.get("verdict") or "") == "alien"])
+    fields: dict = {"alien": осталось}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if a.get("finished_at") and not a.get("closed_at"):
+        _audit_close_if_done({**a, **fields}, fields, now_iso, осталось)
+    a = await db.audit_set(district, day, fields)
+    log.info(f"[audit] {district} {day}: код {code} убран из итога как ошибочный "
+             f"(кем: {str(body.get('as') or '')[:60]}); чужих кодов осталось {осталось}"
+             + ("; ревизия закрыта" if a.get("closed_at") else ""))
+    return web.json_response({"ok": True, "code": code, "alien_left": осталось,
+                              "closed": bool(a.get("closed_at"))}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_audit_finish(request):
     """Завершить ревизию: записать пересчёт по камере и разобрать, чего не
     хватает и чего лишнее. body: {district, day?, as?}
@@ -3798,6 +3854,7 @@ def setup(app):
         ("/api/owner/stock/audit/sheet",  handle_audit_sheet,  "GET"),
         ("/api/owner/stock/audit/start",  handle_audit_start,  "POST"),
         ("/api/owner/stock/audit/drop",   handle_audit_drop,   "POST"),
+        ("/api/owner/stock/audit/alien/drop", handle_audit_alien_drop, "POST"),
         ("/api/owner/stock/audit/finish", handle_audit_finish, "POST"),
         ("/api/owner/stock/audit/short",  handle_audit_short,  "POST"),
         ("/api/owner/stock/audit/over",   handle_audit_over,   "POST"),

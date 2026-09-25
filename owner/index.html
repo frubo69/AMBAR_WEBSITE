@@ -1085,6 +1085,12 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-d b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
   font-variant-numeric:tabular-nums}
 .aud-d b.dn{color:var(--dn)} .aud-d b.warn{color:var(--warn)}
+/* Крестик у кода не из реестра: выкинуть ошибочный скан, если вносить нечего.
+   Тихий — решение здесь «Внести товар», а это выход на случай опечатки. */
+.aud-r-x{flex:0 0 auto;width:26px;height:26px;margin-left:2px;margin-right:-4px;border:0;
+  border-radius:9px;background:none;cursor:pointer;font-family:inherit;font-size:12px;
+  color:var(--muted);-webkit-tap-highlight-color:transparent}
+.aud-r-x:active{background:var(--card2);color:var(--text)}
 .aud-d i{display:block;font-style:normal;font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap}
 .aud-act{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .aud-b{flex:1;padding:13px 10px;border-radius:13px;border:0;cursor:pointer;font-family:inherit;
@@ -16446,6 +16452,32 @@ function audAlienGo(){
   accOpen('qr');
 }
 
+// Второй выход из «QR код не внесён»: выкинуть код. «Внести товар» годится,
+// когда бутылка на полке правда есть. А код попадает сюда и по ошибке —
+// наклейка с чужой коробки, случайный штрихкод (владелец, 25 сен 2026: «это
+// код, который по ошибке внесён в систему, убирай его из итога ревизии»).
+// Вносить такое товаром нельзя: склад вырастет на пустом месте.
+async function audAlienDrop(code){
+  const rep = STK.report; if(!rep) return;
+  if(!await askDialog('Убрать код из итога?',
+      `${code} — в реестре его нет. Если бутылка на полке правда есть, её надо вносить товаром, `
+      + 'а не убирать отсюда.', 'Убрать', 'Оставить')) return;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/alien/drop', {method: 'POST',
+        body: {district: rep.district, day: rep.day, code, as: _meName()}}); }
+  catch(e){
+    const код = ((e || {}).payload || {}).error;
+    _toast(код === 'code_known' ? 'Этот код уже в реестре — обновите отчёт'
+         : код === 'no_scan' ? 'Такого скана в ревизии нет'
+         : код === 'not_alien' ? 'Этот код в реестре есть — убирать нечего'
+         : 'Не удалось убрать');
+    return;
+  }
+  _audHap('medium');
+  _toast(r.closed ? 'Код убран · ревизия закрыта' : 'Код убран из итога');
+  await audReportOpen(rep.district, rep.day);
+}
+
 async function audStart(){
   if(!STK.sheet) return;
   // Вопроса про прошедший день нет: ревизия всегда сегодняшняя, полоса дня
@@ -16606,7 +16638,9 @@ function audReport(rep){
       return `<div class="aud-r${c.done ? ' dim' : ''}">
         <span class="ord-r-n">${escS(c.done ? (c.name || 'внесена') : raw)}<span class="aud-r-s${c.done ? '' : ' dn'}">${
           c.done ? `внесена${c.home_code ? ' на ' + escS(c.home_code) : ''} · ${escS(raw)}` : 'кода нет в реестре'}</span></span>
-        <span class="aud-d">${c.done ? _AUD_CHECK : '<b class="warn">+1</b>'}</span></div>`;
+        <span class="aud-d">${c.done ? _AUD_CHECK : '<b class="warn">+1</b>'}</span>${
+          c.done ? '' : `<button class="aud-r-x" aria-label="Убрать код"
+            onclick="audAlienDrop('${escS(c.code)}')">✕</button>`}</div>`;
     }).join('');
     const foot = !al.left
       ? `<div class="aud-done">${_AUD_CHECK}<span>Внесено в реестр · <b>${fmt(al.done)}</b></span></div>`

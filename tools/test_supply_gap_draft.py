@@ -116,6 +116,19 @@ async def main():
     видно = await db.supplies_with_open_tasks(limit=20)
     eq("отменённого у водителя нет", d2["supply_id"] in [s["_id"] for s in видно], False)
 
+    print("── что можно отменить, а что уже нет ──────────────────────────")
+    случаи = [
+        ({"jvc": {}, "bbay": {}}, 2, "никого не приняли — обе можно"),
+        ({"jvc": {"done_at": "t"}, "bbay": {}}, 1, "один принят — остался один"),
+        ({"jvc": {"done_at": "t"}, "bbay": {"noscan_at": "t"}}, 0,
+         "принят и принят без сканирования — отменять нечего"),
+        ({"jvc": {"done_at": "t"}, "bbay": {"cancelled_at": "t"}}, 0,
+         "принят и уже отменён — нечего"),
+    ]
+    for tasks, ждём, имя in случаи:
+        br = sup._sup_brief({"_id": "S9", "status": "open", "tasks": tasks, "items": []})
+        eq(имя, br["can_cancel"], ждём)
+
     print("── когда магазин дал всё — черновика нет ──────────────────────")
     eq("пусто", await sup._draft_from_gap(
         {"_id": "S3", "day": ДЕНЬ, "items": [], "short": [], "dropped": [], "tasks": {}}), None)

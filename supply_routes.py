@@ -1835,6 +1835,13 @@ def _sup_brief(sup: dict) -> dict:
         "took": took,
         "positions": len(sup.get("items") or []),
         "districts": len(tasks),
+        # Сколько районов ещё можно отменить — по тому же правилу, что и сама
+        # отмена: принятый и принятый без сканирования не отменяют, товар уже
+        # на полке. Кнопка «Отменить заявку» смотрит сюда, а не на статус:
+        # раньше она висела, пока поставка открыта, и на принятой заявке вела
+        # в экран, где отменять нечего (владелец, 25 сен 2026).
+        "can_cancel": sum(1 for t in tasks.values()
+                          if not t.get("done_at") and not t.get("noscan_at")),
         "done": sum(1 for t in tasks.values() if t.get("done_at")),
         "free": sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at")),
         "drivers": sorted({(t.get("driver") or "") for t in tasks.values() if t.get("driver")}),

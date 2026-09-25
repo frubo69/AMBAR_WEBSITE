@@ -24221,7 +24221,7 @@ function pathInner(){
   // Под первым шагом — закупочная сумма заявки, как и в шапке «Закупаем»:
   // прайс продажи в пути закупки ни при чём (владелец, 18 сен 2026).
   const money = m ? [m.asked, m.confirmed,
-                     `${fmt(st.took)} из ${fmt(sup.total_qty || 0)}`]
+                     `${fmtQty(st.took)} из ${fmtQty(sup.total_qty || 0)}`]
                   : [d.total_cost != null ? d.total_cost : d.total_aed, null, null];
   return pathSteps(vals, money, step);
 }
@@ -24241,7 +24241,7 @@ function pathNav(){
   return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
       <span class="pnav-i big live">${ICO_LIST}</span>
       <span class="pnav-b"><b>Заявка</b></span>
-      <span class="pnav-v">${fmt(qty)}<u>${pluralize(qty,'бутылка','бутылки','бутылок')}</u></span>
+      <span class="pnav-v">${fmtQty(qty)}<u>${pluralize(qty,'единица','единицы','единиц')}</u></span>
       <span class="pnav-go">${ICO_CHEV}</span>
     </button>`;
 }
@@ -24544,11 +24544,11 @@ function ordSumInner(){
   const pos = (d.rows || []).length;
   // Первым числом — то, что платим магазину. Прайс продажи тут ни при чём:
   // заявка — это счёт, а не витрина (владелец, 18 сен 2026).
-  return `<span class="ord-sum-c"><b>${fmtQty(d.total_qty || 0)}</b><i>бутылок</i></span>
+  return `<span class="ord-sum-c"><b>${fmtQty(d.total_qty || 0)}</b><i>единиц</i></span>
     <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
           aria-label="Цена по позициям"><b>${fmt(d.total_cost != null ? d.total_cost : d.total_aed || 0)
           }<u>AED</u></b><i>закупка</i></span>
-    <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
+    <span class="ord-sum-c"><b>${pos}</b><i>категорий</i></span>`;
 }
 
 // Прайс — внизу карточки «Закупаем», строками, как «По районам» под остатками
@@ -24729,7 +24729,7 @@ function ordDistricts(list, dist, q){
         <span class="shl-code">${escS(x.code || '')}</span>
         <span class="shl-b"><b>${escS(x.name || x.id)}</b>
           <i>${x.off ? `не везём · по расчёту было ${fmt(qty)} бут`
-                     : `${pos} ${pluralize(pos,'позиция','позиции','позиций')} / ${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}`}</i></span>
+                     : `${pos} ${pluralize(pos,'категория','категории','категорий')} / ${fmtQty(qty)} ${pluralize(qty,'единица','единицы','единиц')}`}</i></span>
         <span class="shl-v"><b>${x.off ? '—' : fmt(Math.round(aed)) + '<u>AED</u>'}</b><i>${x.off ? 'выключен' : 'закупка'}</i></span>
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button>
@@ -30224,10 +30224,16 @@ function supCancelBtn(sup){
   // который давно закрыт, и отменять там нечего: кнопки нет вовсе.
   // Кнопка ведёт на экран отмены: там заявки с районами, отметить можно
   // и часть. Откуда пришли — туда стрелка и вернёт.
-  if(sup) return (sup.status === 'open' && sup.supply_id)
+  // Отменять нечего — кнопки нет. Принятый район не отменяют: товар уже на
+  // полке. Сервер это и так знал и отвечал отказом, а кнопка об этом не
+  // спрашивала и вела в пустой экран (владелец, 25 сен 2026).
+  const живых = s => s && (s.can_cancel != null
+    ? s.can_cancel > 0
+    : (s.districts || 0) - (s.done || 0) > 0);
+  if(sup) return (sup.status === 'open' && sup.supply_id && живых(sup))
     ? `<button class="acc-act dn" onclick="supCancelOpen('${sup.kind === 'extra' ? 'extra' : 'sup'}')"
         >Отменить заявку</button>` : '';
-  if(!_supOpenAll().length) return '';
+  if(!_supOpenAll().filter(живых).length) return '';
   return `<button class="acc-act dn" onclick="supCancelOpen('')">Отменить заявку</button>`;
 }
 

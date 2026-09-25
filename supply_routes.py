@@ -510,11 +510,13 @@ async def handle_import(request):
     # пересчитывать при каждом открытии по снимку заявки, который к тому
     # времени уже сменится следующим днём.
     items, unknown, dropped, short, extra = [], [], [], [], []
+    видели = set()                       # какие коды вообще встретились в ответе
     for row in ws.iter_rows(min_row=hdr_row + 1):
         code = row[cols[CODE_COL] - 1].value
         if not code:
             continue
         pid = str(code).strip()
+        видели.add(pid)
         p = cat.get(pid)
         if not p:
             unknown.append(pid); continue
@@ -553,6 +555,23 @@ async def handle_import(request):
                       # районы забирают разные люди в разное время.
                       "got": {o: 0 for o in by_district}})
 
+    # Строка, которой в ответе нет ВОВСЕ, — такой же отказ, как строка с нулём.
+    # Раньше она проваливалась мимо всего: магазин удалял её из файла, и
+    # позиция исчезала молча — недобор показывал ноль там, где не дали 180
+    # единиц (владелец, 25 сен 2026: «почему магазин дал 511, а просили 691»).
+    # Разбор 25.09: 17 таких строк, 691 − 180 = 511, сходилось до единицы, а в
+    # «отказах» стоял ноль, и в докупку на другую базу они не попадали.
+    for pid, n in asked_map.items():
+        n = int(n or 0)
+        if n <= 0 or pid in видели:
+            continue
+        p = cat.get(pid) or {}
+        dropped.append({"id": pid, "name": p.get("name", ""), "asked": n,
+                        "by_district": {k: int(v) for k, v in (asked_full.get(pid) or {}).items()},
+                        # Отличаем от честного нуля: магазин не отказал, он
+                        # просто не прислал строку. Спросить с него — разное.
+                        "missing": True})
+
     if not items:
         return web.json_response({"error": "nothing_confirmed", "dropped": len(dropped)},
                                  status=400, headers=CORS_HEADERS)
@@ -582,7 +601,14 @@ async def handle_import(request):
     log.info(f"[supply] поставка {sid}: {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, отказов {len(dropped)}, "
              f"урезано {len(short)}, сверх заказа {len(extra)}")
-    return web.json_response({"ok": True, "supply_id": sid,
+    # Магазин дал не всё — на разницу сразу собирается заявка на другую базу.
+    # Черновиком: водителям она не видна (им видны только открытые), человеку
+    # остаётся назвать базу, поправить числа и подтвердить — или отменить
+    # (владелец, 25 сен 2026). Раньше разницу надо было заметить самому и
+    # набрать заявку руками, а незамеченная разница — это просто не купленный
+    # товар.
+    черновик = await _draft_from_gap(doc)
+    return web.json_response({"ok": True, "supply_id": sid, "draft": черновик,
                               "items": len(items), "total_qty": doc["total_qty"],
                               "asked_qty": doc["asked_qty"], "gap_qty": doc["gap_qty"],
                               "dropped": dropped, "short": short, "extra": extra,
@@ -1512,6 +1538,56 @@ async def _unmarked(sup: dict, short: dict) -> dict:
     return out
 
 
+async def _draft_from_gap(sup: dict) -> dict | None:
+    """Заявка на другую базу из того, что магазин не дал. Черновиком.
+
+    Черновик (status=draft) водителю не виден: ему показываются только
+    открытые поставки (db.supplies_with_open_tasks). Поэтому появление
+    черновика не трогает ни одну приёмку — он живёт в панели, пока человек
+    не назовёт базу и не подтвердит.
+
+    Состав берём из общего недобора той же заявки: и отказы (включая строки,
+    которых магазин вовсе не прислал), и урезанное. Строку без разбивки по
+    районам взять некуда — её пропускаем, но в недоборе она остаётся видна.
+    """
+    short = _shortfall(sup)
+    cat = _catalog_by_id()
+    items, tasks = [], {}
+    for r in short.get("rows") or []:
+        by = {o: int(n) for o, n in (r.get("by_district") or {}).items()
+              if o in OFFICE_IDS and int(n or 0) > 0}
+        if not by:
+            continue
+        qty = sum(by.values())
+        items.append({"id": r["id"], "name": r.get("name") or (cat.get(r["id"]) or {}).get("name", ""),
+                      "asked": qty, "qty": qty, "scanned": 0,
+                      "by_district": by, "got": {o: 0 for o in by}})
+        for oid, n in by.items():
+            t = tasks.setdefault(oid, {"qty": 0, "positions": 0, "scanned": 0,
+                                       "driver": "", "driver_id": 0,
+                                       "claimed_at": None, "started_at": None,
+                                       "done_at": None, "last_at": None,
+                                       "undo": 0, "note": "", "gaps": [], "flags": []})
+            t["qty"] += n; t["positions"] += 1
+    if not items:
+        return None
+    now = datetime.now(timezone.utc)
+    xid = "X" + now.strftime("%y%m%d-%H%M%S")
+    doc = {"_id": xid, "at": now, "status": "draft", "day": sup.get("day") or "",
+           "kind": "extra", "base": "", "source": "shortfall",
+           "from_supply": sup.get("_id") or "",
+           "by": sup.get("by") or 0, "by_name": "",
+           "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
+           "tasks": tasks,
+           "total_qty": sum(i["qty"] for i in items),
+           "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
+    await db.supply_save(doc)
+    log.info(f"[supply] черновик докупки {xid} из недобора {sup.get('_id')}: "
+             f"{len(items)} позиций, {doc['total_qty']} единиц, районов {len(tasks)}")
+    return {"supply_id": xid, "total_qty": doc["total_qty"],
+            "items": len(items), "districts": sorted(tasks)}
+
+
 def _shortfall(sup: dict) -> dict:
     rows = {}
 
@@ -2088,6 +2164,53 @@ async def handle_release(request):
 
 
 @require_owner
+async def handle_draft_confirm(request):
+    """Подтвердить черновик докупки: назвать базу и отправить водителям.
+
+    body: {base, as?}. Черновик до этого момента живёт только в панели —
+    водителям видны лишь открытые поставки. Подтверждение переводит его в
+    open, и задачи по районам появляются в приложении в ту же секунду.
+
+    Базу спрашиваем обязательно: «докупить на другой базе» без имени базы
+    водителю ничего не говорит, а в истории через неделю не отличить одну
+    поездку от другой.
+    """
+    sid = request.match_info.get("sid") or ""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if (sup.get("status") or "") != "draft":
+        return web.json_response({"error": "not_draft", "status": sup.get("status")},
+                                 status=409, headers=CORS_HEADERS)
+    base = str(body.get("base") or "").strip()[:60]
+    if not base:
+        return web.json_response({"error": "no_base"}, status=400, headers=CORS_HEADERS)
+    if not (sup.get("items") or []):
+        return web.json_response({"error": "nothing"}, status=400, headers=CORS_HEADERS)
+    who = _owner_name(request, body)
+    await db.supply_set(sid, {"status": "open", "base": base, "by_name": who,
+                              "confirmed_at": datetime.now(timezone.utc)},
+                        only_open=False)
+    log.info(f"[supply] черновик докупки {sid} подтверждён: база «{base}», {who}")
+    try:
+        from owner_routes import notify_owners
+        where = " · ".join(f"{OFFICE_CODES.get(o, o)} {t['qty']}"
+                           for o, t in (sup.get("tasks") or {}).items())
+        await notify_owners("supply.done",
+                            f"🏬 *Докупка на другой базе — {_md(base)}*\n{_md(who)} · "
+                            f"{sup.get('total_qty', 0)} единиц, {len(sup.get('items') or [])} категорий"
+                            f"\n{_md(where)}")
+    except Exception as e:
+        log.error(f"[supply] уведомление о подтверждении докупки: {e}")
+    return web.json_response({"ok": True, "supply_id": sid, "base": base},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_cancel(request):
     """Отменить заявку: магазин не привёз, поехали в другой, передумали.
 
@@ -2111,6 +2234,15 @@ async def handle_cancel(request):
         return web.json_response({"error": "not_found"}, status=404,
                                  headers=CORS_HEADERS)
     st = sup.get("status") or "open"
+    # Черновик докупки отменяется целиком и без разговоров: водителям он не
+    # показывался, принимать по нему нечего.
+    if st == "draft":
+        await db.supply_set(sid, {"status": "cancelled",
+                                  "cancelled_at": datetime.now(timezone.utc),
+                                  "cancelled_by": _owner_name(request, body)},
+                            only_open=False)
+        log.info(f"[supply] черновик докупки {sid} отменён")
+        return web.json_response({"ok": True, "cancelled": "draft"}, headers=CORS_HEADERS)
     if st != "open":
         # Уже закрыта или уже отменена — второе нажатие ничего не меняет.
         return web.json_response({"error": "not_open", "status": st},
@@ -2681,6 +2813,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/buy",             handle_buy,          "POST"),
         ("/api/owner/supply/{sid}/release",         handle_release,      "POST"),
         ("/api/owner/supply/{sid}/cancel",          handle_cancel,       "POST"),
+        ("/api/owner/supply/{sid}/confirm",         handle_draft_confirm, "POST"),
         ("/api/owner/supply/{sid}/shortfall",       handle_short_export, "GET"),
         ("/api/owner/supply/{sid}/shortfall/send",  handle_short_send,   "POST"),
         # Приёмка руками старшего. Под своим «/task/», а не рядом: «/release»

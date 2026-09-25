@@ -29,7 +29,12 @@ def eq(name, got, want):
     if not ok: FAIL.append(name)
 
 owner_auth.install_validator(lambda s: {"id": int(s)} if s.isdigit() else None)
-ABS, BEER, NOCOST = "p1", "p31", "p24"   # Chivas 25Y — в листе закупки клетка пустая (Ballantines с 22.09 с ценой)
+ABS, BEER, NOCOST = "p1", "p31", "p24"
+# NOCOST — позиция без закупочной цены. Привязывать проверку к конкретной
+# дырке в листе нельзя: 25 сен 2026 пришёл новый прайс магазина, и дырок не
+# осталось ни одной (Chivas 25Y, который стоял здесь, получил 975). Поэтому
+# цену снимаем сами — проверяем ПОВЕДЕНИЕ «нет закупки → cost null», а не
+# наличие дырки в прайсе.
 
 
 async def main():
@@ -61,8 +66,13 @@ async def main():
         eq("пиво: закупка за коробку", r.get("cost"), P[BEER]["cost"])
         eq("пиво: продажа за коробку (24)", r.get("price"), P[BEER]["price_app"])
 
+        import config_cost
+        _была = config_cost.COST.pop(NOCOST, None)
+        SV._COST["at"] = 0.0
         s, r = await scan("C-NOCOST")
         eq("без закупки: cost null, продажа есть", (r.get("cost", "нет"), bool(r.get("price"))), (None, True))
+        if _была is not None:
+            config_cost.COST[NOCOST] = _была
 
         await db.cost_override_set(NOCOST, 88.5, "STAR"); SV._COST["at"] = 0.0
         s, r = await scan("C-NOCOST")

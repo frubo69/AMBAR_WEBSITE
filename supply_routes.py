@@ -636,6 +636,7 @@ async def handle_list(request):
     Задачи остаются: по ним считается, кто поехал и сколько уже принято, — а
     это и есть то, ради чего в список смотрят."""
     rows = await db.supply_list(limit=30)
+    await _costs_refresh()               # деньги в списке — закупочные
     try:
         kids = await db.supplies_children([r.get("supply_id") for r in rows])
     except Exception as e:                       # noqa: BLE001
@@ -1789,25 +1790,39 @@ def _short_book(sup: dict, short: dict):
 # выдуманную себестоимость — врать в единственной цифре, ради которой карточку
 # и открывают. «По прайсу» — честная мера: она одинаковая для всех строк и
 # позволяет сравнивать закупы между собой.
-def _bottle_price(p: dict) -> float:
-    """Цена одной бутылки. В прайсе пиво стоит ящиком — делим."""
-    price = int(p.get("price_24_full") or p.get("price_full") or p.get("price") or 0)
-    unit = 24 if (p.get("price_24_full") or p.get("price_12_full")) else 1
-    return price / max(1, unit)
+# Деньги заявки — ЗАКУПОЧНЫЕ, а не прайс продажи (владелец, 25 сен 2026:
+# «запомни раз и навсегда: в заявке мы пишем сумму, за которую покупаем; нахуя
+# мне в заявке продажная стоимость»). Раньше здесь стоял прайс, да ещё делился
+# на 24 и умножался на ящики — число не значило ничего.
+#
+# Цена берётся за УЧЁТНУЮ ЕДИНИЦУ: у пива это ящик, и количества в поставке
+# тоже в ящиках. Тот же cost_map, что считает «Закупаем» на экране заявки, —
+# чтобы две цифры на соседних экранах сходились.
+_COSTS: dict = {}
+
+
+async def _costs_refresh() -> dict:
+    global _COSTS
+    try:
+        import stock_value
+        _COSTS = await stock_value.cost_map() or {}
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] закупочные цены не прочитаны: {e}")
+    return _COSTS
 
 
 def _money(sup: dict) -> dict:
-    cat = _catalog_by_id()
+    c = _COSTS
     asked = confirmed = took = 0.0
     for it in (sup.get("items") or []):
-        pr = _bottle_price(cat.get(it.get("id")) or {})
+        pr = float(c.get(it.get("id")) or 0)
         asked += pr * int(it.get("asked") or 0)
         confirmed += pr * int(it.get("qty") or 0)
         took += pr * sum(int(v or 0) for v in (it.get("got") or {}).values())
     # Отказы просили тоже — без них «просили» окажется меньше, чем было на
     # самом деле, и недобор в деньгах не сойдётся.
     for d in (sup.get("dropped") or []):
-        asked += _bottle_price(cat.get(d.get("id")) or {}) * int(d.get("asked") or 0)
+        asked += float(c.get(d.get("id")) or 0) * int(d.get("asked") or 0)
     return {"asked": round(asked), "confirmed": round(confirmed), "took": round(took)}
 
 
@@ -1850,6 +1865,7 @@ def _sup_brief(sup: dict) -> dict:
 
 
 async def _supply_view(sup: dict) -> dict:
+    await _costs_refresh()
     sid = sup.get("_id")
     tasks = []
     for oid, t in (sup.get("tasks") or {}).items():
@@ -2703,6 +2719,7 @@ async def handle_extra_create(request):
                             f"{doc['total_qty']} бутылок, {len(items)} позиций\n{_md(where)}")
     except Exception as e:
         log.error(f"[supply] уведомление о заявке на базу: {e}")
+    await _costs_refresh()
     return web.json_response({"ok": True, **_sup_brief(doc)}, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 

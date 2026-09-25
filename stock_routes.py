@@ -2290,6 +2290,45 @@ async def handle_audit_start(request):
 
 
 @require_owner
+async def handle_audit_drop(request):
+    """Убрать брошенную ревизию с глаз. body: {district, day, as?}
+
+    Район посчитали заново и довели до конца, а прежний заход так и висит
+    строкой «не завершена» над карточкой (владелец, 25 сен 2026: «это
+    неактуальная ревизия, которая ломает логику»).
+
+    Сканы НЕ стираем: под брошенным заходом их бывают сотни, и часть кодов в
+    новую ревизию не попала — такое стирают руками и осознанно, а не кнопкой
+    «убрать». Ставим пометку, по которой строка перестаёт показываться;
+    снять её — снять поле dropped_at.
+
+    Завершённую не трогаем: она живёт в истории, а не в этой строке.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day)
+    if not a:
+        return web.json_response({"error": "no_audit"}, status=404, headers=CORS_HEADERS)
+    if a.get("finished_at"):
+        return web.json_response({"error": "already_finished"}, status=409, headers=CORS_HEADERS)
+    if a.get("dropped_at"):
+        return web.json_response({"ok": True, "already": True}, headers=CORS_HEADERS)
+    сканов = (await db.audit_scan_stats(district, day)).get("total", 0)
+    await db.audit_set(district, day, {
+        "dropped_at": datetime.now(timezone.utc).isoformat(),
+        "dropped_by": request["owner_id"],
+        "dropped_by_name": str(body.get("as") or "").strip()[:60]})
+    log.info(f"[audit] брошенная ревизия {district} за {day} убрана с глаз; "
+             f"сканов осталось в базе: {сканов}")
+    return web.json_response({"ok": True, "scans": сканов}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_audit_finish(request):
     """Завершить ревизию: записать пересчёт по камере и разобрать, чего не
     хватает и чего лишнее. body: {district, day?, as?}
@@ -3758,6 +3797,7 @@ def setup(app):
         ("/api/owner/stock/audit/scan/reset", handle_audit_scan_reset, "POST"),
         ("/api/owner/stock/audit/sheet",  handle_audit_sheet,  "GET"),
         ("/api/owner/stock/audit/start",  handle_audit_start,  "POST"),
+        ("/api/owner/stock/audit/drop",   handle_audit_drop,   "POST"),
         ("/api/owner/stock/audit/finish", handle_audit_finish, "POST"),
         ("/api/owner/stock/audit/short",  handle_audit_short,  "POST"),
         ("/api/owner/stock/audit/over",   handle_audit_over,   "POST"),

@@ -898,6 +898,15 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-dr-h em{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
 .stk-dr-h em svg{width:11px;height:11px}
+/* Строка «Не завершена» + крестик «убрать заход». Кнопку в кнопку не вложить,
+   поэтому строка и крестик — соседи в одной полосе; полоса ведёт себя как
+   прежняя строка, высота карточки (.aud-open) не меняется. */
+.aud-back-w{display:flex;align-items:stretch}
+.aud-back-w .aud-back-row{flex:1 1 auto;min-width:0}
+.aud-back-x{flex:0 0 auto;width:38px;border:0;border-top:1px solid rgba(255,255,255,.06);
+  background:rgba(255,255,255,.025);cursor:pointer;font-family:inherit;font-size:13px;
+  color:var(--muted);-webkit-tap-highlight-color:transparent}
+.aud-back-x:active{background:var(--card2);color:var(--text)}
 /* 77 (район со строкой состояния) + 42 (история) = 119. Стояло 106: пока места
    хватало, карточки и так были выше, а как только соседние подросли — эти
    сжались, и «История» обрезалась у них. */
@@ -15375,10 +15384,13 @@ function audDistRow(d, left, без, hist){
       </span>
       <span class="stk-dr-go">›</span>
     </button>
-    ${о ? `<button class="stk-dr-h aud-back-row" onclick="stkAuditGo('${d.id}', '${escS(о.day)}')">
+    ${о ? `<div class="aud-back-w"><button class="stk-dr-h aud-back-row"
+        onclick="stkAuditGo('${d.id}', '${escS(о.day)}')">
       <span>Не завершена ${escS(_audDayT(о.day))}</span>
       <b>${fmt(о.scans || 0)}<u>${pluralize(о.scans || 0, 'бутылка', 'бутылки', 'бутылок')}</u></b>
-      <em>${_SC_CHEV}</em></button>` : ''}
+      <em>${_SC_CHEV}</em></button>
+      <button class="aud-back-x" aria-label="Убрать заход"
+        onclick="stkAuditDrop('${d.id}', '${escS(о.day)}', ${о.scans || 0})">✕</button></div>` : ''}
     <button class="stk-dr-h" onclick="stkAudits('${d.id}', 'pick')">
       <span>История</span>${k
         ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>`
@@ -16217,6 +16229,29 @@ async function stkAuditGo(id, day){
   distRemember('stk', id);
   _audHap('sel');
   await audOpen(id, false, day);
+}
+
+// Убрать брошенный заход. Так бывает, когда район посчитали заново и довели до
+// конца, а прежний висит строкой «не завершена» и мешает читать карточку
+// (владелец, 25 сен 2026). Сканы остаются в базе — об этом и говорим в
+// вопросе, чтобы «убрать» не читалось как «стереть».
+async function stkAuditDrop(id, day, scans){
+  const имя = ((STK.districts || []).find(x => x.id === id) || {}).name || id;
+  const сколько = scans ? `Под ним ${fmt(scans)} ${pluralize(scans, 'скан', 'скана', 'сканов')} — `
+                        + 'они останутся в базе, из карточки уйдёт только строка.\n\n' : '';
+  if(!await askYes(`Убрать незавершённую ревизию ${имя} за ${_audDayT(day)}?\n\n${сколько}`
+                   + 'Делать это стоит, когда район уже посчитан заново.')) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/audit/drop',
+      {method: 'POST', body: {district: id, day, as: _meName()}});
+  }catch(e){
+    const код = ((e || {}).payload || {}).error;
+    _toast(код === 'already_finished' ? 'Эта ревизия завершена — она в истории'
+         : код === 'no_audit' ? 'Такой ревизии уже нет' : 'Не удалось убрать');
+    return;
+  }
+  _audHap('medium');
+  await stkAuditPick();                   // возвращаемся в тот же список, уже без строки
 }
 
 async function audOpen(district, тихо, day){

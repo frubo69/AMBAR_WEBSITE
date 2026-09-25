@@ -24271,18 +24271,24 @@ function pathDistricts(){
   const st = supStage(), sup = st.sup;
   const dist = d.districts || [];
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
-  // Строка района — только название. Подписей про бутылки и ожидание нет:
-  // они повторяли то, что видно на приёмке. Взял водитель — справа его имя
-  // плашкой, той же, что у водителей в журнале смен. Цвет строки говорит,
-  // где район: везут, приняли, приняли без сканирования.
+  // Строка района — название и одно слово о состоянии. Подписей про бутылки
+  // и ожидание тут нет (они повторяли приёмку), но принятый район обязан
+  // выглядеть принятым: раньше класс `ok` красил подпись, которой в строке не
+  // было, и принятый район ничем не отличался от того, куда ещё едут
+  // (владелец, 26 сен 2026: «эти районы же уже приняли — почему оно не
+  // обозначается?»). Взял водитель — справа его имя плашкой, той же, что у
+  // водителей в журнале смен.
   const rows = dist.map(x => {
     const t = sup && (sup.tasks || {})[x.id];
     const cls = !t ? '' : t.cancelled_at ? 'no' : t.done_at ? 'ok' : t.noscan_at ? 'warn' : t.driver ? 'live' : '';
+    const под = !t || t.cancelled_at ? '' : t.done_at ? 'принято'
+              : t.noscan_at ? 'принимают без сканирования' : t.driver ? 'в работе' : '';
     const кто = t ? (t.driver || t.noscan_by || '') : '';
     const go = st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`;
     return `<button class="pd-r ${cls}" ${go}>
       <span class="shl-code">${escS(x.code || '')}</span>
-      <span class="pnav-b"><b>${escS(x.name || x.id)}</b></span>
+      <span class="pnav-b"><b>${escS(x.name || x.id)}</b>${
+        под ? `<i>${под}</i>` : ''}</span>
       ${t && t.cancelled_at ? '<span class="pstat-c no">отменён</span>'
         : кто ? `<span class="shl-p on pd-who">${escS(кто)}</span>` : ''}
       ${st.k === 'none' ? '' : `<span class="pnav-go">${ICO_CHEV}</span>`}
@@ -24296,8 +24302,9 @@ function pathDistricts(){
       <span class="pnav-i big live">${ICO_MAP}</span>
       <span class="pnav-b"><b>Приём товара</b></span>
       <span class="pstat-c ${CHIP[st.k]}">${
-        {none:'ждём магазин', wait:'ждёт приёма', live:'идёт приём', done:'принято',
-         cancelled:'отменена'}[st.k] || st.t.toLowerCase()}</span>
+        st.k === 'live' ? `принято ${st.done} из ${st.all}`
+        : ({none:'ждём магазин', wait:'ждёт приёма', done:'принято',
+            cancelled:'отменена'}[st.k] || st.t.toLowerCase())}</span>
     </button>
     ${rows}
   </div>`;

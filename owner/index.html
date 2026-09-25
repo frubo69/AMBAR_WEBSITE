@@ -24233,9 +24233,17 @@ function pathNav(){
   const d = ORD.d || {};
   const st = supStage();
   const pos = (d.rows || []).length;
-  // На карточке «Заявка» — живая поставка, пока она идёт; иначе то, что
-  // просим сегодня.
-  const qty = (st.sup && st.sup.status === 'open') ? (st.sup.asked_qty || 0) : (d.total_qty || 0);
+  // Число на карточке — то, что в итоге ДАЁТ магазин, а не то, что просили
+  // (владелец, 25 сен 2026: «мы вот сюда пишем не то, сколько в заявке было, а
+  // в итоге сколько даёт магазин после ответа»). Сколько просили и сколько не
+  // дали — видно ниже, на трёх шагах пути: там вся история целиком.
+  //
+  // Пока магазин не ответил, давать нечего — показываем запрошенное: это
+  // единственное известное число.
+  const отв = st.sup && (st.sup.total_qty || 0) > 0;
+  const qty = отв ? st.sup.total_qty
+            : (st.sup && st.sup.status === 'open') ? (st.sup.asked_qty || 0)
+            : (d.total_qty || 0);
   const ed = d.edited_count || 0;
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   return `<button class="pnav-r pbig ttl" onclick="accOrderList()">

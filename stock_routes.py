@@ -1417,7 +1417,23 @@ async def order_rows(day: str = "") -> dict:
     Отдельной функцией, потому что этим же расчётом выгружается Excel для
     магазина: держать вторую копию формулы нельзя — разойдутся молча.
     """
-    day = (day or "").strip() or _biz_day()
+    # День не назван — показываем ПОСЛЕДНЮЮ СОБРАННУЮ заявку, а не расчёт на
+    # текущий учётный день: собранная утром заявка живёт весь день, и экран
+    # обязан показывать её, а не прикид на завтрашнюю смену (владелец,
+    # 25 сен 2026). Собранной ещё нет — тогда текущий день, живым расчётом.
+    day = (day or "").strip()
+    if not day:
+        try:
+            _last = await db.zayavka_freeze_last()
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[stock] последняя заявка не прочитана: {e}")
+            _last = {}
+        day = _last.get("day") or _biz_day()
+    try:
+        _sup = await db.supply_of_day(day)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] поставка дня не прочитана: {e}")
+        _sup = {}
     cat = _catalog()
     saved_norms = await db.get_stock_norms()
     try:
@@ -1569,6 +1585,21 @@ async def order_rows(day: str = "") -> dict:
         # показывать: предварительный расчёт (смену ещё не закрывали) и
         # собранная заявка — разные вещи, и путать их нельзя.
         "frozen": bool(frozen_base),
+        # В какой фазе заявка. Она собирается при закрытии смены, а
+        # окончательный вид принимает после ответа магазина (владелец, 25 сен
+        # 2026): до ответа на экране «просим столько-то», после — «магазин
+        # даёт столько, а столько не даёт».
+        "phase": _order_phase(frozen_base, _sup),
+        "supply": ({"supply_id": _sup.get("_id"), "status": _sup.get("status"),
+                    "asked_qty": _sup.get("asked_qty") or 0,
+                    "give_qty": _sup.get("total_qty") or 0,
+                    "gap_qty": _sup.get("gap_qty") or 0,
+                    "districts": len(_sup.get("tasks") or {}),
+                    "done": sum(1 for t in (_sup.get("tasks") or {}).values()
+                                if t.get("done_at")),
+                    "cancelled": sum(1 for t in (_sup.get("tasks") or {}).values()
+                                     if t.get("cancelled_at"))}
+                   if _sup else None),
         "frozen_at": (_fr.get("frozen_at").isoformat()
                       if hasattr(_fr.get("frozen_at"), "isoformat") else (_fr.get("frozen_at") or "")),
         "buy_day": _fr.get("buy_day") or "",
@@ -1600,6 +1631,34 @@ async def order_rows(day: str = "") -> dict:
         "tobacco_qty": sum(r["need_total"] for r in smokes),
         "tobacco_aed": sum(r["need_total"] * r["price"] for r in smokes),
     }
+
+
+def _order_phase(frozen, sup: dict) -> str:
+    """Фаза заявки одним словом — на ней строится вся подпись на экране.
+
+    draft   — предварительный расчёт: смену ещё не закрывали, снимка нет;
+    asked   — собрана, ждём ответ магазина;
+    answered— магазин ответил, но за товаром ещё не ездили;
+    taking  — идёт приёмка;
+    done    — приняли всё, до конца дня только просмотр;
+    cancelled — заявку отменили целиком.
+    """
+    if not frozen:
+        return "draft"
+    if not sup:
+        return "asked"
+    st = sup.get("status") or "open"
+    if st == "cancelled":
+        return "cancelled"
+    if st != "open":
+        return "done"
+    tasks = (sup.get("tasks") or {}).values()
+    живые = [t for t in tasks if not t.get("cancelled_at")]
+    if живые and all(t.get("done_at") for t in живые):
+        return "done"
+    if any(t.get("done_at") or t.get("claimed_at") or t.get("noscan_at") for t in tasks):
+        return "taking"
+    return "answered"
 
 
 async def freeze_order(day: str = "") -> dict:

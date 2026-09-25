@@ -2405,6 +2405,39 @@ async def zayavka_freeze_get(day: str) -> dict:
             "dist": doc.get("dist") or {}, "frozen_at": doc.get("frozen_at")}
 
 
+async def supply_of_day(day: str) -> dict:
+    """Основная поставка, собранная по заявке этого дня (kind != extra).
+
+    Связка нужна экрану заявки: она собирается при закрытии смены, а
+    окончательный вид принимает, когда магазин прислал ответ (владелец,
+    25 сен 2026). До ответа показываем «просим», после — «дают».
+    """
+    db = _db_or_none()
+    if db is None: return {}
+    return await db.supplies.find_one(
+        {"day": day, "kind": {"$ne": "extra"}},
+        {"items": 0}, sort=[("at", -1)]) or {}
+
+
+async def zayavka_freeze_last() -> dict:
+    """Самая свежая замороженная заявка: {day, base, buy_day, dist, frozen_at}.
+
+    Днём на экране должна стоять та заявка, что собралась утром при закрытии
+    смены, — а не живой прикид на завтрашнюю (владелец, 25 сен 2026: «вот
+    сформировалась заявка — всё, дальше её могут только вручную
+    редактировать, пока не сформируется новая в конце смены»). Поэтому экран
+    спрашивает не «сегодняшний день», а «последнюю собранную».
+    """
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.zayavki.find_one({"base": {"$exists": True}}, sort=[("_id", -1)])
+    if not doc:
+        return {}
+    return {"day": doc["_id"], "base": doc.get("base") or {},
+            "buy_day": doc.get("buy_day") or "", "dist": doc.get("dist") or {},
+            "frozen_at": doc.get("frozen_at")}
+
+
 async def zayavka_last() -> dict:
     db = _db_or_none()
     if db is None: return {}

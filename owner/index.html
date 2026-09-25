@@ -24604,13 +24604,45 @@ function _normRuleText(rule, coverDays){
   return `норма на ${coverDays} ${pluralize(coverDays, 'день', 'дня', 'дней')}`;
 }
 
+// Подпись заявки — это в первую очередь ЕЁ СОСТОЯНИЕ, а не правило норм.
+// Заявка собирается один раз, при закрытии смены, и окончательный вид
+// принимает после ответа магазина (владелец, 25 сен 2026). Пока этого не
+// было написано, владелец смотрел на живой прикид и принимал его за заявку —
+// а числа в нём ехали от каждой продажи и каждой приёмки.
+function _ordPhaseText(d){
+  const s = d.supply || {};
+  switch(d.phase){
+    case 'draft':
+      return 'предварительный расчёт · смену ещё не закрывали';
+    case 'asked':
+      return 'собрана' + (d.frozen_at ? ' в ' + _hm(d.frozen_at) : '') + ' · ждём ответ магазина';
+    case 'answered':
+      return s.gap_qty
+        ? `магазин ответил · даёт ${fmt(s.give_qty)}, не даёт ${fmt(s.gap_qty)}`
+        : `магазин ответил · даёт всё, ${fmt(s.give_qty)}`;
+    case 'taking':
+      return `идёт приёмка · ${fmt(s.done || 0)} из ${fmt(s.districts || 0)} `
+        + pluralize(s.districts || 0, 'района', 'районов', 'районов');
+    case 'done':
+      return 'приняли всё · до конца дня только просмотр';
+    case 'cancelled':
+      return 'заявка отменена';
+  }
+  return '';
+}
+
 function ordRender(){
   const d = ORD.d; if(!d) return;
   const dist = d.districts || [];
   const list = ordList();
   const ed = d.edited_count || 0;
   const q = ORD.q.trim();
-  _setText('accSub', `${_dayName(d.day)} · ${_normRuleText(d.norm_rule, d.cover_days)}`);
+  // День — тот, НА который закупаем: смену закрывают утром, и собранная в
+  // этот момент заявка — заявка на сегодня, а не на уходящую смену.
+  const когда = d.buy_day || d.day;
+  const фаза = _ordPhaseText(d);
+  _setText('accSub', `${d.frozen ? 'на ' : ''}${_dayName(когда)} · ${
+    фаза || _normRuleText(d.norm_rule, d.cover_days)}`);
 
   // Два вида одной заявки. По районам — карточки, как везде в панели. Общий
   // список — старый вид: каждая позиция строкой с кодами всех районов, и

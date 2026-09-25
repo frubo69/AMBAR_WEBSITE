@@ -133,7 +133,14 @@ async def on_all_closed(day: str, state: dict) -> bool:
     file_note = ""
     raw = name = None
     try:
-        import supply_routes
+        import supply_routes, stock_routes
+        # Сначала замораживаем заявку дня, потом собираем файл: файл обязан
+        # уехать от тех же чисел, что увидит владелец на экране. Заморозка
+        # пишется один раз — повторное закрытие смены её не перепишет.
+        try:
+            await stock_routes.freeze_order(day)
+        except Exception as e:
+            log.error(f"[shift] заявку не заморозили: {e}")
         raw, name = await supply_routes._build_book(day)
         data = await supply_routes._order_rows(day)
         # Выключенные руками районы в заявку не идут — и в подписи о них

@@ -1438,12 +1438,25 @@ async def order_rows(day: str = "") -> dict:
     # надо купить. Полка считается так, будто перемещения уже сделаны. Берём
     # неотданный остаток строк: по мере сканирования он тает, а бутылки
     # переходят в have_exact получателя.
-    moving, leaving = {}, {}
+    # Замороженная заявка дня. Есть снимок — от склада ничего не считаем:
+    # числа обязаны быть теми же, что были в момент сборки (владелец, 25 сен
+    # 2026: «сформировалась заявка — всё, дальше её могут только вручную
+    # редактировать»). Нет снимка — считаем живьём и честно помечаем расчёт
+    # предварительным: смену ещё не закрывали.
     try:
-        import move_routes
-        moving, leaving = await move_routes.pending_qty()
+        _fr = await db.zayavka_freeze_get(day)
     except Exception as e:                           # noqa: BLE001
-        log.warning(f"[stock] перемещения к заявке не прочитаны: {e}")
+        log.warning(f"[stock] снимок заявки не прочитан: {e}")
+        _fr = {}
+    frozen_base = _fr.get("base") or None
+    _fr_dist = _fr.get("dist") or {}
+    moving, leaving = {}, {}
+    if not frozen_base:
+        try:
+            import move_routes
+            moving, leaving = await move_routes.pending_qty()
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[stock] перемещения к заявке не прочитаны: {e}")
     try:
         import stock_value
         costs = await stock_value.cost_map()
@@ -1454,7 +1467,7 @@ async def order_rows(day: str = "") -> dict:
     leaving_qty = 0.0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
-    per_district = await _district_base(day)
+    per_district = {} if frozen_base else await _district_base(day)
 
     for pid, p in cat.items():
         price = _price(p)
@@ -1462,21 +1475,37 @@ async def order_rows(day: str = "") -> dict:
         row_edited = False
         row_leave = 0
         for oid in OFFICE_IDS:
-            d = per_district[oid]
-            # Остаток точный: полкоробки пива — это 12 банок, и заявка обязана
-            # их просить, а не ждать, пока уйдёт целая коробка.
-            have = _num((d.get("have_exact") or {}).get(pid, d["have"].get(pid)) or 0)
-            sug = int(d["sug"].get(pid) or 0)
-            saved = saved_norms.get(f"{oid}:{pid}")
-            norm = _num(saved if saved is not None else sug)
-            # Полкоробки недостачи — это коробка в заявке: меньше коробки
-            # магазин не отгружает, а приёмка считает коробки целыми.
-            везут = _num(moving.get((oid, pid), 0))
-            уйдёт = _num(leaving.get((oid, pid), 0))
-            calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут), 6)))
-            # Сколько заявка просит из-за того, что район отдаёт соседу:
-            # без перемещения этих единиц в клетке не было бы.
-            row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут), 6)))
+            b = (frozen_base.get(pid) or {}).get(oid) if frozen_base else None
+            if b is not None:
+                # Замороженный день: берём ровно то, что посчитали при сборке.
+                have = _num(b.get("have"))
+                sug = int(b.get("suggested") or 0)
+                norm = _num(b.get("norm"))
+                везут = _num(b.get("moving"))
+                уйдёт = _num(b.get("leaving"))
+                calc = int(b.get("calc") or 0)
+                row_leave += int(b.get("leave_need") or 0)
+                пришло, ушло = _num(b.get("came")), _num(b.get("gone"))
+            elif frozen_base:
+                have = sug = norm = везут = уйдёт = calc = 0
+                пришло = ушло = 0
+            else:
+                d = per_district[oid]
+                # Остаток точный: полкоробки пива — это 12 банок, и заявка обязана
+                # их просить, а не ждать, пока уйдёт целая коробка.
+                have = _num((d.get("have_exact") or {}).get(pid, d["have"].get(pid)) or 0)
+                sug = int(d["sug"].get(pid) or 0)
+                saved = saved_norms.get(f"{oid}:{pid}")
+                norm = _num(saved if saved is not None else sug)
+                # Полкоробки недостачи — это коробка в заявке: меньше коробки
+                # магазин не отгружает, а приёмка считает коробки целыми.
+                везут = _num(moving.get((oid, pid), 0))
+                уйдёт = _num(leaving.get((oid, pid), 0))
+                calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут), 6)))
+                # Сколько заявка просит из-за того, что район отдаёт соседу:
+                # без перемещения этих единиц в клетке не было бы.
+                row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут), 6)))
+                пришло, ушло = _num(d["came"].get(pid) or 0), _num(d["gone"].get(pid) or 0)
             # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
             # которое предлагала программа, иначе непонятно, от чего отступили.
             fix = (edits.get(pid) or {}).get(oid)
@@ -1498,8 +1527,8 @@ async def order_rows(day: str = "") -> dict:
                           # Сколько из «есть» приехало уже после пересчёта и
                           # сколько с тех пор продали: владелец должен видеть,
                           # что число не с полки, а посчитанное.
-                          "came": _num(d["came"].get(pid) or 0),
-                          "gone": _num(d["gone"].get(pid) or 0),
+                          "came": пришло,
+                          "gone": ушло,
                           "edited": fix is not None and need != calc}
             item_total += need
             if sug and norm > sug:
@@ -1536,13 +1565,22 @@ async def order_rows(day: str = "") -> dict:
     total_cost = sum(r["need_total"] * r["cost"] for r in rows)
     return {
         "day": day,
+        # Заморожена ли заявка дня и на какой день закупка. Экран обязан это
+        # показывать: предварительный расчёт (смену ещё не закрывали) и
+        # собранная заявка — разные вещи, и путать их нельзя.
+        "frozen": bool(frozen_base),
+        "frozen_at": (_fr.get("frozen_at").isoformat()
+                      if hasattr(_fr.get("frozen_at"), "isoformat") else (_fr.get("frozen_at") or "")),
+        "buy_day": _fr.get("buy_day") or "",
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
                        "name": OFFICE_NAMES.get(o, o),
-                       "counted": per_district[o]["counted"],
+                       "counted": (_fr_dist.get(o, {}).get("counted") if frozen_base
+                                   else per_district[o]["counted"]),
                        # Выключенный район остаётся в списке — его видно и
                        # можно вернуть, — но в заявку и в файл не идёт.
                        "off": o in off,
-                       "came": sum(per_district[o]["came"].values())} for o in OFFICE_IDS],
+                       "came": (_fr_dist.get(o, {}).get("came", 0) if frozen_base
+                                else sum(per_district[o]["came"].values()))} for o in OFFICE_IDS],
         "off": sorted(off),
         "total_qty": total_qty, "total_aed": total_aed,
         "total_cost": round(total_cost), "moving_qty": _num(moving_qty),
@@ -1562,6 +1600,54 @@ async def order_rows(day: str = "") -> dict:
         "tobacco_qty": sum(r["need_total"] for r in smokes),
         "tobacco_aed": sum(r["need_total"] * r["price"] for r in smokes),
     }
+
+
+async def freeze_order(day: str = "") -> dict:
+    """Собрать заявку дня и заморозить её. Зовётся один раз — при закрытии
+    смены (shift_end). Повторный вызов ничего не переписывает: снимок дня
+    пишется единожды, иначе «заявка не динамическая» перестаёт быть правдой.
+
+    Замораживаем только то, что считается от склада. Ручные правки и
+    выключенные районы остаются живыми: их правят весь день.
+    """
+    day = (day or "").strip() or _biz_day()
+    было = await db.zayavka_freeze_get(day)
+    if было:
+        log.info(f"[stock] заявка за {day} уже заморожена — не трогаем")
+        return {"ok": True, "already": True, "day": day}
+    data = await order_rows(day)
+    base = {}
+    for r in data.get("all_rows") or []:
+        cells = {}
+        for oid, c in (r.get("cells") or {}).items():
+            if not any((c.get("have"), c.get("norm"), c.get("suggested"), c.get("calc"),
+                        c.get("moving"), c.get("leaving"), c.get("came"), c.get("gone"))):
+                continue            # пустую клетку хранить незачем
+            cells[oid] = {"have": c.get("have") or 0, "norm": c.get("norm") or 0,
+                          "suggested": c.get("suggested") or 0, "calc": c.get("calc") or 0,
+                          "moving": c.get("moving") or 0, "leaving": c.get("leaving") or 0,
+                          "came": c.get("came") or 0, "gone": c.get("gone") or 0,
+                          # вклад перемещений в строку — чтобы не считать заново
+                          "leave_need": 0}
+        if cells:
+            base[r["id"]] = cells
+    # Вклад «район отдаёт соседу» живёт на строке, а не в клетке: раскладываем
+    # его на первую клетку строки, чтобы сумма по строке осталась прежней.
+    for r in data.get("all_rows") or []:
+        ln = int(r.get("leaving_need") or 0)
+        if ln and r["id"] in base:
+            первая = next(iter(base[r["id"]]))
+            base[r["id"]][первая]["leave_need"] = ln
+    # День закупки — календарный по Дубаю: смену закрывают утром, и заявка,
+    # собранная в этот момент, — заявка на СЕГОДНЯ, а не на уходящую смену
+    # (владелец, 25 сен 2026).
+    buy_day = datetime.now(DUBAI_TZ).date().isoformat()
+    dist = {d["id"]: {"counted": bool(d.get("counted")), "came": d.get("came") or 0}
+            for d in data.get("districts") or []}
+    ok = await db.zayavka_freeze_set(day, base, buy_day, dist)
+    log.info(f"[stock] заявка за {day} заморожена: {len(base)} категорий, "
+             f"закупка на {buy_day} · записана={ok}")
+    return {"ok": ok, "day": day, "buy_day": buy_day, "rows": len(base)}
 
 
 @require_owner

@@ -2359,6 +2359,52 @@ async def zayavka_save(day: str, asked: dict, by: dict = None):
         upsert=True)
 
 
+async def zayavka_freeze_set(day: str, base: dict, buy_day: str, dist: dict = None) -> bool:
+    """Заморозить заявку дня. Пишется ОДИН РАЗ — при закрытии смены.
+
+    Владелец, 25 сен 2026: «заявка формируется автоматически только один раз
+    в день, после закрытия смены, и она НЕ динамическая; дальше её могут
+    только вручную редактировать, пока не сформируется новая». Поэтому запись
+    только если снимка ещё нет: повторный расчёт не имеет права переписать
+    числа, на которые человек уже смотрел и по которым, может быть, уже ушёл
+    файл магазину.
+
+    В снимке — только то, что считается от склада: остаток, норма, расчёт,
+    перемещения. Ручные правки и выключенные районы НЕ замораживаются: они
+    ложатся поверх при чтении и должны меняться в любой момент.
+    """
+    db = _db_or_none()
+    if db is None: return False
+    # upsert с фильтром «base ещё нет» на уже замороженном дне попытался бы
+    # вставить второй документ с тем же _id — и это была бы ошибка дубликата
+    # ключа, а не тихий отказ. Ловим её: «уже заморожено» — обычный ответ, а
+    # не поломка.
+    try:
+        r = await db.zayavki.update_one(
+            {"_id": day, "base": {"$exists": False}},
+            {"$set": {"base": base, "buy_day": buy_day, "dist": dist or {},
+                      "frozen_at": datetime.now(timezone.utc)},
+             "$setOnInsert": {"asked": {}, "by": {}}},
+            upsert=True)
+    except Exception as e:                       # DuplicateKeyError и родня
+        if "duplicate" not in str(e).lower():
+            raise
+        return False
+    return bool(r.modified_count or r.upserted_id)
+
+
+async def zayavka_freeze_get(day: str) -> dict:
+    """{base, buy_day, frozen_at} или {} — если день ещё не замораживали."""
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.zayavki.find_one({"_id": day},
+                                    {"base": 1, "buy_day": 1, "frozen_at": 1, "dist": 1})
+    if not doc or not doc.get("base"):
+        return {}
+    return {"base": doc["base"], "buy_day": doc.get("buy_day") or "",
+            "dist": doc.get("dist") or {}, "frozen_at": doc.get("frozen_at")}
+
+
 async def zayavka_last() -> dict:
     db = _db_or_none()
     if db is None: return {}

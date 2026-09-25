@@ -1599,6 +1599,17 @@ async def order_rows(day: str = "") -> dict:
         # 2026): до ответа на экране «просим столько-то», после — «магазин
         # даёт столько, а столько не даёт».
         "phase": _order_phase(frozen_base, _sup),
+        # Что покупаем на самом деле. Пока магазин не ответил — то, что
+        # просим; ответил — то, что он даёт (владелец, 25 сен 2026: «тут тоже
+        # число, которое дал магазин»). Деньги считаются теми же закупочными
+        # ценами, что и вся заявка, — иначе два числа на одном экране.
+        "buy": ({"qty": int(_sup.get("total_qty") or 0),
+                 "rows": len(_sup.get("items") or []),
+                 "cost": round(sum(int(i.get("qty") or 0) * float(costs.get(i.get("id")) or 0)
+                                   for i in _sup.get("items") or []))}
+                if _sup and (_sup.get("items") or []) else
+                {"qty": total_qty, "rows": len([r for r in rows if r["need_total"] > 0]),
+                 "cost": round(total_cost)}),
         "supply": ({"supply_id": _sup.get("_id"), "status": _sup.get("status"),
                     "asked_qty": _sup.get("asked_qty") or 0,
                     "give_qty": _sup.get("total_qty") or 0,

@@ -2414,9 +2414,9 @@ async def supply_of_day(day: str) -> dict:
     """
     db = _db_or_none()
     if db is None: return {}
+    # Состав нужен: по нему считается, на сколько мы в итоге закупаемся.
     return await db.supplies.find_one(
-        {"day": day, "kind": {"$ne": "extra"}},
-        {"items": 0}, sort=[("at", -1)]) or {}
+        {"day": day, "kind": {"$ne": "extra"}}, sort=[("at", -1)]) or {}
 
 
 async def zayavka_freeze_for_buy(buy_day: str) -> dict:

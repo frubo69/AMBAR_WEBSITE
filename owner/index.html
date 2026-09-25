@@ -24549,14 +24549,17 @@ function ordList(){
 // видны, пока правишь, а не после отправки.
 function ordSumInner(){
   const d = ORD.d || {};
-  const pos = (d.rows || []).length;
+  // «Закупаем» — это то, что покупаем НА САМОМ ДЕЛЕ: пока магазин не ответил,
+  // то, что просим; ответил — то, что он даёт (владелец, 25 сен 2026). Сколько
+  // просили и сколько не дали — на трёх шагах пути, там история целиком.
+  const b = d.buy || {qty: d.total_qty || 0, rows: (d.rows || []).length,
+                      cost: d.total_cost != null ? d.total_cost : d.total_aed || 0};
   // Первым числом — то, что платим магазину. Прайс продажи тут ни при чём:
   // заявка — это счёт, а не витрина (владелец, 18 сен 2026).
-  return `<span class="ord-sum-c"><b>${fmtQty(d.total_qty || 0)}</b><i>единиц</i></span>
+  return `<span class="ord-sum-c"><b>${fmtQty(b.qty || 0)}</b><i>единиц</i></span>
     <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
-          aria-label="Цена по позициям"><b>${fmt(d.total_cost != null ? d.total_cost : d.total_aed || 0)
-          }<u>AED</u></b><i>закупка</i></span>
-    <span class="ord-sum-c"><b>${pos}</b><i>категорий</i></span>`;
+          aria-label="Цена по позициям"><b>${fmt(b.cost || 0)}<u>AED</u></b><i>закупка</i></span>
+    <span class="ord-sum-c"><b>${b.rows || 0}</b><i>категорий</i></span>`;
 }
 
 // Прайс — внизу карточки «Закупаем», строками, как «По районам» под остатками

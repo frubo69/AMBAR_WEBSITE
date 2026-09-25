@@ -129,16 +129,23 @@ async def фазы():
        (await sr.order_rows("2026-09-30"))["phase"], "draft")
     eq("собрана, магазин не ответил", (await sr.order_rows(ДЕНЬ))["phase"], "asked")
 
+    первый = next(iter(sr._catalog()))
+    второй = list(sr._catalog())[1]
+
     async def поставка(tasks, status="open"):
         await db._db.supplies.delete_many({"day": ДЕНЬ})
         await db.supply_save({"_id": "S" + str(len(tasks)) + status, "day": ДЕНЬ,
                               "kind": "main", "status": status, "at": "now",
-                              "items": [], "tasks": tasks,
+                              "items": [{"id": первый, "qty": 500, "asked": 600},
+                                        {"id": второй, "qty": 11, "asked": 91}],
+                              "tasks": tasks,
                               "asked_qty": 691, "total_qty": 511, "gap_qty": 180})
         return await sr.order_rows(ДЕНЬ)
 
     d = await поставка({"jvc": {}, "bbay": {}})
     eq("магазин ответил — за товаром не ездили", d["phase"], "answered")
+    eq("«Закупаем» показывает то, что даёт магазин, а не что просили",
+       (d["buy"]["qty"], d["buy"]["rows"]), (511, 2))
     eq("и числа ответа на месте",
        (d["supply"]["asked_qty"], d["supply"]["give_qty"], d["supply"]["gap_qty"]),
        (691, 511, 180))

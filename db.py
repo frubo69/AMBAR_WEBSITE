@@ -2419,6 +2419,42 @@ async def supply_of_day(day: str) -> dict:
         {"day": day, "kind": {"$ne": "extra"}}, sort=[("at", -1)]) or {}
 
 
+# ── коды, найденные водителем и не внесённые в реестр ───────────────────────
+# Водитель пикает мешки свободным сканером и натыкается на наклейку, которой в
+# учёте нет. Сам он её внести не может — позицию выбирает владелец (25 сен
+# 2026: «пусть приходит сообщение в АМБАР СТАР, и можно либо ничего с ним не
+# делать, либо зачислить на склад как позицию, я сам выберу какую»).
+
+async def qr_found_add(code: str, district: str, driver: str, at) -> bool:
+    """Записать находку. True — если такой ещё не находили (тогда шлём весть)."""
+    d = _db_or_none()
+    if d is None or not code: return False
+    r = await d.qr_found.update_one(
+        {"_id": code},
+        {"$setOnInsert": {"code": code, "district": district, "driver": driver,
+                          "at": at, "status": "open"}},
+        upsert=True)
+    return bool(r.upserted_id)
+
+
+async def qr_found_list(status: str = "open", limit: int = 50) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    q = {"status": status} if status else {}
+    return await d.qr_found.find(q, {"_id": 0}).sort("at", -1).to_list(length=limit)
+
+
+async def qr_found_close(code: str, status: str, by: str = "") -> bool:
+    """Решение принято: added — внесли на склад, ignored — оставили как есть."""
+    d = _db_or_none()
+    if d is None or not code: return False
+    r = await d.qr_found.update_one(
+        {"_id": code, "status": "open"},
+        {"$set": {"status": status, "decided_at": datetime.now(timezone.utc),
+                  "decided_by": by}})
+    return bool(r.modified_count)
+
+
 async def zayavka_freeze_for_buy(buy_day: str) -> dict:
     """Собранная заявка, по которой закупаемся В ЭТОТ день.
 

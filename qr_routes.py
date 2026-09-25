@@ -365,6 +365,12 @@ async def handle_scan(request):
     if not code:
         return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
 
+    # Внесли код, который водитель нашёл на мешке, — находка решена сама:
+    # отдельной кнопки «я разобрался» не нужно (25 сен 2026).
+    try:
+        await db.qr_found_close(code, "added", str(body.get("as") or "")[:60])
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[qr] находка {code} не закрыта: {e}")
     product_id = (body.get("product_id") or "").strip()
     from operator_routes import _catalog_by_id
     p = _catalog_by_id().get(product_id)
@@ -761,6 +767,39 @@ async def handle_list(request):
 
 
 @require_owner
+async def handle_found_list(request):
+    """Коды, которые водители нашли на мешках, а в реестре их нет.
+
+    Решение за владельцем: оставить как есть или зачислить на склад позицией
+    (25 сен 2026). Сам водитель позицию выбрать не может — он видит мешок, а
+    не то, чем его считать."""
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    rows = await db.qr_found_list("open")
+    return web.json_response({"rows": [{
+        "code": r.get("code"), "driver": r.get("driver") or "",
+        "district": r.get("district") or "",
+        "district_code": OFFICE_CODES.get(r.get("district") or "", ""),
+        "district_name": OFFICE_NAMES.get(r.get("district") or "", ""),
+        "at": str(r.get("at") or ""),
+    } for r in rows]}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_found_skip(request):
+    """«Ничего с ним не делать»: находка уходит с экрана, код в учёт не идёт."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = _clean(body.get("code"))
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    ok = await db.qr_found_close(code, "ignored", str(body.get("as") or "")[:60])
+    log.info(f"[qr] найденный код {code} оставлен без учёта: {ok}")
+    return web.json_response({"ok": True, "closed": ok}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_lookup(request):
     """Что это за бутылка. Сюда же ляжет её история операций."""
     code = _clean(request.match_info.get("code"))
@@ -1004,6 +1043,8 @@ def setup(app):
         ("/api/owner/qr/drop",        handle_drop,   "POST"),
         ("/api/owner/qr/drop/undo",   handle_drop_undo, "POST"),
         ("/api/owner/qr/code/{code}", handle_lookup, "GET"),
+        ("/api/owner/qr/found",       handle_found_list, "GET"),
+        ("/api/owner/qr/found/skip",  handle_found_skip, "POST"),
         ("/api/owner/qr/drivers",     handle_drivers, "GET"),
         ("/api/owner/qr/checks",      handle_checks,  "GET"),
         ("/api/owner/qr/check/start", handle_check_start, "POST"),

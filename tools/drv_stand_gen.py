@@ -278,6 +278,20 @@ async function standBoot(){
   if(ST_Q.get('open') === 'hist'){ await new Promise(r => setTimeout(r, 400)); profHist(); if(ST_Q.get('item')) hsOpen(ST_Q.get('item')); }
   if(ST_Q.get('open') === 'ordhist'){ await new Promise(r => setTimeout(r, 150)); ordHist(); }   // история из ленты заказов
   if(ST_Q.get('open') === 'shs'){ await new Promise(r => setTimeout(r, 150)); shsOpen(!!(ST_Q.get('shclosed') || ST_Q.get('prevday'))); }   // итоги смены: перед закрытием или просмотр после
+  // ?open=ck — «Проверить бутылки»: свободный скан. Камеры на стенде нет, и
+  // смотрим ровно то, ради чего экран сделан, — ленту ответов.
+  if(ST_Q.get('open') === 'ck'){
+    await new Promise(r => setTimeout(r, 150));
+    document.getElementById('ckScr').classList.add('show');
+    document.getElementById('ckMid').innerHTML = '<div class="cam mv-cam" style="background:#000"></div>';
+    CK = {busy: false, list: [
+      {code: 'bud#000247', sent: 'ok', r: {verdict: 'unknown'}},
+      {code: '11072', r: {verdict: 'ok', name: 'Budweiser 0.33 can', label: 'bud#000241', district_code: 'B5'}},
+      {code: '90312', r: {verdict: 'written', name: 'Absolut 1 ltr', label: 'abs#000102', district_code: 'B5'}},
+      {code: '77451', r: {verdict: 'sold', name: 'Chivas 12 1 ltr', label: 'chv#000018', district_code: 'B5'}},
+    ]};
+    ckPaint();
+  }
   if(ST_Q.get('open') === 'supx'){ await new Promise(r => setTimeout(r, 300)); supOpen('s2', 'jvc'); }   // задача доп. заявки
   if(ST_Q.get('open') === 'day1'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); }
   if(ST_Q.get('open') === 'order'){ await new Promise(r => setTimeout(r, 150)); profOrders(); await new Promise(r => setTimeout(r, 200)); histStep(1); await new Promise(r => setTimeout(r, 80)); histOpen('AMB00000011'); }

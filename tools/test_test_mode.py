@@ -345,7 +345,7 @@ async def main():
     eq("настоящий водитель берёт с test=False", LOG.get("in_range"), [(False,)])
     st, r = await call(dr.handle_supply_list, drreq(1))
     eq("закупка тест-водителю пуста", (st, r), (200, {"mine": [], "free": [], "extra": [], "taken": []}))
-    for h, nm in ((dr.handle_move_scan, "move_scan"), (dr.handle_code_info, "code_info"), (dr.handle_writeoff_scan, "writeoff_scan"),
+    for h, nm in ((dr.handle_move_scan, "move_scan"), (dr.handle_code_info, "code_info"), (dr.handle_code_found, "code_found"), (dr.handle_writeoff_scan, "writeoff_scan"),
                   (dr.handle_expense_add, "expense_add"), (dr.handle_supply_claim, "supply_claim")):
         st, r = await call(h, drreq(1, "POST", body={"code": "x", "to": "jvc", "amount": 5, "kind": "fuel", "comment": "x"}, oid=None))
         eq(f"{nm} тест-водителю — 403 test_account", (st, r.get("error")), (403, "test_account"))

@@ -1323,6 +1323,49 @@ async def handle_move_scan(request):
 
 @require_driver
 @_no_test
+async def handle_code_found(request):
+    """Водитель нашёл наклейку, которой нет в реестре. body: {code}
+
+    Сам он её внести не может: позицию выбирает владелец (25 сен 2026: «пусть
+    приходит сообщение в АМБАР СТАР, и можно либо ничего с ним не делать, либо
+    зачислить на склад как позицию»). Здесь только записываем находку и шлём
+    весть — один раз на код, чтобы повторный проход по тем же мешкам не
+    превращался в поток сообщений.
+
+    Код, который на самом деле в реестре есть, не записываем: находка — это
+    именно «в учёте нет».
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    doc = await db.qr_get(code)
+    if doc and (doc.get("status") or "active") != "deleted":
+        return web.json_response({"ok": True, "known": True}, headers=CORS_HEADERS)
+    me = request["driver"]
+    район = (me.get("district") or "").strip()
+    новый = await db.qr_found_add(code, район, me.get("name") or "", datetime.now(timezone.utc))
+    if новый:
+        log.info(f"[qr] {me.get('name')} нашёл код не из реестра: {code} ({район})")
+        try:
+            from owner_routes import notify_owners
+            from config_offices import OFFICE_CODES, OFFICE_NAMES
+            где = f"{OFFICE_CODES.get(район, '')} {OFFICE_NAMES.get(район, район)}".strip()
+            кто, хвост = _mde(me.get("name") or ""), (" · " + _mde(где)) if где else ""
+            await notify_owners(
+                "qr.found",
+                f"🏷 *Код не из реестра*\n{кто} нашёл наклейку `{_mde(code)}`{хвост}.\n"
+                "В учёте её нет. В СТАРе: оставить как есть или зачислить на склад позицией.")
+        except Exception as e:                       # noqa: BLE001
+            log.error(f"[qr] весть о найденном коде: {e}")
+    return web.json_response({"ok": True, "known": False, "new": новый}, headers=CORS_HEADERS)
+
+
+@require_driver
+@_no_test
 async def handle_code_info(request):
     """?code= → что за бутылка, до переезда: название и фото товара из каталога,
     где числится, когда записана, сколько раз ездила. Водитель сначала видит,
@@ -3097,6 +3140,7 @@ def setup(app):
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),
         ("/api/driver/stock/moves",             handle_moves,       "GET"),
         ("/api/driver/stock/code",              handle_code_info,   "GET"),
+        ("/api/driver/stock/found",             handle_code_found,  "POST"),
         ("/api/driver/stock/move",              handle_move_scan,   "POST"),
         ("/api/driver/stock/move/undo",         handle_move_undo,   "POST"),
         ("/api/driver/stock/move/{tid}",        handle_move_del,    "DELETE"),

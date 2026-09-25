@@ -737,6 +737,18 @@ function route(path, opts){
   }
 
   /* ── расходы ── */
+  // Проверить бутылку: в демо один код числится, любой другой — «не внесён»,
+  // чтобы было видно обе строки списка.
+  if(p === '/api/driver/stock/code' && m === 'GET'){
+    const code = String((opts.params || {}).code || '');
+    if(code === '11072') return {ok: true, verdict: 'ok', code,
+      label: 'bud#000241', name: 'Budweiser 0.33 can', district_code: 'B5',
+      district_name: 'Тиком', districts: []};
+    return {ok: false, verdict: 'unknown', code, districts: []};
+  }
+  if(p === '/api/driver/stock/found' && m === 'POST'){
+    return {ok: true, known: false, new: true};
+  }
   if(p === '/api/driver/expenses' && m === 'GET'){
     const byKind = {};
     S.exp.forEach(function(e){

@@ -210,6 +210,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Тест-водитель: имя золотом, кнопки склада и списаний спрятаны */
 body.test-drv .hdr-n{color:var(--gold2)}
 body.test-drv .wo-fix{display:none}
+/* Две кнопки в нижней полосе «Товара»: ревизия и свободная проверка. */
+.wo-fix2{display:flex;gap:8px}
+.wo-fix2 .wo-btn{flex:1 1 0;min-width:0}
+.wo-fix2 .wo-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Список проверенных бутылок: последняя сверху, невнесённая — красной. */
+.ck-none{padding:16px;text-align:center;color:var(--muted);font-size:12.5px}
+.ck-list{max-height:34vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.ck-r{display:flex;align-items:center;gap:10px;padding:9px 14px;
+  border-top:1px solid rgba(255,255,255,.06)}
+.ck-r:first-child{border-top:0}
+.ck-n{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text)}
+.ck-n i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);
+  margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck-r b{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--muted)}
+.ck-r.bad{background:rgba(214,69,69,.10)}
+.ck-r.bad .ck-n{color:var(--dn)} .ck-r.bad b{color:var(--dn)}
 .hdr-n{font-size:14.5px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
 
@@ -4028,6 +4045,25 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   </div>
   <div class="sup-mid mv-mid" id="mvMid"></div>
   <div class="sup-bot" id="mvBot"></div>
+</div>
+<!-- Свободная проверка бутылок. Ни на что не влияет: только смотрит, что за
+     код и числится ли он. Нужна, когда в приёмке не сошёлся один QR и надо
+     найти, на каком мешке наклейка не внесена (владелец, 25 сен 2026:
+     «пусть у себя все бутылки отпикают и найдут невнесённый QR-код»). -->
+<div class="sup-scr" id="ckScr">
+  <div class="sup-top">
+    <button class="sup-back" onclick="ckBack()" aria-label="Назад">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="sup-top-b">
+      <div class="sup-top-t">Проверить бутылки</div>
+      <div class="sup-top-s" id="ckS">Наводите на QR-код — подряд, сколько нужно</div>
+    </div>
+    <div class="sup-top-v" id="ckN"></div>
+  </div>
+  <div class="sup-mid scan" id="ckMid"></div>
+  <div class="sup-bot" id="ckBot"></div>
 </div>
 <!-- Скан бутылки для охраны. Отдельным листом, а не внутри карточки: камера
      на четверть экрана бесполезна, а карточка с камерой перестаёт быть строкой
@@ -10588,6 +10624,100 @@ async function audBriefLoad(force){
   }catch(e){}
 }
 
+// ── Проверить бутылки: свободный скан ─────────────────────────────────────
+// Ничего не пишет и ничего не двигает: спрашивает у сервера, что за код, и
+// показывает ответ. Нужна, когда в приёмке не сошёлся один QR: водитель
+// обходит мешки, пикает подряд, и невнесённая наклейка сама всплывает
+// красной строкой (владелец, 25 сен 2026).
+let CK = {list: [], busy: false};
+
+function ckOpen(){
+  CK = {list: [], busy: false};
+  document.getElementById('ckScr').classList.add('show');
+  ckPaint();
+  ckStart();
+}
+
+async function ckStart(){
+  const mid = document.getElementById('ckMid');
+  mid.innerHTML = `<div class="cam mv-cam">
+      <video id="ckV" playsinline muted autoplay></video>
+      <div class="cam-frame" id="ckF">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="cam-badge" id="ckB"></div>
+      </div>
+      <div class="cam-left"><span class="cam-hint">Пикайте подряд — ничего не запишется</span></div>
+    </div>`;
+  try{ await SCAN.start(document.getElementById('ckV'), ckCode, null, ckCode, null); }
+  catch(e){ _setText('ckS', 'Камера не открылась'); }
+}
+
+function ckBack(){
+  SCAN.stop();
+  document.getElementById('ckScr').classList.remove('show');
+}
+
+async function ckCode(code){
+  if(CK.busy) return;
+  CK.busy = true;
+  let r = null;
+  try{ r = await drvApi.drvFetch('/api/driver/stock/code', {params: {code}}); }
+  catch(e){ r = {verdict: 'err', code}; }
+  CK.busy = false;
+  // Тот же код второй раз не плодим строкой — поднимаем наверх.
+  CK.list = CK.list.filter(x => x.code !== code);
+  CK.list.unshift({code, r});
+  const нет = (r || {}).verdict === 'unknown';
+  try{ tg.HapticFeedback.notificationOccurred(нет ? 'warning' : 'success'); }catch(e){}
+  const f = document.getElementById('ckF');
+  if(f) f.className = 'cam-frame ' + (нет ? 'bad' : 'ok');
+  setTimeout(() => { const g = document.getElementById('ckF'); if(g) g.className = 'cam-frame'; }, 700);
+  ckPaint();
+  if(нет) ckTell(code);
+}
+
+// Находку отдаём владельцу сразу: решает он — оставить как есть или зачислить
+// на склад позицией. Водитель выбрать позицию не может, он видит мешок.
+// Не дошло — строка так и стоит «не сообщили», её видно.
+async function ckTell(code){
+  const строка = CK.list.find(x => x.code === code);
+  if(строка) строка.sent = 'wait';
+  ckPaint();
+  try{
+    await drvApi.drvFetch('/api/driver/stock/found', {method: 'POST', body: {code}});
+    if(строка) строка.sent = 'ok';
+  }catch(e){ if(строка) строка.sent = 'err'; }
+  ckPaint();
+}
+
+const CK_SAY = {ok: '', unknown: 'НЕ ВНЕСЁН', written: 'списана', sold: 'продана',
+                nohome: 'без района', no_item: 'нет в каталоге', err: 'не спросили'};
+
+function ckPaint(){
+  const нет = CK.list.filter(x => (x.r || {}).verdict === 'unknown').length;
+  _setText('ckS', нет ? `не внесено: ${нет}` : 'Наводите на QR-код — подряд, сколько нужно');
+  const n = document.getElementById('ckN');
+  if(n) n.innerHTML = CK.list.length
+    ? `${fmt(CK.list.length)}<u>${нет ? ' · ' + fmt(нет) + ' без учёта' : ' проверено'}</u>` : '';
+  const bot = document.getElementById('ckBot');
+  if(!bot) return;
+  if(!CK.list.length){
+    bot.innerHTML = '<div class="ck-none">Пока ничего не проверяли</div>';
+    return;
+  }
+  bot.innerHTML = `<div class="ck-list">${CK.list.map(x => {
+    const r = x.r || {}, плохо = r.verdict === 'unknown';
+    const где = r.district_code || r.home_code || '';
+    const весть = x.sent === 'ok' ? 'сообщили владельцу'
+                : x.sent === 'err' ? 'сообщить не вышло' : 'сообщаем владельцу…';
+    return `<div class="ck-r${плохо ? ' bad' : ''}">
+      <span class="ck-n">${esc(плохо ? x.code : (r.name || x.code))}
+        <i>${esc(плохо ? 'нет в реестре · ' + весть : [r.label, где].filter(Boolean).join(' · '))}</i></span>
+      <b>${esc(CK_SAY[r.verdict] !== undefined ? CK_SAY[r.verdict] : r.verdict || '')}</b>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function audBtn(){
   const st = (AUD_BRIEF || {}).state || 'idle';
   if(st === 'none') return '';                 // у водителя нет района — ревизии нет
@@ -10595,8 +10725,11 @@ function audBtn(){
   const where = `${b.district_code || ''} ${b.district_name || ''}`.trim();
   const t = (st === 'running' ? 'Продолжить ревизию'
           : (st === 'pending' || st === 'closed') ? 'Итог ревизии' : 'Ревизия') + (where ? ' · ' + where : '');
-  return `<div class="wo-fix"><button class="wo-btn ghost aud${st === 'running' ? ' run' : ''}" onclick="audOpen()">
-      ${svg(ICO.audit, 19)}<span>${t}</span></button></div>`;
+  return `<div class="wo-fix wo-fix2">
+    <button class="wo-btn ghost aud${st === 'running' ? ' run' : ''}" onclick="audOpen()">
+      ${svg(ICO.audit, 19)}<span>${t}</span></button>
+    <button class="wo-btn ghost" onclick="ckOpen()">
+      ${svg(ICO_QR, 19)}<span>Проверить бутылки</span></button></div>`;
 }
 
 const _audU = r => (r && r.unit > 1) ? 'кор' : 'бут';

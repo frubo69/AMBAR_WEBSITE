@@ -108,6 +108,16 @@ async def main():
     eq("ВТОРОЙ ВЕСТИ НЕТ", len(ВЕСТИ), 1)
     eq("и в списке она одна", len(await список()), 1)
 
+    print("── весть настроена, а не просто отправлена ────────────────────")
+    # Ключа нет в настройках — get_owners_subscribed_to берёт False по умолчанию,
+    # и сообщение тихо не уходит НИКОМУ. Ровно так это и было написано сначала.
+    import owner_archive
+    eq("событие включено по умолчанию", db._DEFAULT_PREFS.get("qr.found"), True)
+    eq("и названо в архиве уведомлений", owner_archive.TITLES.get("qr.found"),
+       "Код не из реестра")
+    eq("и стоит в группе «Товар»",
+       "qr.found" in dict(owner_archive.GROUPS)["Товар"], True)
+
     print("── код, который в реестре есть ────────────────────────────────")
     await db._db.qr_codes.insert_one({"_id": "есть", "status": "active", "district": РАЙОН,
                                       "product_id": "p1", "product_name": "Absolut 1 ltr",

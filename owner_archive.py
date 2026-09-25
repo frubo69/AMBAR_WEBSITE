@@ -28,7 +28,7 @@ GROUPS = [
         "shift.closed", "supply.done", "supply.flag",
     ]),
     ("Товар", [
-        "stock.writeoff", "stock.out", "qr.alien", "stock.audit",
+        "stock.writeoff", "stock.out", "qr.alien", "qr.found", "stock.audit",
     ]),
     ("Деньги", [
         "expenses.request", "finance.revenueLow", "finance.avgDrop",
@@ -59,6 +59,7 @@ TITLES = {
     "stock.writeoff":        "Списание",
     "stock.out":             "Позиция кончилась",
     "qr.alien":              "Чужая бутылка",
+    "qr.found":              "Код не из реестра",
     "stock.audit":           "Ревизия водителя",
     "expenses.request":      "Расход водителя",
     "finance.revenueLow":    "Выручка ниже нормы",

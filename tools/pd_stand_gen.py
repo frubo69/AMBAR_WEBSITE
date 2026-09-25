@@ -47,7 +47,7 @@ html = f"""<!doctype html><html lang=ru><head><meta charset=utf-8>
 </head><body><div class=stand><div id=box></div></div>
 <script>
 let ACC_SUP = {{open: {{status: "open", total_qty: 511, tasks: {json.dumps(ЗАДАЧИ, ensure_ascii=False)}}}, list: []}};
-let ORD = {{d: {{districts: {json.dumps(РАЙОНЫ, ensure_ascii=False)}}}}};
+let ORD = {{d: {{districts: {json.dumps(РАЙОНЫ, ensure_ascii=False)}, total_qty: 691, edited_count: 0}}}};
 function conv(v){{ return +v || 0; }}
 function _supCur(){{ return null; }}
 {const("ICO_CHEV", end=r";\n")}
@@ -56,8 +56,11 @@ function _supCur(){{ return null; }}
 {fn("fmt")}
 {fn("pluralize")}
 {fn("supStage")}
+{const("ICO_LIST", end=r";\n")}
+{fn("fmtQty")}
+{fn("pathNav")}
 {fn("pathDistricts")}
-document.getElementById('box').innerHTML = pathDistricts();
+document.getElementById('box').innerHTML = pathNav() + pathDistricts();
 </script></body></html>"""
 
 os.makedirs(OUT, exist_ok=True)

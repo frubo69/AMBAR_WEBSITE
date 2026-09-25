@@ -7796,7 +7796,7 @@ function expBox(kind, title, ico){
 // просмотр. У мойки две плитки (машина, чек), у остальных с чеком — одна.
 const ICO_RCP = '<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21z"/><path d="M9 8h6M9 12h6M9 16h4"/>';
 function expTiles(kind, sent){
-  if(!EXP_RECEIPT.includes(kind)) return '';
+  if(!EXP_CAN_RCP.includes(kind)) return '';
   const tile = (what, ico, name) => {
     const rcp = what === 'rcp';
     const свой = rcp ? (EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null)
@@ -7811,7 +7811,10 @@ function expTiles(kind, sent){
       <span class="exp-tile-c">${плохо ? 'переснять' : name}</span>
     </button>`;
   };
-  const tiles = (kind === 'wash' ? [tile('car', ICO.wash, 'Машина')] : []).concat([tile('rcp', ICO_RCP, 'Чек')]);
+  // Где чек по желанию — подпись так и говорит. Иначе плитка выглядит как
+  // требование, и водитель идёт искать чек, которого не было.
+  const чек = EXP_RCP_OPT.includes(kind) ? 'Чек, если есть' : 'Чек';
+  const tiles = (kind === 'wash' ? [tile('car', ICO.wash, 'Машина')] : []).concat([tile('rcp', ICO_RCP, чек)]);
   return `<div class="exp-tiles ${tiles.length > 1 ? 'two' : ''}" id="tiles-${kind}">${tiles.join('')}</div>`;
 }
 // Перерисовать только плитки: сумму, которую человек уже вписал, терять нельзя.
@@ -7884,6 +7887,14 @@ function expWhy(sent){
 const EXP_RECEIPT = {
   includes: id => ((EXP || {}).kinds || []).some(k => k.id === id && k.receipt)
                   || (!((EXP || {}).kinds || []).length && (id === 'fuel' || id === 'wash'))};
+// Чек по желанию — «что-то ещё» (владелец, 25 сен 2026). Плитка и камера те
+// же, что у обязательного, но «Отправить» без снимка не останавливается: под
+// «что-то ещё» пишут и возвраты, и долги, где чека нет в природе.
+// Отдельный список, а не EXP_RECEIPT: тот решает, требовать ли снимок, и
+// добавлять в него «что-то ещё» значило бы запереть запись без чека.
+const EXP_RCP_OPT = {
+  includes: id => ((EXP || {}).kinds || []).some(k => k.id === id && k.receipt_opt)};
+const EXP_CAN_RCP = {includes: id => EXP_RECEIPT.includes(id) || EXP_RCP_OPT.includes(id)};
 function expRcp(kind, sent){
   if(!EXP_RECEIPT.includes(kind)) return '';
   const свой = EXP_SHOT.kind === kind && EXP_SHOT.thumb;
@@ -8165,7 +8176,10 @@ async function carAccept(){
   // сам, а если забудет — «Отправить» откроет то, чего не хватает.
   expTilesRefresh(kind);
   try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  const inp = document.getElementById('e_' + kind);
+  // Сумма у карточек бензина и мойки лежит в «e_», у карточек видов («что-то
+  // ещё», парковка) — в «k_». Ищем обе, иначе после снимка курсор не встаёт
+  // никуда и человек не понимает, чего от него ждут.
+  const inp = document.getElementById('e_' + kind) || document.getElementById('k_' + kind);
   if(inp && !inp.readOnly && !String(inp.value || '').replace(/\D/g, '')){
     try{ inp.focus(); }catch(e){}
   }

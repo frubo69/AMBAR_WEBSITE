@@ -2676,6 +2676,9 @@ async def handle_expenses(request):
         "meal_rates": {"working": staff.MEAL_WORKING, "off": staff.MEAL_OFF},
         "extras": extras,
         "kinds": [{"id": k, "t": v["t"], "receipt": bool(v.get("receipt")),
+                   # Чек можно приложить, но без него запись всё равно уходит —
+                   # приложение рисует плитку и не требует снимка.
+                   "receipt_opt": bool(v.get("receipt_opt")),
                    "plus": bool(v.get("plus")), "pay": asks_pay(k)} for k, v in EXTRA_KINDS.items()],
         "by_kind": {k: {"sum": sum(x.get("amount", 0) for x in live if x["kind"] == k),
                         "count": sum(1 for x in live if x["kind"] == k)}

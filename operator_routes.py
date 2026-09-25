@@ -710,6 +710,10 @@ def _summary(o: dict) -> dict:
                         or o.get("payment_method") == "crypto"),
         "lang": o.get("lang", "ru"),
         "timestamp": o.get("timestamp", ""),
+        # Смена, в которую заказ приняли. Панель ставит по нему пометку, если
+        # это не сегодня: заказ из вчерашней смены в ленте «в работе» — редкий
+        # случай, и время без даты о нём не говорит ничего.
+        "day": _bizday.order_day(o) or "",
         # Просьба водителя едет вместе с заказом: она меняет то, что оператор
         # должен с ним сделать, и прятать её за отдельным запросом нельзя.
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
@@ -1100,10 +1104,17 @@ async def handle_queue(request):
         od = _biz_date_of(o)
         if od is None:
             continue
-        # Новые показываем любого возраста: заказ, висящий с ночи, тем более
-        # требует ответа. В работе — всегда текущие. Закрытые — за выбранный день.
-        if lane == "work" and od != today:
-            continue
+        # Новые и в работе показываем любого возраста: незакрытый заказ — это
+        # работа, которую кто-то должен доделать, и спрятать её нельзя.
+        #
+        # Раньше «в работе» отсекались чужим днём — и заказ мог исчезнуть с
+        # панели совсем (#AMB1590679, 25 сен 2026: оператор вернул доставленный
+        # заказ, чтобы поправить состав). День у такого заказа — та смена, в
+        # которую его приняли, а вернули его в следующую: в «в работе» он не
+        # проходил по дню, в «закрытые» — больше не подходил по статусу. Ни в
+        # одной ленте, при живом статусе и назначенном водителе.
+        #
+        # Закрытые — за выбранный день: там как раз листают историю.
         if lane == "done" and od != day:
             continue
         row = _summary(o)
@@ -1136,7 +1147,7 @@ async def handle_queue(request):
                       for d in _districts_for(request, districts) if d["id"] in scope],
         "close_reqs": creqs,
         "new": lanes["new"], "work": lanes["work"], "done": lanes["done"],
-        "counts": counts, "day": day.isoformat(),
+        "counts": counts, "day": day.isoformat(), "today": today.isoformat(),
         "now": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 
@@ -1793,9 +1804,16 @@ async def handle_undeliver(request):
     except Exception as e:
         log.error(f"[pos] delete delivered msgs failed for #{oid}: {e}")
 
+    # Отметку о доставке снимаем вместе со статусом: иначе заказ, снова едущий
+    # к клиенту, стоит у оператора в ленте строкой «доставлен» за сегодня, а в
+    # приложении водителя показывает время доставки. Доставят — проставится
+    # заново, одной дверью (_close_delivered).
     now = datetime.now(timezone.utc).isoformat()
-    await db.update_order(oid, status="approved", _delivered_notif_msgs=[], updated_at=now)
-    order.update(status="approved", _delivered_notif_msgs=[])
+    await db.update_order(oid, status="approved", _delivered_notif_msgs=[],
+                          delivered_at="", delivered_by="", delivered_by_driver="",
+                          updated_at=now)
+    order.update(status="approved", _delivered_notif_msgs=[], delivered_at="",
+                 delivered_by="", delivered_by_driver="")
     await _refresh_cards(order)
 
     try:

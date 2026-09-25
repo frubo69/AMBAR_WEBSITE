@@ -4460,6 +4460,7 @@ function _card(o, lane){
     <div class="q-card-h" onclick="openOrder('${o.order_id}')">
       <span class="q-card-id">#${_esc(o.order_id)}</span>
       <span class="oc-st ${stC}">${stT}</span>
+      ${_dayFlag(o)}
       ${o.needs_verify?'<span class="q-flag">не проверен</span>':''}
       ${rq?`<span class="q-flag req">${_esc((DRQ[rq.kind]||DRQ.note).t)}</span>`:''}
       <span class="q-card-when">${when}</span>
@@ -4485,6 +4486,17 @@ function _card(o, lane){
       ${acts?`<div class="q-acts" onclick="event.stopPropagation()">${acts}</div>`:''}
     </div>
   </div>`;
+}
+
+// Заказ не из сегодняшней смены — пометкой в шапке строки. В «в работе» такой
+// попадает редко: его вернули из закрытых или он не доехал за смену. Время «до
+// 02:10» без дня о нём не говорит ничего, а решение зависит именно от дня.
+function _dayFlag(o){
+  const d = o.day, t = Q.today;
+  if(!d || !t || d === t) return '';
+  const вчера = new Date(t + 'T12:00:00'); вчера.setDate(вчера.getDate() - 1);
+  return `<span class="q-flag">${d === _dpIso(вчера) ? 'вчера'
+    : (+d.slice(8, 10)) + ' ' + _MON_RU[+d.slice(5, 7) - 1]}</span>`;
 }
 
 // Одна строка ввода вместо prompt: в телеграмовском вебвью родной prompt то

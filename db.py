@@ -2419,6 +2419,25 @@ async def supply_of_day(day: str) -> dict:
         {"items": 0}, sort=[("at", -1)]) or {}
 
 
+async def zayavka_freeze_for_buy(buy_day: str) -> dict:
+    """Собранная заявка, по которой закупаемся В ЭТОТ день.
+
+    Экран спрашивает «заявку на 25 сентября», а документ лежит под днём
+    закрытой смены (24-го): смену закрывают утром, и собранная в этот момент
+    заявка — заявка на сегодня. Ищем по дню закупки, иначе экран просит день,
+    под которым снимка нет, и считает заново — ровно то, от чего уходили.
+    """
+    db = _db_or_none()
+    if db is None or not buy_day: return {}
+    doc = await db.zayavki.find_one({"buy_day": buy_day, "base": {"$exists": True}},
+                                    sort=[("_id", -1)])
+    if not doc:
+        return {}
+    return {"day": doc["_id"], "base": doc.get("base") or {},
+            "buy_day": doc.get("buy_day") or "", "dist": doc.get("dist") or {},
+            "frozen_at": doc.get("frozen_at")}
+
+
 async def zayavka_freeze_last() -> dict:
     """Самая свежая замороженная заявка: {day, base, buy_day, dist, frozen_at}.
 

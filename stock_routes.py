@@ -1429,11 +1429,6 @@ async def order_rows(day: str = "") -> dict:
             log.warning(f"[stock] последняя заявка не прочитана: {e}")
             _last = {}
         day = _last.get("day") or _biz_day()
-    try:
-        _sup = await db.supply_of_day(day)
-    except Exception as e:                           # noqa: BLE001
-        log.warning(f"[stock] поставка дня не прочитана: {e}")
-        _sup = {}
     cat = _catalog()
     saved_norms = await db.get_stock_norms()
     try:
@@ -1461,11 +1456,25 @@ async def order_rows(day: str = "") -> dict:
     # предварительным: смену ещё не закрывали.
     try:
         _fr = await db.zayavka_freeze_get(day)
+        # Под этим днём снимка нет — может, это ДЕНЬ ЗАКУПКИ собранной заявки:
+        # экран спрашивает «на 25 сентября», а документ лежит под 24-м, днём
+        # закрытой смены. Тогда показываем его и дальше живём его днём: правки
+        # и выключенные районы принадлежат документу, а не календарю.
+        if not _fr:
+            _fr = await db.zayavka_freeze_for_buy(day)
+            if _fr:
+                day = _fr.get("day") or day
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[stock] снимок заявки не прочитан: {e}")
         _fr = {}
     frozen_base = _fr.get("base") or None
     _fr_dist = _fr.get("dist") or {}
+    # Поставку ищем уже уточнённым днём: она принадлежит документу заявки.
+    try:
+        _sup = await db.supply_of_day(day)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] поставка дня не прочитана: {e}")
+        _sup = {}
     moving, leaving = {}, {}
     if not frozen_base:
         try:

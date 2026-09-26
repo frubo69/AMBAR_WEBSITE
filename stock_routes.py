@@ -1475,13 +1475,21 @@ async def order_rows(day: str = "") -> dict:
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[stock] поставка дня не прочитана: {e}")
         _sup = {}
-    moving, leaving = {}, {}
+    moving, leaving, waiting = {}, {}, {}
     if not frozen_base:
         try:
             import move_routes
             moving, leaving = await move_routes.pending_qty()
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[stock] перемещения к заявке не прочитаны: {e}")
+        # Заказанное у магазина и ещё не забранное — такой же будущий приход,
+        # как перемещение. Не вычесть его значит купить одно и то же дважды
+        # (владелец, 26 сен 2026: Силикон не успели забрать, магазин отложил).
+        try:
+            import supply_routes as _sup_mod
+            waiting = await _sup_mod.pending_qty()
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[stock] заказанное и не забранное не прочитано: {e}")
     try:
         import stock_value
         costs = await stock_value.cost_map()
@@ -1489,6 +1497,7 @@ async def order_rows(day: str = "") -> dict:
         log.warning(f"[stock] закупочные цены не прочитаны: {e}")
         costs = {}
     rows, total_aed, total_qty, total_cost, moving_qty = [], 0, 0, 0.0, 0.0
+    pending_qty = 0.0                 # заказано у магазина и ждёт водителя
     leaving_qty = 0.0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
@@ -1508,11 +1517,12 @@ async def order_rows(day: str = "") -> dict:
                 norm = _num(b.get("norm"))
                 везут = _num(b.get("moving"))
                 уйдёт = _num(b.get("leaving"))
+                ждёт = _num(b.get("pending"))
                 calc = int(b.get("calc") or 0)
                 row_leave += int(b.get("leave_need") or 0)
                 пришло, ушло = _num(b.get("came")), _num(b.get("gone"))
             elif frozen_base:
-                have = sug = norm = везут = уйдёт = calc = 0
+                have = sug = norm = везут = уйдёт = ждёт = calc = 0
                 пришло = ушло = 0
             else:
                 d = per_district[oid]
@@ -1526,10 +1536,11 @@ async def order_rows(day: str = "") -> dict:
                 # магазин не отгружает, а приёмка считает коробки целыми.
                 везут = _num(moving.get((oid, pid), 0))
                 уйдёт = _num(leaving.get((oid, pid), 0))
-                calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут), 6)))
+                ждёт = _num(waiting.get((oid, pid), 0))
+                calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут - ждёт), 6)))
                 # Сколько заявка просит из-за того, что район отдаёт соседу:
                 # без перемещения этих единиц в клетке не было бы.
-                row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут), 6)))
+                row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут - ждёт), 6)))
                 пришло, ушло = _num(d["came"].get(pid) or 0), _num(d["gone"].get(pid) or 0)
             # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
             # которое предлагала программа, иначе непонятно, от чего отступили.
@@ -1541,6 +1552,7 @@ async def order_rows(day: str = "") -> dict:
                 need = 0                             # район выключен — не везём
             moving_qty += везут
             leaving_qty += уйдёт
+            pending_qty += ждёт
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc, "off": oid in off,
                           # Сколько едет к району от соседа по заявке на
@@ -1549,6 +1561,9 @@ async def order_rows(day: str = "") -> dict:
                           # Сколько район отдаёт соседу по открытой заявке —
                           # на полке этого уже как бы нет.
                           "leaving": уйдёт,
+                          # Сколько уже заказано у магазина и ждёт на базе:
+                          # заявка это вычла, иначе купили бы дважды.
+                          "pending": ждёт,
                           # Сколько из «есть» приехало уже после пересчёта и
                           # сколько с тех пор продали: владелец должен видеть,
                           # что число не с полки, а посчитанное.
@@ -1635,6 +1650,9 @@ async def order_rows(day: str = "") -> dict:
         "off": sorted(off),
         "total_qty": total_qty, "total_aed": total_aed,
         "total_cost": round(total_cost), "moving_qty": _num(moving_qty),
+        # Сколько уже заказано у магазина и ждёт на базе: заявка это
+        # вычла, и на экране стоит строкой — иначе выглядит как сбой.
+        "pending_qty": _num(pending_qty),
         "leaving_qty": _num(leaving_qty), "leaving_need": leaving_need,
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
@@ -1700,10 +1718,12 @@ async def freeze_order(day: str = "") -> dict:
         cells = {}
         for oid, c in (r.get("cells") or {}).items():
             if not any((c.get("have"), c.get("norm"), c.get("suggested"), c.get("calc"),
-                        c.get("moving"), c.get("leaving"), c.get("came"), c.get("gone"))):
+                        c.get("moving"), c.get("leaving"), c.get("pending"),
+                        c.get("came"), c.get("gone"))):
                 continue            # пустую клетку хранить незачем
             cells[oid] = {"have": c.get("have") or 0, "norm": c.get("norm") or 0,
                           "suggested": c.get("suggested") or 0, "calc": c.get("calc") or 0,
+                          "pending": c.get("pending") or 0,
                           "moving": c.get("moving") or 0, "leaving": c.get("leaving") or 0,
                           "came": c.get("came") or 0, "gone": c.get("gone") or 0,
                           # вклад перемещений в строку — чтобы не считать заново

@@ -1417,6 +1417,33 @@ async def intake_live() -> list:
     return out
 
 
+async def pending_qty() -> dict:
+    """{(район, позиция): единиц} — заказано у магазина и ещё не забрано.
+
+    Товар уже собран на базе и ждёт водителя. Просить его второй раз — значит
+    купить дважды: ровно то же правило, по которому заявка вычитает открытые
+    перемещения (move_routes.pending_qty). Повод — 25 сен 2026: водители не
+    успели забрать Силикон, магазин его отложил и пробил слип, а заявка
+    следующего дня собиралась попросить те же 86 единиц заново.
+
+    Принятое БЕЗ СКАНИРОВАНИЯ сюда не идёт: те бутылки уже на полке, их
+    прибавляет _noscan_after, и вычесть их вторым концом значит потерять их
+    дважды."""
+    out = {}
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        for oid, t in (sup.get("tasks") or {}).items():
+            if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
+                continue
+            for it in sup.get("items") or []:
+                need = float((it.get("by_district") or {}).get(oid) or 0)
+                if need <= 0:
+                    continue
+                left = need - float((it.get("got") or {}).get(oid) or 0)
+                if left > 1e-9:
+                    out[(oid, it["id"])] = out.get((oid, it["id"]), 0.0) + left
+    return out
+
+
 async def noscan_tasks() -> list:
     """Что принято без кодов и ещё не отсканировано — по всем открытым
     поставкам. Этим живут чек-лист и почасовое напоминание."""

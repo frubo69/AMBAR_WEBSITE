@@ -24701,6 +24701,8 @@ function ordRender(){
 
     ${d.moving_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.moving_qty)} ед</b> —
       их сегодня переместят между районами</div>` : ''}
+    ${d.pending_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.pending_qty)} ед</b> —
+      они уже заказаны и ждут на базе</div>` : ''}
     ${(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
       ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}

@@ -1397,7 +1397,7 @@ async def _base_calc(day: str, until: datetime | None = None) -> dict:
     return out
 
 
-async def order_rows(day: str = "") -> dict:
+async def order_rows(day: str = "", live: bool = False) -> dict:
     """Заявка на закупку: сколько довезти в каждый район, чтобы вернуться к норме.
 
     заявка = норма − остаток на руках. Норма берётся сохранённая (ноль — тоже
@@ -1455,12 +1455,18 @@ async def order_rows(day: str = "") -> dict:
     # редактировать»). Нет снимка — считаем живьём и честно помечаем расчёт
     # предварительным: смену ещё не закрывали.
     try:
-        _fr = await db.zayavka_freeze_get(day)
+        # live — считаем от склада и никаких снимков не читаем. Так зовёт
+        # freeze_order: новая заявка обязана родиться из живого расчёта.
+        # Без этого она собиралась бы из вчерашнего снимка: под сегодняшним
+        # днём его нет, а поиск по дню закупки находит вчерашний документ —
+        # и новая заявка выходила копией прежней (найдено 26 сен 2026, до
+        # того как это увидел владелец).
+        _fr = {} if live else await db.zayavka_freeze_get(day)
         # Под этим днём снимка нет — может, это ДЕНЬ ЗАКУПКИ собранной заявки:
         # экран спрашивает «на 25 сентября», а документ лежит под 24-м, днём
         # закрытой смены. Тогда показываем его и дальше живём его днём: правки
         # и выключенные районы принадлежат документу, а не календарю.
-        if not _fr:
+        if not _fr and not live:
             _fr = await db.zayavka_freeze_for_buy(day)
             if _fr:
                 day = _fr.get("day") or day
@@ -1712,7 +1718,7 @@ async def freeze_order(day: str = "") -> dict:
     if было:
         log.info(f"[stock] заявка за {day} уже заморожена — не трогаем")
         return {"ok": True, "already": True, "day": day}
-    data = await order_rows(day)
+    data = await order_rows(day, live=True)      # только от склада, не из вчерашнего снимка
     base = {}
     for r in data.get("all_rows") or []:
         cells = {}

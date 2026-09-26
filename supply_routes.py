@@ -258,7 +258,7 @@ async def _build_book(day: str):
     AMT = TOT + 1                              # Amount
     PL, TL, AL = get_column_letter(PR), get_column_letter(TOT), get_column_letter(AMT)
 
-    ws.cell(row=1, column=N, value=f"AMBAR · purchase order · {data['day']}")
+    ws.cell(row=1, column=N, value=f"Purchase order · {data['day']}")
     ws.cell(row=1, column=N).font = Font(bold=True, size=16)
     ws.cell(row=1, column=N).border = Border(bottom=thin)
     ws.merge_cells(start_row=1, start_column=N, end_row=1, end_column=I)
@@ -1746,7 +1746,7 @@ def _short_book(sup: dict, short: dict):
 
     N, C, I, W, D0 = 2, 3, 4, 5, 6
     LAST = D0 + len(dist) - 1; TOT = LAST + 1
-    ws.cell(row=1, column=N, value=f"AMBAR · shortfall · {sup.get('day') or ''}")
+    ws.cell(row=1, column=N, value=f"Shortfall · {sup.get('day') or ''}")
     ws.cell(row=1, column=N).font = Font(bold=True, size=16)
     ws.merge_cells(start_row=1, start_column=N, end_row=1, end_column=I)
     ws.row_dimensions[1].height = 21.6

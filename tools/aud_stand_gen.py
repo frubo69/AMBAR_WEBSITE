@@ -1,16 +1,18 @@
-"""Стенд строк ревизии из настоящего owner/index.html — до старта и в ходе.
+"""Стенд экрана недостачи из настоящего owner/index.html: строка ревизии,
+список ненайденных бутылок и карточка бутылки с её историей.
 
-Строка «не поднесли к камере» появлялась у КАЖДОЙ позиции ещё до начала
-ревизии: камера ничего не видела, значит не хватает всего. Стенд показывает
-обе половины рядом, чтобы смотреть глазами, а не читать пересказ.
+Берёт стили и сами функции панели регуляркой — как fb_stand_gen: смотреть
+надо на то, что человек увидит, а не на пересказ.
 
-    python3 tools/aud_stand_gen.py <dir> [ширина]   → <dir>/stand.html
+    python3 tools/aud_stand_gen.py <dir>   → <dir>/stand.html?view=row|idle|list|many|card
+
+view=idle — та же полка до начала ревизии: камера ничего не видела, и строка
+не должна кричать «не поднесли к камере» про то, к чему ещё не подходили.
 """
-import json, os, re, sys
+import os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
-W = sys.argv[2] if len(sys.argv) > 2 else "430"
 src = open(os.path.join(ROOT, "owner", "index.html"), encoding="utf-8").read()
 styles = re.findall(r"<style>(.*?)</style>", src, re.S)
 
@@ -21,64 +23,89 @@ def fn(name):
     return m.group(0)
 
 
-def line(pat):
-    m = re.search(pat, src)
-    assert m, pat
+def const(name, end=r";\n"):
+    m = re.search(r"(?:const|let) " + re.escape(name) + r" = .*?" + end, src, re.S)
+    assert m, name
     return m.group(0)
 
 
-# Строки как на снимке владельца: числится 8, кодов 12, камера не видела ничего.
-СТРОКИ = [
-    {"id": "p8",  "no": 50, "name": "Belvedere 1 ltr",   "expected": 8, "coded": 8, "actual": 0,
-     "missing": [{"code": "blv#0001"}] * 12},
-    {"id": "p7",  "no": 51, "name": "Grey Goose 1 ltr",  "expected": 7, "coded": 7, "actual": 0,
-     "missing": [{"code": "gg#0001"}] * 12},
-    {"id": "p6",  "no": 52, "name": "Beluga 0.7 ltr",    "expected": 4, "coded": 4, "actual": 0,
-     "missing": [{"code": "blg#0001"}] * 8},
-    {"id": "p9",  "no": 53, "name": "Ciroc 1 ltr",       "expected": 2, "coded": 2, "actual": 0,
-     "missing": [{"code": "cr#0001"}] * 2},
-    {"id": "p4",  "no": 54, "name": "Skyy Vodka 1 ltr",  "expected": 3, "coded": 3, "actual": 0,
-     "missing": [{"code": "sk#0001"}] * 3},
-]
-# Та же полка, но ревизия идёт: часть уже поднесли к камере.
-ИДЁТ = [dict(r, actual=a) for r, a in zip(СТРОКИ, [8, 5, 4, 0, 3])]
-ИДЁТ[1]["missing"] = [{"code": "gg#0001"}] * 2
-ИДЁТ[3]["missing"] = [{"code": "cr#0001"}] * 2
-for r in (ИДЁТ[0], ИДЁТ[2], ИДЁТ[4]):
-    r["missing"] = []
+ФУНКЦИИ = ["escS", "pluralize", "fmtQty", "_siRow", "_siTap", "scanInfo", "scanInfoHide",
+           "_distName", "_when", "_audU", "_audCoded", "_bizToday", "_dayIsoFor", "_audDayT", "audRow",
+           "audMissing", "audBottle", "_audHap"]
+
+СТРОКА = {
+    "id": "p59", "no": 41, "name": "Tanqueray 1 ltr", "unit": 1, "price": 220,
+    "expected": 3, "coded": 3, "actual": 2, "diff": 1, "noqr": 0, "gone": 0,
+    "missing": [{"code": "16807", "label": "tan#000021", "at": "2026-09-18 14:51:42",
+                 "from": "silicon", "from_code": "B3", "moved_at": "2026-09-20 18:08:58"}],
+}
+МНОГО = {
+    "id": "p1", "no": 1, "name": "Absolut 1 ltr", "unit": 1, "price": 180,
+    "expected": 21, "coded": 21, "actual": 16, "diff": 5, "noqr": 0, "gone": 0,
+    "missing": [{"code": f"229{i:02d}", "label": f"abs#0004{i:02d}", "at": "2026-09-21 16:08:55",
+                 "from": "", "from_code": "", "moved_at": ""} for i in range(6)]
+        + [{"code": f"224{i:02d}", "label": f"abs#0002{i:02d}", "at": "2026-09-18 05:12:00",
+            "from": "", "from_code": "", "moved_at": ""} for i in range(6)],
+}
+БУТЫЛКА = {
+    "code": "16807", "label": "tan#000021", "product_name": "Tanqueray 1 ltr",
+    "district": "tecom", "status": "active",
+    "story": [{"at": "2026-09-18T14:51:42", "what": "заведена", "who": "AMBAR STAR", "where": "tecom"},
+              {"at": "2026-09-20T18:08:58", "what": "переезд", "who": "AMBAR STAR", "where": "silicon → tecom"},
+              {"at": "2026-09-22T14:10:00", "what": "ревизия", "who": "", "where": "tecom"}],
+}
 
 html = f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Строки ревизии</title>
-<link rel="stylesheet" href="{os.path.join(ROOT, "vendor", "fonts.css")}">
+<title>Стенд · недостача</title>
 <style>{''.join(styles)}</style>
 <style>
-  body{{margin:0;background:var(--bg);width:{W}px}}
-  .stand{{padding:14px 12px 20px}}
-  .stand h3{{font:700 12px/1 'Space Grotesk',sans-serif;letter-spacing:.08em;
-    text-transform:uppercase;color:var(--muted);margin:18px 0 8px}}
+  body{{margin:0;background:var(--bg,#0a0b10);color:#fff;font-family:Inter,system-ui,sans-serif}}
+  #phone{{width:390px;margin:0 auto;padding:18px 14px 40px;box-sizing:border-box}}
+  .aud-rows{{border-radius:16px;overflow:hidden;background:var(--card)}}
+  h4{{margin:18px 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(255,255,255,.45);font-weight:700}}
 </style></head><body>
-<div class="stand">
-  <h3>До старта — «Начать ревизию»</h3>
-  <div class="aud-rows" id="idle"></div>
-  <h3>Ревизия идёт</h3>
-  <div class="aud-rows" id="run"></div>
+<div id="phone">
+  <h4>Строка ревизии</h4>
+  <div class="aud-rows" id="rows"></div>
+  <h4>Что откроется по нажатию</h4>
+  <div id="hint" style="font-size:12px;color:rgba(255,255,255,.45)">…</div>
+</div>
+<div class="scan-info-scrim" id="scanInfoScrim" onclick="scanInfoHide()"></div>
+<div class="scan-info" id="scanInfo" role="dialog" aria-label="Бутылка">
+  <div class="scan-info-grab"></div>
+  <div id="scanInfoBody"></div>
 </div>
 <script>
-{line(r"const _CHEV = `[^`]*`;")}
-{line(r"function escS\(s\)\{.*")}
-{line(r"function _audU\(r\)\{.*")}
-{line(r"function _audCoded\(r\)\{.*")}
-{fn("fmtQty")}
-{fn("audRow")}
-function audMissing(){{}}
-document.getElementById('idle').innerHTML =
-  {json.dumps(СТРОКИ, ensure_ascii=False)}.map(r => audRow(r, true)).join('');
-document.getElementById('run').innerHTML =
-  {json.dumps(ИДЁТ, ensure_ascii=False)}.map(r => audRow(r, false)).join('');
+{const('_CHEV', r"`;\n")}
+{const('SHIFT_START_HOUR', chr(10))}
+{const('MONTHS_GEN')}
+{const('MONTHS_RU')}
+{const('_SI_ICON')}
+const STK = {{district: 'tecom', districts: [
+  {{id:'jvc',code:'B1',name:'JVC'}}, {{id:'bbay',code:'B2',name:'Бизнес Бей'}},
+  {{id:'silicon',code:'B3',name:'Силикон'}}, {{id:'alguses',code:'B4',name:'Алгусес'}},
+  {{id:'tecom',code:'B5',name:'Тиком'}}]}};
+STK.sheet = {{day: '2026-09-23', rows: [{СТРОКА!r}, {МНОГО!r}]}};
+const ownerApi = {{ ownerFetch: async () => ({БУТЫЛКА!r}) }};
+const Telegram = {{WebApp:{{HapticFeedback:{{impactOccurred(){{}},notificationOccurred(){{}},selectionChanged(){{}}}}}}}};
+{''.join(fn(n) for n in ФУНКЦИИ)}
+const view = new URLSearchParams(location.search).get('view') || 'row';
+// Второй аргумент audRow — «ревизию ещё не начинали». Обёртка обязательна:
+// .map(audRow) подставил бы туда индекс строки, и со второй строки подсказка
+// пропадала бы сама.
+const пусто = view === 'idle';
+document.getElementById('rows').innerHTML =
+  STK.sheet.rows.map(r => audRow(r, пусто)).join('');
+document.getElementById('hint').textContent =
+  пусто ? 'до старта: число нейтральное, подсказки нет, строка не нажимается'
+  : view === 'row' ? 'нажатие на строку открывает список ненайденных' : '';
+if(view === 'list') audMissing('p59');
+if(view === 'many') audMissing('p1');
+if(view === 'card') audBottle('16807', 'p59');
 </script></body></html>"""
 
-os.makedirs(OUT, exist_ok=True)
-путь = os.path.join(OUT, "stand.html")
-open(путь, "w", encoding="utf-8").write(html)
-print(путь)
+html = html.replace("&quot;", '"')
+open(os.path.join(OUT, "stand.html"), "w", encoding="utf-8").write(html)
+print(os.path.join(OUT, "stand.html"))

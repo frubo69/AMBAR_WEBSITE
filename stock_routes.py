@@ -45,7 +45,7 @@ from config_stock_order import order_key      # порядок обхода по
 log = logging.getLogger("stock")
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-from bizday import SHIFT_START_HOUR      # граница суток одна на всю систему (bizday)
+from bizday import SHIFT_START_HOUR, next_day   # граница суток одна на всю систему (bizday)
 NORM_COVER_DAYS = 3         # на сколько дней запаса рассчитана норма по умолчанию
 STALE_DAYS = 7              # через сколько дней позицию пора проверить заново
 HISTORY_DEPTH = 45          # сколько пересчётов смотреть назад в поисках проверки
@@ -1643,7 +1643,10 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
                    if _sup else None),
         "frozen_at": (_fr.get("frozen_at").isoformat()
                       if hasattr(_fr.get("frozen_at"), "isoformat") else (_fr.get("frozen_at") or "")),
-        "buy_day": _fr.get("buy_day") or "",
+        # День закупки. У замороженной заявки он записан, у живой — это
+        # следующий день смены: заявку собирают под утро и везут по ней в
+        # тот же день, а не в уходящую смену (владелец, 26 сен 2026).
+        "buy_day": _fr.get("buy_day") or next_day(day),
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
                        "name": OFFICE_NAMES.get(o, o),
                        "counted": (_fr_dist.get(o, {}).get("counted") if frozen_base
@@ -1743,10 +1746,11 @@ async def freeze_order(day: str = "") -> dict:
         if ln and r["id"] in base:
             первая = next(iter(base[r["id"]]))
             base[r["id"]][первая]["leave_need"] = ln
-    # День закупки — календарный по Дубаю: смену закрывают утром, и заявка,
-    # собранная в этот момент, — заявка на СЕГОДНЯ, а не на уходящую смену
-    # (владелец, 25 сен 2026).
-    buy_day = datetime.now(DUBAI_TZ).date().isoformat()
+    # День закупки — всегда следующий за днём смены. Смену закрывают под
+    # утро (замеряно: 05:50–09:17 по Дубаю), файл уходит тогда же, и везут
+    # по нему в этот же день. Считаем от дня смены, а не по стенным часам:
+    # закрыли смену вечером того же дня — и день закупки уехал бы назад.
+    buy_day = next_day(day)
     dist = {d["id"]: {"counted": bool(d.get("counted")), "came": d.get("came") or 0}
             for d in data.get("districts") or []}
     ok = await db.zayavka_freeze_set(day, base, buy_day, dist)

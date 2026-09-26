@@ -139,7 +139,8 @@ async def handle_send(request):
     raw, name = await _build_book((request.query.get("day") or "").strip())
     form = _aiohttp.FormData()
     form.add_field("chat_id", str(request.get("owner_id") or 0))
-    form.add_field("caption", f"Заявка в магазин · {name[15:-5]}")
+    form.add_field("caption", "Заявка в магазин · "
+                + name.removeprefix("AMBAR-zayavka-").removesuffix(".xlsx"))
     form.add_field("document", raw, filename=name,
                    content_type="application/vnd.openxmlformats-officedocument."
                                 "spreadsheetml.sheet")
@@ -195,6 +196,11 @@ async def _build_book(day: str):
     from openpyxl.utils import get_column_letter
 
     data = await _order_rows(day)
+    # Заявку датируем днём закупки, а не уходящей сменой: файл уходит в
+    # магазин под утро, и дата на нём — та, в которую мы приедем. Иначе
+    # утром перед тобой лежит документ со вчерашним числом и выглядит
+    # старым (владелец, 26 сен 2026).
+    buy = data.get("buy_day") or data["day"]
     # В файл едет только то, что просим. Позиция, которой не нужно ни одной
     # бутылки, — это пустая строка среди сотни таких же: магазин листает их
     # глазами, ищет, где же цифры, и однажды пропустит настоящую. Понадобится
@@ -258,7 +264,7 @@ async def _build_book(day: str):
     AMT = TOT + 1                              # Amount
     PL, TL, AL = get_column_letter(PR), get_column_letter(TOT), get_column_letter(AMT)
 
-    ws.cell(row=1, column=N, value=f"Purchase order · {data['day']}")
+    ws.cell(row=1, column=N, value=f"Purchase order · {buy}")
     ws.cell(row=1, column=N).font = Font(bold=True, size=16)
     ws.cell(row=1, column=N).border = Border(bottom=thin)
     ws.merge_cells(start_row=1, start_column=N, end_row=1, end_column=I)
@@ -398,7 +404,7 @@ async def _build_book(day: str):
 
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     raw = _with_cached_values(buf.read(), calc)
-    name = f"AMBAR-zayavka-{data['day']}.xlsx"
+    name = f"AMBAR-zayavka-{buy}.xlsx"
     log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
              f"из них с потребностью {sum(1 for r in rows if r['need_total'])}, "
              f"на {money:,.2f} AED, без цены {sum(1 for r in rows if not price_of(r['id']))}")

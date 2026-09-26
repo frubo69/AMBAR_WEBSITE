@@ -25392,7 +25392,10 @@ async function _ordFile(){
     + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
   if(!res.ok) throw new Error('export ' + res.status);
   const blob = await res.blob();
-  const name = 'AMBAR-zayavka-' + ((ORD && ORD.d && ORD.d.day) || '') + '.xlsx';
+  // Имя — по дню закупки, как и у файла с сервера: запрос идёт днём
+  // смены, а называется документ тем днём, в который по нему поедут.
+  const name = 'AMBAR-zayavka-'
+            + ((ORD && ORD.d && (ORD.d.buy_day || ORD.d.day)) || '') + '.xlsx';
   return new File([blob], name,
     {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }

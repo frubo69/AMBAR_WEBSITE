@@ -107,13 +107,19 @@ async def on_all_closed(day: str, state: dict) -> bool:
                     f"(+{again['orders']} зак., +{again['revenue']} AED) — уточняем")
     await db.shift_day_snapshot(day, {"orders": orders, "revenue": revenue})
 
+    # Заявка, собранная при закрытии смены, — заявка на СЛЕДУЮЩИЙ день:
+    # смену закрывают под утро, и везут по ней в этот же день. Подписи и
+    # файл датируем им, чтобы документ не выглядел вчерашним.
+    from bizday import next_day
+    buy = next_day(day)
+
     rows = "\n".join(
         f"• {_md(d['code'])} {_md(d['name'])} — {d['orders']} зак. · {_fmt(d['revenue'])} AED"
         + (f" · висит {d['open']}" if d["open"] else "")
         for d in dd)
 
     if again:
-        head = (f"📑 *Заявка уточнена — {day}*\n"
+        head = (f"📑 *Заявка уточнена — {buy}*\n"
                 f"После первой сборки район открывали заново и добавили "
                 f"{again['orders']} {_plural(again['orders'], 'заказ', 'заказа', 'заказов')} "
                 f"на {_fmt(again['revenue'])} AED. Прежний файл неполный — "
@@ -180,7 +186,7 @@ async def on_all_closed(day: str, state: dict) -> bool:
             try:
                 ok, err = await supply_routes._send_doc(
                     uid, raw, name,
-                    ("Уточнённая заявка · " if again else "Заявка в магазин · ") + day)
+                    ("Уточнённая заявка · " if again else "Заявка в магазин · ") + buy)
                 if not ok:
                     log.warning(f"[shift] файл {uid}: {err}")
             except Exception as e:

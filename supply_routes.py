@@ -273,7 +273,7 @@ async def _build_book(day: str):
     ws.cell(row=2, column=N,
             value="Please correct the quantities you can supply and send the file back. "
                   "Price is our purchase price per bottle / per case of 24. "
-                  "Total and Amount add up by themselves. Do not change the Code and Price columns.")
+                  "Total and Amount add up by themselves. Do not change the Price column.")
     ws.merge_cells(start_row=2, start_column=N, end_row=2, end_column=AMT)
     for col in range(N, AMT + 1):
         c = ws.cell(row=2, column=col)
@@ -381,6 +381,12 @@ async def _build_book(day: str):
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
     ws.column_dimensions[get_column_letter(N)].width = 7.11
     ws.column_dimensions[get_column_letter(C)].width = 10
+    # Код спрятан, а не убран (владелец, 27 сен 2026: «чтобы человеческий глаз
+    # не видел, а программа читала»). Убрать его нельзя: возвращённый магазином
+    # файл раскладывается обратно ровно по этой колонке — без неё handle_import
+    # отвергает файл целиком. Спрятанная колонка лежит в книге как обычная,
+    # openpyxl читает её не глядя на hidden.
+    ws.column_dimensions[get_column_letter(C)].hidden = True
     ws.column_dimensions[get_column_letter(I)].width = 40
     ws.column_dimensions[PL].width = 13
     for col in range(D0, LAST + 1):
@@ -1803,6 +1809,7 @@ def _short_book(sup: dict, short: dict):
     ws.column_dimensions["A"].width = 29.55
     ws.column_dimensions[get_column_letter(N)].width = 7.11
     ws.column_dimensions[get_column_letter(C)].width = 10
+    ws.column_dimensions[get_column_letter(C)].hidden = True    # как в заявке
     ws.column_dimensions[get_column_letter(I)].width = 40
     ws.column_dimensions[get_column_letter(W)].width = 22
     for col in range(D0, LAST + 1):

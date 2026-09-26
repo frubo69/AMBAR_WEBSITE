@@ -77,6 +77,15 @@ async def main():
     eq("имя файла", name, "AMBAR-zayavka-2026-09-22.xlsx")
     wf = load_workbook(io.BytesIO(raw))["Order"]
     wv = load_workbook(io.BytesIO(raw), data_only=True)["Order"]
+    # Код спрятан от глаз магазина, но лежит в книге и читается программой
+    # (владелец, 27 сен 2026). Проверяем обе половины: и что не видно, и что
+    # значение на месте, — иначе «спрятали» однажды превратится в «убрали».
+    eq("колонка Code спрятана", wf.column_dimensions["C"].hidden, True)
+    eq("и код в ней всё равно есть", wf["C4"].value, "p1")
+    eq("а видимые колонки не спрятаны",
+       [wf.column_dimensions[c].hidden for c in ("B", "D", "E", "K", "L")],
+       [False] * 5)
+    eq("красная полоса про код не говорит", "Code" in str(wv["B2"].value), False)
     hdr = [wv.cell(row=3, column=c).value for c in range(2, 13)]
     eq("колонки", hdr, ["№", "Code", "Item", "Price, AED", "B1 JVC", "B2 Business Bay", "B3 Silicon Oasis",
                         "B4 Al Qusais", "B5 Tecom", "Total", "Amount, AED"])

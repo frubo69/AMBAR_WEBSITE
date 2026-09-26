@@ -25789,6 +25789,10 @@ let ACC_IN = null, QR_IN = null, QR_POLL = null;
 // Внесённое за этот заход: с камеры на список и обратно, пока не нажали
 // «Сохранить и добавить на склад». «Выйти» откатывает всё внесённое за заход.
 let QR_SESS = [], QR_NEED = false;
+// Пришли за долгом по пересчёту — в списке только позиции без кодов.
+// QR_ALL поднимается кнопкой «Показать весь каталог»: иногда код надо
+// завести позиции, которой в долге нет.
+let QR_ALL = false;
 // Долг позиции, по которой нажали в режиме «по пересчёту», — знаменатель
 // счётчика на камере: «0/29», «1/29»…
 let QR_GOAL = 0;
@@ -27052,14 +27056,15 @@ let QR_CATF = 'all';
 // Серый треугольник справа у строки: видно, что нажимается и ведёт дальше.
 const _PK_TRI = `<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true"><path d="M8 5l8 7-8 7z" fill="currentColor"/></svg>`;
 function qrPick(district){
-  QR_DIST = district; QR_CATF = 'all';
+  QR_DIST = district; QR_CATF = 'all'; QR_ALL = false;
   distRemember('qr', district);
   const d = (STK.districts || []).find(x => x.id === district) || {};
   // Точка хранения — в заголовке и по ней же выбор: тот же приём, что в
   // ревизии. Название точки крупнее «что сканируем» не случайно — на этом
   // экране первым делом отвечают именно на вопрос «где я».
   const head = _qrHead(`${d.code || ''} ${d.name || ''}`.trim() || 'Точка',
-                       QR_FOUND ? `${QR_FOUND.code} · выберите позицию` : 'выберите позицию',
+                       QR_FOUND ? `${QR_FOUND.code} · выберите позицию`
+                       : QR_NEED ? 'позиции без QR кода' : 'выберите позицию',
                        QR_FOUND ? () => { QR_FOUND = null; qrHome(); } : () => qrLeave());
   const box = document.querySelector('#accOv .stk-ttl');
   if(box){
@@ -27084,7 +27089,10 @@ function qrPick(district){
   // Долг по позициям — свежий: со сканера сюда возвращаются с новыми кодами,
   // и красные числа обязаны уменьшиться без перезахода.
   ownerApi.ownerFetch('/api/owner/qr').then(d => { ACC_QR = d;
-    if(document.getElementById('qrList') && QR_DIST === district) qrRenderList(); }).catch(() => {});
+    // И чипы тоже: до ответа реестра список не отфильтрован, и в чипах стоял
+    // бы весь каталог.
+    if(document.getElementById('qrList') && QR_DIST === district){ qrRenderCats(); qrRenderList(); }
+  }).catch(() => {});
 }
 
 async function qrLoadCatalog(){
@@ -27097,12 +27105,33 @@ async function qrLoadCatalog(){
   qrRenderList();
 }
 
+// Сколько бутылок этой точки ждут кода, по позициям.
+function _qrNeedMap(){ return ((ACC_QR && ACC_QR.unscanned_by_product) || {})[QR_DIST] || {}; }
+// Список позиций на экране: пришли за долгом — только те, у кого код не
+// внесён. Весь каталог здесь не нужен: человек пришёл закрыть долг, а не
+// листать сто двадцать строк (владелец, 27 сен 2026: «зачем мне весь
+// остальной список??»). Реестр ещё не приехал — не фильтруем, иначе список
+// моргнёт пустым.
+function _qrOnlyNeed(){ return QR_NEED && !QR_ALL && !!(ACC_QR && ACC_QR.unscanned_by_product); }
+function _qrBase(){
+  const need = _qrNeedMap();
+  return _qrOnlyNeed() ? (QR_CAT || []).filter(p => (need[p.id] || 0) > 0) : (QR_CAT || []);
+}
+function qrShowAll(){
+  QR_ALL = true; QR_CATF = 'all';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  qrRenderCats(); qrRenderList();
+}
+
 function qrRenderCats(){
   const box = document.getElementById('qrCats'); if(!box) return;
+  const база = _qrBase();
   const cnt = {};
-  (QR_CAT || []).forEach(p => { cnt[p.cat || '—'] = (cnt[p.cat || '—'] || 0) + 1; });
+  база.forEach(p => { cnt[p.cat || '—'] = (cnt[p.cat || '—'] || 0) + 1; });
   const cats = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
-  box.innerHTML = [['all', 'Все', (QR_CAT || []).length]]
+  // Одна категория — полоса чипов ничего не выбирает и только занимает место.
+  if(cats.length < 2){ box.innerHTML = ''; return; }
+  box.innerHTML = [['all', 'Все', база.length]]
     .concat(cats.map(c => [c, c, cnt[c]]))
     .map(([id, name, n]) => `<button class="pk-cat ${QR_CATF === id ? 'on' : ''}"
       onclick="qrCat('${escS(id)}')">${escS(name)}<i>${n}</i></button>`).join('');
@@ -27118,15 +27147,22 @@ function qrRenderList(){
   // внесений». Справа только бронь и красный долг из ревизии.
   // Позиции, у которых на полке лежит больше, чем заведено кодами, — красным:
   // они ждут камеры. Число справа у них — сколько ещё без кодов.
-  const need = ((ACC_QR && ACC_QR.unscanned_by_product) || {})[QR_DIST] || {};
+  const need = _qrNeedMap();
   const slugs = (ACC_QR && ACC_QR.slugs) || {};
   // Порядок — как в рабочей таблице и на бумажном листе: 1…123. Считают,
   // стоя у полки, и алфавит здесь означал бы прыгать по залу.
-  const rows = (QR_CAT || []).filter(p =>
+  const rows = _qrBase().filter(p =>
     (QR_CATF === 'all' || (p.cat || '—') === QR_CATF) &&
     (!q || (p.name || '').toLowerCase().includes(q) ||
            (slugs[p.id] || '').includes(q)))
     .sort((a, b) => (a.no || 999) - (b.no || 999));
+  // Выход из короткого списка: позиции, которой в долге нет, иначе не найти.
+  const хвост = _qrOnlyNeed()
+    ? `<button class="aud-more" onclick="qrShowAll()">весь каталог${_CHEV}</button>` : '';
+  // Пусто по-разному: долг закрыт — это хорошая новость, а не «не нашлось».
+  const пусто = _qrOnlyNeed() && !q
+    ? `<div class="scan-empty">Все коды внесены</div>${хвост}`
+    : '<div class="scan-empty">Ничего не нашлось</div>' + хвост;
 
   document.getElementById('qrList').innerHTML = rows.length ? rows.map(p => {
     const lock = _lockOn(QR_DIST, p.id);
@@ -27148,7 +27184,7 @@ function qrRenderList(){
           <span class="pk-name">${escS(p.name || '')}</span>
           <span class="pk-slug">${escS(slugs[p.id] || '')}</span>
         </span>${tag}<span class="pk-go">${_PK_TRI}</span></button>`;
-  }).join('') : '<div class="scan-empty">Ничего не нашлось</div>';
+  }).join('') + хвост : пусто;
 }
 
 // Долг позиции: у крепкого бутылки, у пива — только коробки, без банок в

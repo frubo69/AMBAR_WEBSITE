@@ -16330,17 +16330,24 @@ function audUnits(rows){
   });
   return t;
 }
-function audRow(r){
+function audRow(r, idle){
   const dim = !r.expected && !r.actual;
   const u = _audU(r), c = _audCoded(r);
+  // До старта камера ничего и не должна была увидеть: красный ноль у каждой
+  // строки — не недостача, а «ещё не подходили». Гасим его тем же правилом,
+  // каким карточка не показывает расхождения до старта (владелец, 27 сен
+  // 2026: «что значит не поднесли к камере?» — вся полка была в красном).
+  //
   // Зелёное — увидели всё, что числится; «излишек» — больше, чем кодовых;
   // остальное нейтрально: бутылки без кодов камера увидеть не может.
-  const cls = dim ? 'dim' : r.actual === r.expected ? 'ok' : r.actual > c ? 'over' : '';
+  const cls = dim || idle ? 'dim' : r.actual === r.expected ? 'ok' : r.actual > c ? 'over' : '';
   const sub = r.noqr ? `<span class="aud-r-s dn">QR код не внесён · ${fmtQty(r.noqr / u)}</span>` : '';
   // Не хватает — значит есть что искать: строка открывает список бутылок,
   // которых камера не видела (владелец, 24 сен 2026: «что теперь с
   // недостачей?»). Без списка «не хватает 1» идти к полке не с чем.
-  const ищем = (r.missing || []).length;
+  // До старта список не предлагаем вовсе: искать нечего, ревизию ещё не
+  // начинали, а строка «не поднесли к камере» стояла бы у каждой позиции.
+  const ищем = idle ? 0 : (r.missing || []).length;
   const найти = ищем ? `<span class="aud-r-s find">не поднесли к камере · ${ищем}${_CHEV}</span>` : '';
   const tag = ищем ? 'button' : 'div';
   return `<${tag} class="aud-r${dim ? ' dim' : ''}${ищем ? ' find' : ''}"${
@@ -16426,10 +16433,12 @@ function audPage(){
   // под списком: сто строк с нулями заслоняли бы те сорок, ради которых пришли.
   const live = rows.filter(r => r.expected || r.actual);
   const rest = rows.filter(r => !r.expected && !r.actual);
-  box.innerHTML = audCard(sh) + `<div class="aud-rows">${live.map(audRow).join('')}${rest.length ? `
+  const пусто = st === 'idle';            // ревизию ещё не начинали
+  const строка = r => audRow(r, пусто);
+  box.innerHTML = audCard(sh) + `<div class="aud-rows">${live.map(строка).join('')}${rest.length ? `
     <button class="aud-more${STK.audMore ? ' open' : ''}" onclick="audMore()">${
       live.length ? '' : 'на складе пусто · '}ещё ${rest.length}${_CHEV}</button>${
-      STK.audMore ? rest.map(audRow).join('') : ''}` : ''}</div>`;
+      STK.audMore ? rest.map(строка).join('') : ''}` : ''}</div>`;
   // Внизу — всегда следующий шаг работы. У завершённой это «возобновить»:
   // забыли полку, спутали район — всякое бывает; отчёт открывается из карточки.
   // Ни одного кода на районе — камере нечего узнавать, и ревизия сказала бы

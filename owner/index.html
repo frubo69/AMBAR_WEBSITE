@@ -3934,6 +3934,29 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-ddcgo{min-height:46px;border-top:1px solid rgba(255,255,255,.05)}
 .fb-ddcgo span{color:var(--gold2);font-weight:700;letter-spacing:.2px}
 .fb-safe-k .fb-r > span{font-size:14px}
+/* Макет владельца, 27 сен 2026 — «пиксель в пиксель»: у каждой стопки свой
+   значок в квадрате слева, между дирхамами и USDT вертикальная черта, а
+   стрелки круглые и залиты золотом. */
+/* Тот же селектор, что у подписи строки (.sc-r span{flex:1}), поэтому
+   квадрат надо прижать точнее — иначе он растягивается на всю строку. */
+.sc-r span.fb-ic{flex:0 0 36px;width:36px;height:36px;border-radius:11px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);
+  background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.16)}
+.fb-ic svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.fb-safe-k .fb-r{padding-left:10px;gap:11px}
+.fb-safe .fb-ddcgo{padding-left:10px;gap:11px}
+/* Залитая золотом стрелка — и в шапке, и в строках сейфа. */
+.fb-safe .fb-r > em,.fb-safe .fb-ddcgo > em,.fb-safe .fb-safe-h .fb-chev{
+  width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#E8C98A,#C9A96E);
+  color:#1a1408;box-shadow:0 2px 8px rgba(201,169,110,.25)}
+.fb-safe .fb-r > em svg,.fb-safe .fb-ddcgo > em svg,.fb-safe .fb-safe-h .fb-chev svg{
+  stroke-width:2.6}
+/* Черта между дирхамами и монетами: две разные деньги, а не одно число. */
+.fb-safe-usdt{padding-left:12px;border-left:1px solid rgba(201,169,110,.28)}
+/* «Отчёт ДДС» — обычной подписью, как остальные строки: золотом он спорил со
+   стрелкой, которая теперь и так золотая. */
+.fb-ddcgo span{color:var(--text);font-weight:600;letter-spacing:.2px}
 /* ── «Аналитика месяца» ──
    Закреплена сверху экрана: страница едет под ней, а сама карточка в
    прокрутке сжимается до полосы с четырьмя числами (владелец, 20 сен 2026).
@@ -19924,9 +19947,21 @@ function fbRow(label, key, v, o){
 }
 function fbGo(label, key, v, go, o){
   o = o || {};
-  return `<button class="sc-r fb-r ${o.cls || ''}" onclick="${go}" style="cursor:pointer"><span>${label}</span>${
+  // Значок слева — только там, где его попросили (макет сейфа, 27 сен 2026).
+  // Остальные строки «Финансов» остаются как были.
+  const ic = o.ico ? `<span class="fb-ic">${o.ico}</span>` : '';
+  return `<button class="sc-r fb-r ${o.cls || ''}" onclick="${go}" style="cursor:pointer">${ic}<span>${label}</span>${
     fbB(key, v, o)}<em${o.em ? ` class="${o.em}"` : ''}>${_SC_CHEV}</em></button>`;
 }
+// Значки стопок сейфа. Рисуем сами: рыба — Барракуда, люди — РП, монеты —
+// крипта, закладка — ЧП, лист — отчёт ДДС.
+const FB_ICO = {
+  b: '<svg viewBox="0 0 24 24"><path d="M15.8 12c0 3-3.1 5.4-6.9 5.4S2 15 2 12s3.1-5.4 6.9-5.4S15.8 9 15.8 12z"/><path d="M15.8 12 22 7.7v8.6z"/><circle cx="6.2" cy="10.6" r=".85"/></svg>',
+  rp: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 19a6.2 6.2 0 0 1 12.4 0"/><path d="M16.2 5.4a3.2 3.2 0 0 1 0 6.1M17.6 13.6A6.2 6.2 0 0 1 21.6 19"/></svg>',
+  wal: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.2" rx="7.4" ry="2.8"/><path d="M4.6 6.2v5.4c0 1.5 3.3 2.8 7.4 2.8s7.4-1.3 7.4-2.8V6.2"/><path d="M4.6 11.6v5.4c0 1.5 3.3 2.8 7.4 2.8s7.4-1.3 7.4-2.8v-5.4"/></svg>',
+  np: '<svg viewBox="0 0 24 24"><path d="M6.4 3.4h11.2v17.2L12 16.3l-5.6 4.3z"/></svg>',
+  ddc: '<svg viewBox="0 0 24 24"><path d="M6 2.6h7.6L18.6 7.6V21.4H6z"/><path d="M13.4 2.6v5.2h5.2"/><path d="M9 12.6h6M9 16.2h6"/></svg>',
+};
 // Поле ввода. val — записанное значение (null — пусто); ph — что показать
 // пустым (число по умолчанию); unit — подпись после поля; eu — подпись,
 // пока поле пустое («по норме», «по заказу»); phk — ключ, по которому
@@ -20396,15 +20431,15 @@ function fbHubHtml(b, err){
     <!-- Порядок стопок: Барракуда, РП, Крипта, ЧП — и здесь, и на экране «Сейф»
          (владелец, 20 сен 2026: «крипта в сейфе должна быть перед чп»). -->
     <div class="fb-safe-k">
-      ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе'})}
-      ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg'})}
+      ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе', ico: FB_ICO.b})}
+      ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg', ico: FB_ICO.rp})}
       ${fbGo('Крипта', 'safe.wal', wal ? wal.aed : null, "fbOpenWal()",
-             {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT'})}
-      ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg'})}
+             {unit: wal ? `AED · ${fmtUsdt(wal.usdt)} USDT` : 'USDT', ico: FB_ICO.wal})}
+      ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg', ico: FB_ICO.np})}
     </div>
     <!-- Отчёт ДДС — низом карточки сейфа (владелец, 20 сен 2026: «добавь сюда
          вниз кнопку — отчёт ДДС»): весь день движений деньгами одной лентой. -->
-    <button class="sc-r fb-ddcgo" onclick="accOpen('finddc')"><span>Отчёт ДДС</span><em>${_SC_CHEV}</em></button>
+    <button class="sc-r fb-ddcgo" onclick="accOpen('finddc')"><span class="fb-ic">${FB_ICO.ddc}</span><span>Отчёт ДДС</span><em>${_SC_CHEV}</em></button>
   </div>
   <div class="sc fb-hub">
     ${fbCapT('Зарплаты/удержания')}

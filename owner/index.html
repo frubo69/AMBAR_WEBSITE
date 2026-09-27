@@ -39022,13 +39022,16 @@ const DETAIL = {
                <div class="dt-row-s">${t.bottles||0} ${pluralize(t.bottles||0,'бутылка','бутылки','бутылок')}${parts.length?' · '+parts.join(' · '):''}</div></div>
                <div class="dt-row-r" style="color:var(--gold2)"><span data-aed="${t.total}">${fmt(t.total)}</span> AED</div></div>`;
            })()}
-          ${(()=>{ const sp=f.spend_out||{}; if(!(+sp.total>0)) return '';
+          ${(()=>{ const sp=f.spend_out||{}; if(!(+sp.total>0) && !(+sp.card>0)) return '';
              // Расход в шапке — одна цифра, а вопрос всегда следующий: из чего.
              // Поэтому строка раскрывается: сначала по людям, потом сами разовые
              // с комментарием водителя, за что он их просил.
              const parts=[];
              if(+sp.meal>0)  parts.push('питание '+fmt(sp.meal));
              if(+sp.extra>0) parts.push('доп. расходы '+fmt(sp.extra));
+             // Безнал стоит рядом, но в расход не входит: из наличных водителя
+             // он не уходил. Без этой строки расход выглядел бы неполным.
+             if(+sp.card>0) parts.push('безналом '+fmt(sp.card)+' — мимо наличных');
              const r=sp.meal_rates||{};
              if(sp.days_working||sp.days_off) parts.push(
                (sp.days_working||0)+' раб.'+((sp.days_off||0)?' · '+sp.days_off+' вых.':''));

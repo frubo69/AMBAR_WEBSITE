@@ -478,13 +478,22 @@ def _order_summary(o):
 async def _drivers_spend(start, end) -> dict:
     """Расходы водителей за окно: питание плюс согласованные разовые.
 
-    Считаем ровно то, что уже стало расходом. Ждущее согласования — ещё не
-    деньги: владелец может отклонить, и вычитать это из выручки заранее значит
-    показывать ему убыток, которого может не случиться.
+    Считаем ровно то, что уже стало расходом И ушло из наличных. Ждущее
+    согласования — ещё не деньги: владелец может отклонить, и вычитать это из
+    выручки заранее значит показывать ему убыток, которого может не случиться.
+    Оплаченное картой и расход по заказу в долг наличных не трогали — в сумму
+    не идут (безнал отдаётся отдельным полем card). Возврат («нам вернули»)
+    расход уменьшает: сумма берётся со знаком, как в «Сборе выручки».
+
+    Одна арифметика с `_cash_amounts`: пока здесь стоял модуль суммы и безнал
+    вычитался наравне с наличными, «Обзор» за 24.09.26 показывал расход 3 003
+    против 953 в «Сборе выручки», и выручка дня выходила на 1 810 меньше той,
+    что водители реально сдали.
 
     Дни здесь учётные, а не календарные: driver_days пишется тем же учётным
     днём, что и заказы, поэтому окно берём по его границам."""
     import config_staff as _staff
+    import expense_routes as _exp
     # Окно приходит в часах (12:00 → 12:00), а driver_days подписан учётным
     # днём. Форматировать границы как календарные даты нельзя: сутки лежат на
     # двух датах, и один день считался бы дважды — ровно это и произошло.
@@ -494,10 +503,10 @@ async def _drivers_spend(start, end) -> dict:
         rows = await db.get_driver_days_range(d_from, d_to)
     except Exception as e:
         log.warning(f"[finance] расходы водителей не прочитаны: {e}")
-        return {"total": 0, "meal": 0, "extra": 0, "by_district": {}}
+        return {"total": 0, "meal": 0, "extra": 0, "card": 0, "by_district": {}}
     # Кроме суммы отдаём и её состав: «расход 1 550» без ответа на вопрос
     # «из чего» — повод открыть базу руками, а не показатель.
-    meal = extra = 0.0
+    meal = extra = card = 0.0
     days_working = days_off = 0
     by_driver: dict = {}
     # И по районам: карточке района нужна своя чистая цифра, а расход
@@ -514,20 +523,31 @@ async def _drivers_spend(start, end) -> dict:
         elif w is False:
             days_off += 1
         meal += m
-        ex = 0.0
+        ex = card_ex = 0.0
         for e in (r.get("extras") or []):
             st = (e.get("status") or "").strip().lower()
             if st and st != "approved":
                 continue
-            try:
-                amt = float(e.get("amount") or 0)
-            except (TypeError, ValueError):
+            # Заказ в долг — строка расхода у водителя, но наличных он не
+            # тронул: товар уехал, денег за него не брали (владелец, 20 сен
+            # 2026). Из выручки такой расход не вычитается нигде.
+            if e.get("nocash"):
+                continue
+            amt = _exp._signed(e)
+            # Оплаченное картой из наличных водителя не уходило. «Сбор выручки»
+            # его не вычитает, а здесь вычиталось — и два экрана за один и тот
+            # же день показывали разные деньги (владелец, 27 сен 2026: «ты уже
+            # напал на след»). Держим отдельной строкой, чтобы расход остался
+            # объяснимым, но из выручки не вычитаем.
+            if _exp.is_card(e):
+                card_ex += amt
                 continue
             ex += amt
             items.append({"day": r.get("day", ""), "driver": name,
                           "comment": (e.get("comment") or "").strip()[:80],
                           "amount": round(amt)})
         extra += ex
+        card += card_ex
         oid = home.get(name) or ""
         by_district[oid] = by_district.get(oid, 0.0) + m + ex
         d = by_driver.setdefault(name, {"name": name, "meal": 0.0, "extra": 0.0, "days": 0})
@@ -543,6 +563,8 @@ async def _drivers_spend(start, end) -> dict:
         key=lambda x: -x["total"])
     items.sort(key=lambda x: (x["day"], x["driver"]), reverse=True)
     return {"total": round(meal + extra), "meal": round(meal), "extra": round(extra),
+            # Безнал — рядом, но не в сумме: он не из наличных водителя.
+            "card": round(card),
             "days_working": days_working, "days_off": days_off,
             "meal_rates": {"working": _staff.MEAL_WORKING, "off": _staff.MEAL_OFF},
             "by_driver": drivers, "items": items[:60],

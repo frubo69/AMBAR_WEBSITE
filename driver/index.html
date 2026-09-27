@@ -4596,6 +4596,25 @@ let LOCKED = false;        // вход закрыт сторожем геопо�
 let TAB = 'orders', EDIT_OID = null, EDIT_TAGS = [];
 let OPEN_OID = '';   // какой из активных заказов раскрыт
 
+// Способ оплаты заказа — ОДИН ответ на всё приложение водителя. Порядок
+// проверок важен: у крипты и перевода стоит «оплачено», и общая ветка
+// «Оплачено онлайн» перехватывала бы их, а водителю нужно видеть, ЧЕМ
+// платили (владелец, 27 сен 2026). До этого способ разъезжался по четырём
+// местам, и перевод в истории показывался «Картой».
+//
+// tone — какого цвета значок: warn (денег не будет), ok (уже оплачено),
+// cash (берём наличными). Значки у экранов свои, слова — общие.
+function payOf(o){
+  o = o || {};
+  const m = String(o.payment_method || '');
+  if(m === 'free')     return {k: 'free',     tone: 'warn', t: 'Без оплаты',      s: 'денег не брать'};
+  if(m === 'debt')     return {k: 'debt',     tone: 'warn', t: 'В долг',          s: 'денег не брать'};
+  if(m === 'crypto')   return {k: 'crypto',   tone: 'ok',   t: 'Криптой',         s: 'денег не брать'};
+  if(m === 'transfer') return {k: 'transfer', tone: 'ok',   t: 'Переводом',       s: 'денег не брать'};
+  if(o.prepaid)        return {k: 'online',   tone: 'ok',   t: 'Оплачено онлайн', s: 'денег не брать'};
+  return {k: 'cash', tone: 'cash', t: 'Наличными', s: ''};
+}
+
 const ICO = {
   move: '<path d="M4 7h11M11 3l4 4-4 4"/><path d="M20 17H9M13 13l-4 4 4 4"/>',
   pin:  '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
@@ -5621,15 +5640,12 @@ function orderCard(o, i){
           : (DONE[req.kind] || ['ok','Оператор принял']));
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
   const nopay = o.payment_method === 'free';          // «без оплаты» — денег нет вовсе
-  const cash = !paid && !debt && !nopay && o.payment_method !== 'transfer';
+  const P = payOf(o), cash = P.k === 'cash';
   const lines = (o.items || []);
   const n = lines.length;
   // Значок оплаты живёт в квадрате слева; «денег не брать» — строкой под способом.
-  const PAY = paid ? {ico: ICO.ok,   w: 24, t: 'Оплачено онлайн', s: 'денег не брать'}
-            : (nopay ? {ico: ICO.warn, w: 24, t: 'Без оплаты',     s: 'денег не брать'}
-            : (debt ? {ico: ICO.warn, w: 24, t: 'В долг',          s: 'денег не брать'}
-            : (o.payment_method === 'transfer' ? {ico: ICO.ok, w: 24, t: 'Переводом', s: 'денег не брать'}
-                    : {ico: INC_ICO.card, w: 27, t: 'Наличными',   s: ''})));
+  const PAY = {ico: P.tone === 'cash' ? INC_ICO.card : (P.tone === 'warn' ? ICO.warn : ICO.ok),
+               w: P.tone === 'cash' ? 27 : 24, t: P.t, s: P.s};
   const now = o.order_id === OPEN_OID || i === 0;
   const fx = o.pay_fx || null;
   const oid = esc(o.order_id);
@@ -5890,10 +5906,8 @@ function histCard(o){
   const addr = esc(o.address) || (o.customer_name ? esc(o.customer_name) : 'Телефонный заказ');
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
   const nopay = o.payment_method === 'free';
-  const PAY = paid ? {ico: ICO.ok,   t: 'Оплачено онлайн'}
-            : (nopay ? {ico: ICO.warn, t: 'Без оплаты'}
-            : (debt ? {ico: ICO.warn, t: 'В долг'}
-                    : {ico: ICO.cash, t: 'Наличными'}));
+  const P = payOf(o);
+  const PAY = {ico: P.tone === 'cash' ? ICO.cash : (P.tone === 'warn' ? ICO.warn : ICO.ok), t: P.t};
   return `<div class="ord hist">
     <div class="ord-row ord-row-hd">
       <span class="ord-seq ok">${svg(ICO.ok, 13)}</span>
@@ -7456,10 +7470,11 @@ function histDayWord(off){
 }
 // Чип оплаты в строке: карта (онлайн), наличные, в долг, без оплаты.
 function histPay(o){
-  if(o.payment_method === 'free') return {k: 'free', t: 'Без оплаты', i: ICO.warn};
-  if(o.payment_method === 'debt') return {k: 'debt', t: 'В долг', i: ICO.clock};
-  if(o.prepaid || o.payment_method === 'transfer' || o.payment_method === 'card') return {k: 'card', t: 'Карта', i: ICO.cash};
-  return {k: 'cash', t: 'Наличные', i: ICO.wallet};
+  const P = payOf(o);
+  return {k: P.k === 'cash' ? 'cash' : (P.tone === 'warn' ? P.k : 'card'),
+          t: P.t,
+          i: P.k === 'free' ? ICO.warn : (P.k === 'debt' ? ICO.clock
+             : (P.k === 'cash' ? ICO.wallet : ICO.cash))};
 }
 // Дата словами: «13 сентября 2026». В списке дат первые две — «Сегодня» и «Вчера».
 function histDateT(off){
@@ -9518,14 +9533,10 @@ function incShow(o){
   payRow.className = 'inc-row inc-row-pay' + (paid ? ' paid' : (debt || nopay ? ' debt' : ''));
   document.getElementById('incPayL').textContent = 'Итого';
   document.getElementById('incTotal').textContent = fmt(o.total);
-  const PAY = paid
-    ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
-    : (nopay
-      ? {ico: ICO.warn, t: 'Без оплаты',      s: 'денег не брать'}
-    : (debt
-      ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
-      // У наличных уточнять нечего: «Наличными» — это и есть всё сообщение.
-      : {ico: INC_ICO.card, t: 'Наличными',   s: ''}));
+  // У наличных уточнять нечего: «Наличными» — это и есть всё сообщение.
+  const P = payOf(o);
+  const PAY = {ico: P.tone === 'cash' ? INC_ICO.card : (P.tone === 'warn' ? ICO.warn : ICO.ok),
+               t: P.t, s: P.s};
   // Значок оплаты живёт в квадрате слева, как у остальных строк листа.
   document.getElementById('incPayIc').innerHTML = svg(PAY.ico, 24);
   document.getElementById('incPay').textContent = PAY.t;

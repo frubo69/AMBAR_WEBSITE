@@ -1,7 +1,7 @@
 """Стенд водителя из НАСТОЯЩЕГО driver/index.html: телеграм и api.js подменены
 заглушками с фикстурами, boot() → standBoot(). Параметры: ?fx=1 (заказ с
 оплатой в валюте), ?req=edit|cancel (открытая просьба), ?chat=1 (ответ
-оператора), ?w=390. python3 tools/drv_stand_gen.py <dir> → <dir>/drv.html"""
+оператора), ?pay=crypto|transfer|debt|free (способ оплаты), ?w=390. python3 tools/drv_stand_gen.py <dir> → <dir>/drv.html"""
 import os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -56,7 +56,11 @@ const ST_ORDER = {
   district: 'Алгусес', customer_name: 'Клиент', source: ST_Q.get('src') || 'app', tip: 0,
   items: [{id: 'absolut', name: 'Absolut 1 ltr', qty: 1, pcs: null, price: 95, line_total: 95, gift: false},
           {id: 'gin', name: "Gordon's London Dry 0.7", qty: 2, pcs: null, price: 100, line_total: 200, gift: false}],
-  total: 295, comment: 'ТЕСТ', payment_method: '', prepaid: false, timestamp: _agoIso(5), confirmed_at: _agoIso(1),
+  total: 295, comment: 'ТЕСТ',
+  // Способ оплаты подменяется из адреса: ?pay=crypto|transfer|debt|free.
+  payment_method: (new URLSearchParams(location.search).get('pay') || ''),
+  prepaid: ['crypto','transfer'].includes(new URLSearchParams(location.search).get('pay')),
+  timestamp: _agoIso(5), confirmed_at: _agoIso(1),
   delivered_at: '', deliver_by: '03:49', eta: 30, driver_ack_at: 'x', driver_req: null, chat_n: 1, chat_new: 0, chat_at: '',
   settle: null, owed: 0, pay_fx: null, chat_last: {text: 'Ждите 5 минут, звоню клиенту', at: _agoIso(2), name: 'Парвиз'}};
 if(ST_Q.get('fx')) ST_ORDER.pay_fx = {code: 'USD', name: 'Доллар США', sym: '$', rate: 3.67, amount: 80.38, at: ''};

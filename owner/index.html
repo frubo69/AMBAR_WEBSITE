@@ -2344,6 +2344,17 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-carry-r{display:flex;align-items:baseline;gap:10px;padding:7px 0;border-top:1px solid rgba(201,169,110,.14);
   font-size:12.5px;color:var(--sub)}
 .cr-carry-r:first-child{border-top:0}
+/* Строка дня — кнопка: забрать выручку именно за него (владелец, 28 сен 2026). */
+.cr-carry-r{width:100%;background:transparent;border-left:0;border-right:0;border-bottom:0;
+  font-family:inherit;color:inherit;text-align:left;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.cr-carry-r:active{background:rgba(201,169,110,.08)}
+.cr-take{flex:0 0 auto;font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--gold2);padding-left:8px}
+.cr-carry-r.got{opacity:.55}
+.cr-carry-r.off .cr-take{color:var(--muted)}
+.cr-carry-r.got .cr-take{color:var(--muted)}
+.cr-carry-r.got svg{width:13px;height:13px;vertical-align:-1px;margin-right:4px;color:var(--up)}
 .cr-carry-r span{flex:1;min-width:0}
 .cr-carry-r b{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text);
   font-variant-numeric:tabular-nums}
@@ -19159,11 +19170,32 @@ function crCard(x){
     : заСколько ? `<span class="cr-days">${заСколько}</span>` : '';
   const money = v => `${v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
   const сегодня = CR && CR.day === CR.today ? 'сегодня' : _dayName(CR && CR.day);
-  const разбивка = carry.length ? `<div class="cr-carry">${
-      (x.cash || x.spend || x.tips) ? `<div class="cr-carry-r"><span>${escS(сегодня)}</span>
-        <b${x.net < 0 ? ' class="dn"' : ''}>${money(x.net)}</b><i>чаевые ${fmt(x.tips)}</i></div>` : ''}${
-      carry.map(c => `<div class="cr-carry-r"><span>${escS(_dayName(c.day))} · не получили</span>
-        <b${c.net < 0 ? ' class="dn"' : ''}>${money(c.net)}</b><i>чаевые ${fmt(c.tips)}</i></div>`).join('')}</div>` : '';
+  // Каждый день — своя кнопка: старший забирает либо всё сразу (большая
+  // «Получил» внизу), либо ровно за один день (владелец, 28 сен 2026).
+  // Забранный поимённо остаётся строкой, но серой и с галочкой — иначе
+  // отметку не снять.
+  const взятые = x.taken || [];
+  // «Получил» целиком уже нажали — всё, что ниже, в кассе: строки без кнопок,
+  // чтобы поверх общей отметки не легла отметка на один день.
+  const всёЗабрал = !!x.done && !x.solo_today;
+  const деньРяд = (подпись, нетто, чай, день, взят) => {
+    взят = взят || всёЗабрал;
+    const тело = `<span>${взят ? IC('check', 13) : ''}${escS(подпись)}</span>` +
+      `<b${нетто < 0 ? ' class="dn"' : ''}>${money(нетто)}</b><i>чаевые ${fmt(чай)}</i>`;
+    if(всёЗабрал) return `<div class="cr-carry-r got">${тело}</div>`;
+    // Расходы района ещё ждут решения — по одному дню тоже не забрать.
+    const жми = ждут ? `crNeedExp('${escS(x.code)}')`
+      : `crTakeDay('${escS(x.id)}','${день}',${взят ? 'false' : 'true'})`;
+    return `<button class="cr-carry-r${взят ? ' got' : ''}${ждут ? ' off' : ''}" onclick="${жми}">${
+      тело}<em class="cr-take">${взят ? 'вернуть' : 'забрать'}</em></button>`;
+  };
+  const есть_сегодня = x.cash || x.spend || x.tips;
+  // Подпись — одна дата: «не получили» рядом с «ЗАБРАТЬ» переносило строку
+  // и говорило то же самое, а у полученных то же делает галочка.
+  const разбивка = (carry.length || взятые.length) ? `<div class="cr-carry">${
+      есть_сегодня ? деньРяд(сегодня, x.net, x.tips, CR.day, !!x.solo_today) : ''}${
+      carry.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, false)).join('')}${
+      взятые.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, true)).join('')}</div>` : '';
   return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
@@ -19320,6 +19352,22 @@ async function crLater(id, on){
 
 // Галочка ставится и снимается одним нажатием, без вопросов: действие
 // обратимо, а спрашивать «точно?» по пять раз за ночь — приучать не читать.
+// Забрать (или вернуть) выручку ровно за один день. Остальное остаётся в
+// переносе: сервер помечает такой день solo и цепочку им не рвёт.
+async function crTakeDay(id, day, done){
+  if(!CR || CR_BUSY) return;
+  CR_BUSY = true;
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day: CR.day, item: 'cash:' + id, done, only: day}});
+    CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: CR.day}});
+  }catch(e){ _toast('Не удалось отметить'); CR_BUSY = false; return; }
+  CR_BUSY = false;
+  crRender();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(done ? 'success' : 'warning'); }catch(e){}
+  _toast(done ? `Получено за ${_dayName(day)}` : `Отметка за ${_dayName(day)} снята`);
+}
+
 async function crToggle(id){
   if(!CR || CR_BUSY) return;
   const x = (CR.districts || []).find(d => d.id === id); if(!x) return;

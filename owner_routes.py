@@ -4196,6 +4196,12 @@ def _cash_chain(day: str, oid: str, back: list, marks: dict) -> list:
             if m.get("via") == day:
                 out.append(d)
                 continue
+            # Забрали именно за этот день (владелец, 28 сен 2026: «либо забрать
+            # всё, что не забрал, либо забрать именно за определённый день»).
+            # День закрыт, но цепочку НЕ рвёт: иначе всё, что старше, пропало
+            # бы с экрана вместе с деньгами.
+            if m.get("solo"):
+                continue
             break
         out.append(d)
     return out
@@ -4223,7 +4229,15 @@ async def cash_round(day: str) -> dict:
         marks_all = {}
     marks = marks_all.get(day) or {}
     chains = {oid: _cash_chain(day, oid, back, marks_all) for oid in OFFICE_IDS}
-    need_days = sorted({d for ch in chains.values() for d in ch})
+    # Дни, забранные ПОИМЕННО (solo) с этого дня: цепочку они не рвут и в
+    # перенос не идут, но показать их надо — иначе отметку не снять, она
+    # исчезла бы с экрана вместе с днём (владелец, 28 сен 2026). Забранные
+    # с других дней ищутся на своих экранах — так же, как via.
+    solo = {oid: [d for d in back
+                  if ((marks_all.get(d) or {}).get(f"cash:{oid}") or {}).get("solo") == day]
+            for oid in OFFICE_IDS}
+    need_days = sorted({d for ch in chains.values() for d in ch}
+                       | {d for s in solo.values() for d in s})
     since = min(need_days) if need_days else day
     try:
         orders = list((await db.orders_from(_bizday.since_utc(since))).values())
@@ -4244,10 +4258,21 @@ async def cash_round(day: str) -> dict:
                 continue
             carry.append({"day": d, "net": p["net"], "tips": p["tips"], "cash": p["cash"],
                           "spend": p["spend"], "orders": p["orders"]})
+        # Забранные поимённо — своей строкой, серыми: деньги уже в кассе.
+        taken = []
+        for d in solo[oid]:
+            p = past[d][oid]
+            if p["empty"]:
+                continue
+            m_ = (marks_all.get(d) or {}).get(f"cash:{oid}") or {}
+            taken.append({"day": d, "net": p["net"], "tips": p["tips"],
+                          "at": str(m_.get("at") or "")})
         c_net = sum(c["net"] for c in carry)
         c_tips = sum(c["tips"] for c in carry)
         m = marks.get(f"cash:{oid}") or {}
         done = bool(m.get("done")) or legacy
+        # Забрали только за сегодня — район закрыт не целиком: перенос остался.
+        solo_today = bool(m.get("solo"))
         later = bool(m.get("later")) and not done
         empty = a["empty"] and not carry
         if not empty:
@@ -4269,8 +4294,10 @@ async def cash_round(day: str) -> dict:
                     "spend_card": a["spend_card"], "fx": a["fx"],
                     "spend_pending": a["spend_pending"], "net": a["net"], "items": a["items"],
                     "carry": carry, "carry_net": c_net, "carry_tips": c_tips,
+                    "taken": taken,
                     "net_all": net_all, "tips_all": tips_all,
-                    "empty": empty, "done": done, "done_at": str(m.get("at") or ""),
+                    "empty": empty, "done": done, "solo_today": solo_today,
+                    "done_at": str(m.get("at") or ""),
                     "later": later, "later_at": str(m.get("at") or "") if later else ""})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
             "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
@@ -4282,9 +4309,26 @@ async def cash_round(day: str) -> dict:
             "carry_total": carry_total}
 
 
-async def cash_receive(day: str, oid: str, done: bool, who: str) -> None:
+async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "") -> None:
     """«Получил» по району — и за все дни, что в него переехали (via = этот
-    день); «снять отметку» — возвращает их обратно в перенос."""
+    день); «снять отметку» — возвращает их обратно в перенос.
+
+    only — забрать ИМЕННО за этот день, остальное оставить в переносе
+    (владелец, 28 сен 2026). Такая отметка помечается solo: она закрывает свой
+    день, но цепочку переноса не рвёт, и всё, что старше, остаётся на экране.
+    """
+    if only:
+        if done:
+            # В solo — день, С КОТОРОГО забрали: по нему строка «получено»
+            # и найдётся, чтобы отметку можно было снять. Копить их за все
+            # прошлые дни нельзя — экран зарастёт, а счёт полезет к началу
+            # переноса.
+            await db.checklist_put(only, f"cash:{oid}",
+                                   {"done": True, "solo": day, "by": who,
+                                    "at": datetime.now(timezone.utc).isoformat()})
+        else:
+            await db.checklist_put(only, f"cash:{oid}", None)
+        return
     back = _cash_back_days(day)
     marks_all = await db.checklist_many(back) if back else {}
     if done:
@@ -4864,8 +4908,14 @@ async def handle_checklist_mark(request):
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
     who = str(request.get("owner_id") or "")
     if item.startswith("cash:"):
-        # «Получил» по району закрывает и перенесённые в него дни.
-        await cash_receive(day, item[5:], bool(body.get("done")), who)
+        # «Получил» по району закрывает и перенесённые в него дни. С only —
+        # забираем ровно за один день, остальное остаётся в переносе.
+        only = (body.get("only") or "").strip()
+        if only and not (len(only) == 10 and only[4] == only[7] == "-"):
+            return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+        if only and only > day:
+            return web.json_response({"error": "future"}, status=400, headers=CORS_HEADERS)
+        await cash_receive(day, item[5:], bool(body.get("done")), who, only)
     else:
         await db.checklist_set(day, item, bool(body.get("done")), who)
     return web.json_response({"ok": True}, headers=CORS_HEADERS)

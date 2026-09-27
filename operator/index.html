@@ -164,20 +164,64 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .ticket-clear{margin-left:auto;font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px}
 .ticket-clear:active{color:var(--dn)}
 .ticket-scroll{flex:1;overflow-y:auto;padding:0 14px 12px;-webkit-overflow-scrolling:touch}
-.tline{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border2)}
-.tline .nm{flex:1;min-width:0;font-size:13px;font-weight:600;line-height:1.25}
-.tline .lt{font-size:13px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;min-width:58px;text-align:right}
+/* Состав — одной карточкой с разделителями внутри, а не строками на фоне:
+   так видно, где кончается заказ и начинается всё остальное (макет владельца,
+   27 сен 2026). */
+.tk-card{background:var(--card);border:1px solid var(--border2);border-radius:16px;
+  overflow:hidden;margin:2px 0 4px}
+.tline{display:flex;align-items:center;gap:10px;padding:11px 13px;
+  border-bottom:1px solid var(--border2)}
+.tline:last-child{border-bottom:0}
+.tline .nm{flex:1;min-width:0;font-size:14px;font-weight:700;line-height:1.25}
+.tline .nm small{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:2px}
+.tline .lt{font-size:15px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;min-width:52px;text-align:right}
 .stepper{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--border2);border-radius:10px}
 .stepper button{width:34px;height:34px;font-size:17px;font-weight:700;color:var(--gold2);display:flex;align-items:center;justify-content:center}
 .stepper .q{min-width:24px;text-align:center;font-size:14px;font-weight:700}
 .ticket-empty{padding:28px 10px;text-align:center;color:var(--muted);font-size:13px}
 .cust{padding:4px 0 2px}
-.cust .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);font-weight:700;margin:10px 0 6px}
+.cust .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);font-weight:700;margin:14px 0 8px}
 .cust input,.cust textarea{margin-bottom:0}
+/* Район выбирают пальцем и на ходу — чипы круглые и крупные. Скоупим по
+   .cust: те же .dchip стоят в других окнах, и трогать их незачем. */
+.cust .dchip{padding:12px 22px;border-radius:999px;font-size:14px}
+.cust .dchips{gap:8px}
+/* «Данные клиента» — обычный заголовок, а не мелкий капс: это раздел, а не
+   подпись к полю. Слово «необязательно» рядом снимает вопрос сразу. */
+.cust-h{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  margin:18px 0 10px;display:flex;align-items:baseline;gap:8px}
+.cust-h i{font-style:normal;font-size:12.5px;font-weight:500;color:var(--muted)}
+/* Поле: значок слева, подпись мелким капсом ВНУТРИ рамки над значением.
+   Отдельная строка-подпись над каждым полем съедала по два десятка точек на
+   поле — ради них и затевалось (владелец: «оптимизируем пространство»). */
+.fld{display:flex;align-items:center;gap:11px;background:var(--card);
+  border:1px solid var(--border2);border-radius:14px;padding:9px 14px;margin-bottom:9px}
+.fld:focus-within{border-color:rgba(201,169,110,.4)}
+.fld-i{width:20px;height:20px;flex-shrink:0;color:var(--muted);display:flex;align-items:center}
+.fld-i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.fld-b{flex:1;min-width:0}
+.fld-b i{display:block;font-style:normal;font-size:9.5px;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:1px}
+.fld input,.fld textarea{background:transparent;border:0;border-radius:0;padding:0;
+  width:100%;font-size:15px;line-height:1.35;resize:none}
+.fld input:focus,.fld textarea:focus{border-color:transparent}
+/* Комментарий нужен редко — держим его свёрнутым, а не полем на весь экран. */
+.cmt-add{display:flex;align-items:center;gap:9px;padding:10px 2px;font-size:14.5px;
+  font-weight:600;color:var(--gold2);font-family:inherit}
+.cmt-add b{font-size:19px;font-weight:700;line-height:1}
+.cmt-add:active{opacity:.6}
+/* На телефоне панель занимает весь экран, и «Чек» в ней — заголовок страницы,
+   а не подпись к колонке (макет владельца, 27 сен 2026). На планшете панель
+   узкая, там заголовок остаётся мелким. */
+@media (max-width:640px){
+  .ticket-hdr .t{font-size:27px;letter-spacing:-.5px}
+  .ticket-clear{font-size:15px}
+}
 .cust .row2{display:flex;gap:8px}
 .ticket-foot{flex-shrink:0;padding:12px 14px calc(12px + var(--safe-bottom));border-top:1px solid var(--border2);background:var(--bg2)}
 .total-row{display:flex;align-items:baseline;margin-bottom:10px}
-.total-row .l{font-size:13px;color:var(--sub)}
+.total-row .l{font-size:13.5px;color:var(--sub)}
 .total-row .v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--gold2)}
 .total-row .v small{font-size:13px;color:var(--muted);font-weight:500}
 .create-btn{width:100%;padding:16px;border-radius:var(--r2);background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:16px;font-weight:800;transition:.15s}
@@ -2835,15 +2879,22 @@ html.kb body{padding-bottom:40vh}
           <div class="lbl">Район *</div>
           <div class="dchips" id="distChips"></div>
           <div id="custFields">
-          <div class="lbl">Клиент · всё необязательно</div>
-          <div class="lbl" style="margin-top:6px">Имя</div>
-          <input id="cName" placeholder="Имя клиента (необязательно)" autocomplete="off" enterkeyhint="next">
-          <div class="lbl">Телефон</div>
-          <input id="cPhone" placeholder="+971 … (необязательно)" inputmode="tel" autocomplete="off" enterkeyhint="next">
-          <div class="lbl">Адрес</div>
-          <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира… (необязательно)" enterkeyhint="next"></textarea>
-          <div class="lbl">Комментарий</div>
-          <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done">
+          <div class="cust-h">Данные клиента <i>необязательно</i></div>
+          <label class="fld"><span class="fld-i"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span>
+            <span class="fld-b"><i>Имя</i>
+              <input id="cName" placeholder="Имя клиента" autocomplete="off" enterkeyhint="next"></span></label>
+          <label class="fld"><span class="fld-i"><svg viewBox="0 0 24 24"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg></span>
+            <span class="fld-b"><i>Телефон</i>
+              <input id="cPhone" placeholder="+971 …" inputmode="tel" autocomplete="off" enterkeyhint="next"></span></label>
+          <label class="fld"><span class="fld-i"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
+            <span class="fld-b"><i>Адрес</i>
+              <textarea id="cAddr" rows="1" placeholder="Район, здание, квартира…" enterkeyhint="next"></textarea></span></label>
+          <!-- Комментарий свёрнут: нужен он редко, а место занимал всегда. -->
+          <button class="cmt-add" id="cmtAdd" onclick="cmtOpen()"><b>+</b>Добавить комментарий</button>
+          <label class="fld" id="cmtFld" style="display:none">
+            <span class="fld-i"><svg viewBox="0 0 24 24"><path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3z"/></svg></span>
+            <span class="fld-b"><i>Комментарий</i>
+              <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done"></span></label>
           </div>
           <div id="drvBlock">
             <div class="lbl">Водитель *</div>
@@ -2853,7 +2904,7 @@ html.kb body{padding-bottom:40vh}
       </div>
       <div class="ticket-foot">
         <div class="total-row"><span class="l" id="totalLbl">Итого</span><span class="v"><span id="totalV">0</span> <small>AED</small></span></div>
-        <button class="create-btn" id="createBtn" onclick="askCreate()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>Создать заказ</button>
+        <button class="create-btn" id="createBtn" onclick="askCreate()">Оформить заказ</button>
       </div>
     </div>
   </div>
@@ -3840,16 +3891,33 @@ function lineName(l){
   const p = CATALOG.find(x=>x.id===l.id);
   return (p?p.name:'?') + (l.pcs?` ×${l.pcs}`:'');
 }
+// Комментарий: свёрнут, пока не понадобился. Раскрыли — кнопка уходит, поле
+// встаёт на её место и получает фокус. Обратно не складываем: человек уже
+// начал писать, и схлопнуть поле под ним было бы грубо.
+function cmtOpen(focus){
+  const b = $('cmtAdd'), f = $('cmtFld');
+  if(!b || !f) return;
+  b.style.display = 'none'; f.style.display = '';
+  if(focus !== false){ try{ $('cComment').focus(); }catch(e){} }
+}
+function cmtReset(){
+  const b = $('cmtAdd'), f = $('cmtFld'), v = ($('cComment')||{}).value;
+  if(!b || !f) return;
+  // Комментарий уже есть (правим заказ или вернулись назад) — показываем поле.
+  if(v){ b.style.display = 'none'; f.style.display = ''; }
+  else { b.style.display = ''; f.style.display = 'none'; }
+}
+
 function renderTicket(){
   const keys = Object.keys(TICKET);
   const wrap = $('tlines');
   if(!keys.length){
     wrap.innerHTML = '<div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div>';
   } else {
-    wrap.innerHTML = keys.map(k=>{
+    wrap.innerHTML = '<div class="tk-card">' + keys.map(k=>{
       const l=TICKET[k], u=lineUnit(l);
       return `<div class="tline">
-        <div class="nm">${lineName(l)}<br><small style="color:var(--muted)">${u} AED</small></div>
+        <div class="nm">${lineName(l)}<small>${u} AED</small></div>
         <div class="stepper">
           <button onclick="addLine('${l.id}',${l.pcs||null},-1)">−</button>
           <span class="q">${l.qty}</span>
@@ -3857,10 +3925,18 @@ function renderTicket(){
         </div>
         <div class="lt">${u*l.qty}</div>
       </div>`;
-    }).join('');
+    }).join('') + '</div>';
   }
   const total = keys.reduce((s,k)=>s+lineUnit(TICKET[k])*TICKET[k].qty,0);
   $('totalV').textContent = total;
+  // Слева в подвале — сколько позиций, а не слово «Итого»: сумма и так стоит
+  // справа крупно, а число позиций проверяют перед отправкой (макет владельца,
+  // 27 сен 2026). В правке заказа подпись свою ставит editOrder.
+  const lbl = $('totalLbl');
+  if(lbl && !lbl.dataset.fixed){
+    const qty = keys.reduce((n,k)=>n+TICKET[k].qty,0);
+    lbl.textContent = qty ? `${qty} ${plural(qty,'позиция','позиции','позиций')}` : 'Итого';
+  }
   $('createBtn').disabled = !keys.length;
   syncTkBar(keys.reduce((n,k)=>n+TICKET[k].qty,0), total);
 }
@@ -4079,6 +4155,7 @@ function clearTicket(confirmIt){
   dayPaint();
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
+  cmtReset();                       // чек очистили — комментарий снова свёрнут
   curDist=''; curDriver=''; editDrvWas=''; editDistWas='';   // район и водитель — под заказ
   renderDispatch();
   renderTicket(); syncBadges();
@@ -5270,6 +5347,7 @@ function startEdit(oid){
   _editWas=null;
   $('cName').value=o.customer_name||'';
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
+  cmtReset();                       // у заказа есть комментарий — поле раскрыто
   // Район берём из самого заказа: у онлайновых он определён по адресу, и
   // подменять его тем, кто сейчас за планшетом, нельзя.
   // Район и водитель уже назначены — подставляем их, а не заставляем выбирать
@@ -7532,6 +7610,9 @@ FIELD_CHAIN.forEach((id,i)=>{
     if(e.key!=='Enter') return;
     e.preventDefault();                         // textarea too: jump, don't insert a newline
     const next=FIELD_CHAIN[i+1];
+    // Комментарий свёрнут, пока его не попросили: «Далее» с адреса упёрлось бы
+    // в скрытое поле, и клавиатура осталась бы ни на чём. Раскрываем молча.
+    if(next==='cComment') cmtOpen(false);
     if(next) $(next).focus(); else el.blur();   // last field → close the keyboard
   });
 });

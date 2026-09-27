@@ -24611,8 +24611,8 @@ function prPaint(){
 }
 function ordPrInner(){
   const d = PR_D, rows = (d && d.rows) || [];
-  const marks = rows.map(_oprMark).filter(v => v !== null);
-  const mark = marks.length ? marks.reduce((a, v) => a + v, 0) / marks.length : null;
+  // Та же накрутка, что в карточке «Прайс»: от сумм, одним расчётом.
+  const mark = _oprTotals(rows).mark;
   const miss = rows.filter(r => !r.cost).length;
   return `<button class="sc-r" onclick="ordPrices()"><span>Прайс</span>${d
       ? `<b>${_oprMarkTxt(mark)}<u>накрутка</u></b>`
@@ -24994,18 +24994,31 @@ function oprPaint(keepFocus){
 
 // Сводка прайса — окошко, как было в «Финансах» (владелец, 19 сен 2026:
 // «сделай такое же окошко, как у нас было в финансах — четыре поля: позиций,
-// в закупке, в продаже, общая накрутка средняя»). «В закупке» и «в продаже» —
-// у скольких позиций вписана эта цена; накрутка — средняя по позициям, где
-// есть обе цены, та же, что в строке «Прайс» под «Закупаем». Полоса — доля
-// позиций с закупкой. Считается по всему прайсу, не по найденному: поиск и
-// «Без цены» её не меняют, а правка цены — меняет сразу.
+// в закупке, в продаже, общая накрутка средняя»).
+//
+// 27 сен 2026 владелец поправил смысл трёх полей: слева — сколько КАТЕГОРИЙ в
+// прайсе, а «в закупке» и «в продаже» — не сколько позиций с такой ценой, а
+// СУММЫ этих цен по всему прайсу. Из них и считается накрутка: «это делается
+// для того, чтобы средняя накрутка вычислилась».
+//
+// Суммируем только те позиции, где известны ОБЕ цены: продажная без
+// закупочной задрала бы накрутку, закупочная без продажной — занизила, и два
+// числа в строке перестали бы сходиться с третьим.
+//
+// Накрутка от сумм — не то же, что среднее по позициям: дешёвая бутылка с
+// наценкой втрое тянет среднее вверх наравне с дорогой. По суммам выходит
+// +91% против +134% среднего (замерено на живом прайсе 27 сен). Это и есть
+// «общая», как просил владелец.
+//
+// Полоса — доля позиций с закупочной ценой. Считается по всему прайсу, не по
+// найденному: поиск и «Без цены» её не меняют, а правка цены — меняет сразу.
 function oprSumCard(){
   const all = OPR.rows || [];
-  const cost = all.filter(r => r.cost).length;
-  const sale = all.filter(r => r.price_list || r.price_app).length;
-  const marks = all.map(_oprMark).filter(v => v !== null);
-  const mark = marks.length ? marks.reduce((a, v) => a + v, 0) / marks.length : null;
-  const cover = all.length ? Math.round(cost / all.length * 100) : 0;
+  const t = _oprTotals(all), mark = t.mark;
+  // Суммы показываем целыми дирхамами: fmt стирает запятую дроби пробелом
+  // («21 515 76» вместо «21 515,76»), а филсы в карточке никто не читает.
+  const cost = Math.round(t.cost), sale = Math.round(t.sale);
+  const cover = all.length ? Math.round(all.filter(r => r.cost).length / all.length * 100) : 0;
   return `<div class="fin-sec opr-sum" id="oprSum">
     <div class="fin-sec-h">
       <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
@@ -25015,9 +25028,11 @@ function oprSumCard(){
       <span class="fin-sec-b"><b>Прайс</b></span>
     </div>
     <div class="fin-strip four">
-      <div><b>${fmt(all.length)}</b><i>позиций</i></div>
-      <div><b>${fmt(cost)}</b><i>в закупке</i></div>
-      <div><b>${fmt(sale)}</b><i>в продаже</i></div>
+      <!-- Число категорий — через fmtQty: fmt перевёл бы его по курсу валюты,
+           и при долларах «126 категорий» превращались в «34». -->
+      <div><b>${fmtQty(all.length)}</b><i>${pluralize(all.length, 'категория', 'категории', 'категорий')}</i></div>
+      <div><b data-aed="${cost}">${fmt(cost)}</b><i>в закупке</i></div>
+      <div><b data-aed="${sale}">${fmt(sale)}</b><i>в продаже</i></div>
       <div><b>${_oprMarkTxt(mark)}</b><i>средняя накрутка</i></div>
     </div>
     <div class="fin-bar"><i style="width:${cover}%"></i></div>
@@ -25110,6 +25125,18 @@ function _oprSrc(r){
 function _oprMark(r){
   const sale = +(r.price_list || r.price_app) || 0, cost = +r.cost || 0;
   return sale > 0 && cost > 0 ? (sale / cost - 1) * 100 : null;
+}
+// Накрутка по всему прайсу: сумма продажных к сумме закупочных. Считается в
+// одном месте и зовётся из двух — карточки «Прайс» и строки под «Закупаем»:
+// два экрана с разной накруткой за один прайс мы уже проходили (владелец,
+// 27 сен 2026). Берём только позиции, где известны обе цены.
+function _oprTotals(rows){
+  const sale1 = r => +(r.price_list || r.price_app) || 0;
+  const пара = (rows || []).filter(r => (+r.cost || 0) > 0 && sale1(r) > 0);
+  const cost = пара.reduce((a, r) => a + (+r.cost || 0), 0);
+  const sale = пара.reduce((a, r) => a + sale1(r), 0);
+  return {n: пара.length, cost, sale,
+          mark: cost > 0 ? (sale / cost - 1) * 100 : null};
 }
 function _oprMarkTxt(v){
   if(v === null) return '—';

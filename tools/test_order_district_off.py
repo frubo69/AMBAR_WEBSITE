@@ -80,9 +80,10 @@ async def main():
     from openpyxl import load_workbook
     from config_offices import OFFICE_CODES
     ws = load_workbook(_io.BytesIO(raw)).active
-    # Шапка таблицы — строка, где стоит «Code»; колонки районов идут после цены.
+    # Шапка таблицы — строка, где стоит «№»; колонки районов идут после цены.
+    # (Колонку «Code» из файла убрали 27 сен 2026 — якорем стал номер.)
     шапка = next([c.value for c in row] for row in ws.iter_rows(min_row=1, max_row=8)
-                 if "Code" in [c.value for c in row])
+                 if "№" in [c.value for c in row])
     колонки = [str(v) for v in шапка if v]
     eq("в файле нет колонки выключенного района",
        any(str(v).startswith(OFFICE_CODES[A] + " ") for v in колонки), False)

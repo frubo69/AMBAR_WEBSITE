@@ -29594,7 +29594,8 @@ async function supImport(inp, btnId){
     try{ ACC_SUP = {list: (await ownerApi.ownerFetch('/api/owner/supply')).supplies || []};
          ACC_SUP.open = _supMain(ACC_SUP.list); accRender(); }catch(e){}
   }catch(e){
-    const E = {not_xlsx:'Это не .xlsx', no_code_column:'В файле нет колонки Code',
+    const E = {not_xlsx:'Это не .xlsx', no_key_column:'В файле нет колонки №',
+               no_code_column:'В файле нет колонки Code',   // старые файлы
                no_district_columns:'Не нашёл колонки районов',
                nothing_confirmed:'Магазин не подтвердил ни одной позиции',
                file_required:'Файл не пришёл', empty_file:'Файл пустой'};

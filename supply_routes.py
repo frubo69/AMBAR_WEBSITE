@@ -29,13 +29,21 @@ from aiohttp import web
 import db
 from owner_auth import require_owner, CORS_HEADERS
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
-from config_stock_order import order_key      # порядок обхода полок, как в их таблице
+from config_stock_order import order_key, STOCK_ORDER   # порядок обхода полок, как в их таблице
 
 log = logging.getLogger("supply")
 
 # Файл уходит в магазин — он на английском целиком. Заголовки читает их
 # сотрудник, и «Подтверждено» ему ничего не говорит.
-CODE_COL = "Code"          # служебная колонка, по ней идёт возврат
+# Колонка кода из файла УБРАНА (владелец, 27 сен 2026). Прятать её не вышло:
+# просмотрщик на айфоне не смотрит ни на hidden, ни на нулевую ширину — код
+# всё равно был виден магазину. Вместо неё якорем стал номер позиции «№»:
+# он и человеку говорит, где строка в его таблице, и нам раскладывает ответ.
+# Имя оставлено, чтобы читать СТАРЫЕ файлы: заявка, отправленная до правки,
+# вернётся с колонкой Code, и разбор обязан её принять.
+CODE_COL = "Code"          # только для файлов, отправленных до 27 сен 2026
+NUM_COL = "№"              # номер позиции — по нему идёт возврат
+ITEM_COL = "Item"
 TOTAL_COL = "Total"          # считается формулой, а не нами
 PRICE_COL = "Price, AED"     # наша закупочная цена за бутылку / коробку 24
 AMOUNT_COL = "Amount, AED"   # цена × Total, формулой
@@ -114,6 +122,31 @@ def _with_cached_values(raw: bytes, calc: dict) -> bytes:
 def _catalog_by_id():
     from operator_routes import _catalog_by_id as f
     return f()
+
+
+def _nums() -> tuple[dict, dict]:
+    """{позиция: номер} и обратно. Номер — место в обходе полок: тот же, что
+    человек видит в пересчёте, чек-листе и оценке склада, и тот же, что в
+    рабочей таблице «отчёт-заявка». Проверено 27 сен 2026: все 126 позиций
+    каталога есть в обходе, номера 1…126 без повторов.
+
+    Позиции, которой в обходе НЕТ, `order_key` отдаёт один и тот же ключ на
+    всех — номер такой позиции дали бы одинаковый, и ответ магазина лёг бы не
+    на ту строку. Поэтому такие идут хвостом, по порядку каталога. Правильное
+    лечение — вписать позицию в config_stock_order руками, как и сказано в
+    его пояснении."""
+    cat = _catalog_by_id()
+    край = len(STOCK_ORDER)
+    прямо, хвост = {}, []
+    for pid in cat:
+        k = order_key(pid)
+        if k < край:
+            прямо[pid] = k + 1
+        else:
+            хвост.append(pid)
+    for i, pid in enumerate(хвост, 1):
+        прямо[pid] = край + i
+    return прямо, {n: pid for pid, n in прямо.items()}
 
 
 async def _order_rows(day):
@@ -270,7 +303,8 @@ async def _build_book(day: str):
 
     # Первая колонка пустая и широкая — поле, за которое лист приятно держать
     # глазами. Всё остальное начинается с B.
-    N, C, I, PR, D0 = 2, 3, 4, 5, 6            # №, Code, Item, Price, первая точка
+    N, I, PR, D0 = 2, 3, 4, 5                  # №, Item, Price, первая точка
+    НОМЕР, _ = _nums()                         # постоянный номер позиции
     LAST = D0 + len(dist) - 1                  # последняя точка
     TOT = LAST + 1                             # Total
     AMT = TOT + 1                              # Amount
@@ -285,7 +319,10 @@ async def _build_book(day: str):
     ws.cell(row=2, column=N,
             value="Please correct the quantities you can supply and send the file back. "
                   "Price is our purchase price per bottle / per case of 24. "
-                  "Total and Amount add up by themselves. Do not change the Price column.")
+                  "Total and Amount add up by themselves. "
+                  # По номеру мы раскладываем ответ обратно: стёрли или
+                  # переставили — строка не найдётся.
+                  "Do not change the No. and Price columns.")
     ws.merge_cells(start_row=2, start_column=N, end_row=2, end_column=AMT)
     for col in range(N, AMT + 1):
         c = ws.cell(row=2, column=col)
@@ -294,7 +331,7 @@ async def _build_book(day: str):
         c.border = Border(left=med, right=med, top=med, bottom=med)
     ws.row_dimensions[2].height = 40
 
-    head = ["№", CODE_COL, "Item", PRICE_COL] + \
+    head = [NUM_COL, ITEM_COL, PRICE_COL] + \
            [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}" for o in dist] + \
            [TOTAL_COL, AMOUNT_COL]
     for k, title in enumerate(head):
@@ -312,8 +349,10 @@ async def _build_book(day: str):
     money = 0.0
     for n, r in enumerate(rows, 1):
         i = first + n - 1
-        ws.cell(row=i, column=N, value=n).alignment = mid
-        ws.cell(row=i, column=C, value=r["id"]).alignment = mid
+        # Номер — постоянный за позицией, а не порядковый по файлу: не берём
+        # Absolut — заявка начинается с шестого номера, и магазин по нему
+        # находит строку у себя в листе (владелец, 27 сен 2026).
+        ws.cell(row=i, column=N, value=НОМЕР.get(r["id"], 0)).alignment = mid
         nm = ws.cell(row=i, column=I, value=r["name"])
         nm.font = bold
         nm.alignment = Alignment(horizontal="left", vertical="center")
@@ -392,13 +431,6 @@ async def _build_book(day: str):
 
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
     ws.column_dimensions[get_column_letter(N)].width = 7.11
-    ws.column_dimensions[get_column_letter(C)].width = 10
-    # Код спрятан, а не убран (владелец, 27 сен 2026: «чтобы человеческий глаз
-    # не видел, а программа читала»). Убрать его нельзя: возвращённый магазином
-    # файл раскладывается обратно ровно по этой колонке — без неё handle_import
-    # отвергает файл целиком. Спрятанная колонка лежит в книге как обычная,
-    # openpyxl читает её не глядя на hidden.
-    ws.column_dimensions[get_column_letter(C)].hidden = True
     ws.column_dimensions[get_column_letter(I)].width = 40
     ws.column_dimensions[PL].width = 13
     for col in range(D0, LAST + 1):
@@ -503,16 +535,21 @@ async def handle_import(request):
                                  status=400, headers=CORS_HEADERS)
     ws = wb[SHEET_MAIN] if SHEET_MAIN in wb.sheetnames else wb.worksheets[0]
 
-    # Ищем строку заголовков, а не полагаемся на номер: магазин мог вставить
-    # сверху свою шапку с логотипом, и жёсткая «третья строка» развалилась бы.
+    # Ищем строку заголовков, а не полагаемся на номер строки: магазин мог
+    # вставить сверху свою шапку с логотипом, и жёсткая «третья строка»
+    # развалилась бы.
+    #
+    # Годится и «№» (новые файлы), и «Code» (отправленные до 27 сен 2026):
+    # заявка живёт у магазина сутками, и та, что ушла вчера в старом виде,
+    # обязана вернуться и прочитаться.
     hdr_row, cols = None, {}
     for row in ws.iter_rows(min_row=1, max_row=15):
         vals = {str(c.value).strip(): c.column for c in row if c.value}
-        if CODE_COL in vals:
+        if NUM_COL in vals or CODE_COL in vals:
             hdr_row, cols = row[0].row, vals
             break
     if not hdr_row:
-        return web.json_response({"error": "no_code_column", "need": CODE_COL},
+        return web.json_response({"error": "no_key_column", "need": NUM_COL},
                                  status=400, headers=CORS_HEADERS)
 
     dcols = _district_cols(cols)
@@ -530,16 +567,66 @@ async def handle_import(request):
         log.warning(f"[supply] снимок заявки не прочитан: {e}")
 
     cat = _catalog_by_id()
+    _, ПО_НОМЕРУ = _nums()
+    # Строку узнаём по номеру; у старых файлов — по коду. Название держим
+    # третьим запасом: магазин иногда стирает число, а подпись оставляет, и
+    # без этого запаса строка молча уехала бы в «чужие».
+    ПО_ИМЕНИ = {}
+    for _pid, _p in cat.items():
+        _nm = str(_p.get("name") or "").strip().lower()
+        if _nm:
+            ПО_ИМЕНИ.setdefault(_nm, _pid)
+    код_кол = cols.get(CODE_COL)
+    ном_кол = cols.get(NUM_COL)
+    имя_кол = cols.get(ITEM_COL)
+
+    # Строки итогов — не товар: у них в первой колонке слово, а не номер.
+    ИТОГИ = ("TOTAL", "AMOUNT")
+
+    def _pid_of(row):
+        """(позиция, метка). Позиция — по коду (старые файлы), номеру или
+        названию. Ключ в строке есть, а позиции нет — отдаём метку: такая
+        строка идёт в «чужие», а не пропадает молча. Ключа нет вовсе —
+        и метки нет, строку пропускаем."""
+        if код_кол:
+            v = row[код_кол - 1].value
+            if v and str(v).strip():
+                s = str(v).strip()
+                return (s, None) if s in cat else (None, s)
+        ключ = ""
+        if ном_кол:
+            v = row[ном_кол - 1].value
+            s = str(v or "").strip()
+            if s.upper().startswith(ИТОГИ):
+                return None, None
+            n = _num(v)
+            if n:
+                if n in ПО_НОМЕРУ:
+                    return ПО_НОМЕРУ[n], None
+                ключ = f"№ {n}"
+        if имя_кол:
+            v = row[имя_кол - 1].value
+            s = str(v or "").strip()
+            if s:
+                pid = ПО_ИМЕНИ.get(s.lower())
+                if pid:
+                    return pid, None
+                ключ = s
+        return None, (ключ or None)
+
     # Разница считается здесь и один раз. Считать её потом, на экране, значит
     # пересчитывать при каждом открытии по снимку заявки, который к тому
     # времени уже сменится следующим днём.
     items, unknown, dropped, short, extra = [], [], [], [], []
-    видели = set()                       # какие коды вообще встретились в ответе
+    видели = set()                       # какие позиции встретились в ответе
     for row in ws.iter_rows(min_row=hdr_row + 1):
-        code = row[cols[CODE_COL] - 1].value
-        if not code:
+        pid, метка = _pid_of(row)
+        if not pid:
+            # Ключ в строке был, а позиции такой нет — магазин дописал своё.
+            # Молча терять такую строку нельзя: владелец должен увидеть.
+            if метка:
+                unknown.append(метка)
             continue
-        pid = str(code).strip()
         видели.add(pid)
         p = cat.get(pid)
         if not p:
@@ -1768,14 +1855,15 @@ def _short_book(sup: dict, short: dict):
     thin = Side(style="thin"); box = Border(left=thin, right=thin, top=thin, bottom=thin)
     mid = Alignment(horizontal="center", vertical="center")
 
-    N, C, I, W, D0 = 2, 3, 4, 5, 6
+    N, I, W, D0 = 2, 3, 4, 5                   # как в заявке: кода в файле нет
+    НОМЕР, _ = _nums()
     LAST = D0 + len(dist) - 1; TOT = LAST + 1
     ws.cell(row=1, column=N, value=f"Shortfall · {sup.get('day') or ''}")
     ws.cell(row=1, column=N).font = Font(bold=True, size=16)
     ws.merge_cells(start_row=1, start_column=N, end_row=1, end_column=I)
     ws.row_dimensions[1].height = 21.6
 
-    head = ["№", CODE_COL, "Item", "Reason"] + \
+    head = [NUM_COL, ITEM_COL, "Reason"] + \
            [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}" for o in dist] + \
            [TOTAL_COL]
     for i, title in enumerate(head):
@@ -1788,8 +1876,7 @@ def _short_book(sup: dict, short: dict):
     for n, r in enumerate(short["rows"], 1):
         i = 3 + n
         stripe = (n % 2 == 0)
-        ws.cell(row=i, column=N, value=n).alignment = mid
-        ws.cell(row=i, column=C, value=r["id"]).alignment = mid
+        ws.cell(row=i, column=N, value=НОМЕР.get(r["id"], 0)).alignment = mid
         nm = ws.cell(row=i, column=I, value=r["name"]); nm.font = bold
         ws.cell(row=i, column=W, value=SHORT_WHY.get(r["why"], ""))
         for k, o in enumerate(dist):
@@ -1820,8 +1907,6 @@ def _short_book(sup: dict, short: dict):
 
     ws.column_dimensions["A"].width = 29.55
     ws.column_dimensions[get_column_letter(N)].width = 7.11
-    ws.column_dimensions[get_column_letter(C)].width = 10
-    ws.column_dimensions[get_column_letter(C)].hidden = True    # как в заявке
     ws.column_dimensions[get_column_letter(I)].width = 40
     ws.column_dimensions[get_column_letter(W)].width = 22
     for col in range(D0, LAST + 1):

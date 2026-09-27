@@ -77,41 +77,42 @@ async def main():
     eq("имя файла", name, "AMBAR-zayavka-2026-09-22.xlsx")
     wf = load_workbook(io.BytesIO(raw))["Order"]
     wv = load_workbook(io.BytesIO(raw), data_only=True)["Order"]
-    # Код спрятан от глаз магазина, но лежит в книге и читается программой
-    # (владелец, 27 сен 2026). Проверяем обе половины: и что не видно, и что
-    # значение на месте, — иначе «спрятали» однажды превратится в «убрали».
     # Тысячи не разделяем: пробел просмотрщик айфона не понимает и подставляет
     # свою запятую, теряя копейки (пробник из шести форматов, 27 сен 2026).
-    eq("формат денег без группировки", wf["L4"].number_format, "0.00;-0.00;;@")
-    eq("запятой в формате нет", "," in wf["L4"].number_format, False)
-    eq("и у цены тот же формат", wf["E4"].number_format, wf["L4"].number_format)
-    eq("колонка Code спрятана", wf.column_dimensions["C"].hidden, True)
-    eq("и код в ней всё равно есть", wf["C4"].value, "p1")
-    eq("а видимые колонки не спрятаны",
-       [wf.column_dimensions[c].hidden for c in ("B", "D", "E", "K", "L")],
-       [False] * 5)
-    eq("красная полоса про код не говорит", "Code" in str(wv["B2"].value), False)
-    hdr = [wv.cell(row=3, column=c).value for c in range(2, 13)]
-    eq("колонки", hdr, ["№", "Code", "Item", "Price, AED", "B1 JVC", "B2 Business Bay", "B3 Silicon Oasis",
+    eq("формат денег без группировки", wf["K4"].number_format, "0.00;-0.00;;@")
+    eq("запятой в формате нет", "," in wf["K4"].number_format, False)
+    eq("и у цены тот же формат", wf["D4"].number_format, wf["K4"].number_format)
+    # Колонки кода в файле НЕТ вовсе: прятать её не вышло — просмотрщик на
+    # айфоне не смотрит ни на hidden, ни на нулевую ширину (владелец, 27 сен
+    # 2026). Якорь теперь номер позиции.
+    eq("кода в файле нет нигде", any(str(c.value or "").startswith("p")
+                                     for r_ in wf.iter_rows() for c in r_), False)
+    eq("красная полоса просит беречь номер", "No. and Price" in str(wv["B2"].value), True)
+    hdr = [wv.cell(row=3, column=c).value for c in range(2, 12)]
+    eq("колонки", hdr, ["№", "Item", "Price, AED", "B1 JVC", "B2 Business Bay", "B3 Silicon Oasis",
                         "B4 Al Qusais", "B5 Tecom", "Total", "Amount, AED"])
-    got = {wv.cell(row=r, column=3).value: [wv.cell(row=r, column=c).value for c in (5, 11, 12)] for r in range(4, 8)}
-    eq("Absolut: цена, Total, сумма", got["p1"], [34.65, 76, 2633.4])
-    eq("Heineken: коробка × 19", got["p31"], [79.8, 19, 1516.2])
-    eq("без цены — пустая цена и пустая сумма", (got["p62"][0], got["p62"][1], got["p62"][2] in (None, "")),
+    # Номер — постоянный за позицией (место в обходе полок), а не порядковый.
+    from config_stock_order import order_key
+    eq("номера постоянные", [wv.cell(row=r, column=2).value for r in range(4, 8)],
+       sorted(order_key(i) + 1 for i, _, _ in ROWS))   # строки идут по обходу полок
+    got = {wv.cell(row=r, column=3).value: [wv.cell(row=r, column=c).value for c in (4, 10, 11)] for r in range(4, 8)}
+    eq("Absolut: цена, Total, сумма", got["Absolut 1 ltr"], [34.65, 76, 2633.4])
+    eq("Heineken: коробка × 19", got["Heineken 0.33 can"], [79.8, 19, 1516.2])
+    eq("без цены — пустая цена и пустая сумма", (got["Malfy Rosa 0.7 ltr"][0], got["Malfy Rosa 0.7 ltr"][1], got["Malfy Rosa 0.7 ltr"][2] in (None, "")),
        (None, 3, True))
-    eq("сумма строки — формулой от цены и Total", wf["L4"].value, '=IF(OR(E4="",N(K4)=0),"",E4*K4)')
+    eq("сумма строки — формулой от цены и Total", wf["K4"].value, '=IF(OR(D4="",N(J4)=0),"",D4*J4)')
     # итоговые строки
-    tot = [wv.cell(row=8, column=c).value for c in range(2, 12)]
-    eq("TOTAL: количества по районам и итог", (tot[0], tot[4:10]), ("TOTAL", [16, 30, 17, 19, 17, 99]))
-    amt = [wv.cell(row=9, column=c).value for c in range(2, 12)]
+    tot = [wv.cell(row=8, column=c).value for c in range(2, 11)]
+    eq("TOTAL: количества по районам и итог", (tot[0], tot[3:9]), ("TOTAL", [16, 30, 17, 19, 17, 99]))
+    amt = [wv.cell(row=9, column=c).value for c in range(2, 11)]
     want = [round(sum(COSTS.get(i, 0) * q[k] for i, _, q in ROWS), 2) for k in range(5)]
-    eq("AMOUNT: сумма каждого района = цена × количество района", (amt[0], amt[4:9]), ("AMOUNT, AED", want))
-    eq("общий итог = сумма строк = сумма районов", (amt[9], round(2633.4 + 1516.2 + 850, 2), round(sum(want), 2)),
+    eq("AMOUNT: сумма каждого района = цена × количество района", (amt[0], amt[3:8]), ("AMOUNT, AED", want))
+    eq("общий итог = сумма строк = сумма районов", (amt[8], round(2633.4 + 1516.2 + 850, 2), round(sum(want), 2)),
        (4999.6, 4999.6, 4999.6))
     merged = {str(r) for r in wf.merged_cells.ranges}
-    eq("итоги растянуты на Total+Amount", {"K8:L8", "K9:L9"} <= merged, True)
-    eq("сумма района — формулой", wf["F9"].value, "=SUMPRODUCT($E$4:$E$7,F4:F7)")
-    eq("общий итог — формулой", wf["K9"].value, "=SUM(L4:L7)")
+    eq("итоги растянуты на Total+Amount", {"J8:K8", "J9:K9"} <= merged, True)
+    eq("сумма района — формулой", wf["E9"].value, "=SUMPRODUCT($D$4:$D$7,E4:E7)")
+    eq("общий итог — формулой", wf["J9"].value, "=SUM(K4:K7)")
 
     print("── ответ магазина читается как раньше ─────────────────────────")
     resp = await unwrap(sr.handle_import)(_Req(raw))

@@ -4145,7 +4145,12 @@ async def _cash_amounts(day: str, orders: list) -> dict:
                     "spend_card": spend_card, "spend_pending": pending,
                     "fx": sorted(fx.values(), key=lambda v: v["code"]), "items": items,
                     "operator": (team[0].get("operator") if team else "") or "",
-                    "drivers": [d["name"] for d in team],
+                    # Показываем только тех, кто сегодня здесь: уехавший денег
+                    # не возит (владелец, 27 сен 2026). На расчёт это не
+                    # влияет — team выше остаётся полным, иначе расходы
+                    # уехавшего выпали бы из района.
+                    "drivers": [d["name"] for d in team
+                                if not _staff.is_away(d["name"])],
                     # Выручка — без чая: чай сидит в цене бутылки и сдаётся
                     # отдельной пачкой (владелец, 19 сен 2026: «две пачки —
                     # выручка и чай»).
@@ -4294,6 +4299,11 @@ async def cash_receive(day: str, oid: str, done: bool, who: str) -> None:
 @require_owner
 async def handle_cash_round(request):
     """GET /api/owner/cash-round?day= — сбор денег по районам."""
+    # Реестр — свежий: расход водителя ищется по его району, а водитель,
+    # заведённый в базе после запуска службы, до первого обновления в районе
+    # не числится, и его расход не вычитался бы ни у кого (найдено 27 сен
+    # 2026). Остальные денежные ручки это уже делают.
+    await _staff_fresh()
     day = (request.query.get("day") or "").strip() or _biz_date(_now_dubai()).isoformat()
     return web.json_response(await cash_round(day), headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))

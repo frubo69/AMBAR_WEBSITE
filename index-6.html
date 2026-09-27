@@ -557,6 +557,16 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pm-thumb{width:calc((100% - 10px)/3)}
 .pm-seg[data-sel="transfer"] .pm-thumb{transform:translateX(100%)}
 .pm-seg[data-sel="crypto"] .pm-thumb{transform:translateX(200%)}
+/* Без перевода способов на один меньше: бегунок шире, и крипта встаёт вторым,
+   а не третьим (владелец, 27 сен 2026 — убрать перевод из клиентского). */
+.pm-seg.no-tr .pm-thumb{width:calc((100% - 10px)/2)}
+.pm-seg.no-tr[data-sel="crypto"] .pm-thumb{transform:translateX(100%)}
+.pm-seg.no-tr.has-debt .pm-thumb{width:calc((100% - 10px)/3)}
+.pm-seg.no-tr.has-debt[data-sel="debt"] .pm-thumb{transform:translateX(200%)}
+.pm-seg.no-tr.has-free .pm-thumb{width:calc((100% - 10px)/3)}
+.pm-seg.no-tr.has-free[data-sel="free"] .pm-thumb{transform:translateX(200%)}
+.pm-seg.no-tr.has-debt.has-free .pm-thumb{width:calc((100% - 10px)/4)}
+.pm-seg.no-tr.has-debt.has-free[data-sel="free"] .pm-thumb{transform:translateX(300%)}
 .pm-seg.has-debt .pm-thumb{width:calc((100% - 10px)/4)}
 .pm-seg.has-free .pm-thumb{width:calc((100% - 10px)/4)}
 .pm-seg.has-debt.has-free .pm-thumb{width:calc((100% - 10px)/5)}
@@ -3380,6 +3390,10 @@ const tg=window.Telegram?.WebApp||null;
 // switched on server-side. CRYPTO_SIM keeps the flow demoable while the on-chain
 // detector is being built — flip to false once /api/crypto/* is live.
 let CRYPTO_ENABLED = localStorage.getItem('ambar_crypto_enabled')==='1';
+// Перевод из КЛИЕНТСКОГО приложения убран (владелец, 27 сен 2026): клиент
+// выбирает наличные или крипту. Оператор перевод по-прежнему ставит руками —
+// там он и нужен, когда клиент перевёл сам. Вернуть — поставить true.
+const TRANSFER_ENABLED = false;
 // В ДОЛГ (pay-later): per-user gate + running balance, both delivered by /api/me.
 // Display-only — POST /api/order re-checks the whitelist server-side.
 let DEBT_ENABLED = localStorage.getItem('ambar_debt_enabled')==='1';
@@ -6965,7 +6979,8 @@ function placeOrder(){
   }
   payload.payment_method = (payMethod === 'free' && FREE_ENABLED) ? 'free'
                          : (payMethod === 'debt' && DEBT_ENABLED) ? 'debt'
-                         : (payMethod === 'transfer' ? 'transfer' : 'cash');
+                         : (payMethod === 'transfer' && TRANSFER_ENABLED) ? 'transfer'
+                         : 'cash';
 
   orders.unshift({order_id:oid,items,total,address:addr.label||addr.address,status:'pending',timestamp:new Date().toISOString()});
   localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
@@ -7073,6 +7088,9 @@ function placeOrder(){
 // └────────────────────────────────────────────────────────────────────────────┘
 
 function selectPayMethod(m){
+  // Кнопки перевода на экране нет, но вызвать способ могли из памяти телефона
+  // или из старой разметки — молча не принимаем.
+  if(m==='transfer' && !TRANSFER_ENABLED) return;
   if(m==='crypto' && !CRYPTO_ENABLED){
     haptic.light();
     showToast(lang==='ru'?'Оплата криптой скоро будет доступна':'Crypto payment is coming soon','err');
@@ -7101,8 +7119,20 @@ function refreshPayMethodUI(){
     if(soon)soon.style.display='';
     if(payMethod==='crypto'){payMethod='cash';localStorage.setItem('ambar_pay_method','cash');}
   }
+  // ПЕРЕВОД: у клиента его нет. Если он остался в памяти телефона с прошлого
+  // раза — молча возвращаем наличные, иначе заказ уехал бы способом, которого
+  // на экране не видно.
+  const trBtn0=el('pm-transfer'), _seg=el('pm-seg');
+  if(TRANSFER_ENABLED){
+    if(trBtn0)trBtn0.style.display='';
+    _seg&&_seg.classList.remove('no-tr');
+  }else{
+    if(trBtn0)trBtn0.style.display='none';
+    _seg&&_seg.classList.add('no-tr');
+    if(payMethod==='transfer'){payMethod='cash';localStorage.setItem('ambar_pay_method','cash');}
+  }
   // В ДОЛГ: third segment option, only for whitelisted debt customers
-  const debtBtn=el('pm-debt'), _seg=el('pm-seg');
+  const debtBtn=el('pm-debt');
   if(DEBT_ENABLED){
     if(debtBtn)debtBtn.style.display='';
     _seg&&_seg.classList.add('has-debt');
@@ -7131,7 +7161,7 @@ function _applyPayMethodVisuals(){
   const cryptoSel=payMethod==='crypto'&&CRYPTO_ENABLED;
   const debtSel=payMethod==='debt'&&DEBT_ENABLED;
   const freeSel=payMethod==='free'&&FREE_ENABLED;
-  const trSel=payMethod==='transfer';
+  const trSel=payMethod==='transfer'&&TRANSFER_ENABLED;
   const cashOn=!cryptoSel&&!debtSel&&!trSel&&!freeSel;
   const cashBtn=el('pm-cash'), cryptoBtn=el('pm-crypto'), debtBtn=el('pm-debt'),
         freeBtn=el('pm-free'), trBtn=el('pm-transfer'), seg=el('pm-seg');

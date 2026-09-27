@@ -835,6 +835,19 @@ async def handle_create(request):
     if err:
         return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
 
+    # Способ оплаты (владелец, 27 сен 2026). До этого крипту вбивали обычным
+    # заказом с комментарием «крипта»: в выручке она была, а система считала
+    # её наличными в кармане водителя — отсюда и расхождение со сданным.
+    #
+    # Крипта и перевод — деньги мимо водителя: в выручку идут, в его наличные
+    # и в сбор выручки не попадают. Отдельной арифметики не заводим: обе
+    # узнаёт cash_math.is_prepaid, и водитель, и «Обзор», и «Сбор выручки»
+    # уже считают по ней.
+    pay = str(body.get("payment_method", "")).strip().lower() or "cash"
+    if pay not in ("cash", "crypto", "transfer"):
+        return web.json_response({"error": "bad_payment", "need": "cash|crypto|transfer"},
+                                 status=400, headers=CORS_HEADERS)
+
     uid = request["op_id"]
     # Офис ≡ район: ручной заказ приписывается тому району, который выбрал
     # оператор. Отдельного выбора офиса больше нет.
@@ -892,6 +905,10 @@ async def handle_create(request):
         "office_id": office_id,
         "office_name": OFFICE_NAMES.get(office_id, office_id),
         "comment": str(body.get("comment", "")).strip(),
+        "payment_method": pay,
+        # Оплачено мимо водителя — тем же признаком, что у криптозаказов из
+        # бота: водитель не должен ехать забирать деньги второй раз.
+        **({"paid": True} if pay in ("crypto", "transfer") else {}),
         # dispatch
         "district_id": dist["id"],
         "district": dist["name"],
@@ -1514,6 +1531,19 @@ async def handle_patch(request):
             if f == "customer_name" and not v:
                 v = "—"
             upd[f] = v
+    # Способ оплаты правится вместе с остальным: оператор мог поставить
+    # наличные, а клиент перевёл. Заодно снимаем/ставим «оплачено», иначе
+    # водитель поедет забирать деньги по заказу, который уже оплачен.
+    if "payment_method" in body:
+        pay = str(body.get("payment_method", "")).strip().lower() or "cash"
+        if pay not in ("cash", "crypto", "transfer"):
+            return web.json_response({"error": "bad_payment", "need": "cash|crypto|transfer"},
+                                     status=400, headers=CORS_HEADERS)
+        # Долг и «без оплаты» через эту ручку не трогаем: их ставят отдельно,
+        # и «наличные» из панели стёрли бы решение владельца.
+        if str(order.get("payment_method") or "") not in ("debt", "free"):
+            upd["payment_method"] = pay
+            upd["paid"] = pay in ("crypto", "transfer")
     if not upd:
         return web.json_response({"error": "nothing to update"}, status=400, headers=CORS_HEADERS)
 

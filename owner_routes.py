@@ -2164,6 +2164,57 @@ async def handle_staff_set(request):
 
 
 @require_owner
+async def handle_car_intakes(request):
+    """GET /api/owner/car-intakes — кто принял машину и кто ещё должен.
+
+    Ждут — те, у кого период работы начался не раньше рубежа и записи нет.
+    Их видно здесь, а не только по звонку водителя «меня не пускает»."""
+    import car_intake as ci
+    await _staff_fresh()
+    rows = await db.car_intakes_list(60)
+    ждут = []
+    for d in staff.drivers():
+        if d.get("away"):
+            continue
+        since = staff.work_since(d["name"])
+        if not since or since < ci.FROM_DAY:
+            continue
+        if not await db.car_intake_get(d["name"], since):
+            ждут.append({"driver": d["name"], "since": since,
+                         "district": d.get("district_code") or ""})
+    return web.json_response({"from_day": ci.FROM_DAY, "waiting": ждут, "rows": rows},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_car_intake_skip(request):
+    """POST /api/owner/car-intakes/skip {driver, note} — пропустить приём.
+
+    Машина в ремонте, новой ещё нет, выходит на чужой — без этой кнопки одна
+    машина останавливает смену целого района, а это дороже любого пробега.
+    Запись всё равно заводится: «пропустили и почему» — такой же факт."""
+    import car_intake as ci
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = (body.get("driver") or "").strip()
+    if name not in staff.driver_names():
+        return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
+    await _staff_fresh()
+    since = staff.work_since(name)
+    if not since or since < ci.FROM_DAY:
+        return web.json_response({"error": "not_needed"}, status=409, headers=CORS_HEADERS)
+    if await db.car_intake_get(name, since):
+        return web.json_response({"error": "already"}, status=409, headers=CORS_HEADERS)
+    await db.car_intake_skip(name, since, request.get("owner_user", {}).get("first_name", "") or "владелец",
+                             str(body.get("note") or "")[:200])
+    log.info(f"[car] приём пропущен: {name} · период с {since}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_staff_gear(request):
     """Наш телефон у водителя. body: {driver, phone: bool}
 
@@ -2755,6 +2806,31 @@ async def tg_edit_caption(token, chat_id, message_id, caption: str,
     except Exception as e:
         log.debug(f"tg_edit_caption {chat_id}/{message_id}: {e}")
         return None
+
+
+async def car_intake_tell(me: dict, car: dict, km: int, since: str) -> None:
+    """Водитель принял машину — владельцу снимком одометра.
+
+    Снимок и есть сообщение: число, вписанное руками, проверяется глазом по
+    кадру, а не пересказом. Рядом — прошлый пробег этой машины: нелепая
+    разница видна сразу, и ловится она так, а не техникой."""
+    import html as _html
+    last = await db.car_intake_last(str(car.get("_id") or ""))
+    img = await db.car_intake_photo(db.car_intake_id(me.get("name", ""), since))
+    было = int((last or {}).get("km") or 0)
+    строки = [f"🚗 <b>{_html.escape(str(me.get('name') or ''))}</b> принял машину",
+              f"{_html.escape(str(car.get('model') or ''))} · "
+              f"{_html.escape(str(car.get('plate') or ''))}",
+              f"Пробег <b>{km:,}</b> км".replace(",", " ")]
+    if было:
+        строки.append(f"В прошлый приём было {было:,} км — разница {km - было:,}"
+                      .replace(",", " "))
+    строки.append(f"Вышел на работу {since}")
+    cap = "\n".join(строки)
+    if img:
+        await notify_owners_photo("driver.car_intake", cap, img)
+    else:
+        await notify_owners("driver.car_intake", re.sub(r"<[^>]+>", "", cap), parse_mode="")
 
 
 async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Markdown",
@@ -5078,6 +5154,11 @@ def setup(app):
     app.router.add_post(            "/api/owner/staff/set", handle_staff_set)
     app.router.add_route("OPTIONS", "/api/owner/staff/gear", handle_staff_gear)
     app.router.add_post(            "/api/owner/staff/gear", handle_staff_gear)
+    # Приём машины: у каждой ручки своя строка OPTIONS, иначе предполёт 405.
+    app.router.add_route("OPTIONS", "/api/owner/car-intakes", handle_car_intakes)
+    app.router.add_get(             "/api/owner/car-intakes", handle_car_intakes)
+    app.router.add_route("OPTIONS", "/api/owner/car-intakes/skip", handle_car_intake_skip)
+    app.router.add_post(            "/api/owner/car-intakes/skip", handle_car_intake_skip)
     app.router.add_route("OPTIONS", "/api/owner/staff/reset", handle_staff_reset)
     app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
     for _p, _h in (("/api/owner/drivers/add", handle_drivers_add),

@@ -1,7 +1,7 @@
 """Стенд водителя из НАСТОЯЩЕГО driver/index.html: телеграм и api.js подменены
 заглушками с фикстурами, boot() → standBoot(). Параметры: ?fx=1 (заказ с
 оплатой в валюте), ?req=edit|cancel (открытая просьба), ?chat=1 (ответ
-оператора), ?pay=crypto|transfer|debt|free (способ оплаты), ?w=390. python3 tools/drv_stand_gen.py <dir> → <dir>/drv.html"""
+оператора), ?pay=crypto|transfer|debt|free (способ оплаты), ?car=1|free (машина не принята), ?open=odo[&km=&err=less|jump] (экран пробега), ?w=390. python3 tools/drv_stand_gen.py <dir> → <dir>/drv.html"""
 import os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -168,6 +168,14 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path.split('?')[0] === '/api/driver/shift/summary') return {...ST_SUM, ...(ST_SHIFT.after_close ? {closed_at: ST_SHIFT.report_closed_at} : {})};   // ?day= — просмотр закрытой
   if(path === '/api/driver/shift/close' && m === 'POST'){ stLog('API POST ' + path); const at = new Date().toISOString(); return {...ST_SHIFT, closed: true, closed_at: at, after_close: true, report_day: ST_SHIFT.day, report_closed_at: at, can_close: false, can_open: false, in_route: [], must: []}; }
   if(path === '/api/driver/shift') return ST_SHIFT;
+  if(path === '/api/driver/car') return m === 'POST'
+    ? {ok: true, km: +(opts.body || {}).km || 0, plate: '97448'}
+    : {need: !!ST_SHIFT.car_need, since: '2026-09-29',
+       car: ST_Q.get('car') === 'free' ? null : {id: 'car_1', model: 'Hyundai Elantra', color: 'серый', plate: '97448'},
+       free: ST_Q.get('car') === 'free'
+         ? [{id: 'car_9', model: 'Kia Rio', color: 'белый', plate: '12345'},
+            {id: 'car_8', model: 'Nissan Sunny', color: 'серебристый', plate: '54321'}] : [],
+       last_km: ST_Q.get('car') === 'free' ? 0 : 84210, last_at: '2026-09-01T09:00:00+04:00', done: null};
   if(path === '/api/driver/history') return ST_Q.get('histempty') ? {ok: true, today: '2026-09-13', days: []} : ST_HIST;
   if(path === '/api/driver/rates') return ST_FX;
   if(path === '/api/driver/catalog') return ST_CAT;
@@ -231,6 +239,13 @@ if(ST_Q.get('route')) ST_SHIFT.in_route = ['AMB82300EB5'];
 if(ST_Q.get('intake')) ST_SHIFT.intake = [{sid: 'S1', district: 'jvc', code: 'JVC', name: 'JVC', need: 12, got: 7, left: 5, started: true}];
 if(ST_Q.get('must')){ ST_SHIFT.must = ['fuel', 'wash']; ST_SHIFT.must_names = ['Бензин', 'Мойка']; }
 if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
+// ?car=1 — машина не принята: на смену нельзя (29 сен 2026). ?car=free —
+// своей машины нет, выбирает из свободных.
+if(ST_Q.get('car')){
+  ST_SHIFT.opened = false; ST_SHIFT.can_open = false; ST_SHIFT.late_hour = 18;
+  ST_SHIFT.car_need = true; ST_SHIFT.car_since = '2026-09-29';
+  ST_SHIFT.car_plate = ST_Q.get('car') === 'free' ? '' : '97448';
+}
 // ?selfopen=1 — оператор открыл смену района, водителя не отметил: открывает сам (22 сен 2026)
 if(ST_Q.get('selfopen')){ ST_SHIFT.opened = false; ST_SHIFT.working = null; ST_SHIFT.district_open = true; ST_SHIFT.late_hour = 18; ST_SHIFT.can_open = true; }
 if(ST_Q.get('shclosed')){ ST_SHIFT.closed = true; ST_SHIFT.closed_at = _agoIso(5); ST_SHIFT.after_close = true; ST_SHIFT.report_day = ST_SHIFT.day; ST_SHIFT.report_closed_at = ST_SHIFT.closed_at; ST_SHIFT.can_open = false; }
@@ -268,6 +283,25 @@ async function standBoot(){
   setInterval(() => { if(!PANIC && !LOCKED) load(); }, 5000);
   await new Promise(r => setTimeout(r, 80));
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
+  // ?open=odo — экран пробега с уже снятым кадром: камеры на стенде нет,
+  // поэтому подсовываем готовый снимок и зовём тот же odoAsk, что и камера.
+  // &free=1 — машина выбрана из свободных, прошлого пробега нет.
+  if(ST_Q.get('open') === 'odo'){
+    const c = document.createElement('canvas'); c.width = 640; c.height = 360;
+    const g = c.getContext('2d');
+    g.fillStyle = '#12100c'; g.fillRect(0, 0, 640, 360);
+    g.fillStyle = '#1b1710'; g.fillRect(70, 120, 500, 120);
+    g.fillStyle = '#E8C98A'; g.font = 'bold 76px monospace'; g.fillText('084210', 120, 205);
+    g.fillStyle = 'rgba(255,255,255,.45)'; g.font = '22px sans-serif'; g.fillText('km', 470, 205);
+    ODO = {photo: c.toDataURL('image/jpeg', .9), thumb: '',
+           car: ST_Q.get('car') === 'free' ? {id: 'car_9', plate: '12345'} : {id: 'car_1', plate: '97448'},
+           last: ST_Q.get('car') === 'free' ? 0 : 84210, confirm: false};
+    odoAsk(ODO.photo, '');
+    if(ST_Q.get('km')) document.getElementById('odoKm').value = ST_Q.get('km');
+    if(ST_Q.get('err') === 'less') _odoSay('Меньше, чем в прошлый приём (84 210 км). Проверьте число', true);
+    if(ST_Q.get('err') === 'jump'){ _odoSay('Это намного больше прошлого приёма (84 210 км). Если верно — нажмите ещё раз', true);
+      document.getElementById('odoGo').textContent = 'Всё верно, принять'; }
+  }
   // ?open=mv — сканер перемещения; &code=1 — как будто код прочитан (камеры на стенде нет); &badcode=1 — списанная; &pick=1 — район выбран
   if(ST_Q.get('open') === 'mv'){ await mvOpen(); if(ST_Q.get('code')){ await new Promise(r => setTimeout(r, 300)); await mvCode('AMB-0001-Q'); if(ST_Q.get('pick')) mvPick('alg'); } }
   // ?open=inc — лист входящего заказа; &mock=1 — цифры как на макете владельца

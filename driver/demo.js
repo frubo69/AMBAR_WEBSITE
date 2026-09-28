@@ -492,6 +492,13 @@ function route(path, opts){
   if(p === '/api/driver/pos' || p === '/api/driver/panic') return {ok: true};
 
   /* ── смена ── */
+  // Приём машины в демо не требуем: показываем приложение в работе, а не
+  // замок на входе. Своя машина у демо-водителя есть, пробег — прошлый.
+  if(p === '/api/driver/car') return m === 'POST'
+    ? {ok: true, km: +(body || {}).km || 0, plate: '97448'}
+    : {need: false, since: '', car: {id: 'car_demo', model: 'Hyundai Elantra',
+       color: 'серый', plate: '97448'}, free: [], last_km: 84210,
+       last_at: '', done: null};
   if(p === '/api/driver/shift' && m === 'GET') return shiftView();
   if(p === '/api/driver/shift/open'){
     S.sh.opened = true; S.sh.opened_at = now(); save();

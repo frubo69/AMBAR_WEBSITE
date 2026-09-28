@@ -306,7 +306,10 @@ def meal_of(day_doc: dict | None) -> int:
 # finance_pay.work_now). Периодов нет — человек на месте: выдумывать отъезд по
 # молчанию нельзя. Список живёт рядом с реестром и обновляется тем же sync(),
 # поэтому один и тот же ответ у всех служб — панели, ботов и сторожей.
-AWAY: dict = {}          # {имя: день отъезда}
+AWAY: dict = {}           # {имя: день отъезда}
+# Имя → день начала текущего периода работы. Нужен приёму машины
+# (car_intake.py): новый период — новый приём.
+SINCE: dict = {}
 
 
 def is_away(name: str) -> bool:
@@ -327,20 +330,37 @@ def away_since(name: str) -> str:
 async def sync_away(day: str = ""):
     """Перечитать, кого сейчас нет. Отдельно от реестра: периоды живут в
     «Зарплатах», и читать их каждому потребителю самому — значит развести
-    пять разных ответов на один вопрос."""
+    пять разных ответов на один вопрос.
+
+    Заодно запоминаем, С КАКОГО ДНЯ человек на работе (SINCE). Это тот же
+    период, из которого считается отъезд, и брать его вторым запросом было бы
+    вторым ответом на тот же вопрос. На нём стоит приём машины
+    (car_intake.py): новый период — новый приём."""
     import db
     import finance_pay as _pay
     if not day:
         import bizday as _bd
         day = _bd.biz_day()
-    out = {}
+    out, since = {}, {}
     for p in await db.fin_people_get():
         имя = str(p.get("_id") or "")
+        if not имя:
+            continue
         w = _pay.work_now(p.get("work"), day)
-        if имя and w.get("set") and not w.get("on"):
+        if w.get("set") and not w.get("on"):
             out[имя] = str(w.get("left") or "")
+        elif w.get("set") and w.get("since"):
+            since[имя] = str(w.get("since"))
     AWAY.clear()
     AWAY.update(out)
+    SINCE.clear()
+    SINCE.update(since)
+
+
+def work_since(name: str) -> str:
+    """С какого дня человек на работе в текущем периоде. Пусто — периодов
+    нет (значит, работает «всегда» и мы этого не знаем)."""
+    return SINCE.get(str(name or "").strip(), "")
 
 
 def drivers() -> list:

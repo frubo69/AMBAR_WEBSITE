@@ -971,6 +971,9 @@ _DEFAULT_PREFS = {
     # Водитель открыл смену позже 18:00 (владелец, 22 сен 2026: «это правило»,
     # с 15:00 переделано на 18:00 тем же днём).
     "driver.late_shift": True,
+    # Принял машину: снимок одометра и пробег, вписанный руками. Новенький или
+    # вернувшийся из отпуска, без этого на смену не выйдет (29 сен 2026).
+    "driver.car_intake": True,
     "finance.revenueLow": True, "finance.avgDrop": True,
     "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,
     "support.new": False, "support.noreply": True, "support.complaint": True, "support.escalation": False,
@@ -2227,6 +2230,81 @@ async def cars_import_from_drivers() -> int:
             n += 1
         await db.drivers.update_one({"_id": r["_id"]}, {"$unset": {"car": ""}})
     return n
+
+
+# ── приём машины: пробег на въезде ───────────────────────────────────────────
+# Владелец, 29 сен 2026: «водители, которые приезжают новенькие или с отпуска,
+# должны будут фотографировать пробег машины и вписывать его вручную, это будет
+# процедурой принятия автомобиля; без этого выйти на работу будет нельзя».
+#
+# Одна запись на период работы: _id = «имя:день начала периода». Повторный
+# запрос ничего не удвоит, а новый период (вернулся из отпуска) — это новый
+# ключ, то есть новый приём. Правило, когда он нужен, живёт в car_intake.py.
+#
+# Снимок — отдельной записью, как чек расхода: строку читают каждый раз, а
+# картинку открывают редко.
+
+def car_intake_id(name: str, since: str) -> str:
+    return f"{str(name or '').strip()}:{str(since or '').strip()}"
+
+
+async def car_intake_get(name: str, since: str) -> dict | None:
+    d = _db_or_none()
+    if d is None: return None
+    return await d.car_intakes.find_one({"_id": car_intake_id(name, since)})
+
+
+async def car_intake_set(name: str, since: str, doc: dict) -> bool:
+    """Принял машину. True — записали впервые; повтор не трогает первую запись:
+    пробег на въезде бывает один, и переписывать его задним числом незачем."""
+    d = _db_or_none()
+    if d is None: return False
+    from pymongo.errors import DuplicateKeyError
+    rec = {"_id": car_intake_id(name, since), "driver": str(name or ""), "since": str(since or ""),
+           "at": datetime.now(timezone.utc), **doc}
+    try:
+        await d.car_intakes.insert_one(rec)
+        return True
+    except DuplicateKeyError:
+        return False
+
+
+async def car_intake_skip(name: str, since: str, by: str, note: str = "") -> bool:
+    """Пропустить приём (машины нет, в ремонте, выходит на чужой). Запись всё
+    равно заводится: «пропустили и почему» — такой же факт, как пробег."""
+    return await car_intake_set(name, since, {"skipped": True, "skip_by": str(by or ""),
+                                              "note": str(note or "")})
+
+
+async def car_intake_last(car_id: str) -> dict | None:
+    """Прошлый приём этой машины — чтобы видеть разницу и ловить нелепые числа."""
+    d = _db_or_none()
+    if d is None or not car_id: return None
+    rows = await d.car_intakes.find({"car_id": car_id, "km": {"$gt": 0}}) \
+        .sort("at", -1).limit(1).to_list(length=1)
+    return rows[0] if rows else None
+
+
+async def car_intakes_list(limit: int = 50) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.car_intakes.find({}).sort("at", -1).to_list(length=limit)
+
+
+async def car_intake_photo_set(iid: str, photo: bytes, thumb: str = "") -> None:
+    d = _db_or_none()
+    if d is None or not iid or not photo: return
+    from bson.binary import Binary
+    await d.car_intake_photos.replace_one(
+        {"_id": iid}, {"_id": iid, "img": Binary(photo), "thumb": thumb,
+                       "at": datetime.now(timezone.utc)}, upsert=True)
+
+
+async def car_intake_photo(iid: str) -> bytes:
+    d = _db_or_none()
+    if d is None: return b""
+    doc = await d.car_intake_photos.find_one({"_id": iid}) or {}
+    return bytes(doc.get("img") or b"")
 
 
 async def driver_gear_set(name: str, ours_phone: bool, by: int = 0) -> bool:

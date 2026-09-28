@@ -112,7 +112,12 @@ async def main():
     eq("и старшему не писал", письма, [])
     eq("штраф уехавшему не заводится",
        await fa.geo_off("Улетел", "jvc", "2026-09-26", "13:32"), False)
-    eq("в базе его и нет", await db._db.fines_pending.count_documents({}), 0)
+    # Коллекция называется fine_pending (без «s») — на «fines_pending» проверка
+    # проходит всегда и ничего не значит.
+    eq("в базе его и нет", await db._db.fine_pending.count_documents({}), 0)
+    eq("а работающему — заводится",
+       await fa.geo_off("Работает", "jvc", "2026-09-26", "13:32"), True)
+    eq("и он в базе", await db._db.fine_pending.count_documents({}), 1)
 
     # Вернулся — доступ и слежение возвращаются сами, руками ничего не трогаем.
     await db._db.fin_people.update_one({"_id": "Улетел"},

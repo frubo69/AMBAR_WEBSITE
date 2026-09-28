@@ -62,15 +62,36 @@ def ssh_жив(ip, секунд=6):
         return False
 
 
+class _БезРедиректа(urllib.request.HTTPRedirectHandler):
+    """За редиректом НЕ идём — он и был причиной ложных тревог.
+
+    29 сен 2026, замер. nginx на 80-м отвечает `301 → https://ambar-delivery.com/`,
+    а `urlopen` послушно шёл по нему в HTTPS — и падал на
+    CERTIFICATE_VERIFY_FAILED, потому что на маке владельца HTTPS идёт через
+    перехватывающий прокси со своим корневым сертификатом, которого у питона
+    нет. Сторож ловил это общим `except` и докладывал «сайт не отвечает».
+    Curl в ту же секунду получал 301, а операторский планшет работал.
+
+    Между тем 301 — это и есть ответ nginx, то есть ровно то, что мы
+    проверяем. Заодно мы больше не трогаем ни TLS, ни домен: домен
+    ambar-delivery.com на части сетей режется по SNI, и идти в него
+    проверкой — напрашиваться на ложную тревогу второй раз."""
+    def redirect_request(self, *a, **k):
+        return None
+
+
+_БЕЗ_РЕДИРЕКТА = urllib.request.build_opener(_БезРедиректа)
+
+
 def http_жив(ip, host, секунд=8):
     """Отвечает ли nginx. Любой код — ответ; важно, что он есть."""
     req = urllib.request.Request(f"http://{ip}/", headers={"Host": host},
                                  method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=секунд) as r:
+        with _БЕЗ_РЕДИРЕКТА.open(req, timeout=секунд) as r:
             return True, r.status
     except urllib.error.HTTPError as e:
-        return True, e.code                      # 403 от nginx — тоже ответ
+        return True, e.code                      # 301, 403 — тоже ответ
     except Exception:
         return False, 0
 
@@ -107,7 +128,7 @@ def сеть_своя(секунд=4):
     """Добираемся ли мы хоть куда-то, кроме своего сервера."""
     for адрес in СВОИ:
         try:
-            urllib.request.urlopen(адрес, timeout=секунд)
+            _БЕЗ_РЕДИРЕКТА.open(адрес, timeout=секунд)
             return True
         except urllib.error.HTTPError:
             return True                          # ответ есть, код неважен

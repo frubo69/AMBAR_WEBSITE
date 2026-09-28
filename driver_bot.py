@@ -75,6 +75,62 @@ async def post_init(app):
         log.info("кнопка приложения установлена")
     except Exception as e:
         log.warning(f"set_chat_menu_button: {e}")
+    asyncio.get_event_loop().create_task(away_loop(app.bot))
+
+
+# ── кнопка «Панель» у уехавших ──────────────────────────────────────────────
+# Сервер уехавшего и так не пускает (driver_routes: 403 away), но кнопка у поля
+# ввода осталась бы на месте, и человек жал бы её впустую. Владелец, 29 сен
+# 2026: «отзывать доступ к водительскому боту». Значит и кнопку.
+#
+# Кнопка у бота двухэтажная: общая по умолчанию (её ставит post_init) и своя у
+# конкретного чата. Своя перекрывает общую, поэтому уехавшему ставим
+# MenuButtonCommands (панели нет), а вернувшемуся возвращаем Default — он
+# снова берёт общую.
+#
+# Ходим не чаще раза в пять минут и только когда состояние человека
+# изменилось: телеграм считает такие вызовы наравне с сообщениями.
+AWAY_EVERY_SEC = 300
+_MENU: dict = {}                           # telegram_id → уехал ли, как мы его последний раз отметили
+
+
+async def _menu_for(bot, tid: int, away: bool) -> None:
+    from telegram import MenuButtonCommands, MenuButtonDefault
+    await bot.set_chat_menu_button(
+        chat_id=tid, menu_button=MenuButtonCommands() if away else MenuButtonDefault())
+
+
+async def away_sync(bot) -> int:
+    """Развесить кнопки по тому, кто сейчас уехал. Возвращает число правок."""
+    правок = 0
+    for name, tid in list(staff.DRIVER_IDS.items()):
+        try:
+            tid = int(tid)
+        except (TypeError, ValueError):
+            continue
+        away = staff.is_away(name)
+        if _MENU.get(tid) == away:
+            continue
+        try:
+            await _menu_for(bot, tid, away)
+        except Exception as e:             # noqa: BLE001
+            # Не начинал чат с ботом — чата нет, и ставить нечего. Это не
+            # ошибка: запомним и не будем долбиться каждые пять минут.
+            log.debug(f"кнопка для {name}: {e}")
+        _MENU[tid] = away
+        правок += 1
+        log.info(f"панель {'скрыта' if away else 'возвращена'}: {name}")
+    return правок
+
+
+async def away_loop(bot, interval: float = AWAY_EVERY_SEC):
+    while True:
+        try:
+            await staff.sync()
+            await away_sync(bot)
+        except Exception as e:             # noqa: BLE001
+            log.warning(f"кнопки уехавших: {e}")
+        await asyncio.sleep(interval)
 
 
 # ── привязка телефона по одноразовой ссылке (15 сен 2026) ───────────────────
@@ -232,6 +288,17 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     await _remember(update.message)
+    # Уехал — панели нет (владелец, 29 сен 2026: «отзывать доступ на время,
+    # пока они не работают»). Ни имени, ни даты: в скрытом режиме чат
+    # прикидывается игрой, и чужая рука не должна узнать отсюда ничего о
+    # хозяине телефона. Вернётся на работу — панель появится сама.
+    if staff.is_away(me["name"]):
+        sent = await update.message.reply_text(
+            "Панель закрыта: вы сейчас не на работе.\n\n"
+            "Она откроется сама, когда вы снова выйдете на смену.")
+        await _remember(sent)
+        log.info(f"вход уехавшего: {me['name']} ({uid})")
+        return
     # Ответ нарочно ни о чём: ни имени, ни района, ни слова о заказах. В
     # скрытом режиме чат прикидывается игрой, и /start, набранный чужой рукой,
     # не должен выдать, чей это телефон и чем он занят (владелец, 10 сен 2026).

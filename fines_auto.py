@@ -114,7 +114,15 @@ async def geo_off(name: str, district: str, day: str, at_hm: str, by_signal: boo
     """Выключилась геолокация — штраф 200 на решение, один за день (на смене
     и вне её: отключать её запрещено вообще, владелец, 22 сен 2026):
     пока по нему не решили, новые выключения того же дня дописываются в
-    подробности. True — новая запись (о ней и стоит сказать старшему)."""
+    подробности. True — новая запись (о ней и стоит сказать старшему).
+
+    Уехавшему штрафа нет (владелец, 29 сен 2026). Проверка стоит и здесь, а не
+    только у сторожа: штраф — это деньги человека, и цена ошибки тут выше цены
+    лишней строки."""
+    import config_staff as _staff
+    if _staff.is_away(name):
+        log.info(f"[fines] {name} уехал — за геолокацию не штрафуем")
+        return False
     pid = f"geo_off:{day}:{name}"
     doc = {"_id": pid, "kind": "geo_off", "name": name, "district": district, "day": day,
            "reason": KINDS["geo_off"]["reason"], "times": [at_hm], "note": _geo_note([at_hm]),

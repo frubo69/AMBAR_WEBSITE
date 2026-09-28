@@ -369,7 +369,11 @@ async def _off_duty(name: str, utc: datetime, day: str, why: str = "") -> bool:
     22 сен 2026): штраф на решение и сообщение старшему — один раз за день.
     Включение вне смены — не событие.
 
-    Вышел срок трансляции — не его вина и не штраф (24 сен 2026)."""
+    Вышел срок трансляции — не его вина и не штраф (24 сен 2026).
+
+    Уехал — вообще не наше дело (29 сен 2026)."""
+    if _не_сторожим(name):
+        return False
     if why == "expired":
         await _owners(text_stream_expired(name, False), EVENT_OFF,
                       meta=geo_meta(name, False))
@@ -381,6 +385,19 @@ async def _off_duty(name: str, utc: datetime, day: str, why: str = "") -> bool:
     await _owners(text_off_duty(name) + line, EVENT_OFF, reply_markup=kb, meta=geo_meta(name, False))
     log.info(f"[geo-watch] {name}: выключил трансляцию вне смены — штраф на решение")
     return True
+
+
+# Уехал — не сторожим и ничего не требуем (владелец, 29 сен 2026: «переставать
+# требовать от них верификацию на время, пока они не работают»). Повод: Азиз
+# уехал 24 сентября, 28-го выключил геопозицию у себя дома и получил штраф
+# 200 AED на решение. Человек вне Дубая не обязан быть видимым: смотреть на
+# него некому и незачем.
+#
+# Отдельной пометки не нужно — отъезд считается из периодов работы в
+# «Зарплатах» (config_staff.AWAY), и слежение возвращается само в тот день,
+# когда он снова вышел.
+def _не_сторожим(name: str) -> bool:
+    return staff.is_away(name)
 
 
 async def _fine(name: str, utc: datetime, day: str, by_signal: bool = True) -> tuple:
@@ -411,6 +428,13 @@ async def on_stream(name: str, on: bool, now: datetime = None, why: str = "") ->
     2026: «как нам теперь это делать, будучи неуверенным в том, что они сами
     её отключили»)."""
     utc = now or datetime.now(timezone.utc)
+    try:
+        await staff.sync()                   # уехал ли он — по свежим «Зарплатам»
+    except Exception as e:                   # noqa: BLE001
+        log.debug(f"[geo-watch] реестр не прочитан: {e}")
+    if _не_сторожим(name):
+        log.info(f"[geo-watch] {name} уехал — трансляцию не разбираем")
+        return False
     day = _biz_day(utc.astimezone(DUBAI_TZ))
     d = await db.get_driver_day(day, name) or {}
     if d.get("working") is not True:
@@ -468,7 +492,12 @@ def _senior_ids() -> set:
 
 async def on_senior_stream(name: str, on: bool, now: datetime = None) -> bool:
     """Старший включил или выключил трансляцию в чате STAR-бота — владельцам
-    (кроме самих старших) в ту же секунду."""
+    (кроме самих старших) в ту же секунду.
+
+    Уехал — молчим, как и про водителей (29 сен 2026): «Парвиз выключил
+    геопозицию» из другой страны владельцу ни о чём не говорит."""
+    if _не_сторожим(name):
+        return False
     utc = now or datetime.now(timezone.utc)
     day = _biz_day(utc.astimezone(DUBAI_TZ))
     key = SENIOR_PREFIX + name
@@ -510,7 +539,9 @@ async def tick(now: datetime = None) -> dict:
         if d.get("working") is not True or not d.get("shift_open_at"):
             continue
         name = (d.get("driver") or "").strip()
-        if name and name in staff.DRIVER_IDS:
+        # Уехавшего в бригаду не ставят (project_shift_rules), но если отметка
+        # осталась с прошлой смены — сторожить всё равно нечего (29 сен 2026).
+        if name and name in staff.DRIVER_IDS and not _не_сторожим(name):
             on_shift.append((name, d))
     if not on_shift:
         out["on_shift"] = 0

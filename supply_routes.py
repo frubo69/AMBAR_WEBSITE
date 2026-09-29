@@ -1705,9 +1705,18 @@ async def pending_qty() -> dict:
 
     Принятое БЕЗ СКАНИРОВАНИЯ сюда не идёт: те бутылки уже на полке, их
     прибавляет _noscan_after, и вычесть их вторым концом значит потерять их
-    дважды."""
+    дважды.
+
+    Сюда же — СЕГОДНЯШНЯЯ докупка (черновик kind=extra). Магазин не дал
+    17 позиций, система завела их в докупку на другие базы И одновременно
+    попросила у Баракуды заново: одна и та же недодача считалась дважды
+    (владелец, 29 сен 2026). Считаем только черновик ТЕКУЩЕГО дня: если за ним
+    так и не съездили, завтрашняя заявка спросит их снова. Лучше спросить
+    дважды, чем не купить вовсе."""
     out = {}
-    for sup in await db.supplies_with_open_tasks(limit=12):
+    сегодня = __import__("stock_routes")._biz_day()
+    for sup in list(await db.supplies_with_open_tasks(limit=12)) \
+            + list(await db.supplies_extra_draft(сегодня)):
         for oid, t in (sup.get("tasks") or {}).items():
             if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
                 continue
@@ -1719,6 +1728,24 @@ async def pending_qty() -> dict:
                 if left > 1e-9:
                     out[(oid, it["id"])] = out.get((oid, it["id"]), 0.0) + left
     return out
+
+
+async def pending_extra_qty() -> float:
+    """Сколько единиц из pending_qty — это сегодняшняя докупка, а не база.
+    Нужно только для подписи на экране: «ждут на базе» и «докупаем сегодня» —
+    разные новости, и путать их нельзя."""
+    всего = 0.0
+    сегодня = __import__("stock_routes")._biz_day()
+    for sup in await db.supplies_extra_draft(сегодня):
+        for oid, t in (sup.get("tasks") or {}).items():
+            if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
+                continue
+            for it in sup.get("items") or []:
+                need = float((it.get("by_district") or {}).get(oid) or 0)
+                left = need - float((it.get("got") or {}).get(oid) or 0)
+                if left > 1e-9:
+                    всего += left
+    return всего
 
 
 async def noscan_tasks() -> list:

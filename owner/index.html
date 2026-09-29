@@ -24878,8 +24878,18 @@ function ordRender(){
 
     ${d.moving_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.moving_qty)} ед</b> —
       их сегодня переместят между районами</div>` : ''}
-    ${d.pending_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.pending_qty)} ед</b> —
-      они уже заказаны и ждут на базе</div>` : ''}
+    ${(() => {
+      // «Ждут на базе» и «докупаем сегодня» — разные новости, и называть их
+      // одним словом нельзя (владелец, 29 сен 2026: недодачу магазина система
+      // одновременно ставила в докупку и просила у Баракуды заново).
+      const всего = +d.pending_qty || 0, док = +d.pending_extra_qty || 0;
+      const база = Math.max(0, всего - док);
+      if(!всего) return '';
+      const части = [];
+      if(база) части.push(`<b>${fmtQty(база)} ед</b> уже ждут на базе`);
+      if(док)  части.push(`<b>${fmtQty(док)} ед</b> докупаем сегодня на других базах`);
+      return `<div class="ord-hint">Заявка не просит ${части.join(' · ')}</div>`;
+    })()}
     ${(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
       ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}

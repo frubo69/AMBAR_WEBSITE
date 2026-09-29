@@ -719,6 +719,22 @@ async def handle_import(request):
            "asked_qty": sum(int(v) for v in asked_map.values()),
            "gap_qty": sum(d["asked"] for d in dropped) + sum(s["gap"] for s in short)}
     await db.supply_save(doc)
+    # Ответ магазина ПИШЕТСЯ В ЗАЯВКУ этого дня (владелец, 29 сен 2026: «всё,
+    # что я хотел — чтобы когда я загружал ответ магазина, он писал туда
+    # правильные цифры, а после смены там появлялась новая заявка, которая
+    # после ответа снова редактировалась согласно ответу»).
+    #
+    # Пишем правками (zayavka_edits) — тем же механизмом, которым владелец
+    # правит заявку руками. Поэтому весь экран показывает одно число: и
+    # «Закупаем», и районы, и общий список. Позиции, которых магазин не дал,
+    # ставим в ноль: заявка показывает то, что РЕАЛЬНО покупаем.
+    #
+    # Правки живут днём. Смена кончилась — наступил новый день, правок там нет,
+    # и заявка снова считается сама. Тот самый круг.
+    try:
+        await _answer_to_order(day, items, asked_full)
+    except Exception as e:                           # noqa: BLE001
+        log.error(f"[supply] ответ в заявку не записан: {e}")
     log.info(f"[supply] поставка {sid}: {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, отказов {len(dropped)}, "
              f"урезано {len(short)}, сверх заказа {len(extra)}")
@@ -1705,18 +1721,9 @@ async def pending_qty() -> dict:
 
     Принятое БЕЗ СКАНИРОВАНИЯ сюда не идёт: те бутылки уже на полке, их
     прибавляет _noscan_after, и вычесть их вторым концом значит потерять их
-    дважды.
-
-    Сюда же — СЕГОДНЯШНЯЯ докупка (черновик kind=extra). Магазин не дал
-    17 позиций, система завела их в докупку на другие базы И одновременно
-    попросила у Баракуды заново: одна и та же недодача считалась дважды
-    (владелец, 29 сен 2026). Считаем только черновик ТЕКУЩЕГО дня: если за ним
-    так и не съездили, завтрашняя заявка спросит их снова. Лучше спросить
-    дважды, чем не купить вовсе."""
+    дважды."""
     out = {}
-    сегодня = __import__("stock_routes")._biz_day()
-    for sup in list(await db.supplies_with_open_tasks(limit=12)) \
-            + list(await db.supplies_extra_draft(сегодня)):
+    for sup in await db.supplies_with_open_tasks(limit=12):
         for oid, t in (sup.get("tasks") or {}).items():
             if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
                 continue
@@ -1730,22 +1737,28 @@ async def pending_qty() -> dict:
     return out
 
 
-async def pending_extra_qty() -> float:
-    """Сколько единиц из pending_qty — это сегодняшняя докупка, а не база.
-    Нужно только для подписи на экране: «ждут на базе» и «докупаем сегодня» —
-    разные новости, и путать их нельзя."""
-    всего = 0.0
-    сегодня = __import__("stock_routes")._biz_day()
-    for sup in await db.supplies_extra_draft(сегодня):
-        for oid, t in (sup.get("tasks") or {}).items():
-            if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
+async def _answer_to_order(day: str, items: list, asked_full: dict) -> None:
+    """Переписать заявку дня по ответу магазина.
+
+    items — что магазин даёт, по районам. asked_full — что просили: по нему
+    находим позиции, которые он не дал вовсе, и ставим им ноль. Иначе они
+    остались бы в заявке прежними числами, и экран показывал бы смесь
+    «что просили» и «что дают»."""
+    дают = {it["id"]: (it.get("by_district") or {}) for it in items}
+    районы = set()
+    for by in list(дают.values()) + list((asked_full or {}).values()):
+        районы |= {str(k) for k in (by or {})}
+    трогали = 0
+    for pid in set(дают) | set(asked_full or {}):
+        по_районам = дают.get(pid) or {}
+        for oid in районы:
+            было = float(((asked_full or {}).get(pid) or {}).get(oid) or 0)
+            стало = float(по_районам.get(oid) or 0)
+            if было == 0 and стало == 0:
                 continue
-            for it in sup.get("items") or []:
-                need = float((it.get("by_district") or {}).get(oid) or 0)
-                left = need - float((it.get("got") or {}).get(oid) or 0)
-                if left > 1e-9:
-                    всего += left
-    return всего
+            await db.zayavka_edit_set(day, pid, oid, стало)
+            трогали += 1
+    log.info(f"[supply] заявка {day} переписана по ответу магазина: {трогали} клеток")
 
 
 async def noscan_tasks() -> list:

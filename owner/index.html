@@ -24425,14 +24425,12 @@ function pathNav(){
             : (d.total_qty || 0);
   const ed = d.edited_count || 0;
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
-  // Кнопка обязана открывать ТО, ЧТО НА НЕЙ НАПИСАНО (владелец, 29 сен 2026:
-  // «нажимаю заявку Баракуда — значит должен видеть ту же заявку, что вижу
-  // изначально, а именно 502 единицы»). Магазин ответил — число на кнопке
-  // берётся из поставки, а открывался при этом список СЛЕДУЮЩЕЙ заявки: на
-  // кнопке 502, внутри 185. Ответил — ведём в поставку, не ответил — в список.
-  const кудa = отв && st.sup && st.sup.supply_id
-    ? `accSupply('who','','${escS(st.sup.supply_id)}')` : 'accOrderList()';
-  return `<button class="pnav-r pbig ttl" onclick="${кудa}">
+  // Кнопка ведёт в список заявки — и только туда. Пробовал уводить её в
+  // приёмку, когда магазин ответил: владелец, 29 сен 2026 — «нажимаю заявку
+  // Баракуда, меня переносит в приёмку, ты чё». Число на кнопке и список
+  // сходятся не подменой экрана, а тем, что ответ магазина пишется в саму
+  // заявку (supply_routes._answer_to_order).
+  return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
       <span class="pnav-i big live">${ICO_LIST}</span>
       <span class="pnav-b"><b>Заявка Баракуда</b></span>
       <span class="pnav-v">${fmtQty(qty)}<u>${pluralize(qty,'единица','единицы','единиц')}</u></span>
@@ -24878,18 +24876,8 @@ function ordRender(){
 
     ${d.moving_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.moving_qty)} ед</b> —
       их сегодня переместят между районами</div>` : ''}
-    ${(() => {
-      // «Ждут на базе» и «докупаем сегодня» — разные новости, и называть их
-      // одним словом нельзя (владелец, 29 сен 2026: недодачу магазина система
-      // одновременно ставила в докупку и просила у Баракуды заново).
-      const всего = +d.pending_qty || 0, док = +d.pending_extra_qty || 0;
-      const база = Math.max(0, всего - док);
-      if(!всего) return '';
-      const части = [];
-      if(база) части.push(`<b>${fmtQty(база)} ед</b> уже ждут на базе`);
-      if(док)  части.push(`<b>${fmtQty(док)} ед</b> докупаем сегодня на других базах`);
-      return `<div class="ord-hint">Заявка не просит ${части.join(' · ')}</div>`;
-    })()}
+    ${d.pending_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.pending_qty)} ед</b> —
+      они уже заказаны и ждут на базе</div>` : ''}
     ${(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
       ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}

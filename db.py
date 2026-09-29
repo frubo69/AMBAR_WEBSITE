@@ -3145,19 +3145,6 @@ async def supplies_with_open_tasks(limit: int = 10) -> list:
     return await cur.to_list(length=limit)
 
 
-async def supplies_extra_draft(day: str, limit: int = 6) -> list:
-    """Черновики докупки на другие базы за этот день.
-
-    Их товар уже назначен к покупке, и просить его у магазина второй раз —
-    купить дважды (владелец, 29 сен 2026). Берём только текущий день: за
-    черновиком могли и не съездить, и завтра он снова станет заявкой.
-    """
-    db = _db_or_none()
-    if db is None: return []
-    cur = db.supplies.find({"status": "draft", "kind": "extra", "day": day}).limit(limit)
-    return await cur.to_list(length=limit)
-
-
 async def supplies_since(day_from: str, limit: int = 80) -> list:
     """Поставки с учётного дня и позже, любого статуса, с задачами и составом —
     история приёмок водителя: закрытая задача не исчезает, в неё заходят

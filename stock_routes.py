@@ -1482,7 +1482,6 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
         log.warning(f"[stock] поставка дня не прочитана: {e}")
         _sup = {}
     moving, leaving, waiting = {}, {}, {}
-    pending_extra = 0.0               # из них — сегодняшняя докупка на другие базы
     if not frozen_base:
         try:
             import move_routes
@@ -1495,7 +1494,6 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
         try:
             import supply_routes as _sup_mod
             waiting = await _sup_mod.pending_qty()
-            pending_extra = await _sup_mod.pending_extra_qty()
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[stock] заказанное и не забранное не прочитано: {e}")
     try:
@@ -1664,8 +1662,6 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
         # Сколько уже заказано у магазина и ждёт на базе: заявка это
         # вычла, и на экране стоит строкой — иначе выглядит как сбой.
         "pending_qty": _num(pending_qty),
-        # Сколько из них — докупка на сегодня: подпись на экране другая.
-        "pending_extra_qty": _num(min(pending_extra, pending_qty)),
         "leaving_qty": _num(leaving_qty), "leaving_need": leaving_need,
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,

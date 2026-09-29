@@ -24,6 +24,12 @@ log = logging.getLogger("ambar.pixoo")
 
 CACHE_SEC = 10                   # рамка спрашивает каждые полминуты; чаще базу не трогаем
 _cache: dict = {}
+# Когда рамка приходила за числом в последний раз. Нужно сторожу в домашней
+# сети (tools/pixoo_watch.py): отсюда видно, что рамка замолчала, а изнутри
+# дома этого не видно — она может стоять на нашем канале и не ходить никуда
+# (так и было 29 сен 2026). Число в памяти процесса: переживать перезапуск ему
+# незачем, после него сторож просто подождёт лишнюю минуту.
+_seen: dict = {}
 
 
 def pixoo_key() -> str:
@@ -75,8 +81,18 @@ async def handle_pixoo(request):
     if not key or not hmac.compare_digest(request.match_info.get("key", ""), key):
         return web.Response(status=401, text="no")
     what = request.match_info.get("what") or "customers"
+    # Не показание, а вопрос о самой рамке: сколько секунд назад она приходила.
+    # Отвечаем по тому же ключу — чужой сюда не попадёт.
+    if what == "seen":
+        было = _seen.get("at") or 0
+        return web.json_response({"ago": int(time.time() - было) if было else -1},
+                                 headers={"Cache-Control": "no-store"})
     if what not in ("customers", "online"):
         return web.Response(status=404, text="no")
+    # Считаем приходом только запрос самой рамки, а не наши проверки curl-ом:
+    # иначе сторож решит, что всё хорошо, глядя на собственный след.
+    if "ESP32" in request.headers.get("User-Agent", ""):
+        _seen["at"] = time.time()
     # Формат — как у эталона Divoom (appin.divoom-gz.com/Device/ReturnCurrentDate):
     # JSON с полем DispData. Голый текст рамка молча не рисует — проверено на
     # Pixoo-64 владельца 17 сен 2026. ?plain=1 — голый текст для глаз.

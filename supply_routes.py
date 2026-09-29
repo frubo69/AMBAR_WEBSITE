@@ -557,12 +557,22 @@ async def handle_import(request):
         return web.json_response({"error": "no_district_columns"},
                                  status=400, headers=CORS_HEADERS)
 
-    asked_map, asked_full, day = {}, {}, ""
+    # День поставки — тот, КОГДА ЗАГРУЗИЛИ ОТВЕТ, а не тот, в чью смену
+    # собирали заявку (владелец, 29 сен 2026: «если мы загружаем ответ
+    # магазина — это заявка сегодняшняя»). Заявку собирают под утро, ответ
+    # приходит днём, товар везут в тот же день — и раньше поставка ложилась во
+    # вчера: чек-лист сегодняшнего дня искал её по дню и не находил, будто
+    # поставки нет вовсе.
+    #
+    # Снимок заявки по-прежнему берём последний: по нему считается, чего
+    # магазин не дал. Он про то, ЧТО просили, а не про то, каким днём считать.
+    asked_map, asked_full = {}, {}
+    import stock_routes as _sr
+    day = _sr._biz_day()
     try:
         snap = await db.zayavka_last_full()
         asked_map = snap.get("asked") or {}
         asked_full = snap.get("by") or {}
-        day = snap.get("_id") or ""
     except Exception as e:
         log.warning(f"[supply] снимок заявки не прочитан: {e}")
 

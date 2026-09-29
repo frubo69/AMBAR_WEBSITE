@@ -24425,7 +24425,14 @@ function pathNav(){
             : (d.total_qty || 0);
   const ed = d.edited_count || 0;
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
-  return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
+  // Кнопка обязана открывать ТО, ЧТО НА НЕЙ НАПИСАНО (владелец, 29 сен 2026:
+  // «нажимаю заявку Баракуда — значит должен видеть ту же заявку, что вижу
+  // изначально, а именно 502 единицы»). Магазин ответил — число на кнопке
+  // берётся из поставки, а открывался при этом список СЛЕДУЮЩЕЙ заявки: на
+  // кнопке 502, внутри 185. Ответил — ведём в поставку, не ответил — в список.
+  const кудa = отв && st.sup && st.sup.supply_id
+    ? `accSupply('who','','${escS(st.sup.supply_id)}')` : 'accOrderList()';
+  return `<button class="pnav-r pbig ttl" onclick="${кудa}">
       <span class="pnav-i big live">${ICO_LIST}</span>
       <span class="pnav-b"><b>Заявка Баракуда</b></span>
       <span class="pnav-v">${fmtQty(qty)}<u>${pluralize(qty,'единица','единицы','единиц')}</u></span>

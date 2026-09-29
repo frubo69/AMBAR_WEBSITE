@@ -487,6 +487,33 @@ def _build_items(raw_items: list, source: str = "manual") -> tuple[list, str]:
     return items, ""
 
 
+def _keep_gift(old_items: list, new_items: list) -> list:
+    """Подарок приложения переживает правку заказа.
+
+    Панель о подарке не знает: она присылает состав целиком, и подарочная
+    строка возвращается обычной — с ценой. До 30 сен 2026 любая правка (даже
+    смена водителя) превращала подарок в платную бутылку: у заказа на 1150 AED
+    итог становился 1250. Подарок кладёт сервер и снимает тоже только сервер —
+    из присланного состава вычитаем его эхо и возвращаем строку как была."""
+    gifts = [dict(i) for i in (old_items or []) if i.get("gift")]
+    if not gifts:
+        return list(new_items or [])
+    out = [dict(i) for i in (new_items or []) if not i.get("gift")]
+    for g in gifts:
+        надо = int(g.get("qty") or 1)
+        for it in out:
+            if надо <= 0:
+                break
+            if it.get("id") != g.get("id") or it.get("pcs"):
+                continue
+            снять = min(надо, int(it.get("qty") or 0))
+            it["qty"] = int(it.get("qty") or 0) - снять
+            it["line_total"] = (it.get("price") or 0) * it["qty"]
+            надо -= снять
+    out = [i for i in out if int(i.get("qty") or 0) > 0]
+    return out + gifts
+
+
 def _item_lines(items: list) -> str:
     return "\n".join(
         f"  • {i['name']} ×{i['qty']} = {i.get('line_total', i['price'] * i['qty'])} AED"
@@ -1507,6 +1534,7 @@ async def handle_patch(request):
         items, err = _build_items(body.get("items"), order.get("source") or "app")
         if err:
             return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
+        items = _keep_gift(order.get("items"), items)
         total = await _order_total_for(order, items)
         items_changed = _items_sig(items) != _items_sig(order.get("items"))
         upd.update(items=items, item_lines=_item_lines(items),
@@ -2377,6 +2405,7 @@ async def handle_driver_req(request):
         items = None
         if isinstance(raw, list) and raw:
             items, _ = _build_items(raw, order.get("source") or "app")
+            items = _keep_gift(order.get("items"), items) if items else items
         items = items or req.get("items")
         if not items:
             return web.json_response({"error": "empty_items"}, status=400, headers=CORS_HEADERS)

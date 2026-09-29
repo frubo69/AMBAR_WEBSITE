@@ -595,7 +595,11 @@ def recalc_order(order):
     pmap  = {p["id"]: p for p in _products()}
     items = order.get("items", [])
     for item in items:
-        if item.get("is_custom"):
+        if item.get("gift"):
+            # Подарок бесплатен, сколько бы ни пересчитывали заказ.
+            price = 0
+            item["price"] = 0
+        elif item.get("is_custom"):
             # Custom items keep their own price
             price = item.get("price", 0)
         else:

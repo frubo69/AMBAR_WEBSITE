@@ -6850,7 +6850,8 @@ function _dayRu(iso){
     {day:'2-digit', month:'long', weekday:'short'});
 }
 
-async function shiftClose(oid){
+async function shiftClose(oid, opts){
+  opts = opts || {};
   if(SHIFT_BUSY) return;
   const x = (SHIFT.districts || []).find(d => d.district === oid);
   // Заказ в пути — не предупреждение, а запрет: после закрытия смены по нему
@@ -6866,7 +6867,7 @@ async function shiftClose(oid){
   SHIFT_BUSY = true;
   try{
     const r = await opApi.opFetch('/api/operator/shift/close',
-      {method:'POST', body:{district: oid, as: curOp}});
+      {method:'POST', body:{district: oid, as: curOp, ...(opts.force ? {force: 1} : {})}});
     haptic('ok');
     toast(r.all_closed ? 'Смена закрыта у всех — заявка ушла старшему'
                        : `Смена закрыта · ${_num(r.revenue)} AED`, 'ok');
@@ -6878,6 +6879,20 @@ async function shiftClose(oid){
       toast(`${p.count || (p.ids||[]).length} в пути${ids ? ': ' + ids : ''} — `
           + `сначала отметьте доставку`, 'err');
       await shiftOpen();
+    } else if(p.error === 'too_early'){
+      // Смену района закрывают под утро. 28 сен 2026 Алгусес закрыли в 14:13,
+      // и все заказы до утра ушли в следующий день — район остался без дня.
+      // Не запрещаем совсем: бывает, что закрыть и правда надо. Но спрашиваем,
+      // и называем тех, кого это оставит без смены.
+      const кто = (p.drivers || []).join(', ');
+      const ч = Math.floor(p.hours || 0);
+      if(confirm(`День ещё идёт — прошло ${ч} ${plural(ч,'час','часа','часов')} из смены.`
+          + (кто ? `\nНа смене: ${кто}.` : '')
+          + `\n\nЕсли закрыть сейчас, заказы до утра запишутся СЛЕДУЮЩИМ днём.`
+          + `\nВсё равно закрыть?`)){
+        SHIFT_BUSY = false;
+        return shiftClose(oid, {force: true});
+      }
     } else {
       toast('Не удалось закрыть', 'err');
     }

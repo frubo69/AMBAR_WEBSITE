@@ -3133,6 +3133,32 @@ async def handle_shift_log(request):
         headers=CORS_HEADERS)
 
 
+# Раньше этого срока после начала дня район не закрывают. Замер по 214
+# закрытиям на 29 сен 2026: 196 из них между 05:00 и 07:00 по Дубаю, остальные
+# до 10:44 — то есть через 19–25 часов после начала суток. Двенадцать часов
+# отделяют их все с большим запасом.
+SHIFT_MIN_H = 12
+
+
+def _hours_in(day) -> float:
+    """Сколько часов прошло с начала учётных суток района."""
+    старт = datetime(day.year, day.month, day.day, SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    return (datetime.now(DUBAI_TZ) - старт).total_seconds() / 3600
+
+
+async def _on_shift(day: str, oid: str) -> list:
+    """Водители района, у кого смена открыта и не закрыта."""
+    out = []
+    for имя in (_staff_mod.DISTRICT_DRIVERS.get(oid) or []):
+        try:
+            d = await db.get_driver_day(day, имя) or {}
+        except Exception:                                    # noqa: BLE001
+            continue
+        if d.get("shift_open_at") and not d.get("shift_close_at"):
+            out.append(имя)
+    return out
+
+
 @require_operator
 @no_test_mode
 async def handle_shift_close(request):
@@ -3170,6 +3196,22 @@ async def handle_shift_close(request):
             {"error": "orders_in_route", "count": mine["in_route"],
              "ids": mine.get("in_route_ids") or [],
              "drivers": mine.get("in_route_drivers") or []},
+            status=409, headers=CORS_HEADERS)
+    # Смену района закрывают под утро, когда день отработан. 28 сен 2026
+    # Алгусес закрыли в 14:13 — через четыре часа после начала суток. Работа
+    # шла ещё шестнадцать часов, и КАЖДЫЙ заказ после этого система подписала
+    # следующим днём (db.order_day_now): за 28-е у района осталось ноль
+    # заказов, три заказа на 3400 AED уехали в 29-е, и никто об этом не узнал.
+    #
+    # Считаем возраст дня, а не «есть ли водители на смене»: на нормальном
+    # закрытии они тоже на смене — оператор закрывает район первым, водитель
+    # свою смену после него. Водителей называем в отказе, чтобы было видно,
+    # кого это оставит без дня.
+    часов = _hours_in(day)
+    if часов < SHIFT_MIN_H and not body.get("force"):
+        return web.json_response(
+            {"error": "too_early", "hours": round(часов, 1),
+             "drivers": await _on_shift(day.isoformat(), oid)},
             status=409, headers=CORS_HEADERS)
     ok = await db.shift_close(day.isoformat(), oid, {
         "closed_at": datetime.now(timezone.utc), "by": request.get("op_id") or 0,

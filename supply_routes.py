@@ -1452,15 +1452,25 @@ async def short_report(sid: str, oid: str, me: str, kind: str, lines: list,
     if ((task.get("short") or {}).get("status")) == "pending":
         return {"ok": False, "verdict": "pending"}
     по_id = {it["id"]: it for it in sup.get("items") or []}
-    итог = []
+    # Одна позиция — одна строка: присланная дважды складывается ДО сверки с
+    # тем, что осталось принять, иначе две строки по отдельности проходят
+    # предел, а вместе — нет.
+    сумма = {}
     for l in lines or []:
-        it = по_id.get(str((l or {}).get("id") or ""))
-        if not it:
+        if not isinstance(l, dict):
             continue
         try:
-            qty = float((l or {}).get("qty") or 0)
+            q = float(l.get("qty") or 0)
         except (TypeError, ValueError):
-            qty = 0.0
+            q = 0.0
+        if q > 0:
+            pid = str(l.get("id") or "")
+            сумма[pid] = сумма.get(pid, 0.0) + q
+    итог = []
+    for pid, qty in сумма.items():
+        it = по_id.get(pid)
+        if not it:
+            continue
         got = float((it.get("got") or {}).get(oid) or 0)
         можно = max(0.0, _need_eff(it, oid, task) - got)
         qty = _qn(min(max(0.0, qty), можно))
@@ -1731,7 +1741,10 @@ async def pending_qty() -> dict:
                 need = float((it.get("by_district") or {}).get(oid) or 0)
                 if need <= 0:
                     continue
-                left = need - float((it.get("got") or {}).get(oid) or 0)
+                # Подтверждённый недовоз на базе не ждёт: его не дали. Считать
+                # его «заказанным и не забранным» — значит не попросить этот
+                # товар в завтрашней заявке (найдено прогоном 29 сен 2026).
+                left = _need_eff(it, oid, t) - float((it.get("got") or {}).get(oid) or 0)
                 if left > 1e-9:
                     out[(oid, it["id"])] = out.get((oid, it["id"]), 0.0) + left
     return out

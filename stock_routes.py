@@ -1095,10 +1095,28 @@ async def _noscan_after(since: dict, until: datetime | None = None) -> dict:
             for it in sup.get("items") or []:
                 need = float((it.get("by_district") or {}).get(oid) or 0)
                 got = float((it.get("got") or {}).get(oid) or 0)
-                rem = max(0.0, need - got)
+                # Подтверждённый недовоз на полке не лежит: его не привезли.
+                # Без этого район «принят без сканирования» держал на складе
+                # и то, чего магазин не дал (найдено прогоном 29 сен 2026).
+                rem = max(0.0, need - _task_miss(t, it.get("id")) - got)
                 if rem and it.get("id"):
                     out.setdefault(oid, {})[it["id"]] = out.get(oid, {}).get(it["id"], 0) + rem
     return out
+
+
+def _task_miss(task: dict, pid, until=None) -> float:
+    """Недовоз по позиции, который старший подтвердил (tasks.<район>.miss).
+    until — склад на прошедший момент: решение, принятое позже, тогда ещё не
+    действовало."""
+    try:
+        v = float(((task or {}).get("miss") or {}).get(pid) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if v and until is not None:
+        at = _aware(((task or {}).get("short") or {}).get("decided_at"))
+        if at is not None and at > until:
+            return 0.0
+    return max(0.0, v)
 
 
 def _aware(v):
@@ -1135,7 +1153,7 @@ async def _noscan_at(since: dict, until: datetime) -> dict:
             for it in sup.get("items") or []:
                 pid = it.get("id")
                 need = float((it.get("by_district") or {}).get(oid) or 0)
-                rem = max(0.0, need - float(got.get(pid) or 0))
+                rem = max(0.0, need - _task_miss(t, pid, until) - float(got.get(pid) or 0))
                 if rem and pid:
                     out.setdefault(oid, {})[pid] = out.get(oid, {}).get(pid, 0) + rem
     return out

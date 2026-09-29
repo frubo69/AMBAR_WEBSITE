@@ -322,9 +322,19 @@ async def main():
     eq("аренда без чека → записана", (r.status, WRITES[-2][1]["line"], WRITES[-2][1]["photo"]), (200, "rentX", False))
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=500, line="simX")))
     eq("не аренда без чека → 400 no_photo", (r.status, json.loads(r.text)["error"]), (400, "no_photo"))
+    # Рент машин с 29 сен 2026 платится ТОЛЬКО с чеком (владелец: «где Орион
+    # рент, Алексей рент и Аслам — сделай так, чтобы вместе с оплатой нужно
+    # было и чеки загружать»). Офисы и реклама — как раньше, без чека.
     BUDGET.append(dict(_id="carX", month="2026-09", name="Орион Рент", group="car", plan=20000, ord=11))
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=20000, line="carX")))
-    eq("аренда машин без чека → записана", (r.status, WRITES[-2][1]["line"]), (200, "carX"))
+    eq("РЕНТ МАШИН БЕЗ ЧЕКА → 400 no_photo", (r.status, json.loads(r.text)["error"]), (400, "no_photo"))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=20000,
+                                                              line="carX", photo=jpeg)))
+    eq("рент машин с чеком → записан, снимок помечен",
+       (r.status, WRITES[-2][1]["line"], WRITES[-2][1]["photo"]), (200, "carX", True))
+    BUDGET.append(dict(_id="adsX", month="2026-09", name="Посты", group="ads", plan=3000, ord=12))
+    r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=3000, line="adsX")))
+    eq("а реклама без чека по-прежнему записывается", (r.status, WRITES[-2][1]["line"]), (200, "adsX"))
     # билет: откуда и куда — ложатся в запись и отдаются обратно
     r = await raw(inner["handle_entry_add"])(_req("POST", dict(day="2026-09-10", book="rp", amount=900, who="Азиз",
                                                               route_from="Дубай", route_to="Ташкент", photo=jpeg)))

@@ -3733,6 +3733,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-fchip.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft);color:var(--gold2)}
 .fb-fchip.on em{background:rgba(201,169,110,.18);color:var(--gold2)}
 .fb-fchip:active{transform:scale(.97)}
+/* Оплата рента ждёт чек: кнопка тусклая, но нажимается — нажатие открывает
+   выбор снимка, а не упирается в молчание. */
+.fb-paybtn.off{opacity:.5}
+.fb-rentrcp{width:100%;margin-top:2px}
 .fb-paybtn.undo{border:1px solid var(--border2);background:none;color:var(--muted);
   font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer}
 .fb-paybtn.undo:active{transform:scale(.96);color:var(--dn);border-color:var(--dn)}
@@ -22368,10 +22372,40 @@ function fbPayRow(l){
   const usd = !e && l.cur === 'USD' && l.plan > 0 ? `${fbFmt(l.plan)} $` : '';
   const sub = e ? `Оплачено <b class="fb-due ok">${escS(fbDayT(e.day))}</b>`
                 : [fbLineSub(l), usd].filter(Boolean).join(' · ');
+  // Рент машин платится только с чеком (владелец, 29 сен 2026). Кнопка ждёт
+  // снимок, и это видно до нажатия, а не после отказа сервера.
+  const рчек = !e && fbPayRcpNeed(l), снимок = (FB.rentShot || {})[l.id];
   return `<div class="fb-e fb-bl fb-pay"><span class="fb-e-b"><b>${fbBldName(l)}</b><i>${sub}</i></span>
     <span class="fb-boxcol fb-paycol">${sum ? `<b class="fb-box${e ? ' ok' : ''}">${fbFmt(sum)}<u>AED</u></b>` : ''}
       ${e ? `<button class="fb-paybtn undo" data-e="${escS(e.id)}" onclick="fbPayUndo(this.dataset.e)">Отменить</button>`
-          : `<button class="aud-b go fb-paybtn" data-l="${l.id}" onclick="fbPayOpen(this.dataset.l)">Оплатил</button>`}</span></div>`;
+          : `<button class="aud-b go fb-paybtn${рчек && !снимок ? ' off' : ''}" data-l="${l.id}"
+               onclick="fbPayOpen(this.dataset.l)">Оплатил</button>`}</span></div>${
+    рчек ? fbRentRcp(l, снимок) : ''}`;
+}
+
+// ── чек к оплате рента ─────────────────────────────────────────────────────
+// Владелец, 29 сен 2026: «где Орион рент, Алексей рент и Аслам — сделай так,
+// чтобы вместе с оплатой нужно было и чеки загружать». До этого ренты были
+// освобождены от чека намеренно (12 сен: «нажал кнопку — оплатил, расход
+// засчитан»); теперь правило снято только для машин — про офисы и рекламу
+// разговора не было.
+//
+// Снимок держим по строке, а не одним FB.shot: рентов три, и кадр, снятый для
+// Ориона, не должен уехать Алексею.
+const FB_PAY_RCP = ['car'];
+function fbPayRcpNeed(l){ return !!l && FB_PAY_RCP.includes(l.group); }
+
+function fbRentRcp(l, s){
+  return `<div class="fb-rcpw"><button class="xe-rcp fb-rcp fb-rentrcp${s ? ' set' : ''}"
+      data-l="${escS(l.id)}" onclick="fbRentShotPick(this.dataset.l)">${
+    s ? `<img src="${s.thumb}" alt=""><span class="xe-rcp-t">Чек добавлен<i>нажать, чтобы заменить</i></span>`
+      : `${IC('note', 16)}<span class="xe-rcp-t">Чек обязателен<i>снимок или из галереи</i></span>`
+    }</button></div>`;
+}
+
+function fbRentShotPick(id){
+  FB.rentPick = id;
+  document.getElementById('fbCam').click();
 }
 // Оплата статьи в этом месяце — последняя запись расхода по ней
 function fbPaidOf(id){
@@ -22396,15 +22430,21 @@ async function fbPayOpen(id){
      !await askDialog('Вы уверены?', `До платежа осталось ${fbLeftT(left)}`, 'Оплатил', 'Вернуться назад')) return;
   const sum = fbPaySum(l);
   if(!(sum > 0)){ _toast('Сумма не заполнена'); return; }
+  // Рент машин — только с чеком. Не отказываем молча: сразу открываем выбор
+  // снимка, чтобы человек не искал, куда нажать.
+  const снимок = (FB.rentShot || {})[id];
+  if(fbPayRcpNeed(l) && !снимок){ _toast('Сначала чек'); fbRentShotPick(id); return; }
   const day = b.today <= b.last ? b.today : b.last;
   if(!await fbAskDay(day, 'Оплата аренды')) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
-      {method: 'POST', body: {day, book: 'rp', amount: sum, comment: '', who: '', line: id, as: _meName()}});
+      {method: 'POST', body: {day, book: 'rp', amount: sum, comment: '', who: '', line: id, as: _meName(),
+                              ...(снимок ? {photo: снимок.photo, thumb: снимок.thumb} : {})}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(снимок){ const r = {...(FB.rentShot || {})}; delete r[id]; FB.rentShot = r; }
     if(res.book){ fbApply(res.book); fbPaint(); }
     fbPagePaint();
-  }catch(e){ _toast('Не удалось записать'); }
+  }catch(e){ _toast(((e && e.payload) || {}).error === 'no_photo' ? 'Нужен чек' : 'Не удалось записать'); }
 }
 // Нажал случайно — вернуть как было: запись уходит, факт и остаток отматываются
 async function fbPayUndo(eid){
@@ -22548,8 +22588,16 @@ function fbShot(inp){
     const tk = Math.min(1, 96 / Math.max(img.width, img.height));
     t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
     t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
-    FB.shot = {photo: c.toDataURL('image/jpeg', 0.72), thumb: t.toDataURL('image/jpeg', 0.5)};
-    fbShotMark();
+    const кадр = {photo: c.toDataURL('image/jpeg', 0.72), thumb: t.toDataURL('image/jpeg', 0.5)};
+    // Снимали для строки рента — кладём к ней, а не в общий FB.shot.
+    if(FB.rentPick){
+      FB.rentShot = {...(FB.rentShot || {}), [FB.rentPick]: кадр};
+      FB.rentPick = null;
+      fbPagePaint();
+    }else{
+      FB.shot = кадр;
+      fbShotMark();
+    }
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   };
   img.onerror = () => _toast('Не смогли прочитать снимок');

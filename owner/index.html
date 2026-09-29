@@ -28840,7 +28840,7 @@ function xsShort(d, t){
   const всего = (sh.lines || []).reduce((a, l) => a + (+l.qty || 0), 0);
   if(sh.status === 'pending'){
     return `<div class="xsh wait">
-      <div class="xsh-h">Недовоз · ${escS(sh.by || '')} (${кто}) · ${fmtQty(всего)}</div>
+      <div class="xsh-h">${t.done_at ? 'Район закрыт · недовоз ждёт решения' : 'Недовоз'} · ${escS(sh.by || '')} (${кто}) · ${fmtQty(всего)}</div>
       ${list}
       ${sh.note ? `<div class="xsh-note">${escS(sh.note)}</div>` : ''}
       <div class="xsh-b">

@@ -11739,6 +11739,11 @@ function supRenderTask(){
            t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>${
          (t.got > 0 || !ns) && !(t.short && t.short.status === 'pending')
            ? `<button class="btn btn-gh" onclick="finOpen()">Не всё привезли</button>` : ''}${
+         // Отчёт ушёл, старший молчит — район всё равно можно закрыть, иначе он
+         // держит и приёмку, и смену (владелец, 29 сен 2026). У принятого без
+         // сканирования закрывать нечего: там остаётся досканировать.
+         !ns && t.short && t.short.status === 'pending'
+           ? `<button class="btn btn-gh" onclick="finPendOpen()">Закрыть район</button>` : ''}${
          ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}`}`;
 }
 
@@ -11853,12 +11858,13 @@ function shortStep(pid, d){
   shortPaint();
 }
 
-async function noscanSend(тихо){
+async function noscanSend(тихо, short){
   const t = TASK; if(!t || (SUP_BUSY && !тихо)) return; SUP_BUSY = true;
   const btn = document.getElementById('finGo'); btn.disabled = true;
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/noscan`,
-      {method:'POST', body:{district: t.district}});
+      {method:'POST', body:{district: t.district, ...(short || {})}});
+    if(!r.ok && r.verdict === 'short_empty'){ toast('Столько не дать не могли — проверьте числа', 'err'); return; }
     if(!r.ok && r.verdict === 'prices_needed'){
       finClose(); if(r.task) TASK = supAdopt(r.task); PRICES_OPEN = true; supRenderTask();
       toast('Сначала впишите цены', 'err'); return;
@@ -12417,22 +12423,48 @@ function finOpen(){
 
 function finClose(){ document.getElementById('finSheet').classList.remove('show'); }
 
+// Закрыть район, пока отчёт о недовозе ждёт решения. Второй раз «чего не
+// дали» не спрашиваем — оно уже у старшего; показываем, с чем район закроется.
+function finPendOpen(){
+  const t = TASK; if(!t) return;
+  const gaps = (t.lines || []).filter(l => l.left > 0);
+  _setText('finT', 'Закрыть район');
+  _setText('finS', `${t.district_code} ${t.district_name} · недовоз ждёт решения старшего`);
+  document.getElementById('finBody').innerHTML =
+    (gaps.length ? `<div class="card" style="margin-bottom:12px">${
+      gaps.slice(0, 8).map(l => `<div class="ord-item" style="margin-bottom:7px">
+        <span>${esc(l.name)}</span><b>${l.got} из ${l.need}</b></div>`).join('')
+      }${gaps.length > 8 ? `<div class="sup-row-s">…и ещё ${gaps.length - 8}</div>` : ''}</div>` : '') +
+    `<textarea id="finNote" placeholder="Комментарий старшему — если нужен"></textarea>`;
+  document.getElementById('finNote').value = (t.short && t.short.note) || '';
+  const b = document.getElementById('finGo');
+  b.textContent = 'Закрыть район'; b.disabled = false;
+  b.onclick = () => finSend(true);
+  document.getElementById('finSheet').classList.add('show');
+}
+
 // Ничего не приняли — значит и закрывать нечего: задача возвращается в общий
 // список, а не закрывается недобором на всю поставку.
 async function supGiveBack(){
   const t = TASK; if(!t) return;
-  try{ await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/release`,
+  let r = null;
+  try{ r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/release`,
     {method:'POST', body:{district: t.district}}); }
   catch(e){ return toast('Не удалось вернуть', 'err'); }
+  if(r && r.ok === false){
+    toast(r.verdict === 'started' ? 'По задаче уже принят товар — вернуть нельзя' : 'Не удалось вернуть', 'err');
+    return supPollTick();
+  }
   document.getElementById('supScr').classList.remove('show');
   TASK = null; toast('Задача снова свободна');
   supLoad(); shLoad();                        // смена: приёмка больше не держит закрытие
 }
 
-async function finSend(){
+async function finSend(ждёт){
   const t = TASK; if(!t || SUP_BUSY) return;
+  ждёт = ждёт === true;                     // кнопка зовёт нас с событием — оно не в счёт
   const note = (document.getElementById('finNote') || {}).value || '';
-  if(t.left > 0 && !note.trim()) return toast('Впишите, почему не хватает', 'err');
+  if(t.left > 0 && !note.trim() && !ждёт) return toast('Впишите, почему не хватает', 'err');
   // Недобор не закрывает район сам: это отчёт старшему, решение за ним
   // (владелец, 21 сен 2026: «конечное решение принимаю я через AMBAR STAR»).
   // Подтвердит — недовоз вычтут из того, что надо отсканировать, и если всё
@@ -12440,7 +12472,7 @@ async function finSend(){
   // Осталось невнесённое — сначала спрашиваем, ЧЕГО именно не дали, по
   // строкам. Раньше отчёт уходил оптом («не довезли всё, что осталось»), и
   // старший не видел, где именно дыра.
-  if(t.left > 0){ SHORT_NOTE = note; return shortOpen('fin'); }
+  if(t.left > 0 && !ждёт){ SHORT_NOTE = note; return shortOpen('fin'); }
   SUP_BUSY = true;
   const btn = document.getElementById('finGo'); btn.disabled = true;
   try{
@@ -12451,9 +12483,11 @@ async function finSend(){
     document.getElementById('supScr').classList.remove('show');
     TASK = null;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    toast('Приёмка закрыта');
+    toast(r.short_pending ? 'Район закрыт · недовоз ждёт решения' : 'Приёмка закрыта');
     supLoad(); shLoad();                      // смена: шаг «Завершить приёмку» снимается сразу
-  }catch(e){ toast('Не удалось закрыть', 'err'); }
+  }catch(e){
+    toast(e && e.message === 'noscan_left' ? 'Сначала отсканируйте то, что на полке' : 'Не удалось закрыть', 'err');
+  }
   finally{ SUP_BUSY = false; btn.disabled = false; }
 }
 
@@ -12468,14 +12502,15 @@ async function shortSend(){
   SUP_BUSY = true;
   const btn = document.getElementById('finGo'); btn.disabled = true;
   try{
+    // Пришли из «принять без сканирования» — отчёт и отметка уходят одним
+    // запросом: товар забрали, просто не весь. Двумя подряд это рвалось на
+    // связи — отчёт ушёл, отметка нет, а повторить было нельзя.
+    if(SHORT.from === 'ns'){ SHORT_NOTE = ''; SUP_BUSY = false; return noscanSend(true, {lines, note}); }
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/short`,
       {method:'POST', body:{district: t.district, lines, note}});
     if(!r.ok) throw new Error(r.verdict);
     if(r.task) TASK = supAdopt(r.task);
     SHORT_NOTE = '';
-    // Пришли из «принять без сканирования» — отметку всё равно ставим: товар
-    // забрали, просто не весь. Одно нажатие, два факта.
-    if(SHORT.from === 'ns'){ SUP_BUSY = false; return noscanSend(true); }
     finClose();
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Отправлено старшему — ждём решения');

@@ -745,6 +745,10 @@ async def handle_import(request):
     # набрать заявку руками, а незамеченная разница — это просто не купленный
     # товар.
     черновик = await _draft_from_gap(doc)
+    try:
+        await _stale_tell(sid)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] о снятых прошлых задачах не сказали: {e}")
     return web.json_response({"ok": True, "supply_id": sid, "draft": черновик,
                               "items": len(items), "total_qty": doc["total_qty"],
                               "asked_qty": doc["asked_qty"], "gap_qty": doc["gap_qty"],
@@ -754,6 +758,44 @@ async def handle_import(request):
                                          "name": OFFICE_NAMES.get(o, o), **t}
                                         for o, t in tasks.items()]},
                              headers=CORS_HEADERS)
+
+
+async def _stale_tell(new_sid: str) -> list:
+    """Пришла новая заявка — задачи прошлой, которые взяли и не начали,
+    снимаем с водителей и говорим им об этом.
+
+    Такая задача из приложения пропадает (tasks_for_driver показывает прошлую
+    заявку, только если по ней что-то принято), и раньше пропадала молча:
+    человек взял район, утром открыл приложение — района нет (найдено
+    разбором 29 сен 2026). Сама задача остаётся открытой: товар по ней может
+    ждать на базе, и заявка это учитывает (pending_qty). Возвращает, кому
+    сказали: [(водитель, район)]."""
+    сняты = []
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        if sup.get("_id") == new_sid or (sup.get("kind") or "main") == "extra":
+            continue
+        for oid, t in (sup.get("tasks") or {}).items():
+            if (not t.get("driver") or t.get("done_at") or t.get("cancelled_at")
+                    or t.get("noscan_at") or int(t.get("scanned") or 0) > 0):
+                continue
+            if await db.supply_task_release(sup["_id"], oid, t["driver"], untouched=True):
+                сняты.append((t["driver"], oid))
+    if not сняты:
+        return []
+    import pay_notify as _pn
+    by: dict = {}
+    for name, oid in сняты:
+        by.setdefault(name, []).append(f"{OFFICE_CODES.get(oid, '')} {OFFICE_NAMES.get(oid, oid)}".strip())
+    for name, where in by.items():
+        try:
+            await _pn.tell_safe(name, "📦 Пришла новая заявка. Прошлая приёмка "
+                                      f"({', '.join(where)}) с вас снята — её заменила новая. "
+                                      "Откройте «Товар» в приложении.", parse_mode=None)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[supply] {name}: о снятой задаче не ушло: {e}")
+    log.info(f"[supply] новая заявка {new_sid}: сняты неначатые задачи — "
+             + ", ".join(f"{n} {o}" for n, o in сняты))
+    return сняты
 
 
 def _task_units_got(sup: dict, oid: str):
@@ -1385,6 +1427,19 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
         return {"ok": False, "verdict": "not_mine"}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
+    # Принятое без сканирования водитель с остатком не закрывает: бутылки уже
+    # на полке, и закрыть район — значит молча снять их со склада. Путь один:
+    # досканировать или сказать, чего не дали. Старший закрыть может — это его
+    # решение, и товар тогда действительно считается отсутствующим.
+    if task.get("noscan_at") and not owner and not force:
+        осталось = sum(max(0.0, _need_eff(i, oid, task) - float((i.get("got") or {}).get(oid) or 0))
+                       for i in (sup.get("items") or []))
+        if осталось > 1e-9:
+            return {"ok": False, "verdict": "noscan_left", "left": _qn(осталось)}
+    # Отчёт о недовозе ещё ждёт решения — район закрыть можно (владелец,
+    # 29 сен 2026): иначе молчащий старший держит водителя и на приёмке, и на
+    # смене. Решение он примет потом, по закрытому району.
+    ждёт = ((task.get("short") or {}).get("status")) == "pending"
 
     gaps = []
     for it in sup.get("items") or []:
@@ -1409,10 +1464,10 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
              f"{(doc.get('tasks') or {}).get(oid, {}).get('scanned', 0)} шт · "
              f"недобор {sum(g['gap'] for g in gaps)}")
     try:
-        await _notify_done(sid, doc, oid, me, gaps, note)
+        await _notify_done(sid, doc, oid, me, gaps, note, short_pending=ждёт)
     except Exception as e:
         log.error(f"[supply] уведомление о приёмке: {e}")
-    return {"ok": True, "gaps": gaps,
+    return {"ok": True, "gaps": gaps, "short_pending": ждёт,
             "supply_done": doc.get("status") == "done"}
 
 
@@ -1519,7 +1574,11 @@ async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
         return {"ok": False, "verdict": "not_pending"}
     now = datetime.now(timezone.utc)
     miss = None
-    if ok:
+    # Район уже закрыт — решение записываем как ответ на отчёт, и только:
+    # принимать по нему больше нечего, недобор посчитан при закрытии, и менять
+    # закрытую приёмку задним числом нельзя.
+    закрыт = bool(task.get("done_at") or task.get("cancelled_at"))
+    if ok and not закрыт:
         miss = dict(task.get("miss") or {})
         for x in sh.get("lines") or []:
             miss[x["id"]] = _qn(float(miss.get(x["id"]) or 0) + float(x.get("qty") or 0))
@@ -1527,7 +1586,7 @@ async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
         return {"ok": False, "verdict": "not_pending"}
     log.info(f"[supply] {sid}/{oid}: недовоз {'подтверждён' if ok else 'отклонён'} · {who}")
     finished = False
-    if ok:
+    if ok and not закрыт:
         sup = await db.supply_get(sid)
         task = (sup.get("tasks") or {}).get(oid) or {}
         осталось = sum(max(0.0, _need_eff(i, oid, task) - float((i.get("got") or {}).get(oid) or 0))
@@ -1566,7 +1625,12 @@ async def open_tasks_all() -> list:
 #
 # Досканировать может кто угодно: тот же водитель из своего списка или старший
 # из приёмки. Бутылка ставится в реестр тем же task_scan — второго пути нет.
-async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
+async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
+                      short: dict | None = None) -> dict:
+    """short — {lines, note}: чего не дали, одним запросом с самой отметкой
+    (29 сен 2026). Двумя запросами подряд это рвалось на связи: отчёт ушёл,
+    отметка нет — район не принят, а повторить нельзя, прошлый отчёт «ждёт».
+    Отчёт, который уже ждёт решения, приёмке не мешает."""
     sup = await db.supply_get(sid)
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
@@ -1582,6 +1646,11 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
     if not owner and _prices_missing(sup, oid):
         return {"ok": False, "verdict": "prices_needed",
                 "task": _task_view(sid, sup, oid, task, me)}
+    if short and (short.get("lines") or []):
+        r = await short_report(sid, oid, me, "driver" if not owner else "senior",
+                               short.get("lines") or [], str(short.get("note") or ""))
+        if not r.get("ok") and r.get("verdict") != "pending":
+            return {"ok": False, "verdict": "short_" + str(r.get("verdict") or "")}
     now = datetime.now(timezone.utc)
     await db.supply_task_start(sid, oid, now)
     doc = await db.supply_task_noscan(sid, oid, me, now)
@@ -1801,7 +1870,7 @@ def _md(s: str) -> str:
 
 
 async def _notify_done(sid: str, doc: dict, oid: str, me: str,
-                       gaps: list, note: str):
+                       gaps: list, note: str, short_pending: bool = False):
     """Старшему — итог приёмки. Одно сообщение на район, а не на бутылку."""
     from owner_routes import notify_owners, notify_owners_force
     task = (doc.get("tasks") or {}).get(oid) or {}
@@ -1834,6 +1903,8 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
         body = f"{head}\n\n*Недобор {sum(g['gap'] for g in gaps)} бутылок:*\n{lst}{more}"
         if note:
             body += f"\n\n_{_md(note)}_"
+        if short_pending:
+            body += "\n\nРайон закрыт, недовоз ждёт вашего решения в STAR."
         await notify_owners("supply.done", body)
     else:
         await notify_owners("supply.done", head + "\n\nВзято полностью.")
@@ -2536,9 +2607,22 @@ async def handle_release(request):
         body = {}
     sid = request.match_info.get("sid") or ""
     oid = str(body.get("district") or "").strip()
+    был = (((await db.supply_get(sid)) or {}).get("tasks") or {}).get(oid) or {}
     ok = await db.supply_task_release(sid, oid)
     if ok:
         log.info(f"[supply] {sid}/{oid}: задача снята владельцем")
+        # Задача, пропавшая из приложения без слова, выглядит как сбой. Тому,
+        # с кого сняли, говорим — и что принятое им осталось на месте.
+        if был.get("driver"):
+            try:
+                import pay_notify as _pn
+                где = f"{OFFICE_CODES.get(oid, '')} {OFFICE_NAMES.get(oid, oid)}".strip()
+                n = int(был.get("scanned") or 0)
+                await _pn.tell_safe(был["driver"], f"📦 Приёмку {где} с вас снял старший."
+                                    + (f" Принятое вами ({n}) остаётся в приёмке." if n else ""),
+                                    parse_mode=None)
+            except Exception as e:                       # noqa: BLE001
+                log.warning(f"[supply] о снятой задаче не сказали: {e}")
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 

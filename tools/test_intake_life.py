@@ -50,6 +50,8 @@ DRV = {"jvc": "Худоба", "bbay": "Авазбек"}
 QTY = {}
 FAIL = []
 N = [0]
+СКАЗАНО = []          # что ушло старшему
+ПИСЬМА = []           # что ушло водителям
 
 
 def eq(имя, дали, ждём):
@@ -128,6 +130,21 @@ async def scan_n(sid, o, pid, n, **kw):
 async def scan_all(sid, o):
     for pid, n in PLAN[o].items():
         await scan_n(sid, o, pid, int(n / QTY[pid]))
+
+
+async def release(sid, o, who):
+    """«Вернуть задачу» — настоящей ручкой водителя."""
+    import json, driver_routes as dr
+    from aiohttp.test_utils import make_mocked_request
+    req = make_mocked_request("POST", f"/api/driver/supply/{sid}/release",
+                              match_info={"sid": sid})
+    req["driver"] = {"name": who, "district": o}; req["tg"] = {"id": 1}
+    async def _json(): return {"district": o}
+    req.json = _json
+    h = dr.handle_supply_release
+    while hasattr(h, "__wrapped__"):
+        h = h.__wrapped__
+    return json.loads((await h(req)).body)
 
 
 async def stock(o):
@@ -233,6 +250,68 @@ async def scenarios():
     eq("закрылся сам", (r.get("finished"), bool(r["task"]["done_at"])), (True, True))
     eq("склад — что приняли", await stock("jvc"), base("jvc", p1=1, p2=2, p31=2))
 
+    print("\nСтарший молчит, а район и смену надо закрывать")
+    sid = await fresh()
+    await scan_n(sid, "jvc", "p2", 2); await scan_n(sid, "jvc", "p31", 4); await scan_n(sid, "jvc", "p1", 1)
+    await sr.short_report(sid, "jvc", "Худоба", "driver", [{"id": "p1", "qty": 2}], "не было")
+    СКАЗАНО.clear()
+    r = await sr.task_finish(sid, "jvc", "Худоба", "не было")
+    eq("район закрывается, не дожидаясь решения", (r.get("ok"), r.get("short_pending")), (True, True))
+    eq("недобор записан", [(g["id"], g["gap"]) for g in r["gaps"]], [("p1", 2)])
+    eq("старшему сказано, что решение за ним",
+       any("ждёт вашего решения" in t for _, t in СКАЗАНО), True)
+    v = await task(sid, "jvc")
+    eq("отчёт по-прежнему ждёт", (bool(v["done_at"]), v["short"]["status"]), (True, "pending"))
+    склад = await stock("jvc")
+    r = await sr.short_decide(sid, "jvc", True, "STAR")
+    eq("решение по закрытому району принимается", (r.get("ok"), r.get("finished")), (True, False))
+    v = await task(sid, "jvc")
+    eq("и записано как ответ", v["short"]["status"], "ok")
+    eq("а закрытую приёмку не меняет", (v["need"], sum(l["miss"] for l in v["lines"])), (7, 0))
+    eq("склад тот же", await stock("jvc"), склад)
+    sid = await fresh()
+    await sr.short_report(sid, "jvc", "Худоба", "driver", [{"id": "p1", "qty": 2}], "")
+    await sr.task_finish(sid, "jvc", "Худоба", "")
+    r = await sr.short_decide(sid, "jvc", False, "STAR")
+    eq("отказ по закрытому — тоже только ответ", (r.get("ok"), (await task(sid, "jvc"))["short"]["status"]),
+       (True, "no"))
+
+    print("\n«Чего не дали» и «без сканирования» — одним запросом")
+    sid = await fresh()
+    r = await sr.task_noscan(sid, "jvc", "Худоба", short={"lines": [{"id": "p1", "qty": 2}], "note": "нет"})
+    eq("принято, отчёт ушёл", (r.get("ok"), bool(r.get("noscan_at")), (r.get("short") or {}).get("status")),
+       (True, True, "pending"))
+    sid = await fresh()
+    await sr.short_report(sid, "jvc", "Худоба", "driver", [{"id": "p1", "qty": 2}], "")
+    r = await sr.task_noscan(sid, "jvc", "Худоба", short={"lines": [{"id": "p1", "qty": 2}], "note": ""})
+    eq("прошлый раз оборвалось на связи — повтор проходит", (r.get("ok"), bool(r.get("noscan_at"))), (True, True))
+    eq("отчёт один, не два", [(x["id"], x["qty"]) for x in r["short"]["lines"]], [("p1", 2)])
+    sid = await fresh()
+    r = await sr.task_noscan(sid, "jvc", "Худоба", short={"lines": [{"id": "нет", "qty": 2}], "note": ""})
+    eq("отчёт пустой — район не принят", (r.get("ok"), r.get("verdict")), (False, "short_empty"))
+    eq("и отметки нет", (await task(sid, "jvc"))["noscan_at"], "")
+
+    print("\nБез сканирования с остатком: закрыть")
+    sid = await fresh()
+    await sr.task_noscan(sid, "jvc", "Худоба"); await scan(sid, "jvc", "p1")
+    было = await stock("jvc")
+    r = await sr.task_finish(sid, "jvc", "Худоба", "")
+    eq("водитель закрыть не может", (r.get("ok"), r.get("verdict"), r.get("left")), (False, "noscan_left", 6))
+    eq("склад не тронут", await stock("jvc"), было)
+    eq("старший — может, это его решение", (await sr.task_finish(sid, "jvc", "STAR", "", owner=True)).get("ok"), True)
+
+    print("\nПришла новая заявка, а вчерашнюю взяли и не начали")
+    await fresh("OLD", at=datetime.now(timezone.utc) - timedelta(days=1))
+    await scan_n("OLD", "bbay", "p1", 1)
+    await add_supply("NEW", claimed=False)
+    ПИСЬМА.clear()
+    сняты = await sr._stale_tell("NEW")
+    eq("неначатая снята с водителя", сняты, [("Худоба", "jvc")])
+    eq("ему об этом сказано", [(n, "с вас снята" in t) for n, t in ПИСЬМА], [("Худоба", True)])
+    s = await db.supply_get("OLD")
+    eq("начатая осталась за своим", (s["tasks"]["jvc"]["driver"], s["tasks"]["bbay"]["driver"]), ("", "Авазбек"))
+    eq("второй раз никому не пишем", await sr._stale_tell("NEW"), [])
+
     print("\nОтчёт висит без решения")
     sid = await fresh()
     await sr.short_report(sid, "jvc", "Худоба", "driver", [{"id": "p2", "qty": 1}], "")
@@ -282,10 +361,22 @@ async def scenarios():
     r = await sr.task_scan(sid, "jvc", "p1", code(), "STAR", 1, "", True)
     eq("телефон сел — через 40 с замок отпал", r.get("verdict"), "taken")
 
-    print("\nЗадачу отдали посреди приёмки")
+    print("\nВернуть задачу")
+    sid = await fresh()
+    eq("пока ничего не принято — можно", (await release(sid, "jvc", "Худоба")).get("ok"), True)
+    sid = await fresh()
+    await sr.task_hold(sid, "jvc", "Худоба", 1, True)
+    eq("камеру открыл, но ничего не принял — можно", (await release(sid, "jvc", "Худоба")).get("ok"), True)
+    sid = await fresh()
+    await sr.task_noscan(sid, "jvc", "Худоба")
+    eq("после «без сканирования» — нельзя", (await release(sid, "jvc", "Худоба")).get("verdict"), "started")
+    eq("и задача осталась за ним", (await task(sid, "jvc"))["driver"], "Худоба")
+
+    print("\nВодитель пропал посреди приёмки — продолжает напарник")
     sid = await fresh()
     await scan_n(sid, "jvc", "p1", 2)
-    eq("отдал", await db.supply_task_release(sid, "jvc", "Худоба"), True)
+    eq("сам вернуть уже не может", (await release(sid, "jvc", "Худоба")).get("verdict"), "started")
+    eq("старший снял с водителя", await db.supply_task_release(sid, "jvc"), True)
     eq("принятое осталось", (await task(sid, "jvc"))["got"], 2)
     ok, _ = await db.supply_task_claim(sid, "jvc", "Фарух", 2, datetime.now(timezone.utc))
     eq("напарник взял", ok, True)
@@ -460,7 +551,7 @@ async def run_seed(seed):
             if bool(r.get("ok")) != (m.pend[o] is not None):
                 FAIL.append((seed, step, "решение")); print("  FAIL решение", r.get("verdict"), trail[-6:]); break
             if r.get("ok"):
-                if ok:
+                if ok and not m.done[o]:
                     for p, q in m.pend[o]:
                         m.miss[o][p] += q
                     if not m.done[o] and m.left(o) <= 1e-9:
@@ -469,9 +560,11 @@ async def run_seed(seed):
         else:
             r = await sr.task_finish(sid, o, who)
             trail.append(f"закрыть {o} → {r.get('verdict') or 'ok'}")
-            if bool(r.get("ok")) != (not m.done[o]):
-                FAIL.append((seed, step, "закрыть")); break
-            m.done[o] = True
+            можно = not m.done[o] and not (m.noscan[o] and m.left(o) > 1e-9)
+            if bool(r.get("ok")) != можно:
+                FAIL.append((seed, step, "закрыть")); print("  FAIL закрыть", r, trail[-6:]); break
+            if можно:
+                m.done[o] = True
         await check(m, sid, seed, step, trail)
         if FAIL:
             break
@@ -487,7 +580,11 @@ async def main():
     SR._biz_day = lambda *a, **k: DAY
     import owner_routes
     async def _say(key, text, **kw):
-        return []
+        СКАЗАНО.append((key, text)); return []
+    import pay_notify
+    async def _tell(name, text, parse_mode=None):
+        ПИСЬМА.append((name, text)); return 1
+    pay_notify.tell_safe = _tell
     owner_routes.notify_owners = _say
     owner_routes.notify_owners_force = _say
     for o in COUNT:

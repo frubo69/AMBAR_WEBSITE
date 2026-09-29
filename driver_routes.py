@@ -2949,7 +2949,14 @@ async def handle_supply_release(request):
         body = {}
     sid = request.match_info.get("sid") or ""
     oid = str(body.get("district") or "").strip()
-    ok = await db.supply_task_release(sid, oid, me["name"])
+    # Вернуть можно то, по чему ещё ничего не принято. Дальше товар уже в
+    # машине или на полке, и задача без хозяина — это товар без хозяина; снять
+    # её с водителя может старший.
+    sup = await db.supply_get(sid) or {}
+    t = (sup.get("tasks") or {}).get(oid) or {}
+    if t.get("driver") == me["name"] and (t.get("noscan_at") or int(t.get("scanned") or 0) > 0):
+        return web.json_response({"ok": False, "verdict": "started"}, headers=CORS_HEADERS)
+    ok = await db.supply_task_release(sid, oid, me["name"], untouched=True)
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 
@@ -3134,9 +3141,12 @@ async def handle_supply_noscan(request):
         body = await request.json()
     except Exception:
         body = {}
+    lines = body.get("lines")
     res = await supply_routes.task_noscan(
         request.match_info.get("sid") or "",
-        str(body.get("district") or "").strip(), me["name"])
+        str(body.get("district") or "").strip(), me["name"],
+        short={"lines": lines, "note": str(body.get("note") or "")}
+              if isinstance(lines, list) and lines else None)
     return web.json_response(res, headers=CORS_HEADERS,
                              dumps=lambda o: json.dumps(o, default=str))
 

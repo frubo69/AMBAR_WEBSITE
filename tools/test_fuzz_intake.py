@@ -365,7 +365,10 @@ async def run_seed(seed):
             r = await sr.task_finish(sid, o, DRV[o], "магазин не дал", False)
             trail.append(f"закрыть {o} → {r.get('verdict') or 'ok'}")
             ветка("закрыть:" + (r.get("verdict") or "ok"))
-            ok_want = m.status_open and not m.done[o]
+            # Принятое без сканирования водитель с остатком не закрывает
+            # (29 сен 2026): товар на полке, закрыть — значит снять его со склада.
+            остаток = any(m.got[o][p] < PLAN[o][p] for p in PLAN[o])
+            ok_want = m.status_open and not m.done[o] and not (m.noscan[o] and остаток)
             if bool(r.get("ok")) != ok_want:
                 fail(seed, step, "закрыть район", r.get("verdict") or "ok", ok_want, trail); break
             if r.get("ok"):

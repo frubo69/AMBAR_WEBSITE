@@ -2884,13 +2884,19 @@ async def supply_task_claim(sid: str, district: str, driver: str,
     return False, ((cur or {}).get("tasks") or {}).get(district)
 
 
-async def supply_task_release(sid: str, district: str, driver: str = None) -> bool:
-    """Отпустить задачу. driver задан — отпускает сам водитель и только свою."""
+async def supply_task_release(sid: str, district: str, driver: str = None,
+                              untouched: bool = False) -> bool:
+    """Отпустить задачу. driver задан — отпускает сам водитель и только свою.
+    untouched — только пока по ней ничего не принято: условие в самом запросе,
+    чтобы первая бутылка и «вернуть» не прошли одновременно."""
     db = _db_or_none()
     if db is None: return False
     q = {"_id": sid, f"tasks.{district}.done_at": None}
     if driver is not None:
         q[f"tasks.{district}.driver"] = driver
+    if untouched:
+        q[f"tasks.{district}.noscan_at"] = None
+        q[f"tasks.{district}.scanned"] = {"$in": [0, None]}
     r = await db.supplies.update_one(q, {"$set": {
         f"tasks.{district}.driver": "", f"tasks.{district}.driver_id": 0,
         f"tasks.{district}.claimed_at": None}})

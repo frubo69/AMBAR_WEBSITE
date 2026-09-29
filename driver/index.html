@@ -1117,6 +1117,29 @@ body.test-drv .wo-fix{display:none}
   background:rgba(201,169,110,.14);color:var(--gold)}
 .exc-tot.dn .exc-big b{color:#E2A0A0}
 .exc-note{margin-top:9px;font-size:12px;line-height:1.35;color:var(--muted)}
+/* Экран «чего не дали»: позиция, план и счётчик недовоза. Тот же ± , что у
+   состава заявки в STAR, — рука уже знает этот жест. */
+.sh-r{display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-top:1px solid var(--border2)}
+.sh-r:first-child{border-top:0}
+.sh-r .xr-img{width:34px;height:34px;object-fit:contain;flex:0 0 34px}
+.sh-n{flex:1;min-width:0;font-size:13.5px;line-height:1.25}
+.sh-n i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+.sh-r.on .sh-n{color:var(--warn)}
+.sh-st{flex:0 0 auto;display:flex;align-items:center;gap:2px}
+.sh-st button{width:30px;height:30px;border-radius:9px;border:1px solid var(--border2);
+  background:var(--bg3);color:var(--text);font-size:17px;line-height:1;font-family:inherit;
+  -webkit-tap-highlight-color:transparent}
+.sh-st button:active{background:var(--card2)}
+.sh-st b{min-width:34px;text-align:center;font-family:'Space Grotesk',sans-serif;
+  font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.sh-r.on .sh-st b{color:var(--warn)}
+.sh-sum{margin:12px 0 0;font-size:12.5px;color:var(--muted);text-align:center}
+/* Строка о недовозе над итогом приёмки: ждёт, подтверждён, отклонён. */
+.sup-short{margin:0 0 10px;padding:9px 12px;border-radius:11px;font-size:12.5px;line-height:1.35;
+  color:var(--gold2);background:rgba(201,169,110,.09);border:1px solid rgba(201,169,110,.2)}
+.sup-short.ok{color:var(--up);background:rgba(61,220,132,.08);border-color:rgba(61,220,132,.22)}
+.sup-short.no{color:var(--dn);background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.22)}
 /* Долг объясняет, почему денег меньше, — его читают, а не пропускают. */
 .exc-note.debt{margin-top:11px;padding:9px 11px;border-radius:11px;font-size:12.5px;
   color:var(--gold2);background:rgba(201,169,110,.09);border:1px solid rgba(201,169,110,.2)}
@@ -11669,7 +11692,15 @@ function supRenderTask(){
   // Одна главная кнопка — следующий шаг. Всё отсканировано — завершить;
   // нет — сканировать дальше, и под ней тихая «без сканирования», пока этот
   // путь ещё не выбран.
-  document.getElementById('supBot').innerHTML = `
+  // Судьба отчёта о недовозе — одной строкой над итогом: ждёт, подтверждён,
+  // отклонён. Молчание здесь читалось бы как «ничего не отправилось».
+  const sh = t.short;
+  const shLine = !sh ? '' : sh.status === 'pending'
+      ? `<div class="sup-short wait">Недовоз отправлен старшему — ждёт решения</div>`
+    : sh.status === 'ok'
+      ? `<div class="sup-short ok">Недовоз подтвердил ${esc(sh.decided_by || 'старший')} — отсканируйте то, что привезли</div>`
+      : `<div class="sup-short no">Недовоз отклонён${sh.decided_by ? ' · ' + esc(sh.decided_by) : ''}</div>`;
+  document.getElementById('supBot').innerHTML = shLine + `
     <div class="sup-tot">
       <span class="sup-tot-l">${all ? (ns ? 'Всё отсканировано' : 'Взято полностью')
                                     : (ns ? 'Не отсканировано' : 'Осталось забрать')}</span>
@@ -11679,7 +11710,8 @@ function supRenderTask(){
       ? `<button class="btn btn-pri" onclick="finOpen()">Завершить приёмку</button>`
       : `<button class="btn btn-pri" onclick="supNext()">${
            t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>${
-         (t.got > 0 || !ns) ? `<button class="btn btn-gh" onclick="finOpen()">Не всё привезли</button>` : ''}${
+         (t.got > 0 || !ns) && !(t.short && t.short.status === 'pending')
+           ? `<button class="btn btn-gh" onclick="finOpen()">Не всё привезли</button>` : ''}${
          ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}`}`;
 }
 
@@ -11711,14 +11743,91 @@ function noscanOpen(){
   _setText('finS', `${t.district_code} ${t.district_name} · ${fmt(t.left)} ${
     plural(t.left,'бутылка','бутылки','бутылок')} · ${t.positions} ${
     plural(t.positions,'позиция','позиции','позиций')}`);
-  document.getElementById('finBody').innerHTML = '';
+  // Вопрос раньше кнопки (владелец, 29 сен 2026): «сходится ли количество
+  // товара, который они принимают, с количеством в заявке». Спросить надо
+  // здесь, а не потом: человек стоит у машины и видит товар. Ответил «всё
+  // сошлось» — дальше как раньше, одной кнопкой.
+  document.getElementById('finBody').innerHTML =
+    `<div class="card" style="margin-bottom:12px">
+       <div class="sup-row-s" style="margin-bottom:10px">Всё ли привезли по заявке?</div>
+       <button class="btn btn-gh" style="width:100%" onclick="shortOpen('ns')">Нет, чего-то не дали</button>
+     </div>`;
   const b = document.getElementById('finGo');
-  b.textContent = 'Принять'; b.onclick = noscanSend;
+  b.textContent = 'Да, всё сошлось — принять'; b.disabled = false;
+  b.onclick = () => noscanSend();
   document.getElementById('finSheet').classList.add('show');
 }
 
-async function noscanSend(){
-  const t = TASK; if(!t || SUP_BUSY) return; SUP_BUSY = true;
+// ── чего не дали ───────────────────────────────────────────────────────────
+// Владелец, 29 сен 2026: «например, они указали, что получают Абсолюта на 3
+// позиции меньше и Столичной на 7 меньше; присылается сообщение старшему;
+// программа теперь ожидает указанное ими число».
+//
+// Экран один на два входа: приёмка без сканирования и завершение сканирования.
+// Не довезти могут и там и там, а спрашивать по-разному — значит держать два
+// разных ответа на один вопрос.
+//
+// Что тут НЕ делается: указанное число не запрещает сканировать. Сканирование
+// считает по плану заявки, а не по заниженному числу, — нашлись бутылки,
+// отсканировали, и цифра выровнялась сама (владелец: «чтобы учесть
+// человеческий фактор»).
+let SHORT = {from: '', qty: {}};
+
+function shortOpen(from){
+  const t = TASK; if(!t) return;
+  SHORT = {from, qty: {}};
+  // При завершении сканирования подставляем невнесённое: обычно именно его и
+  // не дали, и руками останется поправить одну-две строки. При приёмке без
+  // сканирования — нули: товар ещё никто не считал.
+  (t.lines || []).forEach(l => { SHORT.qty[l.id] = from === 'fin' ? (+l.left || 0) : 0; });
+  _setText('finT', 'Чего не дали');
+  _setText('finS', `${t.district_code} ${t.district_name} · укажите, сколько НЕ привезли`);
+  shortPaint();
+  document.getElementById('finSheet').classList.add('show');
+}
+
+function _shortMax(l){ return Math.max(0, (+l.need || 0) - (+l.got || 0)); }
+
+function shortPaint(){
+  const t = TASK; if(!t) return;
+  const строки = (t.lines || []).map(l => {
+    const v = Math.min(+SHORT.qty[l.id] || 0, _shortMax(l));
+    SHORT.qty[l.id] = v;
+    return `<div class="sh-r ${v ? 'on' : ''}">
+      <img class="xr-img" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
+      <span class="sh-n">${esc(l.name)}<i>по заявке ${fmtQty(l.need)}${
+        l.got ? ` · внесено ${fmtQty(l.got)}` : ''}</i></span>
+      <span class="sh-st">
+        <button onclick="shortStep('${esc(l.id)}',-1)" aria-label="меньше">−</button>
+        <b>${fmtQty(v)}</b>
+        <button onclick="shortStep('${esc(l.id)}',1)" aria-label="больше">+</button>
+      </span></div>`;
+  }).join('');
+  const всего = Object.values(SHORT.qty).reduce((a, b) => a + (+b || 0), 0);
+  const было = (document.getElementById('finNote') || {}).value || '';
+  document.getElementById('finBody').innerHTML =
+    `<div class="card">${строки}</div>
+     <div class="sh-sum">${всего ? `Не дали ${fmtQty(всего)} ${
+       plural(Math.round(всего),'единицу','единицы','единиц')}` : 'Пока ничего не отмечено'}</div>
+     <textarea id="finNote" placeholder="Что сказал магазин — если есть что сказать"></textarea>`;
+  document.getElementById('finNote').value = было;
+  const b = document.getElementById('finGo');
+  b.textContent = 'Отправить старшему';
+  b.disabled = !всего;
+  b.onclick = shortSend;
+}
+
+function shortStep(pid, d){
+  const l = ((TASK || {}).lines || []).find(x => x.id === pid); if(!l) return;
+  const v = (+SHORT.qty[pid] || 0) + d;
+  SHORT.qty[pid] = Math.max(0, Math.min(v, _shortMax(l)));
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  shortPaint();
+}
+
+async function noscanSend(тихо){
+  const t = TASK; if(!t || (SUP_BUSY && !тихо)) return; SUP_BUSY = true;
   const btn = document.getElementById('finGo'); btn.disabled = true;
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/noscan`,
@@ -11732,7 +11841,7 @@ async function noscanSend(){
     document.getElementById('supScr').classList.remove('show');
     TASK = null;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    toast('Принято без сканирования');
+    toast(тихо ? 'Принято · недовоз ушёл старшему' : 'Принято без сканирования');
     supLoad(); shLoad();                      // смена: шаг «Завершить приёмку» снимается сразу
   }catch(e){ toast('Не удалось', 'err'); }
   finally{ SUP_BUSY = false; btn.disabled = false; }
@@ -12275,7 +12384,7 @@ function finOpen(){
     `<textarea id="finNote" placeholder="${gaps.length
       ? 'Почему не хватает: магазин не дал, бой, не было на складе…'
       : 'Комментарий старшему — если нужен'}"></textarea>`;
-  document.getElementById('finGo').textContent = gaps.length ? 'Отправить недобор' : 'Завершить';
+  document.getElementById('finGo').textContent = gaps.length ? 'Отправить старшему' : 'Завершить';
   document.getElementById('finSheet').classList.add('show');
 }
 
@@ -12297,6 +12406,14 @@ async function finSend(){
   const t = TASK; if(!t || SUP_BUSY) return;
   const note = (document.getElementById('finNote') || {}).value || '';
   if(t.left > 0 && !note.trim()) return toast('Впишите, почему не хватает', 'err');
+  // Недобор не закрывает район сам: это отчёт старшему, решение за ним
+  // (владелец, 21 сен 2026: «конечное решение принимаю я через AMBAR STAR»).
+  // Подтвердит — недовоз вычтут из того, что надо отсканировать, и если всё
+  // остальное уже принято, район закроется.
+  // Осталось невнесённое — сначала спрашиваем, ЧЕГО именно не дали, по
+  // строкам. Раньше отчёт уходил оптом («не довезли всё, что осталось»), и
+  // старший не видел, где именно дыра.
+  if(t.left > 0){ SHORT_NOTE = note; return shortOpen('fin'); }
   SUP_BUSY = true;
   const btn = document.getElementById('finGo'); btn.disabled = true;
   try{
@@ -12310,6 +12427,38 @@ async function finSend(){
     toast('Приёмка закрыта');
     supLoad(); shLoad();                      // смена: шаг «Завершить приёмку» снимается сразу
   }catch(e){ toast('Не удалось закрыть', 'err'); }
+  finally{ SUP_BUSY = false; btn.disabled = false; }
+}
+
+let SHORT_NOTE = '';
+
+async function shortSend(){
+  const t = TASK; if(!t || SUP_BUSY) return;
+  const lines = Object.entries(SHORT.qty)
+    .filter(([, q]) => (+q || 0) > 0).map(([id, qty]) => ({id, qty: +qty}));
+  if(!lines.length) return toast('Укажите, чего не дали', 'err');
+  const note = ((document.getElementById('finNote') || {}).value || SHORT_NOTE || '').trim();
+  SUP_BUSY = true;
+  const btn = document.getElementById('finGo'); btn.disabled = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/short`,
+      {method:'POST', body:{district: t.district, lines, note}});
+    if(!r.ok) throw new Error(r.verdict);
+    if(r.task) TASK = supAdopt(r.task);
+    SHORT_NOTE = '';
+    // Пришли из «принять без сканирования» — отметку всё равно ставим: товар
+    // забрали, просто не весь. Одно нажатие, два факта.
+    if(SHORT.from === 'ns'){ SUP_BUSY = false; return noscanSend(true); }
+    finClose();
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Отправлено старшему — ждём решения');
+    supRenderTask();
+  }catch(e){
+    const v = e && e.message;
+    toast(v === 'pending' ? 'Прошлый отчёт ещё ждёт решения'
+        : v === 'empty' ? 'Столько не дать не могли — проверьте числа'
+        : 'Не удалось отправить', 'err');
+  }
   finally{ SUP_BUSY = false; btn.disabled = false; }
 }
 

@@ -898,6 +898,24 @@ def _left_units(need, got):
     return int(v) if v == int(v) else v
 
 
+def _miss(task: dict, pid: str) -> float:
+    """Подтверждённый старшим недовоз по позиции района — в единицах."""
+    try:
+        return float(((task or {}).get("miss") or {}).get(pid) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _need_eff(it: dict, oid: str, task: dict) -> float:
+    """Сколько по позиции ещё надо принять: план района минус недовоз, который
+    старший подтвердил (владелец, 21 сен 2026: «магазин обещал всё, приехали —
+    половины нет; конечное решение принимаю я через STAR»). Недовоз в заявке
+    остаётся — в недобор для магазина он всё равно уйдёт, — но отсканировать
+    то, чего не дали, от человека больше не требуют."""
+    need = int((it.get("by_district") or {}).get(oid) or 0)
+    return max(0.0, need - _miss(task, it.get("id")))
+
+
 def _buy_unit(pid: str) -> dict:
     import stock_routes
     n = stock_routes._unit(stock_routes._catalog().get(pid) or {})
@@ -961,13 +979,17 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
     buys = sup.get("buys") or {}
     cost = 0.0
     for it in sup.get("items") or []:
-        need = int((it.get("by_district") or {}).get(oid) or 0)
-        if not need:
+        plan = int((it.get("by_district") or {}).get(oid) or 0)
+        if not plan:
             continue
         # Принятое — сумма qty кодов: бутылка 1, код пива 0.5 — единицы.
         got_u = _qn((it.get("got") or {}).get(oid) or 0)
+        # need — то, что надо принять после подтверждённого недовоза; plan —
+        # что было в заявке. Без недовоза они совпадают.
+        need = _qn(_need_eff(it, oid, task))
         line = {"id": it["id"], "name": it.get("name", ""), "unit": _uof(it["id"]),
-                "need": need, "got": got_u, "left": _left_units(need, got_u)}
+                "need": need, "got": got_u, "left": _left_units(need, got_u),
+                "plan": plan, "miss": _qn(_miss(task, it["id"]))}
         if extra:
             # Цена за учётную единицу и сколько таких единиц во всей заявке:
             # экран цен у водителя считает по ним «= N AED» и итог. Количества
@@ -1026,7 +1048,9 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "cancelled_by": task.get("cancelled_by") or "",
         "note": task.get("note") or "",
         "gaps": task.get("gaps") or [],
-        "need": need, "got": got, "left": max(0, need - got),
+        # Отчёт о недовозе: ждёт решения старшего, подтверждён или отклонён.
+        "short": _short_view(task.get("short")),
+        "need": need, "got": got, "left": _qn(sum(l["left"] for l in lines)),
         "positions": len(lines),
         "lines": lines,
         # Кто сканирует прямо сейчас — и что это не мы.
@@ -1242,7 +1266,7 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     # недобора здесь быть не может.
     finished, supply_done = False, False
     if task.get("noscan_at"):
-        осталось = sum(max(0.0, float((i.get("by_district") or {}).get(oid) or 0)
+        осталось = sum(max(0.0, _need_eff(i, oid, task)
                                 - float((i.get("got") or {}).get(oid) or 0))
                        for i in (upd.get("items") or []))
         if осталось == 0:
@@ -1319,7 +1343,7 @@ async def task_undo(sid: str, oid: str, code: str, me: str,
 
 
 async def task_finish(sid: str, oid: str, me: str, note: str = "",
-                      owner: bool = False) -> dict:
+                      owner: bool = False, force: bool = False) -> dict:
     """Закрыть задачу района. Недобор считается сам — по строкам.
 
     Спрашивать «сколько не хватило» отдельно незачем: разницу между
@@ -1329,7 +1353,9 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
     if not sup:
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
-    if not _can_touch(task, me, owner):
+    # force — закрывает старший своим решением по недовозу: задача не его, но
+    # решение за ним (владелец, 21 сен 2026).
+    if not force and not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine"}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
@@ -1362,6 +1388,136 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
         log.error(f"[supply] уведомление о приёмке: {e}")
     return {"ok": True, "gaps": gaps,
             "supply_done": doc.get("status") == "done"}
+
+
+# ── недовоз: отчёт водителя или оператора, решение — за старшим ──────────────
+# Владелец, 21 сен 2026: «магазин ответил, что предоставит весь товар, а
+# приехали — половины нет, и заявка требует отсканировать всё, даже то, что нам
+# не дали»; «конечное решение в обоих случаях, что с водителями, что с
+# операторами, принимаю я через AMBAR STAR».
+#
+# Отчёт задачу не трогает: водители спокойно досканируют то, что привезли.
+# Подтверждение записывает недовоз в miss — его больше не требуют отсканировать,
+# а в недобор для магазина он уйдёт, когда район закроется. Если к этому
+# моменту всё остальное уже принято, район закрывается сразу.
+def _short_view(sh):
+    if not sh:
+        return None
+    return {"status": sh.get("status") or "pending", "lines": sh.get("lines") or [],
+            "note": sh.get("note") or "", "by": sh.get("by") or "",
+            "by_kind": sh.get("by_kind") or "", "at": str(sh.get("at") or ""),
+            "decided_at": str(sh.get("decided_at") or ""),
+            "decided_by": sh.get("decided_by") or ""}
+
+
+async def short_report(sid: str, oid: str, me: str, kind: str, lines: list,
+                       note: str) -> dict:
+    """Отчёт о недовозе: сколько по каким позициям не дали. kind — кто пишет:
+    «driver» или «operator». Строки сверяются с задачей: больше, чем осталось
+    принять, не бывает недовоза."""
+    sup = await db.supply_get(sid)
+    if not sup:
+        return {"ok": False, "verdict": "no_supply"}
+    task = (sup.get("tasks") or {}).get(oid)
+    if not task:
+        return {"ok": False, "verdict": "no_task"}
+    if task.get("done_at") or task.get("cancelled_at"):
+        return {"ok": False, "verdict": "closed"}
+    if ((task.get("short") or {}).get("status")) == "pending":
+        return {"ok": False, "verdict": "pending"}
+    по_id = {it["id"]: it for it in sup.get("items") or []}
+    итог = []
+    for l in lines or []:
+        it = по_id.get(str((l or {}).get("id") or ""))
+        if not it:
+            continue
+        try:
+            qty = float((l or {}).get("qty") or 0)
+        except (TypeError, ValueError):
+            qty = 0.0
+        got = float((it.get("got") or {}).get(oid) or 0)
+        можно = max(0.0, _need_eff(it, oid, task) - got)
+        qty = _qn(min(max(0.0, qty), можно))
+        if qty > 0:
+            итог.append({"id": it["id"], "name": it.get("name", ""), "qty": qty})
+    if not итог:
+        return {"ok": False, "verdict": "empty"}
+    rec = {"status": "pending", "lines": итог, "note": str(note or "").strip()[:300],
+           "by": str(me or "")[:60], "by_kind": kind, "at": datetime.now(timezone.utc)}
+    if not await db.supply_short_set(sid, oid, rec):
+        return {"ok": False, "verdict": "pending"}
+    что = ", ".join("%s %s" % (x["name"], x["qty"]) for x in итог)
+    log.info(f"[supply] {sid}/{oid}: недовоз от {me} ({kind}) — {что}")
+    try:
+        await _short_tell(sup, oid, rec)
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[supply] о недовозе не сказали: {e}")
+    sup = await db.supply_get(sid)
+    return {"ok": True, "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, me)}
+
+
+async def _short_tell(sup: dict, oid: str, rec: dict):
+    """Старшему — что прислали и что решать в STAR."""
+    from owner_routes import notify_owners
+    where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
+    кто = "водитель" if rec["by_kind"] == "driver" else "оператор"
+    всего = sum(float(x["qty"]) for x in rec["lines"])
+    lst = "\n".join(f"• {_md(x['name'])} — {_qn(x['qty'])}" for x in rec["lines"][:10])
+    more = f"\n…и ещё {len(rec['lines']) - 10}" if len(rec["lines"]) > 10 else ""
+    body = (f"📦 *Недовоз — {_md(where)}*\n{_md(rec['by'])} ({кто}) · {_qn(всего)} ед\n\n"
+            f"{lst}{more}")
+    if rec.get("note"):
+        body += f"\n\n_{_md(rec['note'])}_"
+    body += "\n\nПодтвердить или отклонить — в STAR, в приёмке района."
+    await notify_owners("supply.done", body)
+
+
+async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
+    """Решение старшего по отчёту о недовозе."""
+    sup = await db.supply_get(sid)
+    if not sup:
+        return {"ok": False, "verdict": "no_supply"}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    sh = task.get("short") or {}
+    if sh.get("status") != "pending":
+        return {"ok": False, "verdict": "not_pending"}
+    now = datetime.now(timezone.utc)
+    miss = None
+    if ok:
+        miss = dict(task.get("miss") or {})
+        for x in sh.get("lines") or []:
+            miss[x["id"]] = _qn(float(miss.get(x["id"]) or 0) + float(x.get("qty") or 0))
+    if not await db.supply_short_decide(sid, oid, "ok" if ok else "no", who, now, miss):
+        return {"ok": False, "verdict": "not_pending"}
+    log.info(f"[supply] {sid}/{oid}: недовоз {'подтверждён' if ok else 'отклонён'} · {who}")
+    finished = False
+    if ok:
+        sup = await db.supply_get(sid)
+        task = (sup.get("tasks") or {}).get(oid) or {}
+        осталось = sum(max(0.0, _need_eff(i, oid, task) - float((i.get("got") or {}).get(oid) or 0))
+                       for i in (sup.get("items") or []))
+        # Всё, что привезли, уже принято — район закрываем сразу: ждать от
+        # водителя «Завершить приёмку» ради того, чего не будет, незачем.
+        if осталось <= 1e-9 and not task.get("done_at"):
+            fin = await task_finish(sid, oid, who,
+                                    f"Недовоз подтвердил {who}: {sh.get('note') or 'магазин не дал'}",
+                                    owner=True, force=True)
+            finished = bool(fin.get("ok"))
+    sup = await db.supply_get(sid)
+    return {"ok": True, "finished": finished,
+            "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, who)}
+
+
+async def open_tasks_all() -> list:
+    """Открытые задачи всех районов — для отчёта о недовозе у операторов."""
+    out = []
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        for oid, t in (sup.get("tasks") or {}).items():
+            if oid not in OFFICE_IDS or t.get("done_at") or t.get("cancelled_at"):
+                continue
+            out.append(_task_view(sup["_id"], sup, oid, t))
+    out.sort(key=lambda v: (v["district_code"], v["at"]))
+    return out
 
 
 # ── приёмка без сканирования ─────────────────────────────────────────────────
@@ -2732,6 +2888,20 @@ async def handle_own_finish(request):
 
 
 @require_owner
+async def handle_own_short(request):
+    """POST {district, ok, as} — решение по отчёту о недовозе."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await short_decide(request.match_info.get("sid") or "",
+                             str(body.get("district") or "").strip(),
+                             bool(body.get("ok")), _owner_name(request, body))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
 async def handle_own_noscan(request):
     """Товар забрали, коды не читали — задача остаётся открытой."""
     try:
@@ -2988,6 +3158,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/undo",       handle_own_undo,     "POST"),
         ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
         ("/api/owner/supply/{sid}/task/noscan",     handle_own_noscan,   "POST"),
+        ("/api/owner/supply/{sid}/task/short",      handle_own_short,    "POST"),
         ("/api/owner/supply/{sid}/task/hold",       handle_own_hold,     "POST"),
         ("/api/owner/supply/{sid}/task/line",       handle_own_line,     "POST"),
         ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),

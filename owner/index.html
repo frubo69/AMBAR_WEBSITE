@@ -3024,6 +3024,20 @@ button.path:active{transform:scale(.995)}
 .rt.ok .rt-bar i{background:var(--up)}
 .rt.dn .rt-bar i{background:var(--dn)}
 .rt-fl{margin-top:9px;font-size:10.5px;color:var(--warn)}
+/* Недовоз в карточке района: что сказали и решение старшего. */
+.xsh{margin:10px 0 0;padding:10px 12px;border-radius:12px;
+  border:1px solid rgba(243,180,74,.26);background:rgba(243,180,74,.07)}
+.xsh.ok{border-color:rgba(76,175,125,.28);background:rgba(76,175,125,.07)}
+.xsh.no{border-color:rgba(255,107,107,.26);background:rgba(255,107,107,.07)}
+.xsh-h{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:7px}
+.xsh.ok .xsh-h{color:var(--up)} .xsh.no .xsh-h{color:var(--dn)}
+.xsh-h svg{vertical-align:-2px;margin-right:5px}
+.xsh-l{display:flex;gap:10px;font-size:12.5px;color:var(--sub);padding:3px 0}
+.xsh-l span{flex:1;min-width:0}
+.xsh-l b{font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums;color:var(--text)}
+.xsh-note{margin-top:6px;font-size:12px;color:var(--muted);font-style:italic}
+.xsh-b{display:flex;gap:8px;margin-top:10px}
+.xsh-b .btn{flex:1;padding:9px}
 .rt-note{margin-top:9px;padding:8px 10px;border-radius:10px;font-size:11.5px;
   color:var(--sub);background:var(--card2);line-height:1.4}
 .rt-rel{margin-top:10px;padding:7px 12px;border-radius:9px;cursor:pointer;
@@ -28734,6 +28748,7 @@ function xSupRender(d){
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>${open ? `<div class="xs-fold-b">${list}${
           foldEnd(rows.length, `xSupToggle('${escS(t.district)}', 1)`)}</div>` : ''}`}
+      ${xsShort(d, t)}
       ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
       ${rtActs(t, d)}
@@ -28754,6 +28769,48 @@ function xSupRender(d){
     const el = document.getElementById(goto);
     if(el) requestAnimationFrame(() => el.scrollIntoView({block:'start', behavior:'smooth'}));
   }
+}
+
+// Недовоз: водитель или оператор сказал, чего магазин не дал. Решение за
+// владельцем (его слова, 21 сен 2026: «конечное решение принимаю я через
+// STAR»), и без этого экрана отчёт висел бы вечно — отправить второй нельзя,
+// пока первый ждёт.
+//
+// Подтвердил — недовоз вычитается из того, что надо отсканировать, и район
+// закрывается тем, что реально привезли. В заявке недовоз остаётся: в недобор
+// для магазина он всё равно уйдёт.
+function xsShort(d, t){
+  const sh = t.short; if(!sh) return '';
+  const кто = sh.by_kind === 'operator' ? 'оператор' : 'водитель';
+  const list = (sh.lines || []).map(l =>
+    `<div class="xsh-l"><span>${escS(l.name)}</span><b>${fmtQty(l.qty)}</b></div>`).join('');
+  const всего = (sh.lines || []).reduce((a, l) => a + (+l.qty || 0), 0);
+  if(sh.status === 'pending'){
+    return `<div class="xsh wait">
+      <div class="xsh-h">Недовоз · ${escS(sh.by || '')} (${кто}) · ${fmtQty(всего)}</div>
+      ${list}
+      ${sh.note ? `<div class="xsh-note">${escS(sh.note)}</div>` : ''}
+      <div class="xsh-b">
+        <button class="btn btn-gh" onclick="xsShortGo('${escS(d.supply_id)}','${escS(t.district)}',0)">Отклонить</button>
+        <button class="btn btn-pri" onclick="xsShortGo('${escS(d.supply_id)}','${escS(t.district)}',1)">Подтвердить</button>
+      </div></div>`;
+  }
+  const ok = sh.status === 'ok';
+  return `<div class="xsh ${ok ? 'ok' : 'no'}">
+    <div class="xsh-h">${IC(ok ? 'check' : 'close', 13)}Недовоз ${ok ? 'подтверждён' : 'отклонён'}${
+      sh.decided_by ? ' · ' + escS(sh.decided_by) : ''} · ${fmtQty(всего)}</div>${list}</div>`;
+}
+
+async function xsShortGo(sid, district, ok){
+  if(!sid || !district) return;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${sid}/task/short`,
+      {method: 'POST', body: {district, ok: !!ok}});
+  }catch(e){ return _toast('Не удалось'); }
+  _toast(ok ? 'Недовоз подтверждён' : 'Недовоз отклонён');
+  SUP_GOTO = 'd:' + district;
+  SUP_OPEN.add(district);
+  await supLoad(sid);
 }
 
 // Правки района — черновик: степперы меняют числа на экране, сервер узнаёт

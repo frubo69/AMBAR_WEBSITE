@@ -1414,7 +1414,7 @@ async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
             # угодно. Вопрос всё равно должен дойти: несогласованное списание
             # висит и держит товар на полке, и молчать о нём нельзя. Без
             # кнопок — решать придётся в приложении.
-            from owner_routes import notify_owners
+            from owner_routes import notify_owners, _md
             await notify_owners(
                 "stock.writeoff",
                 f"🗑 Списание · {kind}\n{p.get('name','')} × {qty}"
@@ -3027,6 +3027,30 @@ async def handle_supply_finish(request):
 
 
 @require_driver
+@_no_test
+async def handle_supply_short(request):
+    """POST {district, lines:[{id, qty}], note} — отчёт о недовозе старшему.
+    Писать может водитель, у которого задача, или водитель этого района: за
+    товаром ездят вдвоём, а замечает нехватку тот, кто стоял у прилавка."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    sup = await db.supply_get(sid) or {}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("driver") != me["name"] and me.get("district") != oid:
+        return web.json_response({"ok": False, "verdict": "not_mine"}, headers=CORS_HEADERS)
+    res = await supply_routes.short_report(sid, oid, me["name"], "driver",
+                                           body.get("lines") or [], str(body.get("note") or ""))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_driver
 async def handle_expense_photo(request):
     """Свой снимок у своей траты за эту смену — посмотреть перед тем, как
     переснять или убрать. Чужие записи отсюда не отдаются."""
@@ -3306,6 +3330,7 @@ def setup(app):
         ("/api/driver/supply/{sid}/scan",       handle_supply_scan,   "POST"),
         ("/api/driver/supply/{sid}/undo",       handle_supply_undo,   "POST"),
         ("/api/driver/supply/{sid}/finish",     handle_supply_finish, "POST"),
+        ("/api/driver/supply/{sid}/short",      handle_supply_short,  "POST"),
         ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
         ("/api/driver/supply/{sid}/hold",       handle_supply_hold,   "POST"),
         ("/api/driver/supply/{sid}/buy",        handle_supply_buy,    "POST"),

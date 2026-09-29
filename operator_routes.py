@@ -2112,6 +2112,36 @@ async def handle_op_order_reset(request):
     return await _без_охраны(stock_routes.handle_order_reset)(request)
 
 
+# ── недовоз от оператора ─────────────────────────────────────────────────────
+# Владелец, 21 сен 2026: «операторы тоже забирают — добавь им возможность
+# отправлять репорт о том, что чего-то нет; конечное решение принимаю я через
+# AMBAR STAR». Оператор видит открытые задачи всех районов и пишет, чего
+# сколько не дали. Задачу это не трогает — решает старший.
+@require_operator
+async def handle_op_supply_open(request):
+    import supply_routes
+    return web.json_response({"tasks": await supply_routes.open_tasks_all()},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_operator
+async def handle_op_supply_short(request):
+    """POST {district, lines:[{id, qty}], note, as} — отчёт о недовозе."""
+    import supply_routes
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    who = str(body.get("as") or "").strip()[:60] or "оператор"
+    res = await supply_routes.short_report(request.match_info.get("sid") or "",
+                                           str(body.get("district") or "").strip(),
+                                           who, "operator", body.get("lines") or [],
+                                           str(body.get("note") or ""))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
 @require_operator
 async def handle_move_board(request):
     """GET ?as= — что где лежит: остатки и коды по районам."""
@@ -3764,6 +3794,10 @@ def setup(app):
     r.add_get("/api/operator/stock/order", handle_op_order)
     r.add_post("/api/operator/stock/order/edit", handle_op_order_edit)
     r.add_post("/api/operator/stock/order/reset", handle_op_order_reset)
+    r.add_route("OPTIONS", "/api/operator/supply/open", _opt)
+    r.add_get("/api/operator/supply/open", handle_op_supply_open)
+    r.add_route("OPTIONS", "/api/operator/supply/{sid}/short", _opt)
+    r.add_post("/api/operator/supply/{sid}/short", handle_op_supply_short)
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)

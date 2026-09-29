@@ -3030,6 +3030,34 @@ async def supply_task_noscan(sid: str, district: str, who: str, now) -> dict | N
         return_document=ReturnDocument.AFTER)
 
 
+async def supply_short_set(sid: str, district: str, rec: dict) -> bool:
+    """Отчёт о недовозе по району. Один живой на район: пока прошлый ждёт
+    решения, второй не ложится — условие в самом фильтре."""
+    db = _db_or_none()
+    if db is None: return False
+    k = f"tasks.{district}"
+    r = await db.supplies.update_one(
+        {"_id": sid, f"{k}.done_at": None, f"{k}.cancelled_at": None,
+         f"{k}.short.status": {"$ne": "pending"}},
+        {"$set": {f"{k}.short": rec}})
+    return r.modified_count > 0
+
+
+async def supply_short_decide(sid: str, district: str, status: str, who: str,
+                              now, miss: dict | None) -> bool:
+    """Решение старшего по отчёту. Подтверждение переносит недовоз в miss."""
+    db = _db_or_none()
+    if db is None: return False
+    k = f"tasks.{district}"
+    upd = {f"{k}.short.status": status, f"{k}.short.decided_at": now,
+           f"{k}.short.decided_by": str(who or "")[:60]}
+    if miss is not None:
+        upd[f"{k}.miss"] = miss
+    r = await db.supplies.update_one(
+        {"_id": sid, f"{k}.short.status": "pending"}, {"$set": upd})
+    return r.modified_count > 0
+
+
 async def supply_task_finish(sid: str, district: str, gaps: list,
                              note: str, now) -> dict | None:
     """Закрыть задачу района. Возвращает поставку целиком."""

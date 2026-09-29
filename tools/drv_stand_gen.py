@@ -283,6 +283,17 @@ async function standBoot(){
   setInterval(() => { if(!PANIC && !LOCKED) load(); }, 5000);
   await new Promise(r => setTimeout(r, 80));
   if(ST_Q.get('open') === 'fx') fxOpen(ST_ORDER.order_id);
+  // ?open=short — экран «чего не дали». &from=fin — из завершения сканирования
+  // (подставлено невнесённое), иначе из приёмки без сканирования (нули).
+  if(ST_Q.get('open') === 'short'){
+    TASK = {supply_id: 's9', district: 'jvc', district_code: 'B1', district_name: 'JVC',
+      need: 48, got: 20, left: 28, positions: 4, lines: [
+        {id: 'p1', name: 'Absolut 1 ltr',   need: 12, got: 9, left: 3},
+        {id: 'p7', name: 'Столичная 0,7',   need: 12, got: 5, left: 7},
+        {id: 'p31', name: 'Heineken 0,5',   need: 12, got: 6, left: 6},
+        {id: 'p54', name: 'Martini Bianco', need: 12, got: 0, left: 12}]};
+    shortOpen(ST_Q.get('from') || 'ns');
+  }
   // ?open=odo — экран пробега с уже снятым кадром: камеры на стенде нет,
   // поэтому подсовываем готовый снимок и зовём тот же odoAsk, что и камера.
   // &free=1 — машина выбрана из свободных, прошлого пробега нет.

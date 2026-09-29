@@ -64,6 +64,25 @@ async def main():
        [(d["name"], d["away"], d["away_since"]) for d in staff.drivers() if d["name"] == "Уехал"],
        [("Уехал", True, "2026-09-24")])
 
+    # С 29 сен 2026 его нет и в самой «Команде», и у оператора (владелец:
+    # «почему указаны даже те водители, которые сейчас не работают? это
+    # путает»). Проверяем то, что уходит на экран, а не внутренний список.
+    import operator_routes as opr
+    eq("у оператора в районе только те, кто здесь",
+       opr._districts()[0]["drivers"], ["Работает"])
+    eq("заказ уехавшему не отдать",
+       "Уехал" in opr._drivers_of(False, districts=opr._districts()), False)
+    import owner_routes as ownr
+    async def _ничего(): return None
+    ownr._staff_fresh = _ничего
+    staff.DISTRICT_DRIVERS[staff.DISTRICT_STAFF[0]["district"]] = ["Работает", "Уехал"]
+    штат = await ownr._staff_payload()
+    eq("в команде на районе его нет", штат["districts"][0]["drivers"], ["Работает"])
+    eq("и в списке водителей нет",
+       [v["name"] for v in штат["drivers"] if v["name"] == "Уехал"], [])
+    eq("и среди телефонов нет",
+       [l["name"] for l in штат["links"] if l["name"] == "Уехал"], [])
+
     # Вернулся — и снова везде.
     await db._db.fin_people.update_one({"_id": "Уехал"},
                                        {"$push": {"work": {"from": ДЕНЬ, "to": ""}}})

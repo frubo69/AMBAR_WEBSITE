@@ -65,7 +65,9 @@ def _districts() -> list:
          # Код района отдаём с сервера. Панель считала его по месту в списке, и
          # у оператора с двумя районами Тиком становился B2 вместо B5.
          "code": OFFICE_CODES.get(s["district"], ""),
-         "operator": s["operator"], "drivers": list(s["drivers"])}
+         # Уехавших оператору не показываем: заказ ему не отдать, а имя в
+         # списке путает (владелец, 29 сен 2026).
+         "operator": s["operator"], "drivers": _staff_mod.here(s["drivers"])}
         for s in DISTRICT_STAFF
     ]
 

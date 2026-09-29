@@ -1740,10 +1740,13 @@ async def _staff_payload() -> dict:
                        "operator": staff.DISTRICT_OPERATOR.get(d, ""),
                        "base": staff.base_operator(d),
                        "moved": bool(moves.get(d)),
-                       "drivers": list(staff.DISTRICT_DRIVERS.get(d, [])),
-                       # Кто уехал — остаётся в списке серым, с датой.
-                       "away": {n: staff.away_since(n)
-                                for n in staff.DISTRICT_DRIVERS.get(d, []) if staff.is_away(n)}}
+                       # Уехавших в команде нет вовсе — ни в районах, ни в
+                       # окнах выбора человека, ни в списке телефонов. Серыми
+                       # с датой они простояли с 24 по 29 сен 2026 и путали:
+                       # «почему указаны те, кто сейчас не работает». Вернулся
+                       # (период в «Зарплатах») — появился сам.
+                       "drivers": staff.here(staff.DISTRICT_DRIVERS.get(d, [])),
+                       "away": {}}
                       for d in OFFICE_IDS],
         # Тест-район — отдельно от районов: без оператора и без перестановок,
         # в нём тест-водители из базы. Операторам и чек-листу он не виден.
@@ -1756,7 +1759,7 @@ async def _staff_payload() -> dict:
         # «Штрафы/авансы/долги» ставят его отдельной карточкой наверх
         "stars": list(staff.SENIOR_STAR_IDS),
         # Телефоны водителей: кто привязан, кому выдана ссылка (без id).
-        "links": _links_view(car_by),
+        "links": [l for l in _links_view(car_by) if not staff.is_away(l["name"])],
         # Машины: все, у кого какая, свободные — перезакрепляют между водителями.
         "cars": cars,
         # Трекер-приложения: у кого ключ выдан и когда была точка.
@@ -1776,7 +1779,7 @@ async def _staff_payload() -> dict:
                      # (владелец, 24 сен 2026).
                      "ours_phone": bool((gear.get(n) or {}).get("ours_phone")),
                      "ours_phone_at": _iso_dt((gear.get(n) or {}).get("ours_phone_at"))}
-                    for n in staff.driver_names()],
+                    for n in staff.here(staff.driver_names())],
     }
 
 

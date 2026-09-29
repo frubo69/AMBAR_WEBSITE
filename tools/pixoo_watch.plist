@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Сторож рамки Pixoo-64. Ставится на ноутбук владельца, в его домашнюю
+     Wi-Fi: с сервера до рамки хода нет.
+
+       cp tools/pixoo_watch.plist ~/Library/LaunchAgents/com.ambar.pixoo-watch.plist
+       (заменить $HOME на настоящий путь)
+       launchctl load ~/Library/LaunchAgents/com.ambar.pixoo-watch.plist
+
+     Настройки — ~/.ambar_pixoo.json (ip и адрес цифры), права 600. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.ambar.pixoo-watch</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/bin/env python3</string><string>$HOME/Desktop/xxx/TG/AMBAR/MINIAPP/tools/pixoo_watch.py</string></array>
+  <key>StartInterval</key><integer>300</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/ambar_pixoo.out</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/ambar_pixoo.err</string>
+</dict></plist>

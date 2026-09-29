@@ -7928,7 +7928,7 @@ function _expKept(kind){
 function expRedo(kind){
   EXP_REDO.add(kind);
   if(EXP_SHOT.kind === kind) EXP_SHOT = {kind:'', photo:'', thumb:''};
-  if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
+  if(kind === 'wash') carShotSet('', '');
   render();
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
   // Первый недостающий шаг — сразу: у мойки машина, дальше чек, иначе сумма.
@@ -8109,6 +8109,33 @@ function expRcp(kind, sent){
 // сразу, без повторного «Отправить».
 // Снимок машины живёт отдельно от чека: у мойки их два.
 let CAR_SHOT = {photo: '', thumb: ''};
+// Кадр лежит в телефоне, а не в памяти страницы: машину снимают, пока она
+// моется, а чек выдают через несколько минут. За это время телефон успевает
+// выгрузить свёрнутое приложение, и снимок, живший только в памяти, пропадал
+// (владелец, 29 сен 2026). Стирается сам: когда расход отправлен, когда снимок
+// убрали и когда сменились рабочие сутки — вчерашняя машина мойку не докажет.
+const CAR_SHOT_KEY = 'drv_car_shot';
+let CAR_SHOT_DAY = '';
+try{
+  const raw = JSON.parse(localStorage.getItem(CAR_SHOT_KEY) || 'null');
+  if(raw && raw.photo){ CAR_SHOT = {photo: String(raw.photo), thumb: String(raw.thumb || '')}; CAR_SHOT_DAY = String(raw.day || ''); }
+}catch(e){}
+function carShotSet(photo, thumb){
+  CAR_SHOT = {photo: photo || '', thumb: thumb || ''};
+  try{
+    if(!CAR_SHOT.photo){ CAR_SHOT_DAY = ''; localStorage.removeItem(CAR_SHOT_KEY); return; }
+    CAR_SHOT_DAY = (SH && SH.day) || (ORDERS && ORDERS.day) || '';
+    localStorage.setItem(CAR_SHOT_KEY, JSON.stringify({day: CAR_SHOT_DAY, ...CAR_SHOT}));
+  }catch(e){}
+}
+// Перед отрисовкой расходов: кадр прошлых суток не подставляем.
+function carShotFresh(){
+  if(!CAR_SHOT.photo) return;
+  const day = (SH && SH.day) || (ORDERS && ORDERS.day) || '';
+  if(!day) return;
+  if(CAR_SHOT_DAY && day !== CAR_SHOT_DAY) return carShotSet('', '');
+  if(!CAR_SHOT_DAY) carShotSet(CAR_SHOT.photo, CAR_SHOT.thumb);
+}
 
 function carStrip(sent){
   const мини = CAR_SHOT.thumb || (sent && sent.car_thumb) || '';
@@ -8211,7 +8238,7 @@ async function carDeleteDo(){
   const kind = CAR.kind;
   carClose();
   const sent = _expSentCar(kind);
-  CAR_SHOT = {photo:'', thumb:''};
+  carShotSet('', '');
   if(sent){
     try{ await drvApi.drvFetch('/api/driver/expenses', {method:'POST', body:{kind, car_del: true}}); }
     catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не удалось убрать', 'err'); return; }
@@ -8468,7 +8495,7 @@ async function carAccept(){
   // Приём машины: кадр снят — теперь число, глядя на него.
   if(what === 'odo'){ odoAsk(shot, thumb); return; }
   const rcp = what === 'rcp';
-  if(rcp) EXP_SHOT = {kind, photo: shot, thumb}; else CAR_SHOT = {photo: shot, thumb};
+  if(rcp) EXP_SHOT = {kind, photo: shot, thumb}; else carShotSet(shot, thumb);
   const sent = _expSent(kind);
   // Запись уже есть — кадр уходит сразу: заставлять второй раз нажимать
   // «Отправить» ради того же числа незачем. У отклонённой — тоже сразу, если
@@ -8485,7 +8512,7 @@ async function carAccept(){
               ...(rcp ? {photo: shot, thumb} : {car_photo: shot, car_thumb: thumb})}});
       toast(переснял ? 'Снимок отправлен старшему' : 'Снимок обновлён');
       try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-      if(rcp) EXP_SHOT = {kind:'', photo:'', thumb:''}; else CAR_SHOT = {photo:'', thumb:''};
+      if(rcp) EXP_SHOT = {kind:'', photo:'', thumb:''}; else carShotSet('', '');
       await load();
     }catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не отправилось', 'err'); }
     return;
@@ -9496,7 +9523,7 @@ function expCashCard(total){
   </div>`;
 }
 function renderExpenses(){
-  xpDraftFresh();
+  xpDraftFresh(); carShotFresh();
   const box = document.getElementById('body');
   // Тест-водитель расходы не подаёт: настоящие деньги старшему на согласование
   // из теста идти не должны (сервер отвечает test_account).
@@ -13357,7 +13384,7 @@ async function sendExpense(btn, kind){
                 ? {car_photo: CAR_SHOT.photo, car_thumb: CAR_SHOT.thumb} : {})}});
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
+    if(kind === 'wash') carShotSet('', '');
     EXP_REDO.delete(kind); XP_EDIT.delete(kind); delete EXP_CH[kind]; xpDraftDrop(kind); XP_PARK_EDIT = '';
     EXP_MORE = false; EXP_EDIT = null; EXP_SHOT = {kind:'', photo:'', thumb:''};
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}

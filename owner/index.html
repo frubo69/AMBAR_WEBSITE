@@ -20936,7 +20936,7 @@ async function fbEntryAdd(book, day){
   // «Что-то ещё» без слов — сумма в никуда: сначала за что.
   if(book === 'rp' && !comment && fbIsOther((((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || []).find(l => l.id === FB.line))){
     _toast('Впишите, за что'); const c = document.getElementById('fbCmt-rp'); if(c) c.focus(); return; }
-  if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
+  if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек/документ'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
   if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
@@ -20954,7 +20954,7 @@ async function fbEntryAdd(book, day){
     if(res.book){ fbApply(res.book); fbPaint(); }
     if(FB.lpage){ FB.line = FB.lpage; FB.lineSet = true; }      // статья страницы не теряется
     fbPagePaint();
-  }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек'
+  }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек/документ'
     : (e && (e.payload || {}).error) === 'no_comment' ? 'Впишите, за что' : 'Не удалось записать'); }
 }
 async function fbEntryDel(id){
@@ -22605,8 +22605,8 @@ function fbPayRcpNeed(l){ return !!l && FB_PAY_RCP.includes(l.group); }
 function fbRentRcp(l, s){
   return `<div class="fb-rcpw"><button class="xe-rcp fb-rcp fb-rentrcp${s ? ' set' : ''}"
       data-l="${escS(l.id)}" onclick="fbRentShotPick(this.dataset.l)">${
-    s ? `<img src="${s.thumb}" alt=""><span class="xe-rcp-t">Чек добавлен<i>нажать, чтобы заменить</i></span>`
-      : `${IC('note', 16)}<span class="xe-rcp-t">Чек обязателен<i>снимок или из галереи</i></span>`
+    s ? `<img src="${s.thumb}" alt=""><span class="xe-rcp-t">Чек/документ добавлен<i>нажать, чтобы заменить</i></span>`
+      : `${IC('note', 16)}<span class="xe-rcp-t">Чек/документ обязателен<i>снимок или из галереи</i></span>`
     }</button></div>`;
 }
 
@@ -22651,7 +22651,7 @@ async function fbPayOpen(id){
     if(снимок){ const r = {...(FB.rentShot || {})}; delete r[id]; FB.rentShot = r; }
     if(res.book){ fbApply(res.book); fbPaint(); }
     fbPagePaint();
-  }catch(e){ _toast(((e && e.payload) || {}).error === 'no_photo' ? 'Нужен чек' : 'Не удалось записать'); }
+  }catch(e){ _toast(((e && e.payload) || {}).error === 'no_photo' ? 'Нужен чек/документ' : 'Не удалось записать'); }
 }
 // Нажал случайно — вернуть как было: запись уходит, факт и остаток отматываются
 async function fbPayUndo(eid){
@@ -22772,7 +22772,7 @@ function fbLinePayHtml(b, l){
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
         <input class="fb-txt" placeholder="${fbIsOther(l) ? 'За что' : 'Комментарий'}" autocomplete="off" maxlength="120" id="fbCmt-rp"
           onkeydown="if(event.key==='Enter'){this.blur()}">
-        <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span></button>
+        <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек/документ<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
       </div></div>
     ${rows.length ? `<div class="sc"><button class="fb-e fb-bl" data-l="${l.id}" onclick="fbHistOpen(this.dataset.l)">
@@ -22812,13 +22812,13 @@ function fbShot(inp){
 }
 function fbShotMark(){
   const st = document.getElementById('fbRcp'); if(!st) return;
-  if(FB.shot){ st.classList.add('set'); st.innerHTML = `<img src="${FB.shot.thumb}" alt=""><span class="xe-rcp-t">Чек добавлен<i>нажать, чтобы заменить</i></span>`; }
-  else { st.classList.remove('set'); st.innerHTML = `${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span>`; }
+  if(FB.shot){ st.classList.add('set'); st.innerHTML = `<img src="${FB.shot.thumb}" alt=""><span class="xe-rcp-t">Чек/документ добавлен<i>нажать, чтобы заменить</i></span>`; }
+  else { st.classList.remove('set'); st.innerHTML = `${IC('note', 16)}<span class="xe-rcp-t">Добавить чек/документ<i>снимок или из галереи</i></span>`; }
 }
 // Чек к записи: кнопка-таблетка под строкой — «Открыть фото чека».
 function fbRcpBtn(e){
   if(!e || !e.photo) return '';
-  return `<div class="fb-rcpw"><button class="fb-rcpb" data-id="${escS(e.id)}" data-n="${escS(e.line_name || e.comment || 'Чек')}"
+  return `<div class="fb-rcpw"><button class="fb-rcpb" data-id="${escS(e.id)}" data-n="${escS(e.line_name || e.comment || 'Чек/документ')}"
     onclick="fbShotOpen(this.dataset.id, this.dataset.n)">${IC('note', 14)}Открыть фото чека</button></div>`;
 }
 // Окно чека: крестик в шапке, снимок приближается двумя пальцами и двойным
@@ -22828,7 +22828,7 @@ const _RCP = {sc: 1, x: 0, y: 0, dx: 0, dy: 0, d0: 0, s0: 1, drag: false, tap: 0
 async function fbShotOpen(id, name){
   const ov = document.getElementById('fbRcpOv'), img = document.getElementById('fbRcpImg');
   fbRcpInit();
-  _setText('fbRcpTtl', name || 'Чек');
+  _setText('fbRcpTtl', name || 'Чек/документ');
   fbRcpZoom(1, true);
   img.src = _fbImg[id] || '';
   img.classList.toggle('none', !_fbImg[id]);
@@ -40449,7 +40449,7 @@ function renderHours(h){
 <div class="rcp-ov" id="fbRcpOv" onclick="if(event.target===this)fbShotClose()">
   <div class="rcp-win">
     <div class="rcp-top">
-      <span class="rcp-ttl" id="fbRcpTtl">Чек</span>
+      <span class="rcp-ttl" id="fbRcpTtl">Чек/документ</span>
       <button class="rcp-x" onclick="fbShotClose()" aria-label="Закрыть"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="rcp-body" id="fbRcpBody"><img id="fbRcpImg" alt="Чек"></div>

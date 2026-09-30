@@ -3431,6 +3431,7 @@ button.path:active{transform:scale(.995)}
 .dds-r.kid span{font-size:13.5px;font-weight:500;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dds-r.kid b{font-size:14px;font-weight:600}
 .dds-r.wait span,.dds-r.wait b{color:var(--muted)}
+.dds-r.kid.zero b{color:var(--dim)}
 .dds-r.wait span i{display:block;font-style:normal;font-size:11px;color:var(--warn);margin-top:2px}
 .dds-r.end{background:rgba(201,169,110,.06);border-top-color:rgba(201,169,110,.25)}
 .dds-r.end b{font-size:18px}
@@ -21185,23 +21186,21 @@ function fbDdcStart(b, day){
 // о наличных, а не устройство сейфа. Арифметика та же, из книги:
 // начало + поступления − выплаты = конец (= d.stack_total).
 function fbDdcParts(d){
-  const n = v => +v || 0, ins = [], outs = [], add = (arr, name, v) => {
-    if(!v) return; const x = arr.find(r => r.name === name);
-    if(x) x.v += v; else arr.push({name, v}); };
-  // Выручка: продали за наличные, из них чай и расходы водителей ушли сразу.
-  // День не подтверждён — в сейф она ещё не легла, в итоги не идёт.
-  if(!d.pending){
-    const calc = n(d.cash) - n(d.tips_cash) - n(d.spend_cash), fix = n(d.base) - calc;
-    add(ins, 'Продажи наличными', n(d.cash));
-    add(outs, 'Чай водителям', n(d.tips_cash));
-    add(outs, 'Расходы водителей', n(d.spend_cash));
-    if(fix) add(fix > 0 ? ins : outs, 'Поправка при сдаче выручки', Math.abs(fix));
-  }
-  (d.ins || []).forEach(e => add(ins, e.comment || 'Приход в фонд', n(e.amount)));
-  add(ins, 'Приход в фонд', n(d.extra_manual));
-  add(outs, 'Оплата Барракуде', n(d.pay) || (n(d.pay_b) + n(d.pay_b_extra)));
-  (d.expenses || []).forEach(e => add(outs, e.line_name || e.kind_t || 'Вне плана', n(e.amount)));
-  (d.payouts || []).forEach(e => add(outs, 'Из прибыли' + (e.who || e.comment ? ' · ' + (e.who || e.comment) : ''), n(e.amount)));
+  // Владелец, 30 сен 2026 (вторая правка): «там должны быть движения ЧП+, ЧП−,
+  // РП+, допРП+, РП− и сколько в итоге осталось в сейфе». Строки — движения
+  // стопок сейфа, а не статьи расходов. Пять названных стоят всегда, даже
+  // нулём; Барракуда — только когда в неё клали или из неё платили: без неё
+  // итог не сойдётся с сейфом. ДопРП+ — приход в фонд не из выручки.
+  // День не подтверждён — раскладка ещё предложение, в сейф не легла.
+  const n = v => +v || 0, ok = !d.pending;
+  const rp = ok ? n(d.collected) : 0, b = ok ? n(d.aside) : 0, np = ok ? n(d.np_plus) : 0;
+  const ins = [{name: 'РП+', v: rp}, {name: 'ДопРП+', v: n(d.extra_rp)}, {name: 'ЧП+', v: Math.max(0, np)}];
+  if(b) ins.push({name: 'Барракуда+', v: b});
+  // ЧП−: выплаты из прибыли, оплата Барракуде сверх её стопки и день, когда
+  // расходы водителей больше наличной выручки (ЧП+ ушёл бы в минус).
+  const outs = [{name: 'РП−', v: n(d.expenses_sum)},
+                {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra) + Math.max(0, -np)}];
+  if(n(d.pay_b)) outs.push({name: 'Барракуда−', v: n(d.pay_b)});
   const sum = a => a.reduce((t, r) => t + r.v, 0);
   return {ins, outs, inSum: sum(ins), outSum: sum(outs)};
 }
@@ -21211,7 +21210,7 @@ function fbDdcBodyHtml(d, start){
   const p = fbDdcParts(d), saldo = p.inSum - p.outSum, end = start.all + saldo;
   const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
   const row = (cls, name, val, sign) => `<div class="dds-r ${cls}"><span>${name}</span>${v(val, sign)}</div>`;
-  const kids = (arr, cls, sign) => arr.map(r => row('kid ' + cls, escS(r.name), r.v, sign)).join('');
+  const kids = (arr, cls, sign) => arr.map(r => row('kid ' + (r.v ? cls : 'zero'), escS(r.name), r.v, r.v ? sign : '')).join('');
   // Считаем сами и сверяем с сейфом: разошлось — молчать нельзя.
   const diff = Math.round(end - (+d.stack_total || 0));
   return `<div class="dds">

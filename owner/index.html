@@ -29796,7 +29796,11 @@ async function supImport(inp, btnId){
     const j = await res.json();
     if(!res.ok) throw j;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    _toast(`Поставка на ${j.total_qty} бутылок`);
+    // Строки, которых нет в каталоге, называем сразу: магазин вписал своё, и
+    // молча потерять это нельзя — за товаром по ней никто не поедет.
+    const чужие = (j.unknown || []).length;
+    _toast(`Поставка на ${j.total_qty} бутылок${чужие ? ` · не узнано строк: ${чужие} (${
+      String(j.unknown[0]).slice(0, 28)}${чужие > 1 ? '…' : ''})` : ''}`);
     ACC_SUP = null;
     await supLoad(j.supply_id);
     ACC_BACK = accOrder;

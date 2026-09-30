@@ -491,6 +491,65 @@ def _num(v):
         return None
 
 
+def _name_key(s) -> str:
+    """Название для сравнения: без регистра, пробелов и знаков. «Absolut 1 Ltr.»
+    и «absolut 1ltr» — одна и та же бутылка."""
+    return "".join(ch for ch in str(s or "").lower().replace("ё", "е") if ch.isalnum())
+
+
+def _name_index(cat: dict) -> dict:
+    out = {}
+    for pid, p in cat.items():
+        k = _name_key(p.get("name"))
+        if k:
+            out.setdefault(k, pid)
+    return out
+
+
+def match_row(num, name, cat: dict, by_num: dict, names: dict | None = None) -> tuple:
+    """Чья это строка в ответе магазина: (позиция | None, как узнали).
+
+    НАЗВАНИЕ ГЛАВНЕЕ НОМЕРА. Номер — место в обходе полок, и он у позиции
+    постоянный, но магазин, убрав строки, перенумеровывает остаток 1…N
+    (29 сен 2026: из 60 строк такого файла 51 легла бы не на тот товар —
+    «№ 10 Corona» читалась как Amstel). Название он не трогает: это то, что
+    человек там читает глазами. Поэтому:
+
+      1. название совпало с каталогом — это она, какой бы ни стоял номер;
+      2. название чуть другое (опечатка, сокращение) — ближайшее в каталоге,
+         если оно близко и второе по близости заметно дальше;
+      3. названия нет — верим номеру;
+      4. название есть, в каталоге такого нет — номеру верим, только если имя
+         под этим номером на него похоже; иначе строка чужая: магазин вписал
+         своё, и подставлять вместо этого товар по номеру нельзя.
+
+    Как узнали: name | fuzzy | num | None (чужая)."""
+    import difflib
+    names = names if names is not None else _name_index(cat)
+    key = _name_key(name)
+    n = _num(num)
+    по_номеру = by_num.get(n) if n else None
+    if key:
+        pid = names.get(key)
+        if pid:
+            return pid, "name"
+        близкие = difflib.get_close_matches(key, list(names), n=2, cutoff=0.86)
+        if близкие:
+            r1 = difflib.SequenceMatcher(None, key, близкие[0]).ratio()
+            r2 = (difflib.SequenceMatcher(None, key, близкие[1]).ratio()
+                  if len(близкие) > 1 else 0.0)
+            # «0.75» и «0.7» одной марки отличаются одной цифрой — такие пары
+            # близки друг к другу, и угадывать между ними нельзя.
+            if r1 - r2 >= 0.04 or names[близкие[0]] == по_номеру:
+                return names[близкие[0]], "fuzzy"
+        if по_номеру:
+            своё = _name_key((cat.get(по_номеру) or {}).get("name"))
+            if difflib.SequenceMatcher(None, key, своё).ratio() >= 0.72:
+                return по_номеру, "num"
+        return None, None
+    return (по_номеру, "num") if по_номеру else (None, None)
+
+
 def _district_cols(cols: dict) -> dict:
     """Колонки точек по заголовкам: «B2 Business Bay» → офис.
 
@@ -578,14 +637,10 @@ async def handle_import(request):
 
     cat = _catalog_by_id()
     _, ПО_НОМЕРУ = _nums()
-    # Строку узнаём по номеру; у старых файлов — по коду. Название держим
-    # третьим запасом: магазин иногда стирает число, а подпись оставляет, и
-    # без этого запаса строка молча уехала бы в «чужие».
-    ПО_ИМЕНИ = {}
-    for _pid, _p in cat.items():
-        _nm = str(_p.get("name") or "").strip().lower()
-        if _nm:
-            ПО_ИМЕНИ.setdefault(_nm, _pid)
+    # Строку узнаём по названию, номер — запас (см. match_row); у старых
+    # файлов — по коду.
+    ПО_ИМЕНИ = _name_index(cat)
+    перенумеровано = [0]                # строк, где номер показывал на другой товар
     код_кол = cols.get(CODE_COL)
     ном_кол = cols.get(NUM_COL)
     имя_кол = cols.get(ITEM_COL)
@@ -594,8 +649,8 @@ async def handle_import(request):
     ИТОГИ = ("TOTAL", "AMOUNT")
 
     def _pid_of(row):
-        """(позиция, метка). Позиция — по коду (старые файлы), номеру или
-        названию. Ключ в строке есть, а позиции нет — отдаём метку: такая
+        """(позиция, метка). Позиция — по коду (старые файлы), названию или
+        номеру. Ключ в строке есть, а позиции нет — отдаём метку: такая
         строка идёт в «чужие», а не пропадает молча. Ключа нет вовсе —
         и метки нет, строку пропускаем."""
         if код_кол:
@@ -603,26 +658,19 @@ async def handle_import(request):
             if v and str(v).strip():
                 s = str(v).strip()
                 return (s, None) if s in cat else (None, s)
-        ключ = ""
-        if ном_кол:
-            v = row[ном_кол - 1].value
-            s = str(v or "").strip()
-            if s.upper().startswith(ИТОГИ):
-                return None, None
-            n = _num(v)
-            if n:
-                if n in ПО_НОМЕРУ:
-                    return ПО_НОМЕРУ[n], None
-                ключ = f"№ {n}"
-        if имя_кол:
-            v = row[имя_кол - 1].value
-            s = str(v or "").strip()
-            if s:
-                pid = ПО_ИМЕНИ.get(s.lower())
-                if pid:
-                    return pid, None
-                ключ = s
-        return None, (ключ or None)
+        номер = row[ном_кол - 1].value if ном_кол else None
+        if str(номер or "").strip().upper().startswith(ИТОГИ):
+            return None, None
+        имя = str((row[имя_кол - 1].value if имя_кол else "") or "").strip()
+        if имя.upper().startswith(ИТОГИ):
+            return None, None
+        pid, как = match_row(номер, имя, cat, ПО_НОМЕРУ, ПО_ИМЕНИ)
+        n = _num(номер)
+        if pid:
+            if n and ПО_НОМЕРУ.get(n) != pid:
+                перенумеровано[0] += 1
+            return pid, None
+        return None, (имя or (f"№ {n}" if n else None))
 
     # Разница считается здесь и один раз. Считать её потом, на экране, значит
     # пересчитывать при каждом открытии по снимку заявки, который к тому
@@ -636,6 +684,11 @@ async def handle_import(request):
             # Молча терять такую строку нельзя: владелец должен увидеть.
             if метка:
                 unknown.append(метка)
+            continue
+        if pid in видели:
+            # Одна позиция двумя строками — вторую не складываем и не теряем:
+            # что из двух верно, решает человек.
+            unknown.append(f"повтор: {(cat.get(pid) or {}).get('name') or pid}")
             continue
         видели.add(pid)
         p = cat.get(pid)
@@ -735,6 +788,9 @@ async def handle_import(request):
         await _answer_to_order(day, items, asked_full)
     except Exception as e:                           # noqa: BLE001
         log.error(f"[supply] ответ в заявку не записан: {e}")
+    if перенумеровано[0]:
+        log.info(f"[supply] поставка {sid}: магазин перенумеровал строки — "
+                 f"{перенумеровано[0]} узнаны по названию")
     log.info(f"[supply] поставка {sid}: {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, отказов {len(dropped)}, "
              f"урезано {len(short)}, сверх заказа {len(extra)}")
@@ -753,7 +809,7 @@ async def handle_import(request):
                               "items": len(items), "total_qty": doc["total_qty"],
                               "asked_qty": doc["asked_qty"], "gap_qty": doc["gap_qty"],
                               "dropped": dropped, "short": short, "extra": extra,
-                              "unknown": unknown,
+                              "unknown": unknown, "renumbered": перенумеровано[0],
                               "tasks": [{"district": o, "code": OFFICE_CODES.get(o, ""),
                                          "name": OFFICE_NAMES.get(o, o), **t}
                                         for o, t in tasks.items()]},

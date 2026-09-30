@@ -974,7 +974,8 @@ def _entry_view(e: dict, line_names: dict) -> dict:
                                                     "loan": "Долг"}.get(e.get("kind") or "", ""),
             "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
             "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo")),
-            "route_from": e.get("route_from") or "", "route_to": e.get("route_to") or ""}
+            "route_from": e.get("route_from") or "", "route_to": e.get("route_to") or "",
+            "src": e.get("src") or ""}
 
 
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
@@ -1205,6 +1206,11 @@ async def handle_entry_add(request):
         route_to = str(body.get("route_to") or "").strip()[:40] if book == "rp" else ""
         if kind and not who:
             return _json({"error": "who_required"}, 400)
+        # Доп. РП+ «из крипты» (владелец, 30 сен 2026): вывели USDT наличными в
+        # фонд. Отметка нужна, чтобы потом знать, сколько крипты уже забрали.
+        src = str(body.get("src") or "") if book == "in" else ""
+        if src not in ("", "crypto"):
+            return _json({"error": "bad_src"}, 400)
         import photos
         photo, bad = photos.decode(body.get("photo"))
         if bad:
@@ -1234,6 +1240,8 @@ async def handle_entry_add(request):
            "photo": bool(photo)}
     if route_from or route_to:
         doc["route_from"], doc["route_to"] = route_from, route_to
+    if src:
+        doc["src"] = src
     if photo:
         await db.expense_photo_set("fin:" + doc["_id"], photo, thumb)
     await db.fin_entry_add(doc)

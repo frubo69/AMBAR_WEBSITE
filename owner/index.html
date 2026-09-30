@@ -20852,7 +20852,8 @@ function fbEntries(list, book){
   if(!list.length) return `<div class="fb-none">${book === 'rp' ? 'Расходов за день не записано' : book === 'in' ? 'Прихода за день не было' : 'Выплат за день не было'}</div>`;
   return list.map(e => {
     const t = e.kind_t ? `${e.kind_t} · ${escS(e.who)}` : escS(e.comment || (book === 'rp' ? 'Расход' : book === 'in' ? 'Приход' : 'Выплата'));
-    const sub = e.kind_t ? escS(e.comment && e.comment !== e.kind_t ? e.comment : '') : escS(e.who || '');
+    const sub = e.kind_t ? escS(e.comment && e.comment !== e.kind_t ? e.comment : '')
+              : escS([e.src === 'crypto' && e.comment !== 'Из крипты' ? 'из крипты' : '', e.who].filter(Boolean).join(' · '));
     const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') : '';
     const forM = e.pay_month && e.day && e.pay_month !== e.day.slice(0, 7) ? 'за ' + fbMonthT(e.pay_month).toLowerCase() : '';
     return `<div class="fb-e">
@@ -20890,6 +20891,8 @@ function fbAddRow(book, day){
   return `<button class="sc-r fb-plus" onclick="fbAddToggle('${book}')"><span>${rp ? 'Добавить расход' : np ? 'Забрать из ЧП' : 'Доп. РП+'}</span><em>${_FB_PLUS}</em></button>
   <div class="fb-add" id="fbAdd-${book}" hidden>
     ${rp ? `<div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>` : ''}
+    ${book === 'in' ? `<div class="chip-row fb-chips"><button class="chip${FB.inSrc === 'crypto' ? ' on' : ''}" id="fbSrc-in"
+        onclick="fbInSrc(this)">Из крипты</button></div>` : ''}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"
       onkeydown="if(event.key==='Enter'){document.getElementById('${np ? 'fbWho-np' : 'fbCmt-' + book}').focus()}">
     ${np ? `<input class="fb-txt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
@@ -20898,6 +20901,17 @@ function fbAddRow(book, day){
       onkeydown="if(event.key==='Enter'){fbEntryAdd('${book}','${day}')}">
     <button class="aud-b go" onclick="fbEntryAdd('${book}','${day}')">Записать</button>
   </div>`;
+}
+// Доп. РП+ «из крипты» (владелец, 30 сен 2026): вывели USDT в наличные и
+// положили в фонд. Отметка едет на сервер полем src — по ней потом видно,
+// сколько крипты уже забрали наличными.
+function fbInSrc(btn){
+  FB.inSrc = FB.inSrc === 'crypto' ? '' : 'crypto';
+  btn.classList.toggle('on', FB.inSrc === 'crypto');
+  const c = document.getElementById('fbCmt-in');
+  if(c && FB.inSrc === 'crypto' && !c.value.trim()) c.value = 'Из крипты';
+  if(c && FB.inSrc !== 'crypto' && c.value.trim() === 'Из крипты') c.value = '';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 function fbAddToggle(book){
   const f = document.getElementById('fbAdd-' + book); if(!f) return;
@@ -20930,9 +20944,11 @@ async function fbEntryAdd(book, day){
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(route_from || route_to ? {route_from, route_to} : {}),
+                              ...(book === 'in' && FB.inSrc ? {src: FB.inSrc} : {}),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; }
+    if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
@@ -21246,7 +21262,8 @@ function fbDdcParts(d, month){
   // Под каждым движением — за что (владелец: «везде помимо самой суммы надо
   // писать за что: в РП — сим-карты −192, премия −283»). Запись — своей строкой.
   const it = (name, v) => ({name, v: n(v)}), has = a => a.filter(x => x.v);
-  const extra = (d.ins || []).map(e => it([e.comment || 'Приход в фонд', month ? '' : e.who].filter(Boolean).join(' · '), e.amount));
+  const extra = (d.ins || []).map(e => it(month && e.src === 'crypto' ? 'Из крипты'
+    : [e.comment || 'Приход в фонд', e.src === 'crypto' && e.comment !== 'Из крипты' ? 'из крипты' : '', month ? '' : e.who].filter(Boolean).join(' · '), e.amount));
   if(n(d.extra_manual)) extra.push(it('Вписан руками', d.extra_manual));
   const ins = [{name: 'РП+', v: rp, items: has([it(month ? 'Из выручки' : 'Из выручки дня', rp)])},
                {name: 'Доп РП+', v: n(d.extra_rp), items: has(extra)},

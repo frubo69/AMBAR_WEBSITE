@@ -3371,6 +3371,9 @@ button.path:active{transform:scale(.995)}
   color:var(--muted);line-height:1}
 .fb-gut .fb-r.sum em.fb-sign{color:var(--gold2)}
 .fb-hub .sc-r b u.warn{color:var(--warn)}
+/* Длинный заголовок карточки («Зарплаты/премии/удержания») — в одну строку на
+   любом телефоне: на узком экране буквы чуть мельче, а не перенос в шапке. */
+.fb-hub .sc-cap span{white-space:nowrap;font-size:min(1em,4.3vw)}
 .fb-r[hidden],.fb-add[hidden]{display:none}
 .sc > .fb-days{border:0;border-radius:0;background:none}
 .sc > .fb-days .shl-card:first-child{border-top:0}
@@ -20543,7 +20546,7 @@ function fbHubHtml(b, err){
     <button class="sc-r fb-ddcgo" onclick="accOpen('finddc')"><span class="fb-ic">${FB_ICO.ddc}</span><span>Отчёт ДДС</span><em>${_SC_CHEV}</em></button>
   </div>
   <div class="sc fb-hub">
-    ${fbCapT('Зарплаты/удержания')}
+    ${fbCapT('Зарплаты/премии/удержания')}
     ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
     ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
     ${fbGo('Лист премий', 'bonus.due', (TEN && TEN.due) || 0, "accOpen('finbonus')",

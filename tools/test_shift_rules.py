@@ -134,6 +134,11 @@ async def main():
     opr.db.fin_people_get = people
     opr._staff_mod.DISTRICT_DRIVERS = {"jvc": ["Худоба", "Али", "Файзуло", "Завтра", "Улетел", "Вернулся"],
                                        "bbay": ["Парвиз"]}
+    # Расписание и рабочие списки в бою — одно и то же: держим их вместе и
+    # здесь, иначе пересборка после отъезда подмешает состав из настоящего.
+    for _st in opr._staff_mod.DISTRICT_STAFF:
+        _st["drivers"] = list(opr._staff_mod.DISTRICT_DRIVERS.get(_st["district"], []))
+    opr._staff_mod._ALL_DRIVERS.clear(); opr._staff_mod._HIDDEN.clear()
     opr._here_drop()
     # День отъезда — уже не рабочий (владелец, 24 сен 2026): «то, что у них
     # показывает 24 сентября, значит, что он сегодня не выходит на смену».
@@ -228,6 +233,8 @@ async def main():
 
     print("── край: в районе никого нет в Дубае ───────────────────────────")
     opr._staff_mod.DISTRICT_DRIVERS["tecom"] = ["Улетел"]
+    next(x for x in opr._staff_mod.DISTRICT_STAFF if x["district"] == "tecom")["drivers"] = ["Улетел"]
+    opr._staff_mod._ALL_DRIVERS.pop("tecom", None); opr._staff_mod._HIDDEN.pop("tecom", None)
     opr._scope = lambda people_, who, ds: {"jvc", "tecom"}
     opr._here_drop()
     eq("отмечать некого", await opr._crew_names("tecom", DAY), [])

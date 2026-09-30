@@ -847,10 +847,7 @@ def _driver_district(name: str) -> str:
     if not name:
         return ""
     import config_staff as staff
-    for d, drivers in staff.DISTRICT_DRIVERS.items():
-        if name in drivers:
-            return d
-    return ""
+    return staff.district_map().get(name, "")      # с уехавшими: бутылка прошлого дня — его района
 
 
 @require_owner
@@ -864,7 +861,7 @@ async def handle_check_start(request):
     if driver:
         import config_staff as staff
         await _staff_fresh()
-        if driver not in staff.driver_names():
+        if driver not in staff.all_driver_names():
             return web.json_response({"error": "unknown_driver"}, status=400,
                                      headers=CORS_HEADERS)
     me = request.get("owner_id") or 0

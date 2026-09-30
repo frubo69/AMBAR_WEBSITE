@@ -157,7 +157,7 @@ async def _spend(days: list[str]) -> dict:
         rows = []
     home = {}
     try:
-        for d in _staff.drivers():
+        for d in _staff.all_drivers():
             home[d.get("name")] = d.get("district") or ""
     except Exception:                             # noqa: BLE001
         pass
@@ -559,7 +559,7 @@ def _people(docs: list, dupes: list | None = None) -> list[dict]:
     by_name = {str(d.get("_id")): d for d in docs}
     out, seen = [], {}
     try:
-        водители = {str(d.get("name")) for d in staff.drivers() if d.get("name")}
+        водители = {str(d.get("name")) for d in staff.all_drivers() if d.get("name")}
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] водители не прочитаны: {e}")
         водители = set()
@@ -617,7 +617,7 @@ def _people(docs: list, dupes: list | None = None) -> list[dict]:
             if not o.get("senior"):
                 add(ключ(o.get("name"), "operator"), "operator", title=o.get("name"),
                     roster=True, districts=list(o.get("districts") or []))
-        for d in staff.drivers():
+        for d in staff.all_drivers():
             add(d.get("name"), "driver", roster=True, districts=[d.get("district") or ""])
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] расписание не прочитано: {e}")
@@ -1457,7 +1457,7 @@ async def handle_pay_person(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     import config_staff as staff
-    known = set(staff.driver_names()) | set(staff.operator_names())
+    known = set(staff.all_driver_names()) | set(staff.operator_names())
     fields["manual"] = name not in known
     if "hidden" not in fields:
         fields["hidden"] = False                  # добавили заново — снова в списке

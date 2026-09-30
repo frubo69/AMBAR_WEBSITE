@@ -56,13 +56,24 @@ async def main():
        staff.here(["Работает", "Уехал", "Вернулся", "Сегодня"]), ["Работает", "Вернулся"])
 
     # Расходы смены: строка уехавшего не должна появиться вовсе.
-    staff.DISTRICT_STAFF[0]["drivers"] = ["Работает", "Уехал"]   # состав района
-    строки = [d for d in staff.drivers() if not d.get("away")]
-    eq("в расходах смены только те, кто здесь",
-       [d["name"] for d in строки if d["name"] in ("Работает", "Уехал")], ["Работает"])
-    eq("а в команде он есть, с пометкой",
-       [(d["name"], d["away"], d["away_since"]) for d in staff.drivers() if d["name"] == "Уехал"],
+    # Состав района — через расписание, как в бою: списки собирает apply_moves.
+    _d0 = staff.DISTRICT_STAFF[0]["district"]
+    staff._BASE_DRIVERS[_d0] = ["Работает", "Уехал"]
+    staff._BASE_DRIVER_AT.clear(); staff._BASE_DRIVER_AT.update({"Работает": _d0, "Уехал": _d0})
+    # С 30 сен 2026 уехавших нет в САМОМ ИСТОЧНИКЕ (владелец: «НИГДЕ, кроме
+    # того места, где я указываю, уехал он или приехал»): рабочие списки их не
+    # содержат, полный список отдаётся только по просьбе all=True.
+    staff.apply_moves(*staff._LAST_MOVES)
+    eq("в рабочем списке водителей его нет",
+       [d["name"] for d in staff.drivers() if d["name"] in ("Работает", "Уехал")], ["Работает"])
+    eq("и в составе района", staff.DISTRICT_DRIVERS[staff.DISTRICT_STAFF[0]["district"]], ["Работает"])
+    eq("и среди имён", "Уехал" in staff.driver_names(), False)
+    eq("а по просьбе (зарплаты, деньги прошлых дней, вход) — есть, с пометкой",
+       [(d["name"], d["away"], d["away_since"]) for d in staff.drivers(all=True) if d["name"] == "Уехал"],
        [("Уехал", True, "2026-09-24")])
+    eq("район за ним остаётся — для денег прошедших дней",
+       staff.district_map().get("Уехал"), staff.DISTRICT_STAFF[0]["district"])
+    eq("имя в полном списке", "Уехал" in staff.driver_names(all=True), True)
 
     # С 29 сен 2026 его нет и в самой «Команде», и у оператора (владелец:
     # «почему указаны даже те водители, которые сейчас не работают? это

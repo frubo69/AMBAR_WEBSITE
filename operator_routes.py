@@ -3246,7 +3246,9 @@ async def _crew_names(oid: str, day: str, keep: set = ()) -> list:
     """Водители района, которых сегодня можно отмечать: кто в Дубае, плюс те,
     кого уже отметили или кто уже открыл смену (их не прячем посреди дня)."""
     здесь = await _here_names(day)
-    names = list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
+    # Полный состав района: рабочий список уехавших уже не содержит, а здесь
+    # решает свой счёт по дню (_here_names) и правило «отмеченного не прячем».
+    names = _staff_mod.district_drivers_all(oid)
     return [n for n in names if здесь.get(n, True) or n in (keep or ())]
 
 

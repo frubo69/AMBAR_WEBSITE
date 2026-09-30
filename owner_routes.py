@@ -511,7 +511,7 @@ async def _drivers_spend(start, end) -> dict:
     by_driver: dict = {}
     # И по районам: карточке района нужна своя чистая цифра, а расход
     # водителя — это расход его района.
-    home = {n: oid for oid, names in _staff.DISTRICT_DRIVERS.items() for n in (names or [])}
+    home = _staff.district_map()          # с уехавшими: расход прошлого дня — расход его района
     by_district: dict = {}
     items = []
     for r in rows:
@@ -4187,7 +4187,7 @@ async def _cash_amounts(day: str, orders: list) -> dict:
                                          "amount": 0.0, "aed": 0.0})
                 x["amount"] = round(x["amount"] + amount, 2)
                 x["aed"] = round(x["aed"] + m_["aed"], 2)
-        team = [d for d in _staff.drivers() if d.get("district") == oid]
+        team = [d for d in _staff.all_drivers() if d.get("district") == oid]
         items, spend, pending, spend_card = [], 0, 0, 0
         for d in team:
             r = saved.get(d["name"]) or {}

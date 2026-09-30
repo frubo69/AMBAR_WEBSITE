@@ -197,7 +197,8 @@ def driver_by_tg(telegram_id) -> dict | None:
         # Тест-водитель, привязанный через базу, — та же персона, что и по
         # списку AMBAR_TEST_DRIVER_IDS.
         return test_driver(tid, force=True) if tid in _ROSTER["test"] else None
-    return next((d for d in drivers() if d["name"] == name), None)
+    # Уехавшего тоже узнаём: ему отвечают «вы не на работе», а не «вас нет».
+    return next((d for d in all_drivers() if d["name"] == name), None)
 
 
 # ── тест-водитель ────────────────────────────────────────────────────────────
@@ -307,6 +308,8 @@ def meal_of(day_doc: dict | None) -> int:
 # молчанию нельзя. Список живёт рядом с реестром и обновляется тем же sync(),
 # поэтому один и тот же ответ у всех служб — панели, ботов и сторожей.
 AWAY: dict = {}           # {имя: день отъезда}
+_ALL_DRIVERS: dict = {}   # {район: все водители, включая уехавших}
+_HIDDEN: dict = {}        # {район: кого из состава спрятали как уехавшего}
 # Имя → день начала текущего периода работы. Нужен приёму машины
 # (car_intake.py): новый период — новый приём.
 SINCE: dict = {}
@@ -351,10 +354,63 @@ async def sync_away(day: str = ""):
             out[имя] = str(w.get("left") or "")
         elif w.get("set") and w.get("since"):
             since[имя] = str(w.get("since"))
+    было = set(AWAY)
     AWAY.clear()
     AWAY.update(out)
     SINCE.clear()
     SINCE.update(since)
+    # Кто-то уехал или вернулся — рабочие списки районов собираем заново:
+    # уехавшего в них нет вовсе (см. apply_moves).
+    if set(AWAY) != было:
+        _refilter()
+
+
+def _refilter():
+    """Пересобрать рабочие списки районов после того, как кто-то уехал или
+    вернулся. Состав района берём тот, что есть сейчас, плюс спрятанные раньше
+    уехавшие — не из расписания заново: перестановки уже наложены."""
+    try:
+        текущие = DISTRICT_DRIVERS
+    except NameError:                        # модуль ещё грузится
+        return
+    for st in DISTRICT_STAFF:
+        d = st["district"]
+        порядок = _ALL_DRIVERS.get(d) or []
+        full = list(st["drivers"])
+        full += [n for n in (текущие.get(d) or []) if n not in full]
+        full += [n for n in порядок if n not in full and n in _HIDDEN.get(d, ())]
+        full.sort(key=lambda n: порядок.index(n) if n in порядок else len(порядок))
+        _ALL_DRIVERS[d] = full
+        _HIDDEN[d] = {n for n in full if n in AWAY}
+        st["drivers"] = [n for n in full if n not in AWAY]
+        текущие[d] = list(st["drivers"])
+
+
+def district_drivers_all(district: str) -> list:
+    """Весь состав района, включая уехавших, — там, где людей отмечают на
+    смену: уже отмеченного посреди дня не прячем, даже если он улетел."""
+    cur = list(DISTRICT_DRIVERS.get(district) or [])
+    порядок = _ALL_DRIVERS.get(district) or []
+    full = cur + [n for n in порядок if n not in cur and n in AWAY]
+    full.sort(key=lambda n: порядок.index(n) if n in порядок else len(порядок))
+    return full
+
+
+def all_drivers() -> list:
+    """Все водители, включая уехавших, — для «Зарплат», денег прошедших дней и
+    входа. Отдельным именем, чтобы место, где уехавшие нужны, было видно в
+    коде; рабочим спискам — drivers()."""
+    try:
+        return drivers(all=True)
+    except TypeError:                        # в тестах drivers подменяют простым списком
+        return drivers()
+
+
+def all_driver_names() -> list:
+    try:
+        return driver_names(all=True)
+    except TypeError:
+        return driver_names()
 
 
 def work_since(name: str) -> str:
@@ -363,12 +419,24 @@ def work_since(name: str) -> str:
     return SINCE.get(str(name or "").strip(), "")
 
 
-def drivers() -> list:
-    """Все водители с их районом и оператором, в порядке районов B1…B5."""
+def drivers(all: bool = False) -> list:
+    """Водители с их районом и оператором, в порядке районов B1…B5.
+
+    По умолчанию — только те, кто сейчас на работе. УЕХАВШИХ ЗДЕСЬ НЕТ
+    (владелец, 30 сен 2026: «НИГДЕ уехавшие водители, кроме того места, где я
+    указываю, уехал он или приехал, не указываются — это очень путает»). До
+    этого уехавших убирали по одному экрану — и каждый раз находился ещё один,
+    где они остались. Теперь наоборот: их нет в самом источнике, и попасть в
+    список они могут только там, где их спросили нарочно — all=True. Таких
+    мест три: «Зарплаты» (там отъезд и отмечают), деньги прошедших дней
+    (расходы и сбор выручки за смены, которые человек отработал) и вход в
+    приложение (чтобы ответить «вы не на работе», а не «вас нет»)."""
     from config_offices import OFFICE_CODES, OFFICE_NAMES
     out, seen = [], set()
     for st in DISTRICT_STAFF:
-        for name in st["drivers"]:
+        полный = list(st["drivers"]) + [n for n in (_ALL_DRIVERS.get(st["district"]) or [])
+                                        if n in AWAY and n not in st["drivers"]]
+        for name in полный if all else st["drivers"]:
             if name in seen:
                 continue
             seen.add(name)
@@ -514,7 +582,11 @@ def apply_moves(moves: dict, driver_moves: dict = None):
         # водителей читают глазами, и прыгающий порядок мешает.
         own = [n for n in _BASE_DRIVERS[s["district"]] if at.get(n) == s["district"]]
         came = [n for n in _BASE_DRIVER_AT if at.get(n) == s["district"] and n not in own]
-        s["drivers"] = own + came
+        # Полный состав — отдельно (для drivers(all=True)); в рабочем списке
+        # района уехавших нет.
+        _ALL_DRIVERS[s["district"]] = own + came
+        _HIDDEN[s["district"]] = {n for n in own + came if n in AWAY}
+        s["drivers"] = [n for n in own + came if n not in AWAY]
     DISTRICT_DRIVERS.clear()
     DISTRICT_DRIVERS.update({s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF})
 
@@ -529,9 +601,18 @@ def base_district(driver: str) -> str:
     return _BASE_DRIVER_AT.get(driver, "")
 
 
-def driver_names() -> list:
-    """Все водители в порядке районов расписания."""
-    return list(_BASE_DRIVER_AT)
+def district_map() -> dict:
+    """{водитель: район} по ВСЕМ, включая уехавших: деньги и бутылки прошедших
+    дней принадлежат району, где человек тогда работал."""
+    out = {n: d for d, names in DISTRICT_DRIVERS.items() for n in names}
+    out.update({n: d for d, names in _ALL_DRIVERS.items() for n in names if n in AWAY or n not in out})
+    return out
+
+
+def driver_names(all: bool = False) -> list:
+    """Водители в порядке районов расписания — без уехавших; all=True — все,
+    кто в реестре (см. drivers)."""
+    return [n for n in _BASE_DRIVER_AT if all or n not in AWAY]
 
 
 def operator_names() -> list:
@@ -546,6 +627,7 @@ def operator_names() -> list:
 # ── производное ──────────────────────────────────────────────────────────────
 DISTRICT_OPERATOR = {s["district"]: s["operator"] for s in DISTRICT_STAFF}
 DISTRICT_DRIVERS = {s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF}
+_ALL_DRIVERS.update({s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF})
 
 SENIOR_BY_TG = {s["telegram_id"]: s for s in SENIOR_OPERATORS}
 SENIOR_IDS = tuple(s["telegram_id"] for s in SENIOR_OPERATORS)

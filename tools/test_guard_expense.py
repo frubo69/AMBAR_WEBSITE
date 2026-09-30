@@ -41,7 +41,7 @@ dr._guard_bottle = _bottle
 dr._biz_day = lambda: "2026-09-14"; er._biz_day = lambda: "2026-09-14"
 async def _gone(item, day, driver, by): GONE.append(item["code"])
 er._guard_bottle_gone = _gone
-er.staff = types.SimpleNamespace(drivers=lambda: [{"name": "Худоба"}])
+er.staff = types.SimpleNamespace(drivers=lambda: [{"name": "Худоба"}], all_drivers=lambda: [{"name": "Худоба"}])
 er._day_row = lambda base, saved: {}
 er.backdate = types.SimpleNamespace(notify=(lambda *a, **k: asyncio.sleep(0)))
 import owner_routes

@@ -284,7 +284,7 @@ async def handle_day(request):
     # Улетевших в расходах смены нет вовсе (владелец, 24 сен 2026: «в расходы
     # смены его даже включать не надо»): питания за день у него нет, а строка
     # с нулями только путает — «кто на месте, кто нет».
-    rows = [_day_row(d, saved.get(d["name"])) for d in staff.drivers() if not d.get("away")]
+    rows = [_day_row(d, saved.get(d["name"])) for d in staff.drivers()]
     held = await _held(day, day)
     return web.json_response({
         "day": day,
@@ -307,7 +307,7 @@ async def handle_working(request):
     except Exception:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     driver = str(body.get("driver") or "").strip()
-    if driver not in {d["name"] for d in staff.drivers()}:
+    if driver not in {d["name"] for d in staff.all_drivers()}:
         return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
     day = str(body.get("day") or "").strip() or _biz_day()
     w = body.get("working")
@@ -323,7 +323,7 @@ async def handle_working(request):
                           f"{driver} — " + ("вышел" if working is True
                                             else "дома" if working is False else "отметка снята"))
     saved = await db.get_driver_day(day, driver)
-    base = next(d for d in staff.drivers() if d["name"] == driver)
+    base = next(d for d in staff.all_drivers() if d["name"] == driver)
     return web.json_response({"ok": True, "driver": _day_row(base, saved)},
                              headers=CORS_HEADERS)
 
@@ -337,7 +337,7 @@ async def handle_extra_add(request):
     except Exception:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     driver = str(body.get("driver") or "").strip()
-    if driver not in {d["name"] for d in staff.drivers()}:
+    if driver not in {d["name"] for d in staff.all_drivers()}:
         return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
     amount = _amount(body.get("amount"))
     comment = str(body.get("comment") or "").strip()[:200]
@@ -414,7 +414,7 @@ async def handle_extra_add(request):
     await backdate.notify(day, str(body.get("as") or ""), "доп. расход добавлен",
                           f"{driver} — {amount} AED, {вид['t']}: {comment}")
     saved = await db.get_driver_day(day, driver)
-    base = next(d for d in staff.drivers() if d["name"] == driver)
+    base = next(d for d in staff.all_drivers() if d["name"] == driver)
     return web.json_response({"ok": True, "item": item, "driver": _day_row(base, saved)},
                              headers=CORS_HEADERS)
 
@@ -479,7 +479,7 @@ async def handle_debts(request):
 
     seniors = {x["name"] for x in (staff.SENIOR_OPERATORS or [])}
     operators = {(d.get("operator") or "").strip() for d in staff.DISTRICT_STAFF} - seniors
-    drivers = set(staff.driver_names())
+    drivers = set(staff.all_driver_names())
     def role(n: str) -> str:
         if n in seniors: return "senior"
         if n in operators: return "operator"
@@ -535,7 +535,7 @@ async def handle_extra_del(request):
     await backdate.notify(day, (request.query.get("as") or ""),
                           "доп. расход убран", driver)
     saved = await db.get_driver_day(day, driver)
-    base = next((d for d in staff.drivers() if d["name"] == driver), None)
+    base = next((d for d in staff.all_drivers() if d["name"] == driver), None)
     return web.json_response(
         {"ok": True, "driver": _day_row(base, saved) if base else None},
         headers=CORS_HEADERS)
@@ -587,7 +587,7 @@ async def handle_extra_decide(request):
     else:
         await advance_drop(day, driver, item or {})
 
-    base = next((d for d in staff.drivers() if d["name"] == driver), None)
+    base = next((d for d in staff.all_drivers() if d["name"] == driver), None)
     item = next((e for e in (saved or {}).get("extras", []) if e.get("id") == item_id), None)
     await _tell_driver(driver, item, action == "approve", note)
 
@@ -709,7 +709,7 @@ async def handle_extra_photo_verdict(request):
         причины = " · ".join(x for x in (item.get("car_note"), item.get("photo_note")) if x)
         await _tell_driver(driver, item, status == "approved", причины)
     saved = await db.get_driver_day(day, driver)
-    base = next((d for d in staff.drivers() if d["name"] == driver), None)
+    base = next((d for d in staff.all_drivers() if d["name"] == driver), None)
     return web.json_response(
         {"ok": True, "status": status, "driver": _day_row(base, saved) if base else None},
         headers=CORS_HEADERS)

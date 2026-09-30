@@ -112,9 +112,10 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 #hdrMore{display:flex;margin-left:auto;flex-shrink:0}
 /* Что ушло из шапки в меню справа. Кнопки остаются в разметке: меню нажимает
    их же (moreGo), и состояние строки берёт с них. */
-#moveBtn,#stockBtn,#xtraBtn,#shortBtn,#ordBtn,#callBtn,#themeBtn{display:none}
-/* Звонок идёт или пропущен — кнопка «Связь» теперь в меню, и сигнал с неё
-   переезжает на само меню: иначе его никто не увидит. */
+#moveBtn,#stockBtn,#xtraBtn,#shortBtn,#ordBtn,#themeBtn{display:none}
+/* «Связь» стоит в шапке (владелец, 30 сен 2026: «связь оставь кнопку — и на
+   компе, и на телефоне»). Если её когда-нибудь снова спрячут в меню, сигнал
+   звонка переедет на кнопку меню сам — см. ниже. */
 #hdrMore.ringing{border-color:rgba(224,85,85,.55);color:#E05555;animation:callBlink 1s steps(2) infinite}
 #hdrMore.has-missed{border-color:rgba(224,85,85,.35);color:#E05555}
 #dispatchBtn{color:var(--gold2);border-color:rgba(201,169,110,.4)}
@@ -6301,8 +6302,9 @@ function moreOpen(){
 // Сигнал «Связи» — на кнопке меню: сама «Связь» теперь внутри него.
 (function(){
   const sync = () => { const c = $('callBtn'), m = $('hdrMore'); if(!c || !m) return;
-    m.classList.toggle('ringing', c.classList.contains('ringing'));
-    m.classList.toggle('has-missed', c.classList.contains('has-missed') && !c.classList.contains('ringing')); };
+    const в_меню = !c.getClientRects().length;      // видна в шапке — сигналит сама
+    m.classList.toggle('ringing', в_меню && c.classList.contains('ringing'));
+    m.classList.toggle('has-missed', в_меню && c.classList.contains('has-missed') && !c.classList.contains('ringing')); };
   const start = () => { const c = $('callBtn'); if(!c) return;
     new MutationObserver(sync).observe(c, {attributes: true, attributeFilter: ['class']}); sync(); };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

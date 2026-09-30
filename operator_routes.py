@@ -2172,6 +2172,39 @@ async def handle_op_supply_short(request):
                              dumps=lambda o: json.dumps(o, default=str))
 
 
+# ── остатки по районам: только смотреть ─────────────────────────────────────
+# Владелец, 30 сен 2026: «чтобы операторы смогли смотреть остатки склада в
+# конкретный текущий момент, не редактировать, а просто видеть склад каждого
+# района по категориям, количеству… так же, как у нас в AMBAR STAR остатки по
+# районам». Тот же расчёт, что у карточки «Склад» (stock_value.build), но без
+# денег: закупка и стоимость полки — не операторские числа. Районы видны все:
+# оператор отвечает на «есть ли это в соседнем районе» чаще, чем на «сколько у
+# меня».
+@require_operator
+async def handle_stock_board(request):
+    """GET ?as= — остаток каждой позиции по районам, в учётных единицах."""
+    import stock_value
+    who = (request.query.get("as") or "").strip()
+    try:
+        _, mine = await _op_scope(request, who)
+    except Exception:                                    # noqa: BLE001
+        mine = []
+    v = await stock_value.build("")
+    return _mv_json({
+        "day": v.get("day"), "at": datetime.now(timezone.utc).isoformat(),
+        "districts": v.get("districts") or [],
+        "mine": mine,
+        "by_district": {o: {"bottles": (c or {}).get("bottles", 0)}
+                        for o, c in (v.get("by_district") or {}).items()},
+        "total": (v.get("totals") or {}).get("bottles", 0),
+        "items_with_stock": v.get("items_with_stock", 0),
+        "items": [{"id": r["id"], "no": r["no"], "name": r["name"], "cat": r["cat"],
+                   "unit": r["unit"], "have": r["have"], "bottles": r["bottles"],
+                   "known": r["known"]}
+                  for r in v.get("items") or []],
+    })
+
+
 @require_operator
 async def handle_move_board(request):
     """GET ?as= — что где лежит: остатки и коды по районам."""
@@ -3832,6 +3865,8 @@ def setup(app):
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)
+    r.add_route("OPTIONS", "/api/operator/stock/board", _opt)
+    r.add_get("/api/operator/stock/board", handle_stock_board)
     r.add_get("/api/operator/move/board", handle_move_board)
     r.add_get("/api/operator/move/live", handle_move_live)
     r.add_post("/api/operator/move/create", handle_move_create)

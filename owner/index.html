@@ -20805,6 +20805,9 @@ async function fbEntryAdd(book, day){
     _toast('Откуда и куда летит'); document.getElementById(route_from ? 'fbTo-rp' : 'fbFrom-rp').focus(); return; }
   if(book === 'np' && !who && !comment){ _toast('Кому или за что'); return; }
   if(book === 'rp' && !FB.lineSet){ _toast('Выберите статью'); return; }
+  // «Что-то ещё» без слов — сумма в никуда: сначала за что.
+  if(book === 'rp' && !comment && fbIsOther((((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || []).find(l => l.id === FB.line))){
+    _toast('Впишите, за что'); const c = document.getElementById('fbCmt-rp'); if(c) c.focus(); return; }
   if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
@@ -20821,7 +20824,8 @@ async function fbEntryAdd(book, day){
     if(res.book){ fbApply(res.book); fbPaint(); }
     if(FB.lpage){ FB.line = FB.lpage; FB.lineSet = true; }      // статья страницы не теряется
     fbPagePaint();
-  }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек' : 'Не удалось записать'); }
+  }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек'
+    : (e && (e.payload || {}).error) === 'no_comment' ? 'Впишите, за что' : 'Не удалось записать'); }
 }
 async function fbEntryDel(id){
   if(!await askDialog('Убрать запись?', 'Сумма уйдёт из книги. Вернуть можно будет только новой записью.',
@@ -21247,7 +21251,8 @@ function fbHistRows(b){
 const FB_HIST_G = [['rent', 'Аренда офисов', 'building'], ['auto', 'Расходы на автомобили', 'car'],
                    ['home', 'Бытовые расходы', 'home'], ['sim', 'Sim', 'simcard'], ['ads', 'Реклама', 'megaphone']];
 // Значок статьи без группы — по названию: билет, паспорт, заправочный пистолет
-const FB_HIST_I = {'билеты': 'ticket', 'визы': 'passport', 'бензин': 'fuel', 'зарплаты': 'money'};
+const FB_HIST_I = {'билеты': 'ticket', 'визы': 'passport', 'бензин': 'fuel', 'зарплаты': 'money', 'что-то ещё': 'plus'};
+const fbIsOther = l => String((l || {}).name || '').toLowerCase() === 'что-то ещё';
 function fbHistIco(name){ return FB_HIST_I[String(name || '').toLowerCase()] || 'dot'; }
 function fbHistOpts(b){
   const lines = ((b.budget || {}).lines || []);
@@ -22582,7 +22587,7 @@ function fbLinePayHtml(b, l){
         </div>` : ''}
         <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-rp"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
-        <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-rp"
+        <input class="fb-txt" placeholder="${fbIsOther(l) ? 'За что' : 'Комментарий'}" autocomplete="off" maxlength="120" id="fbCmt-rp"
           onkeydown="if(event.key==='Enter'){this.blur()}">
         <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>

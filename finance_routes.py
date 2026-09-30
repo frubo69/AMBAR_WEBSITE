@@ -294,9 +294,15 @@ def template_lines() -> list[dict]:
     rows += [dict(name=n, group="sim", kind="pool") for n in SIM_NAMES]
     rows += [dict(name="Бензин", kind="pool")]
     rows += [dict(name=n, group="ads") for n in ADS_NAMES]
+    rows += [dict(name=OTHER_NAME, kind="pool")]
     return rows
 
 
+# «Что-то ещё» — расход, которому не нашлось своей статьи (владелец, 30 сен
+# 2026: «где все расходы в РП — зарплаты, сим-карты и т. д. — добавь расход
+# „что-то ещё“»). Статья без даты; что это было — говорит комментарий, и без
+# него запись не принимается. Есть в каждом заполненном бюджете: см. _budget.
+OTHER_NAME = "Что-то ещё"
 GROUPS = ("", "rent", "auto", "home", "car", "ads", "sim")
 AUTO_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг")
 AUTO_LEGACY = ("Авто", "Аренда")  # так статьи назывались до 11 сен 2026
@@ -310,7 +316,8 @@ ADS_NAMES = ("Посты", "Интеграция бота")
 SIM_NAMES = ("Покупка", "Пополнение")
 # Статья без даты платежа (kind="pool"): просто бюджет на месяц, без периода
 # и календаря, правится прямо в списке; старые строки — по названию.
-POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг", "Билеты", "Визы", "Sim", "Бензин") + HOME_NAMES
+POOL_NAMES = ("Гараж и ТО", "Парковка", "Страховка/Пассинг", "Билеты", "Визы", "Sim", "Бензин",
+              OTHER_NAME) + HOME_NAMES
 MAX_PERIOD = 24
 
 
@@ -394,6 +401,18 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         log.warning(f"[fin] бюджет не прочитан: {e}")
         lines = []
     lines = [ln for ln in lines if (ln.get("kind") or "") != "salary"]   # старые строки «Зарплаты»
+    # «Что-то ещё» есть в каждом заполненном бюджете: месяц, заполненный до
+    # 30 сен 2026 (или из прошлого месяца), статьи не имел — дописываем.
+    if lines and not any((ln.get("name") or "") == OTHER_NAME for ln in lines):
+        try:
+            doc = {"_id": secrets.token_hex(4), "month": month, "name": OTHER_NAME, "plan": 0, "due": 0,
+                   "note": "", "kind": "pool", "group": "", "cur": "AED", "period": 1, "next": "",
+                   "span": 0, "ord": max([int(ln.get("ord") or 0) for ln in lines] + [len(lines)]) + 1,
+                   "by": ""}
+            await db.fin_budget_set(doc)
+            lines.append(doc)
+        except Exception as e:                    # noqa: BLE001
+            log.warning(f"[fin] статья «{OTHER_NAME}» не добавлена: {e}")
     fact: dict = {}
     off_plan = 0.0
     sal_fact = 0.0
@@ -1205,6 +1224,9 @@ async def handle_entry_add(request):
     rent = bool(ln) and _line_group(ln) in ("rent", "ads")
     if book == "rp" and not kind and not photo and not rent:
         return _json({"error": "no_photo"}, 400)
+    # «Что-то ещё» без слов — просто сумма в никуда: за что, обязательно.
+    if ln and (ln.get("name") or "") == OTHER_NAME and not str(body.get("comment") or "").strip():
+        return _json({"error": "no_comment"}, 400)
     by = _who(body)
     doc = {"_id": secrets.token_hex(6), "day": day, "book": book, "amount": amount,
            "comment": str(body.get("comment") or "").strip()[:120],

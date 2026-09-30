@@ -6689,10 +6689,14 @@ function shiftPaint(){
     // Раньше тут была одна сводная фраза: «на смене 3 водителя» не говорила,
     // кто когда вышел, а «не открыли: …» прятала тех, кто открыл.
     const drvLine = n => { const v = cs[n] || {};
-      return v.closed ? ['off', `закрыл смену в ${_hhmm(v.closed_at) || '—'}${_hhmm(v.opened_at) ? ' · открывал в ' + _hhmm(v.opened_at) : ''}`]
-           : v.open ? ['ok', `открыл смену в ${_hhmm(v.opened_at) || '—'}`]
+      return v.closed ? ['off', `${_hhmm(v.opened_at) ? 'открыл в ' + _hhmm(v.opened_at) + ' · ' : ''}закрыл в ${_hhmm(v.closed_at) || '—'}`]
+           // Район закрыт, а водитель свою смену так и не закрыл — это видно.
+           : v.open ? (x.closed ? ['warn', `открыл в ${_hhmm(v.opened_at) || '—'} · смену не закрыл`]
+                                : ['ok', `открыл смену в ${_hhmm(v.opened_at) || '—'}`])
            : ['warn', 'смену не открывал']; };
-    const crewLine = x.closed || !on.length ? ''
+    // У закрытого района строки остаются: когда кто открывал и закрывал —
+    // вопрос как раз после смены (владелец, 30 сен 2026).
+    const crewLine = !on.length ? ''
       : `<span class="sh-dl">${on.map(n => { const [k, t] = drvLine(n);
           return `<span class="sh-dv ${k}"><b>${_esc(n)}</b>${t}</span>`; }).join('')}</span>`;
     // Бригаду правят в открытой смене сколько угодно раз (владелец, 24 сен

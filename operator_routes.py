@@ -2172,6 +2172,70 @@ async def handle_op_supply_short(request):
                              dumps=lambda o: json.dumps(o, default=str))
 
 
+# ── доп. заявки: полный доступ ───────────────────────────────────────────────
+# Владелец, 30 сен 2026: операторам «и править, и в целом иметь доступ ко всем
+# доп. заявкам в полном объёме». Собрать новую, поправить состав, вписать цены,
+# отправить черновик водителям, отменить — всё то же, что старший делает в
+# STAR, и теми же обработчиками: правило одно на оба приложения.
+#
+# Основной заявки это не касается: каждая ручка сперва проверяет, что поставка
+# — именно на другую базу, и с основной отвечает отказом.
+async def _extra_only(request):
+    """Поставка из адреса — доп. заявка? (поставка | None, ответ-отказ | None)."""
+    import supply_routes
+    sup = await db.supply_get(request.match_info.get("sid") or "")
+    if not sup:
+        return None, web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if (sup.get("kind") or "main") != "extra":
+        return None, web.json_response({"error": "not_extra"}, status=403, headers=CORS_HEADERS)
+    return sup, None
+
+
+@require_operator
+async def handle_extra_list(request):
+    """GET — доп. заявки: черновики, открытые и недавние закрытые."""
+    import supply_routes
+    rows = [r for r in await db.supply_list(limit=80) if (r.get("kind") or "main") == "extra"]
+    return _mv_json({"supplies": [supply_routes._sup_brief(r) for r in rows[:40]],
+                     "districts": [{"id": d["id"], "code": d.get("code", ""), "name": d.get("name", "")}
+                                   for d in await _fresh_districts()]})
+
+
+@require_operator
+async def handle_extra_one(request):
+    import supply_routes
+    sup, no = await _extra_only(request)
+    if no:
+        return no
+    return _mv_json(await supply_routes._supply_view(sup))
+
+
+@require_operator
+async def handle_extra_new(request):
+    """POST {base, items:[{id, by_district}], as} — собрать доп. заявку."""
+    import supply_routes
+    return await _без_охраны(supply_routes.handle_extra_create)(request)
+
+
+def _extra_do(name: str):
+    """Ручка оператора поверх обработчика старшего — только для доп. заявок."""
+    @require_operator
+    async def h(request):
+        import supply_routes
+        _, no = await _extra_only(request)
+        if no:
+            return no
+        return await _без_охраны(getattr(supply_routes, name))(request)
+    h.__name__ = "handle_extra_" + name
+    return h
+
+
+handle_extra_lines = _extra_do("handle_own_lines")        # состав района
+handle_extra_confirm = _extra_do("handle_draft_confirm")  # черновик → водителям
+handle_extra_cancel = _extra_do("handle_cancel")          # отменить
+handle_extra_buy = _extra_do("handle_buy")                # цена позиции
+
+
 # ── день по районам и водителям: только смотреть ────────────────────────────
 # Владелец, 30 сен 2026: «операторы заполняют заказы, но не видят, сколько
 # сегодня на районах было заказов и сколько это в деньгах… и сколько какой
@@ -3944,6 +4008,21 @@ def setup(app):
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)
+    for _p, _h, _m in (("/api/operator/extra", handle_extra_list, "GET"),
+                       ("/api/operator/extra", handle_extra_new, "POST"),
+                       ("/api/operator/extra/{sid}", handle_extra_one, "GET"),
+                       ("/api/operator/extra/{sid}/lines", handle_extra_lines, "POST"),
+                       ("/api/operator/extra/{sid}/confirm", handle_extra_confirm, "POST"),
+                       ("/api/operator/extra/{sid}/cancel", handle_extra_cancel, "POST"),
+                       ("/api/operator/extra/{sid}/buy", handle_extra_buy, "POST")):
+        if _m == "GET" or _p == "/api/operator/extra":
+            try:
+                r.add_route("OPTIONS", _p, _opt)
+            except Exception:                        # noqa: BLE001 — путь уже с OPTIONS
+                pass
+        else:
+            r.add_route("OPTIONS", _p, _opt)
+        r.add_route(_m, _p, _h)
     r.add_route("OPTIONS", "/api/operator/day/board", _opt)
     r.add_get("/api/operator/day/board", handle_day_board)
     r.add_route("OPTIONS", "/api/operator/stock/board", _opt)

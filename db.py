@@ -2976,7 +2976,9 @@ async def supply_line_set(sid: str, district: str, product_id: str, qty: int,
     задача изменилась. None — замок или поставки нет."""
     db = _db_or_none()
     if db is None: return None
-    guard = {"_id": sid, "status": "open",
+    # Черновик тоже правится: это заявка, которую ещё не отправили водителям,
+    # и поправить её до отправки — самое время.
+    guard = {"_id": sid, "status": {"$in": ["open", "draft"]},
              f"tasks.{district}.started_at": None,
              f"tasks.{district}.noscan_at": None,
              f"tasks.{district}.done_at": None}

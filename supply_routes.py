@@ -2591,6 +2591,7 @@ async def _supply_view(sup: dict) -> dict:
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
         "by_name": sup.get("by_name") or "",
         "source": sup.get("source") or "", "from_supply": sup.get("from_supply") or "",
+        "tried_bases": list(sup.get("tried_bases") or []),
         "closed_at": str(sup.get("closed_at") or ""),
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "cancelled_by": sup.get("cancelled_by") or "",

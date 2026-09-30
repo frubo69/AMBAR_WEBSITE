@@ -6788,7 +6788,7 @@ function shCrewPaint(){
       // Со временем: «открыта» без часа не отвечала на вопрос, когда он вышел;
       // у отмеченного «На смене», но не открывшего — так и пишем.
       const под = своя ? `открыл смену в ${_hhmm(v.opened_at) || '—'}`
-        : ушёл ? `закрыл в ${_hhmm(v.closed_at) || '—'}${_hhmm(v.opened_at) ? ' · открывал в ' + _hhmm(v.opened_at) : ''}`
+        : ушёл ? `${_hhmm(v.opened_at) ? 'открыл в ' + _hhmm(v.opened_at) + ' · ' : ''}закрыл в ${_hhmm(v.closed_at) || '—'}`
         : crew[n] === true ? 'смену не открывал' : '';
       return `<div class="sh-drv">
         <span class="sh-drv-n">${_esc(n)}${под ? `<i class="sh-drv-s${!своя && !ушёл ? ' warn' : ''}">${под}</i>` : ''}</span>

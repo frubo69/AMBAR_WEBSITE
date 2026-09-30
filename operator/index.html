@@ -7842,6 +7842,13 @@ let CALL_VIDEO = false, CALL_CAM = false, CALL_RCAM = false;
 let _callTick = null, _callMuted = false, _callAs = '';
 const CALL_SAYS = ['Перезвоню', 'Занят', 'Пишите в заказ'];
 
+// Звонок из бота: ссылка «Взять звонок» несёт ?call=… — как у водителя.
+let _callWanted = false;
+try{
+  const _p = new URLSearchParams(location.search).get('call')
+          || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
+  if(_p) _callWanted = true;
+}catch(e){}
 function callInit(){
   if(!window.AmbarCall || !curOp) return;
   if(CALL && _callAs === curOp) return;
@@ -7859,6 +7866,8 @@ function callInit(){
 function callEvent(t, d){
   switch(t){
     case 'ready':
+      // Открыли панель кнопкой «Взять звонок» из бота — экран связи сразу.
+      if(_callWanted){ _callWanted = false; callOpen(); }
     case 'roster':
     case 'recent':
     case 'mic':
@@ -9168,8 +9177,7 @@ function caPerson(r){
     <div class="ca-rb" onclick="callDial('${r.key}')">
       <div class="ca-rn">${r.name}</div>
       <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>
-        ${r.online ? 'в приложении'
-          : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
+        ${r.online ? 'в приложении' : r.ring ? 'позвоним в телеграм' : 'не в сети'}</div>
     </div>
     <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
   </div>`;
@@ -9198,7 +9206,7 @@ function caCalls(){
         <div class="ca-rs">${_dirIco(r)}<span>${_cWhen(r.at)}</span>${
           r.talk ? '<span>· ' + _cMm(r.talk) + '</span>' : ''}</div>
       </div>
-      <div class="ca-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
+      ${/^drv:/.test(r.key) ? `<div class="ca-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>` : ''}
       <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
     </div>`).join('');
   return h;
@@ -9217,8 +9225,8 @@ function caContacts(){
   let last = '';
   rows.forEach(r => {
     if(r.role !== last){ last = r.role;
-      h += `<div class="ca-sec">${r.role === 'водитель' ? 'Водители'
-        : r.role === 'оператор' ? 'Операторы' : r.role}</div>`; }
+      h += `<div class="ca-sec">${r.role === 'водитель' ? 'Водители' : r.role === 'свой водитель' ? 'Ваши водители'
+        : r.role === 'оператор' ? 'Операторы' : r.role === 'старший' ? 'Старшие' : r.role}</div>`; }
     h += caPerson(r);
   });
   return h;

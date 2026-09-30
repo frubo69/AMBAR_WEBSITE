@@ -415,14 +415,24 @@ def _drv_app_url() -> str:
     return os.getenv("DRIVER_WEBAPP_URL", "https://ambar-delivery.com/driver/").rstrip("/")
 
 
+def _ringable(key: str) -> bool:
+    """Есть ли куда позвонить телеграмом, когда приложение закрыто."""
+    kind, _, name = key.partition(":")
+    token, chat, url = _ring_to(kind, name)
+    return bool(token and chat and url)
+
+
 def _ring_to(kind: str, name: str):
     """Кому и чем звонить в телеграм, когда приложение закрыто.
 
-    Водителю — его ботом, старшему — своим. Оператору звонить некуда и не
-    надо: районный оператор не аккаунт, а имя за общей панелью, личного чата
-    у него нет вовсе."""
+    Водителю — его ботом, старшему — своим, оператору — ботом оператора (с
+    30 сен 2026: владелец — «убедись, что всем приходят сообщения»; у
+    операторов свои аккаунты в AMBAR_OPERATOR_IDS, звонить есть куда)."""
     if kind == "drv":
         return (_drv_token(), staff.DRIVER_IDS.get(name) or 0, _drv_app_url())
+    if kind == "op":
+        return (os.getenv("OPERATOR_BOT_TOKEN", "").strip(), staff.operator_tg(name) or 0,
+                os.getenv("OPERATOR_WEBAPP_URL", "").strip().rstrip("/"))
     if kind == "star":
         uid = int(name) if str(name).isdigit() else 0
         url = os.getenv("OWNER_WEBAPP_URL", "").strip().rstrip("/")
@@ -473,6 +483,8 @@ async def _ring_driver(call: Call, name: str):
         log.warning(f"[call] некому звонить: {call.callee_key} — нет id, токена или адреса")
         return
     from api_server import tg_send
+    log.info(f"[call] {call.caller.label} → {call.callee_key}: приложение закрыто, звоним в телеграм")
+    первый = True
 
     kb = {"inline_keyboard": [[
         {"text": "Взять звонок",
@@ -488,6 +500,10 @@ async def _ring_driver(call: Call, name: str):
             r = await _tg_ring(token, tg_id,
                                f"Входящий звонок · {call.caller.label}\n"
                                f"Осталось {left} сек", kb)
+            if первый:
+                # Первый тик — в журнал: по нему видно, дошёл ли рингтон вообще.
+                log.info(f"[call] рингтон {call.callee_key}: {'ушёл' if (r or {}).get('ok') else 'НЕ ушёл: ' + str(r)[:200]}")
+                первый = False
             if (r or {}).get("ok"):
                 mid = ((r.get("result") or {}).get("message_id")) or 0
                 if mid:
@@ -513,14 +529,20 @@ async def _ring_driver(call: Call, name: str):
         # остаётся след, иначе пропущенный звонок исчезает бесследно.
         for mid in посланные:
             await _tg_delete(token, tg_id, mid)
-        if _CALLS.get(call.cid) is not call or call.answered:
+        # Не взял — след остаётся ВСЕГДА, и когда звонящий сам положил трубку
+        # раньше срока. До 30 сен 2026 след писался только по истечении
+        # времени: старший набирал водителя, ждал секунд десять, отбивался —
+        # тики стирались, и в чате не оставалось ничего («им никаких
+        # сообщений не приходило»).
+        if call.answered:
             return
         try:
             await tg_send(token, tg_id,
                           f"Пропущенный звонок · {call.caller.label}",
                           parse_mode=None)
-        except Exception:
-            pass
+            log.info(f"[call] {call.callee_key}: оставлен след пропущенного от {call.caller.label}")
+        except Exception as e:
+            log.warning(f"[call] след пропущенного не ушёл {call.callee_key}: {e}")
 
 
 # ── сам звонок ──────────────────────────────────────────────────────────────
@@ -568,6 +590,7 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
         # держим звонок и звоним; если нет — говорим правду сразу.
         token, chat, url = _ring_to(kind, name)
         if token and chat and url:
+            log.info(f"[call] {caller.label} → {to_key}: не в приложении, звоним в телеграм")
             _PENDING[to_key] = (cid, time.time() + RING_TTL)
             call.ring_task = asyncio.create_task(_ring_both(call, name))
             await caller.send(t="calling", call=cid, to=_имя_ключа(to_key),
@@ -576,6 +599,7 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
 
         caller.call = None
         _CALLS.pop(cid, None)
+        log.warning(f"[call] {caller.label} → {to_key}: не в приложении и звонить в телеграм некуда")
         await caller.send(t="failed", why="offline")
         return
 
@@ -925,21 +949,30 @@ def _roster(peer: Peer) -> list:
                     r.setdefault(k, v)
                 return r
         row = {"key": key, "name": name, "role": role,
-               "online": bool(_sessions(key)), **extra}
+               "online": bool(_sessions(key)), "ring": _ringable(key), **extra}
         if not row["online"] and _LAST_SEEN.get(key):
             row["seen"] = int(_LAST_SEEN[key])
         rows.append(row)
         return row
 
+    # Старшие (AMBAR STAR) — у всех (владелец, 30 сен 2026: «чтобы и водители
+    # и операторы могли звонить старшему обратно, чтобы все у всех были в
+    # контактах; НО водители и операторы смогут позвонить только по аудио»).
+    # Голос — не просьба к клиенту, а запрет в _start_call: водитель видео не
+    # набирает никому, пара с оператором всегда голосовая.
+    def add_stars():
+        for uid in sorted(_star_ids()):
+            add(f"star:{uid}", _star_name(uid), "старший")
+
     if peer.kind == "drv":
-        # Водителю видны все операторы районов и все водители, кроме него
-        # самого. Старшего оператора и владельца в списке нет намеренно: звонок
-        # снизу вверх через голову своего оператора не ходит. Своему оператору
-        # — первая строка, дальше остальные операторы, потом водители по
-        # районам; где кто, подписано кодом района.
+        # Водителю видны старшие, все операторы районов и все водители, кроме
+        # него самого. Своему оператору — первая строка, дальше старшие,
+        # остальные операторы, потом водители по районам; где кто, подписано
+        # кодом района.
         from config_offices import OFFICE_CODES, OFFICE_NAMES
         if peer.own_op:
             add(f"op:{peer.own_op}", peer.own_op, "свой оператор")
+        add_stars()
         senior = _senior_name()
         ops: dict = {}
         for d in staff.DISTRICT_STAFF:
@@ -969,8 +1002,23 @@ def _roster(peer: Peer) -> list:
             add(f"drv:{n}", n, "водитель")
         return rows
 
+    # Оператор: свои водители первыми, потом старшие, остальные операторы и
+    # все водители по районам — «все у всех в контактах».
+    from config_offices import OFFICE_CODES
     for n in _drivers_of_operator(peer.label):
-        add(f"drv:{n}", n, "водитель")
+        add(f"drv:{n}", n, "свой водитель")
+    add_stars()
+    ops: dict = {}
+    for d in staff.DISTRICT_STAFF:
+        n = (d.get("operator") or "").strip()
+        if n and n != peer.label:
+            ops.setdefault(n, []).append(OFFICE_CODES.get(d["district"], ""))
+    for n in sorted(ops):
+        add(f"op:{n}", n, "оператор", where=" · ".join(c for c in ops[n] if c))
+    for d in staff.drivers():
+        if d["name"] not in _drivers_of_operator(peer.label):
+            add(f"drv:{d['name']}", d["name"], "водитель",
+                where=d.get("district_code") or "", dname=d.get("district_name") or "")
     return rows
 
 

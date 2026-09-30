@@ -15091,16 +15091,17 @@ function _callRender(){
             <div class="call-item-n">${r.name}${r.where
               ? ` <span class="call-where">${esc(r.where)}</span>` : ''}</div>
             <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
-              ${r.online ? 'в приложении'
-                : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
+              ${r.online ? 'в приложении' : r.ring ? 'позвоним в телеграм' : 'не в сети'}</div>
           </div>
           <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>
         </div>`;
     if(CALL_TAB === 'all' && rows.length){
       const own = rows.filter(r => r.role === 'свой оператор');
+      const stars = rows.filter(r => /^star:/.test(r.key));
       const ops = rows.filter(r => r.role === 'оператор' && !own.includes(r));
       const drv = rows.filter(r => /^drv:/.test(r.key));
       if(own.length) html += `<div class="call-cap">Ваш оператор</div>` + own.map(item).join('');
+      if(stars.length) html += `<div class="call-cap">Старшие</div>` + stars.map(item).join('');
       if(ops.length) html += `<div class="call-cap">Операторы</div>` + ops.map(item).join('');
       if(drv.length) html += `<div class="call-cap">Водители</div>` + drv.map(item).join('');
     }

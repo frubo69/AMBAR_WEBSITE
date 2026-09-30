@@ -1717,7 +1717,9 @@ def _car_view(c: dict, names: set) -> dict:
 async def _fleet_view() -> tuple:
     """(все машины, машина по водителю). У водителя машина одна; оказалось две
     (перезакрепление оборвалось посередине) — видна последняя закреплённая."""
-    names = {str(r.get("name") or "") for r in staff.roster_rows()}
+    # Уехавший — как и тот, кого нет в реестре: машина на экране свободна. В
+    # базе она остаётся за ним и вернётся сама, когда он выйдет на работу.
+    names = {str(r.get("name") or "") for r in staff.roster_rows()} - set(staff.AWAY)
     raw = sorted(await _fleet(), key=lambda c: str(c.get("at") or ""))
     cars = [_car_view(c, names) for c in raw]
     by = {c["driver"]: c for c in cars if c["driver"]}
@@ -2082,6 +2084,8 @@ async def _trackers_view() -> dict:
     try:
         for key, t in (await db.trackers_all()).items():
             name = key[len(geo_watch.SENIOR_PREFIX):] if key.startswith(geo_watch.SENIOR_PREFIX) else key
+            if staff.is_away(name):
+                continue                     # уехавшего в команде нет — и его трекера тоже
             out[name] = {"issued": True, "last_at": _iso_dt(t.get("last_at")) if t.get("last_at") else "",
                          "batt": t.get("batt")}
     except Exception as e:                           # noqa: BLE001

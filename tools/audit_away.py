@@ -42,7 +42,10 @@ async def main():
     import qr_routes as q, stock_value, finance_routes as f, supply_routes as sup
     op = next(iter(staff.DISTRICT_OPERATOR.values()), "")
     day = o._biz_day_start(o.datetime.now(o.DUBAI_TZ)).date().isoformat() if hasattr(o, "_biz_day_start") else ""
-    МОЖНО = {"финансы: книга месяца (там отмечают отъезд)"}
+    МОЖНО = {"финансы: книга месяца (там отмечают отъезд)",
+             # Штраф, который ждёт решения старшего, — это запись о человеке, а
+             # не список работающих: убрать её может только само решение.
+             "STAR: чек-лист"}
     ЧТО = [
         ("STAR: локатор", o.handle_where, {}),
         ("STAR: команда", o.handle_staff, {}),
@@ -52,7 +55,7 @@ async def main():
         ("STAR: расходы смены", e.handle_day, {"day": day}),
         ("STAR: сбор выручки", getattr(o, "handle_cash_round", None), {"day": day}),
         ("STAR: проверка бутылок — кого проверяем", getattr(q, "handle_checks", None), {}),
-        ("STAR: список поставок", sup.handle_list, {}),
+        ("STAR: открытые приёмки — кто держит район", sup.handle_list, {}),
         ("оператор: очередь и районы", getattr(p, "handle_queue", None), {"as": op}),
         ("оператор: смена", p.handle_shift, {"as": op}),
         ("оператор: водители на карте", getattr(p, "handle_where", None), {"as": op}),
@@ -69,6 +72,13 @@ async def main():
             text = json.dumps(json.loads(body), ensure_ascii=False) if body else ""
         except Exception as ex:                          # noqa: BLE001
             print(f"  ?    {имя}: не вызвалась ({type(ex).__name__}: {str(ex)[:70]})"); continue
+        if h is sup.handle_list:
+            # История закрытых приёмок — кто принимал тогда; ищем только в
+            # НЕзакрытых задачах: вот там уехавший держал бы район.
+            d = json.loads(body)
+            text = json.dumps([t.get("driver") for x in d.get("supplies") or []
+                               if x.get("status") in ("open", "draft")
+                               for t in (x.get("tasks") or {}).values()], ensure_ascii=False)
         есть = [n for n in away if f'"{n}"' in text or f"{n}," in text or f" {n}" in text]
         if есть and имя not in МОЖНО:
             плохо += 1

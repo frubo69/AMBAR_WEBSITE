@@ -3417,25 +3417,39 @@ button.path:active{transform:scale(.995)}
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
 .fb-none{padding:13px 16px;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,.05)}
-/* Отчёт ДДС одной таблицей (dds-): в начале → поступления → выплаты → сальдо →
-   в конце. Строка — название и сумма; статьи под итогом с отступом и тише. */
-.dds{border-radius:18px;background:var(--card);border:1px solid var(--border2);overflow:hidden}
-.dds-r{display:flex;align-items:baseline;gap:12px;padding:13px 16px;border-top:1px solid rgba(255,255,255,.06)}
-.dds-r:first-child{border-top:0}
-.dds-r span{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:var(--text)}
-.dds-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+/* Отчёт ДДС (dds-): сейф на начало → поступления → выплаты → итог и сейф на
+   конец. Карточки и золотые заголовки — общие (.sc / .sc-cap), свои здесь
+   только строки движений и две итоговые полосы. Названия — Space Grotesk. */
+.dds-tot{display:flex;align-items:center;gap:12px;min-height:58px;padding:0 16px;
+  font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:1.1px;
+  font-size:15px;font-weight:700;color:var(--gold);
+  background:linear-gradient(180deg,rgba(201,169,110,.2),rgba(201,169,110,.08))}
+#finDdcCard .exp-day.dds-head{border-bottom:0;padding-bottom:8px;margin-bottom:0}
+.dds-tot span{flex:1;min-width:0}
+.dds-tot b{flex:0 0 auto;font-size:22px;font-weight:700;letter-spacing:0;color:var(--text);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.dds-tot b u,.dds-r b u,.dds-day b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.3px;color:var(--muted);margin-left:5px}
+.dds-tot.neg b{color:var(--dn)}
+.dds-tot.end{min-height:72px;border-top:1px solid rgba(201,169,110,.34)}
+.dds-tot.end b{font-size:30px;line-height:1}
+.sc-cap.dds-cap b{font-size:18px}
+.sc-cap.dds-cap.in b{color:var(--up)} .sc-cap.dds-cap.out b{color:var(--dn)}
+.dds-r{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;border-top:1px solid rgba(255,255,255,.05)}
+.sc-cap + .dds-r{border-top:0}
+.dds-r span{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;
+  color:var(--text);text-transform:uppercase}
+.dds-r span i{display:block;font-family:'DM Sans',sans-serif;font-style:normal;font-size:11px;font-weight:500;letter-spacing:0;
+  text-transform:none;color:var(--warn);margin-top:2px}
+.dds-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
-.dds-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
 .dds-r.in b{color:var(--up)} .dds-r.out b{color:var(--dn)}
-.dds-r.kid{padding:10px 16px 10px 30px}
-.dds-r.kid span{font-size:13.5px;font-weight:500;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dds-r.kid b{font-size:14px;font-weight:600}
+.dds-r.zero span{color:var(--muted)} .dds-r.zero b{color:var(--dim)} .dds-r.zero b u{opacity:.5}
 .dds-r.wait span,.dds-r.wait b{color:var(--muted)}
-.dds-r.kid.zero b{color:var(--dim)}
-.dds-r.wait span i{display:block;font-style:normal;font-size:11px;color:var(--warn);margin-top:2px}
-.dds-r.end{background:rgba(201,169,110,.06);border-top-color:rgba(201,169,110,.25)}
-.dds-r.end b{font-size:18px}
-.dds-r.neg b{color:var(--dn)}
+.dds-day{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 16px}
+.dds-day span{flex:1;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+.dds-day b{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.dds-day.in b{color:var(--up)} .dds-day.out b{color:var(--dn)}
 /* Старая лента ДДС (до 30 сен 2026) — стили оставлены, ими никто не пользуется. */
 .ddc-r{display:flex;align-items:center;gap:10px;min-height:46px;padding:7px 16px;
   border-top:1px solid rgba(255,255,255,.05)}
@@ -21165,7 +21179,7 @@ function fbDdcPaint(){
   body.innerHTML = fbDdcBodyHtml(d, start);
 }
 function fbDdcCardInner(d, start){
-  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+  return `<div class="exp-day dds-head${DAY_OFFSET ? ' back' : ''}">
       <span class="exp-day-l"><span class="exp-day-t">Отчёт<i>ДДС</i></span></span>
       ${_dayNav('ddcDay')}
     </div>`;
@@ -21209,20 +21223,25 @@ function fbDdcBodyHtml(d, start){
   if(d.future) return '<div class="exp-empty">Этот день ещё не наступил</div>';
   const p = fbDdcParts(d), saldo = p.inSum - p.outSum, end = start.all + saldo;
   const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
-  const row = (cls, name, val, sign) => `<div class="dds-r ${cls}"><span>${name}</span>${v(val, sign)}</div>`;
-  const kids = (arr, cls, sign) => arr.map(r => row('kid ' + (r.v ? cls : 'zero'), escS(r.name), r.v, r.v ? sign : '')).join('');
+  const kids = (arr, cls, sign) => arr.map(r =>
+    `<div class="dds-r ${r.v ? cls : 'zero'}"><span>${escS(r.name)}</span>${v(r.v, r.v ? sign : '')}</div>`).join('');
   // Считаем сами и сверяем с сейфом: разошлось — молчать нельзя.
   const diff = Math.round(end - (+d.stack_total || 0));
-  return `<div class="dds">
-    ${row(start.all < 0 ? 'neg' : '', 'Сейф начало дня', start.all)}
-    ${row('in', 'Поступления', p.inSum, p.inSum ? '+' : '')}
-    ${kids(p.ins, 'in', '')}
-    ${d.pending && +d.base ? `<div class="dds-r kid wait"><span>Выручка дня<i>день не подтверждён — в сейф ещё не легла</i></span>${v(+d.base)}</div>` : ''}
-    ${row('out', 'Выплаты', p.outSum, p.outSum ? '−' : '')}
+  return `
+  <div class="sc"><div class="dds-tot${start.all < 0 ? ' neg' : ''}"><span>Сейф начало дня</span>${v(start.all)}</div></div>
+  <div class="sc">
+    <div class="sc-cap dds-cap in"><span>Поступления</span>${v(p.inSum, p.inSum ? '+' : '')}</div>
+    ${kids(p.ins, 'in', '+')}
+    ${d.pending && +d.base ? `<div class="dds-r wait"><span>Выручка дня<i>день не подтверждён — в сейф ещё не легла</i></span>${v(+d.base)}</div>` : ''}
+  </div>
+  <div class="sc">
+    <div class="sc-cap dds-cap out"><span>Выплаты</span>${v(p.outSum, p.outSum ? '−' : '')}</div>
     ${kids(p.outs, 'out', '−')}
-    ${row(saldo < 0 ? 'out' : 'in', 'Итог за день', saldo, saldo > 0 ? '+' : '')}
-    ${row('end' + (end < 0 ? ' neg' : ''), 'Сейф конец дня', end)}
-    ${diff ? row('kid out', 'Не сходится с сейфом', diff) : ''}
+  </div>
+  <div class="sc">
+    <div class="dds-day ${saldo < 0 ? 'out' : saldo > 0 ? 'in' : ''}"><span>Итог за день</span>${v(saldo, saldo > 0 ? '+' : '')}</div>
+    <div class="dds-tot end${end < 0 ? ' neg' : ''}"><span>Сейф конец дня</span>${v(end)}</div>
+    ${diff ? `<div class="dds-r out"><span>Не сходится с сейфом</span>${v(diff)}</div>` : ''}
   </div>`;
 }
 

@@ -3466,6 +3466,23 @@ button.path:active{transform:scale(.995)}
 .dds-day span{flex:1;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
 .dds-day b{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
 .dds-day.in b{color:var(--up)} .dds-day.out b{color:var(--dn)}
+/* Барракуда той же таблицей: строка-кнопка заявки, карандаш у оплаты, подпись
+   про долг, кнопка «Долг» в шапке раскрывает историю. */
+.dds-r.plain{width:100%;border:0;border-top:1px solid rgba(255,255,255,.05);background:transparent;font-family:inherit;text-align:left;cursor:pointer}
+.dds-r.plain em.fb-chev{flex:0 0 auto;display:flex;color:var(--dim);margin-left:-4px}
+.dds-r span i.sub{display:block;font-family:'DM Sans',sans-serif;font-style:normal;font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:2px}
+.dds-pen{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 10px;border-radius:9px;
+  border:1px solid var(--border2);background:var(--card2);color:var(--gold2);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.dds-pen svg{width:14px;height:14px}
+.dds-edit{padding:4px 8px 6px}
+.fb-bdebt{display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;padding:10px 12px 10px 14px;border-radius:13px;
+  border:1px solid var(--border2);background:var(--card2);color:var(--text);font-family:inherit;cursor:pointer;text-align:left}
+.fb-bdebt span{flex:1;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--gold)}
+.fb-bdebt b{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.fb-bdebt.dn b{color:var(--dn)}
+.fb-bdebt b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
+.fb-bdebt em{display:flex;color:var(--dim);transition:transform .2s} .fb-bdebt em.up{transform:rotate(90deg)}
+#finDayCard .exp-day.dds-head{border-bottom:0;padding-bottom:6px;margin-bottom:0}
 /* Старая лента ДДС (до 30 сен 2026) — стили оставлены, ими никто не пользуется. */
 .ddc-r{display:flex;align-items:center;gap:10px;min-height:46px;padding:7px 16px;
   border-top:1px solid rgba(255,255,255,.05)}
@@ -22251,16 +22268,19 @@ async function accFinB(){
   await fbDayReload();
 }
 function fbBCardInner(d){
-  const short = d ? Math.max(0, (d.debt_b || 0) - (d.stack_b || 0)) : null;
-  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+  return `<div class="exp-day dds-head${DAY_OFFSET ? ' back' : ''}">
       <span class="exp-day-l"><span class="exp-day-t">Барракуда<i>долг и деньги на неё</i></span></span>
       ${_dayNav('finDay')}
     </div>
-    <div class="aud-g">
-      ${fbTile('Выделено', 'd.stack_b', d ? d.stack_b : null, {mode: 'neg'})}
-      ${fbTile('Долг', 'd.debt_b', d ? d.debt_b : null, {mode: 'debt'})}
-      ${fbTile('Не хватает', 'd.b_short', short, {mode: 'debt'})}
-    </div>`;
+    <button class="fb-bdebt${d && d.debt_b > 0 ? ' dn' : ''}" onclick="fbBDebtToggle()">
+      <span>Долг${FB.bDebt ? ' · история' : ''}</span>
+      <b data-f="d.debt_b" data-fc="debt">${d ? fbFmt(d.debt_b) : '—'}<u>AED</u></b>
+      <em class="${FB.bDebt ? 'up' : ''}">${_SC_CHEV}</em></button>`;
+}
+function fbBDebtToggle(){
+  FB.bDebt = !FB.bDebt;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  fbDayReload();
 }
 // Тело экрана — учёт долга (владелец, 20 сен 2026: «очисти полностью раздел
 // барракуды и давай соберём его заново: в первую очередь долг, контроль
@@ -22272,37 +22292,61 @@ function fbBCardInner(d){
 // «Ежедневный сбор и распределение выручки», — а сюда это приходит числом
 // «Выделено» сверху. Здесь: сколько должны сейчас и из чего долг сложился,
 // как он двигался по дням, и день — заявка и оплата.
+// Владелец, 30 сен 2026: «отсюда всё удаляй; всё, что нам нужно тут видеть —
+// простейшую понятнейшую страницу, как в ДДС: на сколько была составлена
+// заявка, сколько на Барракуду было выделено в этот день, сколько по факту
+// заплатили; в конце — остаётся в сейфе на Барракуду. Историю долга —
+// по нажатию кнопки „Долг“ сверху». Одна таблица той же формы, что ДДС.
 function fbBBodyHtml(d){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
-  const day = d.day, b = fbBook(day.slice(0, 7)) || {}, bb = b.b || {};
-  const месяц = b.month || FB.month || fbMonthNow();
-  const сейчас = месяц === fbMonthNow();
+  const day = d.day, b = fbBook(day.slice(0, 7)) || {}, n = v => +v || 0;
+  const days = b.days || [], i = days.findIndex(x => x.day === day);
+  const from = i > 0 ? n(days[i - 1].stack_b) : n((b.opening || {}).safe_b_open);
   const paid = d.manual.pay !== null && d.manual.pay !== undefined;
   const sup = (d.supplies || []).find(x => x.kind === 'main');
-  const left = (d.stack_b || 0) - (d.debt_b || 0);
-  // Одной строкой словами: хватит ли выделенного, чтобы закрыть долг.
-  const хватает = left >= 0
-    ? `Выделено ${fbFmt(d.stack_b)} AED — на долг хватает, останется ${fbFmt(left)}`
-    : `Выделено ${fbFmt(d.stack_b)} AED — на долг не хватает ${fbFmt(-left)}`;
+  const aside = d.pending ? 0 : n(d.aside), payB = n(d.pay_b), payX = n(d.pay_b_extra), pay = payB + payX;
+  const saldo = aside - payB, end = from + saldo, diff = Math.round(end - n(d.stack_b));
+  const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
+  const row = (cls, name, val, sign) => `<div class="dds-r ${cls}"><span>${name}</span>${v(val, sign)}</div>`;
+  const item = (name, val, sign) => `<div class="dds-i"><span>${escS(name)}</span>${v(val, sign)}</div>`;
+  // Оплата — та же строка, но с правкой: «Вписать», карандаш, поле.
+  const editing = FB.edit && FB.edit.kind === 'bpay' && FB.edit.id === day;
+  const payRow = editing
+    ? `<div class="fb-one fb-bpay dds-edit">${fbBRow('bpay', day, 'Заплатили Барракуде', paid ? d.pay : d.ordered, paid, '')}</div>`
+    : `<div class="dds-r ${pay ? 'out' : 'zero'}"><span>Заплатили Барракуде</span>
+        <button class="dds-pen" onclick="fbFillEdit('bpay','${day}')" aria-label="${paid ? 'Исправить' : 'Вписать'}">${
+          paid || pay ? _FB_PEN : 'Вписать'}</button>${v(pay, pay ? '−' : '')}</div>`
+      + (payX ? item('Из стопки Барракуды', payB, '−') + item('Сверх стопки — из ЧП', payX, '−') : '');
+  // Долг: заявка прибавляет, оплата убавляет.
+  const move = n(d.ordered) - pay;
+  const долг = move > 0 ? `долг вырос на ${fbFmt(move)}` : move < 0 ? `долг уменьшился на ${fbFmt(-move)}` : 'долг не изменился';
+  return `
+  <div class="sc dds-one">
+    <div class="dds-tot long${from < 0 ? ' neg' : ''}"><span>Сейф на Барракуду · начало дня</span>${v(from)}</div>
+    <button class="dds-r plain" onclick="fbBToSupply('${day}')"><span>Заявка Барракуде${sup ? '' : ' — заявки нет'}</span>${v(n(d.ordered))}<em class="fb-chev">${_SC_CHEV}</em></button>
+    <div class="sc-cap dds-cap in"><span>Приход</span>${v(aside, aside ? '+' : '')}</div>
+    ${d.pending && n(d.aside) ? `<div class="dds-r wait"><span>Выделено из выручки<i>день не подтверждён — в сейф ещё не легло</i></span>${v(n(d.aside))}</div>`
+                              : row(aside ? 'in' : 'zero', 'Выделено из выручки', aside, aside ? '+' : '')}
+    <div class="sc-cap dds-cap out"><span>Расход</span>${v(payB, payB ? '−' : '')}</div>
+    ${payRow}
+    <div class="dds-day ${saldo < 0 ? 'out' : saldo > 0 ? 'in' : ''}"><span>Баланс</span>${v(saldo, saldo > 0 ? '+' : '')}</div>
+    <div class="dds-tot end long${end < 0 ? ' neg' : ''}"><span>Остаётся в сейфе на Барракуду</span>${v(end)}</div>
+    ${diff ? row('out', 'Не сходится с сейфом', diff) : ''}
+    <div class="dds-r ${d.debt_b > 0 ? 'out' : ''}"><span>Долг после дня<i class="sub">${долг}</i></span>${v(n(d.debt_b))}</div>
+  </div>
+  ${FB.bDebt ? fbBDebtHtml(b) : ''}`;
+}
+// История долга — по кнопке «Долг» сверху: как сложился за месяц и как
+// двигался по дням.
+function fbBDebtHtml(b){
+  const bb = b.b || {}, месяц = b.month || FB.month || fbMonthNow(), сейчас = месяц === fbMonthNow();
   return `
   <div class="sc fb-gut">
     ${fbCapT('Долг Барракуде', escS(fbMonthT(месяц)))}
     ${fbRow('На начало месяца', 'b.debt_open', bb.debt_open, {mode: 'debt'})}
     ${fbRow('Заказали за месяц', 'b.bought', bb.bought, {sign: '+'})}
     ${fbRow('Оплатили за месяц', 'b.paid', bb.paid, {sign: '−'})}
-    ${fbRow('Из стопки Барракуды', 'b.pay_safe', bb.pay_safe, {sub: true, show: 'b.paid_on', hide: !bb.paid})}
-    ${fbRow('Сверх стопки — из ЧП', 'b.pay_extra', bb.pay_extra, {sub: true, show: 'b.extra_pay_on', hide: !bb.pay_extra})}
     ${fbRow(сейчас ? 'Должны сейчас' : 'Долг на конец месяца', 'b.debt_end', bb.debt_end, {sum: true, sign: '=', mode: 'debt'})}
-    <div class="fb-bnote${left < 0 ? ' dn' : ''}">${хватает}</div>
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('День', escS(fbDayT(day)))}
-    <button class="sc-r fb-r" style="cursor:pointer" onclick="fbBToSupply('${day}')">
-      <span>Заказали${sup ? '' : ' — заявки нет'}</span>
-      <b data-f="d.ordered">${fbFmt(d.ordered)}<u>AED</u></b><em>${_SC_CHEV}</em></button>
-    <div class="fb-one fb-bpay"><div class="fb-card">${fbBRow('bpay', day, 'Оплатили',
-      paid ? d.pay : d.ordered, paid, paid ? '' : d.ordered ? 'по заявке' : '')}</div></div>
-    ${fbRow('Долг после дня', 'd.debt_b', d.debt_b, {sum: true, mode: 'debt'})}
   </div>
   <div class="sc fb-gut">
     ${fbCapT('Как двигался долг', escS(fbMonthT(месяц)))}

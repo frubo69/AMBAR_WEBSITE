@@ -21227,16 +21227,20 @@ function fbDdcParts(d){
   if(n(d.extra_manual)) extra.push(it('Вписан руками', d.extra_manual));
   const ins = [{name: 'РП+', v: rp, items: has([it('Из выручки дня', rp)])},
                {name: 'ДопРП+', v: n(d.extra_rp), items: has(extra)},
-               {name: 'ЧП+', v: Math.max(0, np), items: has([it('Остаток выручки дня', Math.max(0, np))])}];
+               {name: 'ЧП+', v: np, items: has([it('Остаток выручки дня', np)])}];
   if(b) ins.push({name: 'Барракуда+', v: b, items: [it('Из выручки дня', b)]});
-  // ЧП−: выплаты из прибыли, оплата Барракуде сверх её стопки и день, когда
-  // расходы водителей больше наличной выручки (ЧП+ ушёл бы в минус).
+  // В сейф ложится выручка дня — та же сумма, что в окошке «Выручка» на главной
+  // (владелец, 30 сен 2026: «расходы водителей и чай туда не считаются, туда
+  // идёт именно выручка из окошка»). Отдельными движениями чая и расходов
+  // водителей здесь нет; выручка в минусе так и стоит минусом в ЧП+.
+  // РП− — то, что вбито в STAR из панели расходов. ЧП− — выплаты из прибыли и
+  // оплата Барракуде сверх её стопки.
   const rpOut = (d.expenses || []).map(e => it(
     [e.kind_t || e.line_name || 'Вне плана', e.kind_t ? e.who : e.comment].filter(Boolean).join(' · '), e.amount));
   const npOut = (d.payouts || []).map(e => it([e.who, e.comment].filter(Boolean).join(' · ') || 'Выплата', e.amount));
-  npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra), it('Расходы водителей больше выручки', Math.max(0, -np)));
+  npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra));
   const outs = [{name: 'РП−', v: n(d.expenses_sum), items: has(rpOut)},
-                {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra) + Math.max(0, -np), items: has(npOut)}];
+                {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra), items: has(npOut)}];
   if(n(d.pay_b)) outs.push({name: 'Барракуда−', v: n(d.pay_b), items: [it('Оплата Барракуде', d.pay_b)]});
   const sum = a => a.reduce((t, r) => t + r.v, 0);
   return {ins, outs, inSum: sum(ins), outSum: sum(outs)};
@@ -21247,14 +21251,14 @@ function fbDdcBodyHtml(d, start){
   const p = fbDdcParts(d), saldo = p.inSum - p.outSum, end = start.all + saldo;
   const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
   const kids = (arr, cls, sign) => arr.map(r =>
-    `<div class="dds-r ${r.v ? cls : 'zero'}"><span>${escS(r.name)}</span>${v(r.v, r.v ? sign : '')}</div>`
-    + (r.items || []).map(x => `<div class="dds-i ${cls}"><span>${escS(x.name)}</span>${v(x.v, sign)}</div>`).join('')).join('');
+    `<div class="dds-r ${!r.v ? 'zero' : r.v < 0 ? 'out' : cls}"><span>${escS(r.name)}</span>${v(r.v, r.v > 0 ? sign : '')}</div>`
+    + (r.items || []).map(x => `<div class="dds-i"><span>${escS(x.name)}</span>${v(x.v, x.v > 0 ? sign : '')}</div>`).join('')).join('');
   // Считаем сами и сверяем с сейфом: разошлось — молчать нельзя.
   const diff = Math.round(end - (+d.stack_total || 0));
   return `
   <div class="sc dds-one">
     <div class="dds-tot${start.all < 0 ? ' neg' : ''}"><span>Сейф начало дня</span>${v(start.all)}</div>
-    <div class="sc-cap dds-cap in"><span>Поступления</span>${v(p.inSum, p.inSum ? '+' : '')}</div>
+    <div class="sc-cap dds-cap ${p.inSum < 0 ? 'out' : 'in'}"><span>Поступления</span>${v(p.inSum, p.inSum > 0 ? '+' : '')}</div>
     ${kids(p.ins, 'in', '+')}
     ${d.pending && +d.base ? `<div class="dds-r wait"><span>Выручка дня<i>день не подтверждён — в сейф ещё не легла</i></span>${v(+d.base)}</div>` : ''}
     <div class="sc-cap dds-cap out"><span>Выплаты</span>${v(p.outSum, p.outSum ? '−' : '')}</div>

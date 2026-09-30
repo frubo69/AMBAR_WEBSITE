@@ -2341,6 +2341,7 @@ async def handle_stock_board(request):
                         for o, c in (v.get("by_district") or {}).items()},
         "total": (v.get("totals") or {}).get("bottles", 0),
         "items_with_stock": v.get("items_with_stock", 0),
+        "critical": v.get("critical") or {},
         "items": [{"id": r["id"], "no": r["no"], "name": r["name"], "cat": r["cat"],
                    "unit": r["unit"], "have": r["have"], "bottles": r["bottles"],
                    "known": r["known"]}

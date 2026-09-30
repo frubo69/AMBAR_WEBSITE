@@ -4842,6 +4842,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .ord-r-v.gold{color:var(--gold2)}
 .ord-r-go{width:12px;text-align:center;color:var(--muted);font-size:14px;flex-shrink:0}
 .ord-r-b{padding:2px 0 10px}
+/* Критический остаток: на полке меньше, чем уходит за день, или пусто. */
+.ord-r.crit .ord-r-n,.ord-r.crit .ord-r-d{color:var(--dn)}
+.ord-c.crit .ord-c-n,.ord-c.crit .ord-c-calc{color:var(--dn)}
 .ord-c{display:flex;align-items:center;gap:10px;padding:9px 0}
 .ord-c + .ord-c{border-top:1px solid rgba(255,255,255,.04)}
 .ord-c-n{flex:1;min-width:0;font-size:12px;color:var(--sub);overflow:hidden;
@@ -7219,6 +7222,7 @@ button.exp-wait:active{transform:scale(.99)}
 .stkbd th.nm{background:var(--card2)}
 .stkbd td{padding:9px 6px;text-align:center;font-size:13px;font-weight:600;
   border-top:1px solid var(--border2);white-space:nowrap}
+.stkbd td.crit{color:var(--dn);opacity:1;font-weight:700}
 .stkbd td.z{color:var(--muted);opacity:.45}
 /* Ноль и прочерк — разные ответы, и выглядят по-разному: ноль это знание,
    прочерк — его отсутствие. */
@@ -16118,13 +16122,16 @@ async function stkByDistrict(тихо){
             : 'закупка неизвестна'}</i></td>
           ${shown.map(d => {
             const h = (r.have || {})[d.id];
+            // Критический остаток — красным: меньше, чем уходит за день, или
+            // пусто у позиции, которую здесь продают.
+            const кр = ((v.critical || {})[d.id] || []).includes(r.id) ? ' crit' : '';
             // Три разных ответа, и путать их нельзя: прочерк — «не вносили»,
             // ноль — «считали, и нет», число — сколько лежит.
             if(h == null) return '<td class="z">—</td>';
-            if(!h) return '<td class="nil">0</td>';
+            if(!h) return `<td class="nil${кр}">0</td>`;
             const val = режим.ячейка(r, h);
             return val == null ? '<td class="z">—</td>'
-              : `<td>${режим.деньги ? fmt(Math.round(val)) : fmtQty(val)}</td>`;
+              : `<td class="${кр.trim()}">${режим.деньги ? fmt(Math.round(val)) : fmtQty(val)}</td>`;
           }).join('')}
           ${sel ? '' : `<td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
             !известна ? '—' : (сумма == null ? '—'
@@ -25005,13 +25012,14 @@ function ordRow(r, x, num){
   const open = ORD.open === key;
   const c = r.cells[x.id] || {};
   return `<div class="ord-r${open ? ' open' : ''}${c.edited ? ' fixed' : ''}${
-      c.need ? '' : ' zero'}" data-id="${r.id}">
+      c.need ? '' : ' zero'}${c.crit ? ' crit' : ''}" data-id="${r.id}">
     <button class="ord-r-h" onclick="ordOpen('${key}')">
       <span class="ord-r-i">${num || ''}</span>
       <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
         onerror="this.style.visibility='hidden'"></span>
       <span class="ord-r-n">${escS(r.name)}</span>
-      <span class="ord-r-d">${c.edited ? `расчёт ${fmtQty(c.calc)}` : ''}</span>
+      <span class="ord-r-d">${c.edited ? `расчёт ${fmtQty(c.calc)}`
+        : c.crit ? ((+c.have || 0) > 0 ? `на полке ${fmtQty(c.have)}` : 'пусто') : ''}</span>
       <span class="ord-r-v${c.edited ? ' gold' : ''}">${fmtQty(c.need || 0)}</span>
       <span class="ord-r-go">${open ? '⌄' : '›'}</span>
     </button>
@@ -25051,7 +25059,7 @@ function ordRowAll(r, dist, num){
   // Номер строки — тот же, что в файле для магазина: по нему сверяют позицию
   // голосом и пальцем, не читая название целиком.
   return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}${
-      r.need_total ? '' : ' zero'}" data-id="${r.id}">
+      r.need_total ? '' : ' zero'}${r.crit ? ' crit' : ''}" data-id="${r.id}">
     <button class="ord-r-h" onclick="ordOpen('${r.id}')">
       <span class="ord-r-i">${num || ''}</span>
       <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
@@ -25061,7 +25069,7 @@ function ordRowAll(r, dist, num){
       <span class="ord-r-go">${open ? '⌄' : '›'}</span>
     </button>
     ${open ? `<div class="ord-r-b">
-      ${cells.map(o => `<div class="ord-c" data-d="${o.x.id}">
+      ${cells.map(o => `<div class="ord-c${o.c.crit ? ' crit' : ''}" data-d="${o.x.id}">
         <span class="ord-c-n"><b>${o.x.code}</b> ${escS(o.x.name)}</span>
         <span class="ord-c-calc">${o.c.edited ? `расчёт ${fmtQty(o.c.calc)}` : `на полке ${fmtQty(o.c.have||0)}`}</span>
         <span class="ord-st">

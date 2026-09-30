@@ -60,6 +60,7 @@
 .ost-t td.nm s{text-decoration:none;color:var(--sub);font-size:11.5px;margin-right:6px;font-family:'Space Grotesk',sans-serif}
 .ost-t td.z{color:var(--sub);opacity:.45;font-weight:500}
 .ost-t td.nil{color:var(--sub);opacity:.75}
+.ost-t td.crit{color:var(--dn);opacity:1;font-weight:700}
 .ost-t td.tot,.ost-t th.tot{color:var(--gold2)}
 .ost-t td.tot.nil,.ost-t td.tot.z{color:var(--sub)}
 .ost-t tr.cat td{padding:16px 4px 7px;border-bottom:1px solid rgba(201,169,110,.3);font-size:12px;color:var(--gold2);letter-spacing:.07em;text-transform:uppercase}
@@ -136,7 +137,10 @@
     rows.forEach(r => (groups[r.cat || 'Прочее'] = groups[r.cat || 'Прочее'] || []).push(r));
     const order = Object.keys(groups).sort((a, b) =>
       (CATS.indexOf(a) < 0 ? 99 : CATS.indexOf(a)) - (CATS.indexOf(b) < 0 ? 99 : CATS.indexOf(b)));
-    const cell = h => h == null ? '<td class="z">—</td>' : !h ? '<td class="nil">0</td>' : `<td>${q(h)}</td>`;
+    // Критический остаток — красным: меньше, чем уходит за день, или пусто.
+    const crit = d.critical || {};
+    const cell = (h, oid, pid) => { const к = (crit[oid] || []).includes(pid) ? ' crit' : '';
+      return h == null ? '<td class="z">—</td>' : !h ? `<td class="nil${к}">0</td>` : `<td class="${к.trim()}">${q(h)}</td>`; };
     const sum = (list, id) => list.reduce((a, r) => a + (+(r.have || {})[id] || 0), 0);
     const one = !!ST.sel;
     box.innerHTML = `<table class="ost-t"><thead><tr><th class="nm">№ и позиция</th>${
@@ -148,7 +152,7 @@
             cols.map(x => `<td>${q(sum(list, x.id))}</td>`).join('')}${
             one ? '' : `<td class="tot">${q(list.reduce((a, r) => a + (+r.bottles || 0), 0))}</td>`}</tr>`
           + list.map(r => `<tr><td class="nm"><s>${r.no || ''}</s>${esc(r.name)}</td>${
-            cols.map(x => cell((r.have || {})[x.id])).join('')}${
+            cols.map(x => cell((r.have || {})[x.id], x.id, r.id)).join('')}${
             one ? '' : `<td class="tot ${!r.known ? 'z' : r.bottles ? '' : 'nil'}">${!r.known ? '—' : q(r.bottles)}</td>`}</tr>`).join('');
       }).join('')}</tbody></table>
       <div class="ost-note">Числа — в учётных единицах: у крепкого и вина бутылки, у пива коробки

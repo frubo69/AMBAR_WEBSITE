@@ -118,6 +118,8 @@
 #ozvBox .ord-r-v.gold{color:var(--gold2)}
 #ozvBox .ord-r-go{width:12px;text-align:center;color:var(--muted);font-size:14px;flex-shrink:0}
 #ozvBox .ord-r-b{padding:2px 0 10px}
+#ozvBox .ord-r.crit .ord-r-n{color:var(--dn)}
+#ozvBox .ord-c.crit .ord-c-n,#ozvBox .ord-c.crit .ord-c-calc{color:var(--dn)}
 #ozvBox .ord-c{display:flex;align-items:center;gap:10px;padding:9px 0}
 #ozvBox .ord-c + .ord-c{border-top:1px solid rgba(255,255,255,.04)}
 #ozvBox .ord-c-n{flex:1;min-width:0;font-size:12px;color:var(--sub);overflow:hidden;
@@ -237,7 +239,7 @@
     const open = O.open === r.id;
     const cells = dist.map(x => ({ x, c: r.cells[x.id] || {} }));
     return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}${
-        r.need_total ? '' : ' zero'}" data-id="${esc(r.id)}">
+        r.need_total ? '' : ' zero'}${r.crit ? ' crit' : ''}" data-id="${esc(r.id)}">
       <button class="ord-r-h" onclick="opOrdRow('${esc(r.id)}')">
         <span class="ord-r-i">${num || ''}</span>
         <span class="ord-r-img"><img src="/products/${esc(r.id)}.webp" alt="" loading="lazy"
@@ -247,7 +249,7 @@
         <span class="ord-r-go">${open ? '⌄' : '›'}</span>
       </button>
       ${open ? `<div class="ord-r-b">
-        ${cells.map(o => `<div class="ord-c" data-d="${esc(o.x.id)}">
+        ${cells.map(o => `<div class="ord-c${o.c.crit ? ' crit' : ''}" data-d="${esc(o.x.id)}">
           <span class="ord-c-n"><b>${esc(o.x.code)}</b> ${esc(o.x.name)}</span>
           <span class="ord-c-calc">${o.c.edited ? `расчёт ${чис(o.c.calc)}`
             : `на полке ${чис(o.c.have || 0)}`}</span>

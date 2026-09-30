@@ -173,6 +173,12 @@ async def on_startup(app):
         app["supply_nag"] = asyncio.create_task(supply_nag.loop(app))
     except Exception as e:
         log.warning(f"[supply-nag] не запустился: {e}")
+    # Критические остатки: раз в сутки, в 10:00 по Дубаю, владельцам и операторам.
+    try:
+        import stock_alerts
+        app["stock_alerts"] = asyncio.create_task(stock_alerts.loop())
+    except Exception as e:
+        log.warning(f"[alerts] критические остатки не запущены: {e}")
     # Переписка владельца с ботом живёт не дольше 47 часов: позже телеграм
     # запретит её удалять, и в тревожный момент она останется в телефоне.
     try:

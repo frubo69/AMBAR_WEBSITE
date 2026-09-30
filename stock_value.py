@@ -267,6 +267,14 @@ async def build(day: str = "") -> dict:
         "items_total": len(items),
         "items_with_stock": с_остатком,
     }
+    # Критические остатки — что красить на складе красным. Только у живой
+    # цифры: на прошедшее утро «хватит ли на день» — уже не вопрос.
+    if not past:
+        try:
+            import stock_alerts
+            out["critical"] = await stock_alerts.ids(day)
+        except Exception as e:                      # noqa: BLE001
+            log.warning(f"[value] критические остатки не посчитаны: {e}")
     if past and not out["known"]:
         # Раньше первого пересчёта склада не было — скажем, с какого дня он есть.
         try:

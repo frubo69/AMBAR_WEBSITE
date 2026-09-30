@@ -1784,8 +1784,15 @@ async def freeze_order(day: str = "") -> dict:
 
 @require_owner
 async def handle_order(request):
-    return web.json_response(await order_rows(request.query.get("day") or ""),
-                             headers=CORS_HEADERS)
+    data = await order_rows(request.query.get("day") or "")
+    # Критические остатки — красным прямо в заявке (владелец, 30 сен 2026).
+    # Только в ответе экрану: сам расчёт заявки и её файл от этого не зависят.
+    try:
+        import copy, stock_alerts
+        data = await stock_alerts.mark_order(copy.deepcopy(data))
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] критические остатки в заявке не помечены: {e}")
+    return web.json_response(data, headers=CORS_HEADERS)
 
 
 @require_owner

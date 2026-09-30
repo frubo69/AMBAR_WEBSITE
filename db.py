@@ -2772,6 +2772,20 @@ async def supply_save(doc: dict):
     await db.supplies.replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
 
+async def once_mark(key: str, day: str) -> bool:
+    """Отметить «сегодня это уже сделано». True — отметили сейчас (значит,
+    делать), False — отметка уже стояла. Для того, что шлётся раз в сутки:
+    рестарт службы не должен слать второй раз."""
+    db = _db_or_none()
+    if db is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await db.once_marks.insert_one({"_id": f"{key}:{day}", "at": datetime.now(timezone.utc)})
+        return True
+    except DuplicateKeyError:
+        return False
+
+
 async def supply_replace_untouched(doc: dict, districts: list) -> bool:
     """Заменить открытую поставку новой целиком — только если по ней ещё ничего
     не приняли. Условие стоит в самом запросе: между «посмотрел, что не

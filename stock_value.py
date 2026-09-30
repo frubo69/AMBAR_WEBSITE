@@ -81,6 +81,12 @@ async def cost_map() -> dict:
     try:
         sups = await db.supply_list(limit=SUPPLY_LOOKBACK)
         for sup in reversed(sups or []):            # свежая поставка поверх старой
+            # Цены других баз в закупочную цену позиции не идут (владелец,
+            # 30 сен 2026: «не вписывай эти цены в учёт»): разовая покупка на
+            # стороне — не то, во что нам обходится бутылка. Они живут при
+            # своей базе (db.base_prices) и в сумме самой той закупки.
+            if (sup.get("kind") or "main") == "extra":
+                continue
             for pid, b in (sup.get("buys") or {}).items():
                 try:
                     price = float((b or {}).get("price") or 0)

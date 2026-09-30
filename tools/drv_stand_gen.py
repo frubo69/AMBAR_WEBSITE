@@ -118,17 +118,20 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
       const L = [{id:'absolut', name:'Absolut 1 ltr', need:12, qty_total:24, unit_n:1, unit_name:'бутылку'},
                  {id:'gin', name:"Gordon's London Dry 0.7", need:6, qty_total:6, unit_n:1, unit_name:'бутылку'},
                  {id:'beer', name:'Heineken 0.33', need:48, qty_total:96, unit_n:24, unit_name:'ящик'}]
-        .map(l => { const p = +(window.__buys[l.id] || 0); return {...l, got: 0, left: l.need, price: p, units: Math.max(1, Math.round(l.qty_total / l.unit_n))}; });
+        .map(l => { const p = +(window.__buys[l.id] || 0); const na = !!(window.__na || {})[l.id];
+          return {...l, plan: l.need, need: na ? 0 : l.need, got: 0, left: na ? 0 : l.need, na, price: na ? 0 : p, units: Math.max(1, Math.round(l.qty_total / l.unit_n))}; });
       const cost = L.reduce((a, l) => a + (l.price > 0 ? l.price * l.units : 0), 0);
       const need = L.reduce((a, l) => a + l.need, 0);
       return {supply_id: 's2', at: _agoIso(40), day: '2026-09-14', district: 'jvc', district_code: 'B1', district_name: 'JVC',
         driver: 'Али', mine: true, extra: true, base: 'Al Hamra Cellar', claimed_at: _agoIso(30), started_at: '', done_at: '',
         locked: false, lock_at: '', erev: 0, noscan_at: '', noscan_by: '', cancelled_at: '', cancelled_by: '', note: '', gaps: [],
         need, got: 0, left: need, positions: L.length, lines: L, hold: {who: '', kind: '', live: false, mine: false},
-        prices_ok: L.every(l => l.price > 0), cost: Math.round(cost)};
+        prices_ok: L.every(l => l.price > 0 || l.na), cost: Math.round(cost)};
     };
     if(path === '/api/driver/supply') return {mine: [__xTask()], free: [], extra: [], taken: []};
     if(path === '/api/driver/supply/s2' && m === 'GET') return __xTask();
+    if(path === '/api/driver/supply/s2/buy' && 'na' in (opts.body || {})){ window.__na = window.__na || {}; window.__na[opts.body.product_id] = !!opts.body.na;
+      stLog('API POST buy ' + JSON.stringify(opts.body)); return __xTask(); }
     if(path === '/api/driver/supply/s2/buy'){ const b = opts.body || {}; if(+b.price > 0) window.__buys[b.product_id] = +b.price; else delete window.__buys[b.product_id];
       stLog('API POST buy ' + JSON.stringify(b)); return __xTask(); }
     if(path === '/api/driver/supply/s2/hold') return {ok: true, sec: 25, hold: {who: 'Али', kind: 'driver', live: false, mine: true}};

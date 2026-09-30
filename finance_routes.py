@@ -225,6 +225,11 @@ async def _purchases(days: list[str]) -> dict:
         for it in (sup.get("items") or []):
             pid = it.get("id")
             qty = int(it.get("qty") or 0) or int(it.get("asked") or 0)
+            # Чего на другой базе не оказалось — не покупали, и в сумму этой
+            # закупки оно не входит.
+            if extra:
+                qty -= int(sum(float(((t or {}).get("na") or {}).get(pid) or 0)
+                               for t in (sup.get("tasks") or {}).values()))
             if qty <= 0:
                 continue
             b = buys.get(pid) or {}

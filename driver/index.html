@@ -2044,6 +2044,11 @@ body.xp-on{background:#070A12}
 .xpr-in input:focus{outline:none;border-color:var(--gold2)}
 .xpr.ok .xpr-in input{border-color:rgba(201,169,110,.45)}
 .xpr-in u{text-decoration:none;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.xpr-na{align-self:flex-start;margin-top:5px;padding:5px 10px;border-radius:9px;border:1px solid var(--border2);
+  background:none;color:var(--muted);font-family:inherit;font-size:11.5px;font-weight:600}
+.xpr.na .xpr-na{color:var(--gold2);border-color:rgba(201,169,110,.45)}
+.xpr.na .dimg,.xpr.na .xpr-b b{opacity:.45}
+.xpr-nt{flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
 .xpr-sum{display:flex;align-items:center;gap:10px;width:100%;margin:10px 0;padding:12px 14px;cursor:pointer;
   font-family:inherit;color:var(--text);text-align:left}
 .xpr-sum span{flex:1;font-size:13.5px;font-weight:600}
@@ -11552,17 +11557,23 @@ function supRenderPrices(){
   document.getElementById('supV').style.display = 'none';
   document.getElementById('supAct').style.display = 'none';
   const lines = t.lines.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  // «Нет в наличии» — у каждой позиции (владелец, 30 сен 2026): на базе её
+  // нет, цены на неё не бывает, и раньше приёмка не начиналась, пока водитель
+  // не впишет выдуманную. Отметил — позиция уходит в следующую доп. заявку.
+  // Если по ней уже что-то принято, остаток сообщают через «Не всё привезли».
   document.getElementById('supMid').innerHTML = `<div class="dcard xpr-list">${lines.map(l => `
-    <div class="xpr${l.price > 0 ? ' ok' : ''}" id="xpr-${esc(l.id)}">
+    <div class="xpr${l.na ? ' na' : l.price > 0 ? ' ok' : ''}" id="xpr-${esc(l.id)}">
       <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
            onerror="this.style.visibility='hidden'">
-      <span class="xpr-b"><b>${esc(l.name)}</b><i>${supPriceSub(l)}</i></span>
-      <span class="xpr-in">
+      <span class="xpr-b"><b>${esc(l.name)}</b><i>${supPriceSub(l)}</i>${l.got > 0 ? '' : `
+        <button class="xpr-na" onclick="supNa('${esc(l.id)}', ${l.na ? 'false' : 'true'})">${
+          l.na ? 'Есть в наличии' : 'Нет в наличии'}</button>`}</span>
+      ${l.na ? `<span class="xpr-nt">нет в наличии</span>` : `<span class="xpr-in">
         <input inputmode="decimal" enterkeyhint="next" placeholder="0" autocomplete="off"
                value="${l.price > 0 ? l.price : ''}" onfocus="this.select()"
                onchange="supPriceSave('${esc(l.id)}', this)">
         <u>AED / ${esc(l.unit_name || 'бутылку')}</u>
-      </span>
+      </span>`}
     </div>`).join('')}</div>`;
   document.getElementById('supBot').innerHTML = `
     <div class="sup-tot">
@@ -11573,23 +11584,39 @@ function supRenderPrices(){
   supPricesRefresh();
 }
 function supPriceSub(l){
-  const n = l.qty_total || l.need;
+  const n = l.qty_total || l.need || l.plan;
   return `${fmt(n)} ${plural(n, 'бутылка', 'бутылки', 'бутылок')}${
-    l.price > 0 ? ` · ${fmt(Math.round(l.price * (l.units || 1)))} AED` : ''}`;
+    !l.na && l.price > 0 ? ` · ${fmt(Math.round(l.price * (l.units || 1)))} AED` : ''}`;
+}
+async function supNa(pid, on){
+  const t = TASK; if(!t || SUP_BUSY) return; SUP_BUSY = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/buy`,
+      {method:'POST', body:{district: t.district, product_id: pid, na: !!on}});
+    if(r && r.lines) TASK = supAdopt(r);
+    try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  }catch(e){
+    const v = (e.payload || {}).error;
+    toast(v === 'taken' ? 'По ней уже принят товар — сообщите через «Не всё привезли»'
+        : v === 'closed' ? 'Приёмка уже закрыта' : 'Не удалось отметить', 'err');
+    SUP_BUSY = false; return;
+  }
+  SUP_BUSY = false;
+  supRenderPrices();                       // строка меняет вид целиком: поле ↔ пометка
 }
 // Строки и итог — на месте, поле с фокусом не трогаем.
 function supPricesRefresh(){
   const t = TASK; if(!t) return;
   (t.lines || []).forEach(l => {
     const row = document.getElementById('xpr-' + l.id); if(!row) return;
-    row.classList.toggle('ok', l.price > 0);
+    row.classList.toggle('ok', l.price > 0 && !l.na);
     const i = row.querySelector('.xpr-b i'); if(i) i.textContent = supPriceSub(l);
   });
   const tot = document.getElementById('xprTot');
   if(tot) tot.innerHTML = `${fmt(t.cost || 0)}<u> AED</u>`;
   const go = document.getElementById('xprGo');
   if(go){
-    const left = (t.lines || []).filter(l => !(l.price > 0)).length;
+    const left = (t.lines || []).filter(l => !(l.price > 0) && !l.na).length;
     go.disabled = !!left;
     go.textContent = left ? `Впишите цены · осталось ${left}` : 'Дальше';
   }
@@ -11712,8 +11739,9 @@ function supRenderTask(){
       <button class="dpl dli ${l.left ? '' : 'ok'}" ${held ? 'disabled' : ''} onclick="supLineOpen('${l.id}')">
         <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
              onerror="this.style.visibility='hidden'">
-        <span class="dpl-n">${esc(l.name)}${l.left && l.got ? `<i>осталось ${fmt(l.left)}</i>` : ''}</span>
-        <span class="dpl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
+        <span class="dpl-n">${esc(l.name)}${l.na ? '<i>нет в наличии</i>'
+          : l.left && l.got ? `<i>осталось ${fmt(l.left)}</i>` : ''}</span>
+        <span class="dpl-q">${l.na ? '—' : l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
       </button>`).join('')}</div>`;
   const all = t.left === 0;
   // Одна главная кнопка — следующий шаг. Всё отсканировано — завершить;

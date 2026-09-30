@@ -1111,11 +1111,16 @@ def _task_miss(task: dict, pid, until=None) -> float:
     try:
         v = float(((task or {}).get("miss") or {}).get(pid) or 0)
     except (TypeError, ValueError):
-        return 0.0
+        v = 0.0
     if v and until is not None:
         at = _aware(((task or {}).get("short") or {}).get("decided_at"))
         if at is not None and at > until:
-            return 0.0
+            v = 0.0
+    # «Нет в наличии» на другой базе — тоже не привезли.
+    try:
+        v += float(((task or {}).get("na") or {}).get(pid) or 0)
+    except (TypeError, ValueError):
+        pass
     return max(0.0, v)
 
 

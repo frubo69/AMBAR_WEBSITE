@@ -1089,10 +1089,20 @@ def _left_units(need, got):
     return int(v) if v == int(v) else v
 
 
-def _miss(task: dict, pid: str) -> float:
-    """Подтверждённый старшим недовоз по позиции района — в единицах."""
+def _na(task: dict, pid: str) -> float:
+    """«Нет в наличии» на этой базе — сколько единиц водитель снял с района,
+    стоя у прилавка (только заявки на другие базы)."""
     try:
-        return float(((task or {}).get("miss") or {}).get(pid) or 0)
+        return float(((task or {}).get("na") or {}).get(pid) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _miss(task: dict, pid: str) -> float:
+    """Чего по позиции района не будет — в единицах: недовоз, подтверждённый
+    старшим, плюс «нет в наличии» на другой базе."""
+    try:
+        return float(((task or {}).get("miss") or {}).get(pid) or 0) + _na(task, pid)
     except (TypeError, ValueError):
         return 0.0
 
@@ -1118,9 +1128,13 @@ def _prices_missing(sup: dict, oid: str) -> list:
     if (sup.get("kind") or "main") != "extra":
         return []
     buys = sup.get("buys") or {}
+    task = (sup.get("tasks") or {}).get(oid) or {}
     out = []
     for it in sup.get("items") or []:
         if int((it.get("by_district") or {}).get(oid) or 0) <= 0:
+            continue
+        # Нет в наличии — цены на неё не бывает, и приёмку остального она не держит.
+        if _na(task, it["id"]) > 0:
             continue
         try:
             price = float((buys.get(it["id"]) or {}).get("price") or 0)
@@ -1129,6 +1143,51 @@ def _prices_missing(sup: dict, oid: str) -> list:
         if price <= 0:
             out.append(it["id"])
     return out
+
+
+async def na_set(sid: str, oid: str, pid: str, on: bool, me: str) -> dict:
+    """«Нет в наличии» на другой базе (владелец, 30 сен 2026). Водитель стоит
+    у прилавка: позиции нет — цены на неё нет, и раньше приёмка не начиналась,
+    пока он не впишет выдуманную. Отметка снимает позицию с района целиком:
+    цены не требует, сканировать её не надо, а при закрытии района она уходит
+    в следующую доп. заявку — на другую базу.
+
+    Только заявка на другую базу, только своя задача, и пока по позиции ничего
+    не принято: принял часть — остальное сообщают через «Не всё привезли»."""
+    sup = await db.supply_get(sid)
+    if not sup or sup.get("status") != "open":
+        return {"ok": False, "verdict": "no_supply"}
+    if (sup.get("kind") or "main") != "extra":
+        return {"ok": False, "verdict": "not_extra"}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("driver") != me:
+        return {"ok": False, "verdict": "not_mine"}
+    if task.get("done_at") or task.get("cancelled_at"):
+        return {"ok": False, "verdict": "closed"}
+    it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
+    plan = int(((it or {}).get("by_district") or {}).get(oid) or 0)
+    if not it or plan <= 0:
+        return {"ok": False, "verdict": "not_in_supply"}
+    if on and float((it.get("got") or {}).get(oid) or 0) > 0:
+        return {"ok": False, "verdict": "taken"}
+    await db.supply_task_na(sid, oid, pid, plan if on else 0)
+    # Цена у позиции, которой нет, — не цена: стираем, чтобы не ушла в итог.
+    if on and (sup.get("buys") or {}).get(pid) and \
+            sum(int(v or 0) for v in (it.get("by_district") or {}).values()) == plan:
+        await db.supply_buy_set(sid, pid, None)
+    try:
+        import stock_routes
+        stock_routes.base_drop()
+    except Exception:                                # noqa: BLE001
+        pass
+    log.info(f"[supply] {sid}/{oid}: {it.get('name', pid)} — "
+             f"{'нет в наличии' if on else 'снова в наличии'} · {me}")
+    sup = await db.supply_get(sid)
+    return {"ok": True, "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, me)}
+
+
+def _base_key(base: str) -> str:
+    return re.sub(r"\s+", " ", str(base or "")).strip().lower()
 
 
 async def buy_set(sup: dict, pid: str, price: float, qty: int, who: str, by_id: int) -> dict:
@@ -1157,6 +1216,16 @@ async def buy_set(sup: dict, pid: str, price: float, qty: int, who: str, by_id: 
     if not await db.supply_buy_set(sid, pid, doc):
         return {"ok": False, "error": "not_saved"}
     log.info(f"[supply] закупка {pid}: {price} × {qty} ({sid}) · {who or '—'}")
+    # Цена другой базы живёт при этой базе (владелец, 30 сен 2026: «цены, по
+    # которым покупаем, сохраняй только по определённым доп. базам… не вписывай
+    # их в учёт»). В закупочную цену позиции она не идёт — см. cost_map.
+    if (sup.get("kind") or "main") == "extra" and sup.get("base"):
+        try:
+            await db.base_price_set(_base_key(sup.get("base")), sup.get("base"), pid,
+                                    price if price > 0 else 0, row.get("name") or "",
+                                    now, who, sid)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[supply] цена базы не записана: {e}")
     _buy_note((sid, int(by_id or 0)), who, sup.get("day") or "",
               {"id": pid, "name": row.get("name") or "", "price": price, "qty": qty,
                "was": было if (было is not None and было != price) else None})
@@ -1192,9 +1261,10 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
                 price = 0.0
             total_qty = int(it.get("qty") or 0)
             units = max(1, total_qty)
+            na = _na(task, it["id"]) > 0
             line.update(price=price, unit_n=u["n"], unit_name=u["name"],
-                        qty_total=total_qty, units=units)
-            if price > 0:
+                        qty_total=total_qty, units=units, na=na)
+            if price > 0 and not na:
                 cost += price * units
         lines.append(line)
     # Недобранное — вверх: закрытые строки водителю больше не нужны, а искать
@@ -1247,7 +1317,8 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         # Кто сканирует прямо сейчас — и что это не мы.
         "hold": _hold_view(task, me),
         # Заявка на другую базу: пока цены не вписаны, приёмка не начинается.
-        **({"prices_ok": all(l["price"] > 0 for l in lines), "cost": round(cost)} if extra else {}),
+        **({"prices_ok": all(l["price"] > 0 or l.get("na") for l in lines),
+            "cost": round(cost)} if extra else {}),
     }
 
 
@@ -1586,11 +1657,20 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
     log.info(f"[supply] {sid}/{oid}: приёмка закрыта · {me} · "
              f"{(doc.get('tasks') or {}).get(oid, {}).get('scanned', 0)} шт · "
              f"недобор {sum(g['gap'] for g in gaps)}")
+    # На этой базе чего-то не оказалось — собираем следующую доп. заявку, на
+    # другую базу (владелец, 30 сен 2026). Черновиком: базу называет человек.
+    дальше = None
+    if gaps and (doc.get("kind") or "main") == "extra":
+        try:
+            дальше = await _draft_from_extra(doc, oid, gaps)
+        except Exception as e:                       # noqa: BLE001
+            log.error(f"[supply] {sid}/{oid}: следующая доп. заявка не собрана: {e}")
     try:
-        await _notify_done(sid, doc, oid, me, gaps, note, short_pending=ждёт)
+        await _notify_done(sid, doc, oid, me, gaps, note, short_pending=ждёт, next_draft=дальше)
     except Exception as e:
         log.error(f"[supply] уведомление о приёмке: {e}")
     return {"ok": True, "gaps": gaps, "short_pending": ждёт,
+            "next_draft": (дальше or {}).get("supply_id") or "",
             "supply_done": doc.get("status") == "done"}
 
 
@@ -1993,7 +2073,8 @@ def _md(s: str) -> str:
 
 
 async def _notify_done(sid: str, doc: dict, oid: str, me: str,
-                       gaps: list, note: str, short_pending: bool = False):
+                       gaps: list, note: str, short_pending: bool = False,
+                       next_draft: dict | None = None):
     """Старшему — итог приёмки. Одно сообщение на район, а не на бутылку."""
     from owner_routes import notify_owners, notify_owners_force
     task = (doc.get("tasks") or {}).get(oid) or {}
@@ -2028,6 +2109,9 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
             body += f"\n\n_{_md(note)}_"
         if short_pending:
             body += "\n\nРайон закрыт, недовоз ждёт вашего решения в STAR."
+        if next_draft:
+            body += ("\n\nЧего не было на этой базе — в новой доп. заявке "
+                     f"({next_draft['total_qty']} ед). Назовите базу в STAR: «Другие базы».")
         await notify_owners("supply.done", body)
     else:
         await notify_owners("supply.done", head + "\n\nВзято полностью.")
@@ -2138,6 +2222,58 @@ async def _draft_from_gap(sup: dict) -> dict | None:
              f"{len(items)} позиций, {doc['total_qty']} единиц, районов {len(tasks)}")
     return {"supply_id": xid, "total_qty": doc["total_qty"],
             "items": len(items), "districts": sorted(tasks)}
+
+
+async def _draft_from_extra(sup: dict, oid: str, gaps: list) -> dict | None:
+    """Следующая доп. заявка из того, чего не оказалось на другой базе.
+
+    Район доп. заявки закрыли с недобором — недостающее переходит в черновик
+    новой доп. заявки. Один черновик на заявку-родителя: закрылся второй район
+    — его строки ложатся в тот же черновик, пока его не отправили водителям.
+    Отправили — для следующего района собирается новый. `tried_bases` — где
+    уже искали: старшему не надо вспоминать, на какой базе этого не было."""
+    строки = [(g["id"], g.get("name", ""), int(float(g.get("gap") or 0) + 0.5)) for g in gaps or []]
+    строки = [x for x in строки if x[2] > 0]
+    if not строки:
+        return None
+    sid = sup.get("_id") or ""
+    now = datetime.now(timezone.utc)
+    пробовали = list(dict.fromkeys(list(sup.get("tried_bases") or []) + [sup.get("base") or ""]))
+    пробовали = [b for b in пробовали if b]
+    живой = next((c for c in (await db.supplies_children([sid])).get(sid) or []
+                  if c.get("status") == "draft"), None)
+    doc = (await db.supply_get(живой["supply_id"])) if живой else None
+    if not doc:
+        doc = {"_id": "X" + now.strftime("%y%m%d-%H%M%S"), "at": now, "status": "draft",
+               "day": sup.get("day") or "", "kind": "extra", "base": "", "source": "shortfall",
+               "from_supply": sid, "tried_bases": пробовали,
+               "by": sup.get("by") or 0, "by_name": "",
+               "items": [], "dropped": [], "short": [], "extra": [], "unknown": [], "tasks": {}}
+        if doc["_id"] == sid:                        # та же секунда — номер занят
+            doc["_id"] += "b"
+    items = {i["id"]: i for i in doc.get("items") or []}
+    for pid, name, n in строки:
+        it = items.setdefault(pid, {"id": pid, "name": name, "asked": 0, "qty": 0, "scanned": 0,
+                                    "by_district": {}, "got": {}})
+        it["by_district"][oid] = n                   # район закрывается один раз — не складываем
+        it["got"].setdefault(oid, 0)
+    tasks = {}
+    for it in items.values():
+        it["qty"] = it["asked"] = sum(int(v or 0) for v in it["by_district"].values())
+        for o, n in it["by_district"].items():
+            t = tasks.setdefault(o, {"qty": 0, "positions": 0, "scanned": 0,
+                                     "driver": "", "driver_id": 0,
+                                     "claimed_at": None, "started_at": None,
+                                     "done_at": None, "last_at": None,
+                                     "undo": 0, "note": "", "gaps": [], "flags": []})
+            t["qty"] += n; t["positions"] += 1
+    doc.update(items=list(items.values()), tasks=tasks, tried_bases=пробовали,
+               total_qty=sum(i["qty"] for i in items.values()),
+               asked_qty=sum(i["qty"] for i in items.values()), gap_qty=0)
+    await db.supply_save(doc)
+    log.info(f"[supply] следующая доп. заявка {doc['_id']} из недобора {sid}/{oid}: "
+             f"{len(items)} позиций, {doc['total_qty']} единиц; уже искали: {', '.join(пробовали) or '—'}")
+    return {"supply_id": doc["_id"], "total_qty": doc["total_qty"], "items": len(items)}
 
 
 def _shortfall(sup: dict) -> dict:
@@ -2393,6 +2529,9 @@ def _sup_brief(sup: dict) -> dict:
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
         "by_name": sup.get("by_name") or "",
         "source": sup.get("source") or "", "from_supply": sup.get("from_supply") or "",
+        # Где этот товар уже искали и не нашли — у доп. заявки, собранной из
+        # недобора другой доп. заявки.
+        "tried_bases": list(sup.get("tried_bases") or []),
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "asked_qty": int(sup.get("asked_qty") or 0),
         "total_qty": int(sup.get("total_qty") or 0),

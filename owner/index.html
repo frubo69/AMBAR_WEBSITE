@@ -3126,6 +3126,18 @@ button.path:active{transform:scale(.995)}
   color:var(--text);background:var(--card);border:1px solid var(--border3);outline:none}
 .xs-in:focus{border-color:rgba(201,169,110,.55)}
 .xs-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+/* окно отправки черновика доп. заявки */
+/* сверху, а не по центру: в окне поле ввода, и клавиатура закрыла бы кнопки */
+.pin-pop.crw-ask.xsend{width:min(360px,calc(100vw - 32px));top:max(20px,7vh)!important;transform:translate(-50%,0)!important;animation:none!important}
+.xsend .xs-in{font-size:15.5px;padding:13px 14px}
+.xsend .xs-chips{margin:10px 0 4px}
+.xsend-l{margin:-4px 0 12px;font-size:12.5px}
+.xsend-l:empty{display:none}
+.xsend-l div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--border2)}
+.xsend-l div span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xsend-l div b{font-family:'Space Grotesk',sans-serif;color:var(--gold2)}
+.xsend-l div.more{border:0;color:var(--muted);justify-content:flex-start}
+.xsend .crw-ask-b:disabled{opacity:.4}
 .xs-chip{padding:9px 14px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:13px;
   font-weight:600;color:var(--sub);background:var(--card);border:1px solid var(--border2)}
 .xs-chip.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.4)}
@@ -28641,6 +28653,7 @@ function _xList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.kind =
 
 // Состояние заявки одним словом и цветом. Слово короткое: оно стоит в чипе.
 function _xState(x){
+  if(x.status === 'draft') return ['черновик', 'wait'];
   if(x.status === 'cancelled') return ['отменена', 'no'];
   if(x.status !== 'open') return [x.took < x.total_qty ? 'недобор' : 'принято', 'done'];
   const busy = (x.districts || 0) - (x.done || 0) - (x.free || 0);
@@ -28677,16 +28690,24 @@ async function accExtra(){
   await _ordEnsure();
   const tob = ORD && ORD.d ? ordSeparate(ORD.d, ORD.d.districts || [], 'xTobFold') : '';
   const ex = _xList();
-  const open = ex.filter(x => x.status === 'open'), past = ex.filter(x => x.status !== 'open');
+  // Черновик — заявка, которую программа собрала сама: из того, что не дал
+  // магазин, или из того, чего не оказалось на другой базе. Водителям она не
+  // видна, пока старший не назовёт базу. До 30 сен 2026 такие стояли в
+  // «Закрытых» со словом «недобор», и отправить их было нечем.
+  const open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft'),
+        past = ex.filter(x => x.status !== 'open' && x.status !== 'draft');
   _setText('accSub', '');
   const row = x => {
     const st = _xState(x);
     const dt = x.day || String(x.at || '').slice(0, 10);
-    return `<button class="pnav-r" onclick="xOpen('${escS(x.supply_id)}')">
+    const чер = x.status === 'draft';
+    const было = (x.tried_bases || []).filter(Boolean);
+    return `<button class="pnav-r" onclick="${чер ? 'xSend' : 'xOpen'}('${escS(x.supply_id)}')">
       <span class="pnav-i ${st[1] === 'live' ? 'live' : st[1] === 'done' ? 'ok' : ''}">${ICO_BASE}</span>
-      <span class="pnav-b"><b>${escS(x.base || 'База')}</b>
+      <span class="pnav-b"><b>${escS(x.base || (чер ? 'База не названа' : 'База'))}</b>
         <i>${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')} · ${
           x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')} · ${_dayName(dt)}${
+          чер && было.length ? ` · нет на: ${escS(было.join(', '))}` : ''}${
           x.short_left ? ` · <b class="sh-cov warn">докупить ${fmt(x.short_left)}</b>` : ''}</i></span>
       <span class="pstat-c ${st[1]}">${st[0]}</span>
       <span class="pnav-go">${ICO_CHEV}</span>
@@ -28699,11 +28720,89 @@ async function accExtra(){
         <div class="sh-empty-t">Пока пусто</div>
         <div class="sh-empty-s">Магазин дал не всё — соберите заявку на другую базу</div>
       </div></div>`
-    : (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
+    : (wait.length ? `<div class="exp-grp">Ждут отправки</div><div class="pbox">${wait.map(row).join('')}</div>` : '')
+      + (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
       + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : ''));
   mid.innerHTML += xDraftRows();
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
     <button class="qb" onclick="xNew()">${ICO_XPLUS}Новая заявка</button></div>`;
+}
+
+// Черновик, собранный программой: назвать базу и отправить водителям — или
+// отменить. Окно по центру: состав менять здесь нечем, решений два.
+let XSEND = null;
+async function xSend(sid){
+  const x = _xList().find(v => v.supply_id === sid); if(!x) return;
+  XSEND = {sid, base: ''};
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask xsend';
+  const было = (x.tried_bases || []).filter(Boolean);
+  const recent = [...new Set(_xList().map(v => v.base).filter(b => b && !было.includes(b)))].slice(0, 6);
+  box.innerHTML = `
+    <div class="crw-ask-t">Доп. заявка</div>
+    <div class="crw-ask-s">${fmt(x.total_qty)} ${pluralize(x.total_qty,'единица','единицы','единиц')} · ${
+      x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')}${
+      было.length ? `<br>Нет в наличии на: ${escS(было.join(', '))}` : ''}</div>
+    <div class="xsend-l" id="xSendL"></div>
+    <input class="xs-in" id="xSendIn" placeholder="Название базы" maxlength="60" autocomplete="off"
+           oninput="xSendPaint()">
+    ${recent.length ? `<div class="xs-chips">${recent.map(b =>
+      `<button class="xs-chip" data-b="${escS(b)}" onclick="xSendPick(this.dataset.b)">${escS(b)}</button>`).join('')}</div>` : ''}
+    <button class="crw-ask-b go" id="xSendGo" disabled onclick="xSendGo()">Отправить водителям</button>
+    <button class="crw-ask-b bad" onclick="xSendDrop()">Отменить заявку</button>`;
+  document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  // Состав — следом: список весит больше строки, а окно должно открыться сразу.
+  try{
+    const d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(sid));
+    const l = document.getElementById('xSendL');
+    if(l && XSEND && XSEND.sid === sid){
+      const its = (d.items || []).slice().sort((a, b) => (b.qty || 0) - (a.qty || 0));
+      l.innerHTML = its.slice(0, 6).map(i => `<div><span>${escS(i.name)}</span><b>${fmt(i.qty)}</b></div>`).join('')
+        + (its.length > 6 ? `<div class="more">и ещё ${its.length - 6}</div>` : '');
+    }
+  }catch(e){}
+}
+function xSendPaint(){
+  const v = ((document.getElementById('xSendIn') || {}).value || '').trim();
+  const b = document.getElementById('xSendGo'); if(b) b.disabled = !v;
+  document.querySelectorAll('.xsend .xs-chip').forEach(c => c.classList.toggle('on', c.dataset.b === v));
+}
+function xSendPick(b){
+  const i = document.getElementById('xSendIn'); if(i) i.value = b;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  xSendPaint();
+}
+async function xSendGo(){
+  if(!XSEND) return;
+  const base = ((document.getElementById('xSendIn') || {}).value || '').trim();
+  if(!base) return;
+  const b = document.getElementById('xSendGo'); b.disabled = true; b.textContent = 'Отправляю…';
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(XSEND.sid)}/confirm`,
+      {method: 'POST', body: {base, as: _rcvMe()}});
+  }catch(e){
+    b.disabled = false; b.textContent = 'Отправить водителям';
+    return _toast((e.payload || {}).error === 'not_draft' ? 'Её уже отправили' : 'Не удалось отправить');
+  }
+  closePinPop(); XSEND = null;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast('Отправлено водителям · ' + base);
+  accExtra();
+}
+async function xSendDrop(){
+  if(!XSEND) return;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(XSEND.sid)}/cancel`,
+      {method: 'POST', body: {as: _rcvMe()}});
+  }catch(e){ return _toast('Не удалось отменить'); }
+  closePinPop(); XSEND = null;
+  _toast('Заявка отменена');
+  accExtra();
 }
 
 // Заявка на базу открывается в ту же приёмку, что и основная: тот же экран,

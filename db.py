@@ -3060,6 +3060,42 @@ async def supply_task_noscan(sid: str, district: str, who: str, now) -> dict | N
         return_document=ReturnDocument.AFTER)
 
 
+async def supply_task_na(sid: str, district: str, product_id: str, qty) -> bool:
+    """«Нет в наличии» по позиции района: сколько единиц снято (0 — отметку
+    убрать). Только пока район открыт — условие в самом запросе."""
+    db = _db_or_none()
+    if db is None: return False
+    k = f"tasks.{district}"
+    q = {"_id": sid, "status": "open", f"{k}.done_at": None, f"{k}.cancelled_at": None}
+    upd = ({"$set": {f"{k}.na.{product_id}": qty}} if qty
+           else {"$unset": {f"{k}.na.{product_id}": ""}})
+    r = await db.supplies.update_one(q, upd)
+    return r.matched_count > 0
+
+
+async def base_price_set(key: str, base: str, product_id: str, price: float, name: str,
+                         now, who: str, sid: str) -> None:
+    """Цена позиции на конкретной другой базе — последняя, по которой брали.
+    Нулевая цена стирает запись."""
+    db = _db_or_none()
+    if db is None or not key or not product_id: return
+    _id = f"{key}:{product_id}"
+    if not price or price <= 0:
+        await db.base_prices.delete_one({"_id": _id}); return
+    await db.base_prices.update_one({"_id": _id}, {"$set": {
+        "base_key": key, "base": base, "item": product_id, "name": name,
+        "price": float(price), "at": now, "by": str(who or "")[:60], "supply_id": sid}},
+        upsert=True)
+
+
+async def base_prices(key: str = "") -> list:
+    """Цены других баз: одной (key) или всех."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.base_prices.find({"base_key": key} if key else {}, {"_id": 0})
+    return await cur.to_list(length=2000)
+
+
 async def supply_short_set(sid: str, district: str, rec: dict) -> bool:
     """Отчёт о недовозе по району. Один живой на район: пока прошлый ждёт
     решения, второй не ложится — условие в самом фильтре."""

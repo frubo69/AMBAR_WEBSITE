@@ -3116,6 +3116,14 @@ async def handle_supply_buy(request):
     task = (sup.get("tasks") or {}).get(oid) or {}
     if task.get("driver") != me["name"]:
         return web.json_response({"error": "not_mine"}, status=403, headers=CORS_HEADERS)
+    # «Нет в наличии»: {na: true|false} — позиции на этой базе нет (или нашлась).
+    if "na" in body:
+        r = await supply_routes.na_set(sid, oid, pid, bool(body.get("na")), me["name"])
+        if not r.get("ok"):
+            return web.json_response({"error": r.get("verdict") or "failed"},
+                                     status=400, headers=CORS_HEADERS)
+        return web.json_response(r["task"], headers=CORS_HEADERS,
+                                 dumps=lambda o: json.dumps(o, default=str))
     try:
         price = round(float(body.get("price") or 0), 2)
         qty = int(body.get("qty") or 0)

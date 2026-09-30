@@ -40,7 +40,8 @@
 .ost-d{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px;border-radius:13px;background:var(--card);border:1px solid var(--border3);color:var(--text);font-family:inherit;min-width:0}
 .ost-d.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55)}
 .ost-d.mine .ost-dc{color:var(--gold2)}
-.ost-dc{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--sub)}
+.ost-dc{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--sub);max-width:100%;text-align:center;line-height:1.25}
+.ost-dc i{font-style:normal;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
 .ost-dn{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;white-space:nowrap}
 .ost-d.z .ost-dn{color:var(--sub);opacity:.6}
 .ost-bar{display:flex;align-items:center;gap:8px;margin:10px 0;flex-shrink:0}
@@ -73,6 +74,7 @@
   .ost-body{margin:0 -12px;padding:0 12px 18px}
   .ost-t{font-size:13px} .ost-t td,.ost-t th{padding-left:3px;padding-right:3px}
   .ost-dn{font-size:14.5px}
+  .ost-dc i{display:block;font-size:10px;font-weight:600;letter-spacing:-.02em;white-space:normal;line-height:1.15}
 }`;
     document.head.appendChild(css);
     const ov = document.createElement('div');
@@ -104,7 +106,7 @@
       const n = ((d.by_district || {})[x.id] || {}).bottles || 0;
       return `<button class="ost-d${sel === x.id ? ' on' : ''}${mine.has(x.id) ? ' mine' : ''}${n ? '' : ' z'}"
           onclick="opStock.pick('${esc(x.id)}')" aria-label="${esc(x.name)}">
-        <span class="ost-dc">${esc(x.code)}</span><span class="ost-dn">${x.known === false ? '—' : q(n)}</span></button>`;
+        <span class="ost-dc">${esc(x.code)}${x.name && x.name !== x.code ? `<i>(${esc(x.name)})</i>` : ''}</span><span class="ost-dn">${x.known === false ? '—' : q(n)}</span></button>`;
     }).join('');
     $('ostOnly').classList.toggle('on', ST.only);
   }

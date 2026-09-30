@@ -3104,6 +3104,26 @@ async def supply_task_start(sid: str, district: str, now) -> None:
         {"$set": {f"tasks.{district}.started_at": now}})
 
 
+async def supply_noscan_photo_set(sid: str, district: str, photo: bytes, thumb: str = "") -> None:
+    """Снимок чека базы при приёмке без сканирования (30 сен 2026). Байтами
+    рядом с задачей, как чек расхода; на задаче — только флажок."""
+    db = _db_or_none()
+    if db is None or not photo: return
+    from bson.binary import Binary
+    await db.supply_photos.replace_one(
+        {"_id": f"{sid}:{district}"},
+        {"_id": f"{sid}:{district}", "img": Binary(photo), "thumb": thumb,
+         "at": datetime.now(timezone.utc)}, upsert=True)
+    await db.supplies.update_one({"_id": sid}, {"$set": {f"tasks.{district}.noscan_photo": True}})
+
+
+async def supply_noscan_photo(sid: str, district: str) -> bytes:
+    db = _db_or_none()
+    if db is None: return b""
+    doc = await db.supply_photos.find_one({"_id": f"{sid}:{district}"}) or {}
+    return bytes(doc.get("img") or b"")
+
+
 async def supply_task_noscan(sid: str, district: str, who: str, now) -> dict | None:
     """Товар забрали, коды не читали. Задача остаётся открытой.
 

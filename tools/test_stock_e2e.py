@@ -14,6 +14,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("MONGO_URI", ""); os.environ.setdefault("AMBAR_OWNER_IDS", "1")
 from mongomock_motor import AsyncMongoMockClient
 import db, stock_routes as SR, qr_routes as QR, supply_routes as sr, stock_value as SV
+# С 30 сен 2026 водителю без снимка чека базы «без сканирования» не принять
+# (verdict photo_needed); здесь проверяется остальное — кадр подставляем.
+_task_noscan = sr.task_noscan
+sr.task_noscan = lambda *a, **k: _task_noscan(*a, **{"photo": b"\xff\xd8" + b"x" * 40, **k})
+
 FAIL = []
 def eq(name, got, want):
     ok = got == want

@@ -3024,6 +3024,9 @@ button.path:active{transform:scale(.995)}
 .rt.ok .rt-bar i{background:var(--up)}
 .rt.dn .rt-bar i{background:var(--dn)}
 .rt-fl{margin-top:9px;font-size:10.5px;color:var(--warn)}
+.rt-rcp{display:inline-flex;align-items:center;gap:6px;margin-top:9px;padding:6px 10px;border-radius:9px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.rt-rcp:active{border-color:rgba(201,169,110,.5)}
 /* Недовоз в карточке района: что сказали и решение старшего. */
 .xsh{margin:10px 0 0;padding:10px 12px;border-radius:12px;
   border:1px solid rgba(243,180,74,.26);background:rgba(243,180,74,.07)}
@@ -29019,6 +29022,21 @@ async function xOpen(sid){
 // их сотня, поэтому строки свёрнуты под флажок и раскрываются по району.
 let SUP_OPEN = new Set();   // районы с раскрытым списком (для основной)
 
+// Чек базы, снятый водителем при приёмке без сканирования (30 сен 2026) —
+// во весь экран, как чек расхода.
+const _xsRcp = {};
+async function xSupRcp(sid, district, code){
+  const key = sid + ':' + district, ov = _woFull();
+  const кадр = url => `<img src="${url}" alt="Чек базы"><span>Чек базы · ${escS(code)}</span>`;
+  ov.innerHTML = кадр(_xsRcp[key] || '');
+  ov.classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(_xsRcp[key]) return;
+  try{ _xsRcp[key] = await ownerApi.ownerBlob(`/api/owner/supply/${encodeURIComponent(sid)}/noscan-photo?district=${encodeURIComponent(district)}`); }
+  catch(e){ ov.classList.remove('show'); _toast('Снимка не нашлось'); return; }
+  if(ov.classList.contains('show')) ov.innerHTML = кадр(_xsRcp[key]);
+}
+
 function xSupRender(d){
   const extra = d.kind === 'extra';
   const D = d.districts || {};
@@ -29098,6 +29116,7 @@ function xSupRender(d){
         </button>${open ? `<div class="xs-fold-b">${list}${
           foldEnd(rows.length, `xSupToggle('${escS(t.district)}', 1)`)}</div>` : ''}`}
       ${xsShort(d, t)}
+      ${t.noscan_photo ? `<button class="rt-rcp" onclick="xSupRcp('${escS(d.supply_id || SUP_ID || '')}','${escS(t.district)}','${escS(x.code || '')}')">${IC('note', 14)}Чек базы · ${escS(t.noscan_by || t.driver || '')}</button>` : ''}
       ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
       ${rtActs(t, d)}

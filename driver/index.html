@@ -8164,6 +8164,8 @@ const CAR_TXT = {
   car: {t: 'Машина на мойке', s: 'спереди, в контуре', hint: 'Поставьте машину в контур'},
   rcp: {t: 'Фото чека',       s: 'целиком, в рамке',   hint: 'Поместите чек в рамку'},
   odo: {t: 'Пробег машины',   s: 'цифры в рамке',      hint: 'Наведите на одометр'},
+  // Чек базы при приёмке без сканирования (владелец, 30 сен 2026).
+  inv: {t: 'Чек базы',        s: 'целиком, в рамке',   hint: 'Поместите чек в рамку'},
 };
 
 // Снимок уже есть — сначала показываем его: отсюда можно переснять или
@@ -8188,8 +8190,8 @@ function carTap(kind, what){
   carOpen(kind, what);
 }
 
-const CAR_SHAPE = {car: 'carShape', rcp: 'rcpShape', odo: 'odoShape'};
-const CAR_LINES = {car: 'carLines', rcp: 'rcpLines', odo: 'odoLines'};
+const CAR_SHAPE = {car: 'carShape', rcp: 'rcpShape', odo: 'odoShape', inv: 'rcpShape'};
+const CAR_LINES = {car: 'carLines', rcp: 'rcpLines', odo: 'odoLines', inv: 'rcpLines'};
 
 function _carShape(what){
   ['carUseMask', 'carUseLine'].forEach(i => {
@@ -8284,7 +8286,7 @@ async function carOpen(kind, what){
     await v.play();
   }catch(e){
     carClose();
-    toast('Нужна камера — без неё мойку не подтвердить', 'err');
+    toast(what === 'car' ? 'Нужна камера — без неё мойку не подтвердить' : 'Нужна камера — без неё снимок не сделать', 'err');
   }
 }
 
@@ -8294,13 +8296,13 @@ function carBot(mode){
   const rcp = CAR.what === 'rcp';
   // Приём машины смену не закрывает и к расходам отношения не имеет: у него
   // ровно два состояния — снять и «подходит».
-  if(CAR.what === 'odo'){
+  if(CAR.what === 'odo' || CAR.what === 'inv'){
     document.getElementById('carBot').innerHTML = mode === 'live'
       ? `<button class="car-shot" onclick="carShoot()" aria-label="Снять"></button>`
       : `<button class="btn btn-gh" onclick="carRetake()">Переснять</button>
          <button class="btn btn-pri" onclick="carAccept()">Подходит</button>`;
-    _setText('carHint', mode === 'live' ? CAR_TXT.odo.hint : '');
-    _setText('carS', CAR_TXT.odo.s);
+    _setText('carHint', mode === 'live' ? CAR_TXT[CAR.what].hint : '');
+    _setText('carS', CAR_TXT[CAR.what].s);
     return;
   }
   const closed = !rcp && !!(SH && SH.closed);
@@ -8349,7 +8351,7 @@ function carRetake(){ carOpen(CAR.kind, CAR.what); }
 // Оформление снятого кадра: тот же снимок размытым фоном и метка, что это.
 function _carShotLook(src){
   const bg = document.getElementById('carBg'); if(bg) bg.src = src || '';
-  _setText('carTag', CAR.what === 'rcp' ? 'Чек' : CAR.what === 'odo' ? 'Пробег' : 'Машина');
+  _setText('carTag', CAR.what === 'rcp' || CAR.what === 'inv' ? 'Чек' : CAR.what === 'odo' ? 'Пробег' : 'Машина');
   const img = document.getElementById('carImg');
   img.onload = _carFit;
   if(img.complete && img.naturalWidth) _carFit();
@@ -8516,6 +8518,9 @@ async function carAccept(){
   if(!shot) return;
   // Приём машины: кадр снят — теперь число, глядя на него.
   if(what === 'odo'){ odoAsk(shot, thumb); return; }
+  // Чек базы снят — отметка «без сканирования» уходит с ним.
+  if(what === 'inv'){ NS_SHOT = {photo: shot, thumb}; const p = NS_PENDING; NS_PENDING = null;
+    if(p) noscanSend(p.тихо, p.short); return; }
   const rcp = what === 'rcp';
   if(rcp) EXP_SHOT = {kind, photo: shot, thumb}; else carShotSet(shot, thumb);
   const sent = _expSent(kind);
@@ -11839,9 +11844,10 @@ function noscanOpen(){
     `<div class="card" style="margin-bottom:12px">
        <div class="sup-row-s" style="margin-bottom:10px">Всё ли привезли по заявке?</div>
        <button class="btn btn-gh" style="width:100%" onclick="shortOpen('ns')">Нет, чего-то не дали</button>
-     </div>`;
+     </div>
+     <div class="sup-row-s">Дальше — снимок чека базы: без него приёмка не засчитается.</div>`;
   const b = document.getElementById('finGo');
-  b.textContent = 'Да, всё сошлось — принять'; b.disabled = false;
+  b.textContent = 'Да, всё сошлось — снять чек'; b.disabled = false;
   b.onclick = () => noscanSend();
   document.getElementById('finSheet').classList.add('show');
 }
@@ -11914,12 +11920,20 @@ function shortStep(pid, d){
   shortPaint();
 }
 
+// Чек базы (владелец, 30 сен 2026: «если водитель нажимает принять без
+// сканирования, пусть фотографирует чек с Барракуды»): без кадра отметка не
+// уходит. Кадр держим до успешной отправки — сорвалась связь, снимать заново
+// не надо.
+let NS_SHOT = null, NS_PENDING = null;
 async function noscanSend(тихо, short){
-  const t = TASK; if(!t || (SUP_BUSY && !тихо)) return; SUP_BUSY = true;
+  const t = TASK; if(!t || (SUP_BUSY && !тихо)) return;
+  if(!NS_SHOT){ NS_PENDING = {тихо, short}; carOpen('', 'inv'); return; }
+  SUP_BUSY = true;
   const btn = document.getElementById('finGo'); btn.disabled = true;
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/noscan`,
-      {method:'POST', body:{district: t.district, ...(short || {})}});
+      {method:'POST', body:{district: t.district, photo: NS_SHOT.photo, thumb: NS_SHOT.thumb, ...(short || {})}});
+    if(!r.ok && r.verdict === 'photo_needed'){ NS_SHOT = null; NS_PENDING = {тихо, short}; carOpen('', 'inv'); return; }
     if(!r.ok && r.verdict === 'short_empty'){ toast('Столько не дать не могли — проверьте числа', 'err'); return; }
     if(!r.ok && r.verdict === 'prices_needed'){
       finClose(); if(r.task) TASK = supAdopt(r.task); PRICES_OPEN = true; supRenderTask();
@@ -11931,6 +11945,7 @@ async function noscanSend(тихо, short){
     TASK = null;
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast(тихо ? 'Принято · недовоз ушёл старшему' : 'Принято без сканирования');
+    NS_SHOT = null;
     supLoad(); shLoad();                      // смена: шаг «Завершить приёмку» снимается сразу
   }catch(e){ toast('Не удалось', 'err'); }
   finally{ SUP_BUSY = false; btn.disabled = false; }

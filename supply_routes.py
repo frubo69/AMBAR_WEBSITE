@@ -965,6 +965,7 @@ async def handle_list(request):
                               "done_at": str(t.get("done_at") or ""),
                               "noscan_at": str(t.get("noscan_at") or ""),
                               "noscan_by": t.get("noscan_by") or "",
+                              "noscan_photo": bool(t.get("noscan_photo")),
                               "cancelled_at": str(t.get("cancelled_at") or "")}
                           for o, t in (r.get("tasks") or {}).items()}
         out.append(brief)
@@ -1304,6 +1305,7 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         # Пока left > 0, это долг — досканировать.
         "noscan_at": str(task.get("noscan_at") or ""),
         "noscan_by": task.get("noscan_by") or "",
+        "noscan_photo": bool(task.get("noscan_photo")),
         # Район отменили отдельно от заявки: за ним не едем, принятое стоит.
         "cancelled_at": str(task.get("cancelled_at") or ""),
         "cancelled_by": task.get("cancelled_by") or "",
@@ -1829,11 +1831,15 @@ async def open_tasks_all() -> list:
 # Досканировать может кто угодно: тот же водитель из своего списка или старший
 # из приёмки. Бутылка ставится в реестр тем же task_scan — второго пути нет.
 async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
-                      short: dict | None = None) -> dict:
+                      short: dict | None = None, photo: bytes = b"", thumb: str = "") -> dict:
     """short — {lines, note}: чего не дали, одним запросом с самой отметкой
     (29 сен 2026). Двумя запросами подряд это рвалось на связи: отчёт ушёл,
     отметка нет — район не принят, а повторить нельзя, прошлый отчёт «ждёт».
-    Отчёт, который уже ждёт решения, приёмке не мешает."""
+    Отчёт, который уже ждёт решения, приёмке не мешает.
+
+    photo — снимок чека базы (владелец, 30 сен 2026: «если водитель нажимает
+    принять без сканирования, пусть фотографирует чек с Барракуды»). Без него
+    водителю не принять; старшему из STAR — можно, он и так видит заявку."""
     sup = await db.supply_get(sid)
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
@@ -1849,6 +1855,8 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
     if not owner and _prices_missing(sup, oid):
         return {"ok": False, "verdict": "prices_needed",
                 "task": _task_view(sid, sup, oid, task, me)}
+    if not owner and not photo:
+        return {"ok": False, "verdict": "photo_needed"}
     if short and (short.get("lines") or []):
         r = await short_report(sid, oid, me, "driver" if not owner else "senior",
                                short.get("lines") or [], str(short.get("note") or ""))
@@ -1859,6 +1867,9 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
     doc = await db.supply_task_noscan(sid, oid, me, now)
     if not doc:
         return {"ok": False, "verdict": "closed"}
+    if photo:
+        await db.supply_noscan_photo_set(sid, oid, photo, thumb)
+        doc = await db.supply_get(sid) or doc
     try:
         import stock_routes
         stock_routes.base_drop()            # товар на полке — склад видит сразу
@@ -1871,11 +1882,20 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
         from owner_routes import notify_owners_force
         where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
         base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
-        await notify_owners_force(
-            "supply.noscan",
-            f"📦 *Принято без сканирования — {_md(where)}{base}*\n"
-            f"{_md(me)} · {v['left']} {_plural(v['left'], 'бутылка', 'бутылки', 'бутылок')}"
-            f" · {v['positions']} {_plural(v['positions'], 'позиция', 'позиции', 'позиций')}")
+        text = (f"📦 *Принято без сканирования — {_md(where)}{base}*\n"
+                f"{_md(me)} · {v['left']} {_plural(v['left'], 'бутылка', 'бутылки', 'бутылок')}"
+                f" · {v['positions']} {_plural(v['positions'], 'позиция', 'позиции', 'позиций')}")
+        if photo:
+            # Чек базы и есть сообщение: по нему сверяют, что привезли.
+            from owner_routes import notify_owners_photo
+            import html as _html
+            await notify_owners_photo("supply.noscan", "📦 <b>Принято без сканирования — "
+                                      f"{_html.escape(where)}</b>{_html.escape(base)}\n"
+                                      f"{_html.escape(me)} · {v['left']} "
+                                      f"{_plural(v['left'], 'бутылка', 'бутылки', 'бутылок')} · чек базы",
+                                      photo)
+        else:
+            await notify_owners_force("supply.noscan", text)
     except Exception as e:
         log.error(f"[supply] уведомление о приёмке без кодов: {e}")
     return {"ok": True, **v}
@@ -3326,6 +3346,19 @@ async def handle_own_noscan(request):
 
 
 @require_owner
+async def handle_own_noscan_photo(request):
+    """GET /api/owner/supply/{sid}/noscan-photo?district= — чек базы, снятый
+    водителем при приёмке без сканирования."""
+    img = await db.supply_noscan_photo(request.match_info.get("sid") or "",
+                                       str(request.query.get("district") or "").strip())
+    if not img:
+        return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
+    ctype = "image/png" if img[:2] == b"\x89P" else "image/jpeg"
+    return web.Response(body=img, content_type=ctype,
+                        headers={**CORS_HEADERS, "Cache-Control": "private, max-age=3600"})
+
+
+@require_owner
 async def handle_own_hold(request):
     """Занять задачу под сканирование или отпустить: {district, on, as}."""
     try:
@@ -3561,6 +3594,7 @@ def setup(app):
         # выше уже занят и означает совсем другое — освободить позицию, а не
         # отдать район.
         ("/api/owner/supply/{sid}/tasks",           handle_own_tasks,    "GET"),
+        ("/api/owner/supply/{sid}/noscan-photo",    handle_own_noscan_photo, "GET"),
         ("/api/owner/supply/{sid}/task/claim",      handle_own_claim,    "POST"),
         ("/api/owner/supply/{sid}/task/assign",     handle_own_assign,   "POST"),
         ("/api/owner/supply/{sid}/task/release",    handle_own_release,  "POST"),

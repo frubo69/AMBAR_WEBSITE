@@ -3166,11 +3166,16 @@ async def handle_supply_noscan(request):
     except Exception:
         body = {}
     lines = body.get("lines")
+    # Чек базы обязателен (владелец, 30 сен 2026). Кадр — с камеры приложения.
+    photo, плохо = photos.decode(body.get("photo"))
+    if плохо:
+        return web.json_response({"ok": False, "verdict": плохо}, status=400, headers=CORS_HEADERS)
     res = await supply_routes.task_noscan(
         request.match_info.get("sid") or "",
         str(body.get("district") or "").strip(), me["name"],
         short={"lines": lines, "note": str(body.get("note") or "")}
-              if isinstance(lines, list) and lines else None)
+              if isinstance(lines, list) and lines else None,
+        photo=photo, thumb=str(body.get("thumb") or "")[:photos.MAX_THUMB])
     return web.json_response(res, headers=CORS_HEADERS,
                              dumps=lambda o: json.dumps(o, default=str))
 

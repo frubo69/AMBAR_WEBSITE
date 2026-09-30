@@ -37,6 +37,11 @@ os.environ["MONGO_URI"] = ""; os.environ.setdefault("AMBAR_OWNER_IDS", "1")
 import logging; logging.disable(logging.CRITICAL)
 from mongomock_motor import AsyncMongoMockClient                  # noqa: E402
 import db, supply_routes as sr, stock_routes as SR                # noqa: E402
+# С 30 сен 2026 водителю без снимка чека базы «без сканирования» не принять
+# (verdict photo_needed); здесь проверяется остальное — кадр подставляем.
+_task_noscan = sr.task_noscan
+sr.task_noscan = lambda *a, **k: _task_noscan(*a, **{"photo": b"\xff\xd8" + b"x" * 40, **k})
+
 
 SEEDS = int(os.getenv("LIFE_SEEDS", "60"))
 STEPS = int(os.getenv("LIFE_STEPS", "70"))
@@ -176,7 +181,10 @@ async def scenarios():
 
     print("\nБез сканирования, всё сошлось")
     sid = await fresh()
+    eq("без чека базы не принять", (await _task_noscan(sid, "jvc", "Худоба")).get("verdict"), "photo_needed")
     eq("принято без сканирования", (await sr.task_noscan(sid, "jvc", "Худоба")).get("ok"), True)
+    eq("чек базы лёг рядом с задачей", (len(await db.supply_noscan_photo(sid, "jvc")) > 40,
+       ((await db.supply_get(sid))["tasks"]["jvc"]).get("noscan_photo")), (True, True))
     eq("товар на складе сразу", await stock("jvc"), base("jvc", **PLAN["jvc"]))
     eq("второй раз отметить нельзя", (await sr.task_noscan(sid, "jvc", "Худоба")).get("verdict"), "already")
     await scan_n(sid, "jvc", "p1", 2)

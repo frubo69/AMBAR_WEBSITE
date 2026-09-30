@@ -37,6 +37,11 @@ os.environ.setdefault("AMBAR_OWNER_IDS", "1")
 import logging
 logging.disable(logging.CRITICAL)
 import db, supply_routes as sr, stock_routes as SR
+# С 30 сен 2026 водителю без снимка чека базы «без сканирования» не принять
+# (verdict photo_needed); здесь проверяется остальное — кадр подставляем.
+_task_noscan = sr.task_noscan
+sr.task_noscan = lambda *a, **k: _task_noscan(*a, **{"photo": b"\xff\xd8" + b"x" * 40, **k})
+
 
 SEEDS = int(os.getenv("FUZZ_SEEDS", "40"))
 STEPS = int(os.getenv("FUZZ_STEPS", "160"))

@@ -20637,10 +20637,10 @@ function fbHubHtml(b, err){
   </div>
   <div class="sc fb-hub">
     ${fbCapT('Зарплаты/премии/удержания')}
-    ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
     ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
     ${fbGo('Лист премий', 'bonus.due', (TEN && TEN.due) || 0, "accOpen('finbonus')",
            {unit: TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек ждёт', 'человека ждут', 'человек ждут')}` : 'за стаж'})}
+    ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
   </div>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками

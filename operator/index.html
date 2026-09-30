@@ -1934,6 +1934,15 @@ body.safe-open .cvo-hdr{opacity:0}
 .sh-b{flex:1;min-width:0}
 .sh-n{display:block;font-size:14px;font-weight:700;line-height:1.2}
 .sh-s.warn{color:var(--warn)}
+/* Водители открытой смены: кто когда открыл свою. */
+.sh-r.has-dl{flex-wrap:wrap}
+.sh-dl{flex:0 0 100%;display:flex;flex-direction:column;gap:5px;padding-top:10px;
+  border-top:1px solid var(--border3)}
+.sh-dv{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--sub);line-height:1.35}
+.sh-dv b{font-weight:600;color:var(--text);white-space:nowrap}
+.sh-dv.ok{color:var(--up)}
+.sh-dv.warn{color:var(--warn)}
+.sh-drv-s.warn{color:var(--warn)}
 .sh-s{display:block;font-size:11.5px;color:var(--sub);margin-top:2px}
 .sh-s b{color:var(--warn-t)}
 .sh-go{flex:0 0 auto;padding:10px 15px;border-radius:var(--r2);font-family:inherit;
@@ -6675,23 +6684,33 @@ function shiftPaint(){
     const on = Object.keys(x.crew || {}).filter(n => x.crew[n]);
     const notOpen = on.filter(n => !(cs[n] || {}).open && !(cs[n] || {}).closed);
     const gone = on.filter(n => (cs[n] || {}).closed);
+    // По каждому водителю — своя строка со временем (владелец, 30 сен 2026:
+    // «не видно, когда сам водитель открыл смену и открывал ли вообще»).
+    // Раньше тут была одна сводная фраза: «на смене 3 водителя» не говорила,
+    // кто когда вышел, а «не открыли: …» прятала тех, кто открыл.
+    const drvLine = n => { const v = cs[n] || {};
+      return v.closed ? ['off', `закрыл смену в ${_hhmm(v.closed_at) || '—'}${_hhmm(v.opened_at) ? ' · открывал в ' + _hhmm(v.opened_at) : ''}`]
+           : v.open ? ['ok', `открыл смену в ${_hhmm(v.opened_at) || '—'}`]
+           : ['warn', 'смену не открывал']; };
     const crewLine = x.closed || !on.length ? ''
-      : notOpen.length ? `<span class="sh-s warn">не открыли смену: ${_esc(notOpen.join(', '))}</span>`
-      : gone.length ? `<span class="sh-s">закрыли смену: ${_esc(gone.join(', '))}</span>`
-      : `<span class="sh-s">на смене ${on.length} ${plural(on.length,'водитель','водителя','водителей')}</span>`;
+      : `<span class="sh-dl">${on.map(n => { const [k, t] = drvLine(n);
+          return `<span class="sh-dv ${k}"><b>${_esc(n)}</b>${t}</span>`; }).join('')}</span>`;
     // Бригаду правят в открытой смене сколько угодно раз (владелец, 24 сен
     // 2026): человек вышел позже, кого-то отпустили — это обычный ход дня, а
     // не повод закрывать район и открывать заново.
     const crewBtn = x.closed ? '' : `<button class="sh-crew-b"
         onclick="shCrewOpen('${x.district}')">Бригада</button>`;
-    return `<div class="sh-r ${x.closed ? 'off' : ''}">
+    // Водители — отдельной строкой во всю ширину, под кнопками: рядом с ними
+    // на имя и время не хватало места, и время обрезалось.
+    return `<div class="sh-r ${x.closed ? 'off' : ''}${crewLine ? ' has-dl' : ''}">
       <span class="sh-code">${_esc(x.code)}</span>
       <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
-        <span class="sh-s">${sub}</span>${crewLine}</span>
+        <span class="sh-s">${sub}</span></span>
       ${crewBtn}
       <button class="sh-go ${x.closed ? 'ghost' : ''}"
         onclick="${x.closed ? `shiftReopen('${x.district}')` : `shiftClose('${x.district}')`}">
         ${x.closed ? 'Открыть' : 'Закрыть'}</button>
+      ${crewLine}
     </div>`;
   }).join('');
 }
@@ -6761,10 +6780,14 @@ function shCrewPaint(){
         fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="s">на смене ${on} ${plural(on,'водитель','водителя','водителей')} · меняйте сколько нужно</div>
     ${names.length ? `<div class="sh-crew">${names.map(n => {
-      const своя = (cs[n] || {}).open, ушёл = (cs[n] || {}).closed;
-      const под = своя ? 'смена открыта' : ушёл ? 'смену закрыл' : '';
+      const v = cs[n] || {}, своя = v.open, ушёл = v.closed;
+      // Со временем: «открыта» без часа не отвечала на вопрос, когда он вышел;
+      // у отмеченного «На смене», но не открывшего — так и пишем.
+      const под = своя ? `открыл смену в ${_hhmm(v.opened_at) || '—'}`
+        : ушёл ? `закрыл в ${_hhmm(v.closed_at) || '—'}${_hhmm(v.opened_at) ? ' · открывал в ' + _hhmm(v.opened_at) : ''}`
+        : crew[n] === true ? 'смену не открывал' : '';
       return `<div class="sh-drv">
-        <span class="sh-drv-n">${_esc(n)}${под ? `<i class="sh-drv-s">${под}</i>` : ''}</span>
+        <span class="sh-drv-n">${_esc(n)}${под ? `<i class="sh-drv-s${!своя && !ушёл ? ' warn' : ''}">${под}</i>` : ''}</span>
         <span class="sh-drv-b">
           <button class="sh-ch ${crew[n] === true ? 'on' : ''}" ${E.busy ? 'disabled' : ''}
             onclick="shCrewSet('${_esc(n)}',true)">На смене</button>

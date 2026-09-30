@@ -73,19 +73,23 @@ async def main():
     eq("ни названия, ни номера", m("", ""), (None, None))
     eq("опечатка в названии", m(3, nm("p105").replace("Shiraz", "Shiraz.")[:-1] + "5")[0], "p105")
     eq("чужой товар под нашим номером — чужой, а не наш по номеру",
-       m(num["p10"], "Laroche Chablis St Martin"), (None, None))
+       m(num["p10"], "Chateau Неизвестный Grand Cru"), (None, None))
+    eq("своё название магазина для нашей позиции (config_store_names)",
+       nm(m(7, "laroche chablis  st. martin")[0]), "Louis Moreau Chablis 0.75")
+    from config_store_names import STORE_NAMES
+    eq("все названия магазина ведут в каталог", [n for n, p in STORE_NAMES.items() if p not in cat], [])
     eq("название чуть переписали, номер наш — по номеру",
        m(num["p1"], "Absolut Vodka 1L")[0], "p1")
 
     print("\nФайл, который магазин перенумеровал")
     ids = ["p1", "p43", "p35", "p105", "p15"]
     rows = [(i + 1, nm(p), 10, i + 1, 0, 2, 0, 0) for i, p in enumerate(ids)]      # номера 1…5
-    rows.insert(3, (4, "Laroche Chablis St Martin", 50, 3, 0, 0, 0, 0))             # своё от магазина
+    rows.insert(3, (4, "Chateau Неизвестный Grand Cru", 50, 3, 0, 0, 0, 0))             # своё от магазина
     st, body, sup = await load(book(rows))
     eq("загрузился", (st, body.get("ok")), (200, True))
     got = {it["id"]: (it["by_district"].get("jvc"), it["by_district"].get("silicon")) for it in sup["items"]}
     eq("каждая строка на своём товаре", got, {p: (i + 1, 2) for i, p in enumerate(ids)})
-    eq("чужая строка не пропала и ни на кого не легла", body["unknown"], ["Laroche Chablis St Martin"])
+    eq("чужая строка не пропала и ни на кого не легла", body["unknown"], ["Chateau Неизвестный Grand Cru"])
     eq("сказано, сколько строк узнали по названию", body["renumbered"] >= 3, True)
 
     print("\nНаш файл без правок — как раньше")

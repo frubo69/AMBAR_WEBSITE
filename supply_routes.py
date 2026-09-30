@@ -503,6 +503,15 @@ def _name_index(cat: dict) -> dict:
         k = _name_key(p.get("name"))
         if k:
             out.setdefault(k, pid)
+    # Свои названия магазина для наших позиций (config_store_names). Имя из
+    # каталога главнее: если оно совпало с чьим-то прозвищем, верим каталогу.
+    try:
+        from config_store_names import STORE_NAMES
+        for name, pid in STORE_NAMES.items():
+            if pid in cat and _name_key(name):
+                out.setdefault(_name_key(name), pid)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] названия магазина не прочитаны: {e}")
     return out
 
 

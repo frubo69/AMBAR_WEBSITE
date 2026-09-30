@@ -3444,6 +3444,13 @@ button.path:active{transform:scale(.995)}
 .dds-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
 .dds-r.in b{color:var(--up)} .dds-r.out b{color:var(--dn)}
+/* За что: строки под движением — с отступом, обычным шрифтом, тише. */
+.dds-i{display:flex;align-items:baseline;gap:12px;padding:0 16px 11px 30px;margin-top:-4px}
+.dds-i + .dds-i{margin-top:0}
+.dds-i span{flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--sub);line-height:1.3}
+.dds-i b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--sub)}
+.dds-i b u{display:none}
 .dds-r.zero span{color:var(--muted)} .dds-r.zero b{color:var(--dim)} .dds-r.zero b u{opacity:.5}
 .dds-r.wait span,.dds-r.wait b{color:var(--muted)}
 .dds-day{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 16px}
@@ -21208,13 +21215,24 @@ function fbDdcParts(d){
   // День не подтверждён — раскладка ещё предложение, в сейф не легла.
   const n = v => +v || 0, ok = !d.pending;
   const rp = ok ? n(d.collected) : 0, b = ok ? n(d.aside) : 0, np = ok ? n(d.np_plus) : 0;
-  const ins = [{name: 'РП+', v: rp}, {name: 'ДопРП+', v: n(d.extra_rp)}, {name: 'ЧП+', v: Math.max(0, np)}];
-  if(b) ins.push({name: 'Барракуда+', v: b});
+  // Под каждым движением — за что (владелец: «везде помимо самой суммы надо
+  // писать за что: в РП — сим-карты −192, премия −283»). Запись — своей строкой.
+  const it = (name, v) => ({name, v: n(v)}), has = a => a.filter(x => x.v);
+  const extra = (d.ins || []).map(e => it([e.comment || 'Приход в фонд', e.who].filter(Boolean).join(' · '), e.amount));
+  if(n(d.extra_manual)) extra.push(it('Вписан руками', d.extra_manual));
+  const ins = [{name: 'РП+', v: rp, items: has([it('Из выручки дня', rp)])},
+               {name: 'ДопРП+', v: n(d.extra_rp), items: has(extra)},
+               {name: 'ЧП+', v: Math.max(0, np), items: has([it('Остаток выручки дня', Math.max(0, np))])}];
+  if(b) ins.push({name: 'Барракуда+', v: b, items: [it('Из выручки дня', b)]});
   // ЧП−: выплаты из прибыли, оплата Барракуде сверх её стопки и день, когда
   // расходы водителей больше наличной выручки (ЧП+ ушёл бы в минус).
-  const outs = [{name: 'РП−', v: n(d.expenses_sum)},
-                {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra) + Math.max(0, -np)}];
-  if(n(d.pay_b)) outs.push({name: 'Барракуда−', v: n(d.pay_b)});
+  const rpOut = (d.expenses || []).map(e => it(
+    [e.kind_t || e.line_name || 'Вне плана', e.kind_t ? e.who : e.comment].filter(Boolean).join(' · '), e.amount));
+  const npOut = (d.payouts || []).map(e => it([e.who, e.comment].filter(Boolean).join(' · ') || 'Выплата', e.amount));
+  npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra), it('Расходы водителей больше выручки', Math.max(0, -np)));
+  const outs = [{name: 'РП−', v: n(d.expenses_sum), items: has(rpOut)},
+                {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra) + Math.max(0, -np), items: has(npOut)}];
+  if(n(d.pay_b)) outs.push({name: 'Барракуда−', v: n(d.pay_b), items: [it('Оплата Барракуде', d.pay_b)]});
   const sum = a => a.reduce((t, r) => t + r.v, 0);
   return {ins, outs, inSum: sum(ins), outSum: sum(outs)};
 }
@@ -21224,7 +21242,8 @@ function fbDdcBodyHtml(d, start){
   const p = fbDdcParts(d), saldo = p.inSum - p.outSum, end = start.all + saldo;
   const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
   const kids = (arr, cls, sign) => arr.map(r =>
-    `<div class="dds-r ${r.v ? cls : 'zero'}"><span>${escS(r.name)}</span>${v(r.v, r.v ? sign : '')}</div>`).join('');
+    `<div class="dds-r ${r.v ? cls : 'zero'}"><span>${escS(r.name)}</span>${v(r.v, r.v ? sign : '')}</div>`
+    + (r.items || []).map(x => `<div class="dds-i ${cls}"><span>${escS(x.name)}</span>${v(x.v, sign)}</div>`).join('')).join('');
   // Считаем сами и сверяем с сейфом: разошлось — молчать нельзя.
   const diff = Math.round(end - (+d.stack_total || 0));
   return `

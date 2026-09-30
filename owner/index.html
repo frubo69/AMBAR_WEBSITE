@@ -6274,6 +6274,8 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   font-family:inherit;cursor:pointer;line-height:1.3}
 button.shl-p:active{transform:scale(.96)}
 .shl-p.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
+.shl-p.work{color:var(--up);background:var(--up-soft);border-color:currentColor}
+.shl-p.shut{color:var(--dn);background:var(--dn-soft);border-color:currentColor}
 .shl-none{font-size:11.5px;color:var(--muted)}
 
 /* ── Нормы ───────────────────────────────────────────────────────────────
@@ -35628,9 +35630,9 @@ function shLogCard(c){
     if(o) staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i class="op">открыл</i></span>`);
     if(z) staff.push(`<span class="shl-p who">${ICO_WHO}${who(z)}<i class="cl">закрыл</i></span>`);
   }
-  // Золотым горит не тот, кого отметил оператор, а тот, кто САМ открыл
-  // смену в своём приложении: отметка — это «его ждут», открытие — «он
-  // вышел». Нажатие на плашку — карточка с временем открытия и закрытия.
+  // Цвет плашки (владелец, 30 сен 2026): закрыл себе смену — красным; назначен
+  // на день и смену не закрывал — зелёным («пока работает»); не работал — серым.
+  // Нажатие на плашку — карточка с временем открытия и закрытия.
   const day = (o || z || {}).day || '';
   // Кто открыл и закрыл — своей строкой, водители — своей: это разные
   // вопросы, и в одном ряду они читались как одна бригада.
@@ -35639,7 +35641,7 @@ function shLogCard(c){
         const key = `${day}|${c.district || c.code}|${x.name}`;
         SHL_CREW[key] = {...x, day, district: c.code || '', dname: name,
                          opener: o ? (o.by || o.operator || '') : ''};
-        return `<button class="shl-p ${x.opened_at ? 'on' : ''}"
+        return `<button class="shl-p ${x.closed_at ? 'shut' : (x.working || x.opened_at) ? 'work' : ''}"
           onclick="shDrvInfo('${escS(key).replace(/'/g, '&#39;')}')">${escS(x.name)}</button>`;
       }).join('')
     : (o ? '<span class="shl-none">водители не назначены</span>' : '');

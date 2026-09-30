@@ -3417,7 +3417,25 @@ button.path:active{transform:scale(.995)}
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
 .fb-none{padding:13px 16px;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,.05)}
-/* Отчёт ДДС: движение — время, что это, сумма и остаток сейфа после неё. */
+/* Отчёт ДДС одной таблицей (dds-): в начале → поступления → выплаты → сальдо →
+   в конце. Строка — название и сумма; статьи под итогом с отступом и тише. */
+.dds{border-radius:18px;background:var(--card);border:1px solid var(--border2);overflow:hidden}
+.dds-r{display:flex;align-items:baseline;gap:12px;padding:13px 16px;border-top:1px solid rgba(255,255,255,.06)}
+.dds-r:first-child{border-top:0}
+.dds-r span{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:var(--text)}
+.dds-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
+.dds-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
+.dds-r.in b{color:var(--up)} .dds-r.out b{color:var(--dn)}
+.dds-r.kid{padding:10px 16px 10px 30px}
+.dds-r.kid span{font-size:13.5px;font-weight:500;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dds-r.kid b{font-size:14px;font-weight:600}
+.dds-r.wait span,.dds-r.wait b{color:var(--muted)}
+.dds-r.wait span i{display:block;font-style:normal;font-size:11px;color:var(--warn);margin-top:2px}
+.dds-r.end{background:rgba(201,169,110,.06);border-top-color:rgba(201,169,110,.25)}
+.dds-r.end b{font-size:18px}
+.dds-r.neg b{color:var(--dn)}
+/* Старая лента ДДС (до 30 сен 2026) — стили оставлены, ими никто не пользуется. */
 .ddc-r{display:flex;align-items:center;gap:10px;min-height:46px;padding:7px 16px;
   border-top:1px solid rgba(255,255,255,.05)}
 .ddc-r:first-child{border-top:0}
@@ -21146,15 +21164,9 @@ function fbDdcPaint(){
   body.innerHTML = fbDdcBodyHtml(d, start);
 }
 function fbDdcCardInner(d, start){
-  const was = start ? start.all : null, now = d ? d.stack_total : null;
   return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
       <span class="exp-day-l"><span class="exp-day-t">Отчёт<i>ДДС</i></span></span>
       ${_dayNav('ddcDay')}
-    </div>
-    <div class="aud-g">
-      ${fbTile('Было', 'ddc.was', was, {mode: 'neg'})}
-      ${fbTile('Движения', 'ddc.move', d && start ? now - was : null, {mode: 'pos'})}
-      ${fbTile('Стало', 'd.stack_total', now, {mode: 'neg'})}
     </div>`;
 }
 // Сколько лежало в сейфе до этого дня: остаток прошлого дня, а у первого дня
@@ -21166,74 +21178,53 @@ function fbDdcStart(b, day){
   const o = b.opening || {}, sb = +o.safe_b_open || 0, rp = +o.rp_open || 0, np = +o.np_open || 0;
   return {b: sb, rp, np, all: sb + rp + np};
 }
-// Лента движений: со временем — записи книги, без времени — выручка (она
-// сверху) и оплата базе (она снизу); внутри времени порядок как писали.
-function fbDdcRows(d){
-  const n = v => +v || 0, rows = [];
-  if(n(d.base)) rows.push({first: true, name: 'Выручка сдана', wait: d.pending, v: n(d.base),
-    sub: d.pending ? 'день не подтверждён'
-       : `Барракуда ${fbFmt(d.aside)} · РП+ ${fbFmt(d.collected)} · ЧП+ ${fbFmt(d.np_plus)}`});
-  (d.ins || []).forEach(e => rows.push({at: e.at, v: n(e.amount),
-    name: e.comment || 'Приход в фонд', sub: ['РП+', e.who].filter(Boolean).join(' · ')}));
-  if(n(d.extra_manual)) rows.push({name: 'Доп. приход в фонд', sub: 'РП+ · вписан руками', v: n(d.extra_manual)});
-  (d.expenses || []).forEach(e => rows.push({at: e.at, v: -n(e.amount),
-    name: e.kind_t ? `${e.kind_t} · ${e.who || ''}`.trim() : (e.comment || 'Расход'),
-    sub: ['РП−', e.line_name || 'вне плана', e.kind_t ? e.comment : e.who].filter(Boolean).join(' · ')}));
-  (d.payouts || []).forEach(e => rows.push({at: e.at, v: -n(e.amount),
-    name: e.who || e.comment || 'Выплата',
-    sub: ['ЧП−', e.who && e.comment ? e.comment : ''].filter(Boolean).join(' · ')}));
-  if(n(d.pay)) rows.push({last: true, name: 'Оплата Барракуде', v: -n(d.pay),
-    sub: n(d.pay_b_extra) ? `из стопки Барракуды ${fbFmt(d.pay_b)} · из ЧП ${fbFmt(d.pay_b_extra)}`
-                          : 'из стопки Барракуды'});
-  const где = r => r.first ? 0 : r.at ? 1 : r.last ? 3 : 2;
-  return rows.sort((x, y) => (где(x) - где(y)) || String(x.at || '').localeCompare(String(y.at || '')));
+// Отчёт одной таблицей (владелец, 30 сен 2026: «ногу сломишь… нужно что-то
+// максимально простое, минималистичное и с очевидной логикой» — и пример:
+// денег в начале, поступления по статьям, выплаты по статьям, сальдо, денег в
+// конце). Стопок, ленты по времени и «мимо сейфа» здесь больше нет: это отчёт
+// о наличных, а не устройство сейфа. Арифметика та же, из книги:
+// начало + поступления − выплаты = конец (= d.stack_total).
+function fbDdcParts(d){
+  const n = v => +v || 0, ins = [], outs = [], add = (arr, name, v) => {
+    if(!v) return; const x = arr.find(r => r.name === name);
+    if(x) x.v += v; else arr.push({name, v}); };
+  // Выручка: продали за наличные, из них чай и расходы водителей ушли сразу.
+  // День не подтверждён — в сейф она ещё не легла, в итоги не идёт.
+  if(!d.pending){
+    const calc = n(d.cash) - n(d.tips_cash) - n(d.spend_cash), fix = n(d.base) - calc;
+    add(ins, 'Продажи наличными', n(d.cash));
+    add(outs, 'Чай водителям', n(d.tips_cash));
+    add(outs, 'Расходы водителей', n(d.spend_cash));
+    if(fix) add(fix > 0 ? ins : outs, 'Поправка при сдаче выручки', Math.abs(fix));
+  }
+  (d.ins || []).forEach(e => add(ins, e.comment || 'Приход в фонд', n(e.amount)));
+  add(ins, 'Приход в фонд', n(d.extra_manual));
+  add(outs, 'Оплата Барракуде', n(d.pay) || (n(d.pay_b) + n(d.pay_b_extra)));
+  (d.expenses || []).forEach(e => add(outs, e.line_name || e.kind_t || 'Вне плана', n(e.amount)));
+  (d.payouts || []).forEach(e => add(outs, 'Из прибыли' + (e.who || e.comment ? ' · ' + (e.who || e.comment) : ''), n(e.amount)));
+  const sum = a => a.reduce((t, r) => t + r.v, 0);
+  return {ins, outs, inSum: sum(ins), outSum: sum(outs)};
 }
 function fbDdcBodyHtml(d, start){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
   if(d.future) return '<div class="exp-empty">Этот день ещё не наступил</div>';
-  let run = start.all;
-  const list = fbDdcRows(d).map(r => {
-    if(!r.wait) run += r.v;                     // неподтверждённая выручка остаток не двигает
-    const plus = r.v > 0;
-    return `<div class="ddc-r${plus ? ' up' : ''}${r.wait ? ' wait' : ''}">
-      <span class="ddc-t">${escS((r.at && _hm(r.at)) || '·')}</span>
-      <span class="ddc-b"><b>${escS(r.name)}</b>${r.sub ? `<i>${escS(r.sub)}</i>` : ''}</span>
-      <span class="ddc-v"><b>${plus ? '+' : '−'}${fbFmt(Math.abs(r.v))}</b>${
-        r.wait ? '' : `<i>${fbFmt(run)}</i>`}</span>
-    </div>`;
-  }).join('');
-  // Лента и стопки считаются порознь: разошлись — молчать нельзя.
-  const diff = Math.round(run - (+d.stack_total || 0));
-  const side = [], add = (t, k, v) => { if(v) side.push(fbRow(t, k, v, {sub: true})); };
-  add('Чай водителям', 'd.tips_cash', d.tips_cash);
-  add('Расходы водителей', 'd.spend_cash', d.spend_cash);
-  add('Расходы водителей безналом', 'd.spend_card', d.spend_card);
-  add('Заказы картой', 'd.card', d.card);
-  add('Заказы криптой — на кошелёк', 'd.crypto', d.crypto);
-  add('Заказы в долг', 'd.debt', d.debt);
-  add('Заказали у Барракуды', 'd.ordered', d.ordered);
-  add('Закупили на других базах', 'd.ordered_extra', d.ordered_extra);
-  return `
-  <div class="sc fb-gut">
-    ${fbCapT('Было в сейфе')}
-    ${fbRow('Всего наличными', 'ddc.was', start.all, {sum: true, mode: 'neg'})}
-    ${fbRow('Барракуда', 'ddc.was_b', start.b, {sub: true})}
-    ${fbRow('РП', 'ddc.was_rp', start.rp, {sub: true, mode: 'neg'})}
-    ${fbRow('ЧП', 'ddc.was_np', start.np, {sub: true, mode: 'neg'})}
-  </div>
-  <div class="sc">
-    ${fbCapT('Движения за день')}
-    ${list || '<div class="fb-none">Денег в этот день не двигали</div>'}
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Стало в сейфе')}
-    ${fbRow('Барракуда', 'd.stack_b', d.stack_b)}
-    ${fbRow('РП', 'd.stack_rp', d.stack_rp, {mode: 'neg'})}
-    ${fbRow('ЧП', 'd.stack_np', d.stack_np, {mode: 'neg'})}
-    ${fbRow('Всего наличными', 'd.stack_total', d.stack_total, {sum: true, sign: '=', mode: 'neg'})}
-    ${diff ? fbRow('Лента и стопки разошлись', 'ddc.diff', diff, {sub: true, mode: 'diff'}) : ''}
-  </div>
-  ${side.length ? `<div class="sc fb-gut">${fbCapT('Мимо сейфа', 'в наличные не попало')}${side.join('')}</div>` : ''}`;
+  const p = fbDdcParts(d), saldo = p.inSum - p.outSum, end = start.all + saldo;
+  const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
+  const row = (cls, name, val, sign) => `<div class="dds-r ${cls}"><span>${name}</span>${v(val, sign)}</div>`;
+  const kids = (arr, cls, sign) => arr.map(r => row('kid ' + cls, escS(r.name), r.v, sign)).join('');
+  // Считаем сами и сверяем с сейфом: разошлось — молчать нельзя.
+  const diff = Math.round(end - (+d.stack_total || 0));
+  return `<div class="dds">
+    ${row(start.all < 0 ? 'neg' : '', 'Денег в начале', start.all)}
+    ${row('in', 'Поступления', p.inSum, p.inSum ? '+' : '')}
+    ${kids(p.ins, 'in', '')}
+    ${d.pending && +d.base ? `<div class="dds-r kid wait"><span>Выручка дня<i>день не подтверждён — в сейф ещё не легла</i></span>${v(+d.base)}</div>` : ''}
+    ${row('out', 'Выплаты', p.outSum, p.outSum ? '−' : '')}
+    ${kids(p.outs, 'out', '−')}
+    ${row(saldo < 0 ? 'out' : 'in', 'Сальдо', saldo, saldo > 0 ? '+' : '')}
+    ${row('end' + (end < 0 ? ' neg' : ''), 'Денег в конце', end)}
+    ${diff ? row('kid out', 'Не сходится с сейфом', diff) : ''}
+  </div>`;
 }
 
 // ── РП+: сколько откладывали по дням ──────────────────────────────────────

@@ -21258,10 +21258,10 @@ function fbDdcBodyHtml(d, start){
   return `
   <div class="sc dds-one">
     <div class="dds-tot${start.all < 0 ? ' neg' : ''}"><span>Сейф начало дня</span>${v(start.all)}</div>
-    <div class="sc-cap dds-cap ${p.inSum < 0 ? 'out' : 'in'}"><span>Поступления</span>${v(p.inSum, p.inSum > 0 ? '+' : '')}</div>
+    <div class="sc-cap dds-cap ${p.inSum < 0 ? 'out' : 'in'}"><span>Приход</span>${v(p.inSum, p.inSum > 0 ? '+' : '')}</div>
     ${kids(p.ins, 'in', '+')}
     ${d.pending && +d.base ? `<div class="dds-r wait"><span>Выручка дня<i>день не подтверждён — в сейф ещё не легла</i></span>${v(+d.base)}</div>` : ''}
-    <div class="sc-cap dds-cap out"><span>Выплаты</span>${v(p.outSum, p.outSum ? '−' : '')}</div>
+    <div class="sc-cap dds-cap out"><span>Расход</span>${v(p.outSum, p.outSum ? '−' : '')}</div>
     ${kids(p.outs, 'out', '−')}
     <div class="dds-day ${saldo < 0 ? 'out' : saldo > 0 ? 'in' : ''}"><span>Баланс</span>${v(saldo, saldo > 0 ? '+' : '')}</div>
     <div class="dds-tot end${end < 0 ? ' neg' : ''}"><span>Сейф конец дня</span>${v(end)}</div>

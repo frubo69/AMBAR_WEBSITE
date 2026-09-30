@@ -61,6 +61,10 @@ async def extras():
 
 async def main():
     db._db = AsyncMongoMockClient()["ambar_drv_adv"]
+    # Расходы вносят при открытой смене (30 сен 2026) — открываем её водителю.
+    from datetime import datetime as _dt, timezone as _tz
+    await db._db.driver_days.update_one({"day": D, "driver": DRV},
+                                        {"$set": {"shift_open_at": _dt.now(_tz.utc)}}, upsert=True)
     staff.drivers = lambda: [{"name": DRV, "district": "jvc", "operator": "Умар"}]
     staff.DRIVER_IDS = {}
 

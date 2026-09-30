@@ -61,6 +61,10 @@ async def items():
 
 async def main():
     db._db = AsyncMongoMockClient()["ambar_pay"]
+    # Расходы вносят при открытой смене (30 сен 2026) — открываем её водителю.
+    from datetime import datetime as _dt, timezone as _tz
+    await db._db.driver_days.update_one({"day": D, "driver": "Худоба"},
+                                        {"$set": {"shift_open_at": _dt.now(_tz.utc)}}, upsert=True)
 
     print("── приложение обязано спросить ────────────────────────────────")
     st, r = await post({"kind": "kfc", "amount": 30, "comment": "Али", "pay": ""})
@@ -138,6 +142,29 @@ async def main():
     eq("безналом отдельно: только бензин 120", j["spend_card"], 120)
     eq("строки знают, как платили", sorted((x["kind"], x["pay"]) for x in j["items"]),
        [("fuel", "card"), ("guard", ""), ("kfc", "cash"), ("owed_us", ""), ("parking", "cash"), ("we_got", "")])
+
+    # ── расходы только при открытой смене (владелец, 30 сен 2026: «после
+    # закрытия смены больше не мог дозаполнять расходы») ────────────────────
+    print("\nСмена закрыта — расходы не вносятся")
+    from datetime import datetime as _dt2, timezone as _tz2
+    было = len(await items())
+    await db._db.driver_days.update_one({"day": D, "driver": "Худоба"},
+                                        {"$set": {"shift_close_at": _dt2.now(_tz2.utc)}})
+    st, r = await post({"kind": "kfc", "amount": 30, "comment": "кому", "pay": "cash"})
+    eq("новый расход после закрытия — отказ", (st, r.get("error")), (409, "shift_closed"))
+    st, r = await post({"kind": "fuel", "none": True})
+    eq("«не было» после закрытия — тоже", (st, r.get("error")), (409, "shift_closed"))
+    st, r = await post({"kind": "wash", "car_del": True})
+    eq("убрать снимок мойки — тоже", (st, r.get("error")), (409, "shift_closed"))
+    eq("в базе ничего не прибавилось", len(await items()), было)
+    await db._db.driver_days.update_one({"day": D, "driver": "Худоба"},
+                                        {"$set": {"shift_close_at": None, "shift_open_at": None}})
+    st, r = await post({"kind": "kfc", "amount": 30, "comment": "кому", "pay": "cash"})
+    eq("смену ещё не открывал (новый день) — отказ", (st, r.get("error")), (409, "shift_not_open"))
+    await db._db.driver_days.update_one({"day": D, "driver": "Худоба"},
+                                        {"$set": {"shift_open_at": _dt2.now(_tz2.utc)}})
+    st, r = await post({"kind": "kfc", "amount": 30, "comment": "кому", "pay": "cash"})
+    eq("открыл смену — снова можно", st, 200)
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     sys.exit(1 if FAIL else 0)

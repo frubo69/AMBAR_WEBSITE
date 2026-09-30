@@ -8181,7 +8181,9 @@ function carTap(kind, what){
   }
   const есть = what === 'car' ? (CAR_SHOT.photo || _expSentCar(kind))
              : ((EXP_SHOT.kind === kind && EXP_SHOT.photo) || _expKeptRcp(kind));
-  if(есть) carView(kind, what); else carOpen(kind, what);
+  if(есть) return carView(kind, what);      // посмотреть снятое можно всегда
+  if(expShut()) return;
+  carOpen(kind, what);
 }
 
 const CAR_SHAPE = {car: 'carShape', rcp: 'rcpShape', odo: 'odoShape'};
@@ -8834,7 +8836,18 @@ async function expSendKind(kind){
 
 // «Не было» уходит сразу, без второго нажатия: это ответ из одного слова, и
 // подтверждать его нечем. Вернуть можно тем же «Изменить».
+// Расходы вносят, пока своя смена открыта (владелец, 30 сен 2026). Говорим об
+// этом сразу, до камеры и суммы: снять чек, вписать число и только потом
+// услышать отказ от сервера — хуже, чем узнать с первого нажатия.
+function expShut(){
+  if(!SH || (SH.opened && !SH.closed)) return false;
+  toast(SH.closed ? EXP_ERR.shift_closed : EXP_ERR.shift_not_open, 'err');
+  try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  return true;
+}
+
 async function expNone(kind, none){
+  if(expShut()) return;
   try{
     await drvApi.drvFetch('/api/driver/expenses',
       {method:'POST', body:{kind, none}});
@@ -8843,7 +8856,7 @@ async function expNone(kind, none){
     if(none){ delete EXP_CH[kind]; xpDraftDrop(kind); }   // ответили «не было» — черновик ни к чему
     await shLoad();
     await load();
-  }catch(e){ toast('Не отправилось', 'err'); }
+  }catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не отправилось', 'err'); }
 }
 
 // Первое нажатие открывает поле, второе отправляет. Правка уходит той же
@@ -13410,6 +13423,7 @@ async function sendEdit(btn){
 }
 
 async function sendExpense(btn, kind){
+  if(expShut()) return;
   const id = kind.startsWith('o_') ? kind.slice(2) : '';
   const amount = parseInt(((document.getElementById('e_' + kind) || {}).value || '')
     .replace(/\D/g,''), 10);
@@ -13462,7 +13476,8 @@ async function sendExpense(btn, kind){
 const EXP_ERR = {
   no_photo:  'Нужен снимок чека',
   no_car_photo: 'Нужен снимок машины на мойке',
-  shift_closed: 'Смена закрыта — переснять уже нельзя',
+  shift_closed: 'Смена закрыта — расходы больше не вносятся',
+  shift_not_open: 'Сначала откройте смену',
   photo_big: 'Снимок слишком тяжёлый, снимите ещё раз',
   bad_photo: 'Снимок не открылся, снимите ещё раз',
   amount_and_comment_required: 'Впишите сумму и комментарий',

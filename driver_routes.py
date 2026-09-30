@@ -2557,6 +2557,17 @@ async def handle_expense_add(request):
                or EXPENSE_KINDS.get(kind) or вид["t"])
     day = _biz_day()
 
+    # Расходы вносят, пока своя смена открыта (владелец, 30 сен 2026: «после
+    # закрытия смены больше не мог дозаполнять расходы»). Закрыл — всё, что не
+    # вписал, идёт через старшего, задним числом из STAR. До открытия следующей
+    # смены — тоже нельзя: иначе закрытие ничего бы не закрывало, расход
+    # просто лёг бы в новый день. Это касается и «не было», и правки, и снимков.
+    _d0 = await db.get_driver_day(day, me["name"]) or {}
+    if _d0.get("shift_close_at"):
+        return web.json_response({"error": "shift_closed"}, status=409, headers=CORS_HEADERS)
+    if not _d0.get("shift_open_at"):
+        return web.json_response({"error": "shift_not_open"}, status=409, headers=CORS_HEADERS)
+
     # «Не было» — обязательный ответ, а не расход. Пока водитель молчит, нельзя
     # отличить пустую заправку от забытой, и смена не считается сданной.
     if body.get("none") is not None and kind in MUST_ANSWER:

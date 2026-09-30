@@ -105,6 +105,10 @@ console.log(JSON.stringify({
 
 async def main():
     db._db = AsyncMongoMockClient()["ambar_other_rcp"]
+    # Расходы вносят при открытой смене (30 сен 2026) — открываем её водителю.
+    from datetime import datetime as _dt, timezone as _tz
+    await db._db.driver_days.update_one({"day": D, "driver": "Худоба"},
+                                        {"$set": {"shift_open_at": _dt.now(_tz.utc)}}, upsert=True)
 
     print("── «что-то ещё»: чек не обязателен ────────────────────────────")
     st, r = await post({"kind": "other", "amount": 60, "comment": "запчасть", "pay": "cash"})

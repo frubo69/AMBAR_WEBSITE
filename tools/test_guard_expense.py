@@ -29,7 +29,7 @@ class _DB:
     def __getattr__(self, n):
         async def f(*a, **k):
             if n == "add_driver_expense": SAVED.append(a[2]); return None
-            if n == "get_driver_day": return {}
+            if n == "get_driver_day": return {"shift_open_at": "x"}     # расходы — при открытой смене
             return None
         return f
 dr.db = _DB(); er.db = _DB()

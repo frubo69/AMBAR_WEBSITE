@@ -1,6 +1,8 @@
-"""Оператор и доп. заявки — полный доступ (владелец, 30 сен 2026): собрать,
-посмотреть, поправить состав (и у черновика), вписать цену, отправить черновик
-водителям, отменить. Основная заявка этими ручками не трогается.
+"""Оператор и доп. заявки — смотреть и править (владелец, 30 сен 2026: «чтобы
+операторы только редактировали, но отправлять водителям они не могут доп.
+заявку — и тем более заявку»): список, заявка целиком, состав по районам (и у
+черновика), цена. Собрать новую, отправить черновик и отменить оператор не
+может — ручек на это у него нет. Основная заявка не трогается вовсе.
 
     python3 tools/test_operator_extra.py
 """
@@ -42,12 +44,31 @@ async def main():
     # внутренняя ручка в _extra_do завёрнута в require_operator — снимаем охрану целиком
     raw = lambda h: h
 
-    print("Собрать")
-    st, r = await call(opr.handle_extra_new, {"base": "База Один", "as": "Оператор",
-                                              "items": [{"id": "p1", "by_district": {"jvc": 3, "bbay": 2}},
-                                                        {"id": "p2", "by_district": {"jvc": 1}}]})
-    eq("создана, открыта, автор — оператор", (st, r.get("status"), r.get("kind"), r.get("by_name")),
-       (200, "open", "extra", "Оператор"))
+    print("Отправить и собрать оператор не может")
+    eq("ручек «собрать», «отправить», «отменить» у оператора нет",
+       [n for n in ("handle_extra_new", "handle_extra_confirm", "handle_extra_cancel") if hasattr(opr, n)], [])
+    from aiohttp import web
+    app = web.Application(); opr.setup(app)
+    пути = sorted({(r.method, r.resource.canonical) for r in app.router.routes()
+                   if "/operator/extra" in r.resource.canonical and r.method not in ("OPTIONS", "HEAD")})
+    eq("в адресах оператора по доп. заявкам — только смотреть, состав и цена", пути,
+       [("GET", "/api/operator/extra"), ("GET", "/api/operator/extra/{sid}"),
+        ("POST", "/api/operator/extra/{sid}/buy"), ("POST", "/api/operator/extra/{sid}/lines")])
+    eq("и по основной заявке — только смотреть и править",
+       sorted({(r.method, r.resource.canonical) for r in app.router.routes()
+               if "/operator/stock/order" in r.resource.canonical and r.method not in ("OPTIONS", "HEAD")}),
+       [("GET", "/api/operator/stock/order"), ("POST", "/api/operator/stock/order/edit"),
+        ("POST", "/api/operator/stock/order/reset")])
+    eq("ничего про отправку заявки магазину или водителям",
+       [r.resource.canonical for r in app.router.routes() if "/api/operator/" in r.resource.canonical
+        and any(w in r.resource.canonical for w in ("/send", "/confirm", "/import", "/export", "/cancel"))
+        and "/supply" in r.resource.canonical + "/extra" * ("/extra" in r.resource.canonical)], [])
+
+    # Заявку собирает старший — ручкой STAR.
+    import supply_routes as _sr
+    st, r = await call(_sr.handle_extra_create, {"base": "База Один", "as": "Старший",
+                                                 "items": [{"id": "p1", "by_district": {"jvc": 3, "bbay": 2}},
+                                                           {"id": "p2", "by_district": {"jvc": 1}}]})
     sid = r["supply_id"]
 
     print("\nСписок и одна заявка")
@@ -83,21 +104,12 @@ async def main():
     eq("видно, где уже искали", r["tried_bases"], ["База Один"])
     st, r = await call(opr.handle_extra_lines, {"district": "jvc", "lines": [{"product_id": "p2", "qty": 4}]}, sid="X9")
     eq("черновик правится", (st, r["total_qty"]), (200, 4))
-    st, r = await call(opr.handle_extra_confirm, {"as": "Оператор"}, sid="X9")
-    eq("без базы не отправить", (st, r.get("error")), (400, "no_base"))
-    st, r = await call(opr.handle_extra_confirm, {"base": "База Два", "as": "Оператор"}, sid="X9")
-    d = await db.supply_get("X9")
-    eq("отправлен водителям", (st, d["status"], d["base"], d["by_name"]), (200, "open", "База Два", "Оператор"))
-
-    print("\nОтменить")
-    st, r = await call(opr.handle_extra_cancel, {"as": "Оператор", "force": True}, sid="X9")
-    eq("отменена", (st, (await db.supply_get("X9"))["status"]), (200, "cancelled"))
+    eq("а отправить его оператору нечем — черновик остался черновиком",
+       (await db.supply_get("X9"))["status"], "draft")
 
     print("\nОсновную заявку этими ручками не тронуть")
     for имя, h, body in (("посмотреть", opr.handle_extra_one, None),
                          ("править", opr.handle_extra_lines, {"district": "jvc", "lines": [{"product_id": "p1", "qty": 1}]}),
-                         ("отменить", opr.handle_extra_cancel, {"force": True}),
-                         ("отправить", opr.handle_extra_confirm, {"base": "x"}),
                          ("цена", opr.handle_extra_buy, {"product_id": "p1", "price": 1})):
         st, r = await call(h, body, sid="S1")
         eq(имя, (st, r.get("error")), (403, "not_extra"))

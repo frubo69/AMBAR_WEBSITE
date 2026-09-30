@@ -2172,11 +2172,14 @@ async def handle_op_supply_short(request):
                              dumps=lambda o: json.dumps(o, default=str))
 
 
-# ── доп. заявки: полный доступ ───────────────────────────────────────────────
-# Владелец, 30 сен 2026: операторам «и править, и в целом иметь доступ ко всем
-# доп. заявкам в полном объёме». Собрать новую, поправить состав, вписать цены,
-# отправить черновик водителям, отменить — всё то же, что старший делает в
-# STAR, и теми же обработчиками: правило одно на оба приложения.
+# ── доп. заявки: смотреть и править ──────────────────────────────────────────
+# Владелец, 30 сен 2026, сначала: операторам «и править, и в целом иметь доступ
+# ко всем доп. заявкам». Тем же днём уточнил: «чтобы операторы только
+# редактировали, но отправлять водителям они не могут доп. заявку — и тем
+# более заявку». Поэтому у оператора: список, заявка целиком, состав по
+# районам и цены. Собрать новую (она сразу уходит водителям), отправить
+# черновик и отменить — только старший в STAR; ручек на это у оператора НЕТ
+# вовсе, а не просто спрятаны кнопки.
 #
 # Основной заявки это не касается: каждая ручка сперва проверяет, что поставка
 # — именно на другую базу, и с основной отвечает отказом.
@@ -2210,13 +2213,6 @@ async def handle_extra_one(request):
     return _mv_json(await supply_routes._supply_view(sup))
 
 
-@require_operator
-async def handle_extra_new(request):
-    """POST {base, items:[{id, by_district}], as} — собрать доп. заявку."""
-    import supply_routes
-    return await _без_охраны(supply_routes.handle_extra_create)(request)
-
-
 def _extra_do(name: str):
     """Ручка оператора поверх обработчика старшего — только для доп. заявок."""
     @require_operator
@@ -2231,8 +2227,6 @@ def _extra_do(name: str):
 
 
 handle_extra_lines = _extra_do("handle_own_lines")        # состав района
-handle_extra_confirm = _extra_do("handle_draft_confirm")  # черновик → водителям
-handle_extra_cancel = _extra_do("handle_cancel")          # отменить
 handle_extra_buy = _extra_do("handle_buy")                # цена позиции
 
 
@@ -4012,19 +4006,10 @@ def setup(app):
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)
     for _p, _h, _m in (("/api/operator/extra", handle_extra_list, "GET"),
-                       ("/api/operator/extra", handle_extra_new, "POST"),
                        ("/api/operator/extra/{sid}", handle_extra_one, "GET"),
                        ("/api/operator/extra/{sid}/lines", handle_extra_lines, "POST"),
-                       ("/api/operator/extra/{sid}/confirm", handle_extra_confirm, "POST"),
-                       ("/api/operator/extra/{sid}/cancel", handle_extra_cancel, "POST"),
                        ("/api/operator/extra/{sid}/buy", handle_extra_buy, "POST")):
-        if _m == "GET" or _p == "/api/operator/extra":
-            try:
-                r.add_route("OPTIONS", _p, _opt)
-            except Exception:                        # noqa: BLE001 — путь уже с OPTIONS
-                pass
-        else:
-            r.add_route("OPTIONS", _p, _opt)
+        r.add_route("OPTIONS", _p, _opt)
         r.add_route(_m, _p, _h)
     r.add_route("OPTIONS", "/api/operator/day/board", _opt)
     r.add_get("/api/operator/day/board", handle_day_board)

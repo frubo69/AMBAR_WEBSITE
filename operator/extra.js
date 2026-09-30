@@ -1,20 +1,19 @@
-// Доп. заявки у оператора — полный доступ (владелец, 30 сен 2026: «и править,
-// и в целом иметь доступ ко всем доп. заявкам в полном объёме»).
+// Доп. заявки у оператора — смотреть и править (владелец, 30 сен 2026:
+// «чтобы операторы только редактировали, но отправлять водителям они не могут
+// доп. заявку — и тем более заявку»).
 //
-// Три экрана в одном окне:
+// Два экрана в одном окне:
 //   список  — «Ждут отправки» (черновики, собранные программой из недобора),
-//             «В работе», «Закрытые»; внизу «Новая заявка»;
+//             «В работе», «Закрытые»;
 //   заявка  — состав по районам; район, который ещё не начали принимать,
-//             правится счётчиками и «Добавить позицию»; цены закупки;
-//             черновик — назвать базу и отправить водителям; отменить;
-//   новая   — куда, потом что и сколько по районам.
-// Сервер — тот же, что у старшего в STAR: правило одно на оба приложения.
-// Основной заявки здесь нет и быть не может — сервер отвечает отказом.
+//             правится счётчиками и «Добавить позицию»; цены закупки.
+// Собрать новую заявку, отправить черновик водителям и отменить — только
+// старший в STAR: у оператора на это нет ни кнопок, ни ручек на сервере.
 //
 // Отдельным файлом, как stock.js: окно приносит свою разметку и стили (.oxt-*).
 (function(){
   const ST = {view: 'list', list: null, dists: [], one: null, err: '', busy: false,
-              ed: {}, add: '', q: '', cat: null, nw: null, sure: false};
+              ed: {}, add: '', q: '', cat: null};
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
@@ -142,11 +141,10 @@
     const wait = ST.list.filter(x => x.status === 'draft'), open = ST.list.filter(x => x.status === 'open'),
           past = ST.list.filter(x => x.status !== 'draft' && x.status !== 'open');
     box.innerHTML = (!ST.list.length
-        ? '<div class="oxt-empty"><b>Пока пусто</b>Магазин дал не всё — соберите заявку на другую базу</div>' : '')
+        ? '<div class="oxt-empty"><b>Пока пусто</b>Доп. заявку собирает старший в STAR</div>' : '')
       + (wait.length ? `<div class="oxt-grp">Ждут отправки</div>${wait.map(row).join('')}` : '')
       + (open.length ? `<div class="oxt-grp">В работе</div>${open.map(row).join('')}` : '')
       + (past.length ? `<div class="oxt-grp">Закрытые</div>${past.slice(0, 12).map(row).join('')}` : '');
-    $('oxtFoot').innerHTML = `<button class="oxt-btn go" onclick="opExtra.newOpen()">${PLUS}Новая заявка</button>`;
   }
 
   async function loadList(){
@@ -174,12 +172,10 @@
     const было = (d.tried_bases || []).filter(Boolean);
     head(d.base || 'База не названа', `${st} · ${ед(d.total_qty)} · ${dayRu(d.day || d.at)}${
       d.from_base ? ' · из недобора ' + esc(d.from_base) : ''}`, true);
-    const send = !черн ? '' : `<div class="oxt-grp">Куда едем</div>
-      ${было.length ? `<div class="oxt-note">Нет в наличии на: ${esc(было.join(', '))}</div>` : ''}
-      <input class="oxt-in" id="oxtBase" placeholder="Название базы" maxlength="60" autocomplete="off"
-             value="${esc(ST.base || '')}" oninput="opExtra.base(this.value)">
-      ${recent(было).length ? `<div class="oxt-chips">${recent(было).map(b =>
-        `<button class="oxt-chip" data-b="${esc(b)}" onclick="opExtra.base(this.dataset.b, 1)">${esc(b)}</button>`).join('')}</div>` : ''}`;
+    // Черновик водителям не виден. Отправляет его старший — оператор может
+    // только привести состав в порядок до отправки.
+    const send = !черн ? '' : `<div class="oxt-note">Черновик: водителям пока не виден. Базу называет и отправляет
+      старший в STAR.${было.length ? ' Нет в наличии на: ' + esc(было.join(', ')) + '.' : ''}</div>`;
     const cards = (d.tasks || []).map(t => {
       const ok = canEdit(d, t);
       const plan = {}; (t.lines || []).forEach(l => plan[l.id] = l);
@@ -217,17 +213,12 @@
 
   function paintFoot(){
     const d = ST.one; if(!d) return;
-    const k = dirty(), живая = d.status === 'draft' || d.status === 'open';
-    const можноОтменить = живая && (d.tasks || []).some(t => !t.done_at && !t.cancelled_at && t.lock_why !== 'noscan');
-    $('oxtFoot').innerHTML = k
-      ? `<button class="oxt-btn" onclick="opExtra.undo()">Отменить правки</button>
-         <button class="oxt-btn go" onclick="opExtra.save()" ${ST.busy ? 'disabled' : ''}>Сохранить · ${k}</button>`
-      : (можноОтменить ? `<button class="oxt-btn bad" onclick="opExtra.cancel()">${ST.sure ? 'Точно отменить' : 'Отменить заявку'}</button>` : '')
-        + (d.status === 'draft' ? `<button class="oxt-btn go" id="oxtSend" onclick="opExtra.send()" ${
-            (ST.base || '').trim() && !ST.busy ? '' : 'disabled'}>Отправить водителям</button>` : '');
+    const k = dirty();
+    $('oxtFoot').innerHTML = !k ? ''
+      : `<button class="oxt-btn" onclick="opExtra.undo()">Отменить правки</button>
+         <button class="oxt-btn go" onclick="opExtra.save()" ${ST.busy ? 'disabled' : ''}>Сохранить · ${k}</button>`;
   }
 
-  const recent = skip => [...new Set((ST.list || []).map(x => x.base).filter(b => b && !(skip || []).includes(b)))].slice(0, 6);
   const nameOf = pid => ((ST.cat || []).find(p => p.id === pid) || {}).name || pid;
 
   async function loadCat(){
@@ -258,57 +249,16 @@
     $('oxtFoot').innerHTML = '';
   }
 
-  // ── новая заявка ──────────────────────────────────────────────────────────
-  const nwTot = (oid) => Object.values(ST.nw.rows).reduce((a, r) => a + (oid ? (r[oid] || 0)
-    : Object.values(r).reduce((x, y) => x + (y || 0), 0)), 0);
-
-  function paintNew(){
-    const w = ST.nw;
-    head('Новая заявка', w.step === 1 ? 'Куда едем' : esc(w.base), true);
-    const box = $('oxtBody');
-    if(w.step === 1){
-      box.innerHTML = `<input class="oxt-in" id="oxtNBase" placeholder="Название базы" maxlength="60" autocomplete="off"
-          value="${esc(w.base)}" oninput="opExtra.nbase(this.value)">
-        ${recent().length ? `<div class="oxt-chips">${recent().map(b =>
-          `<button class="oxt-chip" data-b="${esc(b)}" onclick="opExtra.nbase(this.dataset.b, 1)">${esc(b)}</button>`).join('')}</div>` : ''}`;
-      $('oxtFoot').innerHTML = `<button class="oxt-btn go" id="oxtNGo" onclick="opExtra.nstep(2)" ${w.base.trim() ? '' : 'disabled'}>Дальше</button>`;
-      return;
-    }
-    const q = ST.q.trim().toLowerCase();
-    // Набранное в этот район — сверху: его правят чаще, чем ищут новое.
-    const list = (ST.cat || []).filter(p => !q || p.name.toLowerCase().includes(q))
-      .sort((a, b) => ((w.rows[b.id] || {})[w.oid] ? 1 : 0) - ((w.rows[a.id] || {})[w.oid] ? 1 : 0)).slice(0, 80);
-    if(!$('oxtNFind')){
-      box.innerHTML = `<div class="oxt-tabs" id="oxtNTabs"></div>
-        <label class="oxt-q">${FIND}<input id="oxtNFind" type="text" placeholder="Поиск по названию"
-          autocomplete="off" oninput="opExtra.find(this.value)"></label><div id="oxtNList"></div>`;
-    }
-    $('oxtNTabs').innerHTML = ST.dists.map(x => { const k = nwTot(x.id);
-      return `<button class="oxt-chip${x.id === w.oid ? ' on' : ''}" onclick="opExtra.ndist('${esc(x.id)}')">${esc(x.code)}${k ? `<i>${n(k)}</i>` : ''}</button>`; }).join('');
-    $('oxtNList').innerHTML = !ST.cat ? Array(6).fill('<div class="oxt-sk"></div>').join('')
-      : !list.length ? '<div class="oxt-empty">Ничего не нашли</div>'
-      : `<div class="oxt-card">${list.map(p => { const v = (w.rows[p.id] || {})[w.oid] || 0;
-          return `<div class="oxt-l" style="border-top:0;border-bottom:1px solid var(--border3)">
-            <img src="/products/${esc(p.id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
-            <span class="oxt-ln">${esc(p.name)}<i>${esc(p.cat)}</i></span>
-            <span class="oxt-stp"><button onclick="opExtra.nput('${esc(p.id)}',-1)" aria-label="меньше">−</button>
-              <b class="${v ? 'ch' : ''}">${n(v)}</b>
-              <button onclick="opExtra.nput('${esc(p.id)}',1)" aria-label="больше">+</button></span></div>`; }).join('')}</div>`;
-    const всего = nwTot();
-    $('oxtFoot').innerHTML = `<button class="oxt-btn go" onclick="opExtra.create()" ${всего && !ST.busy ? '' : 'disabled'}>${
-      всего ? `Создать · ${ед(всего)}` : 'Наберите товар'}</button>`;
-  }
-
   function paint(){
     if(!$('oxtOv')) return;
-    if(ST.view === 'list') paintList(); else if(ST.view === 'one') paintOne(); else paintNew();
+    if(ST.view === 'list') paintList(); else paintOne();
   }
 
   // ── действия ──────────────────────────────────────────────────────────────
   async function open(){
     if(!me()){ try{ window.showOv('opOv'); }catch(e){} return; }
     mount();
-    Object.assign(ST, {view: 'list', list: null, one: null, err: '', ed: {}, add: '', q: '', nw: null, sure: false});
+    Object.assign(ST, {view: 'list', list: null, one: null, err: '', ed: {}, add: '', q: ''});
     paint(); $('oxtOv').classList.add('show'); tap('light');
     loadCat();
     await loadList(); paint();
@@ -317,14 +267,13 @@
 
   async function back(){
     if(ST.view === 'one' && ST.add){ ST.add = ''; ST.q = ''; $('oxtBody').innerHTML = ''; return paint(); }
-    if(ST.view === 'new' && ST.nw.step === 2){ ST.nw.step = 1; ST.q = ''; $('oxtBody').innerHTML = ''; return paint(); }
-    ST.view = 'list'; ST.one = null; ST.ed = {}; ST.nw = null; ST.err = ''; ST.sure = false;
+    ST.view = 'list'; ST.one = null; ST.ed = {}; ST.err = '';
     $('oxtBody').innerHTML = ''; paint();
     await loadList(); if(ST.view === 'list') paint();
   }
 
   async function one(sid){
-    Object.assign(ST, {view: 'one', sid, one: null, err: '', ed: {}, add: '', base: '', sure: false});
+    Object.assign(ST, {view: 'one', sid, one: null, err: '', ed: {}, add: ''});
     $('oxtBody').innerHTML = ''; paint(); tap('light');
     try{ ST.one = await api('/' + encodeURIComponent(sid), {params: {as: me()}}); }
     catch(e){ ST.err = '1'; }
@@ -339,7 +288,7 @@
     const m = ST.ed[oid] = ST.ed[oid] || {};
     if(v === base) delete m[pid]; else m[pid] = v;
     if(!Object.keys(m).length) delete ST.ed[oid];
-    ST.sure = false; tap('sel'); paint();
+    tap('sel'); paint();
   }
   function add(oid){ ST.add = oid; ST.q = ''; $('oxtBody').innerHTML = ''; tap('light'); paint(); }
   function find(v){ ST.q = String(v || ''); paint(); }
@@ -368,38 +317,6 @@
     }finally{ ST.busy = false; paint(); }
   }
 
-  function base(v, chip){
-    ST.base = String(v || '');
-    if(chip){ const i = $('oxtBase'); if(i) i.value = ST.base; tap('sel'); }
-    document.querySelectorAll('#oxtBody .oxt-chip').forEach(c => c.classList.toggle('on', c.dataset.b === ST.base.trim()));
-    paintFoot();
-  }
-
-  async function send(){
-    if(ST.busy || !ST.one) return;
-    const b = (ST.base || '').trim(); if(!b) return;
-    ST.busy = true; paintFoot();
-    try{
-      await api(`/${encodeURIComponent(ST.one.supply_id)}/confirm`, {method: 'POST', body: {base: b, as: me()}});
-      say('Отправлено водителям · ' + b); tap('medium');
-      ST.busy = false; return back();            // последнее действие возвращает в список
-    }catch(e){ say((e.payload || {}).error === 'not_draft' ? 'Её уже отправили' : 'Не удалось отправить', 'err'); }
-    ST.busy = false; paintFoot();
-  }
-
-  async function cancel(){
-    if(ST.busy || !ST.one) return;
-    if(!ST.sure){ ST.sure = true; tap('medium'); return paintFoot(); }   // второе нажатие — решение
-    ST.busy = true;
-    try{
-      await api(`/${encodeURIComponent(ST.one.supply_id)}/cancel`, {method: 'POST', body: {as: me(), force: true}});
-      say('Заявка отменена'); ST.busy = false; return back();
-    }catch(e){
-      say((e.payload || {}).error === 'nothing_to_cancel' ? 'Отменять нечего — товар уже принят' : 'Не удалось отменить', 'err');
-    }
-    ST.busy = false; ST.sure = false; paintFoot();
-  }
-
   async function price(pid, inp){
     const v = parseFloat(String(inp.value || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
     try{
@@ -409,41 +326,5 @@
     }catch(e){ say('Не удалось сохранить цену', 'err'); }
   }
 
-  function newOpen(){
-    ST.view = 'new'; ST.q = '';
-    ST.nw = {step: 1, base: '', rows: {}, oid: (ST.dists[0] || {}).id || ''};
-    $('oxtBody').innerHTML = ''; tap('light'); paint();
-  }
-  function nbase(v, chip){
-    ST.nw.base = String(v || '');
-    if(chip){ const i = $('oxtNBase'); if(i) i.value = ST.nw.base; tap('sel'); }
-    document.querySelectorAll('#oxtBody .oxt-chip').forEach(c => c.classList.toggle('on', c.dataset.b === ST.nw.base.trim()));
-    const b = $('oxtNGo'); if(b) b.disabled = !ST.nw.base.trim();
-  }
-  function nstep(k){ if(k === 2 && !ST.nw.base.trim()) return; ST.nw.step = k; ST.q = ''; $('oxtBody').innerHTML = ''; tap('light'); paint(); }
-  function ndist(oid){ ST.nw.oid = oid; tap('sel'); paint(); }
-  function nput(pid, dir){
-    const r = ST.nw.rows[pid] = ST.nw.rows[pid] || {};
-    const v = Math.max(0, Math.min(999, (r[ST.nw.oid] || 0) + dir));
-    if(v) r[ST.nw.oid] = v; else delete r[ST.nw.oid];
-    if(!Object.keys(r).length) delete ST.nw.rows[pid];
-    tap('sel'); paint();
-  }
-  async function create(){
-    if(ST.busy) return;
-    const items = Object.entries(ST.nw.rows).map(([id, by_district]) => ({id, by_district}));
-    if(!items.length) return;
-    ST.busy = true; paint();
-    try{
-      const r = await api('', {method: 'POST', body: {base: ST.nw.base.trim(), items, source: 'manual', as: me()}});
-      say('Заявка создана — задачи ушли водителям'); tap('medium');
-      ST.busy = false; ST.nw = null;
-      await loadList();
-      return one(r.supply_id);
-    }catch(e){ say('Не удалось создать', 'err'); }
-    ST.busy = false; paint();
-  }
-
-  window.opExtra = {open, close, back, one, step, add, find, put, undo, save, base, send, cancel, price,
-                    newOpen, nbase, nstep, ndist, nput, create};
+  window.opExtra = {open, close, back, one, step, add, find, put, undo, save, price};
 })();

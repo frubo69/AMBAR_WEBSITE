@@ -19597,7 +19597,7 @@ function crDistCard(day){
     <div class="crd-note">${b.base < 0 ? 'Расходы водителей больше наличных — в сейф в этот день ничего не приходит.'
       : 'Выручки в этот день нет.'}</div></div>`;
   const ed = CRD.edit === day;
-  const aside = b.aside || 0, col = b.collected || 0, np = b.base - aside - col;
+  const aside = b.aside || 0, col = b.collected || 0, np = Math.max(0, b.base) - aside - col;
   const half = Math.floor(b.base / 2);
   const short = norm > 0 && col < norm ? norm - col : 0;
   const val = (f, v) => ed
@@ -19635,7 +19635,7 @@ function crDistLive(day){
   const b = crDistBook(day); if(!b) return;
   const norm = crDistNorm(day);
   const col = crDistNum(`crd-collected-${day}`);
-  const np = b.base - crDistNum(`crd-aside-${day}`) - col;
+  const np = Math.max(0, b.base) - crDistNum(`crd-aside-${day}`) - col;
   const el = document.getElementById(`crd-np-${day}`);
   if(el){ el.innerHTML = `${fbFmt(np)}<u>AED</u>`; el.classList.toggle('dn', np < 0); }
   const sh = document.getElementById(`crd-short-${day}`);
@@ -20502,7 +20502,7 @@ function fbCrcHtml(){
   // что согласовать — его цифры; всё согласовано — согласованные.
   const shown = pend.length ? pend : real;
   const sum = f => shown.reduce((a, b) => a + (f(b) || 0), 0);
-  const tB = sum(b => b.aside), tR = sum(b => b.collected), tN = sum(b => b.base - (b.aside || 0) - (b.collected || 0));
+  const tB = sum(b => b.aside), tR = sum(b => b.collected), tN = sum(b => Math.max(0, b.base) - (b.aside || 0) - (b.collected || 0));
   const norm = ((fbBook(c.day.slice(0, 7)) || {}).budget || {}).norm || 0;
   const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0)), 0) : 0;
   const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';

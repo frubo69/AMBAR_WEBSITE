@@ -96,7 +96,11 @@ def compute(days: list[dict], opening: dict) -> dict:
         ordered_extra = _n(d.get('ordered_extra'))
         exp_sum = sum(_n(e.get('amount')) for e in (d.get('expenses') or []))
         pay_sum = sum(_n(e.get('amount')) for e in (d.get('payouts') or []))
-        np_plus = base - aside - collected
+        # Выручка в минусе в сейф не ложится (владелец, 30 сен 2026: «пока там
+        # минус — пиши 0… деньги на расходы мы берём не из сейфа»). Минус в
+        # окошке выручки значит, что водители потратили больше, чем пока
+        # привезли наличными, — это их деньги на руках, а не дыра в сейфе.
+        np_plus = max(0.0, base) - aside - collected
         pending = bool(d.get('pending'))
         # неподтверждённый день — только предложение: в деньгах его ещё нет
         aside_c, collected_c, np_c = (0.0, 0.0, 0.0) if pending else (aside, collected, np_plus)

@@ -21226,7 +21226,7 @@ function fbDdcParts(d){
   const extra = (d.ins || []).map(e => it([e.comment || 'Приход в фонд', e.who].filter(Boolean).join(' · '), e.amount));
   if(n(d.extra_manual)) extra.push(it('Вписан руками', d.extra_manual));
   const ins = [{name: 'РП+', v: rp, items: has([it('Из выручки дня', rp)])},
-               {name: 'ДопРП+', v: n(d.extra_rp), items: has(extra)},
+               {name: 'Доп РП+', v: n(d.extra_rp), items: has(extra)},
                {name: 'ЧП+', v: np, items: has([it('Остаток выручки дня', np)])}];
   if(b) ins.push({name: 'Барракуда+', v: b, items: [it('Из выручки дня', b)]});
   // В сейф ложится выручка дня — та же сумма, что в окошке «Выручка» на главной

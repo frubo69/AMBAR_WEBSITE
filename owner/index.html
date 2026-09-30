@@ -4162,6 +4162,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fb-crc-h:active{background:rgba(201,169,110,.26)}
 .fb-crc-h > span{min-width:0;line-height:1.25}
+/* Длинное название переносится на вторую строку: общее правило «в одну строку»
+   для заголовков хаба сюда не относится. */
+.fb-hub .sc-cap.fb-crc-h > span{white-space:normal;font-size:inherit}
 .fb-crc-h > i{flex:0 0 auto}
 .fb-crc-h + .fb-crc-s{margin-top:12px}
 .fb-crc-s{margin:0 12px 10px 16px;padding:12px 12px 12px 13px;border-radius:13px;cursor:pointer;
@@ -20483,7 +20486,7 @@ function fbCrcHtml(){
   // своя полоса с волоском под ней (владелец: «сделай это как настоящий
   // заголовок, отдели»); нажатие — страница сбора.
   const head = `<button class="sc-cap fb-crc-h" onclick="fbOpenCash()">
-      <span>Ежедневный сбор и распределение выручки</span>
+      <span>Ежд сбор и распределение выручки</span>
       <i>${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'сегодня'}</i>
       <em class="fb-chev r">${_SC_CHEV}</em></button>`;
   if(!st) return `<div class="sc fb-hub fb-crc">${head}

@@ -2172,6 +2172,85 @@ async def handle_op_supply_short(request):
                              dumps=lambda o: json.dumps(o, default=str))
 
 
+# ── день по районам и водителям: только смотреть ────────────────────────────
+# Владелец, 30 сен 2026: «операторы заполняют заказы, но не видят, сколько
+# сегодня на районах было заказов и сколько это в деньгах… и сколько какой
+# водитель наработал». Считаем тем же правилом, что смена: день заказа — смена,
+# где его приняли (bizday.order_day), доставленное — выручка. Заказ «без
+# оплаты» в штуках есть, в деньгах нет — как везде.
+def _day_money(o: dict) -> float:
+    if o.get("payment_method") == "free":
+        return 0.0
+    try:
+        return float(o.get("total") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+@require_operator
+async def handle_day_board(request):
+    """GET ?as=&day=today|yesterday — смена по районам и по водителям: штуки и
+    деньги. Вчера — потому что смена кончается под утро, и вопрос «сколько
+    вышло» задают уже после неё, когда сегодняшний день ещё пуст."""
+    who = (request.query.get("as") or "").strip()
+    districts = await _fresh_districts()
+    try:
+        _, mine = await _op_scope(request, who)
+    except Exception:                                    # noqa: BLE001
+        mine = []
+    today = _biz_date(datetime.now(DUBAI_TZ))
+    вчера = (request.query.get("day") or "") == "yesterday"
+    day = today - timedelta(days=1) if вчера else today
+    orders = list((await db.orders_from(_bizday.since_utc(day.isoformat()))).values())
+    пусто = lambda: {"done": 0, "aed": 0.0, "work": 0, "work_aed": 0.0, "new": 0, "cancelled": 0}
+    по_району = {d["id"]: пусто() for d in districts}
+    по_водителю: dict = {}
+    for o in orders:
+        oid = o.get("office_id") or ""
+        if oid not in по_району:
+            continue
+        lane, st = _lane(o), o.get("status")
+        # Незакрытые — любого возраста: висящий со вчера заказ всё ещё в работе.
+        # На вчерашнем дне их нет: «в работе» бывает только сейчас.
+        if (lane == "done" and _biz_date_of(o) != day) or (вчера and lane != "done"):
+            continue
+        r = по_району[oid]
+        имя = (o.get("driver") or "").strip()
+        v = по_водителю.setdefault((oid, имя), пусто()) if имя else None
+        if st == "delivered":
+            for x in (r, v):
+                if x is not None:
+                    x["done"] += 1; x["aed"] += _day_money(o)
+        elif lane == "work":
+            for x in (r, v):
+                if x is not None:
+                    x["work"] += 1; x["work_aed"] += _day_money(o)
+        elif lane == "new":
+            r["new"] += 1
+        elif st in ("cancelled", "declined"):
+            r["cancelled"] += 1
+    fix = lambda x: {**x, "aed": round(x["aed"]), "work_aed": round(x["work_aed"])}
+    rows = []
+    for d in districts:
+        drv = [{"name": n, **fix(x)} for (oid, n), x in по_водителю.items() if oid == d["id"]]
+        # Кто стоит на районе, но сегодня ещё ничего не возил, — тоже строка:
+        # ноль — это ответ, а отсутствие имени читается как «забыли».
+        for n in d.get("drivers") or []:
+            if not any(x["name"] == n for x in drv):
+                drv.append({"name": n, **fix(пусто())})
+        drv.sort(key=lambda x: (-x["aed"], -x["done"], x["name"]))
+        rows.append({"id": d["id"], "code": d.get("code", ""), "name": d.get("name", ""),
+                     "operator": d.get("operator", ""), **fix(по_району[d["id"]]), "drivers": drv})
+    rows.sort(key=lambda r: r["code"])
+    итог = пусто()
+    for r in rows:
+        for k in итог:
+            итог[k] += r[k]
+    return _mv_json({"day": day.isoformat(), "today": not вчера,
+                     "at": datetime.now(timezone.utc).isoformat(),
+                     "mine": mine, "total": итог, "districts": rows})
+
+
 # ── остатки по районам: только смотреть ─────────────────────────────────────
 # Владелец, 30 сен 2026: «чтобы операторы смогли смотреть остатки склада в
 # конкретный текущий момент, не редактировать, а просто видеть склад каждого
@@ -3865,6 +3944,8 @@ def setup(app):
     for _p in ("/api/operator/move/board", "/api/operator/move/live",
                "/api/operator/move/create", "/api/operator/move/cancel"):
         r.add_route("OPTIONS", _p, _opt)
+    r.add_route("OPTIONS", "/api/operator/day/board", _opt)
+    r.add_get("/api/operator/day/board", handle_day_board)
     r.add_route("OPTIONS", "/api/operator/stock/board", _opt)
     r.add_get("/api/operator/stock/board", handle_stock_board)
     r.add_get("/api/operator/move/board", handle_move_board)

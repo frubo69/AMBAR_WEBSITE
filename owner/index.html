@@ -20669,7 +20669,9 @@ function fbWal(mb){
 // Сумма сейфа вместе с кошельком — в шапке карточки и на экране «Сейф».
 function fbSafeAll(mb){
   const wal = fbWal(mb);
-  return ((mb && mb.safe && mb.safe.total) || 0) + (wal ? wal.aed : 0);
+  // Только наличные (владелец, 30 сен 2026: «жёлтыми цифрами пиши только деньги
+  // в наличных, не надо пересчитывать их из этих USDT»). Крипта — рядом, в USDT.
+  return (mb && mb.safe && mb.safe.total) || 0;
 }
 // Из «Сейфа» в кошелёк и обратно в «Сейф», а не в «Учёт».
 function fbOpenWal(back){

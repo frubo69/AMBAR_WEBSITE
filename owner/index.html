@@ -6802,8 +6802,7 @@ button.shl-p:active{transform:scale(.96)}
 .exp-pend-b{flex:1;min-width:0}
 .exp-pend-b b{display:block;font-size:14.5px;font-weight:700;line-height:1.2;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.exp-pend-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-pend-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35}
 .exp-pend-a{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
   line-height:1;color:var(--warn);font-variant-numeric:tabular-nums}
 .exp-pend-a u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;
@@ -6858,8 +6857,7 @@ button.shl-p:active{transform:scale(.96)}
 .exp-done-b{flex:1;min-width:0}
 .exp-done-b b{display:block;font-size:13.5px;font-weight:700;line-height:1.2;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.exp-done-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-done-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.35}
 .exp-done-r{flex-shrink:0;text-align:right}
 .exp-done-r b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
   line-height:1;font-variant-numeric:tabular-nums}
@@ -31770,10 +31768,20 @@ function expPhotos(e){
 const EXP_PAY_W = {cash: 'наличными', card: 'безналом'};
 const expPayTag = e => EXP_PAY_W[e.pay] ? `<i class="exp-pay${e.pay === 'card' ? ' card' : ''}">${EXP_PAY_W[e.pay]}</i>` : '';
 // Ожидающий расход — карточкой: вид и сумма, снимки крупно, под ними решение.
+// Когда подано и когда решено — по Дубаю (владелец, 1 окт 2026: «указывай
+// время, когда водители указывали расход на согласование»). Правил после
+// подачи — время правки: старший смотрит на то, что прислали последним.
+function expWhen(e){
+  const at = e.edited_at || e.at;
+  const p = [];
+  if(at) p.push((e.edited_at ? 'изменено ' : 'подано ') + _hmDubai(at));
+  if(e.decided_at && (e.status || 'approved') !== 'pending') p.push('решено ' + _hmDubai(e.decided_at));
+  return p.join(' · ');
+}
 function expPendCard(r, e){
   const ph = expPhotos(e);
   const кто = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
+               e.bottle || '', e.by_driver ? 'от водителя' : '', expWhen(e)].filter(Boolean).join(' · ');
   return `<div class="exp-pend" id="pend-${escS(e.id)}">
     <div class="exp-pend-h">
       <span class="exp-pend-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
@@ -31815,7 +31823,7 @@ function expDoneRow(r, e){
   const ph = expPhotos(e);
   const что = [e.comment && e.comment !== e.kind_t ? e.comment : '',
                e.bottle || '', e.by_driver ? 'от водителя' : '',
-               e.no_receipt ? 'без чека' : ''].filter(Boolean).join(' · ');
+               e.no_receipt ? 'без чека' : '', expWhen(e)].filter(Boolean).join(' · ');
   return `<div class="exp-done ${st}">
     ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `
       <button class="exp-done-th" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})"

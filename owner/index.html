@@ -22324,12 +22324,9 @@ function fbBBodyHtml(d){
   <div class="sc dds-one">
     <div class="dds-tot long${from < 0 ? ' neg' : ''}"><span>Сейф на Барракуду · начало дня</span>${v(from)}</div>
     <button class="dds-r plain" onclick="fbBToSupply('${day}')"><span>Заявка Барракуде${sup ? '' : ' — заявки нет'}</span>${v(n(d.ordered))}<em class="fb-chev">${_SC_CHEV}</em></button>
-    <div class="sc-cap dds-cap in"><span>Приход</span>${v(aside, aside ? '+' : '')}</div>
     ${d.pending && n(d.aside) ? `<div class="dds-r wait"><span>Выделено из выручки<i>день не подтверждён — в сейф ещё не легло</i></span>${v(n(d.aside))}</div>`
                               : row(aside ? 'in' : 'zero', 'Выделено из выручки', aside, aside ? '+' : '')}
-    <div class="sc-cap dds-cap out"><span>Расход</span>${v(payB, payB ? '−' : '')}</div>
     ${payRow}
-    <div class="dds-day ${saldo < 0 ? 'out' : saldo > 0 ? 'in' : ''}"><span>Баланс</span>${v(saldo, saldo > 0 ? '+' : '')}</div>
     <div class="dds-tot end long${end < 0 ? ' neg' : ''}"><span>Остаётся в сейфе на Барракуду</span>${v(end)}</div>
     ${diff ? row('out', 'Не сходится с сейфом', diff) : ''}
     <div class="dds-r ${d.debt_b > 0 ? 'out' : ''}"><span>Долг после дня<i class="sub">${долг}</i></span>${v(n(d.debt_b))}</div>

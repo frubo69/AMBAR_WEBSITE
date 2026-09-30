@@ -636,7 +636,7 @@ async def _shift_view(me: dict) -> dict:
         # Незавершённые приёмки: пока есть — «Закрыть смену» не активна.
         "intake": intake,
         # Машина не принята — на смену нельзя (29 сен 2026).
-        "car_need": car["need"], "car_since": car["since"],
+        "car_need": car["need"], "car_since": car["since"], "car_why": car.get("why") or "",
         "car_plate": str((car.get("car") or {}).get("plate") or ""),
         # Неотработанные перемещения района — отдать или забрать. Держат смену
         # так же, как приёмка: закрыть её сервер всё равно не даст.
@@ -715,7 +715,7 @@ async def handle_car_intake(request):
                 "plate": c.get("plate") or ""}
     done = st.get("done") or None
     return web.json_response({
-        "need": st["need"], "since": st["since"],
+        "need": st["need"], "since": st["since"], "why": st.get("why") or "",
         "car": кратко(st["car"]) if st["car"] else None,
         "free": [кратко(c) for c in st["free"]],
         "last_km": int((st.get("last") or {}).get("km") or 0),
@@ -736,10 +736,9 @@ async def handle_car_intake_post(request):
     me = request["driver"]
     body = await request.json()
     st = await car_intake.state(me)
-    if not st["since"]:
-        return web.json_response({"error": "not_needed"}, status=409, headers=CORS_HEADERS)
-    if st["done"]:
-        return web.json_response({"error": "already"}, status=409, headers=CORS_HEADERS)
+    if not st["need"]:
+        return web.json_response({"error": "already" if st["done"] else "not_needed"},
+                                 status=409, headers=CORS_HEADERS)
 
     # Своей машины нет — принимаем свободную, и приём её же закрепляет.
     car = st["car"]
@@ -770,20 +769,26 @@ async def handle_car_intake_post(request):
     except Exception as e:                           # noqa: BLE001
         log.debug(f"[car] точка при приёме: {e}")
 
-    iid = db.car_intake_id(me["name"], st["since"])
-    ок = await db.car_intake_set(me["name"], st["since"], {
-        "car_id": car.get("_id"), "plate": car.get("plate") or "",
-        "model": car.get("model") or "", "km": km, "photo": True,
-        "thumb": thumb, "district": me.get("district") or "", "geo": geo})
-    if not ок:
-        return web.json_response({"error": "already"}, status=409, headers=CORS_HEADERS)
-    await db.car_intake_photo_set(iid, photo, thumb)
+    # Сначала закрепляем, потом пишем показание: оно должно быть ПОЗЖЕ момента,
+    # когда машина стала его, иначе правило «сел на машину» спросит заново.
     if not st["car"]:
-        await db.car_set_driver(str(car.get("_id")), me["name"], expect="")
+        if not await db.car_set_driver(str(car.get("_id")), me["name"], expect=""):
+            return web.json_response({"error": "no_car"}, status=409, headers=CORS_HEADERS)
+    iid = await db.car_reading_add(me["name"], {
+        "car_id": str(car.get("_id") or ""), "plate": car.get("plate") or "",
+        "model": car.get("model") or "", "color": car.get("color") or "", "km": km, "photo": True,
+        "thumb": thumb, "district": me.get("district") or "", "geo": geo,
+        "why": st.get("why") or "", "day": car_intake.today(), "since": st.get("since") or "",
+        "prev_km": int((last or {}).get("km") or 0),
+        "prev_driver": str((last or {}).get("driver") or ""),
+        "prev_at": (last or {}).get("at")})
+    if not iid:
+        return web.json_response({"error": "db"}, status=503, headers=CORS_HEADERS)
+    await db.car_intake_photo_set(iid, photo, thumb)
     log.info(f"[car] {me['name']} принял машину {car.get('plate')} · {km} км")
     try:
         import owner_routes as _own
-        await _own.car_intake_tell(me, car, km, st["since"])
+        await _own.car_intake_tell(me, car, km, iid, st.get("why") or "", last)
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[car] о приёме не сказали: {e}")
     return web.json_response({"ok": True, "km": km, "plate": car.get("plate") or ""},
@@ -797,7 +802,7 @@ async def handle_car_intake_photo(request):
     st = await car_intake.state(me)
     if not st["done"]:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    img = await db.car_intake_photo(db.car_intake_id(me["name"], st["since"]))
+    img = await db.car_intake_photo(str(st["done"].get("_id") or ""))
     if not img:
         return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
     ctype = "image/png" if img[:2] == b"\x89P" else "image/jpeg"
@@ -958,7 +963,7 @@ async def handle_shift_open(request):
     # потом «прими машину» — значит сходить к машине дважды.
     car = await car_intake.state(me)
     if car["need"]:
-        return web.json_response({"error": "need_car", "since": car["since"]},
+        return web.json_response({"error": "need_car", "since": car["since"], "why": car["why"]},
                                  status=409, headers=CORS_HEADERS)
     if d.get("working") is not True and not _tq(me):
         # Отметка оператора снова обязательна (владелец, 24 сен 2026). Послабление

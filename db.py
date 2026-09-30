@@ -2276,12 +2276,58 @@ async def car_intake_skip(name: str, since: str, by: str, note: str = "") -> boo
                                               "note": str(note or "")})
 
 
-async def car_intake_last(car_id: str) -> dict | None:
-    """Прошлый приём этой машины — чтобы видеть разницу и ловить нелепые числа."""
+# С 1 окт 2026 показаний много: каждый месяц и при каждой смене машины
+# (car_intake.py). Поэтому рядом с записью «на период» живёт журнал — у каждого
+# показания свой _id. Пропуск владельца — такая же строка журнала. Снятое
+# владельцем показание («переснять») не удаляется, а гасится полем void.
+
+_CAR_LIVE = {"void": {"$ne": True}}
+
+
+async def car_reading_add(name: str, doc: dict) -> str:
+    """Новая строка журнала пробега. Возвращает её _id (он же ключ снимка)."""
+    d = _db_or_none()
+    if d is None: return ""
+    now = datetime.now(timezone.utc)
+    iid = f"{str(name or '').strip()}:{doc.get('car_id') or '-'}:{now.strftime('%Y%m%d%H%M%S%f')}"
+    await d.car_intakes.insert_one({"_id": iid, "driver": str(name or ""), "at": now, **doc})
+    return iid
+
+
+async def car_reading_mine(name: str, car_id: str) -> dict | None:
+    """Последнее показание (или пропуск) этого водителя по этой машине.
+    car_id пустой — по любой."""
+    d = _db_or_none()
+    if d is None: return None
+    flt = {"driver": str(name or ""), **_CAR_LIVE}
+    if car_id:
+        flt["car_id"] = car_id
+    rows = await d.car_intakes.find(flt).sort("at", -1).limit(1).to_list(length=1)
+    return rows[0] if rows else None
+
+
+async def car_reading_get(iid: str) -> dict | None:
+    d = _db_or_none()
+    if d is None or not iid: return None
+    return await d.car_intakes.find_one({"_id": iid})
+
+
+async def car_reading_void(iid: str, by: str) -> bool:
+    d = _db_or_none()
+    if d is None or not iid: return False
+    r = await d.car_intakes.update_one({"_id": iid, **_CAR_LIVE}, {"$set": {
+        "void": True, "void_by": str(by or ""), "void_at": datetime.now(timezone.utc)}})
+    return r.modified_count > 0
+
+
+async def car_intake_last(car_id: str, before=None) -> dict | None:
+    """Прошлое показание этой машины — чтобы видеть разницу и ловить нелепые числа."""
     d = _db_or_none()
     if d is None or not car_id: return None
-    rows = await d.car_intakes.find({"car_id": car_id, "km": {"$gt": 0}}) \
-        .sort("at", -1).limit(1).to_list(length=1)
+    flt = {"car_id": car_id, "km": {"$gt": 0}, **_CAR_LIVE}
+    if before is not None:
+        flt["at"] = {"$lt": before}
+    rows = await d.car_intakes.find(flt).sort("at", -1).limit(1).to_list(length=1)
     return rows[0] if rows else None
 
 

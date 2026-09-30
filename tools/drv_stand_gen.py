@@ -246,7 +246,7 @@ if(ST_Q.get('shoff')){ ST_SHIFT.opened = false; }
 // своей машины нет, выбирает из свободных.
 if(ST_Q.get('car')){
   ST_SHIFT.opened = false; ST_SHIFT.can_open = false; ST_SHIFT.late_hour = 18;
-  ST_SHIFT.car_need = true; ST_SHIFT.car_since = '2026-09-29';
+  ST_SHIFT.car_need = true; ST_SHIFT.car_since = '2026-09-29'; ST_SHIFT.car_why = ST_Q.get('why') || 'new';
   ST_SHIFT.car_plate = ST_Q.get('car') === 'free' ? '' : '97448';
 }
 // ?selfopen=1 — оператор открыл смену района, водителя не отметил: открывает сам (22 сен 2026)

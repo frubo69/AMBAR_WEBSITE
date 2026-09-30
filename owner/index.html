@@ -4886,6 +4886,49 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;
   font-weight:600;font-family:inherit}
 .crw-cancel:active{border-color:var(--gold2);color:var(--gold2)}
+/* Пробег машин (odm-): журнал показаний одометра по машинам. Карточка — машина,
+   строки — показания месяца, свежее сверху; красная полоса — показания ждём. */
+.odm-mo{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}
+.odm-mo::-webkit-scrollbar{display:none}
+.odm-mo button{flex:0 0 auto;padding:7px 13px;border-radius:10px;border:1px solid var(--border2);background:var(--card);
+  color:var(--muted);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.odm-mo button.on{background:var(--gold-soft);border-color:rgba(201,169,110,.5);color:var(--gold2)}
+.odm-sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 12px}
+.odm-sum div{padding:11px 12px;border-radius:13px;background:var(--card);border:1px solid var(--border2)}
+.odm-sum u{display:block;text-decoration:none;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.odm-sum b{display:block;margin-top:4px;font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700}
+.odm-sum .w b{color:var(--dn)}
+.odm-in{margin-top:12px}
+.odm-c .crw-c-h{gap:9px}
+.odm-pl{flex:0 0 auto;padding:6px 8px;border-radius:9px;color:#1a1408;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
+  font-weight:700;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.odm-who{flex:0 0 auto;text-align:right;font-size:12.5px;font-weight:600;color:var(--text);max-width:42%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.odm-who i{font-style:normal;color:var(--muted);margin-left:5px;font-size:11px}
+.odm-who.gone{color:var(--dn)}
+.odm-km{display:flex;align-items:baseline;gap:8px;padding:10px 12px 0;font-size:12px;color:var(--muted)}
+.odm-km b{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--text)}
+.odm-need{display:flex;align-items:center;gap:9px;margin:10px 12px 0;padding:9px 10px;border-radius:11px;
+  background:var(--dn-soft);color:var(--dn);font-size:12.5px;font-weight:600}
+.odm-need span{flex:1;min-width:0}
+.odm-need button{flex:0 0 auto;padding:6px 10px;border-radius:9px;border:1px solid currentColor;background:none;color:inherit;
+  font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.odm-rows{padding:8px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.odm-r{display:flex;align-items:center;gap:10px;width:100%;padding:8px 9px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.odm-r.np{cursor:default}
+.odm-th{flex:0 0 auto;width:44px;height:44px;border-radius:9px;background:var(--card) center/cover no-repeat;display:flex;
+  align-items:center;justify-content:center;color:var(--muted)}
+.odm-rb{flex:1;min-width:0}
+.odm-rb b{display:block;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.odm-rb i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.odm-rv{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;white-space:nowrap}
+.odm-rv i{display:block;margin-top:2px;font-style:normal;font-family:inherit;font-size:11.5px;font-weight:600;color:var(--gold2)}
+.odm-r.void .odm-rb b,.odm-r.void .odm-rv{text-decoration:line-through;color:var(--muted)}
+.odm-r.void .odm-rv i{display:none}
+.odm-none{padding:2px 0 0;font-size:12px;color:var(--muted)}
+.odm-re{display:block;margin:14px auto 0;padding:10px 16px;border-radius:11px;border:1px solid var(--border2);background:none;
+  color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
 /* Подвал сохранения и вопрос на выходе. */
 .crw-save{display:flex;gap:8px}
 /* Второй шаг под первым: во всю ширину и тише — он следующий по времени, а не
@@ -37054,7 +37097,8 @@ function crewRender(){
         <span>Переставлено: <b>${moved}</b> — не как обычно</span>
         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
       </div>` : ''}
-    ${per}${test}${crewFreeCarsHtml(S)}${crewLinksHtml(S)}`;
+    ${per}${test}${crewFreeCarsHtml(S)}${crewOdoHtml()}${crewLinksHtml(S)}`;
+  crewOdoFill();
 }
 
 // ── телефоны водителей ────────────────────────────────────────────────────
@@ -37250,6 +37294,146 @@ async function crewCarDel(cid){
 }
 // Запрос по машинам: ответ — штат целиком. Черновик перестановок не трогаем:
 // машина уходит сразу, а перенос водителей между районами ждёт «Сохранить».
+// ── пробег машин ──────────────────────────────────────────────────────────
+// Владелец, 30 сен 2026: «продумай, как в AMBAR STAR мне вести учёт всего этого
+// и просматривать все эти фото и данные». Водитель снимает одометр каждый месяц
+// и когда садится на другую машину (car_intake.py). Вход — строкой здесь, рядом
+// с машинами; сам журнал — отдельным экраном: машина, её показания за месяц
+// со снимками и разницей, и кого ещё ждём.
+let ODM = null, ODM_MONTH = '';
+const _odmImg = {};
+const ODM_WHY = {new: 'вышел на работу', car: 'сел на машину', month: 'начало месяца'};
+const odmN = v => String(Math.round(+v || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const odmMonth = m => { const p = String(m || '').split('-');
+  return p.length === 2 ? `${MONTHS_NOM[+p[1] - 1] || m} ${p[0]}` : ''; };
+const MONTHS_NOM = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function crewOdoHtml(){
+  return `<div class="crw-c odm-in"><div class="crw-c-h"><span class="crw-c-n wrap">Пробег машин</span></div>
+    <div class="crw-ln-l"><button class="crw-ln" onclick="odmOpen()">
+      <span class="crw-ln-i">${IC('car', 16)}</span>
+      <span class="crw-ln-b"><b>Показания одометров</b><i id="crwOdoSub">снимки и пробег по месяцам</i></span>
+      <em class="fb-chev">${_SC_CHEV}</em></button></div></div>`;
+}
+// Сколько ждём — подписью у входа: красным, если кто-то ещё не снял.
+let _odmSub = null, _odmSubAt = 0;
+async function crewOdoFill(){
+  try{
+    // Экран перерисовывается на каждое касание — спрашивать сервер каждый раз незачем.
+    if(!_odmSub || Date.now() - _odmSubAt > 60000){
+      _odmSubAt = Date.now(); _odmSub = ownerApi.ownerFetch('/api/owner/car-intakes');
+    }
+    const d = await _odmSub;
+    const el = document.getElementById('crwOdoSub'); if(!el) return;
+    const wait = (d.cars || []).filter(c => c.need).length;
+    el.textContent = !d.live ? `каждый месяц — с ${fbWorkDay(d.from_day)}`
+      : wait ? `${odmMonth(d.month).toLowerCase()} · ждём ${wait} из ${(d.cars || []).filter(c => c.driver && !c.away).length}`
+      : `${odmMonth(d.month).toLowerCase()} · сняли все`;
+    el.className = d.live && wait ? 'wait' : '';
+  }catch(e){ _odmSub = null; }
+}
+
+async function odmOpen(month){
+  // Несохранённая перестановка районов: сначала вопрос, как при любом выходе.
+  if(ACC_VIEW === 'crew' && crewDirty()){ crewAsk(); return; }
+  ACC_VIEW = 'odm';
+  ACC_BACK = crewOpen;
+  _setText('accTitle', 'Пробег машин');
+  _setText('accSub', '');
+  document.getElementById('accFoot').innerHTML = '';
+  if(!ODM) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  if(month !== undefined) ODM_MONTH = month;
+  await odmLoad();
+}
+async function odmLoad(){
+  try{
+    ODM = await ownerApi.ownerFetch('/api/owner/car-intakes' + (ODM_MONTH ? '?month=' + encodeURIComponent(ODM_MONTH) : ''));
+    ODM_MONTH = ODM.month;
+  }catch(e){ ODM = null; }
+  _odmSub = null;
+  if(ACC_VIEW === 'odm') odmRender();
+}
+function odmRender(){
+  const box = document.getElementById('accMid');
+  if(!ODM){ box.innerHTML = loadFail('odmLoad()'); return; }
+  const d = ODM, now = d.month === String(d.today || '').slice(0, 7);
+  _setText('accSub', odmMonth(d.month).toLowerCase());
+  const mine = (d.cars || []).filter(c => c.driver && !c.away);
+  const wait = mine.filter(c => c.need).length;
+  const got = (d.cars || []).filter(c => (c.rows || []).some(r => r.km && !r.void)).length;
+  const months = (d.months || []).length > 1 ? `<div class="odm-mo">${d.months.map(m =>
+    `<button class="${m === d.month ? 'on' : ''}" onclick="odmOpen('${escS(m)}')">${escS(odmMonth(m))}</button>`).join('')}</div>` : '';
+  const sum = `<div class="odm-sum"><div><u>Машин</u><b>${(d.cars || []).length}</b></div>
+    <div><u>Сняли</u><b>${got}</b></div>
+    <div class="${now && wait ? 'w' : ''}"><u>${now ? 'Ждём' : 'Без показаний'}</u><b>${now ? wait : (d.cars || []).length - got}</b></div></div>`;
+  const hint = now && !d.live ? `<div class="crw-hint"><span>Показание каждый месяц и при смене машины — <b>с ${escS(fbWorkDay(d.from_day))}</b>.
+    До этого снимают только вышедшие на работу.</span></div>` : '';
+  const cars = (d.cars || []).map(c => {
+    const rows = (c.rows || []).map(r => {
+      const when = `${fbWorkDm(r.day)}${r.at ? ' · ' + new Date(r.at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : ''}`;
+      if(r.skipped) return `<div class="odm-r np"><span class="odm-th">${IC('minus', 17)}</span>
+        <span class="odm-rb"><b>${escS(r.driver)} · пропущено</b><i>${escS(when)}${r.note ? ' · ' + escS(r.note) : ''}${r.by ? ' · ' + escS(r.by) : ''}</i></span></div>`;
+      const th = r.thumb ? ` style="background-image:url('${escS(r.thumb)}')"` : '';
+      return `<button class="odm-r${r.void ? ' void' : ''}" onclick="odmShot('${escS(r.id)}')">
+        <span class="odm-th"${th}>${r.thumb ? '' : IC('cam', 17)}</span>
+        <span class="odm-rb"><b>${escS(r.driver)}</b><i>${escS(when)}${ODM_WHY[r.why] ? ' · ' + ODM_WHY[r.why] : ''}${r.void ? ' · переснять' : ''}</i></span>
+        <span class="odm-rv">${odmN(r.km)}${r.diff != null ? `<i>${r.diff >= 0 ? '+' : '−'}${odmN(Math.abs(r.diff))} км</i>` : ''}</span></button>`;
+    }).join('');
+    const who = c.driver ? `<span class="odm-who${c.away ? ' gone' : ''}">${escS(c.driver)}<i>${c.away ? 'уехал' : escS(c.district || '')}</i></span>`
+                         : '<span class="odm-who"><i>свободна</i></span>';
+    return `<div class="crw-c odm-c">
+      <div class="crw-c-h"><span class="odm-pl">${escS(c.plate || '—')}</span>
+        <span class="crw-c-n">${escS([c.model, c.color].filter(Boolean).join(' · ') || 'Машина')}</span>${who}</div>
+      <div class="odm-km">${c.km ? `<b>${odmN(c.km)}</b>км · последнее ${escS(fbWorkDay(c.km_day))}` : 'показаний ещё не было'}</div>
+      ${c.need ? `<div class="odm-need">${IC('warn', 16)}<span>Ждём показание · ${ODM_WHY[c.why] || ''}</span>
+        <button onclick="odmSkip('${escS(c.id)}')">Пропустить</button></div>` : ''}
+      <div class="odm-rows">${rows || (c.km ? `<div class="odm-none">${now ? 'В этом месяце показаний нет' : 'За месяц показаний нет'}</div>` : '')}</div>
+    </div>`;
+  }).join('');
+  const nocar = (d.nocar || []).length && now ? `<div class="crw-hint"><span>Без машины: <b>${d.nocar.map(x =>
+    escS(x.driver) + (x.district ? ' · ' + escS(x.district) : '')).join(', ')}</b> — показание не спрашиваем.</span></div>` : '';
+  box.innerHTML = months + sum + hint + nocar + cars;
+}
+
+// Снимок одометра во весь экран: сперва размытая копия из строки, потом кадр.
+// Под ним — «Переснять»: показание гасится, водитель снимает заново.
+async function odmShot(id){
+  let row = null, car = null;
+  (ODM.cars || []).forEach(c => (c.rows || []).forEach(r => { if(r.id === id){ row = r; car = c; } }));
+  if(!row) return;
+  const ov = _woFull();
+  const can = !row.void && ODM.month === String(ODM.today || '').slice(0, 7);
+  const кадр = url => `<img src="${url}" alt="Одометр"><span>${escS(row.driver)} · ${escS(car.plate || '')} · ${odmN(row.km)} км${
+      row.diff != null ? ` · ${row.diff >= 0 ? '+' : '−'}${odmN(Math.abs(row.diff))} с ${escS(fbWorkDm(row.prev_day))}` : ''}</span>${
+      can ? `<button class="odm-re" onclick="event.stopPropagation();odmVoid('${escS(id)}')">Переснять</button>` : ''}`;
+  ov.innerHTML = кадр(_odmImg[id] || row.thumb || '');
+  ov.classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(_odmImg[id]) return;
+  try{ _odmImg[id] = await ownerApi.ownerBlob('/api/owner/car-intakes/photo?id=' + encodeURIComponent(id)); }
+  catch(e){ if(!row.thumb){ ov.classList.remove('show'); _toast('Снимка не нашлось'); } return; }
+  if(ov.classList.contains('show')) ov.innerHTML = кадр(_odmImg[id]);
+}
+async function odmVoid(id){
+  _woFull().classList.remove('show');
+  const a = await _crewAsk3('Переснять пробег?', 'Показание останется в журнале зачёркнутым. Водитель снимет одометр заново перед следующей сменой.',
+    'Переснять', 'Оставить');
+  if(a !== 'a') return;
+  try{ await ownerApi.ownerFetch('/api/owner/car-intakes/void', {method: 'POST', body: {id}}); }
+  catch(e){ _toast('Не удалось сохранить'); return; }
+  await odmLoad();
+}
+async function odmSkip(cid){
+  const c = (ODM.cars || []).find(x => x.id === cid); if(!c) return;
+  const a = await _crewAsk3(`Пропустить пробег · ${c.driver}`, `${escS(c.plate || '')} — смена откроется без показания. В журнале останется строка с причиной.`,
+    'Машина в ремонте', 'Одометр не читается');
+  if(!a) return;
+  try{ await ownerApi.ownerFetch('/api/owner/car-intakes/skip', {method: 'POST',
+    body: {driver: c.driver, note: a === 'a' ? 'машина в ремонте' : 'одометр не читается'}}); }
+  catch(e){ _toast((e && e.payload && e.payload.error) === 'already' ? 'Показание уже есть' : 'Не удалось сохранить'); }
+  await odmLoad();
+}
+
 async function crewCarsPost(path, body){
   try{
     crewCarsApply(await ownerApi.ownerFetch(path, {method: 'POST', body}));

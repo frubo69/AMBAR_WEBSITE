@@ -2170,37 +2170,91 @@ async def handle_staff_set(request):
     return web.json_response(await _staff_payload(), headers=CORS_HEADERS)
 
 
+def _car_row(r: dict) -> dict:
+    """Строка журнала пробега для экрана: без байтов снимка и без координат."""
+    return {"id": str(r.get("_id") or ""), "at": _iso_dt(r.get("at")) if r.get("at") else "",
+            "day": str(r.get("day") or "") or (_bizday.day_of(r.get("at")) or ""),
+            "driver": r.get("driver") or "", "km": int(r.get("km") or 0),
+            "why": r.get("why") or ("new" if r.get("since") else ""),
+            "skipped": bool(r.get("skipped")), "note": r.get("note") or "",
+            "by": r.get("skip_by") or "", "void": bool(r.get("void")),
+            "photo": bool(r.get("photo")), "thumb": r.get("thumb") or "",
+            "car_id": str(r.get("car_id") or ""), "plate": r.get("plate") or ""}
+
+
 @require_owner
 async def handle_car_intakes(request):
-    """GET /api/owner/car-intakes — кто принял машину и кто ещё должен.
+    """GET /api/owner/car-intakes[?month=YYYY-MM] — журнал пробега по машинам.
 
-    Ждут — те, у кого период работы начался не раньше рубежа и записи нет.
-    Их видно здесь, а не только по звонку водителя «меня не пускает»."""
+    На машину: кто за ней сейчас, последнее показание, ждём ли новое и почему,
+    и все показания месяца с разницей против предыдущего (по этой же машине,
+    чьё бы оно ни было). Ждут — видно здесь, а не по звонку «меня не пускает»."""
     import car_intake as ci
     await _staff_fresh()
-    rows = await db.car_intakes_list(60)
-    ждут = []
-    for d in staff.drivers():
-        if d.get("away"):
-            continue
-        since = staff.work_since(d["name"])
-        if not since or since < ci.FROM_DAY:
-            continue
-        if not await db.car_intake_get(d["name"], since):
-            ждут.append({"driver": d["name"], "since": since,
-                         "district": d.get("district_code") or ""})
-    return web.json_response({"from_day": ci.FROM_DAY, "waiting": ждут, "rows": rows},
-                             headers=CORS_HEADERS,
-                             dumps=lambda o: __import__("json").dumps(o, default=str))
+    сегодня = ci.today()
+    month = str(request.query.get("month") or "")[:7]
+    if not re.fullmatch(r"\d{4}-\d{2}", month):
+        month = сегодня[:7]
+    все = [r for r in await db.car_intakes_list(5000)]
+    все.sort(key=lambda r: str(_iso_dt(r.get("at")) if r.get("at") else ""))
+    люди = {d["name"]: d for d in staff.drivers()}
+    cars, занято = [], set()
+    for c in sorted(await db.cars_all(), key=lambda c: (not c.get("driver"), str(c.get("plate") or ""))):
+        cid, водитель = str(c.get("_id") or ""), c.get("driver") or ""
+        занято.add(водитель)
+        rows, было = [], None
+        for r in все:
+            if str(r.get("car_id") or "") != cid:
+                continue
+            row = _car_row(r)
+            if row["km"] and not row["void"]:
+                if было:
+                    row["diff"] = row["km"] - было["km"]
+                    row["prev_day"], row["prev_driver"] = было["day"], было["driver"]
+                было = row
+            if row["day"][:7] == month:
+                rows.append(row)
+        ждём = {"need": False, "why": ""}
+        if водитель in люди and month == сегодня[:7]:
+            st = await ci.state({"name": водитель})
+            ждём = {"need": st["need"], "why": st["why"]}
+        cars.append({"id": cid, "model": c.get("model") or "", "color": c.get("color") or "",
+                     "plate": c.get("plate") or "", "driver": водитель,
+                     "away": bool(водитель) and водитель not in люди,
+                     "district": (люди.get(водитель) or {}).get("district_code") or "",
+                     "km": (было or {}).get("km") or 0, "km_day": (было or {}).get("day") or "",
+                     **ждём, "rows": rows[::-1]})
+    months = sorted({_car_row(r)["day"][:7] for r in все} | {сегодня[:7]}, reverse=True)
+    return web.json_response({
+        "month": month, "months": [m for m in months if m], "today": сегодня,
+        "live": сегодня >= ci.MONTHLY_FROM, "from_day": ci.MONTHLY_FROM, "cars": cars,
+        "nocar": [{"driver": n, "district": d.get("district_code") or ""}
+                  for n, d in люди.items() if n not in занято and not d.get("test")]},
+        headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_car_intake_photo(request):
+    """GET /api/owner/car-intakes/photo?id= — снимок одометра."""
+    img = await db.car_intake_photo(str(request.query.get("id") or ""))
+    if not img:
+        return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
+    ctype = "image/png" if img[:2] == b"\x89P" else "image/jpeg"
+    return web.Response(body=img, content_type=ctype,
+                        headers={**CORS_HEADERS, "Cache-Control": "private, max-age=3600"})
+
+
+def _owner_name(request) -> str:
+    return (request.get("owner_user") or {}).get("first_name", "") or "владелец"
 
 
 @require_owner
 async def handle_car_intake_skip(request):
-    """POST /api/owner/car-intakes/skip {driver, note} — пропустить приём.
+    """POST /api/owner/car-intakes/skip {driver, note} — пропустить показание.
 
-    Машина в ремонте, новой ещё нет, выходит на чужой — без этой кнопки одна
-    машина останавливает смену целого района, а это дороже любого пробега.
-    Запись всё равно заводится: «пропустили и почему» — такой же факт."""
+    Машина в ремонте, одометр не читается — без этой кнопки одна машина
+    останавливает смену целого района, а это дороже любого пробега. Строка в
+    журнале всё равно заводится: «пропустили и почему» — такой же факт."""
     import car_intake as ci
     try:
         body = await request.json()
@@ -2210,14 +2264,30 @@ async def handle_car_intake_skip(request):
     if name not in staff.driver_names():
         return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
     await _staff_fresh()
-    since = staff.work_since(name)
-    if not since or since < ci.FROM_DAY:
-        return web.json_response({"error": "not_needed"}, status=409, headers=CORS_HEADERS)
-    if await db.car_intake_get(name, since):
-        return web.json_response({"error": "already"}, status=409, headers=CORS_HEADERS)
-    await db.car_intake_skip(name, since, request.get("owner_user", {}).get("first_name", "") or "владелец",
-                             str(body.get("note") or "")[:200])
-    log.info(f"[car] приём пропущен: {name} · период с {since}")
+    st = await ci.state({"name": name})
+    if not st["need"]:
+        return web.json_response({"error": "already" if st["done"] else "not_needed"},
+                                 status=409, headers=CORS_HEADERS)
+    car = st["car"] or {}
+    await db.car_reading_add(name, {
+        "car_id": str(car.get("_id") or ""), "plate": car.get("plate") or "",
+        "model": car.get("model") or "", "skipped": True, "skip_by": _owner_name(request),
+        "note": str(body.get("note") or "")[:200], "why": st["why"], "day": ci.today(),
+        "since": st["since"]})
+    log.info(f"[car] показание пропущено: {name} · {st['why']}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_car_intake_void(request):
+    """POST /api/owner/car-intakes/void {id} — «переснять»: показание гасится
+    (в журнале остаётся зачёркнутым), и водитель снимает заново перед сменой."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    if not await db.car_reading_void(str(body.get("id") or ""), _owner_name(request)):
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
@@ -2815,24 +2885,29 @@ async def tg_edit_caption(token, chat_id, message_id, caption: str,
         return None
 
 
-async def car_intake_tell(me: dict, car: dict, km: int, since: str) -> None:
-    """Водитель принял машину — владельцу снимком одометра.
+async def car_intake_tell(me: dict, car: dict, km: int, iid: str, why: str = "",
+                          last: dict | None = None) -> None:
+    """Водитель снял пробег — владельцу снимком одометра.
 
     Снимок и есть сообщение: число, вписанное руками, проверяется глазом по
     кадру, а не пересказом. Рядом — прошлый пробег этой машины: нелепая
     разница видна сразу, и ловится она так, а не техникой."""
     import html as _html
-    last = await db.car_intake_last(str(car.get("_id") or ""))
-    img = await db.car_intake_photo(db.car_intake_id(me.get("name", ""), since))
+    img = await db.car_intake_photo(iid)
     было = int((last or {}).get("km") or 0)
-    строки = [f"🚗 <b>{_html.escape(str(me.get('name') or ''))}</b> принял машину",
-              f"{_html.escape(str(car.get('model') or ''))} · "
-              f"{_html.escape(str(car.get('plate') or ''))}",
-              f"Пробег <b>{km:,}</b> км".replace(",", " ")]
+    e = lambda v: _html.escape(str(v or ""))                          # noqa: E731
+    кто_был = str((last or {}).get("driver") or "")
+    повод = {"new": "вышел на работу", "month": "начало месяца",
+             "car": f"сел на машину после {e(кто_был)}" if кто_был and кто_был != me.get("name")
+                    else "сел на машину"}.get(why, "")
+    строки = [f"🚗 <b>{e(me.get('name'))}</b> · пробег" + (f" · {повод}" if повод else ""),
+              f"{e(car.get('model'))} · {e(car.get('plate'))}",
+              f"<b>{km:,}</b> км".replace(",", " ")]
     if было:
-        строки.append(f"В прошлый приём было {было:,} км — разница {km - было:,}"
-                      .replace(",", " "))
-    строки.append(f"Вышел на работу {since}")
+        день = str((last or {}).get("day") or "") or (_bizday.day_of((last or {}).get("at")) or "")
+        строки.append(f"Было {было:,} км".replace(",", " ")
+                      + (f" ({день[8:10]}.{день[5:7]}" + (f", {e(кто_был)}" if кто_был else "") + ")" if день else "")
+                      + f" — разница {km - было:,}".replace(",", " "))
     cap = "\n".join(строки)
     if img:
         await notify_owners_photo("driver.car_intake", cap, img)
@@ -5166,6 +5241,10 @@ def setup(app):
     app.router.add_get(             "/api/owner/car-intakes", handle_car_intakes)
     app.router.add_route("OPTIONS", "/api/owner/car-intakes/skip", handle_car_intake_skip)
     app.router.add_post(            "/api/owner/car-intakes/skip", handle_car_intake_skip)
+    app.router.add_route("OPTIONS", "/api/owner/car-intakes/void", handle_car_intake_void)
+    app.router.add_post(            "/api/owner/car-intakes/void", handle_car_intake_void)
+    app.router.add_route("OPTIONS", "/api/owner/car-intakes/photo", handle_car_intake_photo)
+    app.router.add_get(             "/api/owner/car-intakes/photo", handle_car_intake_photo)
     app.router.add_route("OPTIONS", "/api/owner/staff/reset", handle_staff_reset)
     app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
     for _p, _h in (("/api/owner/drivers/add", handle_drivers_add),

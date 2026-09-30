@@ -4231,7 +4231,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
     <div class="sup-top-b">
-      <div class="sup-top-t">Приём машины</div>
+      <div class="sup-top-t" id="odoTtl">Приём машины</div>
       <div class="sup-top-s" id="odoCar"></div>
     </div>
   </div>
@@ -6315,17 +6315,19 @@ function shPaint(){
   // сейчас, поэтому он первый: остальные два зависят от оператора и от
   // телефона, а этот только от него.
   if(SH.car_need){
-    steps.unshift(step(1, false, ICO.car || TUT_ICO.pin, 30, 'Приём машины',
-      (SH.car_plate ? `${esc(SH.car_plate)} · снимите одометр` : 'Снимите одометр')
+    const ow = odoW();
+    steps.unshift(step(1, false, ICO.car || TUT_ICO.pin, 30, ow.t,
+      (ow.why ? ow.why + ' · ' : '')
+      + (SH.car_plate ? `${esc(SH.car_plate)} · снимите одометр` : 'снимите одометр')
       + ' и впишите пробег.',
-      `<button class="btn btn-pri gs-go" onclick="odoStart()">Принять машину</button>`));
+      `<button class="btn btn-pri gs-go" onclick="odoStart()">${ow.go}</button>`));
   }
   const ready0 = ready && !SH.car_need;
   const sub = ready0 ? 'Всё готово.'
-            : SH.car_need ? 'Сначала примите машину.'
+            : SH.car_need ? odoW().first
             : geoOn ? 'Ждём, когда оператор откроет смену района.' : 'Два шага — и кнопка загорится.';
   const note = ready0 ? `Всё готово — нажмите «Открыть смену».<br>Открывать — до ${SH.late_hour || 18}:00.`
-             : SH.car_need ? 'Без приёма машины<br>на смену выйти нельзя.'
+             : SH.car_need ? odoW().no
              : geoOn ? 'Оператор откроет смену —<br>кнопка «Открыть смену» загорится.'
              : 'Оба шага выполнены —<br>кнопка «Открыть смену» загорится.';
   list.innerHTML = `
@@ -6374,7 +6376,7 @@ async function shOpen(){
         : err === 'after_close' ? 'Смена закрыта — следующую откроет оператор'
         : err === 'not_marked' ? 'Оператор ещё не отметил вас на смене'
         : err === 'marked_off' ? 'Сегодня вы отмечены как выходной — напишите оператору'
-        : err === 'need_car' ? 'Сначала примите машину — снимок одометра и пробег'
+        : err === 'need_car' ? 'Сначала снимок одометра и пробег'
         : 'Не получилось — повторите', 'err');
     await shLoad();
   }
@@ -8385,6 +8387,18 @@ window.addEventListener('resize', () => { try{ _carFit(); }catch(e){} });
 // нет (общее правило этого экрана), так что кадр снят здесь и сейчас.
 let ODO = {photo: '', thumb: '', car: null, last: 0, confirm: false};
 
+// С 1 окт 2026 пробег снимают не только на въезде: каждый месяц и когда
+// пересел на другую машину. Слова на экране — по причине (SH.car_why).
+function odoW(){
+  const w = SH.car_why || 'new';
+  return w === 'month' ? {t: 'Пробег машины', go: 'Отправить пробег', why: 'Начало месяца',
+                          first: 'Сначала снимите пробег.', no: 'Без пробега<br>на смену выйти нельзя.'}
+       : w === 'car' ? {t: 'Приём машины', go: 'Принять машину', why: 'Новая машина',
+                        first: 'Сначала примите машину.', no: 'Без приёма машины<br>на смену выйти нельзя.'}
+       : {t: 'Приём машины', go: 'Принять машину', why: '',
+          first: 'Сначала примите машину.', no: 'Без приёма машины<br>на смену выйти нельзя.'};
+}
+
 // Что показывает сервер: нужна ли приёмка и какую машину принимаем.
 async function odoLoad(){
   try{ return await drvApi.drvFetch('/api/driver/car'); }
@@ -8427,12 +8441,13 @@ function odoAsk(photo, thumb){
   ODO.photo = photo; ODO.thumb = thumb; ODO.confirm = false;
   const img = document.getElementById('odoImg'); if(img) img.src = photo;
   _setText('odoCar', ODO.car && ODO.car.plate ? ODO.car.plate : 'пробег на въезде');
-  _setText('odoNote', ODO.last ? `В прошлый приём было ${fmt(ODO.last)} км` : '');
+  _setText('odoTtl', odoW().t);
+  _setText('odoNote', ODO.last ? `В прошлый раз было ${fmt(ODO.last)} км` : '');
   document.getElementById('odoNote').classList.remove('err');
   const km = document.getElementById('odoKm');
   km.value = ''; km.disabled = false;
   const go = document.getElementById('odoGo');
-  go.disabled = false; go.textContent = 'Принять машину';
+  go.disabled = false; go.textContent = odoW().go;
   document.getElementById('odoScr').classList.add('show');
   setTimeout(() => { try{ km.focus(); }catch(e){} }, 120);
 }
@@ -8463,7 +8478,7 @@ async function odoSend(){
     await load();
   }catch(e){
     const p = e.payload || {}, err = p.error;
-    go.disabled = false; go.textContent = 'Принять машину';
+    go.disabled = false; go.textContent = odoW().go;
     if(err === 'less'){
       // Одометр назад не ходит: почти всегда это опечатка или чужая машина.
       _odoSay(`Меньше, чем в прошлый приём (${fmt(p.last_km)} км). Проверьте число`, true);
@@ -9160,8 +9175,8 @@ function renderShift(){
     // оператора и телефон, а этот водитель делает сам и прямо сейчас.
     const car = !!SH.car_need, canOpen = marked && g && !car;
     let n = 0;
-    steps = (car ? step(++n, 'now', 'Приём машины',
-        'Снимите одометр и впишите пробег — без этого на смену нельзя',
+    steps = (car ? step(++n, 'now', odoW().t,
+        (odoW().why ? odoW().why + '. ' : '') + 'Снимите одометр и впишите пробег — без этого на смену нельзя',
         ['wait', 'Ожидание'],
         {ico: ICO.car,
          t: SH.car_plate ? `Ваша машина · ${esc(SH.car_plate)}` : 'Выберите машину',

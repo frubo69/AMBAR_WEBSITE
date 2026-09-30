@@ -3434,6 +3434,11 @@ button.path:active{transform:scale(.995)}
 .dds-tot.end{min-height:72px;border-top:1px solid rgba(201,169,110,.34)}
 .dds-tot.end b{font-size:30px;line-height:1}
 .sc-cap.dds-cap b{font-size:18px}
+/* Всё одной карточкой (владелец: «слишком разделено друг от друга»): заголовки
+   разделов — тише полос сейфа, без своей золотой заливки, швом сверху. */
+.dds-one .sc-cap.dds-cap{background:rgba(255,255,255,.025);font-size:15px;min-height:48px;
+  border-top:1px solid rgba(201,169,110,.28);border-bottom:1px solid rgba(255,255,255,.05)}
+.dds-one .dds-day{border-top:1px solid rgba(201,169,110,.28)}
 .sc-cap.dds-cap.in b{color:var(--up)} .sc-cap.dds-cap.out b{color:var(--dn)}
 .dds-r{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;border-top:1px solid rgba(255,255,255,.05)}
 .sc-cap + .dds-r{border-top:0}
@@ -21247,17 +21252,13 @@ function fbDdcBodyHtml(d, start){
   // Считаем сами и сверяем с сейфом: разошлось — молчать нельзя.
   const diff = Math.round(end - (+d.stack_total || 0));
   return `
-  <div class="sc"><div class="dds-tot${start.all < 0 ? ' neg' : ''}"><span>Сейф начало дня</span>${v(start.all)}</div></div>
-  <div class="sc">
+  <div class="sc dds-one">
+    <div class="dds-tot${start.all < 0 ? ' neg' : ''}"><span>Сейф начало дня</span>${v(start.all)}</div>
     <div class="sc-cap dds-cap in"><span>Поступления</span>${v(p.inSum, p.inSum ? '+' : '')}</div>
     ${kids(p.ins, 'in', '+')}
     ${d.pending && +d.base ? `<div class="dds-r wait"><span>Выручка дня<i>день не подтверждён — в сейф ещё не легла</i></span>${v(+d.base)}</div>` : ''}
-  </div>
-  <div class="sc">
     <div class="sc-cap dds-cap out"><span>Выплаты</span>${v(p.outSum, p.outSum ? '−' : '')}</div>
     ${kids(p.outs, 'out', '−')}
-  </div>
-  <div class="sc">
     <div class="dds-day ${saldo < 0 ? 'out' : saldo > 0 ? 'in' : ''}"><span>Итог за день</span>${v(saldo, saldo > 0 ? '+' : '')}</div>
     <div class="dds-tot end${end < 0 ? ' neg' : ''}"><span>Сейф конец дня</span>${v(end)}</div>
     ${diff ? `<div class="dds-r out"><span>Не сходится с сейфом</span>${v(diff)}</div>` : ''}

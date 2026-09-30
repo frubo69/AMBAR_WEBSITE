@@ -2772,6 +2772,30 @@ async def supply_save(doc: dict):
     await db.supplies.replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
 
+async def supply_replace_untouched(doc: dict, districts: list) -> bool:
+    """Заменить открытую поставку новой целиком — только если по ней ещё ничего
+    не приняли. Условие стоит в самом запросе: между «посмотрел, что не
+    начинали» и «записал» помещается первая бутылка водителя, и замена стёрла
+    бы её из заявки, оставив в реестре."""
+    db = _db_or_none()
+    if db is None: return False
+    q = {"_id": doc["_id"], "status": "open"}
+    for o in districts:
+        q[f"tasks.{o}.noscan_at"] = None
+        q[f"tasks.{o}.done_at"] = None
+        q[f"tasks.{o}.scanned"] = {"$in": [0, None]}
+    r = await db.supplies.replace_one(q, doc)
+    return r.matched_count > 0
+
+
+async def supply_main_open(day: str) -> dict | None:
+    """Открытая основная поставка этого дня — самая свежая."""
+    db = _db_or_none()
+    if db is None: return None
+    return await db.supplies.find_one(
+        {"status": "open", "day": day, "kind": {"$in": [None, "main"]}}, sort=[("at", -1)])
+
+
 async def supply_get(sid: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None

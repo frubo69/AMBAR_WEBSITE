@@ -29799,7 +29799,7 @@ async function supImport(inp, btnId){
     // Строки, которых нет в каталоге, называем сразу: магазин вписал своё, и
     // молча потерять это нельзя — за товаром по ней никто не поедет.
     const чужие = (j.unknown || []).length;
-    _toast(`Поставка на ${j.total_qty} бутылок${чужие ? ` · не узнано строк: ${чужие} (${
+    _toast(`${j.replaced ? 'Поставка заменена · ' : 'Поставка на '}${j.total_qty} бутылок${чужие ? ` · не узнано строк: ${чужие} (${
       String(j.unknown[0]).slice(0, 28)}${чужие > 1 ? '…' : ''})` : ''}`);
     ACC_SUP = null;
     await supLoad(j.supply_id);
@@ -29811,6 +29811,8 @@ async function supImport(inp, btnId){
                no_code_column:'В файле нет колонки Code',   // старые файлы
                no_district_columns:'Не нашёл колонки районов',
                nothing_confirmed:'Магазин не подтвердил ни одной позиции',
+               already_started:'По этой поставке уже принимают товар' + ((e||{}).districts && e.districts.length
+                 ? ' (' + e.districts.join(', ') + ')' : '') + ' — заменить нельзя',
                file_required:'Файл не пришёл', empty_file:'Файл пустой'};
     _toast(E[(e||{}).error] || 'Файл не прочитался');
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}

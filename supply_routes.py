@@ -780,7 +780,62 @@ async def handle_import(request):
            "total_qty": sum(i["qty"] for i in items),
            "asked_qty": sum(int(v) for v in asked_map.values()),
            "gap_qty": sum(d["asked"] for d in dropped) + sum(s["gap"] for s in short)}
-    await db.supply_save(doc)
+    # Повторная загрузка за тот же день ЗАМЕНЯЕТ поставку, а не заводит вторую
+    # (владелец, 30 сен 2026). 29 сен файл залили трижды — у водителей стало по
+    # три одинаковые задачи, а «ждёт на базе» показало 1506 вместо 502.
+    # Заменяем на месте, под тем же номером: у водителя открыт экран этой
+    # задачи, и кто взял район — остаётся при нём. Если по поставке уже что-то
+    # приняли, заменять нельзя: принятое записано в неё, и новая заявка стёрла
+    # бы его из строк, оставив в реестре.
+    заменена, снятые = "", []
+    было = await db.supply_main_open(day)
+    if было:
+        начато = sorted(OFFICE_CODES.get(o, o) for o, t in (было.get("tasks") or {}).items()
+                        if t.get("noscan_at") or t.get("done_at") or int(t.get("scanned") or 0) > 0)
+        if начато:
+            return web.json_response({"error": "already_started", "supply_id": было["_id"],
+                                      "districts": начато}, status=409, headers=CORS_HEADERS)
+        старые = было.get("tasks") or {}
+        for oid, t in tasks.items():
+            st = старые.get(oid) or {}
+            if st.get("cancelled_at"):
+                continue                      # район отменяли отдельно — новый ответ его возвращает
+            if st.get("driver"):
+                t.update(driver=st["driver"], driver_id=st.get("driver_id") or 0,
+                         claimed_at=st.get("claimed_at"))
+            # Версия состава растёт: приложение водителя по ней узнаёт, что
+            # заявку обновили, и показывает, что изменилось.
+            t["erev"] = int(st.get("erev") or 0) + 1
+        снятые = [(t["driver"], o) for o, t in старые.items()
+                  if t.get("driver") and o not in tasks and not t.get("cancelled_at")]
+        doc = {**doc, "_id": было["_id"], "replaced_at": now,
+               "replaced_n": int(было.get("replaced_n") or 0) + 1,
+               "first_at": было.get("first_at") or было.get("at")}
+        if not await db.supply_replace_untouched(doc, list(старые)):
+            return web.json_response({"error": "already_started", "supply_id": было["_id"],
+                                      "districts": []}, status=409, headers=CORS_HEADERS)
+        заменена = sid = было["_id"]
+        # Черновик докупки прошлой версии — её недобор, а не нынешний: снимаем,
+        # ниже соберётся новый. Подтверждённую докупку (её уже везут) не трогаем.
+        try:
+            for ch in (await db.supplies_children([sid])).get(sid) or []:
+                if ch.get("status") == "draft":
+                    await db.supply_set(ch.get("_id") or ch.get("supply_id"),
+                                        {"status": "cancelled", "cancelled_at": now,
+                                         "cancelled_by": "заменена новой загрузкой"},
+                                        only_open=False)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[supply] {sid}: прошлый черновик докупки не снят: {e}")
+        try:
+            import stock_routes
+            stock_routes.base_drop()
+        except Exception:                            # noqa: BLE001
+            pass
+        if снятые:
+            await _cancel_tell(снятые, whole=False)
+        log.info(f"[supply] поставка {sid} заменена новой загрузкой (раз {doc['replaced_n']})")
+    else:
+        await db.supply_save(doc)
     # Ответ магазина ПИШЕТСЯ В ЗАЯВКУ этого дня (владелец, 29 сен 2026: «всё,
     # что я хотел — чтобы когда я загружал ответ магазина, он писал туда
     # правильные цифры, а после смены там появлялась новая заявка, которая
@@ -815,6 +870,7 @@ async def handle_import(request):
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[supply] о снятых прошлых задачах не сказали: {e}")
     return web.json_response({"ok": True, "supply_id": sid, "draft": черновик,
+                              "replaced": bool(заменена),
                               "items": len(items), "total_qty": doc["total_qty"],
                               "asked_qty": doc["asked_qty"], "gap_qty": doc["gap_qty"],
                               "dropped": dropped, "short": short, "extra": extra,
@@ -822,7 +878,9 @@ async def handle_import(request):
                               "tasks": [{"district": o, "code": OFFICE_CODES.get(o, ""),
                                          "name": OFFICE_NAMES.get(o, o), **t}
                                         for o, t in tasks.items()]},
-                             headers=CORS_HEADERS)
+                             headers=CORS_HEADERS,
+                             # у заменённой поставки в задачах живут даты — кто когда взял
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 async def _stale_tell(new_sid: str) -> list:

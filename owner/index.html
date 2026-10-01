@@ -4138,7 +4138,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-safe-usdt.tap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:5px 9px 6px;line-height:1.1}
 .fb-safe-usdt.tap > i{font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;color:var(--gold);white-space:nowrap}
-.fb-safe-usdt.tap > span{white-space:nowrap;color:var(--text)}
+.fb-safe-usdt.tap > span{white-space:nowrap;color:var(--gold2)}   /* дирхамы — жёлтым, как сейф (владелец, 1 окт 2026) */
 .fb-safe-usdt.tap > span u{color:var(--sub)}
 /* Главной строкой — сколько в кошельке наших дирхамов (остаток по курсу 3.5),
    ниже — сами USDT (владелец, 1 окт 2026: «основную пиши сумму дирхамы, ниже доллары»). */
@@ -28523,7 +28523,7 @@ function walBody(d){
     ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
   mid.innerHTML = переключатель + `
     <div class="wal-c">
-      <div class="wal-v">${walAed(v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
+      <div class="wal-v" style="color:var(--gold2)">${walAed(v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
       <div class="wal-our"><span>На кошельке</span><b>${fmtUsdt(b.usdt)}<u>USDT</u></b><i>по ${
         String(курс).replace('.', ',')} за USDT</i></div>
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${

@@ -165,6 +165,14 @@ async def _готовь_настоящую(seed):
     async def _молча(*a, **k):
         return None
     backdate.notify = _молча
+    # На сервере в .env настоящие токены ботов: ни одно сообщение из прогона
+    # уйти не должно. 2 окт 2026 первый запуск шёл через проверку прав, та не
+    # узнала выдуманного «Фазза» и подняла владельцам тревогу о попытке входа.
+    import owner_routes
+    owner_auth.install_alerter(None)
+    for имя in ("notify_owners", "notify_owners_force", "notify_owners_photo"):
+        if hasattr(owner_routes, имя):
+            setattr(owner_routes, имя, _молча)
     return db, fr
 
 

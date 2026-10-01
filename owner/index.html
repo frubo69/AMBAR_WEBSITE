@@ -22003,7 +22003,7 @@ async function fbLineEntryAdd(lid){
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
     fbBudRepaint();
-  }catch(e){ _toast('Не удалось записать'); }
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось записать'); }
 }
 const FB_DRAG = {hold: null, sx: 0, sy: 0, el: null, float: null, ox: 0, oy: 0, lock: false, last: null, done: 0, init: false};
 function fbDragInit(){
@@ -22995,7 +22995,7 @@ async function fbPayOpen(id){
     if(снимок){ const r = {...(FB.rentShot || {})}; delete r[id]; FB.rentShot = r; }
     if(res.book){ fbApply(res.book); fbPaint(); }
     fbPagePaint();
-  }catch(e){ _toast(((e && e.payload) || {}).error === 'no_photo' ? 'Нужен чек/документ' : 'Не удалось записать'); }
+  }catch(e){ _toast(fbCrErr(e) || (((e && e.payload) || {}).error === 'no_photo' ? 'Нужен чек/документ' : 'Не удалось записать')); }
 }
 // Нажал случайно — вернуть как было: запись уходит, факт и остаток отматываются
 async function fbPayUndo(eid){

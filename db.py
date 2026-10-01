@@ -6497,6 +6497,50 @@ async def fin_entries_where(q: dict) -> list:
     return await d.fin_entries.find(q).sort("at", 1).to_list(length=2000)
 
 
+# ── Книга крипты: что пришло на кошелёк и ушло с него ───────────────────────
+#   crypto_moves {_id: 'txid:in|out:кошелёк:сумма', txid, dir: in|out, usdt,
+#                 aed (по курсу на момент прихода), rate, ts (мс), wallet, at}
+# Только дописывается: приход, однажды увиденный в сети, из книги не уходит,
+# даже если сеть потом молчит или отдаёт историю короче.
+async def crypto_move_add(doc: dict) -> bool:
+    """True — записали новый перевод, False — такой уже есть."""
+    d = _db_or_none()
+    if d is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await d.crypto_moves.insert_one(doc)
+        return True
+    except DuplicateKeyError:
+        return False
+
+
+async def crypto_moves(direction: str = "") -> list:
+    d = _db_or_none()
+    if d is None: return []
+    q = {"dir": direction} if direction else {}
+    return await d.crypto_moves.find(q).sort("ts", 1).to_list(length=100000)
+
+
+async def fin_days_crypto() -> list:
+    """Подтверждённые дни, в чьём РП+ есть крипта: [{_id: день, collected_cr}]."""
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.fin_days.find({"ok": True, "collected_cr": {"$gt": 0}}, {"collected_cr": 1})
+    return await cur.to_list(length=5000)
+
+
+async def fin_entries_crypto() -> list:
+    """Записи книги, которые двигают крипту: РП− «криптой» и вывод крипты в
+    наличные (Доп. РП+ «из крипты» с раскладкой)."""
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.fin_entries.find({"$or": [{"book": "rp", "pay": "crypto"},
+                                      {"book": "in", "src": "crypto"}]},
+                             {"day": 1, "book": 1, "amount": 1, "pay": 1, "src": 1,
+                              "cr_free": 1, "cr_rp": 1})
+    return await cur.to_list(length=20000)
+
+
 async def shift_days_worked(day_from: str, day_to: str) -> list:
     """Пары (день, район), когда смена района открывалась или закрывалась —
     для подсчёта дней операторов."""

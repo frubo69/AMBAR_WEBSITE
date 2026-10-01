@@ -4150,6 +4150,14 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-safe-v.sm{font-size:20px} .fb-safe-v.sm u{font-size:9.5px;margin-left:3px}
 .fb-safe-usdt.tap.sm{font-size:12.5px;padding-left:8px;padding-right:8px} .fb-safe-usdt.tap.sm u{font-size:9px}
 .fb-safe-h:has(.sm){gap:7px}
+/* Крипта в РП (владелец, 2 окт 2026): подсказка вывода, строка в раскладке. */
+.fb-crhint{margin:2px 0 8px;padding:9px 11px;border-radius:10px;border:1px solid rgba(201,169,110,.28);background:rgba(201,169,110,.06);
+  font-size:11.5px;line-height:1.45;color:var(--sub)}
+.fb-crhint b{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2)}
+.fb-crhint .dn{color:var(--dn)}
+.crd-cr > span, .fb-cr > span{color:var(--gold2)}
+.fb-crc-cr{margin-top:6px;font-size:11px;color:var(--gold2)}
+.aud-g.fb-rp2{padding-top:0}
 .fb-safe-plus{flex:0 0 auto;font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--gold2)}
 .fb-safe-usdt.tap:active{transform:scale(.97);border-color:rgba(201,169,110,.5)}
 /* «Отчёт ДДС» — обычной подписью, как остальные строки: золотом он спорил со
@@ -19807,20 +19815,29 @@ function crDistCard(day){
   const ed = CRD.edit === day;
   const aside = b.aside || 0, col = b.collected || 0, np = Math.max(0, b.base) - aside - col;
   const half = Math.floor(b.base / 2);
-  const short = norm > 0 && col < norm ? norm - col : 0;
+  // Крипта в РП+ — первой: наличными докладываем только то, чего не хватило до
+  // нормы (владелец, 2 окт 2026). До нормы считаем обе части вместе.
+  const cc = fbCr(day.slice(0, 7)), cr = b.collected_cr || 0;
+  const crOn = !!cc.ready && day >= (cc.start_day || '9999');
+  const short = norm > 0 && col + cr < norm ? norm - col - cr : 0;
+  // Крипта бывает с копейками (USDT × 3.5) — её поле и число показываем точно:
+  // округлённая вверх сумма не прошла бы («свободной только 199,99»).
   const val = (f, v) => ed
-    ? `<b><input class="fb-num crd-in" id="crd-${f}-${day}" inputmode="numeric" value="${fbFmt(v)}"
-         onfocus="this.select()" oninput="crDistLive('${day}')"
+    ? `<b><input class="fb-num crd-in" id="crd-${f}-${day}" inputmode="${f === 'collected_cr' ? 'decimal' : 'numeric'}" value="${
+         f === 'collected_cr' ? fbInFmt(v, !Number.isInteger(+v)) : fbFmt(v)}"
+         onfocus="this.select()" oninput="crDistLive('${day}','${f}')"
          onkeydown="if(event.key==='Enter'){this.blur()}"><u>AED</u></b>`
-    : `<b>${fbFmt(v)}<u>AED</u></b>`;
+    : `<b>${f === 'collected_cr' ? fmtUsdt(v) : fbFmt(v)}<u>AED</u></b>`;
   return `<div class="sc fb-gut crd${b.ok ? ' ok' : ''}" id="crd-${day}">
     <div class="sc-cap"><span>${escS(title)}</span><i class="crd-st${b.ok ? ' ok' : ''}">${
       b.ok ? IC('check', 12) + 'согласовано' + (b.ok_by ? ' · ' + escS(b.ok_by) : '') : 'ждёт согласования'}</i></div>
     <div class="sc-r fb-r"><span>Выручка${b.handed_fact != null ? '<i>по факту</i>' : ''}</span><b>${fbFmt(b.base)}<u>AED</u></b></div>
     <div class="sc-r fb-r crd-r${ed ? ' fb-i' : ''}"><em class="fb-sign">−</em><span>Барракуда<i>${
       !ed && aside === half ? 'половина выручки' : 'половина — ' + fbFmt(half)}</i></span>${val('aside', aside)}</div>
-    <div class="sc-r fb-r crd-r${ed ? ' fb-i' : ''}"><em class="fb-sign">−</em><span>РП+<i>${
-      norm ? 'норма ' + fbFmt(norm) + ' в день' : 'норма в бюджете не задана'}</i></span>${val('collected', col)}</div>
+    ${crOn ? `<div class="sc-r fb-r crd-r crd-cr${ed ? ' fb-i' : ''}"><em class="fb-sign">+</em><span>РП+ криптой<i>${
+      b.ok ? 'с кошелька, в сейф не ложится' : b.cr_src === 'free' ? 'вся свободная на кошельке' : 'с кошелька'}</i></span>${val('collected_cr', cr)}</div>` : ''}
+    <div class="sc-r fb-r crd-r${ed ? ' fb-i' : ''}"><em class="fb-sign">−</em><span>${crOn ? 'РП+ наличными' : 'РП+'}<i>${
+      norm ? (crOn && cr ? 'до нормы ' + fbFmt(norm) : 'норма ' + fbFmt(norm) + ' в день') : 'норма в бюджете не задана'}</i></span>${val('collected', col)}</div>
     <div class="crd-short" id="crd-short-${day}"${short ? '' : ' hidden'}>до нормы РП+ не хватает <b>${fbFmt(short)}</b> AED</div>
     <div class="sc-r fb-r sum"><em class="fb-sign">=</em><span>ЧП<i>остаток</i></span><b id="crd-np-${day}"${
       np < 0 ? ' class="dn"' : ''}>${fbFmt(np)}<u>AED</u></b></div>
@@ -19839,37 +19856,47 @@ function crDistNum(id){
   return Number.isFinite(v) ? v : 0;
 }
 // Правят — ЧП и «не хватает до нормы» пересчитываются под пальцем.
-function crDistLive(day){
+function crDistLive(day, src){
   const b = crDistBook(day); if(!b) return;
   const norm = crDistNorm(day);
+  // Поправили крипту — наличные до нормы пересчитываются сами, пока их поле
+  // не трогали руками: «сначала крипта, потом сколько докинуть из налички».
+  const crEl = document.getElementById(`crd-collected_cr-${day}`), colEl = document.getElementById(`crd-collected-${day}`);
+  const cr = crEl ? crDistNum(`crd-collected_cr-${day}`) : (b.collected_cr || 0);
+  if(src === 'collected') CRD.colTouched = day;
+  if(src === 'collected_cr' && colEl && CRD.colTouched !== day && norm > 0)
+    colEl.value = fbFmt(Math.min(Math.max(0, norm - cr), Math.max(0, Math.max(0, b.base) - crDistNum(`crd-aside-${day}`))));
   const col = crDistNum(`crd-collected-${day}`);
   const np = Math.max(0, b.base) - crDistNum(`crd-aside-${day}`) - col;
   const el = document.getElementById(`crd-np-${day}`);
   if(el){ el.innerHTML = `${fbFmt(np)}<u>AED</u>`; el.classList.toggle('dn', np < 0); }
   const sh = document.getElementById(`crd-short-${day}`);
-  if(sh){ const s = norm > 0 && col < norm ? norm - col : 0; sh.hidden = !s; if(s) sh.querySelector('b').textContent = fbFmt(s); }
+  if(sh){ const s = norm > 0 && col + cr < norm ? norm - col - cr : 0; sh.hidden = !s; if(s) sh.querySelector('b').textContent = fbFmt(s); }
 }
 function crDistEdit(day){
-  CRD.edit = day || null;
+  CRD.edit = day || null; CRD.colTouched = null;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   crDistRender();
 }
 function crDistSave(day){
-  crDistOk(day, crDistNum(`crd-aside-${day}`), crDistNum(`crd-collected-${day}`));
+  const b = crDistBook(day) || {};
+  crDistOk(day, crDistNum(`crd-aside-${day}`), crDistNum(`crd-collected-${day}`),
+           document.getElementById(`crd-collected_cr-${day}`) ? crDistNum(`crd-collected_cr-${day}`) : (b.collected_cr || 0));
 }
 // «Согласовать» — предложенное как есть; «Сохранить» — поправленное. Всё
 // распределено — назад к сбору (там внизу «Распределено»); остался ещё день
 // (перенос) — остаёмся, он на экране следующим.
-async function crDistOk(day, aside, collected){
+async function crDistOk(day, aside, collected, collected_cr){
   if(CRD.busy) return;
   const b = crDistBook(day); if(!b) return;
-  if(aside === undefined){ aside = b.aside || 0; collected = b.collected || 0; }
-  if(aside < 0 || collected < 0){ _toast('Сумма не может быть меньше нуля'); return; }
+  if(aside === undefined){ aside = b.aside || 0; collected = b.collected || 0; collected_cr = b.collected_cr || 0; }
+  collected_cr = collected_cr || 0;
+  if(aside < 0 || collected < 0 || collected_cr < 0){ _toast('Сумма не может быть меньше нуля'); return; }
   CRD.busy = true;
   let res;
   try{ res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok',
-         {method: 'POST', body: {day, aside, collected, as: _meName()}}); }
-  catch(e){ CRD.busy = false; _toast('Не удалось сохранить распределение'); return; }
+         {method: 'POST', body: {day, aside, collected, collected_cr, as: _meName()}}); }
+  catch(e){ CRD.busy = false; _toast(fbCrErr(e) || 'Не удалось сохранить распределение'); return; }
   if(res && res.book) fbApply(res.book);
   fbHubRepaint();                   // карточка на «Финансах» под этим экраном — тоже
   // Подтвердили день прошлого месяца (перенос через первое число) — книга
@@ -19880,7 +19907,8 @@ async function crDistOk(day, aside, collected){
   CRD.edit = null;
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   const nb = crDistBook(day) || b;
-  _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)} · ЧП ${fbFmt(nb.np_plus)}`);
+  _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)}${
+    nb.collected_cr ? ' + криптой ' + fbFmt(nb.collected_cr) : ''} · ЧП ${fbFmt(nb.np_plus)}`);
   const left = crDistDays().map(crDistBook).filter(x => x && x.base > 0 && !x.ok);
   if(!left.length){ crDistBack(); return; }
   crDistRender();
@@ -20249,7 +20277,7 @@ function finToggle(n, снизу){
 const FB = {month: null, months: {}, at: {}, flight: {}, seq: 0, applied: 0,
             person: null, line: '', lineSet: false, pick: {open: null, all: false}, bud: null, kind: 'fine', from: 'this'};
 const FB_TTL = 60000;   // книга месяца свежа минуту: заказы и расходы водителей идут мимо неё
-const FB_T = {handed_fact: 'Собрал по факту', ordered_fact: 'Заказали по счёту',
+const FB_T = {collected_cr: 'РП+ криптой', handed_fact: 'Собрал по факту', ordered_fact: 'Заказали по счёту',
               aside: 'Барракуда', collected: 'РП+', extra_rp: 'Приход в РП',
               pay: 'Оплатили Барракуде', note: 'Заметка',
               norm: 'Норма в день', usd: 'Курс доллара',
@@ -20710,9 +20738,11 @@ function fbCrcHtml(){
   // что согласовать — его цифры; всё согласовано — согласованные.
   const shown = pend.length ? pend : real;
   const sum = f => shown.reduce((a, b) => a + (f(b) || 0), 0);
-  const tB = sum(b => b.aside), tR = sum(b => b.collected), tN = sum(b => Math.max(0, b.base) - (b.aside || 0) - (b.collected || 0));
+  // РП+ — наличными и криптой вместе; сколько из него крипты — подписью.
+  const tB = sum(b => b.aside), tR = sum(b => (b.collected || 0) + (b.collected_cr || 0)), tCr = sum(b => b.collected_cr),
+        tN = sum(b => Math.max(0, b.base) - (b.aside || 0) - (b.collected || 0));
   const norm = ((fbBook(c.day.slice(0, 7)) || {}).budget || {}).norm || 0;
-  const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0)), 0) : 0;
+  const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0) - (b.collected_cr || 0)), 0) : 0;
   const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';
   const s2 = st.locked ? (c.need ? 'после сбора' : 'нечего распределять')
     : !known ? 'загрузка…' : !real.length ? 'нечего распределять'
@@ -20725,6 +20755,7 @@ function fbCrcHtml(){
         st.locked ? IC('lock', 12) : st.done ? IC('check', 12) : '2'}</span>
         <b>Распределение</b><i class="${st.done ? 'ok' : !st.locked && pend.length ? 'warn' : ''}">${s2}</i></div>
       <div class="fb-crc-g">${g('Барракуда', tB)}${g('РП+', tR)}${g('ЧП', tN, tN < 0)}</div>
+      ${has && tCr > 0 ? `<div class="fb-crc-cr">в РП+ криптой ${fbFmt(tCr)} AED · наличными ${fbFmt(tR - tCr)}</div>` : ''}
       ${has && short > 0 && !st.locked ? `<div class="fb-crc-short">до нормы РП+ не хватает ${fbFmt(short)} AED</div>` : ''}
     </div>`;
   // Следующее действие — одно, и оно же главное.
@@ -20754,12 +20785,13 @@ async function fbCrcOk(day){
   FB.crcBusy = true;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok',
-      {method: 'POST', body: {day, aside: b.aside || 0, collected: b.collected || 0, as: _meName()}});
+      {method: 'POST', body: {day, aside: b.aside || 0, collected: b.collected || 0, collected_cr: b.collected_cr || 0, as: _meName()}});
     if(res && res.book) fbApply(res.book);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     const nb = fbDayOf(fbBook(day.slice(0, 7)), day) || b;
-    _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)} · ЧП ${fbFmt(nb.np_plus)}`);
-  }catch(e){ _toast('Не удалось согласовать'); }
+    _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)}${
+      nb.collected_cr ? ' + криптой ' + fbFmt(nb.collected_cr) : ''} · ЧП ${fbFmt(nb.np_plus)}`);
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось согласовать'); }
   FB.crcBusy = false;
   fbCrcBooks();
   fbHubRepaint();
@@ -20834,7 +20866,7 @@ function fbHubHtml(b, err){
          (владелец, 20 сен 2026: «крипта в сейфе должна быть перед чп»). -->
     <div class="fb-safe-k">
       ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе', ico: FB_ICO.b})}
-      ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: 'в сейфе', mode: 'neg', ico: FB_ICO.rp})}
+      ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: b.safe.rp_cr ? `в сейфе · криптой ${fbFmt(b.safe.rp_cr)}` : 'в сейфе', mode: 'neg', ico: FB_ICO.rp})}
       ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg', ico: FB_ICO.np})}
     </div>
     <!-- Отчёт ДДС — низом карточки сейфа (владелец, 20 сен 2026: «добавь сюда
@@ -20881,6 +20913,29 @@ function fbSafeAll(mb){
   // Только наличные (владелец, 30 сен 2026: «жёлтыми цифрами пиши только деньги
   // в наличных, не надо пересчитывать их из этих USDT»). Крипта — рядом, в USDT.
   return (mb && mb.safe && mb.safe.total) || 0;
+}
+// ── Крипта в РП (владелец, 2 окт 2026) ─────────────────────────────────────
+// Книга месяца несёт b.crypto: свободная крипта на кошельке и крипта на счёте
+// РП, обе в наших дирхамах (остаток × 3.5). Считает сервер (crypto_book).
+function fbCr(month){ const b = fbBook(month || FB.month || fbMonthNow()); return (b && b.crypto) || {}; }
+// Отказ сервера по крипте — словами. Пусто — отказ не про крипту.
+function fbCrErr(e){
+  const p = (e && e.payload) || {}, f = v => fmtUsdt(v);
+  return p.error === 'no_free' ? `Свободной крипты только ${f(p.free)} AED`
+    : p.error === 'no_crypto' ? (p.free != null ? `Крипты не хватает: свободной ${f(p.free)}, в РП ${f(p.rp)} AED`
+                                                : `В РП криптой только ${f(p.have)} AED`)
+    : p.error === 'cr_spent' ? `Из этой крипты уже потрачено — меньше ${f(p.min)} AED не поставить`
+    : p.error === 'crypto_unready' ? 'Кошелёк ещё не прочитан — попробуйте через минуту'
+    : p.error === 'crypto_early' ? 'Крипта в РП+ идёт с 1 октября' : '';
+}
+// «Чем платили?» — последним вопросом расхода из РП (владелец: «в РП− надо
+// учитывать в конце, чем платили — наличными или криптой»). Крипты на счёте РП
+// нет — не спрашиваем: платить ею нечем. null — передумал.
+async function fbAskPay(month){
+  const c = fbCr(month);
+  if(!c.ready || !(c.rp > 0)) return 'cash';
+  const a = await askChoice('Чем платили?', `На счёте РП криптой ${fmtUsdt(c.rp)} AED`, 'Наличными', 'Криптой', 'go', 'go');
+  return a === 'ok' ? 'cash' : a === 'no' ? 'crypto' : null;
 }
 // Из «Сейфа» в кошелёк и обратно в «Сейф», а не в «Учёт».
 function fbOpenWal(back){
@@ -20955,7 +21010,7 @@ async function fbSave(inp){
     if(res.book){ fbApply(res.book); fbPaint(); }
   }catch(e){
     back();
-    _toast('Не удалось сохранить');
+    _toast(fbCrErr(e) || 'Не удалось сохранить');
   }
 }
 // Числа на месте: каждое вычисленное число помечено ключом data-f, строки с
@@ -20971,7 +21026,8 @@ function fbValues(){
          V['d.card_on'] = d.spend_card ? 1 : 0;
          V['d.sal_on'] = d.salary_sum ? 1 : 0; V['d.paid_on'] = d.pay ? 1 : 0; V['d.extra_pay_on'] = d.pay_b_extra ? 1 : 0;
          // «Барракуда»: сколько не хватает выделенного, чтобы закрыть долг
-         V['d.b_short'] = Math.max(0, (d.debt_b || 0) - (d.stack_b || 0)); }
+         V['d.b_short'] = Math.max(0, (d.debt_b || 0) - (d.stack_b || 0));
+         V['d.rp_plus_all'] = (d.collected || 0) + (d.collected_cr || 0); }
   const mb = fbBook(FB.month || fbMonthNow());
   if(mb){
     for(const g of ['totals', 'rp', 'np', 'b', 'safe']) for(const k in mb[g]) V[(g === 'totals' ? 't' : g) + '.' + k] = mb[g][k];
@@ -21049,7 +21105,9 @@ function fbEntries(list, book){
     const t = e.kind_t ? `${e.kind_t} · ${escS(e.who)}` : escS(e.comment || (book === 'rp' ? 'Расход' : book === 'in' ? 'Приход' : 'Выплата'));
     const sub = e.kind_t ? escS(e.comment && e.comment !== e.kind_t ? e.comment : '')
               : escS([e.src === 'crypto' && e.comment !== 'Из крипты' ? 'из крипты' : '', e.who].filter(Boolean).join(' · '));
-    const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') : '';
+    const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') + (e.pay === 'crypto' ? ' · криптой' : '')
+      : book === 'in' && e.src === 'crypto' && (e.cr_free || e.cr_rp)
+        ? [e.cr_free ? 'из свободной ' + walAed(e.cr_free) : '', e.cr_rp ? 'с крипта-счёта РП ' + walAed(e.cr_rp) : ''].filter(Boolean).join(' · ') : '';
     const forM = e.pay_month && e.day && e.pay_month !== e.day.slice(0, 7) ? 'за ' + fbMonthT(e.pay_month).toLowerCase() : '';
     return `<div class="fb-e">
     <span class="fb-e-b"><b>${t}</b><i>${[line, forM, sub].filter(Boolean).join(' · ')}</i></span>
@@ -21087,8 +21145,10 @@ function fbAddRow(book, day){
   <div class="fb-add" id="fbAdd-${book}" hidden>
     ${rp ? `<div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>` : ''}
     ${book === 'in' ? `<div class="chip-row fb-chips"><button class="chip${FB.inSrc === 'crypto' ? ' on' : ''}" id="fbSrc-in"
-        onclick="fbInSrc(this)">Из крипты</button></div>` : ''}
-    <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"
+        onclick="fbInSrc(this)">Из крипты</button></div>
+      <div class="fb-crhint" id="fbCrHint" data-day="${day}"${FB.inSrc === 'crypto' ? '' : ' hidden'}>${fbCrHintHtml(day, 0)}</div>` : ''}
+    <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"${
+      book === 'in' ? ' oninput="fbCrHint()"' : ''}
       onkeydown="if(event.key==='Enter'){document.getElementById('${np ? 'fbWho-np' : 'fbCmt-' + book}').focus()}">
     ${np ? `<input class="fb-txt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
       onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-np').focus()}">` : ''}
@@ -21106,7 +21166,27 @@ function fbInSrc(btn){
   const c = document.getElementById('fbCmt-in');
   if(c && FB.inSrc === 'crypto' && !c.value.trim()) c.value = 'Из крипты';
   if(c && FB.inSrc !== 'crypto' && c.value.trim() === 'Из крипты') c.value = '';
+  fbCrHint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+// Вывод крипты в наличные: откуда возьмётся сумма (владелец, 2 окт 2026:
+// «надо обязательно писать, сколько мы из свободной крипты должны взять, а
+// остальное — из крипты в РП перемещаем в наличку»). Делит сервер; здесь — то
+// же правило для глаз: сперва свободная, остальное с крипта-счёта РП.
+function fbCrHintHtml(day, amount){
+  const c = fbCr(day.slice(0, 7));
+  if(!c.ready) return 'Кошелёк ещё не прочитан';
+  const free = Math.max(0, +c.free || 0), rp = Math.max(0, +c.rp || 0);
+  const есть = `Свободной крипты <b>${walAed(free)}</b> · на счёте РП <b>${walAed(rp)}</b> AED`;
+  if(!(amount > 0)) return есть;
+  if(amount > free + rp + 0.005) return `${есть}<br><span class="dn">Столько крипты нет — можно вывести до ${walAed(free + rp)} AED</span>`;
+  const f = Math.min(amount, free), r = Math.round((amount - f) * 100) / 100;
+  return `${есть}<br>Возьмём: из свободной <b>${walAed(f)}</b>${r > 0 ? ` · с крипта-счёта РП в наличные <b>${walAed(r)}</b>` : ''} AED`;
+}
+function fbCrHint(){
+  const el = document.getElementById('fbCrHint'); if(!el) return;
+  el.hidden = FB.inSrc !== 'crypto';
+  if(!el.hidden) el.innerHTML = fbCrHintHtml(el.dataset.day || accDay(), fbAmt('fbAmt-in'));
 }
 function fbAddToggle(book){
   const f = document.getElementById('fbAdd-' + book); if(!f) return;
@@ -21133,6 +21213,8 @@ async function fbEntryAdd(book, day){
     _toast('Впишите, за что'); const c = document.getElementById('fbCmt-rp'); if(c) c.focus(); return; }
   if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек/документ'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
+  const pay = book === 'rp' ? await fbAskPay(day.slice(0, 7)) : '';
+  if(pay === null) return;
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
   if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
   try{
@@ -21140,17 +21222,20 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(route_from || route_to ? {route_from, route_to} : {}),
                               ...(book === 'in' && FB.inSrc ? {src: FB.inSrc} : {}),
+                              ...(pay === 'crypto' ? {pay} : {}),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
+    if(book === 'in' && FB.inSrc === 'crypto' && res && (res.cr_free || res.cr_rp))
+      _toast(`Выведено: из свободной ${walAed(res.cr_free || 0)}${res.cr_rp ? ' · с крипта-счёта РП ' + walAed(res.cr_rp) : ''} AED`);
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; }
-    if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); }
+    if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); fbCrHint(); }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
     if(FB.lpage){ FB.line = FB.lpage; FB.lineSet = true; }      // статья страницы не теряется
     fbPagePaint();
-  }catch(e){ _toast(e && /no_photo/.test(String(e)) ? 'Нужен чек/документ'
-    : (e && (e.payload || {}).error) === 'no_comment' ? 'Впишите, за что' : 'Не удалось записать'); }
+  }catch(e){ _toast(fbCrErr(e) || (e && /no_photo/.test(String(e)) ? 'Нужен чек/документ'
+    : (e && (e.payload || {}).error) === 'no_comment' ? 'Впишите, за что' : 'Не удалось записать')); }
 }
 async function fbEntryDel(id){
   if(!await askDialog('Убрать запись?', 'Сумма уйдёт из книги. Вернуть можно будет только новой записью.',
@@ -21225,6 +21310,9 @@ function fbDayCardInner(d){
 function fbDayBodyHtml(d){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
   const day = d.day, sc = `data-day="${day}"`;
+  const cr = fbCr(day.slice(0, 7));
+  // Строка крипты — с того дня, с которого она идёт в РП+, и когда кошелёк прочитан.
+  const crOn = !!cr.ready && day >= (cr.start_day || '9999') && !d.future && (d.base > 0 || d.collected_cr > 0);
   const okRow = d.future || !(d.base > 0) ? ''
     : d.ok ? `<div class="sc-r fb-r sub fb-okdone"><span>Подтверждено${d.ok_by ? ' · ' + escS(d.ok_by) : ''}</span><em>${IC('check', 15)}</em></div>`
            : `<div class="fb-okwrap"><button class="aud-b go fb-okday" data-d="${day}" onclick="fbDayOk(this.dataset.d)">Подтвердить</button></div>`;
@@ -21246,8 +21334,13 @@ function fbDayBodyHtml(d){
     ${fbCapT('Распределение')}
     ${fbRow('Выручка', 'd.base', d.base)}
     ${fbIn('Барракуда', 'aside', d.manual.aside, sc, {sign: '−', ph: fbFmt(d.aside), phk: 'd.aside', eu: d.aside_src === 'half' ? 'половина' : 'AED'})}
-    ${fbIn('РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? 'норма' : 'AED'})}
+    ${crOn ? `<!-- Крипта в РП+ — сначала она, наличными только то, чего не хватило до
+         нормы (владелец, 2 окт 2026). В сейф не ложится: остаётся на кошельке,
+         но числится за РП. Предлагается вся свободная; поправить можно. -->
+    ${fbIn('РП+ криптой', 'collected_cr', d.manual.collected_cr, sc, {sign: '+', ph: fbInFmt(d.collected_cr || 0, true), phk: 'd.collected_cr', dec: true, eu: d.cr_src === 'free' ? 'вся свободная' : 'AED', cls: 'fb-cr'})}` : ''}
+    ${fbIn(crOn ? 'РП+ наличными' : 'РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? (crOn && d.collected_cr ? 'до нормы' : 'норма') : 'AED'})}
     ${fbRow('ЧП+', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
+    ${crOn ? fbRow('РП+ всего — наличными и криптой', 'd.rp_plus_all', (d.collected || 0) + (d.collected_cr || 0), {sub: true}) : ''}
     ${okRow}
   </div>
   <div class="sc fb-gut">
@@ -21266,6 +21359,7 @@ function fbDayBodyHtml(d){
     ${fbRow('РП', 'd.stack_rp', d.stack_rp, {mode: 'neg'})}
     ${fbRow('ЧП', 'd.stack_np', d.stack_np, {mode: 'neg'})}
     ${fbRow('Всего', 'd.stack_total', d.stack_total, {sum: true, sign: '=', mode: 'neg'})}
+    ${d.stack_rp_cr ? fbRow('РП криптой — на кошельке', 'd.stack_rp_cr', d.stack_rp_cr, {sub: true}) : ''}
   </div>`;
 }
 // Сбор выручки — тот же день, отсюда и обратно.
@@ -21357,7 +21451,8 @@ async function accFinSafe(){
 // «Подтвердить» прямо в строке; подтверждён — зелёное окошко и карандаш.
 // Сама строка ведёт в день, где раскладку можно поправить.
 function fbSafeDayRow(d){
-  const sub = `${fbFmt(d.base)} → Барракуда ${fbFmt(d.aside)} · РП+ ${fbFmt(d.collected)} · ЧП+ ${fbFmt(d.np_plus)}`;
+  const sub = `${fbFmt(d.base)} → Барракуда ${fbFmt(d.aside)} · РП+ ${fbFmt(d.collected)}${
+    d.collected_cr ? ' + криптой ' + fbFmt(d.collected_cr) : ''} · ЧП+ ${fbFmt(d.np_plus)}`;
   return `<div class="fb-card"><button class="fb-e fb-bl fb-sday" onclick="fbGoDay('${d.day}')">
     <span class="fb-e-b"><b>${escS(fbDayT(d.day))}</b><i>${sub}</i></span>${
     d.ok ? `<b class="fb-box ok">${fbFmt(d.base)}<u>AED</u></b><em class="fb-fill-em pen">${_FB_PEN}</em>`
@@ -21370,12 +21465,13 @@ async function fbDayOk(day){
   const b = fbBook(day.slice(0, 7)), d = fbDayOf(b, day); if(!d) return;
   const val = (f, dflt) => { const el = document.querySelector(`#accMid input[data-field="${f}"]`); if(!el || el.value.trim() === '') return dflt; const v = +el.value.replace(/\s/g, '').replace(',', '.'); return Number.isNaN(v) ? dflt : v; };
   const aside = val('aside', d.aside || 0), collected = val('collected', d.collected || 0);
+  const collected_cr = val('collected_cr', d.collected_cr || 0);
   try{
-    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok', {method: 'POST', body: {day, aside, collected, as: _meName()}});
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok', {method: 'POST', body: {day, aside, collected, collected_cr, as: _meName()}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
     if(ACC_VIEW === 'finday' || ACC_VIEW === 'finb') fbDayReload(); else fbRepaint();
-  }catch(e){ _toast('Не удалось подтвердить'); }
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось подтвердить'); }
 }
 // ── Отчёт ДДС ─────────────────────────────────────────────────────────────
 // Весь день сейфа одной лентой (владелец, 20 сен 2026: «отчёт за день, там
@@ -21470,13 +21566,15 @@ function fbDdcParts(d, month){
   // водителей здесь нет; выручка в минусе так и стоит минусом в ЧП+.
   // РП− — то, что вбито в STAR из панели расходов. ЧП− — выплаты из прибыли и
   // оплата Барракуде сверх её стопки.
-  const rpOut = (d.expenses || []).map(e => it(
+  // Оплаченное криптой из сейфа не выходило (владелец, 2 окт 2026: «криптой —
+  // из крипты»): в ДДС — только то, что платили наличными.
+  const rpOut = (d.expenses || []).filter(e => e.pay !== 'crypto').map(e => it(
     month ? (e.kind_t || e.line_name || 'Вне плана')
           : [e.kind_t || e.line_name || 'Вне плана', e.kind_t ? e.who : e.comment].filter(Boolean).join(' · '), e.amount));
   const npOut = (d.payouts || []).map(e => it(
     (month ? (e.who || e.comment) : [e.who, e.comment].filter(Boolean).join(' · ')) || 'Выплата', e.amount));
   npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra));
-  const outs = [{name: 'РП−', v: n(d.expenses_sum), items: has(rpOut)},
+  const outs = [{name: 'РП−', v: n(d.expenses_sum) - n(d.expenses_cr_sum), items: has(rpOut)},
                 {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra), items: has(npOut)}];
   if(n(d.pay_b)) outs.push({name: 'Барракуда−', v: n(d.pay_b), items: [it('Оплата Барракуде', d.pay_b)]});
   const sum = a => a.reduce((t, r) => t + r.v, 0);
@@ -21576,15 +21674,20 @@ function fbDdcMonthHtml(b, now){
 // Карточка над расходами: раскрывается на месте, размер окна строго задан —
 // все дни месяца листаются внутри него (владелец: «листать внутри карточки»).
 function fbRpInRows(b){
-  const rows = (b.days || []).filter(d => !d.future && ((d.collected || 0) + (d.extra_rp || 0)) > 0).reverse();
+  const rows = (b.days || []).filter(d => !d.future && ((d.collected || 0) + (d.collected_cr || 0) + (d.extra_rp || 0)) > 0).reverse();
   if(!rows.length) return '<div class="fb-none">В этом месяце в РП ещё не откладывали</div>';
   return rows.map(d => {
     // в фонд легло только подтверждённое: неподтверждённая раскладка дня — это
     // ещё предложение, и в «В сейфе» она не входит (как и в calc)
-    const col = d.ok ? (d.collected || 0) : 0, sum = col + (d.extra_rp || 0);
+    // Крипта в РП+ (со 2 окт 2026) — тоже приход в фонд; крипта, переложенная
+    // в наличные с крипта-счёта РП, новым приходом не считается — столбец
+    // сходится с плиткой «Отложено».
+    const col = d.ok ? (d.collected || 0) : 0, cr = d.ok ? (d.collected_cr || 0) : 0,
+          sum = col + cr + (d.extra_rp || 0) - (d.cr_cash || 0);
     const parts = [];
-    if(!d.ok && d.collected) parts.push(`ждёт подтверждения: ${fbFmt(d.collected)}`);
-    if(d.extra_rp) parts.push(`приход ${fbFmt(d.extra_rp)}`);
+    if(!d.ok && (d.collected || d.collected_cr)) parts.push(`ждёт подтверждения: ${fbFmt((d.collected || 0) + (d.collected_cr || 0))}`);
+    if(cr) parts.push(`криптой ${fbFmt(cr)}`);
+    if(d.extra_rp) parts.push(`приход ${fbFmt(d.extra_rp)}${d.cr_cash ? ` · из них перекладка ${fbFmt(d.cr_cash)}` : ''}`);
     const sub = parts.join(' · ');
     return `<div class="fb-e"><span class="fb-e-b"><b>${escS(fbDayT(d.day))}</b>${sub ? `<i>${sub}</i>` : ''}</span>
       <b class="fb-e-v${sum ? '' : ' none'}">${fbFmt(sum)}<u>AED</u></b></div>`;
@@ -21892,9 +21995,11 @@ async function fbLineEntryAdd(lid){
   if(!(amount > 0)){ _toast('Нужна сумма'); const a = document.getElementById('fbAmt-ln'); if(a) a.focus(); return; }
   const day = FB.month === fbMonthNow() ? _dayIsoFor(0) : b.last;
   if(!await fbAskDay(day, 'Расход из фонда')) return;
+  const pay = await fbAskPay(day.slice(0, 7)); if(pay === null) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
-      {method: 'POST', body: {day, book: 'rp', amount, comment: fbTxt('fbCmt-ln'), who: '', line: lid, as: _meName()}});
+      {method: 'POST', body: {day, book: 'rp', amount, comment: fbTxt('fbCmt-ln'), who: '', line: lid, as: _meName(),
+                              ...(pay === 'crypto' ? {pay} : {})}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
     fbBudRepaint();
@@ -22595,10 +22700,15 @@ async function accFinRP(){
   <div class="fb-rppage">
     <div class="sc fb-gut">
       ${fbCap(b.month, true)}
-      <div class="aud-g">
+      <div class="aud-g fb-safe4">
         ${fbTile('РП+', 'safe.rp_in', s.rp_in)}
         ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
-        ${fbTile('В сейфе', 'safe.rp', s.rp, {mode: 'neg'})}
+      </div>
+      <!-- На счёте РП: слева наличные (в сейфе), справа крипта (на кошельке) —
+           как в шапке сейфа (владелец, 2 окт 2026). -->
+      <div class="aud-g fb-safe4 fb-rp2">
+        ${fbTile('Наличные', 'safe.rp', s.rp, {mode: 'neg', unit: 'AED · в сейфе'})}
+        ${fbTile('Крипта', 'safe.rp_cr', s.rp_cr || 0, {unit: 'AED · на кошельке', go: 'fbOpenWal(accFinRP)'})}
       </div>
     </div>
     <button class="sc fb-rpbtn" onclick="fbRpInPage()">
@@ -22683,7 +22793,7 @@ function fbRpInPaint(){
 }
 function fbRpInHtml(b){
   const s = b.safe || {};
-  const n = (b.days || []).filter(d => !d.future && ((d.ok ? (d.collected || 0) : 0) + (d.extra_rp || 0)) > 0).length;
+  const n = (b.days || []).filter(d => !d.future && ((d.ok ? (d.collected || 0) + (d.collected_cr || 0) : 0) + (d.extra_rp || 0)) > 0).length;
   return `<div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
@@ -22875,9 +22985,11 @@ async function fbPayOpen(id){
   if(fbPayRcpNeed(l) && !снимок){ _toast('Сначала чек'); fbRentShotPick(id); return; }
   const day = b.today <= b.last ? b.today : b.last;
   if(!await fbAskDay(day, 'Оплата аренды')) return;
+  const pay = await fbAskPay(day.slice(0, 7)); if(pay === null) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
       {method: 'POST', body: {day, book: 'rp', amount: sum, comment: '', who: '', line: id, as: _meName(),
+                              ...(pay === 'crypto' ? {pay} : {}),
                               ...(снимок ? {photo: снимок.photo, thumb: снимок.thumb} : {})}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(снимок){ const r = {...(FB.rentShot || {})}; delete r[id]; FB.rentShot = r; }
@@ -23529,16 +23641,18 @@ async function fbAdvGo(name){
              : FB_ADV.mode === 'part' ? `Аванс в счёт зарплаты за ${fbMonthT(FB.month).toLowerCase()}` : 'Аванс по частям';
   if(!await askDialog(`${what} · ${fbFmt(amount)} AED`, `${name} получает деньги из фонда сегодня. ${
       String(document.getElementById('fbAdvP').textContent || '').trim()}`, 'Выдать', 'Вернуться назад')) return;
+  const pay = await fbAskPay(_dayIsoFor(0).slice(0, 7)); if(pay === null) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/item',
       {method: 'POST', body: {name, kind: 'advance', mode: FB_ADV.mode, amount, per_month: per,
+                              ...(pay === 'crypto' ? {pay} : {}),
                               from: FB_ADV.mode === 'custom' ? FB.from : '', month: FB.month, day: _dayIsoFor(0),
                               note: fbTxt('fbCmt-adv'), as: _meName()}});
     ['fbAmt-adv', 'fbPer-adv', 'fbCmt-adv'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); accFinPerson(); }
     _toast(`${what} выдан${FB_ADV.mode === 'ahead' ? 'а' : ''} · ${name}`);
-  }catch(e){ _toast('Не удалось записать'); }
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось записать'); }
 }
 
 async function fbPaySeg(field, value){
@@ -24504,9 +24618,11 @@ async function fbItemAdd(name){
   const cash = FB.kind === 'advance' || FB.kind === 'loan';
   if(cash && !await askDialog(`${FB_KIND_T[FB.kind]} ${fbFmt(amount)} AED`, `Деньги выданы из фонда сегодня, с зарплаты снимутся с ${
       fbMonthGen(FB.from === 'next' ? fbMonthAdd(FB.month, 1) : FB.month)}${per ? ` по ${fbFmt(per)} в месяц` : ''}.`, 'Записать', 'Вернуться назад')) return;
+  const pay = cash ? await fbAskPay(_dayIsoFor(0).slice(0, 7)) : 'cash'; if(pay === null) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/item',
-      {method: 'POST', body: {name, kind: FB.kind, amount, per_month: per, from: FB.from, month: FB.month, day: _dayIsoFor(0), note: fbTxt('fbCmt-item'), as: _meName()}});
+      {method: 'POST', body: {name, kind: FB.kind, amount, per_month: per, from: FB.from, month: FB.month, day: _dayIsoFor(0), note: fbTxt('fbCmt-item'), as: _meName(),
+                              ...(pay === 'crypto' ? {pay} : {})}});
     ['fbAmt-item', 'fbPer-item', 'fbCmt-item'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     const f = document.getElementById('fbAdd-item'); if(f) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -24518,7 +24634,7 @@ async function fbItemAdd(name){
       return;
     }
     if(res.book) fbPaint();
-  }catch(e){ _toast('Не удалось записать'); }
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось записать'); }
 }
 async function fbItemDel(id){
   if(!await askDialog('Убрать?', 'Удержание уйдёт из расчёта. Выданные деньги уйдут и из расходов фонда.',
@@ -24548,14 +24664,16 @@ async function fbPayOut(name){
   if(!(amount > 0)) amount = p && p.left > 0 ? p.left : 0;
   if(!(amount > 0)){ _toast('Нужна сумма'); return; }
   if(!await askDialog(`Выплатить ${fbFmt(amount)} AED`, `${name} · за ${fbMonthT(FB.month).toLowerCase()}, из фонда сегодняшним днём.`, 'Выплатить', 'Вернуться назад')) return;
+  const pay = await fbAskPay(_dayIsoFor(0).slice(0, 7)); if(pay === null) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/pay/out',
-      {method: 'POST', body: {name, amount, day: _dayIsoFor(0), month: FB.month, note: fbTxt('fbCmt-pay'), as: _meName()}});
+      {method: 'POST', body: {name, amount, day: _dayIsoFor(0), month: FB.month, note: fbTxt('fbCmt-pay'), as: _meName(),
+                              ...(pay === 'crypto' ? {pay} : {})}});
     ['fbAmt-pay', 'fbCmt-pay'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
     fbPagePaint();
-  }catch(e){ _toast('Не удалось записать'); }
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось записать'); }
 }
 
 // ── Экран «Прибыль» ───────────────────────────────────────────────────────
@@ -28506,6 +28624,20 @@ function walBody(d){
         escS(fbDayT(o.day))}</span><i>${fbFmt(o.total)} AED · ${fmtUsdt(o.usdt)} USDT</i></div>`).join('')}
       ${z.free_n > 12 ? `<div class="wal-ord-r"><span>и ещё ${z.free_n - 12}</span><i></i></div>` : ''}
     </div>` : '';
+  // Крипта по книге (владелец, 2 окт 2026): сколько свободной — её предложат в
+  // следующее распределение РП+, — и сколько уже лежит на счёте РП. Разница с
+  // тем, что на кошельке на самом деле, — то, что ушло и ещё не записано.
+  const k = (WAL_SEL < 0 && d && d.book) || {};
+  const книга = k.ready ? `<div class="wal-led wal-ord">
+      <div class="wal-ord-h">Крипта по книге</div>
+      <div><span>Свободная</span><b>${walAed(k.free)}<u>AED</u></b></div>
+      <div><span>пойдёт в РП+ при распределении</span><i></i></div>
+      <div><span>На счёте РП</span><b>${walAed(k.rp)}<u>AED</u></b></div>
+      <div class="rest"><span>Всего по книге</span><b>${walAed(k.book)}<u>AED</u></b></div>
+      ${Math.abs(k.diff || 0) >= 0.01 ? `<div class="${k.diff < 0 ? 'out' : ''}"><span>${
+        k.diff < 0 ? 'С кошелька ушло, а в книгу не внесено' : 'На кошельке больше, чем по книге'}</span><b>${
+        walAed(Math.abs(k.diff))}<u>AED</u></b></div>` : ''}
+    </div>` : '';
   _setText('accSub', v && v.address ? v.address : 'USDT · TRC-20');
   const переключатель = old.length ? `<div class="periods wal-sw" id="walSw" style="--count:${1 + old.length}">
       <div class="period-pill"></div>
@@ -28539,6 +28671,7 @@ function walBody(d){
       <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}
         за всё время · растёт с каждой оплатой через приложение</div>
     </div>` : ''}
+    ${книга}
     ${заказы}
     <!-- Откуда взялся остаток: пришло минус ушло. Пока этих двух строк не было,
          ноль на балансе при полной ленте выглядел поломкой экрана. -->

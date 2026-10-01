@@ -189,9 +189,26 @@ async def _build() -> dict:
         заказы = await _crypto_orders(оплачены)
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] заказы криптой не сведены: {e}")
+    # Книга крипты (crypto_book): заодно дочитываем в неё новые переводы — экран
+    # кошелька и есть то место, где их ждут первыми. Что свободно, что на счету
+    # РП и сходится ли книга с тем, что лежит на кошельке на самом деле.
+    книга = {}
+    try:
+        import crypto_book
+        await crypto_book.sync()
+        st = await crypto_book.state()
+        книга = {k: st.get(k) for k in ("ready", "free", "rp", "book", "open", "inflow", "alloc",
+                                         "exp", "wd_free", "wd_rp", "out", "out_book")}
+        # На кошельке на самом деле (по курсу) против книги: плюс — на кошельке
+        # больше, чем числится (приход ещё не дочитан или вывод записан раньше,
+        # чем ушёл); минус — с кошелька ушло, а в книгу не внесли.
+        книга["wallet"] = _ours(всего)
+        книга["diff"] = round(_ours(всего) - float(st.get("book") or 0), 2)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] книга крипты не прочитана: {e}")
     return {**main, "label": "Кошелёк", "paid": paid, "old": old,
             "rate": _rate(), "usdt_all": round(всего, 2), "ours_all_aed": _ours(всего),
-            "orders": заказы, "at": int(_t.time() * 1000)}
+            "orders": заказы, "book": книга, "at": int(_t.time() * 1000)}
 
 
 def _is_crypto(o: dict) -> bool:

@@ -43,7 +43,11 @@ MAX_AMOUNT = 10_000_000
 MAX_SPAN = 31                  # окно платежа: сколько дней после даты им можно платить
 USD_FALLBACK = 3.67
 
-DAY_FIELDS = ('handed_fact', 'ordered_fact', 'aside', 'collected', 'extra_rp', 'pay')
+DAY_FIELDS = ('handed_fact', 'ordered_fact', 'aside', 'collected', 'collected_cr', 'extra_rp', 'pay')
+PAY_WAYS = ('', 'cash', 'crypto')      # чем платили расход из РП; пусто = наличными
+# Крипту РП двигают несколько ручек; проверка «хватает ли» и запись — под одним
+# замком, иначе два запроса разом оба увидят остаток и оба его потратят.
+_CR_LOCK = asyncio.Lock()
 OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стопки сейфа и долг на начало
 MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
 BOOKS = ('rp', 'np', 'in')
@@ -979,7 +983,10 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
             "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo")),
             "route_from": e.get("route_from") or "", "route_to": e.get("route_to") or "",
-            "src": e.get("src") or ""}
+            "src": e.get("src") or "",
+            # чем платили расход из РП; у вывода крипты — сколько из свободной
+            # и сколько с крипта-счёта РП
+            "pay": e.get("pay") or "", "cr_free": e.get("cr_free") or 0, "cr_rp": e.get("cr_rp") or 0}
 
 
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
@@ -1000,6 +1007,13 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         bk = e.get("book") if e.get("book") in BOOKS else "rp"
         by_day_entries.setdefault(e.get("day"), {"rp": [], "np": [], "in": []})[bk].append(
             _entry_view(e, line_names))
+    # Книга крипты (crypto_book): сколько свободной сейчас и сколько на счету
+    # РП было на начало месяца. Свободную предлагаем целиком в РП+ первого дня,
+    # который ждёт подтверждения; следующему ждущему — уже ноль.
+    import crypto_book
+    cb = await crypto_book.state()
+    opening["opening"]["rp_cr_open"] = crypto_book.rp_before(cb["by_day"], days[0])
+    free_run = cb["free"] if cb["ready"] else 0.0
     rows, meta = [], {}
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
@@ -1020,23 +1034,42 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             aside_src = ""
             if past and base > 0:
                 aside, aside_src = float(int(base // 2)), "half"
+        # РП+ криптой (владелец, 2 окт 2026: «сначала считай, сколько криптой
+        # пришло на кошелёк, потом — сколько докинуть из налички»). У
+        # подтверждённого дня сумма заморожена. У ждущего: вписанное руками
+        # (но не больше свободной), иначе — вся свободная крипта.
+        cr, cr_src = 0.0, ""
+        if m.get("ok"):
+            cr, cr_src = calc._n(m.get("collected_cr")), "manual"
+        elif past and base > 0 and d >= crypto_book.START_DAY and cb["ready"]:
+            if m.get("collected_cr") is not None:
+                cr, cr_src = min(calc._n(m.get("collected_cr")), max(0.0, free_run)), "manual"
+            else:
+                cr, cr_src = max(0.0, free_run), "free"
+            cr = round(cr, 2)
+            free_run = round(free_run - cr, 2)
         collected, collected_src = m.get("collected"), "manual"
         if collected is None:
             collected_src = ""
             if past and base > 0 and budget["norm"]:
-                collected = float(min(calc._n(budget["norm"]), max(0.0, base - calc._n(aside))))
+                # наличными — то, чего до нормы не хватило после крипты; до
+                # целого дирхама вверх: крипта бывает с копейками (USDT × 3.5),
+                # а наличные копейками не докладывают
+                collected = float(min(math.ceil(max(0.0, calc._n(budget["norm"]) - cr) - 1e-9),
+                                      max(0.0, base - calc._n(aside))))
                 collected_src = "norm"
         extra_in = sum(calc._n(x.get("amount")) for x in en["in"])
+        cr_cash = sum(calc._n(x.get("cr_rp")) for x in en["in"] if x.get("src") == "crypto")
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
             debt=s["debt"], tips=s["tips"], spend=sp["spend"], handed=handed,
             handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"],
-            aside=aside, collected=collected,
+            aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
             ok=bool(m.get("ok")), pending=past and base > 0 and not m.get("ok"),
             expenses=en["rp"], payouts=en["np"]))
-        meta[d] = dict(aside_src=aside_src, collected_src=collected_src, ins=en["in"],
+        meta[d] = dict(aside_src=aside_src, collected_src=collected_src, cr_src=cr_src, ins=en["in"],
                        extra_manual=m.get("extra_rp"), ok_by=m.get("ok_by") or "",
                        tips_cash=s["tips_cash"])
     book = calc.compute(rows, opening["opening"])
@@ -1049,12 +1082,14 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                  ordered_cover=pu["cover"], supplies=pu["supplies"],
                  note=m.get("note") or "", future=d > today, today=d == today,
                  aside_src=meta[d]["aside_src"], collected_src=meta[d]["collected_src"],
+                 cr_src=meta[d]["cr_src"],
                  ins=meta[d]["ins"], extra_manual=meta[d]["extra_manual"],
                  ok_by=meta[d]["ok_by"], tips_cash=meta[d]["tips_cash"],
                  pending=bool(d <= today and r["base"] > 0 and not r["ok"]),
                  salary_sum=calc._i(sum(calc._n(e["amount"]) for e in r["expenses"]
                                         if e.get("kind") in ("salary", "advance", "loan"))))
         r["manual"] = {k: m.get(k) for k in calc.DAY_MANUAL}
+        r["manual"]["collected_cr"] = m.get("collected_cr")
         if not light:
             mk = marks.get(d) or {}
             need = set(s["cash_by"]) | set(k for k, v in sp["spend_by"].items() if v)
@@ -1065,7 +1100,10 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     book.update(month=month, today=today, first=days[0], last=days[-1],
                 opening=opening["opening"], opening_explicit=opening["explicit"],
                 opening_carried=opening["carried"], month_note=opening["note"],
-                prev_month=_prev_month(month), budget=budget)
+                prev_month=_prev_month(month), budget=budget,
+                # крипта сейчас: свободная и на счету РП — экранам, которые
+                # предлагают раскладку и спрашивают, чем платили
+                crypto={k: cb[k] for k in ("ready", "rate", "free", "rp", "book", "start_day")})
     if not light:
         book["pay"] = await _payroll(month, days, today, entries, work, fx["usd"])
         book["pay"].update(fx)
@@ -1121,6 +1159,59 @@ async def handle_book(request):
     return _json(book)
 
 
+# ── Крипта РП: проверки перед записью ────────────────────────────────────────
+# Все под _CR_LOCK у того, кто зовёт. None — можно, иначе тело отказа (409).
+async def _cr_alloc_check(day: str, new: float, was: float) -> dict | None:
+    """Сколько крипты кладём в РП+ дня: new — станет, was — уже лежит в книге
+    (у неподтверждённого дня — ноль). Больше свободной не положить; меньше
+    сделать можно, только если из положенного ещё не потратили."""
+    import crypto_book
+    if new <= 0 and was <= 0:
+        return None
+    st = await crypto_book.state()
+    if new > 0 and not st["ready"]:
+        return {"error": "crypto_unready"}
+    if new > 0 and day < crypto_book.START_DAY:
+        return {"error": "crypto_early", "from": crypto_book.START_DAY}
+    delta = round(new - was, 2)
+    if delta > st["free"] + crypto_book.EPS:
+        return {"error": "no_free", "free": st["free"], "max": round(st["free"] + was, 2)}
+    if delta < -crypto_book.EPS:
+        have = crypto_book.rp_min_from(st["by_day"], day)
+        if -delta > have + crypto_book.EPS:
+            return {"error": "cr_spent", "have": have, "min": round(was - have, 2)}
+    return None
+
+
+async def _cr_spend_check(day: str, amount: float) -> dict | None:
+    """Расход из РП криптой: на счету РП должно хватать и в этот день, и в
+    каждый следующий — иначе счёт ушёл бы в минус задним числом."""
+    import crypto_book
+    st = await crypto_book.state()
+    if not st["ready"]:
+        return {"error": "crypto_unready"}
+    have = crypto_book.rp_min_from(st["by_day"], day)
+    if amount > have + crypto_book.EPS:
+        return {"error": "no_crypto", "have": have}
+    return None
+
+
+async def _cr_withdraw_split(day: str, amount: float):
+    """Вывод крипты в наличные (Доп. РП+ «из крипты»): сначала из свободной,
+    остальное — с крипта-счёта РП в наличные РП (владелец, 2 окт 2026). Отдаёт
+    (из свободной, из РП, отказ)."""
+    import crypto_book
+    st = await crypto_book.state()
+    if not st["ready"]:
+        return 0.0, 0.0, {"error": "crypto_unready"}
+    free = max(0.0, st["free"])
+    rp = max(0.0, crypto_book.rp_min_from(st["by_day"], day))
+    if amount > free + rp + crypto_book.EPS:
+        return 0.0, 0.0, {"error": "no_crypto", "free": free, "rp": rp, "have": round(free + rp, 2)}
+    f = round(min(amount, free), 2)
+    return f, round(amount - f, 2), None
+
+
 @require_owner
 async def handle_day_set(request):
     """POST {day, field, value, as} — одно ручное поле дня. value пустое —
@@ -1139,10 +1230,20 @@ async def handle_day_set(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
-    if value is None or value == "":
-        await db.fin_day_set(day, {"by": who}, unset=[field])
-    else:
-        await db.fin_day_set(day, {field: value, "by": who})
+    async with _CR_LOCK:
+        if field == "collected_cr":
+            if value is not None and value < 0:
+                return _json({"error": "bad_number"}, 400)
+            m = (await db.fin_days_get(day, day)).get(day) or {}
+            # у неподтверждённого дня это черновик: в книге его ещё нет
+            было = calc._n(m.get("collected_cr")) if m.get("ok") else 0.0
+            отказ = await _cr_alloc_check(day, calc._n(value), было)
+            if отказ:
+                return _json(отказ, 409)
+        if value is None or value == "":
+            await db.fin_day_set(day, {"by": who}, unset=[field])
+        else:
+            await db.fin_day_set(day, {field: value, "by": who})
     await _touch(day[:7])
     log.info(f"[fin] {day} {field} → {value!r} · {who or '—'}")
     await backdate.notify(day, who, "финансы: " + FIELD_T.get(field, field),
@@ -1161,17 +1262,30 @@ async def handle_day_ok(request):
         day = _day_arg(body.get("day"))
         aside = _num(body.get("aside")) or 0
         collected = _num(body.get("collected")) or 0
-        if aside < 0 or collected < 0:
+        cr = _num(body.get("collected_cr")) if "collected_cr" in body else None
+        if aside < 0 or collected < 0 or (cr is not None and cr < 0):
             return _json({"error": "bad_number"}, 400)
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     if day > _biz_day():
         return _json({"error": "future"}, 400)
     who = _who(body)
-    await db.fin_day_set(day, {"aside": aside, "collected": collected, "ok": True,
-                               "ok_at": datetime.now(timezone.utc), "ok_by": who, "by": who})
+    async with _CR_LOCK:
+        m = (await db.fin_days_get(day, day)).get(day) or {}
+        # Экран, который про крипту не знает, её не трогает: что лежало в дне —
+        # то и остаётся.
+        if cr is None:
+            cr = calc._n(m.get("collected_cr"))
+        было = calc._n(m.get("collected_cr")) if m.get("ok") else 0.0
+        отказ = await _cr_alloc_check(day, cr, было)
+        if отказ:
+            return _json(отказ, 409)
+        await db.fin_day_set(day, {"aside": aside, "collected": collected, "collected_cr": cr,
+                                   "ok": True, "ok_at": datetime.now(timezone.utc),
+                                   "ok_by": who, "by": who})
     await _touch(day[:7])
-    log.info(f"[fin] {day} раскладка подтверждена: Барракуде {aside}, РП+ {collected} · {who or '—'}")
+    log.info(f"[fin] {day} раскладка подтверждена: Барракуде {aside}, РП+ наличными {collected}, "
+             f"криптой {cr} · {who or '—'}")
     return _json({"ok": True, "day": day, "book": await build(day[:7])})
 
 
@@ -1215,6 +1329,11 @@ async def handle_entry_add(request):
         src = str(body.get("src") or "") if book == "in" else ""
         if src not in ("", "crypto"):
             return _json({"error": "bad_src"}, 400)
+        # Чем платили расход из РП (владелец, 2 окт 2026): наличными — из
+        # наличных РП, криптой — с крипта-счёта РП.
+        pay_way = str(body.get("pay") or "") if book == "rp" else ""
+        if pay_way not in PAY_WAYS:
+            return _json({"error": "bad_pay"}, 400)
         import photos
         photo, bad = photos.decode(body.get("photo"))
         if bad:
@@ -1246,14 +1365,29 @@ async def handle_entry_add(request):
         doc["route_from"], doc["route_to"] = route_from, route_to
     if src:
         doc["src"] = src
-    if photo:
-        await db.expense_photo_set("fin:" + doc["_id"], photo, thumb)
-    await db.fin_entry_add(doc)
+    async with _CR_LOCK:
+        if pay_way == "crypto":
+            отказ = await _cr_spend_check(day, amount)
+            if отказ:
+                return _json(отказ, 409)
+            doc["pay"] = "crypto"
+        if src == "crypto":
+            f, r, отказ = await _cr_withdraw_split(day, amount)
+            if отказ:
+                return _json(отказ, 409)
+            doc["cr_free"], doc["cr_rp"] = f, r
+        if photo:
+            await db.expense_photo_set("fin:" + doc["_id"], photo, thumb)
+        await db.fin_entry_add(doc)
     await _touch(day[:7])
-    log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}")
+    log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}"
+             + (" · криптой" if pay_way == "crypto" else "")
+             + (f" · из свободной крипты {doc['cr_free']}, с крипта-счёта РП {doc['cr_rp']}"
+                if src == "crypto" else ""))
     await backdate.notify(day, by, "финансы: " + BOOK_T.get(book, book),
                           f"{amount} AED {who} {doc['comment']}".strip())
-    return _json({"ok": True, "id": doc["_id"], "book": await build(day[:7])})
+    return _json({"ok": True, "id": doc["_id"], "cr_free": doc.get("cr_free"),
+                  "cr_rp": doc.get("cr_rp"), "book": await build(day[:7])})
 
 
 @require_owner
@@ -1617,12 +1751,21 @@ async def handle_pay_item_add(request):
     reason = str(body.get("reason") or "").strip()[:80]
     iid = secrets.token_hex(5)
     entry_id = ""
+    pay_way = str(body.get("pay") or "")
+    if pay_way not in PAY_WAYS:
+        return _json({"error": "bad_pay"}, 400)
     if kind in pay.CASH_KINDS:
         entry_id = secrets.token_hex(6)
-        await db.fin_entry_add({"_id": entry_id, "day": day, "book": "rp", "amount": amount,
-                                "comment": note or pay.KINDS[kind], "who": name,
-                                "line": "", "kind": kind, "item": iid,
-                                "by": who, "at": datetime.now(timezone.utc)})
+        async with _CR_LOCK:
+            if pay_way == "crypto":
+                отказ = await _cr_spend_check(day, amount)
+                if отказ:
+                    return _json(отказ, 409)
+            await db.fin_entry_add({"_id": entry_id, "day": day, "book": "rp", "amount": amount,
+                                    "comment": note or pay.KINDS[kind], "who": name,
+                                    "line": "", "kind": kind, "item": iid,
+                                    **({"pay": "crypto"} if pay_way == "crypto" else {}),
+                                    "by": who, "at": datetime.now(timezone.utc)})
     item = {"_id": iid, "name": name, "kind": kind, "amount": amount,
             "per_month": per_month, "from": start, "day": day, "note": note,
             **({"mode": mode} if mode else {}),
@@ -1913,11 +2056,20 @@ async def handle_pay_out(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
+    pay_way = str(body.get("pay") or "")
+    if pay_way not in PAY_WAYS:
+        return _json({"error": "bad_pay"}, 400)
     doc = {"_id": secrets.token_hex(6), "day": day, "book": "rp", "amount": amount,
            "comment": str(body.get("note") or "").strip()[:120] or "Зарплата",
            "who": name, "line": "", "kind": "salary", "pay_month": month,
+           **({"pay": "crypto"} if pay_way == "crypto" else {}),
            "by": who, "at": datetime.now(timezone.utc)}
-    await db.fin_entry_add(doc)
+    async with _CR_LOCK:
+        if pay_way == "crypto":
+            отказ = await _cr_spend_check(day, amount)
+            if отказ:
+                return _json(отказ, 409)
+        await db.fin_entry_add(doc)
     await _touch(min(month, day[:7]))
     await _pn.tell_safe(name, _pn.payout(amount, day, month, doc["comment"], who))
     log.info(f"[fin] зарплата {name} {amount} за {month} ({day}) · {who or '—'}")
@@ -1928,6 +2080,7 @@ async def handle_pay_out(request):
 FIELD_T = {
     "handed_fact": "сдали по факту", "ordered_fact": "заказали по счёту",
     "aside": "отложили Барракуде", "collected": "отложили в РП", "pay": "оплата Барракуде",
+    "collected_cr": "в РП криптой",
     "extra_rp": "приход в фонд", "pay_b": "оплата Барракуде из отложенного",
     "pay_b_extra": "оплата Барракуде сверх отложенного", "note": "заметка дня",
 }

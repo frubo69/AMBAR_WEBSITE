@@ -183,6 +183,13 @@ async def on_startup(app):
         app["fines_sweep"] = asyncio.create_task(fines_auto.loop())
     except Exception as e:
         log.warning(f"[alerts] критические остатки не запущены: {e}")
+    # Книга крипты: раз в пять минут дочитываем приход на кошелёк, чтобы утреннее
+    # распределение РП+ видело его, даже если экран кошелька не открывали.
+    try:
+        import crypto_book
+        app["crypto_book"] = asyncio.create_task(crypto_book.loop())
+    except Exception as e:
+        log.warning(f"[crypto] книга крипты не запущена: {e}")
     # Переписка владельца с ботом живёт не дольше 47 часов: позже телеграм
     # запретит её удалять, и в тревожный момент она останется в телефоне.
     try:

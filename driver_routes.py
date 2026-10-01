@@ -758,7 +758,7 @@ async def handle_car_intake_post(request):
 
     last = st["last"] or await db.car_intake_last(str(car.get("_id") or ""))
     km, беда = car_intake.check_km(body.get("km"), last)
-    if беда == "jump" and body.get("confirm"):
+    if беда in ("jump", "small") and body.get("confirm"):
         беда = ""                                   # переспросили — человек подтвердил
     if беда:
         return web.json_response({"error": беда, "last_km": int((last or {}).get("km") or 0)},
@@ -829,7 +829,7 @@ async def handle_car_repair(request):
     cid = str(car.get("_id") or "")
     last = await db.car_intake_last(cid)
     km, беда = car_intake.check_km(body.get("km"), last)
-    if беда == "jump" and body.get("confirm"):
+    if беда in ("jump", "small") and body.get("confirm"):
         беда = ""
     if беда:
         return web.json_response({"error": беда, "last_km": int((last or {}).get("km") or 0)},

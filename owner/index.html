@@ -37940,6 +37940,7 @@ async function repsSend(cid, back){
     const p = (e && e.payload) || {};
     b.disabled = false;
     if(p.error === 'less'){ err.textContent = `Меньше прошлого показания (${odmN(p.last_km)} км) — проверьте число`; return; }
+    if(p.error === 'small'){ b.dataset.sure = '1'; err.textContent = 'Это весь пробег? Обычно пять–шесть цифр. Верно — нажмите ещё раз'; return; }
     if(p.error === 'jump'){ b.dataset.sure = '1'; err.textContent = `Намного больше прошлого (${odmN(p.last_km)} км). Верно — нажмите ещё раз`; return; }
     err.textContent = p.error === 'bad_km' ? 'Непохоже на пробег' : p.error === 'in_repair' ? 'Она уже в ремонте'
       : p.error === 'not_in_repair' ? 'Она уже не в ремонте' : 'Не удалось сохранить';

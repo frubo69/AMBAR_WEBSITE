@@ -2009,7 +2009,7 @@ async def handle_cars_repair(request):
     if str(body.get("km") or "").strip():
         last = await db.car_intake_last(cid)
         km, беда = ci.check_km(body.get("km"), last)
-        if беда == "jump" and body.get("confirm"):
+        if беда in ("jump", "small") and body.get("confirm"):
             беда = ""
         if беда:
             return web.json_response({"error": беда, "last_km": int((last or {}).get("km") or 0)},

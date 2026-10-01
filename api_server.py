@@ -2591,7 +2591,11 @@ async def handle_support_send_image(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
         return web.Response(status=200, headers=CORS_HEADERS)
 
-    reader    = await request.multipart()
+    # Не форма — отвечаем отказом, а не падением (audit_auth, 1 окт 2026).
+    try:
+        reader = await request.multipart()
+    except Exception:
+        return web.json_response({"error": "bad_form"}, status=400, headers=CORS_HEADERS)
     init_data = order_id = caption = ""
     image_data = None
     image_ext  = ".jpg"
@@ -2888,7 +2892,10 @@ async def handle_static(request: web.Request) -> web.Response:
 
 
 # ── App setup ─────────────────────────────────────────────────────────────────
-def main():
+def build_app() -> web.Application:
+    """Собрать приложение со всеми ручками, не запуская его. Отдельно от main():
+    так его может собрать проверка прав (tools/audit_auth.py) и постучаться в
+    каждую ручку — ровно в те, что уйдут в бой, а не в список из памяти."""
     if not BOT_TOKEN:
         log.warning("⚠️  BOT_TOKEN not set — initData validation will always fail!")
 
@@ -3052,7 +3059,11 @@ def main():
 
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)
+    return app
 
+
+def main():
+    app = build_app()
     log.info(f"🍾 AMBAR API+Static → http://{HOST}:{PORT}")
     # Bind loopback by default: nginx proxies to 127.0.0.1:8080, so listening on
     # 0.0.0.0 only added a second door on the public IP that skips TLS, the

@@ -21516,7 +21516,9 @@ async function accFinDdcM(){
   document.getElementById('accFoot').innerHTML =
     `<div class="qb-wrap"><button class="qb" onclick="accOpen('finddc')">Отчёт ДДС день</button></div>`;
 }
-function fbDdcMonthHtml(b, now){
+// Арифметика месяца — отдельно от разметки: её гоняет tools/fuzz_finance.py на
+// тысячах случайных месяцев и сверяет с сейфом сервера.
+function fbDdcMonthParts(b){
   const n = v => +v || 0, o = (b.safe || {});
   const from = n(o.open_b) + n(o.open_rp) + n(o.open_np);
   // Складываем дни: движения — по названию, «за что» — по статье.
@@ -21538,11 +21540,15 @@ function fbDdcMonthHtml(b, now){
   ['ins', 'outs'].forEach(k => { acc[k].sort((x, y) => order.indexOf(x.name) - order.indexOf(y.name));
     acc[k].forEach(r => r.items.sort((x, y) => Math.abs(y.v) - Math.abs(x.v))); });
   const sum = a => a.reduce((t, r) => t + r.v, 0);
-  const p = {ins: acc.ins, outs: acc.outs, inSum: sum(acc.ins), outSum: sum(acc.outs)};
-  return fbDdcTable(p, from, o.total,
+  return {p: {ins: acc.ins, outs: acc.outs, inSum: sum(acc.ins), outSum: sum(acc.outs)},
+          from, fact: o.total, waitV, waitN};
+}
+function fbDdcMonthHtml(b, now){
+  const m = fbDdcMonthParts(b);
+  return fbDdcTable(m.p, m.from, m.fact,
     {from: 'Перенесено с прошлого месяца', to: now ? 'Остаток на текущий момент' : 'Сейф конец месяца'},
-    waitN ? {name: 'Выручка не подтверждена', v: waitV,
-             sub: `${waitN} ${pluralize(waitN, 'день', 'дня', 'дней')} — в сейф ещё не легла`} : null);
+    m.waitN ? {name: 'Выручка не подтверждена', v: m.waitV,
+               sub: `${m.waitN} ${pluralize(m.waitN, 'день', 'дня', 'дней')} — в сейф ещё не легла`} : null);
 }
 
 // ── РП+: сколько откладывали по дням ──────────────────────────────────────
@@ -22451,15 +22457,22 @@ function fbBDebtToggle(){
 // заявка, сколько на Барракуду было выделено в этот день, сколько по факту
 // заплатили; в конце — остаётся в сейфе на Барракуду. Историю долга —
 // по нажатию кнопки „Долг“ сверху». Одна таблица той же формы, что ДДС.
+// Арифметика дня Барракуды — отдельно от разметки (её гоняет fuzz_finance.py):
+// что лежало в её стопке, что выделили, что заплатили и что осталось.
+function fbBParts(d, b){
+  const n = v => +v || 0, day = d.day;
+  const days = (b || {}).days || [], i = days.findIndex(x => x.day === day);
+  const from = i > 0 ? n(days[i - 1].stack_b) : n(((b || {}).opening || {}).safe_b_open);
+  const aside = d.pending ? 0 : n(d.aside), payB = n(d.pay_b), payX = n(d.pay_b_extra), pay = payB + payX;
+  const end = from + aside - payB;
+  return {from, aside, payB, payX, pay, end, diff: Math.round(end - n(d.stack_b)), move: n(d.ordered) - pay};
+}
 function fbBBodyHtml(d){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
   const day = d.day, b = fbBook(day.slice(0, 7)) || {}, n = v => +v || 0;
-  const days = b.days || [], i = days.findIndex(x => x.day === day);
-  const from = i > 0 ? n(days[i - 1].stack_b) : n((b.opening || {}).safe_b_open);
   const paid = d.manual.pay !== null && d.manual.pay !== undefined;
   const sup = (d.supplies || []).find(x => x.kind === 'main');
-  const aside = d.pending ? 0 : n(d.aside), payB = n(d.pay_b), payX = n(d.pay_b_extra), pay = payB + payX;
-  const saldo = aside - payB, end = from + saldo, diff = Math.round(end - n(d.stack_b));
+  const {from, aside, payB, payX, pay, end, diff} = fbBParts(d, b);
   const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
   const row = (cls, name, val, sign) => `<div class="dds-r ${cls}"><span>${name}</span>${v(val, sign)}</div>`;
   const item = (name, val, sign) => `<div class="dds-i"><span>${escS(name)}</span>${v(val, sign)}</div>`;

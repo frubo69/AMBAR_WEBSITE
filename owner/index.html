@@ -4140,8 +4140,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   text-transform:uppercase;color:var(--gold);white-space:nowrap}
 .fb-safe-usdt.tap > span{white-space:nowrap;color:var(--text)}
 .fb-safe-usdt.tap > span u{color:var(--sub)}
-/* Сколько в кошельке наших дирхамов — остаток по курсу 3.5 (владелец, 1 окт 2026). */
-.fb-safe-our{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--gold2);white-space:nowrap;letter-spacing:0}
+/* Главной строкой — сколько в кошельке наших дирхамов (остаток по курсу 3.5),
+   ниже — сами USDT (владелец, 1 окт 2026: «основную пиши сумму дирхамы, ниже доллары»). */
+.fb-safe-our{font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;color:var(--sub);white-space:nowrap;letter-spacing:0}
 .fb-safe-our u{text-decoration:none;font-size:9px;color:var(--muted);margin-left:3px}
 .fb-safe-usdt.tap{border-color:rgba(201,169,110,.4)}
 /* Длинные суммы: название не сжимается, цифры становятся мельче. */
@@ -4719,7 +4720,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 /* Наших денег в кошельке — остаток по курсу 3.5 (владелец, 1 окт 2026). */
 .wal-our{display:flex;align-items:baseline;gap:8px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border2)}
 .wal-our span{font-size:12.5px;color:var(--sub)}
-.wal-our b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;color:var(--gold2);
+.wal-our b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--text);
   font-variant-numeric:tabular-nums;letter-spacing:-.4px}
 .wal-our b u{text-decoration:none;font-size:11px;font-weight:600;color:var(--muted);margin-left:4px;letter-spacing:0}
 .wal-our i{font-style:normal;font-size:10.5px;color:var(--muted);white-space:nowrap}
@@ -20828,7 +20829,7 @@ function fbHubHtml(b, err){
   </div></div>
   ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">
-    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}${fbFmt(all).length > 6 ? ' sm' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><i class="fb-safe-plus">+</i><span class="fb-safe-usdt tap${wal && fmtUsdt(wal.usdt).length > 7 ? ' sm' : ''}" role="button" tabindex="0" aria-label="Кошелёк USDT" onclick="event.stopPropagation();fbOpenWal()"><i>Крипто-кошелёк</i><span>${wal ? fmtUsdt(wal.usdt) : '—'}<u>USDT</u></span>${wal ? `<small class="fb-safe-our">наших ${walAed(wal.ours)}<u>AED</u></small>` : ''}</span><em class="fb-chev r">${_SC_CHEV}</em></button>
+    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}${fbFmt(all).length > 6 ? ' sm' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><i class="fb-safe-plus">+</i><span class="fb-safe-usdt tap${wal && walAed(wal.ours).length > 7 ? ' sm' : ''}" role="button" tabindex="0" aria-label="Кошелёк USDT" onclick="event.stopPropagation();fbOpenWal()"><i>Крипто-кошелёк</i><span>${wal ? walAed(wal.ours) : '—'}<u>AED</u></span>${wal ? `<small class="fb-safe-our">${fmtUsdt(wal.usdt)}<u>USDT</u></small>` : ''}</span><em class="fb-chev r">${_SC_CHEV}</em></button>
     <!-- Порядок стопок: Барракуда, РП, Крипта, ЧП — и здесь, и на экране «Сейф»
          (владелец, 20 сен 2026: «крипта в сейфе должна быть перед чп»). -->
     <div class="fb-safe-k">
@@ -28522,9 +28523,9 @@ function walBody(d){
     ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
   mid.innerHTML = переключатель + `
     <div class="wal-c">
-      <div class="wal-v">${fmtUsdt(b.usdt)}<u>USDT</u></div>
-      <div class="wal-our"><span>Наших денег</span><b>${walAed(v.ours_aed != null ? v.ours_aed
-        : (+b.usdt || 0) * курс)}<u>AED</u></b><i>по ${String(курс).replace('.', ',')} за USDT</i></div>
+      <div class="wal-v">${walAed(v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
+      <div class="wal-our"><span>На кошельке</span><b>${fmtUsdt(b.usdt)}<u>USDT</u></b><i>по ${
+        String(курс).replace('.', ',')} за USDT</i></div>
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
         _walWhen(d && d.at) || 'только что'}</div>
       ${газ}${сеть}

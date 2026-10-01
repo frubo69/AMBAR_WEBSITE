@@ -835,7 +835,7 @@ async def handle_import(request):
             await _cancel_tell(снятые, whole=False)
         log.info(f"[supply] поставка {sid} заменена новой загрузкой (раз {doc['replaced_n']})")
     else:
-        await db.supply_save(doc)
+        sid = await _save_new(doc, "S", now)
     # Ответ магазина ПИШЕТСЯ В ЗАЯВКУ этого дня (владелец, 29 сен 2026: «всё,
     # что я хотел — чтобы когда я загружал ответ магазина, он писал туда
     # правильные цифры, а после смены там появлялась новая заявка, которая
@@ -1790,6 +1790,13 @@ async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
     if not await db.supply_short_decide(sid, oid, "ok" if ok else "no", who, now, miss):
         return {"ok": False, "verdict": "not_pending"}
     log.info(f"[supply] {sid}/{oid}: недовоз {'подтверждён' if ok else 'отклонён'} · {who}")
+    # Подтверждённый недовоз на полке не лежит: район «без сканирования» держал
+    # его на складе, пока не истечёт кэш основы (найдено фаззером, 1 окт 2026).
+    try:
+        import stock_routes
+        stock_routes.base_drop()
+    except Exception:                                # noqa: BLE001
+        pass
     finished = False
     if ok and not закрыт:
         sup = await db.supply_get(sid)
@@ -2194,6 +2201,24 @@ async def _unmarked(sup: dict, short: dict) -> dict:
     return out
 
 
+async def _save_new(doc: dict, prefix: str, now) -> str:
+    """Записать новую поставку под свободным номером и вернуть его.
+
+    Номер — буква и время до секунды, а запись раньше шла заменой по номеру:
+    две заявки, собранные в одну секунду (два района закрыли разом; черновик
+    докупки собрался в ту же секунду, что и заявка руками), получали один
+    номер, и вторая молча стирала первую (найдено фаззером приёмки, 1 окт
+    2026). Теперь новая только вставляется; номер занят — добавляем букву."""
+    основа = prefix + now.strftime("%y%m%d-%H%M%S")
+    for хвост in [""] + list("bcdefghijklmnopqrstuvwxyz"):
+        doc["_id"] = основа + хвост
+        if await db.supply_insert(doc):
+            return doc["_id"]
+    doc["_id"] = основа + "-" + os.urandom(3).hex()
+    await db.supply_save(doc)
+    return doc["_id"]
+
+
 async def _draft_from_gap(sup: dict) -> dict | None:
     """Заявка на другую базу из того, что магазин не дал. Черновиком.
 
@@ -2207,10 +2232,21 @@ async def _draft_from_gap(sup: dict) -> dict | None:
     районам взять некуда — её пропускаем, но в недоборе она остаётся видна.
     """
     short = _shortfall(sup)
+    # Ответ магазина загрузили повторно, а докупку по прошлой версии уже
+    # отправили водителям: её не трогаем, но и второй раз то же самое не
+    # просим — в черновик идёт только то, чего она не покрывает. Раньше новый
+    # черновик собирался на весь недобор заново, и одни и те же бутылки
+    # просили две заявки разом (найдено фаззером приёмки, 1 окт 2026).
+    try:
+        дети = (await db.supplies_children([sup.get("_id")])).get(sup.get("_id")) or []
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] докупки по {sup.get('_id')} не прочитаны: {e}")
+        дети = []
+    _cover(short, дети)
     cat = _catalog_by_id()
     items, tasks = [], {}
     for r in short.get("rows") or []:
-        by = {o: int(n) for o, n in (r.get("by_district") or {}).items()
+        by = {o: int(n) for o, n in (r.get("left_by") or {}).items()
               if o in OFFICE_IDS and int(n or 0) > 0}
         if not by:
             continue
@@ -2228,8 +2264,7 @@ async def _draft_from_gap(sup: dict) -> dict | None:
     if not items:
         return None
     now = datetime.now(timezone.utc)
-    xid = "X" + now.strftime("%y%m%d-%H%M%S")
-    doc = {"_id": xid, "at": now, "status": "draft", "day": sup.get("day") or "",
+    doc = {"at": now, "status": "draft", "day": sup.get("day") or "",
            "kind": "extra", "base": "", "source": "shortfall",
            "from_supply": sup.get("_id") or "",
            "by": sup.get("by") or 0, "by_name": "",
@@ -2237,7 +2272,7 @@ async def _draft_from_gap(sup: dict) -> dict | None:
            "tasks": tasks,
            "total_qty": sum(i["qty"] for i in items),
            "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
-    await db.supply_save(doc)
+    xid = await _save_new(doc, "X", now)
     log.info(f"[supply] черновик докупки {xid} из недобора {sup.get('_id')}: "
              f"{len(items)} позиций, {doc['total_qty']} единиц, районов {len(tasks)}")
     return {"supply_id": xid, "total_qty": doc["total_qty"],
@@ -2263,14 +2298,13 @@ async def _draft_from_extra(sup: dict, oid: str, gaps: list) -> dict | None:
     живой = next((c for c in (await db.supplies_children([sid])).get(sid) or []
                   if c.get("status") == "draft"), None)
     doc = (await db.supply_get(живой["supply_id"])) if живой else None
-    if not doc:
-        doc = {"_id": "X" + now.strftime("%y%m%d-%H%M%S"), "at": now, "status": "draft",
+    новый = not doc
+    if новый:
+        doc = {"at": now, "status": "draft",
                "day": sup.get("day") or "", "kind": "extra", "base": "", "source": "shortfall",
                "from_supply": sid, "tried_bases": пробовали,
                "by": sup.get("by") or 0, "by_name": "",
                "items": [], "dropped": [], "short": [], "extra": [], "unknown": [], "tasks": {}}
-        if doc["_id"] == sid:                        # та же секунда — номер занят
-            doc["_id"] += "b"
     items = {i["id"]: i for i in doc.get("items") or []}
     for pid, name, n in строки:
         it = items.setdefault(pid, {"id": pid, "name": name, "asked": 0, "qty": 0, "scanned": 0,
@@ -2290,7 +2324,10 @@ async def _draft_from_extra(sup: dict, oid: str, gaps: list) -> dict | None:
     doc.update(items=list(items.values()), tasks=tasks, tried_bases=пробовали,
                total_qty=sum(i["qty"] for i in items.values()),
                asked_qty=sum(i["qty"] for i in items.values()), gap_qty=0)
-    await db.supply_save(doc)
+    if новый:
+        await _save_new(doc, "X", now)
+    else:
+        await db.supply_save(doc)
     log.info(f"[supply] следующая доп. заявка {doc['_id']} из недобора {sid}/{oid}: "
              f"{len(items)} позиций, {doc['total_qty']} единиц; уже искали: {', '.join(пробовали) or '—'}")
     return {"supply_id": doc["_id"], "total_qty": doc["total_qty"], "items": len(items)}
@@ -2353,6 +2390,14 @@ def _cover(short: dict, children: list) -> dict:
     # не выдали: это уже ЕГО недобор, и следующая база собирается с его
     # экрана. Иначе одни и те же бутылки просили бы оба экрана разом.
     for ch in children or []:
+        # Черновик, который отменили, не отправив водителям, не покрывает
+        # ничего: за этим товаром никто не поехал, и своего экрана недобора у
+        # него нет. Узнаём его по базе: её называют при отправке, у
+        # неотправленного она пуста. Раньше он считался покрытием, и недобор
+        # пропадал с экрана — «в заявке на базу», которой нет (найдено
+        # фаззером приёмки, 1 окт 2026).
+        if ch.get("status") == "cancelled" and not (ch.get("base") or "").strip():
+            continue
         qty = 0
         for it in ch.get("items") or []:
             for oid, n in (it.get("by_district") or {}).items():
@@ -3010,8 +3055,11 @@ async def handle_cancel(request):
     if not targets:
         return web.json_response({"error": "nothing_to_cancel"}, status=409,
                                  headers=CORS_HEADERS)
-    took = sum(sum(int(v or 0) for o, v in (it.get("got") or {}).items() if o in targets)
-               for it in (sup.get("items") or []))
+    # Единицами, не целыми: принятые полкоробки пива — тоже принятое. Раньше
+    # int(0.5) давал ноль, и район с одним кодом пива отменялся без вопроса
+    # (найдено фаззером приёмки, 1 окт 2026).
+    took = _qn(sum(sum(float(v or 0) for o, v in (it.get("got") or {}).items() if o in targets)
+                   for it in (sup.get("items") or [])))
     if took and not body.get("force"):
         return web.json_response({"error": "already_taken", "took": took},
                                  status=409, headers=CORS_HEADERS)
@@ -3438,7 +3486,6 @@ async def handle_extra_create(request):
     if not items:
         return web.json_response({"error": "nothing"}, status=400, headers=CORS_HEADERS)
     now = datetime.now(timezone.utc)
-    sid = "X" + now.strftime("%y%m%d-%H%M%S")
     who = _owner_name(request, body)
     # Откуда взялся состав: «shortfall» — подставлен из недобора основной
     # заявки (магазин дал не всё), «manual» — набран руками. На экране заявки
@@ -3450,14 +3497,14 @@ async def handle_extra_create(request):
     # из снимка склада. По календарю она попадала в следующий день и пропадала
     # с хаба той смены, в которую её собрали.
     import stock_routes as SR
-    doc = {"_id": sid, "at": now, "status": "open", "day": SR._biz_day(),
+    doc = {"at": now, "status": "open", "day": SR._biz_day(),
            "kind": "extra", "base": base, "source": source, "from_supply": from_supply,
            "by": request.get("owner_id") or 0, "by_name": who,
            "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
            "tasks": tasks,
            "total_qty": sum(i["qty"] for i in items),
            "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
-    await db.supply_save(doc)
+    sid = await _save_new(doc, "X", now)
     log.info(f"[supply] заявка на базу «{base}» {sid}: {who} · {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, районов {len(tasks)}")
     # Это деньги мимо магазина — владелец узнаёт сразу, а не по итогу приёмки.

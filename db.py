@@ -2856,6 +2856,19 @@ async def supply_save(doc: dict):
     await db.supplies.replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
 
+async def supply_insert(doc: dict) -> bool:
+    """Завести НОВУЮ поставку. False — номер занят: supply_save записал бы
+    поверх и молча стёр чужую заявку, а здесь это отказ."""
+    db = _db_or_none()
+    if db is None: return True
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await db.supplies.insert_one(doc)
+        return True
+    except DuplicateKeyError:
+        return False
+
+
 # Настройки, которые правит старший в приложении (правила штрафов и т. п.):
 # один документ на ключ в app_settings.
 async def setting_get(key: str) -> dict | None:

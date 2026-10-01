@@ -11243,7 +11243,11 @@ async function audStart(){
 }
 
 // ── камера ──
+// Подход — один заход в сканер: его сканы уходят с одной меткой, и старший в
+// STAR видит, сколько было в каждом (1 окт 2026).
+let AUD_SES = '';
 async function audCamOpen(){
+  AUD_SES = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   AUD_CAM = true; AUD_ROWS = []; AUD_LAST = '';
   audCamPaint(true);
   try{
@@ -11376,7 +11380,7 @@ function audScan(code){
   AUD_ROWS.unshift({code, state: 'sending', verdict: '', name: '', label: ''});
   audFlash('ok', 'посчитана');
   audFeed();
-  AUDQ.push({path: '/api/driver/audit/scan', body: {code}, code});
+  AUDQ.push({path: '/api/driver/audit/scan', body: {code, ses: AUD_SES}, code});
 }
 AUDQ.onDone = (err, r, job) => {
   const row = AUD_ROWS.find(x => x.code === job.code && x.state === 'sending');

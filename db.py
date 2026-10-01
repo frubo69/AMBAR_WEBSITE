@@ -4780,6 +4780,57 @@ async def audit_scan_del(district: str, day: str, code: str) -> bool:
     return bool(r.deleted_count)
 
 
+# Подходы ревизии (владелец, 1 окт 2026: старший сканирует подходами — 10–15
+# бутылок, возвращается к списку — и хочет видеть, сколько было в последнем и
+# в предыдущих). Подход — это один заход в сканер: приложение метит свои сканы
+# одной меткой `ses`. У сканов без метки (старые ревизии, старая версия
+# приложения) подходы восстанавливаются по паузам: тишина дольше трёх минут
+# или другой человек — значит, новый подход.
+AUDIT_SES_GAP = 180
+
+
+async def audit_sessions(district: str, day: str) -> list:
+    """Подходы ревизии, новые сверху: номер, с и по, кто, сколько кодов, сколько
+    единиц и какими позициями. Пустых подходов не бывает — их делают сканы."""
+    db = _db_or_none()
+    if db is None: return []
+    rows = await db.audit_scans.find({"district": district, "day": day}) \
+                               .sort("at", 1).to_list(length=20000)
+    out, cur = [], None
+    for r in rows:
+        at = r.get("at")
+        if isinstance(at, datetime) and at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        ses, by = str(r.get("ses") or ""), r.get("by")
+        новый = cur is None
+        if cur is not None:
+            if ses or cur["ses"]:
+                новый = ses != cur["ses"]
+            else:
+                пауза = (at - cur["_to"]).total_seconds() if isinstance(at, datetime) and cur["_to"] else 0
+                новый = пауза > AUDIT_SES_GAP or by != cur["_by"]
+        if новый:
+            cur = {"ses": ses, "_by": by, "by_name": r.get("by_name") or "", "from": at, "_to": at,
+                   "n": 0, "qty": 0.0, "odd": 0, "_items": {}}
+            out.append(cur)
+        cur["_to"] = at
+        cur["n"] += 1
+        if r.get("verdict") != "ok":
+            cur["odd"] += 1
+        if r.get("product_id"):
+            q = float(r.get("qty") or 1)
+            cur["qty"] += q
+            it = cur["_items"].setdefault(r["product_id"], {"id": r["product_id"],
+                                                             "name": r.get("product_name") or "", "qty": 0.0})
+            it["qty"] += q
+    res = []
+    for i, c in enumerate(out, 1):
+        res.append({"no": i, "id": c["ses"] or f"auto{i}", "from": c["from"], "to": c["_to"],
+                    "by_name": c["by_name"], "n": c["n"], "qty": c["qty"], "odd": c["odd"],
+                    "items": sorted(c["_items"].values(), key=lambda x: (-x["qty"], x["name"]))})
+    return res[::-1]
+
+
 async def audit_scans_archive(district: str, day: str, stamp: str) -> int:
     """Сканы отменённого захода — в архив (audit_scans_dropped), чтобы новая
     ревизия того же района и дня началась с нуля. Не стираем: под заходом

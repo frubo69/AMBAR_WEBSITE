@@ -3423,6 +3423,30 @@ button.path:active{transform:scale(.995)}
 /* Отчёт ДДС (dds-): сейф на начало → поступления → выплаты → итог и сейф на
    конец. Карточки и золотые заголовки — общие (.sc / .sc-cap), свои здесь
    только строки движений и две итоговые полосы. Названия — Space Grotesk. */
+/* Подходы ревизии (ses-): карточка между итогом и позициями. Номер подхода —
+   золотым кружком, справа число бутылок; раскрытый подход показывает позиции. */
+.ses-card{margin:12px 0}
+.ses-r{display:flex;align-items:center;gap:11px;width:100%;min-height:54px;padding:8px 12px 8px 14px;border:0;
+  border-top:1px solid rgba(255,255,255,.05);background:transparent;color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.sc-cap + .ses-r{border-top:0}
+.ses-r:active{background:var(--card2)}
+.ses-n{flex:0 0 26px;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.ses-b{flex:1;min-width:0}
+.ses-b b{display:block;font-size:14px;font-weight:700}
+.ses-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ses-v{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--gold2);line-height:1}
+.ses-v u{display:block;text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-top:3px}
+.ses-r em{flex:0 0 auto;display:flex;color:var(--dim);transition:transform .2s}
+.ses-r.open em{transform:rotate(90deg)}
+.ses-r.fresh{animation:sesFresh 2.2s ease-out}
+@keyframes sesFresh{0%{background:rgba(201,169,110,.28)}100%{background:transparent}}
+.ses-items{padding:2px 14px 10px 51px}
+.ses-items div{display:flex;align-items:baseline;gap:10px;padding:4px 0;font-size:12.5px;color:var(--sub)}
+.ses-items span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ses-items b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text)}
+.ses-all{display:block;width:100%;padding:11px;border:0;border-top:1px solid rgba(255,255,255,.05);background:transparent;
+  color:var(--gold2);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
 .dds-tot{display:flex;align-items:center;gap:12px;min-height:58px;padding:0 16px;
   font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:1.1px;
   font-size:15px;font-weight:700;color:var(--gold);
@@ -16651,7 +16675,7 @@ function audPage(){
   const rest = rows.filter(r => !r.expected && !r.actual);
   const пусто = st === 'idle';            // ревизию ещё не начинали
   const строка = r => audRow(r, пусто);
-  box.innerHTML = audCard(sh) + `<div class="aud-rows">${live.map(строка).join('')}${rest.length ? `
+  box.innerHTML = audCard(sh) + audSesHtml(sh) + `<div class="aud-rows">${live.map(строка).join('')}${rest.length ? `
     <button class="aud-more${STK.audMore ? ' open' : ''}" onclick="audMore()">${
       live.length ? '' : 'на складе пусто · '}ещё ${rest.length}${_CHEV}</button>${
       STK.audMore ? rest.map(строка).join('') : ''}` : ''}</div>`;
@@ -16690,6 +16714,39 @@ async function audCancel(){
   await stkAuditPick();
 }
 function audMore(){ STK.audMore = !STK.audMore; _audHap('sel'); audPage(); }
+
+// ── подходы ───────────────────────────────────────────────────────────────
+// Владелец, 1 окт 2026: старший сканирует подходами — 10–15 бутылок, вернулся
+// к списку — и хочет видеть, сколько было в последнем и в предыдущих. Карточка
+// между итогом и позициями: последние три подхода, остальные по «все N»;
+// нажатие на подход раскрывает, что именно в нём сняли. Пустых подходов нет.
+function audSesHtml(sh){
+  const all = (sh.sessions || []).filter(x => x.n > 0);
+  if(!all.length) return '';
+  const total = all.reduce((t, x) => t + x.n, 0);
+  const list = STK.sesAll ? all : all.slice(0, 3);
+  const hm = iso => iso ? _hmDubai(iso) : '';
+  const row = x => {
+    const a = hm(x.from), b = hm(x.to), open = STK.sesOpen === x.id;
+    const мин = x.from && x.to ? Math.floor((new Date(x.to) - new Date(x.from)) / 60000) : 0;
+    const sub = [a === b ? a : `${a} – ${b}`, мин > 0 ? `${мин} мин` : '', x.by_name || '',
+                 x.odd ? `${x.odd} с вопросом` : ''].filter(Boolean).join(' · ');
+    return `<button class="ses-r${open ? ' open' : ''}${STK.sesFresh === x.id ? ' fresh' : ''}" onclick="audSesToggle('${escS(x.id)}')">
+        <span class="ses-n">${x.no}</span>
+        <span class="ses-b"><b>Подход ${x.no}</b><i>${escS(sub)}</i></span>
+        <span class="ses-v">${fmt(x.n)}<u>${pluralize(x.n, 'бутылка', 'бутылки', 'бутылок')}</u></span>
+        <em>${_SC_CHEV}</em></button>${open ? `<div class="ses-items">${(x.items || []).map(i =>
+          `<div><span>${escS(i.name || i.id)}</span><b>${fmtQty(i.qty)}</b></div>`).join('')
+          || '<div><span>Коды не из реестра</span><b></b></div>'}</div>` : ''}`;
+  };
+  return `<div class="sc ses-card">
+    <div class="sc-cap"><span>Подходы</span><i>${all.length} · ${fmt(total)} ${pluralize(total, 'бутылка', 'бутылки', 'бутылок')}</i></div>
+    ${list.map(row).join('')}
+    ${all.length > 3 ? `<button class="ses-all" onclick="audSesAll()">${STK.sesAll ? 'Свернуть' : `Все подходы · ${all.length}`}</button>` : ''}
+  </div>`;
+}
+function audSesToggle(id){ STK.sesOpen = STK.sesOpen === id ? '' : id; _audHap('sel'); audPage(); }
+function audSesAll(){ STK.sesAll = !STK.sesAll; _audHap('sel'); audPage(); }
 
 // «QR не внесён» ведёт вносить — на ту же точку, экран склада остаётся под
 // разделом, и по возвращении числа перечитываются (см. _accClose).
@@ -17182,6 +17239,8 @@ async function audScanOpen(){
   const sh = STK.sheet || {};
   STK.view = 'scan'; _setRail('stkRail', '');
   AUD = {rows: [], counts: {}, total: 0, chipPid: ''};
+  // Подход — один заход в сканер: его сканы уходят с одной меткой.
+  STK.ses = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const old = document.getElementById('audCam'); if(old) old.remove();
   const lay = document.createElement('div');
   lay.className = 'aud-cam'; lay.id = 'audCam';
@@ -17240,7 +17299,16 @@ async function audScanClose(){
     lay.classList.remove('on');
     setTimeout(() => { lay.remove(); if(STK.view !== 'scan') try{ SCAN.stop(); }catch(e){} }, 480);
   } else { try{ SCAN.stop(); }catch(e){} }
+  const мой = STK.ses || '';
   await audOpen(STK.district, true);
+  // Вернулись из сканера: что дал этот подход. Пустой заход молчит.
+  const s1 = ((STK.sheet || {}).sessions || []).find(x => x.id === мой);
+  if(s1 && s1.n > 0){
+    STK.sesFresh = мой;
+    _toast(`Подход ${s1.no} · ${fmt(s1.n)} ${pluralize(s1.n, 'бутылка', 'бутылки', 'бутылок')}`);
+    audPage();
+    setTimeout(() => { STK.sesFresh = ''; }, 2500);
+  }
 }
 
 // Плашка: последняя бутылка и «столько из стольких» по ней. До первого скана
@@ -17286,7 +17354,8 @@ function audSave(code){
   // бутылке. Возразит — цвет сменится, но это редкий случай.
   qrFlash('ok', 'посчитана');
   audQ().push({path: '/api/owner/stock/audit/scan',
-               body: {code, district: STK.district, day: (STK.sheet || {}).day || ''}, code});
+               body: {code, district: STK.district, day: (STK.sheet || {}).day || '',
+                      ses: STK.ses || '', as: _meName()}, code});
 }
 
 function audDone(err, r, job){

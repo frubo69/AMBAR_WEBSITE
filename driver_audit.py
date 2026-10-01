@@ -176,7 +176,8 @@ async def handle_scan(request):
         return _json({"ok": False, "error": "finished"})
     if not a.get("started_at"):               # начали с другого телефона и сбросили — начинаем заново
         await SR.audit_start(district, day, int(request["tg"].get("id") or 0), me["name"])
-    r = await SR.audit_scan(district, day, code, int(request["tg"].get("id") or 0), me["name"])
+    r = await SR.audit_scan(district, day, code, int(request["tg"].get("id") or 0), me["name"],
+                            str(b.get("ses") or ""))
     return _json(r)
 
 

@@ -2003,7 +2003,8 @@ def audit_code(raw) -> str:
     return _re.sub(r"\s+", "", str(raw or ""))[:120]
 
 
-async def audit_scan(district: str, day: str, code: str, by: int, by_name: str = "") -> dict:
+async def audit_scan(district: str, day: str, code: str, by: int, by_name: str = "",
+                     ses: str = "") -> dict:
     """Записать бутылку в проход — одно и то же у старшего в STAR и у водителя
     района (владелец, 19 сен 2026: «можем водителям тоже сделать кнопку
     ревизия»). district уже проверен вызывающим, code — очищен (audit_code)."""
@@ -2024,6 +2025,10 @@ async def audit_scan(district: str, day: str, code: str, by: int, by_name: str =
     }
     if by_name:
         rec["by_name"] = by_name
+    # Подход: один заход в сканер — одна метка (см. db.audit_sessions).
+    ses = re.sub(r"[^A-Za-z0-9_-]", "", str(ses or ""))[:24]
+    if ses:
+        rec["ses"] = ses
     fresh = await db.audit_scan_add(district, day, code, rec)
     counts = await db.audit_scan_counts(district, day)
     unit = _unit(p) if p else 1
@@ -2062,8 +2067,10 @@ async def handle_audit_scan(request):
     code = audit_code(body.get("code"))
     if not code:
         return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
-    return web.json_response(await audit_scan(district, day, code, request["owner_id"]),
-                             headers=CORS_HEADERS)
+    return web.json_response(
+        await audit_scan(district, day, code, request["owner_id"],
+                         str(body.get("as") or "").strip()[:60], str(body.get("ses") or "")),
+        headers=CORS_HEADERS)
 
 
 async def audit_scan_state(district: str, day: str) -> dict:
@@ -2484,7 +2491,23 @@ async def audit_sheet(district: str, day: str) -> dict:
         # считать, камера ответит «нет в реестре» на каждую бутылку.
         "coded": int(coded),
         "audit": _audit_view(a), "scan": stats,
+        # Подходы: сколько отсканировали за каждый заход в сканер.
+        "sessions": await _audit_sessions(district, day),
     }
+
+
+async def _audit_sessions(district: str, day: str) -> list:
+    try:
+        rows = await db.audit_sessions(district, day)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] подходы не собраны ({district} {day}): {e}")
+        return []
+    for r in rows:
+        r["from"], r["to"] = _iso_of(r["from"]), _iso_of(r["to"])
+        r["qty"] = _num(r["qty"])
+        for it in r["items"]:
+            it["qty"] = _num(it["qty"])
+    return rows
 
 
 async def audit_start(district: str, day: str, by: int, by_name: str) -> tuple:

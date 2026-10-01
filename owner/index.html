@@ -4140,6 +4140,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   text-transform:uppercase;color:var(--gold);white-space:nowrap}
 .fb-safe-usdt.tap > span{white-space:nowrap;color:var(--text)}
 .fb-safe-usdt.tap > span u{color:var(--sub)}
+/* Сколько в кошельке наших дирхамов — остаток по курсу 3.5 (владелец, 1 окт 2026). */
+.fb-safe-our{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--gold2);white-space:nowrap;letter-spacing:0}
+.fb-safe-our u{text-decoration:none;font-size:9px;color:var(--muted);margin-left:3px}
 .fb-safe-usdt.tap{border-color:rgba(201,169,110,.4)}
 /* Длинные суммы: название не сжимается, цифры становятся мельче. */
 .fb-safe-h .fb-safe-t{flex:1 0 auto}
@@ -4713,6 +4716,19 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .wal-v u{font-size:14px;font-weight:600;text-decoration:none;color:var(--muted);
   margin-left:6px;letter-spacing:0}
 .wal-s{margin-top:7px;font-size:11.5px;color:var(--muted)}
+/* Наших денег в кошельке — остаток по курсу 3.5 (владелец, 1 окт 2026). */
+.wal-our{display:flex;align-items:baseline;gap:8px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border2)}
+.wal-our span{font-size:12.5px;color:var(--sub)}
+.wal-our b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.wal-our b u{text-decoration:none;font-size:11px;font-weight:600;color:var(--muted);margin-left:4px;letter-spacing:0}
+.wal-our i{font-style:normal;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.wal-ord .wal-ord-h{display:block;padding:0 0 6px;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--gold)}
+.wal-led.wal-ord div:nth-child(2) span{color:var(--sub);font-size:12.5px}
+.wal-ord b u{text-decoration:none;font-size:10px;font-weight:600;color:var(--muted);margin-left:3px}
+.wal-ord .wal-ord-r{padding:3px 0;font-size:11.5px}
+.wal-ord .wal-ord-r span,.wal-ord .wal-ord-r i{color:var(--muted)}
 .wal-warn{margin-top:9px;font-size:11.5px;color:var(--warn)}
 .wal-sum{display:flex;gap:9px;margin-bottom:10px}
 .wal-sum div{flex:1;padding:11px 12px;border-radius:13px;background:var(--card);
@@ -20812,7 +20828,7 @@ function fbHubHtml(b, err){
   </div></div>
   ${fbCrcHtml()}
   <div class="sc fb-hub fb-safe">
-    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}${fbFmt(all).length > 6 ? ' sm' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><i class="fb-safe-plus">+</i><span class="fb-safe-usdt tap${wal && fmtUsdt(wal.usdt).length > 7 ? ' sm' : ''}" role="button" tabindex="0" aria-label="Кошелёк USDT" onclick="event.stopPropagation();fbOpenWal()"><i>Крипто-кошелёк</i><span>${wal ? fmtUsdt(wal.usdt) : '—'}<u>USDT</u></span></span><em class="fb-chev r">${_SC_CHEV}</em></button>
+    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}${fbFmt(all).length > 6 ? ' sm' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><i class="fb-safe-plus">+</i><span class="fb-safe-usdt tap${wal && fmtUsdt(wal.usdt).length > 7 ? ' sm' : ''}" role="button" tabindex="0" aria-label="Кошелёк USDT" onclick="event.stopPropagation();fbOpenWal()"><i>Крипто-кошелёк</i><span>${wal ? fmtUsdt(wal.usdt) : '—'}<u>USDT</u></span>${wal ? `<small class="fb-safe-our">наших ${walAed(wal.ours)}<u>AED</u></small>` : ''}</span><em class="fb-chev r">${_SC_CHEV}</em></button>
     <!-- Порядок стопок: Барракуда, РП, Крипта, ЧП — и здесь, и на экране «Сейф»
          (владелец, 20 сен 2026: «крипта в сейфе должна быть перед чп»). -->
     <div class="fb-safe-k">
@@ -20851,9 +20867,13 @@ function fbWal(mb){
   const w = ACC_WAL; if(!w || !w.balance) return null;
   const usdt = (+w.balance.usdt || 0)
     + (w.old || []).reduce((a, o) => a + (+((o.balance || {}).usdt) || 0), 0);
-  const rate = +((mb && fbCur(mb) || {}).usd) || 3.6725;
-  return {usdt, aed: Math.round(usdt * rate)};
+  // Наших денег — по курсу, по которому платил клиент (3.5): разница до рынка
+  // уходит посреднику (владелец, 1 окт 2026). Курс отдаёт сервер.
+  const rate = +w.rate || 3.5;
+  return {usdt, rate, aed: Math.round(usdt * rate), ours: Math.round(usdt * rate * 100) / 100};
 }
+// Дирхамы «наших»: мелочь — с копейками, от сотни — целыми.
+function walAed(v){ v = +v || 0; return Math.abs(v) < 100 ? fmtUsdt(v) : fbFmt(v); }
 // Сумма сейфа вместе с кошельком — в шапке карточки и на экране «Сейф».
 function fbSafeAll(mb){
   const wal = fbWal(mb);
@@ -28472,6 +28492,19 @@ function walBody(d){
   const v = WAL_SEL < 0 ? (d || {}) : old[WAL_SEL];
   const b = (v && v.balance) || {}, t = (v && v.totals) || {}, p = (WAL_SEL < 0 && d && d.paid) || {};
   const rows = (v && v.transfers) || [];
+  const курс = +(d && d.rate) || 3.5;
+  // Заказы криптой этого месяца против переводов — только у текущего кошелька.
+  const z = (WAL_SEL < 0 && d && d.orders) || {};
+  const заказы = z.n ? `<div class="wal-led wal-ord">
+      <div class="wal-ord-h">Заказы криптой · ${escS(MONTHS_NOM[+String(z.month).slice(5) - 1] || '')}</div>
+      <div><span>Заказов ${z.n}</span><b>${fbFmt(z.aed)}<u>AED</u></b></div>
+      <div><span>должно прийти</span><i>${fmtUsdt(z.usdt)} USDT</i></div>
+      <div><span>перевод найден · ${z.found_n}</span><i>${fbFmt(z.found_aed)} AED</i></div>
+      <div class="${z.free_n ? 'out' : 'rest'}"><span>без перевода · ${z.free_n}</span><b>${fbFmt(z.free_aed)}<u>AED</u></b></div>
+      ${(z.free || []).slice(0, 12).map(o => `<div class="wal-ord-r"><span>Заказ #${escS(o.order_id)} · ${
+        escS(fbDayT(o.day))}</span><i>${fbFmt(o.total)} AED · ${fmtUsdt(o.usdt)} USDT</i></div>`).join('')}
+      ${z.free_n > 12 ? `<div class="wal-ord-r"><span>и ещё ${z.free_n - 12}</span><i></i></div>` : ''}
+    </div>` : '';
   _setText('accSub', v && v.address ? v.address : 'USDT · TRC-20');
   const переключатель = old.length ? `<div class="periods wal-sw" id="walSw" style="--count:${1 + old.length}">
       <div class="period-pill"></div>
@@ -28490,6 +28523,8 @@ function walBody(d){
   mid.innerHTML = переключатель + `
     <div class="wal-c">
       <div class="wal-v">${fmtUsdt(b.usdt)}<u>USDT</u></div>
+      <div class="wal-our"><span>Наших денег</span><b>${walAed(v.ours_aed != null ? v.ours_aed
+        : (+b.usdt || 0) * курс)}<u>AED</u></b><i>по ${String(курс).replace('.', ',')} за USDT</i></div>
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
         _walWhen(d && d.at) || 'только что'}</div>
       ${газ}${сеть}
@@ -28503,6 +28538,7 @@ function walBody(d){
       <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}
         за всё время · растёт с каждой оплатой через приложение</div>
     </div>` : ''}
+    ${заказы}
     <!-- Откуда взялся остаток: пришло минус ушло. Пока этих двух строк не было,
          ноль на балансе при полной ленте выглядел поломкой экрана. -->
     <div class="wal-led">
@@ -28743,6 +28779,7 @@ function walMatchBody(){
       <div class="wal-r match">
         <span class="wal-r-b">
           <span class="wal-r-t">Заказ #${escS(String(p.order_id))}${
+            p.crypto ? '<span class="wal-tag">отмечен криптой</span>' : ''}${
             p.sure ? '' : '<span class="wal-tag">спорный</span>'}</span>
           <span class="wal-r-s">${escS(_walWhen(p.ts))} · ${fmtUsdt(p.amount)} USDT
             ≈ ${fmt(p.order_total)} AED${p.off ? ' · расхождение ' + fmtUsdt(p.off) : ''}

@@ -44,6 +44,19 @@ def _short(a: str) -> str:
     return f"{a[:6]}…{a[-4:]}" if len(a) > 12 else a
 
 
+def _rate() -> float:
+    """Сколько дирхамов НАШИХ в одном USDT кошелька — курс, по которому клиент
+    платил (3.5). Рынок даёт 3.65–3.67, разница — посредника (владелец, 1 окт
+    2026: «считать по курсу, вычитая разницу посредника»). Поэтому наши
+    деньги = остаток × этот курс, а не × рыночный."""
+    from config import CRYPTO_AED_PER_USDT
+    return float(CRYPTO_AED_PER_USDT or 3.5)
+
+
+def _ours(usdt) -> float:
+    return round(float(usdt or 0) * _rate(), 2)
+
+
 async def old_addresses() -> list:
     """Прежние кошельки: из настроек и из уже выставленных счетов. Сменили
     адрес — старый остаётся на экране «Старым кошельком», деньги там."""
@@ -129,6 +142,8 @@ async def _view(address: str) -> dict:
         "address": _short(address),
         "address_full": address,
         "balance": balance or {"usdt": 0.0, "trx": 0.0, "unknown": True},
+        # Наших денег в этом кошельке — остаток по курсу 3.5 (см. _rate).
+        "ours_aed": _ours((balance or {}).get("usdt")),
         "offline": offline or balance is None,
         # Лента отдаётся целиком: обрезка на полусотне превращала историю в
         # «последние две недели», и человек справедливо спрашивал, где
@@ -162,8 +177,58 @@ async def _build() -> dict:
         paid = await db.crypto_paid_totals()
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] итог по счетам не посчитан: {e}")
+    всего = float((main.get("balance") or {}).get("usdt") or 0) + sum(
+        float((w.get("balance") or {}).get("usdt") or 0) for w in old)
+    # Заказы криптой против переводов (владелец, 1 окт 2026: «цифры из заказов,
+    # которые теперь операторы заполняют, используй, чтобы сопоставлять её с
+    # заказами»). Ошибка здесь кошелёк не роняет: остаток важнее сверки.
+    заказы = {}
+    try:
+        оплачены = {str(r.get("order_id")) for w in [main] + old
+                    for r in (w.get("transfers") or []) if r.get("in") and r.get("order_id")}
+        заказы = await _crypto_orders(оплачены)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] заказы криптой не сведены: {e}")
     return {**main, "label": "Кошелёк", "paid": paid, "old": old,
-            "at": int(_t.time() * 1000)}
+            "rate": _rate(), "usdt_all": round(всего, 2), "ours_all_aed": _ours(всего),
+            "orders": заказы, "at": int(_t.time() * 1000)}
+
+
+def _is_crypto(o: dict) -> bool:
+    return str(o.get("payment_method") or "").lower() == "crypto" or bool(o.get("crypto_paid"))
+
+
+async def _crypto_orders(оплачены: set, month: str = "") -> dict:
+    """Заказы месяца, оплаченные криптой (счёт в приложении или отметка
+    оператора), и есть ли под каждым перевод на кошельке. `оплачены` — номера
+    заказов, у которых перевод уже найден: по счёту или привязкой.
+
+    Заказ криптой без перевода — это деньги, которые по книге на кошельке, а
+    по блокчейну их там нет: либо перевод ещё не свели, либо он не приходил."""
+    import bizday
+    import finance_routes as fr
+    month = month or bizday.biz_day()[:7]
+    days = fr._month_days(month)
+    since, until = bizday.window_utc(days[0], days[-1])
+    rate = _rate()
+    n = aed = found_n = found_aed = 0
+    free = []
+    for o in await db.orders_between(since, until):
+        day = bizday.order_day(o)
+        if day not in days or not _is_crypto(o):
+            continue
+        total = int(float(o.get("total") or 0))
+        n += 1; aed += total
+        if str(o.get("order_id") or "") in оплачены:
+            found_n += 1; found_aed += total
+        else:
+            free.append({"order_id": str(o.get("order_id") or ""), "day": day,
+                         "total": total, "usdt": round(total / rate, 2)})
+    free.sort(key=lambda x: x["day"], reverse=True)
+    return {"month": month, "n": n, "aed": aed, "usdt": round(aed / rate, 2),
+            "found_n": found_n, "found_aed": found_aed,
+            "free_n": len(free), "free_aed": sum(x["total"] for x in free),
+            "free": free[:40]}
 
 
 async def _all_transfers() -> list | None:
@@ -290,8 +355,12 @@ def _usdt_of(total_aed) -> float:
     return round(float(total_aed or 0) / rate, 2)
 
 
-async def _match(apply: bool, who: str = "") -> dict:
-    """Свести прямые поступления с заказами по сумме и дню."""
+async def _match_orders(apply: bool, who: str = "") -> dict:
+    """Свести прямые поступления с заказами по сумме и дню.
+
+    Имя своё, не `_match`: так же называлась сверка отчёта владельца кошелька
+    ниже по файлу, она объявлена позже и подменяла эту — с 20 сен 2026 кнопка
+    «Сверить с заказами» отвечала ошибкой (найдено 1 окт 2026)."""
     from datetime import timedelta
     transfers = await _all_transfers()
     if transfers is None:
@@ -313,7 +382,7 @@ async def _match(apply: bool, who: str = "") -> dict:
     orders = await db.get_orders_in_range(
         start, end, limit=None,
         fields=["order_id", "timestamp", "total", "status", "customer_name",
-                "payment_method", "paid"])
+                "payment_method", "paid", "crypto_paid"])
     # Заказ, за который уже заплатили криптой по счёту, второй раз не платят.
     занятые = {(v or {}).get("order_id") for v in byid.values()}
     занятые |= {(v or {}).get("order_id") for v in links.values()}
@@ -344,12 +413,18 @@ async def _match(apply: bool, who: str = "") -> dict:
             расхождение = abs(ожидали - нужно)
             if расхождение <= допуск:
                 рядом.append((расхождение, разрыв, oid, o, ожидали))
-        рядом.sort(key=lambda x: (round(x[0], 2), x[1]))
         if not рядом:
             continue
+        # Оператор отметил заказ «крипта» — это и есть заявление «деньги ушли
+        # на кошелёк» (владелец, 1 окт 2026). Такой заказ идёт первым: перевод
+        # ищем сначала среди них, и наличный заказ на ту же сумму ему не
+        # соперник. Раньше способ оплаты сверка не читала вовсе.
+        крипто = [x for x in рядом if _is_crypto(x[3])]
+        круг = крипто or рядом
+        круг.sort(key=lambda x: (round(x[0], 2), x[1]))
         # Второй кандидат с той же суммой — это монетка, а не совпадение.
-        спорно = len(рядом) > 1 and round(рядом[1][0], 2) == round(рядом[0][0], 2)
-        расхождение, разрыв, oid, o, ожидали = рядом[0]
+        спорно = len(круг) > 1 and round(круг[1][0], 2) == round(круг[0][0], 2)
+        расхождение, разрыв, oid, o, ожидали = круг[0]
         if спорно:
             спорных += 1
         pairs.append({
@@ -359,7 +434,9 @@ async def _match(apply: bool, who: str = "") -> dict:
             "name": o.get("customer_name") or "",
             "gap_h": round(разрыв, 1), "off": round(расхождение, 2),
             "sure": not спорно,
-            "others": len(рядом) - 1,
+            # заказ отмечен криптой (оператором или счётом) — не догадка по сумме
+            "crypto": bool(крипто),
+            "others": len(круг) - 1,
         })
         if спорно:
             continue
@@ -387,7 +464,7 @@ async def handle_match(request):
             who = str((await request.json()).get("as") or "").strip()[:40]
         except Exception:
             who = ""
-    out = await _match(apply, who)
+    out = await _match_orders(apply, who)
     if out.get("error") == "offline":
         return web.json_response(out, status=503, headers=CORS_HEADERS)
     if apply and out.get("taken"):
@@ -711,7 +788,7 @@ def _report_rows(name: str, raw: bytes) -> list:
     return out
 
 
-def _match(rows: list, transfers: list) -> tuple:
+def _match_report(rows: list, transfers: list) -> tuple:
     """Сводим строки отчёта с переводами: (нашли, спорные, не нашли).
 
     Хеша в отчёте владельца кошелька нет, поэтому опора — сумма и время. Время
@@ -818,7 +895,7 @@ async def handle_report(request):
     transfers = await _all_transfers()
     if transfers is None:
         return web.json_response({"error": "offline"}, status=502, headers=CORS_HEADERS)
-    нашли, спорные, мимо = _match(rows, transfers)
+    нашли, спорные, мимо = _match_report(rows, transfers)
     # Не нашли — это две разные вещи. Трата из остатка («снятие наличных с
     # банкомата») перевода на кошельке и не оставляет: её не ищут, о ней
     # сообщают. А вот платёж без перевода — повод посмотреть глазами.

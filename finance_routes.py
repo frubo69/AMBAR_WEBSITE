@@ -992,6 +992,11 @@ def _entry_view(e: dict, line_names: dict) -> dict:
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     days = _month_days(month)
     today = _biz_day()
+    if depth == 0:
+        try:
+            await _budget_carry(month)
+        except Exception as e:                        # noqa: BLE001
+            log.warning(f"[fin] бюджет {month} не перенесён: {e}")
     sales, spend, purch, manual, entries, opening = (
         await _sales(days), await _spend(days), await _purchases(days),
         await db.fin_days_get(days[0], days[-1]),
@@ -1547,6 +1552,49 @@ async def handle_budget_del(request):
     return _json({"ok": True, "book": await build(str(old.get("month")))})
 
 
+def _rows_from_prev(prev: list) -> list:
+    """Статьи прошлого месяца — как статьи нового: те же названия, суммы, сроки
+    и расписания. Старые строки «Зарплаты» не берём — фонд считается из людей."""
+    return [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
+                 note=ln.get("note") or "", kind="pool" if _is_pool(ln) else "office" if ln.get("kind") == "office" else "",
+                 group=_line_group(ln), cur="USD" if ln.get("cur") == "USD" else "AED",
+                 period=int(ln.get("period") or 1), next=str(ln.get("next") or "")) for ln in prev
+            if (ln.get("kind") or "") != "salary"]
+
+
+_BUD_LOCK = asyncio.Lock()
+
+
+async def _budget_carry(month: str) -> int:
+    """Бюджет нового месяца сам переезжает из прошлого (владелец, 2 окт 2026:
+    «у нас каждый месяц бюджет одинаковый»). Раньше новый месяц начинался
+    пустым, и заполнять его надо было кнопкой — нажали «По образцу» вместо «Из
+    прошлого месяца», и октябрь остался без единой суммы.
+
+    Только текущий месяц и только один раз (отметка budget_carried): бюджет,
+    который потом вычистили руками, заново не появляется. Месяц, в котором
+    статьи уже есть, не трогаем. Сколько статей перенесли."""
+    if month != _biz_day()[:7]:
+        return 0
+    async with _BUD_LOCK:
+        mdoc = await db.fin_month_get(month)
+        if mdoc.get("budget_carried") or await db.fin_budget_get(month):
+            return 0
+        rows = _rows_from_prev(await db.fin_budget_get(_prev_month(month)))
+        if not rows:
+            return 0
+        # Сначала отметка, потом статьи: упади мы посередине, второй перенос
+        # не задвоит то, что уже легло.
+        await db.fin_month_set(month, {"budget_carried": True})
+        for i, r in enumerate(rows):
+            await db.fin_budget_set({"_id": secrets.token_hex(4), "month": month, "ord": i,
+                                     "by": "перенос из прошлого месяца", **r})
+        await _touch(month)
+        log.info(f"[fin] бюджет {month} перенесён из {_prev_month(month)}: {len(rows)} статей, "
+                 f"план {sum(calc._n(r['plan']) for r in rows):.0f}")
+        return len(rows)
+
+
 @require_owner
 async def handle_budget_fill(request):
     """POST {month, from: prev|template, as} — заполнить пустой бюджет: из
@@ -1563,11 +1611,7 @@ async def handle_budget_fill(request):
         prev = await db.fin_budget_get(_prev_month(month))
         if not prev:
             return _json({"error": "no_prev"}, 404)
-        rows = [dict(name=ln.get("name"), plan=ln.get("plan") or 0, due=ln.get("due") or 0,
-                     note=ln.get("note") or "", kind="pool" if _is_pool(ln) else "office" if ln.get("kind") == "office" else "",
-                     group=_line_group(ln), cur="USD" if ln.get("cur") == "USD" else "AED",
-                     period=int(ln.get("period") or 1), next=str(ln.get("next") or "")) for ln in prev
-                if (ln.get("kind") or "") != "salary"]
+        rows = _rows_from_prev(prev)
     else:
         rows = [dict(name=r["name"], plan=0, due=0, note="", kind=r.get("kind") or "", group=r.get("group") or "", cur="AED")
                 for r in template_lines()]

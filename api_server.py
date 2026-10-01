@@ -177,6 +177,10 @@ async def on_startup(app):
     try:
         import stock_alerts
         app["stock_alerts"] = asyncio.create_task(stock_alerts.loop())
+        # Обход закончившихся суток: незакрытые смены, недосканированные приёмки —
+        # штрафом на решение (fines_auto.sweep).
+        import fines_auto
+        app["fines_sweep"] = asyncio.create_task(fines_auto.loop())
     except Exception as e:
         log.warning(f"[alerts] критические остатки не запущены: {e}")
     # Переписка владельца с ботом живёт не дольше 47 часов: позже телеграм

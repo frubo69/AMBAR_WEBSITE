@@ -586,6 +586,18 @@ async def handle_extra_decide(request):
         await advance_apply(day, driver, item or {}, str(body.get("as") or ""))
     else:
         await advance_drop(day, driver, item or {})
+        # Отклонённый расход, который прислал сам водитель, — на решение по
+        # штрафу (fines_auto; сумма из правил, ноль там — не предлагать).
+        if (item or {}).get("by_driver"):
+            try:
+                import fines_auto
+                вид = (EXTRA_KINDS.get(str(item.get("kind") or "")) or {}).get("t") or item.get("comment") or "расход"
+                await fines_auto.propose(
+                    "exp_rejected", driver, (item or {}).get("district") or "", day,
+                    f"{вид} {int(float(item.get('amount') or 0))} AED" + (f" · {note}" if note else ""),
+                    key=item_id, ref={"expense": item_id, "day": day})
+            except Exception as e:                           # noqa: BLE001
+                log.warning(f"[expenses] штраф на решение не предложен: {e}")
 
     base = next((d for d in staff.all_drivers() if d["name"] == driver), None)
     item = next((e for e in (saved or {}).get("extras", []) if e.get("id") == item_id), None)

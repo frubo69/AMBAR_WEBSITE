@@ -43,6 +43,12 @@ GEO_OFF_FINE = 200
 KINDS = {
     "late_shift": {"reason": "Поздно открыл смену", "action": "meal"},
     "geo_off": {"reason": "Отключил геолокацию", "action": "fine", "amount": GEO_OFF_FINE},
+    # С 1 окт 2026 — «штраф из того места, где видно нарушение» (владелец: «1, 2,
+    # 7»). Сумма — из правил (fine_rules, раздел «Автоматические»); ноль в
+    # правилах значит «не предлагать»: выключатель — сама сумма.
+    "exp_rejected": {"reason": "Отклонённый расход", "action": "fine"},
+    "noscan_debt": {"reason": "Приёмка без сканирования не досканирована", "action": "fine"},
+    "shift_left": {"reason": "Смена не закрыта", "action": "fine"},
 }
 
 
@@ -82,6 +88,9 @@ def full_text(d: dict) -> str:
         r = re.search(r"до (\d{1,2}):00", note)
         rule = d.get("rule_hour") or (int(r.group(1)) if r else 18)
         return f"Открытие смены позже {rule}:00" + (f"{nb}— смена открыта в{nb}{hm}" if hm else "")
+    if kind in ("exp_rejected", "noscan_debt", "shift_left"):
+        note = str(d.get("note") or "").strip()
+        return (KINDS[kind]["reason"] + (f"{nb}— {note}" if note else ""))
     return d.get("reason") or ""
 
 
@@ -124,9 +133,12 @@ async def geo_off(name: str, district: str, day: str, at_hm: str, by_signal: boo
         log.info(f"[fines] {name} уехал — за геолокацию не штрафуем")
         return False
     pid = f"geo_off:{day}:{name}"
+    # Сумма — из правил (экран «Правила и суммы» в STAR), 200 — если их нет.
+    import fine_rules
     doc = {"_id": pid, "kind": "geo_off", "name": name, "district": district, "day": day,
            "reason": KINDS["geo_off"]["reason"], "times": [at_hm], "note": _geo_note([at_hm]),
-           "self": bool(by_signal), "amount": GEO_OFF_FINE, "status": "pending",
+           "self": bool(by_signal), "amount": await fine_rules.amount("geo_off", GEO_OFF_FINE) or GEO_OFF_FINE,
+           "status": "pending",
            "at": datetime.now(timezone.utc)}
     try:
         if await db.fine_pending_add(doc):
@@ -144,6 +156,110 @@ async def geo_off(name: str, district: str, day: str, at_hm: str, by_signal: boo
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[fines] {name}: штраф за геолокацию не записан: {e}")
     return False
+
+
+async def propose(kind: str, name: str, district: str, day: str, note: str = "",
+                  key: str = "", ref: dict | None = None) -> bool:
+    """Нарушение, которое заметила программа, — на решение старшему, с суммой
+    из правил. True — новая запись (о ней стоит сказать).
+
+    Сумма 0 в правилах — не предлагаем вовсе: так старший включает и выключает
+    каждое автоматическое нарушение сам, на экране «Правила и суммы». Уехавшему
+    и тест-водителю не предлагаем. key — что именно (id расхода, поставка и
+    район): одно событие — одна запись, повтор второй не даёт."""
+    if kind not in KINDS or not name:
+        return False
+    import config_staff as _staff
+    import fine_rules
+    if _staff.is_away(name):
+        return False
+    try:
+        if _staff.is_test_driver(name):
+            return False
+    except Exception:                                        # noqa: BLE001
+        pass
+    amount = await fine_rules.amount(kind, 0)
+    if amount <= 0:
+        return False
+    doc = {"_id": f"{kind}:{day}:{name}" + (f":{key}" if key else ""), "kind": kind, "name": name,
+           "district": district or "", "day": day, "reason": KINDS[kind]["reason"],
+           "note": str(note or "")[:200], "amount": amount, "status": "pending",
+           "at": datetime.now(timezone.utc), **({"ref": ref} if ref else {})}
+    try:
+        ok = await db.fine_pending_add(doc)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[fines] {name}: {kind} не записан: {e}")
+        return False
+    if ok:
+        log.info(f"[fines] на решение: {name} — {KINDS[kind]['reason']} {day} · {note}")
+    return ok
+
+
+def _hm_dubai(v) -> str:
+    import bizday
+    dt = bizday.parse_ts(v)
+    return dt.astimezone(bizday.DUBAI_TZ).strftime("%H:%M") if dt else ""
+
+
+async def sweep(day: str) -> dict:
+    """Обход закончившихся суток: что осталось несделанным и за что положен
+    штраф на решение. Зовётся раз в сутки после смены дня (loop)."""
+    import config_staff as _staff
+    from config_offices import OFFICE_CODES
+    out = {"shift_left": 0, "noscan_debt": 0}
+    home = {}
+    try:
+        home = _staff.district_map()
+    except Exception:                                        # noqa: BLE001
+        pass
+    # 1. Смена открыта и не закрыта, а сутки кончились.
+    try:
+        for d in await db.get_driver_days_range(day, day):
+            if d.get("shift_open_at") and not d.get("shift_close_at"):
+                name = d.get("driver") or ""
+                if await propose("shift_left", name, home.get(name, ""), day,
+                                 f"открыта в {_hm_dubai(d.get('shift_open_at'))}, до конца суток не закрыта"):
+                    out["shift_left"] += 1
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[fines] обход смен {day}: {e}")
+    # 2. Приняли без сканирования и так и не досканировали.
+    try:
+        for sup in await db.supply_list(60, status="open"):
+            if str(sup.get("day") or str(sup.get("at") or "")[:10]) > day:
+                continue
+            for oid, t in (sup.get("tasks") or {}).items():
+                if not t.get("noscan_at") or t.get("done_at") or t.get("cancelled_at"):
+                    continue
+                name = t.get("noscan_by") or t.get("driver") or ""
+                left = sum(max(0, int((it.get("by_district") or {}).get(oid, 0)) - int((it.get("got") or {}).get(oid, 0)))
+                           for it in sup.get("items") or [])
+                if left <= 0:
+                    continue
+                if await propose("noscan_debt", name, oid, day,
+                                 f"{OFFICE_CODES.get(oid, oid)} · осталось {left} шт",
+                                 key=f"{sup.get('_id')}:{oid}", ref={"supply": str(sup.get("_id")), "district": oid}):
+                    out["noscan_debt"] += 1
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[fines] обход приёмок {day}: {e}")
+    if any(out.values()):
+        log.info(f"[fines] обход {day}: {out}")
+    return out
+
+
+async def loop():
+    """Раз в десять минут смотрим, не сменились ли учётные сутки; сменились —
+    обходим закончившиеся, один раз (отметка в базе переживает рестарт)."""
+    import asyncio
+    import bizday
+    while True:
+        try:
+            today = bizday.biz_day()
+            prev = (datetime.strptime(today, "%Y-%m-%d") - __import__("datetime").timedelta(days=1)).strftime("%Y-%m-%d")
+            if await db.once_mark("fines_sweep", prev):
+                await sweep(prev)
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[fines] обход не прошёл: {e}")
+        await asyncio.sleep(600)
 
 
 def view(d: dict) -> dict:

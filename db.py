@@ -2818,6 +2818,20 @@ async def supply_save(doc: dict):
     await db.supplies.replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
 
+# Настройки, которые правит старший в приложении (правила штрафов и т. п.):
+# один документ на ключ в app_settings.
+async def setting_get(key: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.app_settings.find_one({"_id": key}, {"_id": 0})
+
+
+async def setting_set(key: str, doc: dict) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.app_settings.replace_one({"_id": key}, {"_id": key, **doc}, upsert=True)
+
+
 async def once_mark(key: str, day: str) -> bool:
     """Отметить «сегодня это уже сделано». True — отметили сейчас (значит,
     делать), False — отметка уже стояла. Для того, что шлётся раз в сутки:

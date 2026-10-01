@@ -3620,6 +3620,39 @@ button.path:active{transform:scale(.995)}
 /* «Штрафы и удержания» и шаги штрафного листа — размеры сняты с макета владельца (экран 390) */
 .sc.fb-pen2c{background:linear-gradient(180deg,#151935 0%,#10132b 100%);border-color:rgba(255,255,255,.06)}
 .fb-pen-cap{font-size:14.5px;font-weight:600;color:#E8E8EF;line-height:1.3}
+/* Дисциплина (dsc-): люди строками, как подходы ревизии; раскрытый человек —
+   виды нарушений и события по дням. */
+.dsc-mo{margin-bottom:12px}
+.dsc-r .ses-b b{font-size:15px}
+.dsc-v{color:var(--dn)} .dsc-v.z{color:var(--dim)}
+.dsc-in{padding:2px 14px 12px}
+.dsc-k{display:flex;align-items:baseline;gap:10px;padding:5px 0;font-size:13px}
+.dsc-k span{flex:1;min-width:0;font-weight:600}
+.dsc-k b{font-family:'Space Grotesk',sans-serif;color:var(--gold2)}
+.dsc-k i{flex:0 0 78px;text-align:right;font-style:normal;font-family:'Space Grotesk',sans-serif;font-weight:600;color:var(--sub)}
+.dsc-ev{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)}
+.dsc-ev div{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:12px;color:var(--sub)}
+.dsc-ev u{flex:0 0 40px;text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;color:var(--muted)}
+.dsc-ev span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsc-ev i{flex:0 0 auto;font-style:normal;font-size:10.5px;color:var(--muted)}
+.dsc-ev b{flex:0 0 46px;text-align:right;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text)}
+.dsc-ev .out i{color:var(--dn)} .dsc-ev .wait i{color:var(--warn)} .dsc-ev .mut b{text-decoration:line-through;color:var(--muted)}
+.dsc-go{width:100%;height:42px;margin-top:10px;border-radius:11px;border:1px solid var(--border2);background:var(--card2);
+  color:var(--gold2);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+/* Правила штрафов: строка — нарушение и сумма; правка — название, сумма, степени. */
+.fb-rules-go{border-top:1px solid rgba(255,255,255,.06)}
+.fb-rule b{font-size:13.5px;color:var(--gold2);text-align:right;white-space:nowrap}
+.fb-rule b.none{font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:500;color:var(--muted)}
+.fb-rule span{white-space:normal;line-height:1.3;padding:8px 0}
+.fb-rule-f{display:block}
+.fb-rule-fix{font-size:15px;font-weight:600;color:var(--text);padding:6px 0 2px}
+.fb-rule-tier{display:grid;grid-template-columns:1fr 96px 40px;gap:8px;margin-bottom:8px}
+.fb-rule-tier button{border:1px solid var(--border2);border-radius:12px;background:none;color:var(--muted);cursor:pointer}
+.fb-rule-add{width:100%;height:46px;border-radius:12px;border:1px dashed rgba(201,169,110,.45);background:none;color:var(--gold2);
+  font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.fb-rule-del{display:block;width:100%;height:48px;margin:4px 0 16px;border-radius:13px;border:1px solid rgba(224,82,82,.4);background:none;
+  color:var(--dn);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+
 .fb-pen2c > .fb-pen-cap{padding:16px 16px 0;font-weight:700;color:#F3F3F7}
 .fb-pen2{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:12px 12px 14px}
 .fb-pen2-b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:114px;padding:14px 4px;
@@ -20837,6 +20870,9 @@ function fbRepaint(){
   if(fbItemOn()){ fbItemPersonPaint(); return; }
   // шаги штрафного листа и удержания от месяца не зависят — не трогаем вовсе
   if(fbPenOn()) return;
+  // экран правил штрафов держит черновик — книга под ним обновится сама
+  if(typeof RULES !== 'undefined' && RULES) return;
+  if(typeof DISC !== 'undefined' && DISC && document.querySelector('#accMid .dsc-mo')) return;
   if(FB_VIEWS[ACC_VIEW]) FB_VIEWS[ACC_VIEW]();
 }
 
@@ -23627,6 +23663,8 @@ function fbItemsHtml(b){
       <button class="fb-pen2-b" onclick="fbPenOpen()"><em>${IC('note', 20)}</em><b>Штрафной лист</b><i>Выбрать нарушение и назначить штраф</i></button>
       <button class="fb-pen2-b" onclick="fbHoldOpen()"><em>${IC('minus', 20)}</em><b>Свободное удержание</b><i>Указать сумму вручную</i></button>
     </div>
+    <button class="sc-r fb-r fb-rules-go" style="cursor:pointer" onclick="fbRulesOpen()"><span>Правила и суммы</span><em>${_SC_CHEV}</em></button>
+    <button class="sc-r fb-r fb-rules-go" style="cursor:pointer" onclick="fbDiscOpen()"><span>Дисциплина</span><em>${_SC_CHEV}</em></button>
   </div>
   ${fbPendHtml(b)}
   ${fbPenHistHtml(b)}`;
@@ -23638,7 +23676,7 @@ function fbItemsHtml(b){
 //     прямо в строке: «Назначить» / «Не назначать»;
 //   • смену открыли позже 18:00 — не деньги, а питание: «Урезать питание»
 //     (40 вместо 80 за тот день) / «Не урезать».
-const FB_AUTO_IC = {late_shift: 'clock', geo_off: 'pin'};
+const FB_AUTO_IC = {late_shift: 'clock', geo_off: 'pin', exp_rejected: 'note', noscan_debt: 'box', shift_left: 'clock'};
 const FB_MEAL_FROM = 80, FB_MEAL_TO = 40;
 function fbPendHtml(b){
   const list = fbCur(b).pending || [];
@@ -23772,6 +23810,158 @@ function fbPenHistMore(btn){
   if(rows.length <= 10) btn.remove();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
+// ── Правила штрафов ───────────────────────────────────────────────────────
+// Владелец, 1 окт 2026: прейскурант правится в STAR, а не в коде. Разделы
+// постоянные; нарушение — название и либо одна сумма, либо степени, либо
+// ничего («впишут при назначении»). В «Автоматических» правится только сумма:
+// эти нарушения замечает программа. Сохраняется целиком, одной кнопкой.
+let RULES = null;          // черновик: {cats, dirty, edit: {cat, i} | null}
+function fbRulesOpen(){
+  const b = fbBook(FB.month); if(!b) return;
+  RULES = {cats: _copy(fbCur(b).rules || []), dirty: false, edit: null};
+  fbPenUi(false);
+  ACC_BACK = fbRulesBack;
+  fbRulesPaint();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+async function fbRulesBack(){
+  if(RULES && RULES.edit){ fbRuleDone(true); ACC_BACK = fbRulesBack; return; }
+  if(RULES && RULES.dirty && !await askYes('Правила изменены и не сохранены.\n\nВыйти без сохранения?')){ ACC_BACK = fbRulesBack; return; }
+  RULES = null; document.getElementById('accFoot').innerHTML = ''; accOpen('finitems');
+}
+function fbRulesSum(v){
+  return v.tiers && v.tiers.length ? `${v.tiers.length} ${pluralize(v.tiers.length, 'степень', 'степени', 'степеней')} · ${fbFmt(v.tiers[0].amount)} – ${fbFmt(v.tiers[v.tiers.length - 1].amount)}`
+       : v.amount ? `${fbFmt(v.amount)} AED` : v._sys ? 'выключено' : 'сумма при назначении';
+}
+function fbRulesPaint(){
+  if(!RULES) return;
+  _setText('accTitle', 'Правила и суммы'); _setText('accSub', '');
+  const mid = document.getElementById('accMid'), y = mid.scrollTop;
+  if(RULES.edit){ mid.innerHTML = fbRuleEditHtml(); document.getElementById('accFoot').innerHTML =
+      `<div class="qb-wrap"><button class="qb" onclick="fbRuleDone()">Готово</button></div>`; mid.scrollTop = 0; return; }
+  mid.innerHTML = RULES.cats.map((c, ci) => `<div class="sc fb-rules">
+      <div class="sc-cap"><span>${escS(c.t)}</span>${c.id === 'sys' ? '<i>замечает программа</i>' : ''}</div>
+      ${(c.items || []).map((v, i) => `<button class="sc-r fb-r fb-rule" style="cursor:pointer" onclick="fbRuleEdit(${ci},${i})">
+          <span>${escS(v.t)}</span><b class="${v.amount || (v.tiers || []).length ? '' : 'none'}">${fbRulesSum(c.id === 'sys' ? {...v, _sys: 1} : v)}</b><em>${_SC_CHEV}</em></button>`).join('')
+        || '<div class="fb-none">Нарушений нет — сумму вписывают при назначении</div>'}
+      ${c.id === 'sys' ? '' : `<button class="sc-r fb-plus" onclick="fbRuleAdd(${ci})"><span>Добавить нарушение</span><em>${_FB_PLUS}</em></button>`}
+    </div>`).join('');
+  mid.scrollTop = y;
+  document.getElementById('accFoot').innerHTML = RULES.dirty
+    ? `<div class="qb-wrap"><button class="qb" id="fbRulesSave" onclick="fbRulesSave()">Сохранить правила</button></div>` : '';
+}
+function fbRuleEdit(ci, i){ RULES.edit = {cat: ci, i}; ACC_BACK = fbRulesBack; fbRulesPaint(); }
+function fbRuleAdd(ci){
+  const items = RULES.cats[ci].items = RULES.cats[ci].items || [];
+  items.push({id: 'n' + Date.now().toString(36), t: '', _new: true});
+  fbRuleEdit(ci, items.length - 1);
+}
+function fbRuleEditHtml(){
+  const c = RULES.cats[RULES.edit.cat], v = c.items[RULES.edit.i], sys = c.id === 'sys';
+  const tiers = v.tiers || [];
+  return `<div class="fb-pen-card fb-pen-form fb-rule-f">
+      <div class="fb-pen-sec"><div class="fb-pen-cap">Нарушение</div>
+        ${sys ? `<div class="fb-rule-fix">${escS(v.t)}</div>`
+              : `<input class="fb-pen-inp" id="fbRuleT" maxlength="60" placeholder="Например: опоздание на смену" autocomplete="off" value="${escS(v.t)}">`}</div>
+      ${tiers.length ? '' : `<div class="fb-pen-sec"><div class="fb-pen-cap">Сумма (AED)</div>
+        <input class="fb-pen-inp" id="fbRuleA" inputmode="decimal" placeholder="${sys ? 'Пусто — программа не предлагает' : 'Пусто — впишут при назначении'}" autocomplete="off" value="${v.amount || ''}"></div>`}
+      ${sys ? '' : `<div class="fb-pen-sec"><div class="fb-pen-cap">Степени</div>
+        ${tiers.map((t, k) => `<div class="fb-rule-tier"><input class="fb-pen-inp" data-k="${k}" data-f="t" maxlength="40" placeholder="Степень" value="${escS(t.t)}">
+            <input class="fb-pen-inp" data-k="${k}" data-f="amount" inputmode="decimal" placeholder="AED" value="${t.amount || ''}">
+            <button onclick="fbRuleTierDel(${k})" aria-label="Убрать степень">${IC('xmark', 15)}</button></div>`).join('')}
+        <button class="fb-rule-add" onclick="fbRuleTierAdd()">${tiers.length ? 'Ещё степень' : 'Разбить на степени'}</button></div>`}
+    </div>
+    ${sys ? '' : `<button class="fb-rule-del" onclick="fbRuleDel()">Убрать нарушение</button>`}`;
+}
+// Снять набранное с полей в черновик (перед любой перерисовкой).
+function fbRuleRead(){
+  const c = RULES.cats[RULES.edit.cat], v = c.items[RULES.edit.i];
+  const num = x => Math.round(+String(x).replace(/\s/g, '').replace(',', '.') || 0);
+  const t = document.getElementById('fbRuleT'), a = document.getElementById('fbRuleA');
+  if(t) v.t = t.value.trim();
+  if(a){ if(num(a.value) > 0) v.amount = num(a.value); else delete v.amount; }
+  document.querySelectorAll('.fb-rule-tier input').forEach(inp => {
+    const tr = (v.tiers || [])[+inp.dataset.k]; if(!tr) return;
+    if(inp.dataset.f === 't') tr.t = inp.value.trim(); else tr.amount = num(inp.value);
+  });
+  return v;
+}
+function fbRuleTierAdd(){ const v = fbRuleRead(); v.tiers = v.tiers || []; if(v.tiers.length >= 8) return _toast('Не больше восьми степеней');
+  v.tiers.push({t: '', amount: 0}); delete v.amount; fbRulesPaint(); }
+function fbRuleTierDel(k){ const v = fbRuleRead(); v.tiers.splice(k, 1); if(!v.tiers.length) delete v.tiers; fbRulesPaint(); }
+function fbRuleDel(){ const c = RULES.cats[RULES.edit.cat]; c.items.splice(RULES.edit.i, 1); RULES.dirty = true; RULES.edit = null; fbRulesPaint(); }
+// «Готово» и стрелка назад: правка ложится в черновик. Пустое новое — просто
+// не заводится; пустое название у старого по стрелке назад не трогаем.
+function fbRuleDone(back){
+  const c = RULES.cats[RULES.edit.cat], v = fbRuleRead();
+  if(!v.t){ if(v._new || back){ if(v._new) c.items.splice(RULES.edit.i, 1); RULES.edit = null; return fbRulesPaint(); }
+    _toast('Нужно название'); const t = document.getElementById('fbRuleT'); if(t) t.focus(); return; }
+  if((v.tiers || []).some(t => !t.t || !(t.amount > 0))){ _toast('У каждой степени — название и сумма'); return; }
+  delete v._new; RULES.dirty = true; RULES.edit = null; fbRulesPaint();
+}
+async function fbRulesSave(){
+  const b = document.getElementById('fbRulesSave'); if(b){ b.disabled = true; b.textContent = 'Сохраняю…'; }
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/finance/fines/rules', {method: 'POST', body: {cats: RULES.cats, as: _meName()}});
+    const book = fbBook(FB.month); if(book && book.pay) book.pay.rules = r.rules;
+    RULES = {cats: _copy(r.rules), dirty: false, edit: null};
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast('Правила сохранены');
+    fbRulesPaint();
+  }catch(e){ _toast('Не удалось сохранить'); if(b){ b.disabled = false; b.textContent = 'Сохранить правила'; } }
+}
+
+// ── Дисциплина ────────────────────────────────────────────────────────────
+// Владелец, 1 окт 2026 («1, 2, 7»): по каждому человеку — сколько и каких
+// нарушений, сумма, что ждёт решения и что простили. Считает сервер
+// (discipline.py) из тех же записей, что и «Штрафы»; здесь — только показать.
+let DISC = null, DISC_DAYS = 90, DISC_OPEN = '';
+async function fbDiscOpen(days){
+  if(days) DISC_DAYS = days;
+  fbPenUi(false);
+  ACC_BACK = () => { DISC = null; document.getElementById('accFoot').innerHTML = ''; accOpen('finitems'); };
+  FB.disc = true;
+  _setText('accTitle', 'Дисциплина'); _setText('accSub', '');
+  document.getElementById('accFoot').innerHTML = '';
+  if(!DISC) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{ DISC = await ownerApi.ownerFetch('/api/owner/finance/discipline', {params: {days: DISC_DAYS}}); }
+  catch(e){ document.getElementById('accMid').innerHTML = loadFail('fbDiscOpen()'); return; }
+  fbDiscPaint();
+}
+function fbDiscPaint(){
+  const d = DISC; if(!d) return;
+  const t = d.totals || {}, n = v => fbFmt(v || 0);
+  const chips = [[30, '30 дней'], [90, '90 дней'], [365, 'Год']].map(([v, w]) =>
+    `<button class="${v === d.days ? 'on' : ''}" onclick="fbDiscOpen(${v})">${w}</button>`).join('');
+  const ST = {fine: ['штраф', 'out'], amnesty: ['амнистия', 'mut'], forgiven: ['прощён', 'mut'],
+              meal: ['питание урезано', 'out'], pending: ['ждёт решения', 'wait']};
+  const person = p => {
+    const open = DISC_OPEN === p.name;
+    const sub = [p.fines ? `${p.fines} ${pluralize(p.fines, 'штраф', 'штрафа', 'штрафов')}` : '',
+                 p.meal ? `питание ×${p.meal}` : '', p.pending ? `ждёт ${p.pending}` : '',
+                 p.forgiven ? `прощено ${p.forgiven}` : '', p.amnesty ? `амнистий ${p.amnesty}` : '',
+                 p.clean != null ? `чисто ${p.clean} ${pluralize(p.clean, 'день', 'дня', 'дней')}` : ''].filter(Boolean).join(' · ');
+    return `<button class="ses-r dsc-r${open ? ' open' : ''}" data-n="${escS(p.name)}" onclick="fbDiscToggle(this.dataset.n)">
+        <span class="ses-b"><b>${escS(p.name)}</b><i>${escS(sub)}</i></span>
+        <span class="ses-v dsc-v${p.sum ? '' : ' z'}">${n(p.sum)}<u>AED</u></span><em>${_SC_CHEV}</em></button>${open ? `<div class="dsc-in">
+        ${(p.kinds || []).map(k => `<div class="dsc-k"><span>${escS(k.t)}</span><b>×${k.n}</b><i>${k.sum ? n(k.sum) + ' AED' : ''}</i></div>`).join('')}
+        <div class="dsc-ev">${(p.rows || []).map(r => `<div class="${(ST[r.state] || [])[1] || ''}"><u>${escS(fbWorkDm(r.day))}</u>
+          <span>${escS(r.t)}</span><i>${(ST[r.state] || [''])[0]}</i><b>${r.amount ? n(r.amount) : ''}</b></div>`).join('')}</div>
+        <button class="dsc-go" data-n="${escS(p.name)}" onclick="fbItemPerson(this.dataset.n)">Открыть удержания · ${escS(p.name)}</button></div>` : ''}`;
+  };
+  document.getElementById('accMid').innerHTML = `
+    <div class="odm-mo dsc-mo">${chips}</div>
+    <div class="sc dds-one">
+      <div class="dds-r ${t.sum ? 'out' : 'zero'}"><span>Назначено${t.fines ? ` · ${t.fines}` : ''}</span><b>${n(t.sum)}<u>AED</u></b></div>
+      <div class="dds-r ${t.pending ? '' : 'zero'}"><span>Ждут решения</span><b>${n(t.pending)}</b></div>
+      <div class="dds-r ${t.meal ? '' : 'zero'}"><span>Питание урезано</span><b>${n(t.meal)}</b></div>
+      <div class="dds-r ${t.forgiven ? '' : 'zero'}"><span>Прощено</span><b>${n(t.forgiven)}</b></div>
+    </div>
+    ${(d.people || []).length ? `<div class="sc ses-card"><div class="sc-cap"><span>По людям</span><i>с ${escS(fbWorkDay(d.since))}</i></div>
+      ${d.people.map(person).join('')}</div>` : '<div class="exp-empty">За этот период нарушений нет</div>'}`;
+}
+function fbDiscToggle(name){ DISC_OPEN = DISC_OPEN === name ? '' : name; try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} fbDiscPaint(); }
+
 // ── Штрафной лист и свободное удержание ─────────────────────────────────
 // Штрафной лист — по шагам: за что (вид) → нарушение → степень с суммой →
 // кого → разово или по частям. Свободное удержание — сразу люди, потом сумма
@@ -23806,6 +23996,16 @@ const FB_PEN = [
   {id: 'look', t: 'Внешний вид', sub: 'Нарушения внешнего вида', svg: FB_PEN_SHIRT},
   {id: 'misc', t: 'Другое', sub: 'Прочие нарушения', svg: FB_PEN_DOTS},
 ];
+// Нарушения и суммы — с сервера (fine_rules.py, экран «Правила», 1 окт 2026);
+// значки и подписи разделов — здесь. Пока правила не приехали — список выше.
+// Раздел «Автоматические» в ручном листе не показываем: его ведёт программа.
+function fbPenList(){
+  const rules = fbCur(fbBook(FB.month)).rules;
+  if(!rules || !rules.length) return FB_PEN;
+  return FB_PEN.map(c => { const r = rules.find(x => x.id === c.id);
+    return r ? {...c, items: (r.items || []).length ? r.items.map(i => {
+      const old = (c.items || []).find(o => o.id === i.id); return old && old.ic ? {...i, ic: old.ic} : i; }) : undefined} : c; });
+}
 // за что — одной строкой в записи: нарушение и степень, а без списка — вид
 function fbPenReason(){
   const {cat, vio, tier} = fbPenCur();
@@ -23818,7 +24018,7 @@ function fbPenExit(){ FB.pen = null; ACC_BACK = null; fbPenUi(false); fbPenFoot(
 // Шапка шагов — как в макете владельца: крупный заголовок без месяца
 function fbPenUi(on){ const ov = document.getElementById('accOv'); if(ov) ov.classList.toggle('pen-ui', !!on); }
 function fbPenCur(){
-  const P = FB.pen || {}, cat = FB_PEN.find(c => c.id === P.cat) || null;
+  const P = FB.pen || {}, cat = fbPenList().find(c => c.id === P.cat) || null;
   const vio = cat ? (cat.items || []).find(v => v.id === P.vio) || null : null;
   const tier = vio && vio.tiers && P.tier !== null && P.tier !== undefined ? vio.tiers[P.tier] || null : null;
   return {P, cat, vio, tier};
@@ -23856,17 +24056,18 @@ function fbPenGo(step, anim){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbPenCatsHtml(){
-  return FB_PEN.map(c => `<button class="fb-penc${c.hot ? '' : ' plain'}" onclick="fbPenCat('${c.id}')"><em class="fb-penc-i">${c.svg || IC(c.ic, 26)}</em>
+  return fbPenList().map(c => `<button class="fb-penc${c.hot ? '' : ' plain'}" onclick="fbPenCat('${c.id}')"><em class="fb-penc-i">${c.svg || IC(c.ic, 26)}</em>
       <span class="fb-penc-b"><b>${escS(c.t)}</b><i>${escS(c.sub)}</i></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('');
 }
 function fbPenCat(id){
-  const cat = FB_PEN.find(c => c.id === id); if(!cat) return;
+  const cat = fbPenList().find(c => c.id === id); if(!cat) return;
   Object.assign(FB.pen, {cat: id, vio: null, tier: null});
   fbPenGo((cat.items || []).length ? 'vios' : 'who');
 }
 function fbPenViosHtml(cat){
   return `<div class="fb-pen-list">${(cat.items || []).map(v => `<button class="fb-pen-row" onclick="fbPenVio('${v.id}')">
-      <span class="fb-pen-rb"><b>${escS(v.t)}</b></span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
+      <span class="fb-pen-rb"><b>${escS(v.t)}</b>${v.tiers ? `<i>${v.tiers.length} ${pluralize(v.tiers.length, 'степень', 'степени', 'степеней')}</i>`
+        : v.amount ? `<i>${fbFmt(v.amount)} AED</i>` : ''}</span><em class="fb-chev">${_SC_CHEV}</em></button>`).join('')}</div>`;
 }
 function fbPenVio(id){
   const {cat} = fbPenCur(), vio = cat && (cat.items || []).find(v => v.id === id); if(!vio) return;
@@ -23965,7 +24166,7 @@ function fbPenFineHtml(cat, vio, tier){
         : vio ? '' : `<i class="fb-pen-cs">${escS(cat.sub.replace(/\n/g, ' '))}</i>`}</span></div>
     ${fbPenWhoCard(true)}
     ${fbPenHowCard()}
-    <div class="fb-pen-card fb-pen-form">${tier ? '' : fbPenAmtSec()}${fbPenCmtSec()}</div>
+    <div class="fb-pen-card fb-pen-form">${tier ? '' : fbPenAmtSec(vio && vio.amount ? vio.amount : '')}${fbPenCmtSec()}</div>
     <button class="fb-pen-go" onclick="fbPenApply()">Применить штраф</button>`;
 }
 function fbPenHowCard(){
@@ -23985,7 +24186,8 @@ function fbPenHowCard(){
 // возвращают к главной; отмена спрашивает — штраф уйдёт из расчёта зарплаты.
 function fbPenCatOf(h){
   const first = String(h.reason || '').split(' · ')[0];
-  return FB_PEN.find(c => c.t === first) || FB_PEN.find(c => (c.items || []).some(v => v.t === first)) || null;
+  const L = fbPenList();
+  return L.find(c => c.t === first) || L.find(c => (c.items || []).some(v => v.t === first)) || null;
 }
 function fbPenEdit(id){
   const b = fbBook(FB.month); if(!b) return;

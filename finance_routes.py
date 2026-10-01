@@ -745,6 +745,10 @@ async def _payroll(month: str, days: list[str], today: str, entries: list,
     res["dupes"] = dupes
     res["pending"] = await fines_auto.pending()
     res["history"] = _penalty_history(items, month, decided=await fines_auto.decided())
+    # Правила штрафов — те же, что на экране «Правила»: лист берёт нарушения
+    # и суммы отсюда, а не из кода приложения.
+    import fine_rules
+    res["rules"] = await fine_rules.get()
     return res
 
 
@@ -1695,6 +1699,34 @@ async def handle_tenure_pay(request):
 
 
 @require_owner
+async def handle_discipline(request):
+    """GET ?days=30|90|365 — карточки дисциплины: что на каждом человеке."""
+    import discipline
+    try:
+        days = max(7, min(365, int(request.query.get("days") or 90)))
+    except ValueError:
+        days = 90
+    return _json({"ok": True, **(await discipline.build(days))})
+
+
+@require_owner
+async def handle_fine_rules(request):
+    """GET — правила штрафов; POST {cats, as} — сохранить их целиком (экран
+    «Правила» в STAR). Ответ — правила в том виде, в каком легли."""
+    import fine_rules
+    if request.method == "GET":
+        return _json({"ok": True, "rules": await fine_rules.get()})
+    try:
+        body = await request.json()
+        cats = body.get("cats")
+        if not isinstance(cats, list):
+            return _json({"error": "bad_request"}, 400)
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    return _json({"ok": True, "rules": await fine_rules.save(cats, _who(body))})
+
+
+@require_owner
 async def handle_fine_decide(request):
     """POST {id, decision: assign|skip, amount, month, as} — решение по тому,
     что сформировала программа (fines_auto.py). У штрафа «Назначить» — обычный
@@ -1928,6 +1960,9 @@ def setup(app):
         ("/api/owner/finance/book/pay/item/edit", handle_pay_item_edit, "POST"),
         ("/api/owner/finance/book/pay/item/restore", handle_pay_item_restore, "POST"),
         ("/api/owner/finance/fines/decide", handle_fine_decide, "POST"),
+        ("/api/owner/finance/discipline", handle_discipline, "GET"),
+        ("/api/owner/finance/fines/rules", handle_fine_rules, "GET"),
+        ("/api/owner/finance/fines/rules", handle_fine_rules, "POST"),
         ("/api/owner/finance/bonus",        handle_tenure,     "GET"),
         ("/api/owner/finance/bonus/pay",    handle_tenure_pay, "POST"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),

@@ -851,6 +851,13 @@ async def handle_car_repair(request):
     await db.car_intake_photo_set(iid, photo, thumb)
     await db.car_repair_set(cid, None if back else {
         "at": datetime.now(timezone.utc).isoformat(), "by": me["name"], "km": km, "note": note})
+    # Журнал ремонтов — для старшего: сколько стояла, что чинили, пробег в сервисе.
+    if back:
+        await db.car_repair_close(cid, {"back_by": me["name"], "back_km": km, "back_reading": iid})
+    else:
+        await db.car_repair_open({"car_id": cid, "plate": car.get("plate") or "", "model": car.get("model") or "",
+                                  "color": car.get("color") or "", "driver": me["name"], "out_by": me["name"],
+                                  "out_km": km, "out_reading": iid, "note": note, "back_at": None})
     log.info(f"[car] {me['name']} {'забрал из ремонта' if back else 'сдал в ремонт'} {car.get('plate')} · {km} км")
     try:
         import owner_routes as _own

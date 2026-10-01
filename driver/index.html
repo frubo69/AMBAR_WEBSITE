@@ -2891,7 +2891,11 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
    же файле с flex:1, и при равном весе побеждал он — поле растягивалось на
    весь остаток экрана и висело посреди пустой рамки. */
 .odo .odo-f{flex:0 0 auto;width:100%;max-width:300px}
-.odo .odo-f .amt{text-align:center;font-size:26px;letter-spacing:1px;padding:14px;outline:none}
+/* Цвет задан явно: у поля нет своего, и без этого вписанное число выходило
+   чёрным на тёмном — водитель набирал пробег вслепую (найдено 1 окт 2026). */
+.odo .odo-f .amt{text-align:center;font-size:26px;letter-spacing:1px;padding:14px;outline:none;
+  color:var(--text);font-family:'Space Grotesk',sans-serif;font-weight:700;caret-color:var(--gold2)}
+.odo .odo-f .amt::placeholder{color:var(--muted);font-weight:500}
 .odo-note{margin-top:12px;min-height:18px;max-width:320px;font-size:12.5px;
   line-height:1.35;text-align:center;color:var(--sub)}
 .odo-note.err{color:var(--dn)}

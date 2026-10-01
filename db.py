@@ -2205,6 +2205,34 @@ async def car_repair_set(cid: str, info: dict | None) -> bool:
     return r.matched_count > 0
 
 
+# Журнал ремонтов (1 окт 2026): одна запись на «сдали → забрали». Отметка на
+# машине (cars.repair) отвечает «в ремонте ли сейчас», журнал — «сколько раз,
+# на сколько дней, что чинили и сколько проехала в сервисе».
+async def car_repair_open(doc: dict) -> str:
+    db = _db_or_none()
+    if db is None: return ""
+    now = datetime.now(timezone.utc)
+    rid = f"{doc.get('car_id')}:{now.strftime('%Y%m%d%H%M%S%f')}"
+    await db.car_repairs.insert_one({"_id": rid, "out_at": now, **doc})
+    return rid
+
+
+async def car_repair_close(car_id: str, fields: dict) -> bool:
+    """Закрыть последний открытый ремонт этой машины."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.car_repairs.find_one_and_update(
+        {"car_id": car_id, "back_at": None},
+        {"$set": {"back_at": datetime.now(timezone.utc), **fields}}, sort=[("out_at", -1)])
+    return bool(r)
+
+
+async def car_repairs_list(limit: int = 200) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.car_repairs.find({}).sort("out_at", -1).to_list(length=limit)
+
+
 async def car_set_driver(cid: str, driver: str, by: int = 0, expect: str | None = None) -> bool:
     """Закрепить машину за водителем ("" — свободна). expect — у кого машина
     должна быть сейчас: не сходится — ничего не меняем, кто-то успел раньше."""

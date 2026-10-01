@@ -5028,6 +5028,30 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;
   font-weight:600;font-family:inherit}
 .crw-cancel:active{border-color:var(--gold2);color:var(--gold2)}
+/* Ремонт машин (rep-): карточка машины в сервисе — крупно сколько дней, ниже
+   кто сдал, что с машиной и пробег; история — строками. */
+.rep-b{padding:12px}
+.rep-big{display:flex;align-items:baseline;gap:9px;margin-bottom:8px}
+.rep-big b{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--warn)}
+.rep-big i{font-style:normal;font-size:12px;color:var(--muted)}
+.rep-l{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px}
+.rep-l span{flex:0 0 auto;color:var(--muted)}
+.rep-l b{flex:1;min-width:0;text-align:right;font-weight:600;color:var(--text)}
+.rep-ph{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--gold2);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;vertical-align:1px}
+.rep-go{width:100%;height:44px;margin-top:10px;border-radius:12px;border:1px solid rgba(201,169,110,.45);background:var(--gold-soft);
+  color:var(--gold2);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.rep-h{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.05)}
+.sc-cap + .rep-h{border-top:0}
+.rep-hb{flex:1;min-width:0}
+.rep-hb b{display:block;font-size:13.5px;font-weight:700}
+.rep-hb i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rep-hv{flex:0 0 auto;text-align:right}
+.rep-hv b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text)}
+.rep-hv u{display:block;text-decoration:none;font-size:10px;color:var(--muted)}
+.pin-pop.crw-ask.rep-ask .fb-pen-inp{margin:0 0 8px;text-align:left}
+.rep-err{min-height:16px;margin:0 0 8px;font-size:11.5px;color:var(--dn);text-align:center}
+.crw-p-rep{color:var(--warn)}
 /* Пробег машин (odm-): журнал показаний одометра по машинам. Карточка — машина,
    строки — показания месяца, свежее сверху; красная полоса — показания ждём. */
 .odm-mo{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}
@@ -37565,7 +37589,7 @@ function crewRender(){
         <span class="crw-p-a">${IC('car', 15)}</span>
         <span class="crw-p-t"><span class="crw-p-n">${escS(n)}</span>${
           уехал ? `<span class="crw-p-car">уехал ${escS(fbWorkDay(уехал))}</span>`
-                : (car ? `<span class="crw-p-car">${escS(car)}</span>` : '')}${трубка}</span>
+                : (car ? `<span class="crw-p-car${v.car && v.car.repair ? ' crw-p-rep' : ''}">${escS(car)}${v.car && v.car.repair ? ' · в ремонте' : ''}</span>` : '')}${трубка}</span>
         ${v.moved && !уехал ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
       </button>`;
     }).join('') : '<span class="crw-none">никого нет</span>';
@@ -37601,8 +37625,8 @@ function crewRender(){
         <span>Переставлено: <b>${moved}</b> — не как обычно</span>
         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
       </div>` : ''}
-    ${per}${test}${crewFreeCarsHtml(S)}${crewOdoHtml()}${crewLinksHtml(S)}`;
-  crewOdoFill();
+    ${per}${test}${crewFreeCarsHtml(S)}${crewOdoHtml()}${crewRepHtml()}${crewLinksHtml(S)}`;
+  crewOdoFill(); crewRepFill();
 }
 
 // ── телефоны водителей ────────────────────────────────────────────────────
@@ -37798,6 +37822,132 @@ async function crewCarDel(cid){
 }
 // Запрос по машинам: ответ — штат целиком. Черновик перестановок не трогаем:
 // машина уходит сразу, а перенос водителей между районами ждёт «Сохранить».
+// ── ремонт машин ──────────────────────────────────────────────────────────
+// Владелец, 1 окт 2026: «добавь старшему и сделай ему инструмент для
+// контроля». Экран рядом с «Пробегом машин»: что в сервисе сейчас и сколько
+// дней, кнопка «Сдать машину», история ремонтов — сколько стояла, что чинили,
+// сколько проехала в сервисе. Сдаёт и забирает и водитель (со снимком
+// одометра), и старший отсюда (снимок не нужен, пробег — по желанию).
+let REPS = null;
+function crewRepHtml(){
+  return `<div class="crw-c odm-in"><div class="crw-c-h"><span class="crw-c-n wrap">Ремонт машин</span></div>
+    <div class="crw-ln-l"><button class="crw-ln" onclick="repsOpen()">
+      <span class="crw-ln-i">${IC('car', 16)}</span>
+      <span class="crw-ln-b"><b>В сервисе и история</b><i id="crwRepSub">кто сдал, сколько стоит, что чинили</i></span>
+      <em class="fb-chev">${_SC_CHEV}</em></button></div></div>`;
+}
+function crewRepFill(){
+  const n = _crewCarsOf(CREW_D || CREW || {}).filter(c => c.repair).length;
+  const el = document.getElementById('crwRepSub'); if(!el) return;
+  el.textContent = n ? `в ремонте сейчас: ${n}` : 'в ремонте сейчас никого';
+  el.className = n ? 'wait' : '';
+}
+async function repsOpen(){
+  if(ACC_VIEW === 'crew' && crewDirty()){ crewAsk(); return; }
+  ACC_VIEW = 'reps';
+  ACC_BACK = crewOpen;
+  _setText('accTitle', 'Ремонт машин'); _setText('accSub', '');
+  if(!REPS) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  await repsLoad();
+}
+async function repsLoad(){
+  try{ REPS = await ownerApi.ownerFetch('/api/owner/cars/repairs'); }
+  catch(e){ REPS = null; }
+  if(ACC_VIEW === 'reps') repsPaint();
+}
+function repsPaint(){
+  const box = document.getElementById('accMid');
+  if(!REPS){ box.innerHTML = loadFail('repsLoad()'); document.getElementById('accFoot').innerHTML = ''; return; }
+  const d = REPS, t = d.totals || {};
+  const дней = n => n ? `${n} ${pluralize(n, 'день', 'дня', 'дней')}` : 'меньше дня';
+  const dm = iso => iso ? fbWorkDm(String(iso).slice(0, 10)) : '';
+  const car = r => `<span class="odm-pl">${escS(r.plate || '—')}</span>
+        <span class="crw-c-n">${escS([r.model, r.color].filter(Boolean).join(' · ') || 'Машина')}</span>
+        <span class="odm-who">${escS(r.driver || 'свободна')}${r.district ? `<i>${escS(r.district)}</i>` : ''}</span>`;
+  const shot = (id, word) => id ? `<button class="rep-ph" onclick="repsShot('${escS(id)}','${word}')">${IC('cam', 13)}${word}</button>` : '';
+  const now = (d.now || []).map(r => `<div class="crw-c odm-c rep-now">
+      <div class="crw-c-h">${car(r)}</div>
+      <div class="rep-b">
+        <div class="rep-big"><b>${дней(r.days)}</b><i>в ремонте с ${escS(fbWorkDay(String(r.out_at).slice(0, 10)))}</i></div>
+        <div class="rep-l"><span>Сдал</span><b>${escS(r.out_by || '—')}</b></div>
+        ${r.note ? `<div class="rep-l"><span>Что с машиной</span><b>${escS(r.note)}</b></div>` : ''}
+        <div class="rep-l"><span>Пробег при сдаче</span><b>${r.out_km ? odmN(r.out_km) + ' км' : 'не вписан'}${shot(r.out_photo, 'снимок')}</b></div>
+        <button class="rep-go" onclick="repsAsk('${escS(r.car_id)}', true)">Забрали из ремонта</button>
+      </div></div>`).join('');
+  const hist = (d.history || []).map(r => `<div class="rep-h">
+      <span class="odm-pl">${escS(r.plate || '—')}</span>
+      <span class="rep-hb"><b>${escS(dm(r.out_at))} – ${escS(dm(r.back_at))} · ${дней(r.days)}</b>
+        <i>${escS([r.note, r.driver, r.out_by && r.out_by !== r.driver ? 'сдал ' + r.out_by : ''].filter(Boolean).join(' · ') || r.model)}</i></span>
+      <span class="rep-hv">${r.service_km != null ? `<b>+${odmN(r.service_km)}</b><u>км в сервисе</u>` : '<u>без пробега</u>'}</span></div>`).join('');
+  box.innerHTML = `
+    <div class="odm-sum">
+      <div class="${t.now ? 'w' : ''}"><u>В ремонте</u><b>${t.now || 0}</b></div>
+      <div><u>Ремонтов</u><b>${(t.done || 0) + (t.now || 0)}</b></div>
+      <div><u>Дней простоя</u><b>${t.days || 0}</b></div>
+    </div>
+    ${now || '<div class="crw-hint"><span>Сейчас в ремонте машин нет.</span></div>'}
+    ${hist ? `<div class="sc ses-card"><div class="sc-cap"><span>История</span><i>${(d.history || []).length}</i></div>${hist}</div>` : ''}`;
+  document.getElementById('accFoot').innerHTML = (d.cars || []).length
+    ? `<div class="qb-wrap"><button class="qb" onclick="repsPick()">Сдать машину в ремонт</button></div>` : '';
+}
+// Какую машину сдаём — списком, как выбор машины в «Кто на каком районе».
+function repsPick(){
+  const cars = (REPS && REPS.cars) || [];
+  _crewPop('#accFoot .qb', `<div class="crw-lk-h">Какую машину сдаём</div>${cars.map(c => `
+      <button onclick="closePinPop();repsAsk('${escS(c.id)}', false)">${IC('car', 15)}<span>${escS([c.plate, c.model].filter(Boolean).join(' · '))}
+        <span class="pin-s">${escS(c.driver || 'свободна')}${c.district ? ' · ' + escS(c.district) : ''}</span></span></button>`).join('')}`);
+}
+// Сдать или забрать: что с машиной и пробег — оба поля по желанию.
+function repsAsk(cid, back){
+  const all = [...((REPS && REPS.cars) || []), ...((REPS && REPS.now) || []).map(r => ({id: r.car_id, plate: r.plate, model: r.model}))];
+  const c = all.find(x => x.id === cid) || {};
+  closePinPop();
+  const bk = document.createElement('div'); bk.className = 'pin-back ask'; bk.addEventListener('click', closePinPop);
+  const box = document.createElement('div'); box.className = 'pin-pop crw-ask rep-ask';
+  box.innerHTML = `<div class="crw-ask-t">${back ? 'Забрали из ремонта' : 'Сдать в ремонт'} · ${escS(c.plate || '')}</div>
+    <div class="crw-ask-s">${escS(c.model || '')}</div>
+    ${back ? '' : `<input class="fb-pen-inp" id="repNote" maxlength="120" placeholder="Что с машиной" autocomplete="off">`}
+    <input class="fb-pen-inp" id="repKm" inputmode="numeric" placeholder="Пробег, км — если известен" autocomplete="off">
+    <div class="rep-err" id="repErr"></div>
+    <button class="crw-ask-b go" id="repGo">${back ? 'Забрали' : 'Сдать в ремонт'}</button>
+    <button class="crw-ask-b no" onclick="closePinPop()">Отмена</button>`;
+  document.body.append(bk, box);
+  box.querySelector('#repGo').onclick = () => repsSend(cid, back);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+async function repsSend(cid, back){
+  const b = document.getElementById('repGo'), err = document.getElementById('repErr');
+  const km = String((document.getElementById('repKm') || {}).value || '').replace(/[^0-9]/g, '');
+  const note = String((document.getElementById('repNote') || {}).value || '').trim();
+  b.disabled = true;
+  try{
+    await ownerApi.ownerFetch('/api/owner/cars/repair', {method: 'POST', body: {car_id: cid, back, km, note, as: _meName(),
+      ...(b.dataset.sure ? {confirm: 1} : {})}});
+  }catch(e){
+    const p = (e && e.payload) || {};
+    b.disabled = false;
+    if(p.error === 'less'){ err.textContent = `Меньше прошлого показания (${odmN(p.last_km)} км) — проверьте число`; return; }
+    if(p.error === 'jump'){ b.dataset.sure = '1'; err.textContent = `Намного больше прошлого (${odmN(p.last_km)} км). Верно — нажмите ещё раз`; return; }
+    err.textContent = p.error === 'bad_km' ? 'Непохоже на пробег' : p.error === 'in_repair' ? 'Она уже в ремонте'
+      : p.error === 'not_in_repair' ? 'Она уже не в ремонте' : 'Не удалось сохранить';
+    return;
+  }
+  closePinPop();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast(back ? 'Машина забрана из ремонта' : 'Машина сдана в ремонт');
+  CREW = null;                                // у машины в «Кто на каком районе» отметка поменялась
+  await repsLoad();
+}
+async function repsShot(id, word){
+  const ov = _woFull();
+  ov.innerHTML = `<img src="${_odmImg[id] || ''}" alt="Одометр"><span>Одометр · ${escS(word)}</span>`;
+  ov.classList.add('show');
+  if(_odmImg[id]) return;
+  try{ _odmImg[id] = await ownerApi.ownerBlob('/api/owner/car-intakes/photo?id=' + encodeURIComponent(id)); }
+  catch(e){ ov.classList.remove('show'); _toast('Снимка не нашлось'); return; }
+  if(ov.classList.contains('show')) ov.innerHTML = `<img src="${_odmImg[id]}" alt="Одометр"><span>Одометр · ${escS(word)}</span>`;
+}
+
 // ── пробег машин ──────────────────────────────────────────────────────────
 // Владелец, 30 сен 2026: «продумай, как в AMBAR STAR мне вести учёт всего этого
 // и просматривать все эти фото и данные». Водитель снимает одометр каждый месяц

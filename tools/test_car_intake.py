@@ -293,6 +293,30 @@ async def main():
     код, тело = await зови(dr.handle_car_repair, "POST", {"km": 900360, "photo": КАДР, "back": True})
     eq("забрать то, что не в ремонте, нельзя", (код, тело.get("error")), (409, "not_in_repair"))
 
+    print("── ремонт у старшего: сдать, контроль, забрать ────────────────")
+    код, тело = await зови(orr.handle_cars_repairs, auth="tma 1")
+    eq("журнал: один закрытый ремонт, сейчас в сервисе пусто",
+       (код, len(тело["now"]), [(r["plate"], r["service_km"], r["note"]) for r in тело["history"]]),
+       (200, 0, [("97448", 50, "стучит подвеска")]))
+    eq("в списке «сдать» — все машины не в ремонте", "97448" in [c["plate"] for c in тело["cars"]], True)
+    код, тело = await зови(orr.handle_cars_repair, "POST", {"car_id": моя, "note": "ТО", "as": "Старший"}, auth="tma 1")
+    eq("старший сдал без снимка и без пробега", (код, тело.get("ok")), (200, True))
+    код, тело = await зови(orr.handle_cars_repair, "POST", {"car_id": моя, "as": "Старший"}, auth="tma 1")
+    eq("второй раз — нельзя", (код, тело.get("error")), (409, "in_repair"))
+    код, тело = await зови(orr.handle_cars_repairs, auth="tma 1")
+    eq("в сервисе сейчас — эта машина, кто сдал и за что",
+       [(r["plate"], r["out_by"], r["note"], r["driver"]) for r in тело["now"]], [("97448", "Старший", "ТО", "Новичок")])
+    eq("из списка «сдать» она ушла", "97448" in [c["plate"] for c in тело["cars"]], False)
+    eq("у водителя приложение видит ремонт", bool((await ci.state(НОВЫЙ))["repair"]), True)
+    код, тело = await зови(orr.handle_cars_repair, "POST", {"car_id": моя, "back": True, "km": 5, "as": "Старший"}, auth="tma 1")
+    eq("пробег меньше прошлого и у старшего не берём", (код, тело.get("error")), (400, "less"))
+    код, тело = await зови(orr.handle_cars_repair, "POST", {"car_id": моя, "back": True, "km": 900400, "as": "Старший"}, auth="tma 1")
+    eq("старший забрал, с пробегом", (код, тело.get("ok")), (200, True))
+    код, тело = await зови(orr.handle_cars_repairs, auth="tma 1")
+    eq("ремонтов в истории два, в сервисе пусто", (len(тело["history"]), len(тело["now"]), тело["totals"]["done"]), (2, 0, 2))
+    код, _ = await зови(orr.handle_cars_repairs, auth="tma x")
+    eq("чужому журнал ремонтов закрыт", код in (401, 403), True)
+
     print(("\nПРОВАЛЫ: " + ", ".join(FAIL)) if FAIL else "\nвсё сошлось")
     return 1 if FAIL else 0
 

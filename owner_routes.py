@@ -1711,7 +1711,9 @@ def _car_view(c: dict, names: set) -> dict:
     никто: машина свободна."""
     d = str(c.get("driver") or "")
     return {"id": c["_id"], "model": str(c.get("model") or ""), "color": str(c.get("color") or ""),
-            "plate": str(c.get("plate") or ""), "driver": d if d in names else ""}
+            "plate": str(c.get("plate") or ""), "driver": d if d in names else "",
+            # В ремонте — видно у машины в «Кто на каком районе».
+            "repair": bool(c.get("repair"))}
 
 
 async def _fleet_view() -> tuple:
@@ -1926,6 +1928,110 @@ async def _car_assign(cid: str, driver: str, mode: str = "take", expect: str | N
 
 def _car_err(code: str, status: int = 409, **kw):
     return web.json_response({"error": code, **kw}, status=status, headers=CORS_HEADERS)
+
+
+def _repair_view(r: dict, now) -> dict:
+    out_at, back_at = _bizday.parse_ts(r.get("out_at")), _bizday.parse_ts(r.get("back_at"))
+    конец = back_at or now
+    return {"id": str(r.get("_id") or ""), "car_id": str(r.get("car_id") or ""),
+            "plate": r.get("plate") or "", "model": r.get("model") or "", "color": r.get("color") or "",
+            "driver": r.get("driver") or "", "note": r.get("note") or "",
+            "out_at": _iso_dt(out_at) if out_at else "", "out_by": r.get("out_by") or "",
+            "out_km": int(r.get("out_km") or 0), "out_photo": str(r.get("out_reading") or ""),
+            "back_at": _iso_dt(back_at) if back_at else "", "back_by": r.get("back_by") or "",
+            "back_km": int(r.get("back_km") or 0), "back_photo": str(r.get("back_reading") or ""),
+            # Сколько простояла: полные сутки, а в день сдачи — «меньше дня».
+            "days": max(0, (конец - out_at).days) if out_at else 0,
+            "service_km": (int(r.get("back_km") or 0) - int(r.get("out_km") or 0))
+                          if r.get("back_km") and r.get("out_km") else None}
+
+
+@require_owner
+async def handle_cars_repairs(request):
+    """GET /api/owner/cars/repairs — ремонты: что в сервисе сейчас, история и
+    машины, которые можно сдать (владелец, 1 окт 2026: «добавь старшему и
+    сделай ему инструмент для контроля»)."""
+    await _staff_fresh()
+    now = datetime.now(timezone.utc)
+    rows = [_repair_view(r, now) for r in await db.car_repairs_list(300)]
+    cars = await db.cars_all()
+    люди = {d["name"]: d for d in staff.drivers()}
+    сейчас = []
+    for c in cars:
+        if not c.get("repair"):
+            continue
+        cid = str(c.get("_id") or "")
+        r = next((x for x in rows if x["car_id"] == cid and not x["back_at"]), None)
+        if not r:                                    # отметка есть, записи нет — собираем из отметки
+            rp = c.get("repair") or {}
+            at = _bizday.parse_ts(rp.get("at"))
+            r = {"id": "", "car_id": cid, "plate": c.get("plate") or "", "model": c.get("model") or "",
+                 "color": c.get("color") or "", "driver": c.get("driver") or "", "note": rp.get("note") or "",
+                 "out_at": _iso_dt(at) if at else "", "out_by": rp.get("by") or "", "out_km": int(rp.get("km") or 0),
+                 "out_photo": "", "back_at": "", "back_by": "", "back_km": 0, "back_photo": "",
+                 "days": max(0, (now - at).days) if at else 0, "service_km": None}
+        r["district"] = (люди.get(c.get("driver") or "") or {}).get("district_code") or ""
+        сейчас.append(r)
+    сейчас.sort(key=lambda r: r["out_at"])
+    история = [r for r in rows if r["back_at"]]
+    return web.json_response({
+        "now": сейчас, "history": история[:60],
+        "cars": [{"id": str(c.get("_id") or ""), "plate": c.get("plate") or "", "model": c.get("model") or "",
+                  "color": c.get("color") or "", "driver": c.get("driver") or "",
+                  "district": (люди.get(c.get("driver") or "") or {}).get("district_code") or ""}
+                 for c in sorted(cars, key=lambda c: str(c.get("plate") or "")) if not c.get("repair")],
+        "totals": {"now": len(сейчас), "done": len(история),
+                   "days": sum(r["days"] for r in история) + sum(r["days"] for r in сейчас)}},
+        headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_cars_repair(request):
+    """POST /api/owner/cars/repair {car_id, back?, km?, note?, as?} — старший
+    сдаёт машину в ремонт или забирает из него. Снимка не требуем: старший
+    чаще не у машины. Пробег — по желанию, но если вписан, то не меньше
+    прошлого показания этой машины."""
+    import car_intake as ci
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    cid, back = str(body.get("car_id") or "").strip(), bool(body.get("back"))
+    car = next((c for c in await db.cars_all() if str(c.get("_id")) == cid), None)
+    if not car:
+        return web.json_response({"error": "no_car"}, status=404, headers=CORS_HEADERS)
+    if bool(car.get("repair")) != back:
+        return web.json_response({"error": "not_in_repair" if back else "in_repair"},
+                                 status=409, headers=CORS_HEADERS)
+    кто = str(body.get("as") or "").strip()[:60] or _owner_name(request)
+    note = " ".join(str(body.get("note") or "").split())[:200]
+    km = 0
+    if str(body.get("km") or "").strip():
+        last = await db.car_intake_last(cid)
+        km, беда = ci.check_km(body.get("km"), last)
+        if беда == "jump" and body.get("confirm"):
+            беда = ""
+        if беда:
+            return web.json_response({"error": беда, "last_km": int((last or {}).get("km") or 0)},
+                                     status=400, headers=CORS_HEADERS)
+    iid = ""
+    if km:
+        # Пробег, вписанный старшим, — такое же показание журнала, только без снимка.
+        iid = await db.car_reading_add(кто, {
+            "car_id": cid, "plate": car.get("plate") or "", "model": car.get("model") or "",
+            "color": car.get("color") or "", "km": km, "photo": False, "thumb": "",
+            "why": "repair_back" if back else "repair", "day": ci.today(), "note": note, "by_senior": True})
+    if back:
+        await db.car_repair_set(cid, None)
+        await db.car_repair_close(cid, {"back_by": кто, "back_km": km, "back_reading": iid})
+    else:
+        await db.car_repair_set(cid, {"at": datetime.now(timezone.utc).isoformat(), "by": кто, "km": km, "note": note})
+        await db.car_repair_open({"car_id": cid, "plate": car.get("plate") or "", "model": car.get("model") or "",
+                                  "color": car.get("color") or "", "driver": car.get("driver") or "", "out_by": кто,
+                                  "out_km": km, "out_reading": iid, "note": note, "back_at": None})
+    log.info(f"[car] {кто}: {car.get('plate')} — {'забрана из ремонта' if back else 'сдана в ремонт'}"
+             + (f" · {km} км" if km else ""))
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -5261,10 +5367,13 @@ def setup(app):
                    ("/api/owner/drivers/tracker", handle_drivers_tracker),
                    ("/api/owner/drivers/car", handle_drivers_car),
                    ("/api/owner/cars/assign", handle_cars_assign),
+                   ("/api/owner/cars/repair", handle_cars_repair),
                    ("/api/owner/cars/save", handle_cars_save),
                    ("/api/owner/cars/delete", handle_cars_delete)):
         app.router.add_route("OPTIONS", _p, _h)
         app.router.add_post(_p, _h)
+    app.router.add_route("OPTIONS", "/api/owner/cars/repairs", handle_cars_repairs)
+    app.router.add_get(             "/api/owner/cars/repairs", handle_cars_repairs)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/where", handle_where)

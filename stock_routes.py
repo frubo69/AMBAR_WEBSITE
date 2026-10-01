@@ -2391,6 +2391,9 @@ def _audit_view(a: dict | None) -> dict:
     """Состояние ревизии для экрана — одно на лист, отчёт и список районов."""
     a = a or {}
     fin = bool(a.get("finished_at"))
+    # Отменённый заход — это «не начата»: район можно считать заново.
+    if a.get("dropped_at") and not fin:
+        a = {}
     state = ("closed" if a.get("closed_at") else "pending" if fin
              else "running" if a.get("started_at") else "idle")
     return {
@@ -2490,6 +2493,14 @@ async def audit_start(district: str, day: str, by: int, by_name: str) -> tuple:
     a = await db.audit_get(district, day) or {}
     if a.get("finished_at"):
         return 409, {"error": "finished", "audit": _audit_view(a)}
+    if a.get("dropped_at"):
+        # Заход отменили (audit_cancel) и начинают заново в тот же день: его
+        # сканы уходят в архив, иначе новая ревизия унаследовала бы чужой счёт.
+        n = await db.audit_scans_archive(district, day, str(a.get("dropped_at")))
+        await db.audit_unset(district, day, ["dropped_at", "dropped_by", "dropped_by_name",
+                                             "started_at", "started_by", "started_by_name"])
+        log.info(f"[audit] {district} {day}: новый заход после отмены, в архив ушло сканов: {n}")
+        a = {}
     if not a.get("started_at"):
         a = await db.audit_set(district, day, {
             "started_at": datetime.now(timezone.utc).isoformat(),
@@ -2536,21 +2547,91 @@ async def handle_audit_drop(request):
     district, day = _district_of(request, body)
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    st, res = await audit_cancel(district, day, request["owner_id"],
+                                 str(body.get("as") or "").strip()[:60] or "STAR")
+    return web.json_response(res, status=st, headers=CORS_HEADERS)
+
+
+def _q_ru(v) -> str:
+    v = float(v or 0)
+    return str(int(v)) if v == int(v) else f"{v:g}".replace(".", ",")
+
+
+async def audit_cancel(district: str, day: str, by: int, by_name: str) -> tuple:
+    """Отменить начатую и недоделанную ревизию. (код, ответ).
+
+    Владелец, 1 окт 2026: «сделай, чтобы начатую недоделанную ревизию можно было
+    отменить; просто присылай уведомление в AMBAR STAR с результатами
+    неоконченной ревизии. Она хочет начать новую, но из-за того, что не
+    завершили старую, новую начать не даёт, а если завершить как есть — будет
+    куча недостач».
+
+    Пересчёт склада не пишется и недостач не заводит: отмена — не завершение.
+    Что успели насчитать, уходит старшему сообщением; сканы не стираются, а
+    переносятся в архив (audit_scans_dropped) — район можно считать заново."""
     a = await db.audit_get(district, day)
-    if not a:
-        return web.json_response({"error": "no_audit"}, status=404, headers=CORS_HEADERS)
+    if not a or not a.get("started_at"):
+        return 404, {"error": "no_audit"}
     if a.get("finished_at"):
-        return web.json_response({"error": "already_finished"}, status=409, headers=CORS_HEADERS)
+        return 409, {"error": "already_finished"}
     if a.get("dropped_at"):
-        return web.json_response({"ok": True, "already": True}, headers=CORS_HEADERS)
-    сканов = (await db.audit_scan_stats(district, day)).get("total", 0)
+        return 200, {"ok": True, "already": True}
+    try:
+        sh = await audit_sheet(district, day)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] лист отменяемой ревизии не собран ({district} {day}): {e}")
+        sh = {"rows": [], "scan": {}}
+    сканов = int((sh.get("scan") or {}).get("total") or 0)
+    stamp = datetime.now(timezone.utc).isoformat()
     await db.audit_set(district, day, {
-        "dropped_at": datetime.now(timezone.utc).isoformat(),
-        "dropped_by": request["owner_id"],
-        "dropped_by_name": str(body.get("as") or "").strip()[:60]})
-    log.info(f"[audit] брошенная ревизия {district} за {day} убрана с глаз; "
-             f"сканов осталось в базе: {сканов}")
-    return web.json_response({"ok": True, "scans": сканов}, headers=CORS_HEADERS)
+        "dropped_at": stamp, "dropped_by": int(by or 0), "dropped_by_name": by_name,
+        "dropped_scans": сканов})
+    # Сканы — в архив сразу: лист района после отмены должен быть чистым, а не
+    # показывать счёт брошенного захода. Не стираем — переносим.
+    в_архив = await db.audit_scans_archive(district, day, stamp)
+    log.info(f"[audit] ревизия {district} за {day} отменена · {by_name or '—'}; "
+             f"сканов в архив: {в_архив}")
+    try:
+        await _audit_cancel_tell(district, day, a, sh, by_name)
+    except Exception as e:                           # noqa: BLE001
+        log.error(f"[audit] сообщение об отмене не ушло ({district} {day}): {e}")
+    return 200, {"ok": True, "scans": сканов}
+
+
+async def _audit_cancel_tell(district: str, day: str, a: dict, sh: dict, by_name: str) -> None:
+    """Старшему — что успели насчитать до отмены. Без денег и без «недостач»:
+    недосчитанное здесь — это то, до чего не дошли, а не пропажа."""
+    import html as _h
+    from owner_routes import notify_owners
+    rows = sh.get("rows") or []
+    coded = lambda r: float(r.get("coded") if r.get("coded") is not None            # noqa: E731
+                            else max(0, (r.get("expected") or 0) - (r.get("noqr") or 0)))
+    found = lambda r: float(r.get("actual") or 0)                                   # noqa: E731
+    всего_кодов = sum(coded(r) for r in rows)
+    нашли = sum(min(found(r), coded(r)) for r in rows)
+    не_дошли = [r for r in rows if coded(r) > found(r)]
+    не_дошли.sort(key=lambda r: coded(r) - found(r), reverse=True)
+    scan = sh.get("scan") or {}
+    where = f"{OFFICE_CODES.get(district, '')} {OFFICE_NAMES.get(district, district)}".strip()
+    dm = f"{day[8:10]}.{day[5:7]}" if len(day) == 10 else day
+    строки = [f"🚫 <b>Ревизия отменена — {_h.escape(where)}</b> · за {dm}",
+              f"Отменил: {_h.escape(by_name or '—')}"
+              + (f" · начал {_h.escape(str(a.get('started_by_name') or ''))}" if a.get("started_by_name") else ""),
+              "",
+              f"Отсканировано: <b>{int(scan.get('total') or 0)}</b> "
+              f"· найдено {_q_ru(нашли)} из {_q_ru(всего_кодов)} по кодам"]
+    странных = int(scan.get("odd") or 0)
+    if странных:
+        строки.append(f"Из них с вопросом (чужой район, не из реестра): {странных}")
+    if не_дошли:
+        строки += ["", "Не досчитано (нашли / числится):"]
+        for r in не_дошли[:20]:
+            строки.append(f"• {_h.escape(str(r.get('name') or r.get('id') or ''))} — "
+                          f"{_q_ru(found(r))} / {_q_ru(coded(r))}")
+        if len(не_дошли) > 20:
+            строки.append(f"… и ещё {len(не_дошли) - 20} поз.")
+    строки += ["", "Склад не менялся, недостач не заведено. Район можно считать заново."]
+    await notify_owners("stock.audit", "\n".join(строки), parse_mode="HTML")
 
 
 @require_owner

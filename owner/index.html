@@ -16456,7 +16456,10 @@ async function stkLoadContext(){
 async function stkAuditGo(id, day){
   distRemember('stk', id);
   _audHap('sel');
-  await audOpen(id, false, day);
+  // День передаём всегда. Без него audOpen оставлял день прошлого открытия:
+  // открыли «Не завершена 26 сен», вернулись, нажали на район — и снова
+  // попадали в старую ревизию вместо сегодняшней («новую начать не даёт»).
+  await audOpen(id, false, day || '');
 }
 
 // Убрать брошенный заход. Так бывает, когда район посчитали заново и довели до
@@ -16465,10 +16468,10 @@ async function stkAuditGo(id, day){
 // вопросе, чтобы «убрать» не читалось как «стереть».
 async function stkAuditDrop(id, day, scans){
   const имя = ((STK.districts || []).find(x => x.id === id) || {}).name || id;
-  const сколько = scans ? `Под ним ${fmt(scans)} ${pluralize(scans, 'скан', 'скана', 'сканов')} — `
-                        + 'они останутся в базе, из карточки уйдёт только строка.\n\n' : '';
-  if(!await askYes(`Убрать незавершённую ревизию ${имя} за ${_audDayT(day)}?\n\n${сколько}`
-                   + 'Делать это стоит, когда район уже посчитан заново.')) return;
+  const сколько = scans ? `Под ней ${fmt(scans)} ${pluralize(scans, 'скан', 'скана', 'сканов')} — `
+                        + 'они уйдут в архив, не сотрутся.\n\n' : '';
+  if(!await askYes(`Отменить незавершённую ревизию ${имя} за ${_audDayT(day)}?\n\n${сколько}`
+                   + 'Склад не изменится. Что успели насчитать, уйдёт сообщением в бот.')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/audit/drop',
       {method: 'POST', body: {district: id, day, as: _meName()}});
@@ -16661,7 +16664,30 @@ function audPage(){
            : st === 'running' ? ['audScanOpen()', 'Продолжить сканирование']
            :                    ['audReopen()', 'Возобновить ревизию'];
   document.getElementById('stkFoot').innerHTML =
-    `<div class="qb-wrap"><button class="qb" onclick="${go[0]}">${go[1]}</button></div>`;
+    `<div class="qb-wrap"><button class="qb" onclick="${go[0]}">${go[1]}</button>${
+      st === 'running' ? `<button class="qb qb-ghost" onclick="audCancel()">Отменить ревизию</button>` : ''}</div>`;
+}
+// Отменить начатую и недоделанную ревизию (владелец, 1 окт 2026): склад не
+// меняется, недостач не заводится; что успели насчитать, уходит сообщением в
+// бот. После отмены район можно считать заново.
+async function audCancel(){
+  const sh = STK.sheet || {}, n = ((sh.scan || {}).total) || 0;
+  const имя = `${sh.district_code || ''} ${sh.district_name || ''}`.trim();
+  if(!await askYes(`Отменить ревизию ${имя}?\n\n`
+      + (n ? `Отсканировано ${fmt(n)} — результат уйдёт сообщением в бот. ` : '')
+      + 'Склад не изменится, недостач не будет. Район можно будет посчитать заново.')) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/audit/drop',
+      {method: 'POST', body: {district: STK.district, day: sh.day || STK.auditDay || '', as: _meName()}});
+  }catch(e){
+    const код = ((e || {}).payload || {}).error;
+    _toast(код === 'already_finished' ? 'Эта ревизия уже завершена' : 'Не удалось отменить');
+    return;
+  }
+  _audHap('medium');
+  _toast('Ревизия отменена · отчёт в боте');
+  STK.auditDay = '';
+  await stkAuditPick();
 }
 function audMore(){ STK.audMore = !STK.audMore; _audHap('sel'); audPage(); }
 

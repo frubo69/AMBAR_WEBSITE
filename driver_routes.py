@@ -3317,6 +3317,13 @@ async def handle_audit_finish(request):
     return await driver_audit.handle_finish(request)
 
 
+@require_driver
+@_no_test
+async def handle_audit_cancel(request):
+    import driver_audit
+    return await driver_audit.handle_cancel(request)
+
+
 def setup(app):
     r = app.router
     routes = (
@@ -3390,6 +3397,7 @@ def setup(app):
         ("/api/driver/audit/scan",              handle_audit_scan,    "POST"),
         ("/api/driver/audit/undo",              handle_audit_undo,    "POST"),
         ("/api/driver/audit/finish",            handle_audit_finish,  "POST"),
+        ("/api/driver/audit/cancel",            handle_audit_cancel,  "POST"),
     )
     seen = set()
     for path, handler, method in routes:

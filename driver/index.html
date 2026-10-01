@@ -11194,12 +11194,38 @@ function audRender(){
       <span class="sup-tot-v">${fmtQty(t.short)}<u> ед.</u></span>
     </div>
     <button class="btn btn-pri" onclick="audCamOpen()">Продолжить сканирование</button>
-    <button class="btn btn-gh" onclick="audFinOpen()">Завершить ревизию</button>` : `
+    <button class="btn btn-gh" onclick="audFinOpen()">Завершить ревизию</button>
+    <button class="btn btn-gh aud-cancel" onclick="audCancel()">Отменить ревизию</button>` : `
     <div class="sup-tot">
       <span class="sup-tot-l">Числится с QR-кодом</span>
       <span class="sup-tot-v">${fmtQty(t.coded)}<u> ед.</u></span>
     </div>
     <button class="btn btn-pri" id="audGo" onclick="audStart()">Начать ревизию</button>`;
+}
+
+// Отменить начатую и недоделанную ревизию (владелец, 1 окт 2026): склад не
+// меняется, недостач не заводится; что успели насчитать, уходит старшему.
+// Спрашиваем своим окном: confirm() в телеграме показывается через раз.
+function audCancel(){
+  const t = _audT();
+  ASK = {t: 'Отменить ревизию?',
+         s: (t.actual ? `Отсканировано ${fmtQty(t.actual)} ед. — это уйдёт старшему сообщением. ` : '')
+            + 'Склад не изменится, недостач не будет. Потом ревизию можно начать заново.',
+         btn: 'Отменить ревизию', fn: audCancelSend};
+  renderAsk();
+}
+async function audCancelSend(){
+  if(AUD_BUSY) return; AUD_BUSY = true;
+  let r;
+  try{ r = await drvApi.drvFetch('/api/driver/audit/cancel', {method:'POST', body:{}}); }
+  catch(e){ toast('Не удалось отменить', 'err'); AUD_BUSY = false; return; }
+  AUD_BUSY = false;
+  AUDS = r;
+  if(!r.ok){ toast(r.error === 'already_finished' ? 'Ревизию уже завершили' : 'Не удалось отменить', 'err'); return audRender(); }
+  try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  toast('Ревизия отменена · старшему ушёл отчёт');
+  audBriefLoad(true);
+  audRender();
 }
 
 async function audStart(){

@@ -124,6 +124,7 @@ FILTS = []
 class _Cur:
     def __init__(self, f): self.f = f
     def sort(self, *a, **k): return self
+    def limit(self, *a, **k): return self      # car_intake: с 1 окт пробег спрашивают у всех
     async def to_list(self, length=None): return []
     def __aiter__(self): return self
     async def __anext__(self): raise StopAsyncIteration

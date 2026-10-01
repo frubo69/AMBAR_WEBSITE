@@ -180,6 +180,18 @@ async def handle_scan(request):
     return _json(r)
 
 
+async def handle_cancel(request):
+    """POST — отменить начатую и недоделанную ревизию своего района (владелец,
+    1 окт 2026). Склад не меняется, старшему уходит, что успели насчитать."""
+    district, day = _where(request)
+    if not district:
+        return _json({"ok": False, "error": "no_district"})
+    me = request["driver"]
+    st, res = await SR.audit_cancel(district, day, int(request["tg"].get("id") or 0), me["name"])
+    return _json({"ok": st == 200, **({} if st == 200 else {"error": res.get("error")}),
+                  **(await _full(district, day))})
+
+
 async def handle_undo(request):
     """POST {code} — убрать бутылку, записанную зря. Только пока ревизия идёт:
     после завершения пересчёт уже записан."""

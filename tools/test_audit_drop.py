@@ -27,6 +27,10 @@ from datetime import datetime, timezone                            # noqa: E402
 from aiohttp.test_utils import make_mocked_request                 # noqa: E402
 from mongomock_motor import AsyncMongoMockClient                   # noqa: E402
 import db, stock_routes as sr                                      # noqa: E402
+import owner_routes as _orr                                        # noqa: E402
+УШЛО = []
+async def _tell(event, text, **k): УШЛО.append(text); return []
+_orr.notify_owners = _tell
 
 FAIL = []
 def eq(имя, дали, ждём):
@@ -91,7 +95,20 @@ async def main():
     st, r = await drop(РАЙОН, БРОШЕН)
     eq("ручка ответила", (st, r.get("ok"), r.get("scans")), (200, True, 100))
     eq("из незавершённых ушла", sorted(await db.audits_unfinished(СЕГОДНЯ)), [])
-    eq("СКАНЫ НА МЕСТЕ — все сто", (await db.audit_scan_stats(РАЙОН, БРОШЕН))["total"], 100)
+    # С 1 окт 2026 сканы отменённого захода не висят под районом, а переносятся
+    # в архив: лист после отмены чистый, но ни один скан не потерян.
+    eq("под районом сканов больше нет", (await db.audit_scan_stats(РАЙОН, БРОШЕН))["total"], 0)
+    eq("СКАНЫ ЦЕЛЫ — все сто в архиве",
+       await db._db.audit_scans_dropped.count_documents({"district": РАЙОН, "day": БРОШЕН}), 100)
+    eq("старшему ушло, что успели насчитать",
+       (len(УШЛО), "Ревизия отменена" in (УШЛО[-1] if УШЛО else ""), "Отсканировано: <b>100</b>" in (УШЛО[-1] if УШЛО else "")),
+       (1, True, True))
+    eq("для экрана это «не начата»", sr._audit_view(await db.audit_get(РАЙОН, БРОШЕН))["state"], "idle")
+    код, отв = await sr.audit_start(РАЙОН, БРОШЕН, 1, "STAR")
+    нов = await db.audit_get(РАЙОН, БРОШЕН)
+    eq("НАЧАТЬ ЗАНОВО МОЖНО — заход чистый", (код, bool(нов.get("started_at")), bool(нов.get("dropped_at")),
+       (await db.audit_scan_stats(РАЙОН, БРОШЕН))["total"]), (200, True, False, 0))
+    await db.audit_set(РАЙОН, БРОШЕН, {"dropped_at": "x", "dropped_by": 1})      # дальше тест ждёт пометку
     a = await db.audit_get(РАЙОН, БРОШЕН)
     eq("сама запись цела, на ней пометка", (bool(a), bool(a.get("dropped_at")), a.get("dropped_by")),
        (True, True, 1))

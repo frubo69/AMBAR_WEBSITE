@@ -849,6 +849,11 @@ function route(path, opts){
     return {ok: true, code: code, total: Object.keys(S.aud.codes).length,
             positions: audRows().filter(r => r.actual).length};
   }
+  if(p === '/api/driver/audit/cancel'){
+    if(S.aud.finished_at) return {ok: false, error: 'already_finished', ...audFull()};
+    S.aud.state = 'idle'; S.aud.started_at = ''; S.aud.codes = {}; save();
+    return {ok: true, ...audFull()};
+  }
   if(p === '/api/driver/audit/finish'){
     if(S.aud.finished_at) return {ok: false, error: 'finished', ...audFull()};
     S.aud.state = 'pending'; S.aud.finished_at = now(); S.aud.finished_by = ME.name;

@@ -4780,6 +4780,22 @@ async def audit_scan_del(district: str, day: str, code: str) -> bool:
     return bool(r.deleted_count)
 
 
+async def audit_scans_archive(district: str, day: str, stamp: str) -> int:
+    """Сканы отменённого захода — в архив (audit_scans_dropped), чтобы новая
+    ревизия того же района и дня началась с нуля. Не стираем: под заходом
+    бывают сотни сканов, и по ним потом разбирают, что именно считали."""
+    db = _db_or_none()
+    if db is None: return 0
+    rows = await db.audit_scans.find({"district": district, "day": day}).to_list(length=20000)
+    if not rows:
+        return 0
+    for r in rows:
+        r["src_id"] = r.pop("_id"); r["dropped"] = stamp
+    await db.audit_scans_dropped.insert_many(rows)
+    await db.audit_scans.delete_many({"district": district, "day": day})
+    return len(rows)
+
+
 async def audit_scan_counts(district: str, day: str) -> dict:
     """{позиция: сколько бутылок увидела камера}. Чужие коды сюда не попадают:
     у них нет позиции, и приписать их некуда."""

@@ -224,10 +224,18 @@ async def прогон(seed, шагов):
             МИР["клиент"].close(); МИР["клиент"] = None
 
 
+def _голая(h):
+    """Ручка без проверки прав: на сервере владельцы настоящие, и выдуманного
+    «Фазза» среди них нет — права проверяет tools/audit_auth.py, здесь считаем."""
+    while hasattr(h, "__wrapped__"):
+        h = h.__wrapped__
+    return h
+
+
 async def _прогон(seed, шагов):
     r = random.Random(seed)
     db, fr, cb, wr = await готовь(seed)
-    зови = FF._зови
+    зови = (lambda h, m, b: FF._зови(_голая(h), m, b)) if REAL else FF._зови
     м = Модель()
     след = []
     было = len(БЕДЫ)

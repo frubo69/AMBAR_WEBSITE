@@ -74,7 +74,8 @@ KM_MIN, KM_MAX = 1, 2_000_000
 # Машина по городу ходит 100–200 км в день; 50 000 — это месяцы работы.
 KM_JUMP = 50_000
 
-WHY_RU = {"new": "вышел на работу", "car": "сел на машину", "month": "начало месяца"}
+WHY_RU = {"new": "вышел на работу", "car": "сел на машину", "month": "начало месяца",
+          "repair": "сдал в ремонт", "repair_back": "забрал из ремонта"}
 
 
 def _int(v) -> int:
@@ -133,7 +134,7 @@ async def state(me: dict) -> dict:
     """
     имя = str((me or {}).get("name") or "")
     пусто = {"need": False, "why": "", "since": "", "done": None, "car": None,
-             "free": [], "last": None, "nocar": False}
+             "free": [], "last": None, "nocar": False, "repair": None}
     if not имя or (me or {}).get("test"):
         return пусто                                   # тест-водитель живёт вне «Зарплат»
     день = today()
@@ -154,6 +155,12 @@ async def state(me: dict) -> dict:
         return out
     cid = str(своя.get("_id") or "")
     моё = await db.car_reading_mine(имя, cid)
+    # Машина в ремонте (владелец, 1 окт 2026: «перед сдачей водитель так же
+    # фоткает одометр»): её у водителя нет, снимать нечего — на смену пускаем.
+    # Пробег он снял при сдаче и снимет, когда заберёт.
+    if своя.get("repair"):
+        out.update(car=своя, done=моё, repair=своя.get("repair"))
+        return out
     why = why_need(since, своя, моё, день, await db.car_reading_mine(имя, ""))
     out.update(need=bool(why), why=why, car=своя, done=None if why else моё)
     if why:

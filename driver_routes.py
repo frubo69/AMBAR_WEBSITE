@@ -637,6 +637,9 @@ async def _shift_view(me: dict) -> dict:
         "intake": intake,
         # Машина не принята — на смену нельзя (29 сен 2026).
         "car_need": car["need"], "car_since": car["since"], "car_why": car.get("why") or "",
+        "car_model": str((car.get("car") or {}).get("model") or ""),
+        # Машина в ремонте: с какого момента (строка профиля, кнопка «Забрал»).
+        "car_repair": str(((car.get("car") or {}).get("repair") or {}).get("at") or ""),
         "car_plate": str((car.get("car") or {}).get("plate") or ""),
         # Неотработанные перемещения района — отдать или забрать. Держат смену
         # так же, как приёмка: закрыть её сервер всё равно не даст.
@@ -714,12 +717,17 @@ async def handle_car_intake(request):
         return {"id": c.get("_id"), "model": c.get("model") or "", "color": c.get("color") or "",
                 "plate": c.get("plate") or ""}
     done = st.get("done") or None
+    # Прошлое показание нужно и вне приёма — экрану сдачи в ремонт: число
+    # сверяют с ним.
+    if not st.get("last") and st.get("car"):
+        st["last"] = await db.car_intake_last(str(st["car"].get("_id") or ""))
     return web.json_response({
         "need": st["need"], "since": st["since"], "why": st.get("why") or "",
         "car": кратко(st["car"]) if st["car"] else None,
         "free": [кратко(c) for c in st["free"]],
         "last_km": int((st.get("last") or {}).get("km") or 0),
         "last_at": str((st.get("last") or {}).get("at") or ""),
+        "repair": bool((st.get("car") or {}).get("repair")),
         "done": ({"km": int(done.get("km") or 0), "at": str(done.get("at") or ""),
                   "skipped": bool(done.get("skipped")),
                   "plate": done.get("plate") or ""} if done else None),
@@ -793,6 +801,65 @@ async def handle_car_intake_post(request):
         log.warning(f"[car] о приёме не сказали: {e}")
     return web.json_response({"ok": True, "km": km, "plate": car.get("plate") or ""},
                              headers=CORS_HEADERS)
+
+
+@require_driver
+@_no_test
+async def handle_car_repair(request):
+    """POST /api/driver/car/repair {km, photo, thumb, back?, note?} — сдать
+    машину в ремонт или забрать из него: снимок одометра и пробег.
+
+    Владелец, 1 окт 2026: «мы иногда сдаём машины на ремонт; перед сдачей
+    водитель так же фоткает одометр и присылает». Забирая, снимает ещё раз:
+    между двумя числами — то, что машина проехала в сервисе. Машина остаётся
+    за водителем, на ней только отметка «в ремонте»; смену это не запирает."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    back = bool(body.get("back"))
+    машины = await db.cars_all()
+    car = next((c for c in машины if (c.get("driver") or "") == me["name"]), None)
+    if not car:
+        return web.json_response({"error": "no_car"}, status=409, headers=CORS_HEADERS)
+    if bool(car.get("repair")) != back:
+        return web.json_response({"error": "not_in_repair" if back else "in_repair"},
+                                 status=409, headers=CORS_HEADERS)
+    cid = str(car.get("_id") or "")
+    last = await db.car_intake_last(cid)
+    km, беда = car_intake.check_km(body.get("km"), last)
+    if беда == "jump" and body.get("confirm"):
+        беда = ""
+    if беда:
+        return web.json_response({"error": беда, "last_km": int((last or {}).get("km") or 0)},
+                                 status=400, headers=CORS_HEADERS)
+    photo, плохо = photos.decode(body.get("photo"))
+    if плохо or not photo:
+        return web.json_response({"error": плохо or "no_photo"}, status=400, headers=CORS_HEADERS)
+    thumb = str(body.get("thumb") or "")[:photos.MAX_THUMB]
+    note = " ".join(str(body.get("note") or "").split())[:200]
+    why = "repair_back" if back else "repair"
+    iid = await db.car_reading_add(me["name"], {
+        "car_id": cid, "plate": car.get("plate") or "", "model": car.get("model") or "",
+        "color": car.get("color") or "", "km": km, "photo": True, "thumb": thumb,
+        "district": me.get("district") or "", "why": why, "day": car_intake.today(),
+        "note": note, "prev_km": int((last or {}).get("km") or 0),
+        "prev_driver": str((last or {}).get("driver") or ""), "prev_at": (last or {}).get("at")})
+    if not iid:
+        return web.json_response({"error": "db"}, status=503, headers=CORS_HEADERS)
+    await db.car_intake_photo_set(iid, photo, thumb)
+    await db.car_repair_set(cid, None if back else {
+        "at": datetime.now(timezone.utc).isoformat(), "by": me["name"], "km": km, "note": note})
+    log.info(f"[car] {me['name']} {'забрал из ремонта' if back else 'сдал в ремонт'} {car.get('plate')} · {km} км")
+    try:
+        import owner_routes as _own
+        await _own.car_intake_tell(me, car, km, iid, why, last, note=note)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[car] о ремонте не сказали: {e}")
+    return web.json_response({"ok": True, "km": km, "plate": car.get("plate") or "",
+                              "shift": await _shift_view(me)}, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
 
 
 @require_driver
@@ -3336,6 +3403,7 @@ def setup(app):
         ("/api/driver/car",                     handle_car_intake,  "GET"),
         ("/api/driver/car",                     handle_car_intake_post, "POST"),
         ("/api/driver/car/photo",               handle_car_intake_photo, "GET"),
+        ("/api/driver/car/repair",              handle_car_repair,  "POST"),
         ("/api/driver/expenses/photo/{item_id}", handle_expense_photo, "GET"),
         ("/api/driver/bottle",                  handle_bottle_look, "GET"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),

@@ -5053,6 +5053,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .odm-need{display:flex;align-items:center;gap:9px;margin:10px 12px 0;padding:9px 10px;border-radius:11px;
   background:var(--dn-soft);color:var(--dn);font-size:12.5px;font-weight:600}
 .odm-need span{flex:1;min-width:0}
+.odm-need.odm-rep{background:var(--warn-soft);color:var(--warn)}
 .odm-need button{flex:0 0 auto;padding:6px 10px;border-radius:9px;border:1px solid currentColor;background:none;color:inherit;
   font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
 .odm-rows{padding:8px 12px 12px;display:flex;flex-direction:column;gap:6px}
@@ -37805,7 +37806,8 @@ async function crewCarDel(cid){
 // со снимками и разницей, и кого ещё ждём.
 let ODM = null, ODM_MONTH = '';
 const _odmImg = {};
-const ODM_WHY = {new: 'вышел на работу', car: 'сел на машину', month: 'начало месяца'};
+const ODM_WHY = {new: 'вышел на работу', car: 'сел на машину', month: 'начало месяца',
+                 repair: 'сдал в ремонт', repair_back: 'забрал из ремонта'};
 const odmN = v => String(Math.round(+v || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const odmMonth = m => { const p = String(m || '').split('-');
   return p.length === 2 ? `${MONTHS_NOM[+p[1] - 1] || m} ${p[0]}` : ''; };
@@ -37879,7 +37881,8 @@ function odmRender(){
       const th = r.thumb ? ` style="background-image:url('${escS(r.thumb)}')"` : '';
       return `<button class="odm-r${r.void ? ' void' : ''}" onclick="odmShot('${escS(r.id)}')">
         <span class="odm-th"${th}>${r.thumb ? '' : IC('cam', 17)}</span>
-        <span class="odm-rb"><b>${escS(r.driver)}</b><i>${escS(when)}${ODM_WHY[r.why] ? ' · ' + ODM_WHY[r.why] : ''}${r.void ? ' · переснять' : ''}</i></span>
+        <span class="odm-rb"><b>${escS(r.driver)}</b><i>${escS(when)}${ODM_WHY[r.why] ? ' · ' + ODM_WHY[r.why] : ''}${
+          r.note ? ' · ' + escS(r.note) : ''}${r.void ? ' · переснять' : ''}</i></span>
         <span class="odm-rv">${odmN(r.km)}${r.diff != null ? `<i>${r.diff >= 0 ? '+' : '−'}${odmN(Math.abs(r.diff))} км</i>` : ''}</span></button>`;
     }).join('');
     const who = c.driver ? `<span class="odm-who${c.away ? ' gone' : ''}">${escS(c.driver)}<i>${c.away ? 'уехал' : escS(c.district || '')}</i></span>`
@@ -37888,6 +37891,8 @@ function odmRender(){
       <div class="crw-c-h"><span class="odm-pl">${escS(c.plate || '—')}</span>
         <span class="crw-c-n">${escS([c.model, c.color].filter(Boolean).join(' · ') || 'Машина')}</span>${who}</div>
       <div class="odm-km">${c.km ? `<b>${odmN(c.km)}</b>км · последнее ${escS(fbWorkDay(c.km_day))}` : 'показаний ещё не было'}</div>
+      ${c.repair ? `<div class="odm-need odm-rep">${IC('warn', 16)}<span>В ремонте с ${escS(fbWorkDay(String(c.repair.at).slice(0, 10)))}${
+        c.repair.by ? ' · сдал ' + escS(c.repair.by) : ''}${c.repair.note ? ' · ' + escS(c.repair.note) : ''}</span></div>` : ''}
       ${c.need ? `<div class="odm-need">${IC('warn', 16)}<span>Ждём показание · ${ODM_WHY[c.why] || ''}</span>
         <button onclick="odmSkip('${escS(c.id)}')">Пропустить</button></div>` : ''}
       <div class="odm-rows">${rows || (c.km ? `<div class="odm-none">${now ? 'В этом месяце показаний нет' : 'За месяц показаний нет'}</div>` : '')}</div>

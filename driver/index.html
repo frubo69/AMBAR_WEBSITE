@@ -2895,6 +2895,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .odo-note{margin-top:12px;min-height:18px;max-width:320px;font-size:12.5px;
   line-height:1.35;text-align:center;color:var(--sub)}
 .odo-note.err{color:var(--dn)}
+.odo .odo-why{margin-top:12px}
+.odo .odo-why input{width:100%;padding:13px 14px;font-size:14px;text-align:center;outline:none;
+  background:transparent;border:0;color:var(--text);font-family:inherit}
+.odo .odo-why input::placeholder{color:var(--muted)}
 .odo-bot{flex:0 0 auto;display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 .odo-bot .btn{flex:1}
 .car-scr{position:fixed;inset:0;z-index:97;display:none;background:#000}
@@ -4241,6 +4245,8 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     <div class="exp-field odo-f"><input class="amt" id="odoKm" type="text" inputmode="numeric"
       autocomplete="off" placeholder="км"></div>
     <div class="odo-note" id="odoNote"></div>
+    <div class="exp-field odo-f odo-why" id="odoWhyBox" hidden><input id="odoWhy" type="text" maxlength="120"
+      autocomplete="off" placeholder="Что с машиной — если нужно"></div>
   </div>
   <div class="odo-bot">
     <button class="btn btn-gh" onclick="odoRetake()">Переснять</button>
@@ -5445,7 +5451,32 @@ function profHtml(){
     <span class="pf-row-b"><b>Тест-режим</b><i>${ME.test ? 'Включён — только тест-заказы' : 'Выключен — боевая смена'}</i></span>
     <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
   </button>` : '';
-  return head + money + orders + testRow;
+  // Машина водителя и сдача её в ремонт (владелец, 1 окт 2026: «перед сдачей
+  // водитель так же фоткает одометр… надо где-то предусмотреть кнопку»).
+  // В ремонте — та же строка забирает машину обратно, тоже с пробегом.
+  const rep = SH && SH.car_repair;
+  const carRow = SH && SH.car_plate ? `<button class="card pf-row${rep ? ' pf-rep' : ''}" onclick="repOpen()">
+    <span class="pf-row-i">${svg(ICO.car, 19)}</span>
+    <span class="pf-row-b"><b>${esc([SH.car_model, SH.car_plate].filter(Boolean).join(' · '))}</b><i>${
+      rep ? `В ремонте с ${profDayT(String(SH.car_repair).slice(0, 10))} — забрать из ремонта` : 'Сдать машину на ремонт'}</i></span>
+    <em class="pf-tap-c">${svg(ICO.chevR, 14)}</em>
+  </button>` : '';
+  return head + money + orders + carRow + testRow;
+}
+// Сначала вопрос своим окном, потом камера и пробег — тот же экран, что у
+// приёма машины, только слова и ручка другие (ODO.mode).
+function repOpen(){
+  const back = !!(SH && SH.car_repair);
+  ASK = {t: back ? 'Забрать машину из ремонта?' : 'Сдать машину на ремонт?',
+         s: 'Сначала снимок одометра и пробег числом — они уйдут старшему.',
+         btn: 'Снять одометр', fn: () => repStart(back)};
+  renderAsk();
+}
+async function repStart(back){
+  const st = await odoLoad();
+  if(!st || !st.car){ toast(st ? 'За вами нет машины — скажите старшему' : 'Не удалось загрузить — повторите', 'err'); return; }
+  ODO = {photo: '', thumb: '', car: st.car, last: +st.last_km || 0, confirm: false, mode: back ? 'back' : 'repair'};
+  carOpen('', 'odo');
 }
 function testToggle(){
   let on = false;
@@ -8391,6 +8422,14 @@ let ODO = {photo: '', thumb: '', car: null, last: 0, confirm: false};
 
 // С 1 окт 2026 пробег снимают не только на въезде: каждый месяц и когда
 // пересел на другую машину. Слова на экране — по причине (SH.car_why).
+// Слова экрана пробега: сдача в ремонт и возврат из него (владелец, 1 окт
+// 2026) идут тем же экраном, что приём. Отдельно от odoW: шаг на экране смены
+// про ремонт знать не должен, даже если человек бросил сдачу на полпути.
+function odoFW(){
+  if(ODO && ODO.mode === 'repair') return {t: 'Сдача в ремонт', go: 'Сдать в ремонт'};
+  if(ODO && ODO.mode === 'back') return {t: 'Из ремонта', go: 'Забрать машину'};
+  return odoW();
+}
 function odoW(){
   const w = SH.car_why || 'new';
   return w === 'month' ? {t: 'Пробег машины', go: 'Отправить пробег', why: 'Начало месяца',
@@ -8443,13 +8482,15 @@ function odoAsk(photo, thumb){
   ODO.photo = photo; ODO.thumb = thumb; ODO.confirm = false;
   const img = document.getElementById('odoImg'); if(img) img.src = photo;
   _setText('odoCar', ODO.car && ODO.car.plate ? ODO.car.plate : 'пробег на въезде');
-  _setText('odoTtl', odoW().t);
+  _setText('odoTtl', odoFW().t);
   _setText('odoNote', ODO.last ? `В прошлый раз было ${fmt(ODO.last)} км` : '');
   document.getElementById('odoNote').classList.remove('err');
+  const wb = document.getElementById('odoWhyBox');
+  if(wb){ wb.hidden = ODO.mode !== 'repair'; document.getElementById('odoWhy').value = ''; }
   const km = document.getElementById('odoKm');
   km.value = ''; km.disabled = false;
   const go = document.getElementById('odoGo');
-  go.disabled = false; go.textContent = odoW().go;
+  go.disabled = false; go.textContent = odoFW().go;
   document.getElementById('odoScr').classList.add('show');
   setTimeout(() => { try{ km.focus(); }catch(e){} }, 120);
 }
@@ -8469,6 +8510,21 @@ async function odoSend(){
   const go = document.getElementById('odoGo');
   go.disabled = true; go.textContent = 'Отправляем…';
   try{
+    if(ODO.mode){
+      // Ремонт: своя ручка, машина остаётся за водителем — только отметка.
+      const back = ODO.mode === 'back';
+      const r = await drvApi.drvFetch('/api/driver/car/repair', {method: 'POST', body: {
+        km: +km, photo: ODO.photo, thumb: ODO.thumb, back,
+        note: back ? '' : String((document.getElementById('odoWhy') || {}).value || '').trim(),
+        ...(ODO.confirm ? {confirm: 1} : {})}});
+      odoBack(); ODO.mode = '';
+      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      toast(back ? `Машина забрана из ремонта · ${fmt(r.km)} км` : `Машина сдана в ремонт · ${fmt(r.km)} км`);
+      if(r.shift) SH = r.shift;
+      await shLoad();
+      try{ profPaint(); }catch(e){}
+      return;
+    }
     const r = await drvApi.drvFetch('/api/driver/car', {method: 'POST', body: {
       car_id: ODO.car && ODO.car.id ? ODO.car.id : '',
       km: +km, photo: ODO.photo, thumb: ODO.thumb,
@@ -8480,7 +8536,7 @@ async function odoSend(){
     await load();
   }catch(e){
     const p = e.payload || {}, err = p.error;
-    go.disabled = false; go.textContent = odoW().go;
+    go.disabled = false; go.textContent = odoFW().go;
     if(err === 'less'){
       // Одометр назад не ходит: почти всегда это опечатка или чужая машина.
       _odoSay(`Меньше, чем в прошлый приём (${fmt(p.last_km)} км). Проверьте число`, true);
@@ -8496,6 +8552,8 @@ async function odoSend(){
     _odoSay(err === 'bad_km' ? 'Непохоже на пробег — проверьте число'
           : err === 'no_photo' || err === 'bad_photo' ? 'Снимок не прошёл — переснимите'
           : err === 'photo_big' ? 'Снимок слишком тяжёлый — переснимите'
+          : err === 'in_repair' ? 'Машина уже в ремонте'
+          : err === 'not_in_repair' ? 'Машина не в ремонте'
           : err === 'no_car' ? 'Машина не выбрана'
           : err === 'already' ? 'Машина уже принята'
           : 'Не получилось — повторите', true);

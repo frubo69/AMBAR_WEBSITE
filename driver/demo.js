@@ -494,6 +494,8 @@ function route(path, opts){
   /* ── смена ── */
   // Приём машины в демо не требуем: показываем приложение в работе, а не
   // замок на входе. Своя машина у демо-водителя есть, пробег — прошлый.
+  // Сдача в ремонт в демо просто отвечает «принято»: машины там нет.
+  if(p === '/api/driver/car/repair') return {ok: true, km: +(body.km || 0), plate: ''};
   if(p === '/api/driver/car') return m === 'POST'
     ? {ok: true, km: +(body || {}).km || 0, plate: '97448'}
     : {need: false, since: '', car: {id: 'car_demo', model: 'Hyundai Elantra',

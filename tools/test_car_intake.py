@@ -263,6 +263,36 @@ async def main():
     eq("в журнале оно осталось зачёркнутым, пробег машины — прежний",
        (r0["rows"][0]["void"], r0["km"], r0["need"]), (True, 53150, True))
 
+    print("── сдача в ремонт ─────────────────────────────────────────────")
+    # Владелец, 1 окт 2026: «перед сдачей водитель так же фоткает одометр».
+    кто["я"] = НОВЫЙ
+    код, тело = await зови(dr.handle_car_intake_post, "POST", {"km": 900200, "photo": КАДР})   # снял своё, чтобы не мешало
+    код, тело = await зови(dr.handle_car_repair, "POST", {"km": 900300})
+    eq("без снимка не сдать", (код, тело.get("error")), (400, "no_photo"))
+    код, тело = await зови(dr.handle_car_repair, "POST", {"km": 100, "photo": КАДР})
+    eq("пробег меньше прошлого не берём", (код, тело.get("error")), (400, "less"))
+    код, тело = await зови(dr.handle_car_repair, "POST", {"km": 900300, "photo": КАДР, "note": "стучит подвеска"})
+    eq("сдал в ремонт", (код, тело.get("km"), bool(тело["shift"]["car_repair"])), (200, 900300, True))
+    c = next(x for x in await db.cars_all() if x["_id"] == моя)
+    eq("машина осталась за ним, на ней отметка", (c["driver"], c["repair"]["by"], c["repair"]["note"]),
+       ("Новичок", "Новичок", "стучит подвеска"))
+    rec = await db.car_reading_mine("Новичок", моя)
+    eq("показание записано с причиной", (rec["km"], rec["why"], rec["note"]), (900300, "repair", "стучит подвеска"))
+    код, тело = await зови(dr.handle_car_repair, "POST", {"km": 900310, "photo": КАДР})
+    eq("второй раз сдать нельзя", (код, тело.get("error")), (409, "in_repair"))
+    день["d"] = "2027-02-01"
+    st = await ci.state(НОВЫЙ)
+    eq("В РЕМОНТЕ — месячный пробег не спрашиваем, смену не держим", (st["need"], bool(st["repair"])), (False, True))
+    код, тело = await зови(orr.handle_car_intakes, path="/x?month=2027-02", auth="tma 1")
+    eq("старший видит «в ремонте»", {c["plate"]: bool(c["repair"]) for c in тело["cars"]}["97448"], True)
+    код, тело = await зови(dr.handle_car_repair, "POST", {"km": 900350, "photo": КАДР, "back": True})
+    eq("забрал из ремонта", (код, тело.get("km"), тело["shift"]["car_repair"]), (200, 900350, ""))
+    eq("отметка снята", "repair" in next(x for x in await db.cars_all() if x["_id"] == моя), False)
+    rec = await db.car_reading_mine("Новичок", моя)
+    eq("и это показание закрывает месяц", (rec["why"], (await ci.state(НОВЫЙ))["need"]), ("repair_back", False))
+    код, тело = await зови(dr.handle_car_repair, "POST", {"km": 900360, "photo": КАДР, "back": True})
+    eq("забрать то, что не в ремонте, нельзя", (код, тело.get("error")), (409, "not_in_repair"))
+
     print(("\nПРОВАЛЫ: " + ", ".join(FAIL)) if FAIL else "\nвсё сошлось")
     return 1 if FAIL else 0
 

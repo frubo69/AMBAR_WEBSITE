@@ -2195,6 +2195,16 @@ async def car_delete(cid: str) -> bool:
     return (await db.cars.delete_one({"_id": cid})).deleted_count > 0
 
 
+async def car_repair_set(cid: str, info: dict | None) -> bool:
+    """Машина в ремонте (info: когда, кто сдал, пробег, что с ней) или забрана
+    из ремонта (None). Закрепление за водителем при этом не меняется."""
+    db = _db_or_none()
+    if db is None: return False
+    upd = {"$set": {"repair": info}} if info else {"$unset": {"repair": ""}}
+    r = await db.cars.update_one({"_id": cid}, upd)
+    return r.matched_count > 0
+
+
 async def car_set_driver(cid: str, driver: str, by: int = 0, expect: str | None = None) -> bool:
     """Закрепить машину за водителем ("" — свободна). expect — у кого машина
     должна быть сейчас: не сходится — ничего не меняем, кто-то успел раньше."""

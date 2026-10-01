@@ -171,6 +171,7 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
   if(path.split('?')[0] === '/api/driver/shift/summary') return {...ST_SUM, ...(ST_SHIFT.after_close ? {closed_at: ST_SHIFT.report_closed_at} : {})};   // ?day= — просмотр закрытой
   if(path === '/api/driver/shift/close' && m === 'POST'){ stLog('API POST ' + path); const at = new Date().toISOString(); return {...ST_SHIFT, closed: true, closed_at: at, after_close: true, report_day: ST_SHIFT.day, report_closed_at: at, can_close: false, can_open: false, in_route: [], must: []}; }
   if(path === '/api/driver/shift') return ST_SHIFT;
+  if(path === '/api/driver/car/repair'){ stLog('API POST repair ' + JSON.stringify(Object.keys(opts.body || {}))); ST_SHIFT.car_repair = (opts.body || {}).back ? '' : new Date().toISOString(); return {ok: true, km: +(opts.body || {}).km || 0, plate: '97448', shift: ST_SHIFT}; }
   if(path === '/api/driver/car') return m === 'POST'
     ? {ok: true, km: +(opts.body || {}).km || 0, plate: '97448'}
     : {need: !!ST_SHIFT.car_need, since: '2026-09-29',

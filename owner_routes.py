@@ -2223,6 +2223,10 @@ async def handle_car_intakes(request):
                      "away": bool(водитель) and водитель not in люди,
                      "district": (люди.get(водитель) or {}).get("district_code") or "",
                      "km": (было or {}).get("km") or 0, "km_day": (было or {}).get("day") or "",
+                     # В ремонте: с какого момента, кто сдал и что с машиной.
+                     "repair": ({"at": str((c.get("repair") or {}).get("at") or ""),
+                                 "by": (c.get("repair") or {}).get("by") or "",
+                                 "note": (c.get("repair") or {}).get("note") or ""} if c.get("repair") else None),
                      **ждём, "rows": rows[::-1]})
     months = sorted({_car_row(r)["day"][:7] for r in все} | {сегодня[:7]}, reverse=True)
     return web.json_response({
@@ -2886,7 +2890,7 @@ async def tg_edit_caption(token, chat_id, message_id, caption: str,
 
 
 async def car_intake_tell(me: dict, car: dict, km: int, iid: str, why: str = "",
-                          last: dict | None = None) -> None:
+                          last: dict | None = None, note: str = "") -> None:
     """Водитель снял пробег — владельцу снимком одометра.
 
     Снимок и есть сообщение: число, вписанное руками, проверяется глазом по
@@ -2898,9 +2902,11 @@ async def car_intake_tell(me: dict, car: dict, km: int, iid: str, why: str = "",
     e = lambda v: _html.escape(str(v or ""))                          # noqa: E731
     кто_был = str((last or {}).get("driver") or "")
     повод = {"new": "вышел на работу", "month": "начало месяца",
+             "repair": "СДАЛ В РЕМОНТ", "repair_back": "забрал из ремонта",
              "car": f"сел на машину после {e(кто_был)}" if кто_был and кто_был != me.get("name")
                     else "сел на машину"}.get(why, "")
-    строки = [f"🚗 <b>{e(me.get('name'))}</b> · пробег" + (f" · {повод}" if повод else ""),
+    значок = "🔧" if why in ("repair", "repair_back") else "🚗"
+    строки = [f"{значок} <b>{e(me.get('name'))}</b> · пробег" + (f" · {повод}" if повод else ""),
               f"{e(car.get('model'))} · {e(car.get('plate'))}",
               f"<b>{km:,}</b> км".replace(",", " ")]
     if было:
@@ -2908,6 +2914,8 @@ async def car_intake_tell(me: dict, car: dict, km: int, iid: str, why: str = "",
         строки.append(f"Было {было:,} км".replace(",", " ")
                       + (f" ({день[8:10]}.{день[5:7]}" + (f", {e(кто_был)}" if кто_был else "") + ")" if день else "")
                       + f" — разница {km - было:,}".replace(",", " "))
+    if note:
+        строки.append(f"Что с машиной: {e(note)}")
     cap = "\n".join(строки)
     if img:
         await notify_owners_photo("driver.car_intake", cap, img)

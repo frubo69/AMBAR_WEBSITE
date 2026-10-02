@@ -3990,6 +3990,19 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .sc-r.fb-wk-f > b.ph{color:var(--dim);font-weight:600}
 .sc-r.fb-wk-f:active{background:transparent}
 .fb-wk-note{margin:6px 2px 0;font-size:11px;line-height:1.35;color:var(--muted)}
+/* Приезды: все периоды работы человека списком, новые сверху (владелец, 2 окт 2026). */
+.fb-wk-back > span i{display:block;margin-top:2px;font-style:normal;font-size:10.5px;font-weight:500;color:var(--muted)}
+.sc-r.fb-wk-f.fb-wk-back > b.ph{color:var(--gold2);border-color:rgba(201,169,110,.4)}
+.fb-stays{margin:10px 2px 4px;padding:10px 12px;border-radius:12px;border:1px solid var(--border2);background:var(--bg2)}
+.fb-stays-h{margin-bottom:6px;font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--gold)}
+.fb-stay{display:flex;align-items:baseline;gap:9px;padding:5px 0;font-size:12px;color:var(--muted)}
+.fb-stay + .fb-stay{border-top:1px solid var(--border2)}
+.fb-stay > b{flex:0 0 auto;min-width:30px;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--sub)}
+.fb-stay > span{flex:1 1 auto;min-width:0}
+.fb-stay > i{flex:0 0 auto;font-style:normal;font-size:11px;white-space:nowrap}
+.fb-stay.live > b{color:var(--up)} .fb-stay.live > span{color:var(--text)}
+.fb-stay.on > span{color:var(--text)}
 .sc-r.fb-wk-f:active > b{border-color:rgba(201,169,110,.55);background:var(--card)}
 .shl-card.fb-pc.fb-away{opacity:.5}
 /* ── Лист премий ── строки те же, что в зарплатной ведомости; своё здесь
@@ -23453,10 +23466,47 @@ function fbWorkRows(p, m){
   return row('from', 'Вышел на работу', w.from, 'не указано')
        + row('to', 'Уезжает', w.to, 'ещё работает')
        + (w.to ? `<div class="fb-wk-note">В день отъезда уже не работает: последний рабочий — ${
-            escS(fbWorkDay(fbDayShift(w.to, -1)))}</div>` : '');
+            escS(fbWorkDay(fbDayShift(w.to, -1)))}</div>` : '')
+       + fbStaysHtml(p, m);
+}
+// ── Приезды (владелец, 2 окт 2026) ─────────────────────────────────────────
+// «Чтобы было понятно, какой раз человек возвращается… чтобы не стирать каждый
+// раз и заново писать, а было видно, что в прошлый раз он приехал тогда-то,
+// уехал тогда-то». Каждый период работы — свой приезд, и они все на виду:
+// прошлые не затираются. Уехавшему — отдельная кнопка «Вернулся»: она заводит
+// НОВЫЙ приезд, а не правит даты прошлого. Данные те же, что и были
+// (fin_people.work) — сервер прошлые периоды хранил всегда, их просто не
+// показывали: в месяце был виден один, и новая дата выглядела как затирание.
+function fbStayDays(w){
+  if(!w.from || !w.to) return 0;
+  return Math.max(0, Math.round((new Date(w.to + 'T12:00:00Z') - new Date(w.from + 'T12:00:00Z')) / 86400000));
+}
+function fbStaysHtml(p, m){
+  const work = p.work || [], n = work.length;
+  if(!n) return '';
+  const last = work[n - 1], уехал = !!last.to && last.to <= _dayIsoFor(0);
+  const вернулся = уехал ? `<button class="sc-r fb-r fb-wk-f fb-wk-back" onclick="fbWorkPick('back')"><span>Вернулся<i>новый приезд — прошлые остаются</i></span><b class="ph">${
+    FB_WK_CAL}указать день</b></button>` : '';
+  if(n < 2) return вернулся;
+  const сейчас = fbWorkIdx(work, m);
+  const строки = work.map((w, k) => {
+    const дней = fbStayDays(w);
+    const когда = [w.from ? 'приехал ' + fbWorkDay(w.from) : 'приехал — не указано',
+                   w.to ? (w.to > _dayIsoFor(0) ? 'уезжает ' : 'уехал ') + fbWorkDay(w.to) : 'работает'].join(' · ');
+    return `<div class="fb-stay${k === сейчас ? ' on' : ''}${w.to ? '' : ' live'}"><b>${k + 1}-й</b><span>${escS(когда)}</span>${
+      дней ? `<i>${дней} ${pluralize(дней, 'день', 'дня', 'дней')}</i>` : ''}</div>`;
+  }).reverse().join('');
+  return вернулся + `<div class="fb-stays"><div class="fb-stays-h">Приезды · ${n}</div>${строки}</div>`;
 }
 function fbWorkPerson(){ return (fbCur(fbBook(FB.month)).people || []).find(x => x.name === FB.person); }
 function fbWorkPick(field){
+  // «Вернулся» — новый приезд сегодняшним (или выбранным) днём; прошлые не трогаем.
+  if(field === 'back'){
+    FB.workPick = {field, i: -1, day: _dayIsoFor(0), has: false,
+                   lbl: `${(fbWorkPerson() || {}).title || FB.person} — вернулся, вышел на работу`};
+    openDate('fbWork');
+    return;
+  }
   const work = (fbWorkPerson() || {}).work || [], i = fbWorkIdx(work, FB.month), w = work[i] || {};
   FB.workPick = {field, i, day: w[field] || _dayIsoFor(0), has: !!w[field],
                  lbl: `${(fbWorkPerson() || {}).title || FB.person} — ${field === 'from' ? 'вышел на работу' : 'последний день на работе'}`};
@@ -23464,6 +23514,7 @@ function fbWorkPick(field){
 }
 function fbWorkPicked(ymd){
   const k = FB.workPick || {}, work = (fbWorkPerson() || {}).work || [], w = work[k.i];
+  if(k.field === 'back') return fbWorkSend({action: 'start', day: ymd});
   if(!w) return fbWorkSend({action: k.field === 'from' ? 'start' : 'end', day: ymd});
   // Уехал и снова вышел: дата выхода позже отъезда — новый период, прошлый
   // остаётся (за те месяцы уже посчитано).
@@ -23475,7 +23526,7 @@ function fbWorkPicked(ymd){
 function fbWorkClear(){
   const k = FB.workPick || {}, work = (fbWorkPerson() || {}).work || [], w = work[k.i];
   closeDate();
-  if(!w) return;
+  if(!w || k.field === 'back') return;
   if(k.field === 'to') return fbWorkSend({action: 'set', i: k.i, from: w.from, to: ''});
   if(w.to) return fbWorkSend({action: 'set', i: k.i, from: '', to: w.to});
   fbWorkSend({action: 'del', i: k.i});

@@ -38341,7 +38341,18 @@ async function crewLinkIssue(name, force, sure){
     await crewLoad(); CREW_D = _copy(CREW); crewRender();
     crewLinkShow(r);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  }catch(e){ closePinPop(); _toast('Не удалось выдать ссылку'); }
+  }catch(e){
+    // Сервер отказывает по двум разным поводам, и для человека это разные
+    // новости. «Уже привязан» — не отказ вовсе, а вопрос: сменить телефон?
+    // Раньше оба превращались в глухое «не удалось», и упереться в него можно
+    // было, даже просто добавив водителя, который в базе уже есть
+    // (владелец, 2 окт 2026: три нажатия подряд, все три — 409 linked).
+    const err = ((e && e.payload) || {}).error;
+    closePinPop();
+    if(err === 'linked'){ crewLinkIssue(name, true); return; }
+    _toast(err === 'unknown_driver' ? 'Такого водителя нет в базе'
+         : 'Не удалось выдать ссылку');
+  }
 }
 function crewLinkShow(r){
   closePinPop();

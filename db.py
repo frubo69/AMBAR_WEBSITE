@@ -6253,6 +6253,13 @@ async def fin_entry_del(eid: str) -> bool:
     return bool(r.deleted_count)
 
 
+async def fin_entry_unset(eid: str, fields: list) -> None:
+    """Снять поля записи книги (у вывода крипты — комиссию, когда её строку убрали)."""
+    d = _db_or_none()
+    if d is None or not fields: return
+    await d.fin_entries.update_one({"_id": eid}, {"$unset": {k: "" for k in fields}})
+
+
 async def fin_month_get(month: str) -> dict:
     d = _db_or_none()
     if d is None: return {}
@@ -6537,7 +6544,7 @@ async def fin_entries_crypto() -> list:
     cur = d.fin_entries.find({"$or": [{"book": "rp", "pay": "crypto"},
                                       {"book": "in", "src": "crypto"}]},
                              {"day": 1, "book": 1, "amount": 1, "pay": 1, "src": 1,
-                              "cr_free": 1, "cr_rp": 1})
+                              "cr_free": 1, "cr_rp": 1, "fee_free": 1})
     return await cur.to_list(length=20000)
 
 

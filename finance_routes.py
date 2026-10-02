@@ -986,7 +986,12 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             "src": e.get("src") or "",
             # чем платили расход из РП; у вывода крипты — сколько из свободной
             # и сколько с крипта-счёта РП
-            "pay": e.get("pay") or "", "cr_free": e.get("cr_free") or 0, "cr_rp": e.get("cr_rp") or 0}
+            "pay": e.get("pay") or "", "cr_free": e.get("cr_free") or 0, "cr_rp": e.get("cr_rp") or 0,
+            # комиссия вывода: вся (в USDT и дирхамах), наша половина, сколько
+            # её взято из свободной крипты; у строки расхода — к какому выводу
+            "fee_usdt": e.get("fee_usdt") or 0, "fee": e.get("fee") or 0,
+            "fee_ours": e.get("fee_ours") or 0, "fee_free": e.get("fee_free") or 0,
+            "fee_entry": e.get("fee_entry") or "", "fee_of": e.get("fee_of") or ""}
 
 
 async def build(month: str, depth: int = 0, light: bool = False) -> dict:
@@ -1065,11 +1070,14 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                 collected_src = "norm"
         extra_in = sum(calc._n(x.get("amount")) for x in en["in"])
         cr_cash = sum(calc._n(x.get("cr_rp")) for x in en["in"] if x.get("src") == "crypto")
+        # наша половина комиссии вывода, взятая из свободной крипты: на счёт РП
+        # она приходит и тут же тратится записью РП− «криптой»
+        extra_cr = sum(calc._n(x.get("fee_free")) for x in en["in"] if x.get("src") == "crypto")
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
             debt=s["debt"], tips=s["tips"], spend=sp["spend"], handed=handed,
             handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"],
-            aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash,
+            aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash, extra_cr=extra_cr,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
             ok=bool(m.get("ok")), pending=past and base > 0 and not m.get("ok"),
@@ -1201,20 +1209,27 @@ async def _cr_spend_check(day: str, amount: float) -> dict | None:
     return None
 
 
-async def _cr_withdraw_split(day: str, amount: float):
+async def _cr_withdraw_split(day: str, amount: float, fee_ours: float = 0.0):
     """Вывод крипты в наличные (Доп. РП+ «из крипты»): сначала из свободной,
-    остальное — с крипта-счёта РП в наличные РП (владелец, 2 окт 2026). Отдаёт
-    (из свободной, из РП, отказ)."""
+    остальное — с крипта-счёта РП в наличные РП (владелец, 2 окт 2026).
+
+    fee_ours — наша половина комиссии: наличных пришло amount, а крипты ушло
+    amount + fee_ours. Берётся тем же порядком — сперва свободная (сначала на
+    сами наличные, остаток её — на комиссию), потом счёт РП.
+
+    Отдаёт (наличные из свободной, наличные с РП, комиссия из свободной, отказ)."""
     import crypto_book
     st = await crypto_book.state()
     if not st["ready"]:
-        return 0.0, 0.0, {"error": "crypto_unready"}
+        return 0.0, 0.0, 0.0, {"error": "crypto_unready"}
     free = max(0.0, st["free"])
     rp = max(0.0, crypto_book.rp_min_from(st["by_day"], day))
-    if amount > free + rp + crypto_book.EPS:
-        return 0.0, 0.0, {"error": "no_crypto", "free": free, "rp": rp, "have": round(free + rp, 2)}
-    f = round(min(amount, free), 2)
-    return f, round(amount - f, 2), None
+    надо = round(amount + fee_ours, 2)
+    if надо > free + rp + crypto_book.EPS:
+        return 0.0, 0.0, 0.0, {"error": "no_crypto", "free": free, "rp": rp, "have": round(free + rp, 2)}
+    из_свободной = round(min(надо, free), 2)
+    f = round(min(amount, из_свободной), 2)
+    return f, round(amount - f, 2), round(из_свободной - f, 2), None
 
 
 @require_owner
@@ -1339,6 +1354,10 @@ async def handle_entry_add(request):
         pay_way = str(body.get("pay") or "") if book == "rp" else ""
         if pay_way not in PAY_WAYS:
             return _json({"error": "bad_pay"}, 400)
+        # Комиссия вывода крипты — в USDT, как её сняли (владелец, 2 окт 2026).
+        fee_usdt = (_num(body.get("fee_usdt"), 6) or 0) if src == "crypto" else 0
+        if fee_usdt < 0:
+            return _json({"error": "bad_fee"}, 400)
         import photos
         photo, bad = photos.decode(body.get("photo"))
         if bad:
@@ -1376,23 +1395,43 @@ async def handle_entry_add(request):
             if отказ:
                 return _json(отказ, 409)
             doc["pay"] = "crypto"
+        комиссия = None
         if src == "crypto":
-            f, r, отказ = await _cr_withdraw_split(day, amount)
+            import crypto_book
+            курс = crypto_book.rate()
+            fee = round(float(fee_usdt) * курс, 2)                 # вся комиссия, в наших дирхамах
+            наша = round(fee * crypto_book.FEE_OURS, 2)            # половина — на нас
+            f, r, из_свободной, отказ = await _cr_withdraw_split(day, amount, наша)
             if отказ:
                 return _json(отказ, 409)
             doc["cr_free"], doc["cr_rp"] = f, r
+            if наша > 0:
+                # Наша половина — расход РП «криптой», своей строкой в РП−:
+                # по ней видно, куда ушла разница между наличными и USDT.
+                комиссия = {"_id": secrets.token_hex(6), "day": day, "book": "rp", "amount": наша,
+                            "comment": "Комиссия за вывод крипты", "who": "", "line": "", "kind": "",
+                            "by": by, "at": datetime.now(timezone.utc), "photo": False, "pay": "crypto",
+                            "fee_of": doc["_id"], "fee_usdt": fee_usdt, "fee": fee}
+                doc.update(fee_usdt=fee_usdt, fee=fee, fee_ours=наша, fee_free=из_свободной,
+                           fee_entry=комиссия["_id"], fee_rate=курс)
         if photo:
             await db.expense_photo_set("fin:" + doc["_id"], photo, thumb)
         await db.fin_entry_add(doc)
+        if комиссия:
+            await db.fin_entry_add(комиссия)
     await _touch(day[:7])
     log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}"
              + (" · криптой" if pay_way == "crypto" else "")
              + (f" · из свободной крипты {doc['cr_free']}, с крипта-счёта РП {doc['cr_rp']}"
-                if src == "crypto" else ""))
+                if src == "crypto" else "")
+             + (f" · комиссия {doc['fee_usdt']} USDT = {doc['fee']} AED, наша половина {doc['fee_ours']}"
+                f" (из свободной {doc['fee_free']})" if doc.get("fee_ours") else ""))
     await backdate.notify(day, by, "финансы: " + BOOK_T.get(book, book),
                           f"{amount} AED {who} {doc['comment']}".strip())
     return _json({"ok": True, "id": doc["_id"], "cr_free": doc.get("cr_free"),
-                  "cr_rp": doc.get("cr_rp"), "book": await build(day[:7])})
+                  "cr_rp": doc.get("cr_rp"), "fee": doc.get("fee"), "fee_ours": doc.get("fee_ours"),
+                  "fee_free": doc.get("fee_free"), "fee_id": doc.get("fee_entry") or "",
+                  "book": await build(day[:7])})
 
 
 @require_owner
@@ -1417,7 +1456,16 @@ async def handle_entry_del(request):
     old = await db.fin_entry_get(eid)
     if not old:
         return _json({"error": "not_found"}, 404)
-    await db.fin_entry_del(eid)
+    async with _CR_LOCK:
+        await db.fin_entry_del(eid)
+        # Вывод крипты убрали — его комиссия уходит вместе с ним. Убрали одну
+        # комиссию — вывод остаётся, но уже без неё (и без её части из
+        # свободной крипты).
+        if old.get("fee_entry"):
+            await db.fin_entry_del(str(old["fee_entry"]))
+        if old.get("fee_of"):
+            await db.fin_entry_unset(str(old["fee_of"]),
+                                     ["fee_usdt", "fee", "fee_ours", "fee_free", "fee_entry", "fee_rate"])
     if old.get("photo"):
         await db.expense_photo_del("fin:" + eid)
     if old.get("item"):

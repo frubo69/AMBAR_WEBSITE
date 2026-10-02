@@ -177,6 +177,53 @@ async def main():
     await cb.sync(); await cb.sync()
     eq("свободная не изменилась", (await cb.state())["free"], было)
 
+    print("\nКомиссия вывода: наличных пришло N, из крипты ушло N + наша половина")
+    пришло(700); await cb.sync()
+    st = await cb.state(); b0 = await книга()
+    eq("перед выводом: свободных 700, на счёте РП 3100", (st["free"], st["rp"]), (700.0, 3100.0))
+    код, r1 = await зови(fr.handle_entry_add, "POST", {"day": "2026-10-05", "book": "in", "amount": 500, "comment": "Из крипты",
+                                                      "src": "crypto", "fee_usdt": 4, "as": "Т"})
+    eq("вывели 500, комиссия 4 USDT = 14 AED, наша половина 7 — вся из свободной",
+       (код, r1.get("cr_free"), r1.get("cr_rp"), r1.get("fee"), r1.get("fee_ours"), r1.get("fee_free")), (200, 500.0, 0.0, 14.0, 7.0, 7.0))
+    st = await cb.state(); b = await книга()
+    eq("из свободной ушло 507, счёт РП не тронут", (st["free"], st["rp"]), (193.0, 3100.0))
+    eq("наличных в РП пришло ровно 500", b["safe"]["rp"] - b0["safe"]["rp"], 500)
+    d5 = день(b, "2026-10-05")
+    ком = [e for e in d5["expenses"] if e.get("fee_of")]
+    eq("комиссия — своей строкой в РП−, «криптой», с пометкой вывода",
+       [(e["amount"], e["pay"], e["comment"], e["fee_of"] == r1["id"]) for e in ком], [(7.0, "crypto", "Комиссия за вывод крипты", True)])
+    # Комиссия оплачена свободной криптой, а не деньгами, уже лежавшими в РП:
+    # в РП пришло 507 (500 наличными и 7 криптой), 7 тут же ушло расходом.
+    eq("РП+ вырос на 507, РП− на 7, РП целиком — на 500",
+       (round(b["safe"]["rp_in"] - b0["safe"]["rp_in"], 2), round(b["safe"]["rp_out"] - b0["safe"]["rp_out"], 2),
+        round(b["safe"]["rp_all"] - b0["safe"]["rp_all"], 2)), (507, 7, 500))
+    eq("сейф (наличные) комиссию не видит: +500", b["safe"]["total"] - b0["safe"]["total"], 500)
+    eq("сохранение: открытие + пришло = свободно + РП + потрачено + выведено",
+       round(st["open"] + st["inflow"], 2), round(st["free"] + st["rp"] + st["exp"] + st["wd_free"] + st["wd_rp"], 2))
+    код, r2 = await зови(fr.handle_entry_add, "POST", {"day": "2026-10-05", "book": "in", "amount": 190, "comment": "Из крипты",
+                                                      "src": "crypto", "fee_usdt": 4, "as": "Т"})
+    eq("свободной на комиссию не хватило: 3 из свободной, 4 со счёта РП",
+       (код, r2.get("cr_free"), r2.get("cr_rp"), r2.get("fee_ours"), r2.get("fee_free")), (200, 190.0, 0.0, 7.0, 3.0))
+    st = await cb.state()
+    eq("свободной 0, на счёте РП 3096", (st["free"], st["rp"]), (0.0, 3096.0))
+    код, r3 = await зови(fr.handle_entry_add, "POST", {"day": "2026-10-05", "book": "in", "amount": 3095, "comment": "Из крипты",
+                                                      "src": "crypto", "fee_usdt": 4, "as": "Т"})
+    eq("с комиссией не хватает — отказ, хотя самих наличных хватило бы", (код, r3.get("error"), r3.get("have")), (409, "no_crypto", 3096.0))
+    код, _ = await зови(fr.handle_entry_del, "DELETE", {"id": r2["fee_id"], "as": "Т"})
+    st = await cb.state()
+    d5 = день(await книга(), "2026-10-05")
+    вывод2 = next(e for e in d5["ins"] if e["id"] == r2["id"])
+    eq("убрали одну комиссию: вывод остался без неё, 3 вернулись в свободную, 4 — на счёт РП",
+       (код, st["free"], st["rp"], вывод2["fee_ours"], вывод2["fee_free"]), (200, 3.0, 3100.0, 0, 0))
+    код, _ = await зови(fr.handle_entry_del, "DELETE", {"id": r1["id"], "as": "Т"})
+    st = await cb.state()
+    d5 = день(await книга(), "2026-10-05")
+    eq("убрали вывод — его комиссия ушла вместе с ним", (код, st["free"], st["rp"], [e for e in d5["expenses"] if e.get("fee_of")]),
+       (200, 510.0, 3100.0, []))
+    код, r4 = await зови(fr.handle_entry_add, "POST", {"day": "2026-10-05", "book": "in", "amount": 100, "comment": "Из крипты",
+                                                      "src": "crypto", "as": "Т"})
+    eq("без комиссии — как раньше", (код, r4.get("cr_free"), r4.get("fee_ours"), r4.get("fee_id")), (200, 100.0, None, ""))
+
     print("\nПеренос на следующий месяц")
     МИР["today"] = "2026-11-02"
     n = await книга("2026-11")

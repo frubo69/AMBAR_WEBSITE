@@ -4168,6 +4168,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   font-size:11.5px;line-height:1.45;color:var(--sub)}
 .fb-crhint b{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2)}
 .fb-crhint .dn{color:var(--dn)}
+.fb-add .fb-feerow{flex:1 1 100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:12.5px;font-weight:600;color:var(--sub)}
+.fb-add .fb-feerow[hidden]{display:none}
+.fb-feerow > span i{display:block;margin-top:2px;font-style:normal;font-size:10.5px;font-weight:500;color:var(--muted)}
 .crd-cr > span, .fb-cr > span{color:var(--gold2)}
 .fb-crc-cr{margin-top:6px;font-size:11px;color:var(--gold2)}
 .aud-g.fb-rp2{padding-top:0}
@@ -21119,8 +21123,10 @@ function fbEntries(list, book){
     const sub = e.kind_t ? escS(e.comment && e.comment !== e.kind_t ? e.comment : '')
               : escS([e.src === 'crypto' && e.comment !== 'Из крипты' ? 'из крипты' : '', e.who].filter(Boolean).join(' · '));
     const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') + (e.pay === 'crypto' ? ' · криптой' : '')
+        + (e.fee_of ? ` · наша половина от ${fmtUsdt(e.fee_usdt)} USDT` : '')
       : book === 'in' && e.src === 'crypto' && (e.cr_free || e.cr_rp)
-        ? [e.cr_free ? 'из свободной ' + walAed(e.cr_free) : '', e.cr_rp ? 'с крипта-счёта РП ' + walAed(e.cr_rp) : ''].filter(Boolean).join(' · ') : '';
+        ? [e.cr_free ? 'из свободной ' + walAed(e.cr_free) : '', e.cr_rp ? 'с крипта-счёта РП ' + walAed(e.cr_rp) : '',
+           e.fee_ours ? `комиссия ${fmtUsdt(e.fee_usdt)} USDT, наша половина ${fmtUsdt(e.fee_ours)}` : ''].filter(Boolean).join(' · ') : '';
     const forM = e.pay_month && e.day && e.pay_month !== e.day.slice(0, 7) ? 'за ' + fbMonthT(e.pay_month).toLowerCase() : '';
     return `<div class="fb-e">
     <span class="fb-e-b"><b>${t}</b><i>${[line, forM, sub].filter(Boolean).join(' · ')}</i></span>
@@ -21159,7 +21165,7 @@ function fbAddRow(book, day){
     ${rp ? `<div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>` : ''}
     ${book === 'in' ? `<div class="chip-row fb-chips"><button class="chip${FB.inSrc === 'crypto' ? ' on' : ''}" id="fbSrc-in"
         onclick="fbInSrc(this)">Из крипты</button></div>
-      <div class="fb-crhint" id="fbCrHint" data-day="${day}"${FB.inSrc === 'crypto' ? '' : ' hidden'}>${fbCrHintHtml(day, 0)}</div>` : ''}
+      <div class="fb-crhint" id="fbCrHint" data-day="${day}"${FB.inSrc === 'crypto' ? '' : ' hidden'}>${fbCrHintHtml(day, 0, 0)}</div>` : ''}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"${
       book === 'in' ? ' oninput="fbCrHint()"' : ''}
       onkeydown="if(event.key==='Enter'){document.getElementById('${np ? 'fbWho-np' : 'fbCmt-' + book}').focus()}">
@@ -21167,6 +21173,11 @@ function fbAddRow(book, day){
       onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-np').focus()}">` : ''}
     <input class="fb-txt" placeholder="${rp ? 'На что' : np ? 'За что' : 'Откуда'}" autocomplete="off" maxlength="120" id="fbCmt-${book}"
       onkeydown="if(event.key==='Enter'){fbEntryAdd('${book}','${day}')}">
+    ${book === 'in' ? `<!-- Комиссия вывода — сколько сняли в USDT (владелец, 2 окт 2026: «вывели
+         столько-то наличных, но в USDT нам отняли комиссию — чтобы было объяснимо,
+         куда деньги ушли»). Половина — на нас, половина — посредника. -->
+    <label class="fb-feerow" id="fbFeeRow-in"${FB.inSrc === 'crypto' ? '' : ' hidden'}><span>Комиссия, USDT<i>сколько сняли при выводе · половина на нас</i></span>
+      <input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFee-in" oninput="fbCrHint()"></label>` : ''}
     <button class="aud-b go" onclick="fbEntryAdd('${book}','${day}')">Записать</button>
   </div>`;
 }
@@ -21186,20 +21197,29 @@ function fbInSrc(btn){
 // «надо обязательно писать, сколько мы из свободной крипты должны взять, а
 // остальное — из крипты в РП перемещаем в наличку»). Делит сервер; здесь — то
 // же правило для глаз: сперва свободная, остальное с крипта-счёта РП.
-function fbCrHintHtml(day, amount){
+function fbCrHintHtml(day, amount, feeUsdt){
   const c = fbCr(day.slice(0, 7));
   if(!c.ready) return 'Кошелёк ещё не прочитан';
-  const free = Math.max(0, +c.free || 0), rp = Math.max(0, +c.rp || 0);
+  const free = Math.max(0, +c.free || 0), rp = Math.max(0, +c.rp || 0), r2 = v => Math.round(v * 100) / 100;
   const есть = `Свободной крипты <b>${walAed(free)}</b> · на счёте РП <b>${walAed(rp)}</b> AED`;
   if(!(amount > 0)) return есть;
-  if(amount > free + rp + 0.005) return `${есть}<br><span class="dn">Столько крипты нет — можно вывести до ${walAed(free + rp)} AED</span>`;
-  const f = Math.min(amount, free), r = Math.round((amount - f) * 100) / 100;
-  return `${есть}<br>Возьмём: из свободной <b>${walAed(f)}</b>${r > 0 ? ` · с крипта-счёта РП в наличные <b>${walAed(r)}</b>` : ''} AED`;
+  // Комиссия: вся — в наших дирхамах по курсу, наша половина уходит из крипты
+  // сверх самих наличных. Делит сервер; здесь то же правило для глаз.
+  const fee = r2((+feeUsdt || 0) * (+c.rate || 3.5)), наша = r2(fee / 2), надо = r2(amount + наша);
+  if(надо > free + rp + 0.005) return `${есть}<br><span class="dn">Столько крипты нет — ${
+    наша ? `с комиссией нужно ${fmtUsdt(надо)}, есть` : 'можно вывести до'} ${fmtUsdt(r2(free + rp))} AED</span>`;
+  const f = Math.min(amount, free), r = r2(amount - f);
+  const ком = наша ? `<br>Комиссия ${fmtUsdt(+feeUsdt)} USDT = ${fmtUsdt(fee)} AED: наша половина <b>${fmtUsdt(наша)}</b> — спишется с крипты расходом РП−` : '';
+  return `${есть}<br>Наличные <b>${walAed(amount)}</b>: из свободной <b>${walAed(f)}</b>${
+    r > 0 ? ` · с крипта-счёта РП <b>${walAed(r)}</b>` : ''} AED${ком}`;
 }
 function fbCrHint(){
   const el = document.getElementById('fbCrHint'); if(!el) return;
+  const fee = document.getElementById('fbFee-in'), row = document.getElementById('fbFeeRow-in');
   el.hidden = FB.inSrc !== 'crypto';
-  if(!el.hidden) el.innerHTML = fbCrHintHtml(el.dataset.day || accDay(), fbAmt('fbAmt-in'));
+  if(row) row.hidden = el.hidden;
+  if(fee && el.hidden) fee.value = '';
+  if(!el.hidden) el.innerHTML = fbCrHintHtml(el.dataset.day || accDay(), fbAmt('fbAmt-in'), fbAmt('fbFee-in'));
 }
 function fbAddToggle(book){
   const f = document.getElementById('fbAdd-' + book); if(!f) return;
@@ -21228,6 +21248,8 @@ async function fbEntryAdd(book, day){
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Забрали из ЧП')) return;
   const pay = book === 'rp' ? await fbAskPay(day.slice(0, 7)) : '';
   if(pay === null) return;
+  const feeUsdt = book === 'in' && FB.inSrc === 'crypto' ? fbAmt('fbFee-in') : 0;
+  if(feeUsdt < 0 || Number.isNaN(feeUsdt)){ _toast('Комиссия — число в USDT'); return; }
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
   if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
   try{
@@ -21235,11 +21257,13 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(route_from || route_to ? {route_from, route_to} : {}),
                               ...(book === 'in' && FB.inSrc ? {src: FB.inSrc} : {}),
+                              ...(feeUsdt > 0 ? {fee_usdt: feeUsdt} : {}),
                               ...(pay === 'crypto' ? {pay} : {}),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
     if(book === 'in' && FB.inSrc === 'crypto' && res && (res.cr_free || res.cr_rp))
-      _toast(`Выведено: из свободной ${walAed(res.cr_free || 0)}${res.cr_rp ? ' · с крипта-счёта РП ' + walAed(res.cr_rp) : ''} AED`);
-    ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+      _toast(`Выведено: из свободной ${walAed(res.cr_free || 0)}${res.cr_rp ? ' · с крипта-счёта РП ' + walAed(res.cr_rp) : ''} AED${
+        res.fee_ours ? ` · комиссия, наша половина ${fmtUsdt(res.fee_ours)}` : ''}`);
+    ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp', 'fbFee-' + book].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; }
     if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); fbCrHint(); }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;

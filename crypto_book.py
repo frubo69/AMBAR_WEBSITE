@@ -26,7 +26,17 @@
   • fin_days.collected_cr подтверждённого дня      → +
   • fin_entries book=rp, pay=crypto                → −
   • fin_entries book=in, src=crypto: cr_rp         → − (и столько же в наличные РП)
-Свободную: тот же collected_cr (−) и cr_free вывода (−).
+  • тот же вывод: fee_free                         → + (см. комиссию ниже)
+Свободную: тот же collected_cr (−), cr_free вывода (−) и fee_free (−).
+
+Комиссия вывода (владелец, 2 окт 2026: «вывели столько-то наличных, но в USDT
+нам отняли комиссию — чтобы было объяснимо, куда деньги ушли лишние; 50% на
+посреднике, 50% на нас»). Наличных пришло N, а крипты ушло N + наша половина
+комиссии. Половина — расход РП «криптой» (обычная запись РП− с pay=crypto,
+связанная с выводом). Берётся она, как и сам вывод, сперва из свободной крипты:
+эта часть (fee_free) в ту же секунду ложится на счёт РП и тут же им тратится —
+так расход целиком виден в РП−, а счёт РП уменьшается только на то, что взяли
+с него самого.
 
 Правило времени: счёт РП не уходит в минус НИ В ОДИН день. Расход криптой днём
 D проходит, только если на конец D и каждого следующего дня в РП хватает.
@@ -43,6 +53,7 @@ START_DAY = "2026-10-01"     # первый день, в чьё распреде
 KEY = "crypto_book"
 EPS = 0.005
 OVERLAP_MS = 6 * 3600 * 1000  # насколько назад перечитываем сеть при сверке
+FEE_OURS = 0.5                # наша доля комиссии вывода; вторая половина — посредника
 
 
 def _r(v) -> float:
@@ -139,7 +150,7 @@ async def sync() -> dict:
 def _deltas(days: list, entries: list) -> tuple:
     """Движения по дням: счёт РП {день: изменение} и итоги для свободной."""
     по_дням: dict = {}
-    alloc = exp = wd_free = wd_rp = 0.0
+    alloc = exp = wd_free = wd_rp = fee_in = 0.0
     def put(day, v):
         по_дням[day] = _r(по_дням.get(day, 0.0) + v)
     for d in days:
@@ -156,7 +167,12 @@ def _deltas(days: list, entries: list) -> tuple:
             wd_free += f; wd_rp += r
             if r:
                 put(day, -r)
-    return по_дням, _r(alloc), _r(exp), _r(wd_free), _r(wd_rp)
+            # часть нашей комиссии, взятая из свободной: приходит на счёт РП
+            # (и тут же тратится записью РП− «криптой»)
+            ff = float(e.get("fee_free") or 0)
+            if ff:
+                fee_in += ff; put(day, ff)
+    return по_дням, _r(alloc), _r(exp), _r(wd_free), _r(wd_rp), _r(fee_in)
 
 
 def rp_min_from(по_дням: dict, day: str) -> float:
@@ -187,20 +203,21 @@ async def state() -> dict:
     c = await cfg()
     days = await db.fin_days_crypto()
     entries = await db.fin_entries_crypto()
-    по_дням, alloc, exp, wd_free, wd_rp = _deltas(days, entries)
+    по_дням, alloc, exp, wd_free, wd_rp, fee_in = _deltas(days, entries)
     if not c:
         return {"ready": False, "rate": rate(), "open": 0.0, "inflow": 0.0, "alloc": alloc,
-                "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp, "free": 0.0,
-                "rp": _r(alloc - exp - wd_rp), "book": 0.0, "out": 0.0,
+                "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp, "fee_in": fee_in, "free": 0.0,
+                "rp": _r(alloc + fee_in - exp - wd_rp), "book": 0.0, "out": 0.0,
                 "by_day": по_дням, "start_day": START_DAY}
     moves = await db.crypto_moves()
     inflow = _r(sum(float(m.get("aed") or 0) for m in moves if m.get("dir") == "in"))
     out = _r(sum(float(m.get("aed") or 0) for m in moves if m.get("dir") == "out"))
     open_ = _r(c.get("open_aed"))
-    free = _r(open_ + inflow - alloc - wd_free)
-    rp = _r(alloc - exp - wd_rp)
+    free = _r(open_ + inflow - alloc - fee_in - wd_free)
+    rp = _r(alloc + fee_in - exp - wd_rp)
     return {"ready": True, "rate": float(c.get("rate") or rate()), "open": open_,
             "inflow": inflow, "alloc": alloc, "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp,
+            "fee_in": fee_in,
             "free": free, "rp": rp, "book": _r(free + rp),
             # Ушло с кошелька по сети и записано в книге (РП− криптой + выводы):
             # разница — то, что ушло, а в книгу ещё не внесли (или наоборот).

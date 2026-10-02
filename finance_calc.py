@@ -56,6 +56,9 @@ def compute(days: list[dict], opening: dict) -> dict:
          cr_cash        сколько из вывода крипты взято с крипта-счёта РП: это
                         не новый приход, а перекладка внутри РП — крипта-часть
                         уменьшается на столько же, на сколько выросли наличные
+         extra_cr       свободная крипта, пришедшая на крипта-счёт РП мимо
+                        ежедневной раскладки: часть комиссии вывода, взятая из
+                        свободной (тут же тратится расходом «криптой»)
          pay            оплатили Баракуде всего за день: сначала из стопки
                         Баракуды, остальное — из ЧП (делится само); если задано,
                         pay_b / pay_b_extra ниже не читаются
@@ -91,7 +94,7 @@ def compute(days: list[dict], opening: dict) -> dict:
              ordered_extra=0.0, aside=0.0, collected=0.0, extra_rp=0.0,
              pay_b=0.0, pay_b_extra=0.0, expenses=0.0, np_plus=0.0,
              payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0, pending=0,
-             collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0)
+             collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0)
     for d in days:
         cash = _n(d.get('cash'))
         spend = _n(d.get('spend'))
@@ -111,6 +114,7 @@ def compute(days: list[dict], opening: dict) -> dict:
                      if e.get('pay') == 'crypto')
         collected_cr = _n(d.get('collected_cr'))
         cr_cash = _n(d.get('cr_cash'))
+        extra_cr = _n(d.get('extra_cr'))
         pay_sum = sum(_n(e.get('amount')) for e in (d.get('payouts') or []))
         # Выручка в минусе в сейф не ложится (владелец, 30 сен 2026: «пока там
         # минус — пиши 0… деньги на расходы мы берём не из сейфа»). Минус в
@@ -132,12 +136,12 @@ def compute(days: list[dict], opening: dict) -> dict:
         debt_b = debt_b + ordered - pay_b - pay_b_extra
         # Фонд целиком (наличные + крипта): перекладка крипты в наличные его
         # не меняет, поэтому cr_cash вычитается из прихода.
-        rp = rp + collected_c + collected_cr_c + extra_rp - cr_cash - exp_sum
+        rp = rp + collected_c + collected_cr_c + extra_rp + extra_cr - cr_cash - exp_sum
         np_acc = np_acc + np_c - pay_sum
         # Наличная стопка РП — только то, что в сейфе; оплаченное криптой её
         # не трогает. Крипта-часть — рядом, своим счётом.
         rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr)
-        rp_cr = rp_cr + collected_cr_c - exp_cr - cr_cash
+        rp_cr = rp_cr + collected_cr_c + extra_cr - exp_cr - cr_cash
         np_st = np_st + np_c - pay_sum - pay_b_extra
         touched = any(d.get(k) is not None for k in DAY_MANUAL) \
             or bool(d.get('expenses')) or bool(d.get('payouts'))
@@ -150,7 +154,7 @@ def compute(days: list[dict], opening: dict) -> dict:
             handed_fact=None if fact is None else _i(_n(fact)), base=_i(base), gap=_i(gap),
             ordered=_i(ordered), ordered_extra=_i(ordered_extra),
             aside=_i(aside), collected=_i(collected), extra_rp=_i(extra_rp),
-            collected_cr=_i(collected_cr), cr_cash=_i(cr_cash),
+            collected_cr=_i(collected_cr), cr_cash=_i(cr_cash), extra_cr=_i(extra_cr),
             expenses_cr_sum=_i(exp_cr), stack_rp_cr=_i(rp_cr),
             pay_b=_i(pay_b), pay_b_extra=_i(pay_b_extra),
             expenses=d.get('expenses') or [], expenses_sum=_i(exp_sum),
@@ -168,13 +172,14 @@ def compute(days: list[dict], opening: dict) -> dict:
         t['ordered_extra'] += ordered_extra; t['aside'] += aside_c
         t['collected'] += collected_c; t['extra_rp'] += extra_rp
         t['collected_cr'] += collected_cr_c; t['expenses_cr'] += exp_cr; t['cr_cash'] += cr_cash
+        t['extra_cr'] += extra_cr
         t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra
         t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
 
     # «РП + и −»
     # всего собрал за месяц — наличными и криптой; перекладка крипты в
     # наличные приходом не считается
-    rp_in = t['collected'] + t['collected_cr'] + t['extra_rp'] - t['cr_cash']
+    rp_in = t['collected'] + t['collected_cr'] + t['extra_rp'] + t['extra_cr'] - t['cr_cash']
     rp_result = rp_in - t['expenses']               # ИТОГО месяц (фонд)
     # «ЧП +»
     profit = t['np_plus'] + rp_result               # ИТОГО месяц

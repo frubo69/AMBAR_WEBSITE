@@ -91,6 +91,8 @@ def месяц(r, n=None):
             d["collected_cr"] = _сумма(r)
         if d.get("extra_rp") and r.random() < 0.4:
             d["cr_cash"] = min(d["extra_rp"], _сумма(r))
+        if r.random() < 0.15:
+            d["extra_cr"] = _сумма(r)          # часть комиссии вывода, взятая из свободной крипты
         d["payouts"] = [{"amount": _сумма(r) or 1} for _ in range(r.choice([0, 0, 0, 1, 2]))]
         # как на сервере: день «ждёт», если выручка в плюсе и не подтверждён
         d["ok"] = r.random() < 0.6
@@ -114,7 +116,7 @@ def модель(days, opening):
         pays = sum(C(e["amount"]) for e in d.get("payouts") or [])
         ждёт = bool(d.get("pending"))
         # крипта: в РП+ дня (только подтверждённого), расход криптой, перекладка в наличные
-        rp_cr += (0 if ждёт else C(d.get("collected_cr"))) - exp_cr - C(d.get("cr_cash"))
+        rp_cr += (0 if ждёт else C(d.get("collected_cr"))) + C(d.get("extra_cr")) - exp_cr - C(d.get("cr_cash"))
         прибыль = max(0, base) - aside - col
         a_c, c_c, n_c = (0, 0, 0) if ждёт else (aside, col, прибыль)
         if d.get("pay") is not None:

@@ -24575,7 +24575,7 @@ function fbRulesPaint(){
       <div class="sc-cap"><span>${escS(c.t)}</span>${c.id === 'sys' ? '<i>замечает программа</i>' : ''}</div>
       ${(c.items || []).map((v, i) => `<button class="sc-r fb-r fb-rule" style="cursor:pointer" onclick="fbRuleEdit(${ci},${i})">
           <span>${escS(v.t)}</span><b class="${v.amount || (v.tiers || []).length ? '' : 'none'}">${fbRulesSum(c.id === 'sys' ? {...v, _sys: 1} : v)}</b><em>${_SC_CHEV}</em></button>`).join('')
-        || '<div class="fb-none">Нарушений нет — сумму вписывают при назначении</div>'}
+        || ''}
       ${c.id === 'sys' ? '' : `<button class="sc-r fb-plus" onclick="fbRuleAdd(${ci})"><span>Добавить нарушение</span><em>${_FB_PLUS}</em></button>`}
     </div>`).join('');
   mid.scrollTop = y;

@@ -162,8 +162,10 @@ def restored(item: dict, who: str) -> str:
             + (f"\nВернул: {_e(who)}" if who else ""))
 
 
-def payout(amount, day: str, month: str, note: str, who: str) -> str:
+def payout(amount, day: str, month: str, note: str, who: str, hands_day: str = "") -> str:
     return (f"💰 <b>Зарплата {_aed(amount)}</b> за {month_t(month)} — выплачена {day_t(day)}"
+            + (f"\nИз наличных на руках за смену {day_t(hands_day)}: эта сумма вычтена из того, что вы сдаёте."
+               if hands_day else "")
             + (f"\n<i>{_e(note)}</i>" if note and note != "Зарплата" else "")
             + (f"\nВыдал: {_e(who)}" if who else ""))
 

@@ -175,7 +175,7 @@ async def _spend(days: list[str]) -> dict:
         pass
     # card — согласованное, оплаченное безналом (18 сен 2026): расход дня,
     # но наличных водителя не тронул, и из выручки дня его не вычитаем.
-    out = {d: dict(spend=0, pending=0, card=0, spend_by=dict()) for d in days}
+    out = {d: dict(spend=0, pending=0, card=0, kept=0, spend_by=dict()) for d in days}
     work: dict = {}
     for r in rows:
         s = out.get(r.get("day") or "")
@@ -191,6 +191,12 @@ async def _spend(days: list[str]) -> dict:
             # Заказ в долг уже посчитан в выручке дня, а деньги по нему у
             # клиента: расходом он не становится (владелец, 20 сен 2026).
             if e.get("nocash"):
+                continue
+            # Зарплата, оставленная себе из наличных смены (владелец, 3 окт
+            # 2026): из выручки дня вычитается, но расход водителя — не она,
+            # расход фонда «зарплата» уже записан (pay=hands).
+            if st == "approved" and e.get("salary_of"):
+                s["kept"] += _exp._signed(e)
                 continue
             if st == "approved":
                 amt += _exp._signed(e)
@@ -997,6 +1003,9 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             # чем платили расход из РП; у вывода крипты — сколько из свободной
             # и сколько с крипта-счёта РП
             "pay": e.get("pay") or "", "cr_free": e.get("cr_free") or 0, "cr_rp": e.get("cr_rp") or 0,
+            # зарплата из наличных на руках у водителя: за какую смену и какой
+            # записью расхода водителя она вычтена
+            "hands_day": e.get("hands_day") or "", "hands_extra": e.get("hands_extra") or "",
             # комиссия вывода: вся (в USDT и дирхамах), наша половина, сколько
             # её взято из свободной крипты; у строки расхода — к какому выводу
             "fee_usdt": e.get("fee_usdt") or 0, "fee": e.get("fee") or 0,
@@ -1041,7 +1050,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         # выручка дня — то, что старший собирает наличными: наличные заказов
         # минус чай (он водителя) минус расходы водителей наличными; как в
         # обзоре. Оплаченное безналом наличных не тронуло — не вычитаем.
-        handed = s["cash"] - s["tips_cash"] - (sp["spend"] - sp["card"])
+        handed = s["cash"] - s["tips_cash"] - (sp["spend"] - sp["card"]) - sp["kept"]
         fact = m.get("handed_fact")
         base = handed if fact is None else calc._n(fact)
         ordered = m["ordered_fact"] if m.get("ordered_fact") is not None else pu["ordered"]
@@ -1086,7 +1095,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
             debt=s["debt"], tips=s["tips"], spend=sp["spend"], handed=handed,
-            handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"],
+            handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"], kept=sp["kept"],
             aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash, extra_cr=extra_cr,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
@@ -1584,6 +1593,8 @@ async def handle_entry_del(request):
         return _json({"error": "not_found"}, 404)
     async with _CR_LOCK:
         await db.fin_entry_del(eid)
+        if old.get("hands_extra"):
+            await _hands_extra_drop(old)
         # Вывод крипты убрали — его комиссия уходит вместе с ним. Убрали одну
         # комиссию — вывод остаётся, но уже без неё (и без её части из
         # свободной крипты).
@@ -2277,22 +2288,179 @@ async def handle_pay_out(request):
     pay_way = str(body.get("pay") or "")
     if pay_way not in PAY_WAYS:
         return _json({"error": "bad_pay"}, 400)
+    # Откуда деньги (владелец, 3 окт 2026): из стопки РП — как было; «с рук» —
+    # водитель оставил себе из наличных смены hands_day. Тогда сейф не
+    # трогается: из выручки той смены сумма вычитается записью расхода
+    # водителя, а зарплата записывается расходом фонда с pay=hands.
+    src = str(body.get("src") or "")
+    if src not in ("", "rp", "hands"):
+        return _json({"error": "bad_src"}, 400)
+    hands = None
+    if src == "hands":
+        try:
+            hands_day = _day_arg(body.get("hands_day") or day)
+        except Exception:                         # noqa: BLE001
+            return _json({"error": "bad_request"}, 400)
+        hands, отказ = await _hands_check(name, hands_day, amount, str(body.get("req") or ""))
+        if отказ:
+            return _json(отказ, 409 if отказ.get("error") in ("collected", "no_cash", "req_taken") else 400)
+        pay_way = ""
     doc = {"_id": secrets.token_hex(6), "day": day, "book": "rp", "amount": amount,
            "comment": str(body.get("note") or "").strip()[:120] or "Зарплата",
            "who": name, "line": "", "kind": "salary", "pay_month": month,
            **({"pay": "crypto"} if pay_way == "crypto" else {}),
+           **({"pay": "hands", "src": "hands", "hands_day": hands["day"]} if hands else {}),
            "by": who, "at": datetime.now(timezone.utc)}
     async with _CR_LOCK:
         if pay_way == "crypto":
             отказ = await _cr_spend_check(day, amount)
             if отказ:
                 return _json(отказ, 409)
+        if hands:
+            doc["hands_extra"] = await _hands_extra_put(hands, doc, who)
         await db.fin_entry_add(doc)
-    await _touch(min(month, day[:7]))
-    await _pn.tell_safe(name, _pn.payout(amount, day, month, doc["comment"], who))
-    log.info(f"[fin] зарплата {name} {amount} за {month} ({day}) · {who or '—'}")
-    await backdate.notify(day, who, f"финансы: зарплата {name}", f"{amount} AED")
-    return _json({"ok": True, "id": doc["_id"], "book": await build(month)})
+    await _touch(min(month, day[:7], (hands or {}).get("day", day)[:7]))
+    await _pn.tell_safe(name, _pn.payout(amount, day, month, doc["comment"], who,
+                                        hands_day=(hands or {}).get("day", "")))
+    log.info(f"[fin] зарплата {name} {amount} за {month} ({day})"
+             + (f" · из наличных на руках за {hands['day']}" if hands else "") + f" · {who or '—'}")
+    await backdate.notify(day, who, f"финансы: зарплата {name}",
+                          f"{amount} AED" + (f" · из выручки на руках за {hands['day']}" if hands else ""))
+    return _json({"ok": True, "id": doc["_id"], "hands": hands and {"day": hands["day"], "extra": doc.get("hands_extra")},
+                  "book": await build(month)})
+
+
+async def _hands_info(name: str, day: str) -> dict:
+    """Сколько наличных у водителя на руках за смену day — той же
+    арифметикой, что сбор выручки (cash_math): наличные заказов − чай −
+    согласованные расходы наличными − уже оставленная зарплата. Плюс: сдана ли
+    выручка его района за этот день и что он прислал на согласование."""
+    import bizday, cash_math
+    import config_staff as _staff
+    import expense_routes as _exp
+    drv = next((d for d in _staff.all_drivers() if d.get("name") == name), None)
+    oid = (drv or {}).get("district") or ""
+    try:
+        orders = list((await db.orders_from(bizday.since_utc(day))).values())
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] заказы за {day}: {e}")
+        orders = []
+    mine = [o for o in orders if o.get("status") == "delivered" and bizday.order_day(o) == day
+            and (o.get("driver") or "").strip() == name]
+    cash_orders = [o for o in mine if cash_math.pays_cash(o)]
+    cash = int(round(sum(cash_math.order_money(o)["aed"] for o in cash_orders)))
+    tips = sum(cash_math.order_tea(o) for o in mine)
+    row = await db.get_driver_day(day, name) or {}
+    spend = _staff.meal_of(row) if row.get("working") is not None else 0
+    kept, requests = 0, []
+    for e in row.get("extras") or []:
+        st = str(e.get("status") or "approved")
+        if st == "approved" and not _exp.is_card(e):
+            if e.get("salary_of"):
+                kept += _exp._signed(e)
+            else:
+                spend += _exp._signed(e)
+        elif st == "pending":
+            requests.append({"id": e.get("id") or "", "kind": e.get("kind") or "other",
+                             "kind_t": _exp._kind(e).get("t", ""), "amount": _exp._amount(e.get("amount")),
+                             "comment": e.get("comment") or "", "at": str(e.get("at") or "")})
+    marks = await db.checklist_get(day) or {}
+    collected = bool(((marks.get(f"cash:{oid}") or {}).get("done")) or ((marks.get("cash") or {}).get("done")))
+    have = cash - tips - spend - kept
+    return {"name": name, "day": day, "district": oid, "driver": bool(drv), "cash": cash, "tips": tips,
+            "spend": spend, "kept": kept, "have": have, "collected": collected, "requests": requests}
+
+
+async def _hands_check(name: str, day: str, amount: float, req: str):
+    """Можно ли выдать зарплату из наличных на руках за эту смену."""
+    if day > _biz_day():
+        return None, {"error": "future"}
+    if day < _add_days(_biz_day(), -31):
+        return None, {"error": "too_old"}
+    info = await _hands_info(name, day)
+    if not info["driver"]:
+        return None, {"error": "not_driver"}
+    if info["collected"]:
+        return None, {"error": "collected", **{k: info[k] for k in ("have", "day")}}
+    if amount > info["have"] + 0.005:
+        return None, {"error": "no_cash", **{k: info[k] for k in ("have", "cash", "tips", "spend", "kept", "day")}}
+    if req and not any(r["id"] == req for r in info["requests"]):
+        return None, {"error": "req_taken"}
+    info["req"] = req
+    return info, None
+
+
+async def _hands_extra_put(hands: dict, doc: dict, who: str) -> str:
+    """Вычет из наличных смены — записью расхода водителя (согласованной):
+    так его видят и сбор выручки, и итоги смены водителя, и книга. Запрос,
+    который водитель прислал сам, — подхватываем: он и становится этим
+    вычетом, а не одобряется как обычный расход. Прежние поля запоминаем в
+    prev — убрали выплату, запрос вернётся на согласование как был."""
+    import config_staff as _staff
+    text = f"Зарплата за {pay_month_t(doc['pay_month'])}"
+    now = datetime.now(timezone.utc)
+    if hands.get("req"):
+        row = await db.get_driver_day(hands["day"], hands["name"]) or {}
+        e = next((x for x in row.get("extras") or [] if x.get("id") == hands["req"]), None) or {}
+        prev = {k: e.get(k) for k in ("kind", "status", "amount", "comment", "pay")}
+        await db.set_driver_expense_fields(hands["day"], hands["name"], hands["req"], {
+            "kind": "other", "status": "approved", "amount": int(round(float(doc["amount"]))), "comment": text,
+            "pay": "cash", "salary_of": doc["_id"], "prev": prev, "decided_by": who,
+            "decided_at": now.isoformat(), "decided_note": "", "photo_ok": "ok", "car_ok": "ok"})
+        return hands["req"]
+    iid = secrets.token_hex(5)
+    drv = next((d for d in _staff.all_drivers() if d.get("name") == hands["name"]), None) or {}
+    await db.add_driver_expense(hands["day"], hands["name"], {
+        "id": iid, "amount": int(round(float(doc["amount"]))), "kind": "other", "comment": text, "pay": "cash",
+        "status": "approved", "salary_of": doc["_id"], "by": who, "at": now.isoformat(),
+        "district": drv.get("district") or "", "decided_by": who, "decided_at": now.isoformat()})
+    return iid
+
+
+async def _hands_extra_drop(old: dict) -> None:
+    """Выплату убрали — вычет из наличных смены уходит: свой — стирается,
+    подхваченный запрос водителя — возвращается на согласование как был."""
+    day, name, xid = str(old.get("hands_day") or ""), str(old.get("who") or ""), str(old.get("hands_extra") or "")
+    if not (day and name and xid):
+        return
+    row = await db.get_driver_day(day, name) or {}
+    e = next((x for x in row.get("extras") or [] if x.get("id") == xid), None)
+    if not e:
+        return
+    prev = e.get("prev")
+    if isinstance(prev, dict):
+        await db.set_driver_expense_fields(day, name, xid, {**{k: v for k, v in prev.items()}, "salary_of": "",
+                                                            "prev": "", "status": prev.get("status") or "pending"})
+    else:
+        await db.del_driver_expense(day, name, xid)
+    try:
+        await _touch(day[:7])
+    except Exception:                             # noqa: BLE001
+        pass
+
+
+def pay_month_t(month: str) -> str:
+    import pay_notify as _p
+    try:
+        return _p.month_t(month)
+    except Exception:                             # noqa: BLE001
+        return month
+
+
+@require_owner
+async def handle_pay_hands(request):
+    """GET /api/owner/finance/book/pay/hands?name=&day= — наличные на руках у
+    водителя за смену: можно ли выдать из них зарплату и что он прислал."""
+    name = str(request.query.get("name") or "").strip()[:40]
+    try:
+        day = _day_arg(request.query.get("day") or _biz_day())
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if not name:
+        return _json({"error": "bad_request"}, 400)
+    info = await _hands_info(name, day)
+    info["today"] = _biz_day()
+    return _json(info)
 
 
 FIELD_T = {
@@ -2338,6 +2506,7 @@ def setup(app):
         ("/api/owner/finance/bonus",        handle_tenure,     "GET"),
         ("/api/owner/finance/bonus/pay",    handle_tenure_pay, "POST"),
         ("/api/owner/finance/book/pay/out", handle_pay_out, "POST"),
+        ("/api/owner/finance/book/pay/hands", handle_pay_hands, "GET"),
     )
     seen = set()
     for path, handler, method in routes:

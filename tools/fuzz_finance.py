@@ -92,8 +92,11 @@ def месяц(r, n=None):
                 d["pay_rp"] = _сумма(r)
         # норма РП+ дня — по ней считается возврат долга фонда; бывает и без неё
         d["norm"] = r.choice([0, 0, 3900, 9100, 500, 12000.5])
-        d["expenses"] = [{"amount": _сумма(r) or 1, **({"pay": "crypto"} if r.random() < 0.25 else {})}
+        d["expenses"] = [{"amount": _сумма(r) or 1, **({"pay": r.choice(["crypto", "crypto", "hands"])} if r.random() < 0.3 else {})}
                          for _ in range(r.choice([0, 0, 1, 2, 5]))]
+        # зарплата, оставленная водителем из наличных смены (3 окт 2026): в выручке дня её нет
+        if r.random() < 0.15:
+            d["kept"] = _сумма(r)
         # крипта в РП+ дня и вывод крипты в наличные (часть — с крипта-счёта РП)
         if r.random() < 0.3:
             d["collected_cr"] = _сумма(r)
@@ -122,11 +125,12 @@ def модель(days, opening):
     out = []
     for d in days:
         cash, spend = C(d.get("cash")), C(d.get("spend"))
-        handed = C(d["handed"]) if d.get("handed") is not None else cash - spend
+        handed = C(d["handed"]) if d.get("handed") is not None else cash - spend - C(d.get("kept"))   # зарплата с рук в сейф не доехала
         base = C(d["handed_fact"]) if d.get("handed_fact") is not None else handed
         aside, col, extra = C(d.get("aside")), C(d.get("collected")), C(d.get("extra_rp"))
-        exp = sum(C(e["amount"]) for e in d.get("expenses") or [] if e.get("pay") != "crypto")   # наличными
+        exp = sum(C(e["amount"]) for e in d.get("expenses") or [] if e.get("pay") not in ("crypto", "hands"))   # наличными из сейфа
         exp_cr = sum(C(e["amount"]) for e in d.get("expenses") or [] if e.get("pay") == "crypto")
+        exp_hands = sum(C(e["amount"]) for e in d.get("expenses") or [] if e.get("pay") == "hands")  # с рук: сейф не трогает
         pays = sum(C(e["amount"]) for e in d.get("payouts") or [])
         ждёт = bool(d.get("pending"))
         # крипта: в РП+ дня (только подтверждённого), расход криптой, перекладка в наличные
@@ -154,7 +158,7 @@ def модель(days, opening):
         возврат = min(долг_рп, сверх)
         долг_рп -= возврат
         out.append({"b": b, "rp": rp, "np": np_, "debt": debt, "pay_b": из_б, "pay_x": из_чп, "pay_rp": из_рп,
-                    "np_plus": прибыль, "base": base, "rp_cr": rp_cr, "owed": долг_рп, "back": возврат})
+                    "np_plus": прибыль, "base": base, "rp_cr": rp_cr, "owed": долг_рп, "back": возврат, "hands": exp_hands})
     return out
 
 
@@ -172,8 +176,8 @@ def проверить_ядро(days, opening, метка):
             return беда(метка, "сейф ≠ сумма стопок", день=i)
         # сейф дня = сейф вчера + движения; неподтверждённая выручка не входит
         ждёт = bool(src.get("pending"))
-        # в сейф и из сейфа ходят только наличные: оплаченное криптой его не трогает
-        exp = sum(C(e["amount"]) for e in src.get("expenses") or [] if e.get("pay") != "crypto"); pays = sum(C(e["amount"]) for e in src.get("payouts") or [])
+        # в сейф и из сейфа ходят только наличные: оплаченное криптой и зарплата с рук его не трогают
+        exp = sum(C(e["amount"]) for e in src.get("expenses") or [] if e.get("pay") not in ("crypto", "hands")); pays = sum(C(e["amount"]) for e in src.get("payouts") or [])
         движ = (0 if ждёт else max(0, w["base"])) + C(src.get("extra_rp")) - exp - pays - w["pay_b"] - w["pay_x"] - w["pay_rp"]
         if abs(C(d["stack_total"]) - prev - движ) > 1:
             return беда(метка, "сейф дня ≠ вчера + движения", день=i, было=prev, движ=движ, стало=C(d["stack_total"]))
@@ -184,6 +188,8 @@ def проверить_ядро(days, opening, метка):
             return беда(метка, "из РП взято больше, чем вписано", день=i)
         if C(d["rp_owed"]) < 0 or C(d["rp_back"]) < 0:
             return беда(метка, "долг фонда или возврат в минусе", день=i)
+        if abs(C(d["expenses_hands_sum"]) - w["hands"]) > 1 or (src.get("handed") is None and abs(C(d["handed"]) - (C(src.get("cash")) - C(src.get("spend")) - C(src.get("kept")))) > 1):
+            return беда(метка, "зарплата с рук / выручка дня ≠ входу", день=i)
         prev = C(d["stack_total"])
         mv_b = sum(C(x["amount"]) * ((x["to"] == "b") - (x["from"] == "b")) for x in src.get("moves") or [])
         if src.get("pay") is not None and C(d["pay_b"]) > max(0, (m[i - 1]["b"] if i else C(opening.get("safe_b_open"))) + (0 if ждёт else C(src.get("aside"))) + mv_b) + 1:
@@ -206,6 +212,8 @@ def проверить_ядро(days, opening, метка):
     if abs(C(s["open_rp"]) + C(s["open_rp_cr"]) + C(s["rp_in"]) - C(s["rp_out"]) - C(s["rp_b"]) + C(s["mv_rp_in"]) - C(s["mv_rp_out"])
            - C(s["rp"]) - C(s["rp_cr"])) > len(days) + 1:
         return беда(метка, "РП: начало + приход − расход − Барракуде ± переводы ≠ наличные + крипта", s=s)
+    if abs(C(book["rp"]["hands"]) - sum(w["hands"] for w in m)) > 1:
+        return беда(метка, "зарплата с рук месяца ≠ дням", s=s)
     if abs(C(s["rp_b"]) - sum(w["pay_rp"] for w in m)) > 1 or abs(C(s["rp_back"]) - sum(w["back"] for w in m)) > 1 \
             or abs(C(s["rp_owed"]) - (m[-1]["owed"] if m else C(opening.get("rp_owed_open")))) > 1:
         return беда(метка, "долг фонда месяца ≠ дням", s=s)
@@ -348,8 +356,8 @@ def _книга_ок(book, метка, шаг):
         if abs(C(d["stack_total"]) - C(d["stack_b"]) - C(d["stack_rp"]) - C(d["stack_np"])) > 1:
             return беда(метка, "сервер: сейф ≠ сумма стопок", шаг=шаг, день=d["day"])
         ждёт = bool(d.get("pending"))
-        движ = (0 if ждёт else max(0, C(d["base"]))) + C(d["extra_rp"]) - C(d["expenses_sum"]) - C(d["payouts_sum"]) \
-            - C(d["pay_b"]) - C(d["pay_b_extra"]) - C(d["pay_rp"])
+        движ = (0 if ждёт else max(0, C(d["base"]))) + C(d["extra_rp"]) - C(d["expenses_sum"]) + C(d["expenses_cr_sum"]) + C(d["expenses_hands_sum"]) \
+            - C(d["payouts_sum"]) - C(d["pay_b"]) - C(d["pay_b_extra"]) - C(d["pay_rp"])
         if abs(C(d["stack_total"]) - prev - движ) > 1:
             return беда(метка, "сервер: сейф дня ≠ вчера + движения", шаг=шаг, день=d["day"],
                         было=prev / 100, движ=движ / 100, стало=d["stack_total"])
@@ -362,8 +370,8 @@ def _книга_ок(book, метка, шаг):
         if abs(C(d["expenses_sum"]) - sum(C(e["amount"]) for e in d["expenses"])) > 1:
             return беда(метка, "сервер: сумма расходов ≠ записям", шаг=шаг, день=d["day"])
         # выручка дня: наличные минус чай и расходы водителей наличными (или вписанный факт)
-        if d["manual"].get("handed_fact") is None and abs(C(d["base"]) - (C(d["cash"]) - C(d["tips_cash"]) - C(d["spend_cash"]))) > 1:
-            return беда(метка, "сервер: выручка ≠ наличные − чай − расходы водителей", шаг=шаг, день=d["day"])
+        if d["manual"].get("handed_fact") is None and abs(C(d["base"]) - (C(d["cash"]) - C(d["tips_cash"]) - C(d["spend_cash"]) - C(d["kept"]))) > 1:
+            return беда(метка, "сервер: выручка ≠ наличные − чай − расходы водителей − зарплата с рук", шаг=шаг, день=d["day"])
     if abs(C(book["safe"]["total"]) - prev) > 1:
         return беда(метка, "сервер: сейф месяца ≠ последнему дню", шаг=шаг)
     return True

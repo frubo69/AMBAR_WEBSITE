@@ -527,6 +527,7 @@ async def handle_extra_del(request):
     было = next((e for e in (старое.get("extras") or []) if e.get("id") == item_id), None)
     if было:
         await advance_drop(day, driver, было)
+        await hands_salary_drop(было)
     ok = await db.del_driver_expense(day, driver, item_id)
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
@@ -586,6 +587,7 @@ async def handle_extra_decide(request):
         await advance_apply(day, driver, item or {}, str(body.get("as") or ""))
     else:
         await advance_drop(day, driver, item or {})
+        await hands_salary_drop(item or {})
         # Отклонённый расход, который прислал сам водитель, — на решение по
         # штрафу (fines_auto; сумма из правил, ноль там — не предлагать).
         if (item or {}).get("by_driver"):
@@ -647,6 +649,26 @@ async def advance_apply(day: str, driver: str, item: dict, who: str = "") -> str
         log.warning(f"[expenses] аванс: сообщение водителю не ушло: {e}")
     log.info(f"[expenses] аванс {amount} AED водителю {driver} — в ведомость {iid}")
     return iid
+
+
+async def hands_salary_drop(item: dict) -> bool:
+    """Запись расхода — вычет зарплаты из наличных смены (salary_of): её
+    стёрли или отклонили — зарплата в ведомости без вычета стоять не может,
+    запись выплаты уходит из книги (владелец, 3 окт 2026)."""
+    eid = str((item or {}).get("salary_of") or "")
+    if not eid:
+        return False
+    try:
+        old = await db.fin_entry_get(eid)
+        if old:
+            await db.fin_entry_del(eid)
+            import finance_routes as _fin
+            await _fin._touch(str(old.get("day") or "")[:7] or _biz_day()[:7])
+            log.info(f"[expenses] вычет зарплаты {eid} снят — выплата убрана из книги")
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[expenses] выплата {eid} не убрана: {e}")
+        return False
+    return True
 
 
 async def advance_drop(day: str, driver: str, item: dict) -> bool:

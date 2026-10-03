@@ -5245,7 +5245,6 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-bsrc .fb-mix label u{text-decoration:none;font-size:10px;font-weight:600;color:var(--muted)}
 .fb-bsrc-note{margin-top:12px;font-size:12px;font-weight:600;color:var(--dn);line-height:1.4}
 .fb-bsrc-note[hidden]{display:none}
-.fb-bsrc-wait{margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
 .fb-bsrc .crw-ask-b:disabled{opacity:.45}
 .fb-loan-how{padding:12px 16px 14px;font-size:12px;line-height:1.45;color:var(--muted)}
 /* «Откуда деньги» у зарплаты водителю (3 окт 2026): под строкой «Из выручки на
@@ -22920,7 +22919,6 @@ function fbAskBSrc(info){
         <span class="crw-ask-i">${ico}</span>
         <span class="crw-ask-n"><b>${t}</b><i data-sub="${id}"></i></span>
         <span class="crw-ask-q" data-q="${id}"></span></button>`;
-    const wait = (info.wait || []).map(x => fbDayT(x.day));
     box.innerHTML = `<div class="crw-ask-t">Не хватает в Барракуде</div>
       <div class="crw-ask-s">Оплата ${fbFmt(info.amount)} AED · в Барракуде ${fbFmt(info.bHave)}<br>не хватает <b>${fbFmt(short)}</b> AED</div>
       <div class="crw-ask-g">Откуда взять недостающее</div>
@@ -22934,7 +22932,6 @@ function fbAskBSrc(info){
         </div>
       </div>
       <div class="fb-bsrc-note" id="fbBsrcNote" hidden></div>
-      ${wait.length ? `<div class="fb-bsrc-wait">Распределение не подтверждено: ${escS(wait.join(', '))}. После подтверждения в Барракуде, РП и ЧП прибавится.</div>` : ''}
       <button class="crw-ask-b go" id="askOk">Записать оплату</button>
       <button class="crw-ask-b no" id="askNo">Отмена</button>`;
     document.body.append(back, box);

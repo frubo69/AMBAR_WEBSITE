@@ -5261,17 +5261,26 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-bsrc .crw-ask-r.off{pointer-events:none;background:rgba(224,85,85,.06);border-color:rgba(224,85,85,.22);color:rgba(224,85,85,.55)}
 .fb-bsrc .crw-ask-r.off .crw-ask-i{background:rgba(224,85,85,.08);border-color:rgba(224,85,85,.2);color:rgba(224,85,85,.5)}
 .fb-bsrc .crw-ask-r.off .crw-ask-n i,.fb-bsrc .crw-ask-r.off .crw-ask-q u{color:rgba(224,85,85,.4)}
-.fb-bsrc .fb-mix{margin-top:7px;padding:2px 6px;border-radius:12px;background:var(--card2);border:1px solid var(--border2)}
-.fb-bsrc .fb-mix[hidden]{display:none}
-.fb-bsrc .fb-mix label{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 4px 0 10px;
-  font-size:13px;font-weight:600;color:var(--sub);text-align:left}
+/* «Понемногу» — карточка-вариант с полями внутри: шапка как у других строк,
+   под ней две строки полей на том же фоне. */
+.fb-bsrc .crw-ask-r.fb-mixrow{flex-direction:column;align-items:stretch;padding:0;cursor:pointer}
+.fb-bsrc .fb-mixrow .fb-mixhead{display:flex;align-items:center;gap:10px;padding:11px 12px}
+.fb-bsrc .fb-mix{padding:0 10px 2px;border-top:1px solid rgba(255,255,255,.08)}
+.fb-bsrc .crw-ask-r.main .fb-mix{border-top-color:rgba(26,20,8,.18)}
+.fb-bsrc .crw-ask-r.off .fb-mix{border-top-color:rgba(224,85,85,.18)}
+.fb-bsrc .fb-mix label{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 2px 0 4px;
+  font-size:13px;font-weight:600;color:#cfd3e5;text-align:left}
 .fb-bsrc .fb-mix label + label{border-top:1px solid rgba(255,255,255,.06)}
+.fb-bsrc .crw-ask-r.main .fb-mix label{color:#1a1408}
+.fb-bsrc .crw-ask-r.main .fb-mix label + label{border-top-color:rgba(26,20,8,.14)}
+.fb-bsrc .crw-ask-r.off .fb-mix label{color:rgba(224,85,85,.5)}
 .fb-bsrc .fb-mix label span{flex:1}
 .fb-bsrc .fb-mix label b{display:flex;align-items:center;gap:6px}
-.fb-bsrc .fb-mix label u{text-decoration:none;font-size:10px;font-weight:600;color:var(--muted)}
+.fb-bsrc .fb-mix label u{text-decoration:none;font-size:10px;font-weight:600;color:inherit;opacity:.7}
+.fb-bsrc .fb-mix input{background:#0C0C18;border-color:rgba(255,255,255,.08);color:var(--gold3)}
 .fb-bsrc-note{min-height:17px;margin-top:10px;font-size:12px;font-weight:600;color:var(--dn);line-height:1.4}
-.fb-bsrc .fb-mix.off label{color:var(--muted)}
-.fb-bsrc .fb-mix input:disabled{color:var(--muted);opacity:.7;-webkit-text-fill-color:var(--muted)}
+.fb-bsrc .fb-mix input:disabled{color:#8a8fa6;opacity:.75;-webkit-text-fill-color:#8a8fa6}
+.fb-bsrc .crw-ask-r.off .fb-mix input:disabled{color:rgba(224,85,85,.45);-webkit-text-fill-color:rgba(224,85,85,.45);border-color:rgba(224,85,85,.15)}
 .fb-bsrc .crw-ask-b:disabled{opacity:.45}
 /* «Откуда деньги» у зарплаты водителю (3 окт 2026): под строкой «Из выручки на
    руках» — смена фишками, что на руках, и запросы водителя на согласование.
@@ -22963,13 +22972,19 @@ function fbAskBSrc(info){
       <div class="crw-ask-box">
         ${row('np', FB_ICO.np, 'Из ЧП')}
         ${row('rp', FB_ICO.rp, 'Из РП')}
-        ${row('mix', FB_ICO_MIX, 'Понемногу отовсюду')}
-        <!-- Поля видны всегда (владелец, 3 окт 2026: «не нравится, когда резко
-             меняется размер окон»): у «из ЧП» и «из РП» они показывают раскладку
-             и не правятся, у «понемногу» — правятся. -->
-        <div class="fb-mix" id="fbMix">
-          <label><span>Из ЧП</span><b><input class="fb-num" inputmode="decimal" id="fbMixNp" autocomplete="off"><u>AED</u></b></label>
-          <label><span>Из РП</span><b><input class="fb-num" inputmode="decimal" id="fbMixRp" autocomplete="off"><u>AED</u></b></label>
+        <!-- «Понемногу» — одна карточка с полями внутри (владелец, 3 окт 2026:
+             «в одну кнопку объедини»). Поля на месте всегда, размер окна не
+             прыгает: у «из ЧП» и «из РП» они показывают раскладку и выключены. -->
+        <div class="crw-ask-r fb-mixrow" data-src="mix" role="button">
+          <div class="fb-mixhead">
+            <span class="crw-ask-i">${FB_ICO_MIX}</span>
+            <span class="crw-ask-n"><b>Понемногу отовсюду</b><i data-sub="mix"></i></span>
+            <span class="crw-ask-q" data-q="mix"></span>
+          </div>
+          <div class="fb-mix" id="fbMix">
+            <label><span>Из ЧП</span><b><input class="fb-num" inputmode="decimal" id="fbMixNp" autocomplete="off"><u>AED</u></b></label>
+            <label><span>Из РП</span><b><input class="fb-num" inputmode="decimal" id="fbMixRp" autocomplete="off"><u>AED</u></b></label>
+          </div>
         </div>
       </div>
       <div class="fb-bsrc-note" id="fbBsrcNote"></div>
@@ -22983,9 +22998,8 @@ function fbAskBSrc(info){
     const q = v => `${fbFmt(v)}<u>AED</u>`;
     const paint = () => {
       box.querySelectorAll('.crw-ask-r').forEach(el => { el.classList.toggle('main', el.dataset.src === src); el.classList.toggle('off', !can[el.dataset.src]); });
-      // поля: у «понемногу» правятся, иначе показывают раскладку выбранного и выключены
+      // поля внутри «понемногу»: правятся, когда оно выбрано; иначе показывают раскладку выбранного и выключены
       const mixOn = src === 'mix';
-      $('#fbMix').classList.toggle('off', !mixOn);
       $('#fbMixNp').disabled = !mixOn; $('#fbMixRp').disabled = !mixOn;
       if(!mixOn){ $('#fbMixNp').value = fbFmt(src === 'np' ? short : 0); $('#fbMixRp').value = fbFmt(src === 'rp' ? short : 0); }
       const p = parts(), lackNp = r2(p.np - npHave), lackRp = r2(p.rp - rpHave);

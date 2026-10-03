@@ -5305,6 +5305,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    выше и круглее обычных: «Сумма» узкая, «Комментарий» тянется, кнопка
    золотая справа. */
 .fb-mvcard .sc-cap{padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.fb-npbal{display:flex;align-items:baseline;justify-content:center;gap:8px;padding:22px 16px 24px}
+.fb-npbal b{font-family:'Space Grotesk',sans-serif;font-size:44px;line-height:1;font-weight:700;letter-spacing:-.8px;color:var(--text);font-variant-numeric:tabular-nums}
+.fb-npbal b.dn{color:var(--dn)}
+.fb-npbal u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--muted)}
 .fb-mvmodes{display:flex;gap:8px;padding:12px 16px 0}
 .fb-mvc{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;border-radius:12px;
   background:#1a1f36;border:1.5px solid rgba(255,255,255,.09);color:#cfd3e5;font-family:inherit;font-size:13px;
@@ -21220,7 +21224,7 @@ function fbPaint(){
     put('fbList-in', fbEntries(d.ins, 'in'));
   }
   if(mb){
-    put('fbList-npm', fbPayoutsMonth(mb));
+    put('fbList-npm', fbNpList(mb));
     put('fbList-an', fbAnalysis(mb));
     put('fbList-people', fbPeopleHtml(mb));
     const p = FB.person ? (fbCur(mb).people || []).find(x => x.name === FB.person) : null;
@@ -21248,32 +21252,6 @@ function fbEntries(list, book){
     <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
   </div>`; }).join('');
-}
-// Форма «Взять из ЧП»: сумма и кому одним рядом, «за что» второй строкой,
-// кнопка на всю ширину. Те же поля, что были у «Забрать из ЧП» (ids), пишет
-// fbEntryAdd('np').
-function fbNpTakeForm(day){
-  return `<div class="fb-mvform np">
-    <input class="fb-mvin sum" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-np"
-      onkeydown="if(event.key==='Enter'){document.getElementById('fbWho-np').focus()}">
-    <input class="fb-mvin cmt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
-      onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-np').focus()}">
-    <input class="fb-mvin cmt wide" placeholder="За что" autocomplete="off" maxlength="120" id="fbCmt-np"
-      onkeydown="if(event.key==='Enter'){fbEntryAdd('np','${day}')}">
-    <button class="fb-mvgo" onclick="fbEntryAdd('np','${day}')">Взять из ЧП</button>
-  </div>`;
-}
-function fbPayoutsMonth(b){
-  const rows = [];
-  (b.days || []).forEach(d => (d.payouts || []).forEach(e => rows.push({...e, day: d.day})));
-  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
-  if(!rows.length) return '<div class="fb-none">Из ЧП в этом месяце не брали</div>';
-  return rows.map(e => `<div class="fb-e">
-    <span class="fb-e-b"><b>${escS(e.who || e.comment || 'Выплата')}</b><i>${escS(fbDayT(e.day))}${
-      e.who && e.comment ? ' · ' + escS(e.comment) : ''}</i></span>
-    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
-    <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
-  </div>`).join('');
 }
 // Статья бюджета у расхода: фишки со статьями месяца, ничего не выбрано —
 // «вне плана».
@@ -25351,49 +25329,101 @@ function fbAskPaySrc(p, amount){
 // ── Экран «Прибыль» ───────────────────────────────────────────────────────
 async function accFinNP(){
   const b = await fbMonthScreen('ЧП'); if(!b) return;
-  const s = b.safe || {};
-  const days = (b.days || []).filter(d => !d.future && (d.base || d.np_plus))
-    .map(d => fbDayRow(d, [`выручка ${fbFmt(d.base)}`, `Барракуда ${fbFmt(d.aside)}`, `РП+ ${fbFmt(d.collected)}`].join(' / '),
-                       d.np_plus, {unit: 'ЧП+', cls: d.np_plus < 0 ? 'dn' : ''}));
-  document.getElementById('accMid').innerHTML = `
+  // Владелец, 3 окт 2026: «здесь просто нужно показывать чистую прибыль, как
+  // будто денег на счету, и опции: перевести из чистой прибыли или забрать
+  // чистую прибыль — и можно вписывать сколько». Крупно остаток ЧП, под ним
+  // карточка с двумя режимами и суммой, ниже — что брали и переводили за месяц.
+  FB.np = FB.np || {mode: 'take', to: 'rp', amt: '', cmt: ''};
+  document.getElementById('accMid').innerHTML = fbNpHtml(b);
+}
+function fbNpPaint(){ const b = fbBook(FB.month); if(b && ACC_VIEW === 'finnp') document.getElementById('accMid').innerHTML = fbNpHtml(b); }
+function fbNpKeep(){ if(FB.np){ FB.np.amt = fbTxt(FB.np.mode === 'mv' ? 'fbAmt-npmv' : 'fbAmt-np') || FB.np.amt; FB.np.cmt = fbTxt(FB.np.mode === 'mv' ? 'fbCmt-npmv' : 'fbCmt-np') || FB.np.cmt; } }
+function fbNpMode(m){ fbNpKeep(); FB.np.mode = m; fbNpPaint(); try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
+function fbNpTo(k){ fbNpKeep(); FB.np.to = k; fbNpPaint(); try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
+// Операции месяца по ЧП: забрали (выплаты из прибыли) и переводы с ЧП и на ЧП
+function fbNpRows(b){
+  const rows = [];
+  (b.days || []).forEach(d => {
+    (d.payouts || []).forEach(e => rows.push({...e, day: d.day, t: `Забрали${e.who ? ' · ' + escS(e.who) : ''}`, v: -(+e.amount || 0)}));
+    (d.moves || []).forEach(e => {
+      if(e.from === 'np') rows.push({...e, day: d.day, t: `Перевели в ${FB_MV_T[e.to] || '?'}`, v: -(+e.amount || 0)});
+      else if(e.to === 'np') rows.push({...e, day: d.day, t: `Перевели из ${FB_MV_T[e.from] || '?'}`, v: +e.amount || 0});
+    });
+  });
+  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
+  return rows;
+}
+function fbNpHtml(b){
+  const s = b.safe || {}, np = FB.np, day = FB.month === fbMonthNow() ? b.today : b.last;
+  const rows = fbNpRows(b);
+  const form = np.mode === 'mv'
+    ? `<div class="fb-mvrow"><span>Куда</span><div class="fb-mvchips">${['rp', 'b'].map(k =>
+          `<button class="fb-mvc${np.to === k ? ' on' : ''}" onclick="fbNpTo('${k}')">${FB_MV_T[k]}</button>`).join('')}</div></div>
+      <div class="fb-mvform">
+        <input class="fb-mvin sum" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-npmv" value="${escS(np.amt || '')}"
+          onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-npmv').focus()}">
+        <input class="fb-mvin cmt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-npmv" value="${escS(np.cmt || '')}"
+          onkeydown="if(event.key==='Enter'){fbNpMove('${day}')}">
+        <button class="fb-mvgo" onclick="fbNpMove('${day}')">Перевести ЧП → ${FB_MV_T[np.to]}</button>
+      </div>`
+    : `<div class="fb-mvform np">
+        <input class="fb-mvin sum" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-np" value="${escS(np.amt || '')}"
+          onkeydown="if(event.key==='Enter'){document.getElementById('fbWho-np').focus()}">
+        <input class="fb-mvin cmt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
+          onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-np').focus()}">
+        <input class="fb-mvin cmt wide" placeholder="За что" autocomplete="off" maxlength="120" id="fbCmt-np" value="${escS(np.cmt || '')}"
+          onkeydown="if(event.key==='Enter'){fbEntryAdd('np','${day}')}">
+        <button class="fb-mvgo" onclick="fbEntryAdd('np','${day}')">Забрать</button>
+      </div>`;
+  return `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
-    <div class="aud-g">
-      ${fbTile('ЧП+', 'safe.np_in', s.np_in, {mode: 'neg'})}
-      ${fbTile('ЧП−', 'safe.np_out', s.np_out)}
-      ${fbTile('В сейфе', 'safe.np', s.np, {mode: 'neg'})}
-    </div>
-    ${fbRow('На начало месяца', 'safe.open_np', s.open_np)}
-    ${fbRow('Из выручки за месяц', 'np.days', b.np.days, {sign: '+', mode: 'neg'})}
-    ${fbRow('Взяли из ЧП', 'np.payouts', b.np.payouts, {sign: '−'})}
-    ${fbRow('Сверх стопки Барракуде', 'b.pay_extra', b.b.pay_extra, {sign: '−', show: 'b.extra_pay_on', hide: !b.b.pay_extra})}
-    ${fbRow('Переводы на ЧП', 'safe.mv_np_in', s.mv_np_in, {sign: '+', show: 'safe.mv_np_in_on', hide: !s.mv_np_in})}
-    ${fbRow('Переводы с ЧП', 'safe.mv_np_out', s.mv_np_out, {sign: '−', show: 'safe.mv_np_out_on', hide: !s.mv_np_out})}
-    ${fbRow('В сейфе', 'safe.np', s.np, {sum: true, sign: '=', mode: 'neg'})}
-    <button class="sc-r fb-r" onclick="fbMovePage(accFinNP)" style="cursor:pointer"><span>Перевод между счетами</span><em>${_SC_CHEV}</em></button>
+    <div class="fb-npbal"><b data-f="safe.np" data-fc="neg"${s.np < 0 ? ' class="dn"' : ''}>${fbFmt(s.np)}</b><u>AED</u></div>
   </div>
-  <!-- «Взять из ЧП» — отдельная функция на экране ЧП (владелец, 3 окт 2026:
-       «не снять с ЧП, а взять из ЧП; и это должно быть не в РП, а в ЧП»): та же
-       форма, что у перевода, — сумма, кому, за что, золотая кнопка. -->
   <div class="sc fb-mvcard">
-    ${fbCapT('Взять из ЧП')}
-    ${fbNpTakeForm(b.today <= b.last ? b.today : b.last)}
+    ${fbCapT(np.mode === 'mv' ? 'Перевести' : 'Забрать')}
+    <div class="fb-mvmodes">
+      <button class="fb-mvc${np.mode === 'mv' ? '' : ' on'}" onclick="fbNpMode('take')">Забрать</button>
+      <button class="fb-mvc${np.mode === 'mv' ? ' on' : ''}" onclick="fbNpMode('mv')">Перевести</button>
+    </div>
+    ${form}
   </div>
-  <div class="sc">
-    ${fbCapT('Взяли из ЧП', b.np.payouts ? fbFmt(b.np.payouts) + ' AED' : '')}
-    <div id="fbList-npm">${fbPayoutsMonth(b)}</div>
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('По расчёту')}
-    ${fbRow('Продали', 't.gross', b.totals.gross)}
-    ${fbRow('Купили у Барракуды', 't.ordered', b.totals.ordered, {sign: '−'})}
-    ${fbRow('Расходы', 't.expenses', b.totals.expenses, {sign: '−'})}
-    ${fbRow('Расходы водителей', 't.spend', b.totals.spend, {sign: '−'})}
-    ${fbRow('Чай', 't.tips', b.totals.tips, {sign: '−'})}
-    ${fbRow('Чистая прибыль', 'econ', b.econ, {sum: true, sign: '=', mode: 'neg'})}
-    ${fbRow('Долг Барракуде за месяц', 'b.debt_delta', b.b.debt_end - b.b.debt_open, {sub: true, mode: 'debt'})}
-  </div>
-  ${fbDays(days)}`;
+  <div class="sc">${fbCapT('За месяц', rows.length ? `${rows.length} ${pluralize(rows.length, 'запись', 'записи', 'записей')}` : '')}<div class="fb-one" id="fbList-npm">${fbNpList(b)}</div></div>`;
+}
+function fbNpList(b){
+  const rows = fbNpRows(b);
+  if(!rows.length) return '<div class="fb-none">В этом месяце из ЧП не брали и не переводили</div>';
+  return rows.map(e => `<div class="fb-e">
+    <span class="fb-e-b"><b>${e.t}</b><i>${escS(fbDayT(e.day))}${e.at ? ', ' + fbAtT(e.at) : ''}${e.comment ? ' · ' + escS(e.comment) : ''}${e.by ? ' · записал ' + escS(e.by) : ''}</i></span>
+    <b class="fb-e-v${e.v < 0 ? '' : ' ok'}">${e.v < 0 ? '−' : '+'}${fbFmt(Math.abs(e.v))}<u>AED</u></b>
+    <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
+  </div>`).join('');
+}
+async function fbNpMove(day){
+  const amount = fbAmt('fbAmt-npmv'), comment = fbTxt('fbCmt-npmv'), to = FB.np.to;
+  if(!(amount > 0)){ _toast('Нужна сумма'); const a = document.getElementById('fbAmt-npmv'); if(a) a.focus(); return; }
+  if(!await fbAskDay(day, 'Перевод из ЧП')) return;
+  let force = false;
+  for(let turn = 0; turn < 2; turn++){
+    try{
+      const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
+        {method: 'POST', body: {day, book: 'mv', amount, comment, from: 'np', to, force, as: _meName()}});
+      FB.np.amt = ''; FB.np.cmt = '';
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      if(res.book){ fbApply(res.book); fbPaint(); }
+      fbNpPaint();
+      _toast(`ЧП → ${FB_MV_T[to]} · ${fbFmt(amount)} AED`);
+      return;
+    }catch(e){
+      const p = (e && e.payload) || {};
+      if(p.error === 'not_enough' && !force){
+        if(!await askDialog(`В ЧП только ${fbFmt(p.have)} AED`, 'Перевести всё равно? ЧП уйдёт в минус.', 'Перевести всё равно', 'Отмена', 'bad')) return;
+        force = true; continue;
+      }
+      _toast('Не удалось записать');
+      return;
+    }
+  }
 }
 
 (function initWalBlock(){

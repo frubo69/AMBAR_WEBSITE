@@ -166,7 +166,7 @@ async def main():
     eq("payouts_sum", d4["payouts_sum"], 7)
     eq("cash_need (marina + jbr дома, без отметок)", (d4["cash_need"], d4["cash_got"]), (2, 0))
     print("— бегущие остатки и переносы из августа (по факту пересчёта)")
-    eq("opening carried: стопки августа (старый carry_np → ЧП), факты пересчёта больше не читаются", b["opening_carried"], dict(carry_np=0, safe_b_open=34500, debt_b_open=110198, rp_open=0, np_open=41030))
+    eq("opening carried: стопки августа (старый carry_np → ЧП), факты пересчёта больше не читаются", b["opening_carried"], dict(carry_np=0, safe_b_open=34500, debt_b_open=110198, rp_open=0, np_open=41030, rp_owed_open=0))
     eq("opening explicit (storage/факты — не поля)", b["opening_explicit"], {})
     eq("safe_b d3 = 34500 + 100 − 60", d3["safe_b"], 34540)
     eq("debt_b d3 = 110198 + 640 − 60", d3["debt_b"], 110778)
@@ -289,7 +289,7 @@ async def main():
     r = await raw(inner["handle_day_ok"])(_req("POST", dict(day="2026-09-04", aside=-1, collected=1)))
     eq("подтверждение с минусом → 400", r.status, 400)
     r = await raw(inner["handle_day_set"])(_req("POST", dict(day="2026-09-04", field="pay", value="40000", **{"as": "Ст"})))
-    eq("оплата Барракуде одной суммой пишется полем pay", (r.status, WRITES[-2]), (200, ("day", "2026-09-04", {"pay": 40000, "by": "Ст"}, None)))
+    eq("оплата Барракуде одной суммой пишется полем pay", (r.status, WRITES[-2]), (200, ("day", "2026-09-04", {"pay": 40000, "by": "Ст"}, ["pay_src", "pay_rp", "pay_at", "pay_by"])))
     FIN_DAYS["2026-09-04"]["pay"] = 40000
     bp = await fr.build(M); d4p = next(x for x in bp["days"] if x["day"] == "2026-09-04")
     eq("оплата делится сама: из стопки Барракуды 34540, остальное 5460 из ЧП", (d4p["pay"], d4p["pay_b"], d4p["pay_b_extra"], d4p["stack_b"]), (40000, 34540, 5460, 0))

@@ -51,7 +51,13 @@ _CR_LOCK = asyncio.Lock()
 OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стопки сейфа и долг на начало
 MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
 BOOKS = ('rp', 'np', 'in')
-ENTRY_KINDS = ('', 'salary', 'advance', 'loan')
+# 'take' — «Забрали из РП» (владелец, 3 окт 2026): деньги вынули из фонда не
+# по статье и без чека, с комментарием и датой; в книге — обычный РП−.
+ENTRY_KINDS = ('', 'salary', 'advance', 'loan', 'take')
+# Откуда взято то, чего не хватило в стопке Барракуды на оплату (владелец,
+# 3 окт 2026): из ЧП (как было всегда), из РП, или понемногу из обоих.
+PAY_SRC = ('', 'np', 'rp', 'mix')
+PAY_SRC_T = {"": "из ЧП", "np": "из ЧП", "rp": "из РП", "mix": "из РП и ЧП"}
 PAY_FIELDS = ('rate', 'unit', 'cur', 'days', 'note', 'bonus')
 # Премию за стаж выплачивают из двух рук сразу — считаем и пишем по очереди.
 _TENURE_LOCK = asyncio.Lock()
@@ -979,7 +985,7 @@ def _entry_view(e: dict, line_names: dict) -> dict:
     return {"id": e.get("_id"), "amount": e.get("amount"), "comment": e.get("comment") or "",
             "who": e.get("who") or "", "line": lid, "line_name": line_names.get(lid, ""),
             "kind": e.get("kind") or "", "kind_t": {"salary": "Зарплата", "advance": "Аванс",
-                                                    "loan": "Долг"}.get(e.get("kind") or "", ""),
+                                                    "loan": "Долг", "take": "Забрали из РП"}.get(e.get("kind") or "", ""),
             "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
             "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo")),
             "route_from": e.get("route_from") or "", "route_to": e.get("route_to") or "",
@@ -1080,12 +1086,31 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash, extra_cr=extra_cr,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
+            pay_src=m.get("pay_src") or "", pay_rp=m.get("pay_rp"), norm=budget["norm"],
             ok=bool(m.get("ok")), pending=past and base > 0 and not m.get("ok"),
             expenses=en["rp"], payouts=en["np"]))
         meta[d] = dict(aside_src=aside_src, collected_src=collected_src, cr_src=cr_src, ins=en["in"],
                        extra_manual=m.get("extra_rp"), ok_by=m.get("ok_by") or "",
-                       tips_cash=s["tips_cash"])
+                       tips_cash=s["tips_cash"], base=base)
     book = calc.compute(rows, opening["opening"])
+    # Долг фонда (владелец, 3 окт 2026): день, который ждёт подтверждения,
+    # предлагает собрать в РП+ ещё и то, что фонд отдал Барракуде и не вернул —
+    # в пределах выручки дня. Первый расчёт даёт долг на каждый день, второй —
+    # раскладку с его учётом; на сам долг она не влияет (ждущие дни в стопки
+    # не входят), поэтому двух проходов достаточно.
+    changed = False
+    for i, d in enumerate(days):
+        r, row = book["days"][i], rows[i]
+        if row["pending"] and meta[d]["collected_src"] == "norm" and calc._n(r["rp_owed_before"]) > 0:
+            cap = max(0.0, meta[d]["base"] - calc._n(row["aside"]))
+            want = math.ceil(max(0.0, calc._n(budget["norm"]) - calc._n(row["collected_cr"]))
+                             + calc._n(r["rp_owed_before"]) - 1e-9)
+            new = float(min(want, cap))
+            if new != row["collected"]:
+                row["collected"] = new
+                changed = True
+    if changed:
+        book = calc.compute(rows, opening["opening"])
     marks = {} if light else await _marks([d for d in days if d <= today])
     for i, d in enumerate(days):
         r, s, sp, pu, m = book["days"][i], sales[d], spend[d], purch[d], manual.get(d) or {}
@@ -1098,11 +1123,21 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                  cr_src=meta[d]["cr_src"],
                  ins=meta[d]["ins"], extra_manual=meta[d]["extra_manual"],
                  ok_by=meta[d]["ok_by"], tips_cash=meta[d]["tips_cash"],
+                 pay_by=m.get("pay_by") or "",
+                 pay_at=_utc_iso(m["pay_at"]) if isinstance(m.get("pay_at"), datetime) else str(m.get("pay_at") or ""),
                  pending=bool(d <= today and r["base"] > 0 and not r["ok"]),
                  salary_sum=calc._i(sum(calc._n(e["amount"]) for e in r["expenses"]
                                         if e.get("kind") in ("salary", "advance", "loan"))))
         r["manual"] = {k: m.get(k) for k in calc.DAY_MANUAL}
         r["manual"]["collected_cr"] = m.get("collected_cr")
+        # Сколько из РП+ дня — возврат долга фонда: у подтверждённого дня
+        # считает ядро, у ждущего — по предложению (или вписанному руками).
+        if r["pending"] and calc._n(budget["norm"]) > 0:
+            r["rp_back_plan"] = calc._i(min(calc._n(r["rp_owed_before"]),
+                                            max(0.0, calc._n(r["collected"]) + calc._n(r["collected_cr"])
+                                                - calc._n(budget["norm"]))))
+        else:
+            r["rp_back_plan"] = r["rp_back"]
         if not light:
             mk = marks.get(d) or {}
             need = set(s["cash_by"]) | set(k for k, v in sp["spend_by"].items() if v)
@@ -1260,16 +1295,84 @@ async def handle_day_set(request):
             отказ = await _cr_alloc_check(day, calc._n(value), было)
             if отказ:
                 return _json(отказ, 409)
+        # Оплата этим путём — без источника: недостающее из ЧП, как было до
+        # 3 окт 2026 (STAR теперь пишет оплату через /book/day/pay).
+        src_fields = ["pay_src", "pay_rp", "pay_at", "pay_by"] if field == "pay" else []
         if value is None or value == "":
-            await db.fin_day_set(day, {"by": who}, unset=[field])
+            await db.fin_day_set(day, {"by": who}, unset=[field] + src_fields)
         else:
-            await db.fin_day_set(day, {field: value, "by": who})
+            await db.fin_day_set(day, {field: value, "by": who}, unset=src_fields or None)
     await _touch(day[:7])
     log.info(f"[fin] {day} {field} → {value!r} · {who or '—'}")
     await backdate.notify(day, who, "финансы: " + FIELD_T.get(field, field),
                           "" if value in (None, "") else (value if field == "note" else f"{value} AED"))
     return _json({"ok": True, "day": day, "field": field, "value": value,
                   "book": await build(day[:7])})
+
+
+@require_owner
+async def handle_pay_b(request):
+    """POST {day, pay, src, rp, force, as} — оплата Барракуде за день одной
+    суммой и откуда взято то, чего не хватило в её стопке (владелец, 3 окт
+    2026: «пусть программа предлагает взять или из РП, или из ЧП, или понемногу
+    отовсюду»): src 'np' — из ЧП, 'rp' — из РП, 'mix' — из РП rp, остальное из
+    ЧП. pay пустое — снять оплату. Больше, чем лежит в ЧП или в РП по книге,
+    не взять — 409 not_enough с остатками; force — записать всё равно (стопка
+    уйдёт в минус, старший это видел и подтвердил)."""
+    try:
+        body = await request.json()
+        day = _day_arg(body.get("day"))
+        pay = _num(body.get("pay"))
+        src = str(body.get("src") or "")
+        rp_part = _num(body.get("rp")) or 0
+        force = bool(body.get("force"))
+        if src not in PAY_SRC or (pay is not None and pay < 0) or rp_part < 0:
+            return _json({"error": "bad_request"}, 400)
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if day > _biz_day():
+        return _json({"error": "future"}, 400)
+    who = _who(body)
+    month = day[:7]
+    from_b = from_np = from_rp = 0.0
+    if pay is None:
+        await db.fin_day_set(day, {"by": who}, unset=["pay", "pay_src", "pay_rp", "pay_at", "pay_by"])
+    else:
+        book = await build(month, light=True)
+        r = next(x for x in book["days"] if x["day"] == day)
+        # стопки без сегодняшней оплаты — что лежало в сейфе, когда платили
+        b_have = calc._n(r["stack_b"]) + calc._n(r["pay_b"])
+        np_have = calc._n(r["stack_np"]) + calc._n(r["pay_b_extra"])
+        rp_have = calc._n(r["stack_rp"]) + calc._n(r["pay_rp"])
+        from_b = min(pay, max(0.0, b_have))
+        short = round(pay - from_b, 2)
+        if src == "rp":
+            from_rp = short
+        elif src == "mix":
+            if rp_part > short + 0.005:
+                return _json({"error": "bad_split", "short": short}, 400)
+            from_rp = round(rp_part, 2)
+        from_np = round(short - from_rp, 2)
+        if not force and (from_rp > rp_have + 0.005 or from_np > np_have + 0.005):
+            return _json({"error": "not_enough", "pay": pay, "short": short, "b": calc._i(b_have),
+                          "np": calc._i(np_have), "rp": calc._i(rp_have),
+                          "from_np": calc._i(from_np), "from_rp": calc._i(from_rp)}, 409)
+        fields = {"pay": pay, "pay_src": src if short > 0 else "", "pay_at": datetime.now(timezone.utc),
+                  "pay_by": who, "by": who}
+        unset = []
+        if src == "mix" and short > 0:
+            fields["pay_rp"] = round(from_rp, 2)
+        else:
+            unset.append("pay_rp")
+        await db.fin_day_set(day, fields, unset=unset or None)
+    await _touch(month)
+    откуда = (f" · из стопки {calc._i(from_b)}" + (f", из ЧП {calc._i(from_np)}" if from_np else "")
+              + (f", из РП {calc._i(from_rp)}" if from_rp else "")) if pay is not None else " снята"
+    log.info(f"[fin] {day} оплата Барракуде {pay!r}{откуда}" + (" · force" if force else "") + f" · {who or '—'}")
+    await backdate.notify(day, who, "финансы: оплата Барракуде",
+                          "" if pay is None else f"{pay} AED{откуда}")
+    return _json({"ok": True, "day": day, "pay": pay, "from_b": calc._i(from_b), "from_np": calc._i(from_np),
+                  "from_rp": calc._i(from_rp), "book": await build(month)})
 
 
 @require_owner
@@ -1342,8 +1445,12 @@ async def handle_entry_add(request):
         # билет: откуда и куда летит — для учёта, кому что покупали
         route_from = str(body.get("route_from") or "").strip()[:40] if book == "rp" else ""
         route_to = str(body.get("route_to") or "").strip()[:40] if book == "rp" else ""
-        if kind and not who:
+        if kind and not who and kind != "take":
             return _json({"error": "who_required"}, 400)
+        # «Забрали из РП» — без чека и статьи, но обязательно за что (владелец,
+        # 3 окт 2026: «с возможностью оставлять комментарий и дату, когда взяли»)
+        if kind == "take" and not str(body.get("comment") or "").strip():
+            return _json({"error": "no_comment"}, 400)
         # Доп. РП+ «из крипты» (владелец, 30 сен 2026): вывели USDT наличными в
         # фонд. Отметка нужна, чтобы потом знать, сколько крипты уже забрали.
         src = str(body.get("src") or "") if book == "in" else ""
@@ -1426,7 +1533,7 @@ async def handle_entry_add(request):
                 if src == "crypto" else "")
              + (f" · комиссия {doc['fee_usdt']} USDT = {doc['fee']} AED, наша половина {doc['fee_ours']}"
                 f" (из свободной {doc['fee_free']})" if doc.get("fee_ours") else ""))
-    await backdate.notify(day, by, "финансы: " + BOOK_T.get(book, book),
+    await backdate.notify(day, by, "финансы: " + ("забрали из РП" if kind == "take" else BOOK_T.get(book, book)),
                           f"{amount} AED {who} {doc['comment']}".strip())
     return _json({"ok": True, "id": doc["_id"], "cr_free": doc.get("cr_free"),
                   "cr_rp": doc.get("cr_rp"), "fee": doc.get("fee"), "fee_ours": doc.get("fee_ours"),
@@ -2189,6 +2296,7 @@ def setup(app):
         ("/api/owner/finance/book", handle_book, "GET"),
         ("/api/owner/finance/book/day", handle_day_set, "POST"),
         ("/api/owner/finance/book/day/ok", handle_day_ok, "POST"),
+        ("/api/owner/finance/book/day/pay", handle_pay_b, "POST"),
         ("/api/owner/finance/book/photo/{id}", handle_entry_photo, "GET"),
         ("/api/owner/finance/book/entry", handle_entry_add, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_del, "DELETE"),

@@ -5229,6 +5229,27 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   font-size:9px;font-weight:600;color:rgba(245,224,176,.52);margin-top:2px;letter-spacing:0}
 .crw-ask-r.main .crw-ask-q u{color:rgba(26,20,8,.55)}
 
+/* Окно «не хватает в стопке Барракуды» (3 окт 2026): три источника теми же
+   строками, что выбор заявки; у «понемногу отовсюду» два поля под строкой. */
+.fb-bsrc .crw-ask-s b{color:var(--text)}
+.fb-bsrc .crw-ask-i svg.solid{fill:currentColor;stroke:none}
+.fb-bsrc .crw-ask-n i .dn{color:var(--dn)}
+.fb-bsrc .crw-ask-r.main .crw-ask-n i .dn{color:#6b1f1f}
+.fb-bsrc .fb-mix{margin-top:7px;padding:2px 6px;border-radius:12px;background:var(--card2);border:1px solid var(--border2)}
+.fb-bsrc .fb-mix[hidden]{display:none}
+.fb-bsrc .fb-mix label{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 4px 0 10px;
+  font-size:13px;font-weight:600;color:var(--sub);text-align:left}
+.fb-bsrc .fb-mix label + label{border-top:1px solid rgba(255,255,255,.06)}
+.fb-bsrc .fb-mix label span{flex:1}
+.fb-bsrc .fb-mix label b{display:flex;align-items:center;gap:6px}
+.fb-bsrc .fb-mix label u{text-decoration:none;font-size:10px;font-weight:600;color:var(--muted)}
+.fb-bsrc-note{margin-top:12px;font-size:12px;font-weight:600;color:var(--dn);line-height:1.4}
+.fb-bsrc-note[hidden]{display:none}
+.fb-bsrc-wait{margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
+.fb-bsrc .crw-ask-b:disabled{opacity:.45}
+.fb-loan-how{padding:12px 16px 14px;font-size:12px;line-height:1.45;color:var(--muted)}
+.fb-loan .fb-e-b i{white-space:normal;line-height:1.35}
+
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 /* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
    он читается целиком, а не собирается в голове из двух списков. */
@@ -20983,7 +21004,7 @@ function fbRepaint(){
   if(!document.getElementById('accOv').classList.contains('show')) return;
   // открыта страница расхода (статья, аренда, зарплаты, история) — месяц
   // листается прямо на ней, экран под ней трогать незачем
-  if(FB.hist || FB.lpage || FB.rentGrp || FB.salPage){ fbPagePaint(); return; }
+  if(FB.hist || FB.lpage || FB.rentGrp || FB.salPage || FB.loanPage || FB.takePage){ fbPagePaint(); return; }
   // страница удержаний человека: только список, форму с набранным не трогаем
   if(fbItemOn()){ fbItemPersonPaint(); return; }
   // шаги штрафного листа и удержания от месяца не зависят — не трогаем вовсе
@@ -21012,6 +21033,13 @@ async function fbSave(inp){
   if(now === was || (!text && now !== null && was !== null && Math.abs(now - was) < .005)){ back(); return; }
   if(!text && now !== null && Math.abs(now) > 10000000){ back(); _toast('Слишком большое число'); return; }
   if(day && !await fbAskDay(day, FB_T[field] || 'Запись')){ back(); return; }
+  // Оплата Барракуде — своей ручкой: не хватает в стопке — спросит, откуда взять.
+  if(field === 'pay' && day){
+    if(!await fbPayB(day, now, true)){ back(); return; }
+    inp.dataset.was = now === null ? '' : now; inp.value = fbInFmt(now, inp.dataset.dec);
+    inp.classList.add('saved'); setTimeout(() => inp.classList.remove('saved'), 900);
+    return;
+  }
   try{
     const url = name ? '/api/owner/finance/book/pay/month' : day ? '/api/owner/finance/book/day' : '/api/owner/finance/book/month';
     const body = name ? {month, name, field, value: now, as: _meName()}
@@ -21044,7 +21072,9 @@ function fbValues(){
          V['d.sal_on'] = d.salary_sum ? 1 : 0; V['d.paid_on'] = d.pay ? 1 : 0; V['d.extra_pay_on'] = d.pay_b_extra ? 1 : 0;
          // «Барракуда»: сколько не хватает выделенного, чтобы закрыть долг
          V['d.b_short'] = Math.max(0, (d.debt_b || 0) - (d.stack_b || 0));
-         V['d.rp_plus_all'] = (d.collected || 0) + (d.collected_cr || 0); }
+         V['d.rp_plus_all'] = (d.collected || 0) + (d.collected_cr || 0);
+         // оплата Барракуде из РП и долг фонда (3 окт 2026)
+         V['d.pay_rp_on'] = d.pay_rp ? 1 : 0; V['d.owed_on'] = d.rp_owed > 0 ? 1 : 0; V['d.back_on'] = d.rp_back_plan > 0 ? 1 : 0; }
   const mb = fbBook(FB.month || fbMonthNow());
   if(mb){
     for(const g of ['totals', 'rp', 'np', 'b', 'safe']) for(const k in mb[g]) V[(g === 'totals' ? 't' : g) + '.' + k] = mb[g][k];
@@ -21375,7 +21405,10 @@ function fbDayBodyHtml(d){
          нормы (владелец, 2 окт 2026). В сейф не ложится: остаётся на кошельке,
          но числится за РП. Предлагается вся свободная; поправить можно. -->
     ${fbIn('РП+ криптой', 'collected_cr', d.manual.collected_cr, sc, {sign: '+', ph: fbInFmt(d.collected_cr || 0, true), phk: 'd.collected_cr', dec: true, eu: d.cr_src === 'free' ? 'вся свободная' : 'AED', cls: 'fb-cr'})}` : ''}
-    ${fbIn(crOn ? 'РП+ наличными' : 'РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? (crOn && d.collected_cr ? 'до нормы' : 'норма') : 'AED'})}
+    ${fbIn(crOn ? 'РП+ наличными' : 'РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? (d.rp_owed_before > 0 ? 'норма + возврат' : crOn && d.collected_cr ? 'до нормы' : 'норма') : 'AED'})}
+    <!-- Фонд отдал Барракуде — РП+ предлагается с возвратом сверх нормы, пока
+         долг не закрыт (владелец, 3 окт 2026). -->
+    ${fbRow('В том числе возврат в РП за Барракуду', 'd.rp_back_plan', d.rp_back_plan, {sub: true, show: 'd.back_on', hide: !(d.rp_back_plan > 0)})}
     ${fbRow('ЧП+', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
     ${crOn ? fbRow('РП+ всего — наличными и криптой', 'd.rp_plus_all', (d.collected || 0) + (d.collected_cr || 0), {sub: true}) : ''}
     ${okRow}
@@ -21388,7 +21421,9 @@ function fbDayBodyHtml(d){
     ${fbIn('Оплатили', 'pay', d.manual.pay, sc, {ph: '0'})}
     ${fbRow('Из стопки Барракуды', 'd.pay_b', d.pay_b, {sub: true, show: 'd.paid_on', hide: !d.pay})}
     ${fbRow('Сверх стопки — из ЧП', 'd.pay_b_extra', d.pay_b_extra, {sub: true, show: 'd.extra_pay_on', hide: !d.pay_b_extra})}
+    ${fbRow('Сверх стопки — из РП', 'd.pay_rp', d.pay_rp, {sub: true, show: 'd.pay_rp_on', hide: !d.pay_rp})}
     ${fbRow('Долг Барракуде', 'd.debt_b', d.debt_b, {sum: true, mode: 'debt'})}
+    ${fbRow('Взято из РП — ещё не вернулось', 'd.rp_owed', d.rp_owed, {sub: true, mode: 'debt', show: 'd.owed_on', hide: !(d.rp_owed > 0)})}
   </div>
   <div class="sc fb-gut">
     ${fbCapT('В сейфе после дня')}
@@ -21431,6 +21466,7 @@ function fbDays(rows){
 }
 async function fbMonthScreen(title){
   _setText('accTitle', title);
+  FB.loanPage = false; FB.takePage = false;
   FB.month = FB.month || fbMonthNow();
   _setText('accSub', fbMonthT(FB.month));
   const m = FB.month;
@@ -21611,7 +21647,9 @@ function fbDdcParts(d, month){
   const npOut = (d.payouts || []).map(e => it(
     (month ? (e.who || e.comment) : [e.who, e.comment].filter(Boolean).join(' · ')) || 'Выплата', e.amount));
   npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra));
-  const outs = [{name: 'РП−', v: n(d.expenses_sum) - n(d.expenses_cr_sum), items: has(rpOut)},
+  // Барракуде из РП (владелец, 3 окт 2026) — тоже уход из стопки РП.
+  rpOut.push(it('Барракуде сверх её стопки', d.pay_rp));
+  const outs = [{name: 'РП−', v: n(d.expenses_sum) - n(d.expenses_cr_sum) + n(d.pay_rp), items: has(rpOut)},
                 {name: 'ЧП−', v: n(d.payouts_sum) + n(d.pay_b_extra), items: has(npOut)}];
   if(n(d.pay_b)) outs.push({name: 'Барракуда−', v: n(d.pay_b), items: [it('Оплата Барракуде', d.pay_b)]});
   const sum = a => a.reduce((t, r) => t + r.v, 0);
@@ -21724,6 +21762,7 @@ function fbRpInRows(b){
     const parts = [];
     if(!d.ok && (d.collected || d.collected_cr)) parts.push(`ждёт подтверждения: ${fbFmt((d.collected || 0) + (d.collected_cr || 0))}`);
     if(cr) parts.push(`криптой ${fbFmt(cr)}`);
+    if(d.ok && d.rp_back) parts.push(`возврат за Барракуду ${fbFmt(d.rp_back)}`);
     if(d.extra_rp) parts.push(`приход ${fbFmt(d.extra_rp)}${d.cr_cash ? ` · из них перекладка ${fbFmt(d.cr_cash)}` : ''}`);
     const sub = parts.join(' · ');
     return `<div class="fb-e"><span class="fb-e-b"><b>${escS(fbDayT(d.day))}</b>${sub ? `<i>${sub}</i>` : ''}</span>
@@ -21758,7 +21797,8 @@ function fbHistRows(b){
   ((b.budget || {}).lines || []).forEach(l => { byId[l.id] = l; });
   const grp = e => ((byId[e.line] || {}).group || '');
   const hit = (e, f) => f === '' ? true
-    : f === 'salary' ? !!e.kind
+    : f === 'salary' ? ['salary', 'advance', 'loan'].includes(e.kind)
+    : f === 'take' ? e.kind === 'take'
     : f === 'none' ? (!e.line && !e.kind)
     : f.startsWith('l:') ? e.line === f.slice(2)
     : f === 'g:auto' ? ['car', 'auto'].includes(grp(e))
@@ -21784,6 +21824,7 @@ function fbHistOpts(b){
   const opts = [{id: '', t: 'Все расходы', i: 'inbox'}, {id: 'salary', t: 'Зарплаты', i: 'money'}];
   FB_HIST_G.forEach(([g, t, i]) => { if(has(g)) opts.push({id: 'g:' + g, t, i}); });
   lines.filter(l => !l.group).forEach(l => opts.push({id: 'l:' + l.id, t: escS(l.name), i: fbHistIco(l.name)}));
+  opts.push({id: 'take', t: 'Забрали из РП', i: 'export'});
   opts.push({id: 'none', t: 'Без статьи', i: 'warn'});
   return opts;
 }
@@ -21834,8 +21875,9 @@ function fbHistHtml(b){
   ${days || '<div class="sc"><div class="fb-none">Таких расходов в этом месяце не было</div></div>'}`;
 }
 function fbHistRow(e){
-  const t = e.kind_t ? `${e.kind_t} · ${escS(e.who)}` : (e.line_name ? escS(e.line_name) : escS(e.comment || 'Расход'));
+  const t = e.kind_t ? (e.who ? `${e.kind_t} · ${escS(e.who)}` : e.kind_t) : (e.line_name ? escS(e.line_name) : escS(e.comment || 'Расход'));
   const sub = [!e.kind && e.who ? 'кому ' + escS(e.who) : '',
+               e.kind === 'take' && e.at ? fbAtT(e.at) : '',
                e.route_from || e.route_to ? `${escS(e.route_from || '?')} → ${escS(e.route_to || '?')}` : '',
                e.line_name && e.comment ? escS(e.comment) : '', e.kind_t && e.comment ? escS(e.comment) : '',
                e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
@@ -22537,8 +22579,11 @@ async function fbFillOk(){
   if(Number.isNaN(val) || val < 0){ _toast('Нужно число'); return; }
   let url, body;
   if(e.kind === 'bpay'){
-    // Оплата Барракуде: выделяют ей не здесь — на экране распределения выручки.
-    url = '/api/owner/finance/book/day'; body = {day: e.id, field: 'pay', value: val, as: _meName()};
+    // Оплата Барракуде — своей ручкой: в стопке не хватает — спросит, откуда
+    // взять недостающее (из ЧП, из РП или понемногу отовсюду).
+    FB.edit = null;
+    if(!await fbPayB(e.id, val)) fbBudRepaint();
+    return;
   }else if(e.kind === 'rate'){
     url = '/api/owner/finance/book/pay/month';
     body = {month: FB.month, name: e.id, field: 'rate', value: val > 0 ? val : null, cur: FB.editCur || 'AED', as: _meName()};
@@ -22626,16 +22671,17 @@ function fbBParts(d, b){
   const n = v => +v || 0, day = d.day;
   const days = (b || {}).days || [], i = days.findIndex(x => x.day === day);
   const from = i > 0 ? n(days[i - 1].stack_b) : n(((b || {}).opening || {}).safe_b_open);
-  const aside = d.pending ? 0 : n(d.aside), payB = n(d.pay_b), payX = n(d.pay_b_extra), pay = payB + payX;
+  // Сверх стопки платят из ЧП (payX) и/или из РП (payR) — владелец, 3 окт 2026.
+  const aside = d.pending ? 0 : n(d.aside), payB = n(d.pay_b), payX = n(d.pay_b_extra), payR = n(d.pay_rp), pay = payB + payX + payR;
   const end = from + aside - payB;
-  return {from, aside, payB, payX, pay, end, diff: Math.round(end - n(d.stack_b)), move: n(d.ordered) - pay};
+  return {from, aside, payB, payX, payR, pay, end, diff: Math.round(end - n(d.stack_b)), move: n(d.ordered) - pay, owed: n(d.rp_owed)};
 }
 function fbBBodyHtml(d){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
   const day = d.day, b = fbBook(day.slice(0, 7)) || {}, n = v => +v || 0;
   const paid = d.manual.pay !== null && d.manual.pay !== undefined;
   const sup = (d.supplies || []).find(x => x.kind === 'main');
-  const {from, aside, payB, payX, pay, end, diff} = fbBParts(d, b);
+  const {from, aside, payB, payX, payR, pay, end, diff, owed} = fbBParts(d, b);
   const v = (x, sign) => `<b>${sign || (x < 0 ? '−' : '')}${fbFmt(Math.abs(x))}<u>AED</u></b>`;
   const row = (cls, name, val, sign) => `<div class="dds-r ${cls}"><span>${name}</span>${v(val, sign)}</div>`;
   const item = (name, val, sign) => `<div class="dds-i"><span>${escS(name)}</span>${v(val, sign)}</div>`;
@@ -22646,7 +22692,9 @@ function fbBBodyHtml(d){
     : `<div class="dds-r ${pay ? 'out' : 'zero'}"><span>Заплатили Барракуде</span>
         <button class="dds-pen" onclick="fbFillEdit('bpay','${day}')" aria-label="${paid ? 'Исправить' : 'Вписать'}">${
           paid || pay ? _FB_PEN : 'Вписать'}</button>${v(pay, pay ? '−' : '')}</div>`
-      + (payX ? item('Из стопки Барракуды', payB, '−') + item('Сверх стопки — из ЧП', payX, '−') : '');
+      + (payX || payR ? item('Из стопки Барракуды', payB, '−') : '')
+      + (payX ? item('Сверх стопки — из ЧП', payX, '−') : '')
+      + (payR ? item('Сверх стопки — из РП', payR, '−') : '');
   // Долг: заявка прибавляет, оплата убавляет.
   const move = n(d.ordered) - pay;
   const долг = move > 0 ? `долг вырос на ${fbFmt(move)}` : move < 0 ? `долг уменьшился на ${fbFmt(-move)}` : 'долг не изменился';
@@ -22660,6 +22708,7 @@ function fbBBodyHtml(d){
     <div class="dds-tot end long${end < 0 ? ' neg' : ''}"><span>Остаётся в сейфе на Барракуду</span>${v(end)}</div>
     ${diff ? row('out', 'Не сходится с сейфом', diff) : ''}
     <div class="dds-r ${d.debt_b > 0 ? 'out' : ''}"><span>Долг после дня<i class="sub">${долг}</i></span>${v(n(d.debt_b))}</div>
+    ${owed > 0 ? `<div class="dds-r out"><span>Взято из РП — ещё не вернулось<i class="sub">вернётся из выручки: РП+ следующих дней сверх нормы</i></span>${v(owed)}</div>` : ''}
   </div>
   ${FB.bDebt ? fbBDebtHtml(b) : ''}`;
 }
@@ -22712,12 +22761,146 @@ function fbBRow(kind, day, name, value, ok, sub){
 // раскладки дня, оплата — сумма заявки полем pay.
 async function fbBOk(kind, day){
   const d = fbDayOf(fbBook(day.slice(0, 7)), day); if(!d) return;
-  try{
-    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day', {method: 'POST', body: {day, field: 'pay', value: d.ordered || 0, as: _meName()}});
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    if(res.book){ fbApply(res.book); fbPaint(); }
-    fbDayReload();
-  }catch(e){ _toast('Не удалось сохранить'); }
+  await fbPayB(day, d.ordered || 0);
+}
+// ── Оплата Барракуде: откуда недостающее ──────────────────────────────────
+// Владелец, 3 окт 2026: «в сейфе не хватило денег на Барракуду, но программа
+// знает, что есть сумма в ЧП или в РП — пусть предлагает взять из РП, из ЧП
+// или понемногу отовсюду; потом предлагать собрать больше на следующий день,
+// пока не вернёмся к тому РП, который должен быть; с ЧП проще — берём, в
+// истории пишем, что брали и сколько».
+// Сумма одна; из стопки Барракуды — сколько там есть; не хватило — вопрос.
+// Сервер делит так же и отказывает, если в выбранной стопке столько нет
+// (409 not_enough): тогда вопрос повторяется с его остатками. true — записано.
+async function fbPayB(day, amount, asked){
+  if(amount !== null && amount !== undefined && !(amount >= 0)){ _toast('Нужно число'); return false; }
+  if(!asked && !await fbAskDay(day, 'Оплатили Барракуде')) return false;
+  let pick = {src: '', rp: 0, force: false}, info = amount > 0 ? fbBShort(day, amount) : null;
+  if(info && info.short > 0){ pick = await fbAskBSrc(info); if(!pick) return false; }
+  for(let turn = 0; turn < 3; turn++){
+    try{
+      const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/pay',
+        {method: 'POST', body: {day, pay: amount, src: pick.src, rp: pick.rp, force: !!pick.force, as: _meName()}});
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      if(res.book){ fbApply(res.book); fbPaint(); }
+      if(ACC_VIEW === 'finb') fbDayReload();
+      if(res.from_np > 0 || res.from_rp > 0) _toast(`Из стопки ${fbFmt(res.from_b)}${res.from_np ? ` · из ЧП ${fbFmt(res.from_np)}` : ''}${res.from_rp ? ` · из РП ${fbFmt(res.from_rp)}` : ''}`);
+      return true;
+    }catch(e){
+      const p = (e && e.payload) || {};
+      if(p.error === 'not_enough' && info){
+        // книга на сервере свежее — спросить ещё раз с его остатками
+        info = {...info, bHave: p.b, short: p.short, fromB: Math.round((amount - p.short) * 100) / 100, np: p.np, rp: p.rp};
+        pick = await fbAskBSrc(info); if(!pick) return false;
+        continue;
+      }
+      _toast(p.error === 'future' ? 'Этот день ещё не наступил' : p.error === 'bad_split' ? 'Из РП больше, чем не хватает' : 'Не удалось сохранить');
+      return false;
+    }
+  }
+  return false;
+}
+// Сколько не хватает в стопке Барракуды на эту оплату и что лежит в ЧП и РП —
+// без сегодняшней оплаты (её ведь переписываем). Та же арифметика, что в
+// fbBParts и в ядре: стопка = вчерашняя + выделенное сегодня (если день
+// подтверждён).
+function fbBShort(day, amount){
+  const b = fbBook(day.slice(0, 7)), d = fbDayOf(b, day); if(!d) return null;
+  const n = v => +v || 0, r2 = v => Math.round(v * 100) / 100, P = fbBParts(d, b);
+  const bHave = Math.max(0, P.from + P.aside), fromB = Math.min(amount, bHave), short = r2(amount - fromB);
+  const np = r2(n(d.stack_np) + n(d.pay_b_extra)), rp = r2(n(d.stack_rp) + n(d.pay_rp));
+  const wait = (b.days || []).filter(x => x.pending && x.day <= day && n(x.base) > 0);
+  const m = d.manual || {};
+  return {day, amount, bHave, fromB, short, np, rp, wait, cur: {src: m.pay_src || '', rp: n(m.pay_rp)}};
+}
+// Окно «не хватает в стопке Барракуды»: три источника карточками — из ЧП, из
+// РП, понемногу отовсюду. Предлагаем то, что покроет: ЧП, если в ней хватает
+// (возвращать не надо); иначе ЧП целиком и остальное из РП; иначе РП. Ни одна
+// не покрывает — записать можно, но окно говорит, какая стопка уйдёт в минус,
+// и кнопка краснеет. Ответ: {src, rp, force} или null — передумал.
+const FB_ICO_MIX = '<svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="7.5" height="13" rx="2"/><rect x="13.5" y="5.5" width="7.5" height="13" rx="2"/><path d="M10.5 12h3"/></svg>';
+function fbAskBSrc(info){
+  return new Promise(resolve => {
+    closePinPop();
+    const r2 = v => Math.round(v * 100) / 100, short = r2(info.short), npHave = r2(info.np), rpHave = r2(info.rp);
+    let src = npHave + 0.005 >= short ? 'np' : (npHave > 0 && npHave + rpHave + 0.005 >= short) ? 'mix' : 'rp';
+    let mixNp = r2(Math.min(Math.max(0, npHave), short)), mixRp = r2(short - mixNp);
+    // правка записанной оплаты — с тем выбором, что был
+    if(info.cur && ['np', 'rp', 'mix'].includes(info.cur.src)) src = info.cur.src;
+    if(info.cur && info.cur.src === 'mix'){ mixRp = r2(Math.min(Math.max(0, info.cur.rp), short)); mixNp = r2(short - mixRp); }
+    const back = document.createElement('div');
+    back.className = 'pin-back ask';
+    back.addEventListener('click', () => { closePinPop(); resolve(null); });
+    const box = document.createElement('div');
+    box.className = 'pin-pop crw-ask crw-pick fb-bsrc';
+    const row = (id, ico, t) => `<button class="crw-ask-r" data-src="${id}">
+        <span class="crw-ask-i">${ico}</span>
+        <span class="crw-ask-n"><b>${t}</b><i data-sub="${id}"></i></span>
+        <span class="crw-ask-q" data-q="${id}"></span></button>`;
+    const wait = (info.wait || []).map(x => fbDayT(x.day));
+    box.innerHTML = `<div class="crw-ask-t">Не хватает в стопке Барракуды</div>
+      <div class="crw-ask-s">Оплата ${fbFmt(info.amount)} AED · в стопке ${fbFmt(info.bHave)}<br>не хватает <b>${fbFmt(short)}</b> AED</div>
+      <div class="crw-ask-g">Откуда взять недостающее</div>
+      <div class="crw-ask-box">
+        ${row('np', FB_ICO.np, 'Из ЧП')}
+        ${row('rp', FB_ICO.rp, 'Из РП')}
+        ${row('mix', FB_ICO_MIX, 'Понемногу отовсюду')}
+        <div class="fb-mix" id="fbMix" hidden>
+          <label><span>Из ЧП</span><b><input class="fb-num" inputmode="decimal" id="fbMixNp" autocomplete="off"><u>AED</u></b></label>
+          <label><span>Из РП</span><b><input class="fb-num" inputmode="decimal" id="fbMixRp" autocomplete="off"><u>AED</u></b></label>
+        </div>
+      </div>
+      <div class="fb-bsrc-note" id="fbBsrcNote" hidden></div>
+      ${wait.length ? `<div class="fb-bsrc-wait">Распределение не подтверждено: ${escS(wait.join(', '))}. После подтверждения в стопках прибавится.</div>` : ''}
+      <button class="crw-ask-b go" id="askOk">Записать оплату</button>
+      <button class="crw-ask-b no" id="askNo">Отмена</button>`;
+    document.body.append(back, box);
+    const $ = q => box.querySelector(q);
+    const num = id => { const v = +String(($('#' + id) || {}).value || '').replace(/\s/g, '').replace(',', '.'); return Number.isNaN(v) ? 0 : v; };
+    const parts = () => src === 'np' ? {np: short, rp: 0} : src === 'rp' ? {np: 0, rp: short} : {np: num('fbMixNp'), rp: num('fbMixRp')};
+    const q = v => `${fbFmt(v)}<u>AED</u>`;
+    const paint = () => {
+      box.querySelectorAll('.crw-ask-r').forEach(el => el.classList.toggle('main', el.dataset.src === src));
+      $('#fbMix').hidden = src !== 'mix';
+      const p = parts(), lackNp = r2(p.np - npHave), lackRp = r2(p.rp - rpHave);
+      $('[data-q="np"]').innerHTML = q(short); $('[data-q="rp"]').innerHTML = q(short);
+      $('[data-q="mix"]').innerHTML = src === 'mix' ? q(r2(p.np + p.rp)) : `${fbFmt(mixNp)} + ${fbFmt(mixRp)}<u>AED</u>`;
+      $('[data-sub="np"]').innerHTML = npHave + 0.005 >= short ? `в ЧП ${fbFmt(npHave)} · берём, возвращать не надо` : `<span class="dn">в ЧП только ${fbFmt(npHave)}</span>`;
+      $('[data-sub="rp"]').innerHTML = rpHave + 0.005 >= short ? `в РП ${fbFmt(rpHave)} · вернётся из выручки следующих дней` : `<span class="dn">в РП только ${fbFmt(rpHave)}</span>`;
+      $('[data-sub="mix"]').innerHTML = 'из ЧП и из РП — суммы можно поправить';
+      let note = '', bad = false;
+      if(src === 'mix' && Math.abs(p.np + p.rp - short) > 0.005){ note = `Вместе должно быть ${fbFmt(short)} AED`; bad = true; }
+      else{
+        const lacks = [];
+        if(lackNp > 0.005) lacks.push(`ЧП уйдёт в минус на ${fbFmt(lackNp)}`);
+        if(lackRp > 0.005) lacks.push(`РП уйдёт в минус на ${fbFmt(lackRp)}`);
+        note = lacks.join(' · ');
+      }
+      const nt = $('#fbBsrcNote'); nt.textContent = note; nt.hidden = !note;
+      const ok = $('#askOk');
+      ok.disabled = bad;
+      ok.textContent = !bad && note ? 'Записать всё равно' : 'Записать оплату';
+      ok.classList.toggle('bad', !bad && !!note); ok.classList.toggle('go', bad || !note);
+    };
+    box.querySelectorAll('.crw-ask-r').forEach(el => el.onclick = () => {
+      src = el.dataset.src;
+      if(src === 'mix'){ $('#fbMixNp').value = fbFmt(mixNp); $('#fbMixRp').value = fbFmt(mixRp); }
+      paint();
+      try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+    });
+    // одно поле правят — второе досчитывается до недостающего
+    $('#fbMixNp').oninput = () => { mixNp = r2(Math.min(Math.max(0, num('fbMixNp')), short)); mixRp = r2(short - mixNp); $('#fbMixRp').value = fbFmt(mixRp); paint(); };
+    $('#fbMixRp').oninput = () => { mixRp = r2(Math.min(Math.max(0, num('fbMixRp')), short)); mixNp = r2(short - mixRp); $('#fbMixNp').value = fbFmt(mixNp); paint(); };
+    $('#askOk').onclick = () => {
+      const p = parts(), force = p.np > npHave + 0.005 || p.rp > rpHave + 0.005;
+      closePinPop();
+      resolve({src, rp: src === 'mix' ? r2(p.rp) : (src === 'rp' ? short : 0), force});
+    };
+    $('#askNo').onclick = () => { closePinPop(); resolve(null); };
+    if(src === 'mix'){ $('#fbMixNp').value = fbFmt(mixNp); $('#fbMixRp').value = fbFmt(mixRp); }
+    paint();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  });
 }
 // В заявку — и обратно сюда же.
 function fbBToSupply(day){
@@ -22730,7 +22913,7 @@ async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {};
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null; FB.rentGrp = null;
-  FB.salPage = false; FB.hist = null; FB.sec = null; FB.rpPage = false;
+  FB.salPage = false; FB.hist = null; FB.sec = null; FB.rpPage = false; FB.loanPage = false; FB.takePage = false;
   // Две карточки одного размера делят остаток экрана: листается ВНУТРИ каждой,
   // страница не прокручивается (владелец: «занимали всю страницу ровно»).
   document.getElementById('accMid').innerHTML = `
@@ -22747,6 +22930,10 @@ async function accFinRP(){
         ${fbTile('Наличные', 'safe.rp', s.rp, {mode: 'neg', unit: 'AED · в сейфе'})}
         ${fbTile('Крипта', 'safe.rp_cr', s.rp_cr || 0, {unit: 'AED · на кошельке', go: 'fbOpenWal(accFinRP)'})}
       </div>
+      <!-- Фонд одалживал Барракуде (владелец, 3 окт 2026): сколько ещё не
+           вернулось — и страница, как отдавали и как возвращается. -->
+      ${(s.rp_b || s.rp_owed || s.open_rp_owed) ? fbGo('Барракуде из РП', 'safe.rp_owed', s.rp_owed, 'fbBLoanPage()',
+          {unit: s.rp_owed > 0 ? 'не вернулось' : 'вернулось', mode: 'debt', cls: 'fb-rploan'}) : ''}
     </div>
     <button class="sc fb-rpbtn" onclick="fbRpInPage()">
       <span class="fb-hcap-t"><b>РП+</b><i>смотреть историю по дням</i></span>
@@ -22776,8 +22963,11 @@ function fbRpSections(b){
 }
 function fbRpSecTiles(b){
   const secs = fbRpSections(b);
-  if(!secs.length) return `<button class="fb-fchip" onclick="accOpen('finbud')"><em>${IC('warn', 16)}</em><span>Бюджет не заполнен</span></button>`;
-  return secs.map(x => `<button class="fb-fchip" onclick="${x.go}"><em>${IC(x.i, 16)}</em><span>${x.t}</span></button>`).join('');
+  const hint = secs.length ? '' : `<button class="fb-fchip" onclick="accOpen('finbud')"><em>${IC('warn', 16)}</em><span>Бюджет не заполнен</span></button>`;
+  // «Забрать из РП» (владелец, 3 окт 2026) — вынуть из фонда не по статье: с
+  // комментарием и датой, когда взяли.
+  secs.push({t: 'Забрать из РП', i: 'export', go: 'fbTakePage()'});
+  return hint + secs.map(x => `<button class="fb-fchip" onclick="${x.go}"><em>${IC(x.i, 16)}</em><span>${x.t}</span></button>`).join('');
 }
 // Страница раздела: те же плитки, только его детьми (авто, бытовые, sim)
 const FB_SEC_T = {auto: 'Расходы на автомобили', home: 'Бытовые расходы', sim: 'Sim'};
@@ -22814,6 +23004,115 @@ function fbSecHtml(b){
       tiles.map(x => `<button class="fb-fchip" onclick="${x.go}"><em>${IC(x.i, 16)}</em><span>${x.t}</span></button>`).join('')}</div></div>`;
 }
 // Страница РП+: те же дни, но во всю высоту и с итогами
+// ── «Барракуде из РП»: что фонд отдал и что вернулось ─────────────────────
+// Владелец, 3 окт 2026: отдали Барракуде из РП — потом в РП+ предлагается
+// собрать больше нормы, пока фонд не вернёт своё. Здесь — отдано, вернулось,
+// не вернулось, и по дням: когда отдавали и когда возвращалось.
+function fbBLoanPage(){
+  const b = fbBook(FB.month); if(!b) return;
+  FB.loanPage = true; FB.takePage = false; FB.rpPage = false; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
+  _setText('accTitle', 'Барракуде из РП'); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbBLoanHtml(b)}</div>`;
+  mid.scrollTop = 0;
+  ACC_BACK = accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbBLoanPaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  if(b && body) body.innerHTML = fbBLoanHtml(b);
+}
+// Время записи в книге приходит строкой базы (с пробелом и микросекундами) —
+// приводим к тому, что разбирает и Safari.
+function fbAtT(at){ return _hmDubai(String(at || '').replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1')); }
+function fbBLoanHtml(b){
+  const s = b.safe || {}, n = v => +v || 0, rows = [];
+  (b.days || []).filter(d => !d.future && (n(d.pay_rp) || n(d.rp_back))).forEach(d => {
+    if(n(d.pay_rp)) rows.push({day: d.day, at: d.pay_at, t: 'Отдано Барракуде', v: -n(d.pay_rp), left: n(d.rp_owed_before),
+                               sub: `из оплаты ${fbFmt(d.pay)}${d.pay_by ? ' · ' + escS(d.pay_by) : ''}`});
+    if(n(d.rp_back)) rows.push({day: d.day, t: 'Вернулось из выручки', v: n(d.rp_back), left: n(d.rp_owed),
+                                sub: `РП+ сверх нормы ${fbFmt(d.norm)}`});
+  });
+  rows.reverse();
+  return `<div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Отдано', 'safe.rp_b', s.rp_b)}
+      ${fbTile('Вернулось', 'safe.rp_back', s.rp_back)}
+      ${fbTile('Не вернулось', 'safe.rp_owed', s.rp_owed, {mode: 'debt'})}
+    </div>
+    ${s.open_rp_owed ? fbRow('Не вернулось с прошлого месяца', 'safe.open_rp_owed', s.open_rp_owed, {sub: true}) : ''}
+  </div>
+  <div class="sc"><div class="fb-loan-how">Пока фонд не вернул своё, в РП+ каждого дня предлагается норма и сверх неё — долг, в пределах выручки дня. Собранное сверх нормы и есть возврат.</div></div>
+  <div class="sc">${fbCapT('По дням')}<div class="fb-one fb-loan">${rows.length ? rows.map(r => `<div class="fb-e">
+      <span class="fb-e-b"><b>${r.t}</b><i>${escS(fbDayT(r.day))}${r.at ? ', ' + fbAtT(r.at) : ''} · ${r.sub}<br>осталось вернуть ${fbFmt(r.left)}</i></span>
+      <b class="fb-e-v${r.v < 0 ? ' dn' : ' ok'}">${r.v < 0 ? '−' : '+'}${fbFmt(Math.abs(r.v))}<u>AED</u></b></div>`).join('')
+    : '<div class="fb-none">В этом месяце фонд Барракуде не одалживал</div>'}</div></div>`;
+}
+// ── «Забрать из РП»: вынуть из фонда с комментарием и датой ──────────────
+// Владелец, 3 окт 2026: «добавь возможность забирать РП с возможностью
+// оставлять комментарий и пиши дату, когда взяли». Запись — РП− вида take:
+// без статьи и чека, за что — обязательно.
+function fbTakePage(){
+  const b = fbBook(FB.month); if(!b) return;
+  FB.takePage = true; FB.loanPage = false; FB.rpPage = false; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
+  _setText('accTitle', 'Забрать из РП'); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbTakeHtml(b)}</div>`;
+  mid.scrollTop = 0;
+  ACC_BACK = accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbTakePaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  if(b && body) body.innerHTML = fbTakeHtml(b);
+}
+function fbTakeRows(b){
+  const rows = [];
+  (b.days || []).forEach(d => (d.expenses || []).forEach(e => { if(e.kind === 'take') rows.push({...e, day: d.day}); }));
+  rows.sort((x, y) => (y.day + String(y.at)).localeCompare(x.day + String(x.at)));
+  return rows;
+}
+function fbTakeHtml(b){
+  const rows = fbTakeRows(b), sum = rows.reduce((a, e) => a + (e.amount || 0), 0);
+  const day = FB.month === fbMonthNow() ? b.today : b.last;
+  return `<div class="sc fb-gut">
+    ${fbCap(b.month, true)}
+    <div class="aud-g">
+      ${fbTile('Забрали', 'take.sum', sum)}
+      ${fbTile('Записей', 'take.n', rows.length, {unit: pluralize(rows.length, 'запись', 'записи', 'записей')})}
+      ${fbTile('В РП сейчас', 'safe.rp', (b.safe || {}).rp, {mode: 'neg'})}
+    </div>
+  </div>
+  <div class="sc">${fbCapT('Забрать')}
+    <div class="fb-add fb-lnf">
+      <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-take"
+        onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-take').focus()}">
+      <input class="fb-txt" placeholder="За что / куда" autocomplete="off" maxlength="120" id="fbCmt-take"
+        onkeydown="if(event.key==='Enter'){fbTakeAdd('${day}')}">
+      <button class="aud-b go" onclick="fbTakeAdd('${day}')">Записать</button>
+    </div></div>
+  <div class="sc">${fbCapT('Забирали', rows.length ? fbFmt(sum) + ' AED' : '')}<div class="fb-one">${rows.length ? rows.map(e => `<div class="fb-e">
+      <span class="fb-e-b"><b>${escS(e.comment || 'Забрали из РП')}</b><i>${escS(fbDayT(e.day))}${e.at ? ', ' + fbAtT(e.at) : ''}${e.pay === 'crypto' ? ' · криптой' : ''}${e.by ? ' · записал ' + escS(e.by) : ''}</i></span>
+      <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
+      <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
+    </div>`).join('') : '<div class="fb-none">В этом месяце из РП не забирали</div>'}</div></div>`;
+}
+async function fbTakeAdd(day){
+  const amount = fbAmt('fbAmt-take'), comment = fbTxt('fbCmt-take');
+  if(!(amount > 0)){ _toast('Нужна сумма'); const a = document.getElementById('fbAmt-take'); if(a) a.focus(); return; }
+  if(!comment){ _toast('Впишите, за что'); const c = document.getElementById('fbCmt-take'); if(c) c.focus(); return; }
+  if(!await fbAskDay(day, 'Забрали из РП')) return;
+  const pay = await fbAskPay(day.slice(0, 7)); if(pay === null) return;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
+      {method: 'POST', body: {day, book: 'rp', amount, comment, kind: 'take', line: '', pay, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbTakePaint();
+    _toast(`Забрали из РП · ${fbFmt(amount)} AED`);
+  }catch(e){ _toast(fbCrErr(e) || 'Не удалось записать'); }
+}
 function fbRpInPage(){
   const b = fbBook(FB.month); if(!b) return;
   FB.rpPage = true; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
@@ -23124,6 +23423,8 @@ function fbPagePaint(){
   else if(FB.sec) fbSecPaint();
   else if(FB.rpPage) fbRpInPaint();
   else if(FB.who) fbWhoPaint();
+  else if(FB.loanPage) fbBLoanPaint();
+  else if(FB.takePage) fbTakePaint();
 }
 function fbLinePayPaint(){
   const b = fbBook(FB.month), body = document.getElementById('fbPayBody');

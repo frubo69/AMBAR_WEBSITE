@@ -18,7 +18,8 @@
 
 from __future__ import annotations
 
-DAY_MANUAL = ('handed_fact', 'aside', 'collected', 'extra_rp', 'pay', 'pay_b', 'pay_b_extra')
+DAY_MANUAL = ('handed_fact', 'aside', 'collected', 'extra_rp', 'pay', 'pay_b', 'pay_b_extra',
+              'pay_src', 'pay_rp')
 MONTH_MANUAL = ('safe_b_open', 'debt_b_open', 'carry_np', 'storage',
                 'safe_np_fact', 'safe_b_fact')
 
@@ -60,10 +61,19 @@ def compute(days: list[dict], opening: dict) -> dict:
                         ежедневной раскладки: часть комиссии вывода, взятая из
                         свободной (тут же тратится расходом «криптой»)
          pay            оплатили Баракуде всего за день: сначала из стопки
-                        Баракуды, остальное — из ЧП (делится само); если задано,
-                        pay_b / pay_b_extra ниже не читаются
+                        Баракуды, недостающее — из ЧП и/или РП (делится само
+                        по pay_src); если задано, pay_b / pay_b_extra ниже не
+                        читаются
+         pay_src        откуда взято недостающее сверх стопки Баракуды
+                        (владелец, 3 окт 2026): '' или 'np' — из ЧП (как было),
+                        'rp' — всё из РП, 'mix' — из РП pay_rp, остальное из ЧП
+         pay_rp         при pay_src='mix' — сколько недостающего взято из РП;
+                        при явных pay_b / pay_b_extra — оплата из РП своей суммой
+         norm           норма РП+ дня (из бюджета): по ней видно, сколько в
+                        РП+ собрано СВЕРХ нормы — это возврат того, что фонд
+                        отдал Баракуде (см. rp_owed)
          pay_b          оплатили Баракуде из сейфа Б
-         pay_b_extra    добавили оплату Баракуде из ЧП / РП
+         pay_b_extra    добавили оплату Баракуде из ЧП
          expenses       [{amount, comment, pay}] — расходы предприятия из
                         фонда; pay='crypto' — платили криптой: вычитается из
                         крипта-части РП, наличные сейфа не трогает
@@ -78,6 +88,8 @@ def compute(days: list[dict], opening: dict) -> dict:
          rp_open, np_open           — стопки РП и ЧП в сейфе на начало месяца
                                       (три стопки сейфа: Баракуда, РП, ЧП)
          rp_cr_open                 — крипта на счету РП на начало месяца
+         rp_owed_open               — сколько фонд РП отдал Баракуде и ещё не
+                                      вернул на начало месяца
          safe_np_fact, safe_b_fact  — пересчитанные сейфы (None — не считали)
     """
     safe_b = _n(opening.get('safe_b_open'))
@@ -89,12 +101,18 @@ def compute(days: list[dict], opening: dict) -> dict:
     np_st = _n(opening.get('np_open'))
     # Крипта-часть РП: лежит на кошельке, а не в сейфе, но числится за фондом.
     rp_cr = _n(opening.get('rp_cr_open'))
+    # Что фонд отдал Баракуде и ещё не вернул (владелец, 3 окт 2026: «в
+    # последующем предлагать собрать больше на следующий день, пока не вернёмся
+    # к тому РП, который по состоянию на этот день должен быть»). Возвращается
+    # тем, что в РП+ собрано сверх нормы дня.
+    owed = _n(opening.get('rp_owed_open'))
     out = []
     t = dict(gross=0.0, cash=0.0, spend=0.0, handed=0.0, ordered=0.0,
              ordered_extra=0.0, aside=0.0, collected=0.0, extra_rp=0.0,
              pay_b=0.0, pay_b_extra=0.0, expenses=0.0, np_plus=0.0,
              payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0, pending=0,
-             collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0)
+             collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0,
+             pay_rp=0.0, rp_back=0.0)
     for d in days:
         cash = _n(d.get('cash'))
         spend = _n(d.get('spend'))
@@ -107,6 +125,8 @@ def compute(days: list[dict], opening: dict) -> dict:
         extra_rp = _n(d.get('extra_rp'))
         pay_b = _n(d.get('pay_b'))
         pay_b_extra = _n(d.get('pay_b_extra'))
+        pay_rp = _n(d.get('pay_rp'))
+        norm = _n(d.get('norm'))
         ordered = _n(d.get('ordered'))
         ordered_extra = _n(d.get('ordered_extra'))
         exp_sum = sum(_n(e.get('amount')) for e in (d.get('expenses') or []))
@@ -127,20 +147,37 @@ def compute(days: list[dict], opening: dict) -> dict:
         collected_cr_c = 0.0 if pending else collected_cr
         if d.get('pay') is not None:
             # одна сумма оплаты: из стопки Баракуды, сколько в ней есть (с учётом
-            # подтверждённой раскладки этого дня), остальное из ЧП
+            # подтверждённой раскладки этого дня); недостающее — из ЧП, из РП
+            # или понемногу из обоих, как выбрал старший (pay_src)
             pay_total = _n(d.get('pay'))
             pay_b = min(pay_total, max(0.0, safe_b + aside_c))
-            pay_b_extra = pay_total - pay_b
+            short = pay_total - pay_b
+            src = d.get('pay_src') or ''
+            if src == 'rp':
+                pay_rp = short
+            elif src == 'mix':
+                pay_rp = min(short, max(0.0, pay_rp))
+            else:
+                pay_rp = 0.0
+            pay_b_extra = short - pay_rp
         # книга «Баракуда»: сейф и долг — бегущие остатки
         safe_b = safe_b + aside_c - pay_b
-        debt_b = debt_b + ordered - pay_b - pay_b_extra
+        debt_b = debt_b + ordered - pay_b - pay_b_extra - pay_rp
+        # Долг фонда: отданное Баракуде сегодня прибавляется, а собранное в РП+
+        # сверх нормы (подтверждённого дня) его возвращает — в тот же день или
+        # в следующие. Без нормы возврат не распознать: тогда он не считается.
+        owed_before = owed + pay_rp
+        above = max(0.0, collected_c + collected_cr_c - norm) if norm > 0 else 0.0
+        rp_back = min(owed_before, above)
+        owed = owed_before - rp_back
         # Фонд целиком (наличные + крипта): перекладка крипты в наличные его
-        # не меняет, поэтому cr_cash вычитается из прихода.
-        rp = rp + collected_c + collected_cr_c + extra_rp + extra_cr - cr_cash - exp_sum
+        # не меняет, поэтому cr_cash вычитается из прихода. Отданное Баракуде
+        # из фонда уходит; возврат уже сидит в collected.
+        rp = rp + collected_c + collected_cr_c + extra_rp + extra_cr - cr_cash - exp_sum - pay_rp
         np_acc = np_acc + np_c - pay_sum
         # Наличная стопка РП — только то, что в сейфе; оплаченное криптой её
         # не трогает. Крипта-часть — рядом, своим счётом.
-        rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr)
+        rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr) - pay_rp
         rp_cr = rp_cr + collected_cr_c + extra_cr - exp_cr - cr_cash
         np_st = np_st + np_c - pay_sum - pay_b_extra
         touched = any(d.get(k) is not None for k in DAY_MANUAL) \
@@ -156,12 +193,14 @@ def compute(days: list[dict], opening: dict) -> dict:
             aside=_i(aside), collected=_i(collected), extra_rp=_i(extra_rp),
             collected_cr=_i(collected_cr), cr_cash=_i(cr_cash), extra_cr=_i(extra_cr),
             expenses_cr_sum=_i(exp_cr), stack_rp_cr=_i(rp_cr),
-            pay_b=_i(pay_b), pay_b_extra=_i(pay_b_extra),
+            pay_b=_i(pay_b), pay_b_extra=_i(pay_b_extra), pay_rp=_i(pay_rp),
+            pay_src=d.get('pay_src') or '', norm=_i(norm),
+            rp_owed_before=_i(owed_before), rp_back=_i(rp_back), rp_owed=_i(owed),
             expenses=d.get('expenses') or [], expenses_sum=_i(exp_sum),
             payouts=d.get('payouts') or [], payouts_sum=_i(pay_sum),
             np_plus=_i(np_plus), safe_b=_i(safe_b), debt_b=_i(debt_b),
             rp=_i(rp), np_acc=_i(np_acc), touched=touched,
-            pay=_i(pay_b + pay_b_extra), ok=bool(d.get('ok')), counted=not pending,
+            pay=_i(pay_b + pay_b_extra + pay_rp), ok=bool(d.get('ok')), counted=not pending,
             stack_b=_i(safe_b), stack_rp=_i(rp_st), stack_np=_i(np_st), stack_total=_i(safe_b + rp_st + np_st),
             manual={k: d.get(k) for k in DAY_MANUAL},
         ))
@@ -173,7 +212,7 @@ def compute(days: list[dict], opening: dict) -> dict:
         t['collected'] += collected_c; t['extra_rp'] += extra_rp
         t['collected_cr'] += collected_cr_c; t['expenses_cr'] += exp_cr; t['cr_cash'] += cr_cash
         t['extra_cr'] += extra_cr
-        t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra
+        t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra; t['pay_rp'] += pay_rp; t['rp_back'] += rp_back
         t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
 
     # «РП + и −»
@@ -195,7 +234,7 @@ def compute(days: list[dict], opening: dict) -> dict:
     sold = t['gross'] if t['gross'] else t['handed']
     bought = t['ordered']
     ratio = (bought / (sold / 100.0)) if sold else None
-    paid = t['pay_b'] + t['pay_b_extra']
+    paid = t['pay_b'] + t['pay_b_extra'] + t['pay_rp']
     safe_b_fact = opening.get('safe_b_fact')
     safe_b_diff = None if safe_b_fact is None else _n(safe_b_fact) - safe_b
     # Прибыль по расчёту, не по кассе: продали − купили у базы − расходы фонда
@@ -216,6 +255,10 @@ def compute(days: list[dict], opening: dict) -> dict:
                 # крипта-часть РП: не в сейфе (total — только наличные), рядом
                 open_rp_cr=_i(_n(opening.get('rp_cr_open'))), rp_cr=_i(rp_cr),
                 rp_all=_i(rp_st + rp_cr),
+                # отдано Баракуде из фонда за месяц, что из этого уже вернулось
+                # собранным сверх нормы, и что фонду ещё должны (на конец)
+                rp_b=_i(t['pay_rp']), rp_back=_i(t['rp_back']), rp_owed=_i(owed),
+                open_rp_owed=_i(_n(opening.get('rp_owed_open'))),
                 np_in=_i(t['np_plus']), np_out=_i(t['payouts'] + t['pay_b_extra']),
                 pending=int(t['pending']))
     return dict(
@@ -223,7 +266,8 @@ def compute(days: list[dict], opening: dict) -> dict:
         totals=totals,
         rp=dict(collected=_i(t['collected']), collected_cr=_i(t['collected_cr']),
                 extra=_i(t['extra_rp']), cr_cash=_i(t['cr_cash']),
-                rp_in=_i(rp_in), expenses=_i(t['expenses']), result=_i(rp_result)),
+                rp_in=_i(rp_in), expenses=_i(t['expenses']), result=_i(rp_result),
+                to_b=_i(t['pay_rp']), back=_i(t['rp_back']), owed=_i(owed)),
         np=dict(days=_i(t['np_plus']), rp_result=_i(rp_result), profit=_i(profit),
                 half=_i(half), payouts=_i(t['payouts']), left=_i(np_left),
                 storage=_i(storage), carry=_i(carry_np), should_be=_i(should_be),
@@ -234,6 +278,7 @@ def compute(days: list[dict], opening: dict) -> dict:
                sold=_i(sold), bought=_i(bought),
                ratio=None if ratio is None else round(ratio, 1),
                paid=_i(paid), pay_safe=_i(t['pay_b']), pay_extra=_i(t['pay_b_extra']),
+               pay_rp=_i(t['pay_rp']),
                aside=_i(t['aside']), debt_end=_i(debt_b), safe_end=_i(safe_b),
                balance=_i(safe_b - debt_b),
                safe_fact=None if safe_b_fact is None else _i(_n(safe_b_fact)),
@@ -256,4 +301,5 @@ def carry_from(prev: dict | None) -> dict:
         safe_b_open=b['safe_fact'] if b.get('safe_fact') is not None else b.get('safe_end'),
         debt_b_open=b.get('debt_end'),
         rp_open=safe.get('rp'), np_open=safe.get('np'),
+        rp_owed_open=safe.get('rp_owed'),
     )

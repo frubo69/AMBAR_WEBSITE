@@ -82,8 +82,16 @@ def месяц(r, n=None):
         k = r.random()
         if k < 0.4:
             d["pay"] = r.choice([0, _сумма(r, True), d["ordered"]])
+            # откуда недостающее сверх стопки Барракуды (3 окт 2026): ЧП, РП, понемногу
+            d["pay_src"] = r.choice(["", "np", "rp", "mix", "mix"])
+            if d["pay_src"] == "mix":
+                d["pay_rp"] = r.choice([0, _сумма(r), _сумма(r, True)])
         elif k < 0.5:
             d["pay_b"] = _сумма(r); d["pay_b_extra"] = r.choice([0, _сумма(r)])
+            if r.random() < 0.5:
+                d["pay_rp"] = _сумма(r)
+        # норма РП+ дня — по ней считается возврат долга фонда; бывает и без неё
+        d["norm"] = r.choice([0, 0, 3900, 9100, 500, 12000.5])
         d["expenses"] = [{"amount": _сумма(r) or 1, **({"pay": "crypto"} if r.random() < 0.25 else {})}
                          for _ in range(r.choice([0, 0, 1, 2, 5]))]
         # крипта в РП+ дня и вывод крипты в наличные (часть — с крипта-счёта РП)
@@ -105,6 +113,7 @@ def месяц(r, n=None):
 def модель(days, opening):
     b, rp, np_, debt = C(opening.get("safe_b_open")), C(opening.get("rp_open")), C(opening.get("np_open")), C(opening.get("debt_b_open"))
     rp_cr = C(opening.get("rp_cr_open"))
+    долг_рп = C(opening.get("rp_owed_open"))          # фонд отдал Барракуде и ещё не вернул
     out = []
     for d in days:
         cash, spend = C(d.get("cash")), C(d.get("spend"))
@@ -120,15 +129,24 @@ def модель(days, opening):
         прибыль = max(0, base) - aside - col
         a_c, c_c, n_c = (0, 0, 0) if ждёт else (aside, col, прибыль)
         if d.get("pay") is not None:
-            всего = C(d["pay"]); из_б = min(всего, max(0, b + a_c)); из_чп = всего - из_б
+            всего = C(d["pay"]); из_б = min(всего, max(0, b + a_c)); нехват = всего - из_б
+            src = d.get("pay_src") or ""
+            из_рп = нехват if src == "rp" else min(нехват, max(0, C(d.get("pay_rp")))) if src == "mix" else 0
+            из_чп = нехват - из_рп
         else:
-            из_б, из_чп = C(d.get("pay_b")), C(d.get("pay_b_extra"))
+            из_б, из_чп, из_рп = C(d.get("pay_b")), C(d.get("pay_b_extra")), C(d.get("pay_rp"))
         b += a_c - из_б
-        rp += c_c + extra - exp
+        rp += c_c + extra - exp - из_рп
         np_ += n_c - pays - из_чп
-        debt += C(d.get("ordered")) - из_б - из_чп
-        out.append({"b": b, "rp": rp, "np": np_, "debt": debt, "pay_b": из_б, "pay_x": из_чп,
-                    "np_plus": прибыль, "base": base, "rp_cr": rp_cr})
+        debt += C(d.get("ordered")) - из_б - из_чп - из_рп
+        # долг фонда: отданное сегодня прибавляется, собранное сверх нормы (подтверждённого дня) возвращает
+        норма = C(d.get("norm"))
+        долг_рп += из_рп
+        сверх = max(0, c_c + (0 if ждёт else C(d.get("collected_cr"))) - норма) if норма > 0 else 0
+        возврат = min(долг_рп, сверх)
+        долг_рп -= возврат
+        out.append({"b": b, "rp": rp, "np": np_, "debt": debt, "pay_b": из_б, "pay_x": из_чп, "pay_rp": из_рп,
+                    "np_plus": прибыль, "base": base, "rp_cr": rp_cr, "owed": долг_рп, "back": возврат})
     return out
 
 
@@ -138,8 +156,8 @@ def проверить_ядро(days, opening, метка):
     prev = C(opening.get("safe_b_open")) + C(opening.get("rp_open")) + C(opening.get("np_open"))
     for i, (d, w, src) in enumerate(zip(book["days"], m, days)):
         got = (C(d["stack_b"]), C(d["stack_rp"]), C(d["stack_np"]), C(d["debt_b"]), C(d["pay_b"]), C(d["pay_b_extra"]), C(d["np_plus"]),
-               C(d["stack_rp_cr"]))
-        want = (w["b"], w["rp"], w["np"], w["debt"], w["pay_b"], w["pay_x"], w["np_plus"], w["rp_cr"])
+               C(d["stack_rp_cr"]), C(d["pay_rp"]), C(d["rp_owed"]), C(d["rp_back"]))
+        want = (w["b"], w["rp"], w["np"], w["debt"], w["pay_b"], w["pay_x"], w["np_plus"], w["rp_cr"], w["pay_rp"], w["owed"], w["back"])
         if any(abs(g - x) > 1 for g, x in zip(got, want)):
             return беда(метка, "ядро разошлось со второй моделью", день=i, ядро=got, модель=want, вход=src)
         if abs(C(d["stack_total"]) - (w["b"] + w["rp"] + w["np"])) > 1:
@@ -148,9 +166,16 @@ def проверить_ядро(days, opening, метка):
         ждёт = bool(src.get("pending"))
         # в сейф и из сейфа ходят только наличные: оплаченное криптой его не трогает
         exp = sum(C(e["amount"]) for e in src.get("expenses") or [] if e.get("pay") != "crypto"); pays = sum(C(e["amount"]) for e in src.get("payouts") or [])
-        движ = (0 if ждёт else max(0, w["base"])) + C(src.get("extra_rp")) - exp - pays - w["pay_b"] - w["pay_x"]
+        движ = (0 if ждёт else max(0, w["base"])) + C(src.get("extra_rp")) - exp - pays - w["pay_b"] - w["pay_x"] - w["pay_rp"]
         if abs(C(d["stack_total"]) - prev - движ) > 1:
             return беда(метка, "сейф дня ≠ вчера + движения", день=i, было=prev, движ=движ, стало=C(d["stack_total"]))
+        # оплата одной суммой: из стопки — сколько есть, недостающее — ровно из ЧП и РП
+        if src.get("pay") is not None and abs(C(d["pay"]) - C(src["pay"])) > 1:
+            return беда(метка, "оплата ≠ стопка + ЧП + РП", день=i)
+        if src.get("pay") is not None and (src.get("pay_src") or "") == "mix" and C(d["pay_rp"]) > max(0, C(src.get("pay_rp"))) + 1:
+            return беда(метка, "из РП взято больше, чем вписано", день=i)
+        if C(d["rp_owed"]) < 0 or C(d["rp_back"]) < 0:
+            return беда(метка, "долг фонда или возврат в минусе", день=i)
         prev = C(d["stack_total"])
         if src.get("pay") is not None and C(d["pay_b"]) > max(0, (m[i - 1]["b"] if i else C(opening.get("safe_b_open"))) + (0 if ждёт else C(src.get("aside")))) + 1:
             return беда(метка, "из стопки Барракуды взято больше, чем в ней было", день=i)
@@ -162,9 +187,13 @@ def проверить_ядро(days, opening, метка):
         ключ = {"Б": "b", "ЧП": "np"}[имя]
         if abs(C(s[o]) + C(s[i_]) - C(s[u]) - C(s[ключ])) > len(days) + 1:      # допуск: по сотой на день округления
             return беда(метка, f"стопка {имя}: начало + приход − расход ≠ остаток", s=s)
-    # РП — фонд целиком, наличные и крипта вместе: РП+ и РП− считают обе части
-    if abs(C(s["open_rp"]) + C(s["open_rp_cr"]) + C(s["rp_in"]) - C(s["rp_out"]) - C(s["rp"]) - C(s["rp_cr"])) > len(days) + 1:
-        return беда(метка, "РП: начало + приход − расход ≠ наличные + крипта", s=s)
+    # РП — фонд целиком, наличные и крипта вместе: РП+ и РП− считают обе части;
+    # отданное Барракуде из фонда (rp_b) — отдельной строкой
+    if abs(C(s["open_rp"]) + C(s["open_rp_cr"]) + C(s["rp_in"]) - C(s["rp_out"]) - C(s["rp_b"]) - C(s["rp"]) - C(s["rp_cr"])) > len(days) + 1:
+        return беда(метка, "РП: начало + приход − расход − Барракуде ≠ наличные + крипта", s=s)
+    if abs(C(s["rp_b"]) - sum(w["pay_rp"] for w in m)) > 1 or abs(C(s["rp_back"]) - sum(w["back"] for w in m)) > 1 \
+            or abs(C(s["rp_owed"]) - (m[-1]["owed"] if m else C(opening.get("rp_owed_open")))) > 1:
+        return беда(метка, "долг фонда месяца ≠ дням", s=s)
     if abs(C(s["rp_cr"]) - (m[-1]["rp_cr"] if m else C(opening.get("rp_cr_open")))) > 1 or abs(C(s["rp_all"]) - C(s["rp"]) - C(s["rp_cr"])) > 1:
         return беда(метка, "крипта РП месяца ≠ последнему дню", s=s)
     return book
@@ -305,12 +334,12 @@ def _книга_ок(book, метка, шаг):
             return беда(метка, "сервер: сейф ≠ сумма стопок", шаг=шаг, день=d["day"])
         ждёт = bool(d.get("pending"))
         движ = (0 if ждёт else max(0, C(d["base"]))) + C(d["extra_rp"]) - C(d["expenses_sum"]) - C(d["payouts_sum"]) \
-            - C(d["pay_b"]) - C(d["pay_b_extra"])
+            - C(d["pay_b"]) - C(d["pay_b_extra"]) - C(d["pay_rp"])
         if abs(C(d["stack_total"]) - prev - движ) > 1:
             return беда(метка, "сервер: сейф дня ≠ вчера + движения", шаг=шаг, день=d["day"],
                         было=prev / 100, движ=движ / 100, стало=d["stack_total"])
         prev = C(d["stack_total"])
-        долг += C(d["ordered"]) - C(d["pay_b"]) - C(d["pay_b_extra"])
+        долг += C(d["ordered"]) - C(d["pay_b"]) - C(d["pay_b_extra"]) - C(d["pay_rp"])
         if abs(долг - C(d["debt_b"])) > 1:
             return беда(метка, "сервер: долг Барракуде ≠ вчера + заявка − оплата", шаг=шаг, день=d["day"])
         if d.get("future") and (C(d["base"]) or C(d["expenses_sum"]) or d.get("pending")):
@@ -370,13 +399,28 @@ async def сервер(seed, шагов=30):
             # снятое поле у подтверждённого дня возвращается к предложению — заморозки больше нет
             замороз.pop(день) if v is None else замороз.__setitem__(день, (v, c) if f == "aside" else (a, v))
 
+    async def оплата():
+        """Оплата Барракуде с источником недостающего: сервер либо пишет, либо
+        отказывает 409 (в стопке столько нет) — тогда с force пишет всё равно."""
+        день = r.choice(прошлые)
+        body = {"day": день, "pay": r.choice([None, 0, 500, 2500, 9000, 40000]), "src": r.choice(["", "np", "rp", "mix"]),
+                "rp": r.choice([0, 100, 700, 5000]), "force": r.random() < 0.3, "as": "Фазз"}
+        код, отв = await _зови(fr.handle_pay_b, "POST", body)
+        if код not in (200, 400, 409):
+            raise RuntimeError(f"оплата: код {код} {отв}")
+        if код == 200 and body["pay"] is not None and abs(C(отв["from_b"]) + C(отв["from_np"]) + C(отв["from_rp"]) - C(body["pay"])) > 1:
+            raise RuntimeError(f"оплата: части не складываются {отв}")
+
     async def запись():
         book_ = r.choice(["rp", "np", "in", "rp"])
         body = {"day": r.choice(прошлые), "book": book_, "amount": r.choice([25, 192, 283, 1000, 12.5]),
                 "comment": "фазз", "as": "Фазз"}
         if book_ == "rp":
-            if r.random() < 0.5:
+            k = r.random()
+            if k < 0.4:
                 body.update(kind=r.choice(["salary", "advance"]), who="Худоба")
+            elif k < 0.55:
+                body.update(kind="take")            # «Забрали из РП»: без чека, с комментарием
             else:
                 body.update(photo=КАДР, thumb="")
         if book_ == "np":
@@ -395,7 +439,7 @@ async def сервер(seed, шагов=30):
         await _зови(fr.handle_month_set, "POST", {"month": МЕС, "field": r.choice(["safe_b_open", "rp_open", "np_open", "debt_b_open"]),
                                                   "value": r.choice([None, 0, 5000, 30902, -22]), "as": "Фазз"})
 
-    ходы = [заказ] * 5 + [расход_водителя] * 2 + [подтвердить] * 3 + [поле] * 3 + [запись] * 3 + [убрать, начало]
+    ходы = [заказ] * 5 + [расход_водителя] * 2 + [подтвердить] * 3 + [поле] * 3 + [запись] * 3 + [убрать, начало, оплата, оплата]
     for шаг in range(шагов):
         ход = r.choice(ходы)
         try:

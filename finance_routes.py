@@ -1042,7 +1042,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     import crypto_book
     cb = await crypto_book.state()
     opening["opening"]["rp_cr_open"] = crypto_book.rp_before(cb["by_day"], days[0])
-    free_run = cb["free"] if cb["ready"] else 0.0
+    free_run = cb["free_fact"] if cb["ready"] else 0.0     # по факту на кошельке, не по книге
     rows, meta = [], {}
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
@@ -1164,7 +1164,8 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                 prev_month=_prev_month(month), budget=budget,
                 # крипта сейчас: свободная и на счету РП — экранам, которые
                 # предлагают раскладку и спрашивают, чем платили
-                crypto={k: cb[k] for k in ("ready", "rate", "free", "rp", "book", "start_day")})
+                crypto={**{k: cb[k] for k in ("ready", "rate", "rp", "book", "start_day")},
+                        "free": cb["free_fact"], "free_book": cb["free"], "wallet": cb.get("wallet")})
     if not light:
         book["pay"] = await _payroll(month, days, today, entries, work, fx["usd"])
         book["pay"].update(fx)
@@ -1235,8 +1236,8 @@ async def _cr_alloc_check(day: str, new: float, was: float) -> dict | None:
     if new > 0 and day < crypto_book.START_DAY:
         return {"error": "crypto_early", "from": crypto_book.START_DAY}
     delta = round(new - was, 2)
-    if delta > st["free"] + crypto_book.EPS:
-        return {"error": "no_free", "free": st["free"], "max": round(st["free"] + was, 2)}
+    if delta > st["free_fact"] + crypto_book.EPS:
+        return {"error": "no_free", "free": st["free_fact"], "max": round(st["free_fact"] + was, 2)}
     if delta < -crypto_book.EPS:
         have = crypto_book.rp_min_from(st["by_day"], day)
         if -delta > have + crypto_book.EPS:
@@ -1270,7 +1271,7 @@ async def _cr_withdraw_split(day: str, amount: float, fee_ours: float = 0.0):
     st = await crypto_book.state()
     if not st["ready"]:
         return 0.0, 0.0, 0.0, {"error": "crypto_unready"}
-    free = max(0.0, st["free"])
+    free = max(0.0, st["free_fact"])
     rp = max(0.0, crypto_book.rp_min_from(st["by_day"], day))
     надо = round(amount + fee_ours, 2)
     if надо > free + rp + crypto_book.EPS:

@@ -54,6 +54,10 @@ KEY = "crypto_book"
 EPS = 0.005
 OVERLAP_MS = 6 * 3600 * 1000  # насколько назад перечитываем сеть при сверке
 FEE_OURS = 0.5                # наша доля комиссии вывода; вторая половина — посредника
+# Что лежит на кошельках по последнему чтению сети (USDT): предложение в РП+
+# не должно быть больше того, что есть на самом деле (владелец, 3 окт 2026:
+# «показатель должен совпадать с фактическим в крипте»). Читается в sync().
+_BAL: dict = {"usdt": None, "at": 0.0}
 
 
 def _r(v) -> float:
@@ -144,7 +148,27 @@ async def sync() -> dict:
                 новых += 1
                 log.info(f"[crypto] {'пришло' if куда == 'in' else 'ушло'} {usdt} USDT = {doc['aed']} AED "
                          f"· {t['txid'][:12]}…")
+    # Остаток кошельков — заодно: по нему предложение в РП+ режется до факта.
+    # Сеть не ответила по любому адресу — прежнее значение остаётся.
+    всего, есть = 0.0, True
+    for a in адреса:
+        try:
+            b = await tron.get_balance(a)
+        except Exception:                                    # noqa: BLE001
+            b = None
+        if not b or b.get("unknown"):
+            есть = False
+            break
+        всего += float(b.get("usdt") or 0)
+    if есть:
+        _BAL.update(usdt=всего, at=time.time())
     return {"ok": ок, "new": новых}
+
+
+def wallet_aed() -> float | None:
+    """Сколько лежит на кошельках в наших дирхамах по последнему чтению; None —
+    ещё не читали."""
+    return None if _BAL["usdt"] is None else _r(float(_BAL["usdt"]) * rate())
 
 
 def _deltas(days: list, entries: list) -> tuple:
@@ -207,6 +231,7 @@ async def state() -> dict:
     if not c:
         return {"ready": False, "rate": rate(), "open": 0.0, "inflow": 0.0, "alloc": alloc,
                 "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp, "fee_in": fee_in, "free": 0.0,
+                "free_fact": 0.0, "wallet": wallet_aed(),
                 "rp": _r(alloc + fee_in - exp - wd_rp), "book": 0.0, "out": 0.0,
                 "by_day": по_дням, "start_day": START_DAY}
     moves = await db.crypto_moves()
@@ -215,10 +240,14 @@ async def state() -> dict:
     open_ = _r(c.get("open_aed"))
     free = _r(open_ + inflow - alloc - fee_in - wd_free)
     rp = _r(alloc + fee_in - exp - wd_rp)
+    # Свободная по факту: не больше того, что лежит на кошельках сверх счёта
+    # РП. Ушло с кошелька без записи в книге — в РП+ этого не предложим.
+    wallet = wallet_aed()
+    free_fact = free if wallet is None else max(0.0, min(free, _r(wallet - rp)))
     return {"ready": True, "rate": float(c.get("rate") or rate()), "open": open_,
             "inflow": inflow, "alloc": alloc, "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp,
             "fee_in": fee_in,
-            "free": free, "rp": rp, "book": _r(free + rp),
+            "free": free, "free_fact": free_fact, "wallet": wallet, "rp": rp, "book": _r(free + rp),
             # Ушло с кошелька по сети и записано в книге (РП− криптой + выводы):
             # разница — то, что ушло, а в книгу ещё не внесли (или наоборот).
             "out": out, "out_book": _r(exp + wd_free + wd_rp),

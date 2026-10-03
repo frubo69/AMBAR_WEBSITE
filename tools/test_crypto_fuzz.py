@@ -47,13 +47,13 @@ async def _двоит(doc):
 print("── фаззер обязан ловить испорченное правило ───────────────────")
 ПОЛОМКИ = (
     ("в РП+ кладут крипты больше, чем свободно", fr, "_cr_alloc_check",
-     'if delta > st["free"] + crypto_book.EPS:', "if False:"),
+     'if delta > st["free_fact"] + crypto_book.EPS:', "if False:"),
     ("расход криптой задним числом уводит счёт РП в минус", fr, "_cr_spend_check",
      'have = crypto_book.rp_min_from(st["by_day"], day)', 'have = st["rp"]'),
     ("вывод в наличные берёт всё с крипта-счёта РП, минуя свободную", fr, "_cr_withdraw_split",
      "из_свободной = round(min(надо, free), 2)", "из_свободной = 0.0"),
     ("расход криптой уменьшает наличные сейфа", calc, "compute",
-     "rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr)", "rp_st = rp_st + collected_c + extra_rp - exp_sum"),
+     "rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr - exp_hands)", "rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_hands)"),
     ("перекладка крипты в наличные не уменьшает крипту РП", calc, "compute",
      "rp_cr = rp_cr + collected_cr_c + extra_cr - exp_cr - cr_cash", "rp_cr = rp_cr + collected_cr_c + extra_cr - exp_cr"),
     ("перевод между своими кошельками считается приходом", cb, "sync",

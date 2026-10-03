@@ -91,6 +91,7 @@ class Модель:
         self.ok = set()
         self.поле = {}                  # день → collected_cr в документе дня (сотые) или нет ключа
         self.записи = {}                # id → {вид, день, сумма, pay, f, r}
+        self.видно = None               # что лежало на кошельках (сотые) при последней сверке сервера
 
     def движения(self):
         по = {}
@@ -112,6 +113,13 @@ class Модель:
     def free(self):
         return self.open + self.inflow - sum(self.alloc.values()) \
             - sum(e["f"] + e.get("ff", 0) for e in self.записи.values() if e["вид"] == "in")
+
+    def free_fact(self):
+        """Свободная по факту (3 окт 2026): не больше того, что лежит на кошельках
+        сверх счёта РП по последнему чтению сети."""
+        if self.видно is None:
+            return self.free()
+        return max(0, min(self.free(), self.видно - self.rp()))
 
     def на_конец(self, day):
         return sum(v for d, v in self.движения().items() if d <= day)
@@ -137,7 +145,7 @@ class Модель:
             return "crypto_unready"
         if new > 0 and day < СТАРТ:
             return "crypto_early"
-        if new - was > self.free():
+        if new - was > self.free_fact():
             return "no_free"
         if new < was and was - new > self.мин_с(day):
             return "cr_spent"
@@ -269,6 +277,7 @@ async def _прогон(seed, шагов):
             if res["ok"]:
                 беда(seed, шаг, "сеть молчит, а сверка говорит «всё прочитано»", res, False, след)
             return
+        м.видно = C(round((МИР["bal"]["MAIN"] + МИР["bal"]["OLD"]) * КУРС, 2))   # остаток прочитан вместе с переводами
         if not м.ready:
             м.ready = True
             м.open = C(round((МИР["bal"]["MAIN"] + МИР["bal"]["OLD"]) * КУРС, 2))
@@ -407,7 +416,7 @@ async def _прогон(seed, шагов):
             if not м.ready:
                 ждём = "crypto_unready"
             else:
-                св, рп = max(0, м.free()), max(0, м.мин_с(день))
+                св, рп = max(0, м.free_fact()), max(0, м.мин_с(день))
                 надо = C(amt) + наша
                 if надо > св + рп:
                     ждём = "no_crypto"
@@ -478,6 +487,8 @@ async def сверка(seed, шаг, м, fr, cb, wr, след, r):
         return беда(seed, шаг, "книга заведена", st["ready"], м.ready, след)
     if (C(st["free"]), C(st["rp"])) != ((м.free(), м.rp()) if м.ready else (0, м.rp())):
         return беда(seed, шаг, "свободная крипта и крипта РП", (st["free"], st["rp"]), (м.free() / 100, м.rp() / 100), след)
+    if м.ready and C(st["free_fact"]) != м.free_fact():
+        return беда(seed, шаг, "свободная крипта по факту (не больше кошелька)", st["free_fact"], м.free_fact() / 100, след)
     if м.free() < 0 or м.rp() < 0:
         return беда(seed, шаг, "счёт в минусе", (м.free() / 100, м.rp() / 100), "≥ 0", след)
     if м.ready:
@@ -495,8 +506,8 @@ async def сверка(seed, шаг, м, fr, cb, wr, след, r):
     for мес in месяцы:
         b = книги[мес] = await fr.build(мес, light=True)
         s = b["safe"]
-        if (b["crypto"]["ready"], C(b["crypto"]["free"]), C(b["crypto"]["rp"])) != (st["ready"], C(st["free"]), C(st["rp"])):
-            return беда(seed, шаг, f"{мес}: крипта в книге месяца ≠ книге крипты", b["crypto"], (st["free"], st["rp"]), след)
+        if (b["crypto"]["ready"], C(b["crypto"]["free"]), C(b["crypto"]["free_book"]), C(b["crypto"]["rp"])) != (st["ready"], C(st["free_fact"]), C(st["free"]), C(st["rp"])):
+            return беда(seed, шаг, f"{мес}: крипта в книге месяца ≠ книге крипты", b["crypto"], (st["free_fact"], st["free"], st["rp"]), след)
         if abs(C(s["total"]) - C(s["b"]) - C(s["rp"]) - C(s["np"])) > 1:
             return беда(seed, шаг, f"{мес}: сейф ≠ сумме наличных стопок", s["total"], (s["b"], s["rp"], s["np"]), след)
         if abs(C(s["rp_all"]) - (C(s["open_rp"]) + C(s["open_rp_cr"]) + C(s["rp_in"]) - C(s["rp_out"]))) > 1:
@@ -506,7 +517,7 @@ async def сверка(seed, шаг, м, fr, cb, wr, след, r):
             return беда(seed, шаг, f"{мес}: РП целиком ≠ наличные + крипта", s["rp_all"], (s["rp"], s["rp_cr"]), след)
         prev = C(s["open_b"]) + C(s["open_rp"]) + C(s["open_np"])
         норма = C((b.get("budget") or {}).get("norm"))
-        остаток = м.free() if м.ready else 0
+        остаток = м.free_fact() if м.ready else 0          # предлагается только то, что лежит на кошельке
         for d in b["days"]:
             день = d["day"]
             if abs(C(d["stack_rp_cr"]) - м.на_конец(день)) > 0:
@@ -550,6 +561,7 @@ async def сверка(seed, шаг, м, fr, cb, wr, след, r):
         w = await wr._build()
         kn = w.get("book") or {}
         лежит = C(round((МИР["bal"]["MAIN"] + МИР["bal"]["OLD"]) * КУРС, 2))
+        м.видно = лежит                                     # экран кошелька тоже сверяется с сетью
         if м.ждут:                       # экран кошелька сам дочитал приход
             м.inflow += sum(м.ждут); м.ждут.clear()
             if not м.ready:

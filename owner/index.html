@@ -4173,7 +4173,6 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-add .fb-feerow[hidden]{display:none}
 .fb-feerow > span i{display:block;margin-top:2px;font-style:normal;font-size:10.5px;font-weight:500;color:var(--muted)}
 .crd-cr > span, .fb-cr > span{color:var(--gold2)}
-.fb-crc-cr{margin-top:6px;font-size:11px;color:var(--gold2)}
 .aud-g.fb-rp2{padding-top:0}
 .fb-safe-plus{flex:0 0 auto;font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--gold2)}
 .fb-safe-usdt.tap:active{transform:scale(.97);border-color:rgba(201,169,110,.5)}
@@ -20878,7 +20877,6 @@ function fbCrcHtml(){
         st.locked ? IC('lock', 12) : st.done ? IC('check', 12) : '2'}</span>
         <b>Распределение</b><i class="${st.done ? 'ok' : !st.locked && pend.length ? 'warn' : ''}">${s2}</i></div>
       <div class="fb-crc-g">${g('Барракуда', tB)}${g('РП+', tR)}${g('ЧП', tN, tN < 0)}</div>
-      ${has && tCr > 0 ? `<div class="fb-crc-cr">в РП+ криптой ${fbFmt(tCr)} AED · наличными ${fbFmt(tR - tCr)}</div>` : ''}
       ${has && short > 0 && !st.locked ? `<div class="fb-crc-short">до нормы РП+ не хватает ${fbFmt(short)} AED</div>` : ''}
     </div>`;
   // Следующее действие — одно, и оно же главное.

@@ -5263,12 +5263,40 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-psrc .fb-hands-l{display:block;width:100%;font-size:11px;color:var(--muted);padding:6px 2px 2px}
 .fb-psrc .crw-ask-i svg{width:17px;height:17px}
 .fb-loan .fb-e-b i{white-space:normal;line-height:1.35}
-/* «Перевод»: откуда / куда — фишками стопок; совпавшая с другой стороной гаснет */
-.fb-mvdir{display:flex;align-items:center;gap:10px;padding:4px 16px 0}
-.fb-mvdir > span{flex:0 0 58px;font-size:12px;font-weight:600;color:var(--muted)}
-.fb-mvdir .chip-row{flex:1;padding:6px 0}
-.fb-mvdir .chip.off{opacity:.35;pointer-events:none}
-.fb-mvmode{padding-bottom:0}
+/* «Перевести» — по макету владельца (3 окт 2026). Плашка: тёмно-синяя с
+   тонкой рамкой; выбранная — тёмная тёплая с золотой рамкой и золотым
+   текстом; занятая другой стороной — погашена. Поля и кнопка — одним рядом,
+   выше и круглее обычных: «Сумма» узкая, «Комментарий» тянется, кнопка
+   золотая справа. */
+.fb-mvcard .sc-cap{padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.fb-mvmodes{display:flex;gap:8px;padding:12px 16px 0}
+.fb-mvc{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;border-radius:12px;
+  background:#1a1f36;border:1.5px solid rgba(255,255,255,.09);color:#cfd3e5;font-family:inherit;font-size:13px;
+  font-weight:600;letter-spacing:.1px;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s,color .12s}
+.fb-mvc.on{background:#2a241f;border-color:var(--gold2);color:var(--gold2)}
+.fb-mvc.off{opacity:.38;pointer-events:none}
+.fb-mvc:active{transform:scale(.97)}
+.fb-mvrow{display:flex;align-items:center;gap:10px;padding:12px 16px 0}
+.fb-mvrow > span{flex:0 0 58px;font-size:15px;font-weight:600;color:var(--muted)}
+.fb-mvchips{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
+.fb-mvchips .fb-mvc{height:38px;padding:0 17px;font-size:14px;font-weight:700}
+/* Один ряд, как на макете: «Сумма» узкая, «Комментарий» тянется, кнопка
+   своей ширины справа — не переносится. */
+.fb-mvform{display:flex;gap:8px;padding:16px 16px 16px;flex-wrap:nowrap}
+.fb-mvin{height:50px;border-radius:14px;background:#141830;border:1.5px solid rgba(255,255,255,.09);color:var(--text);
+  font-family:inherit;font-size:14px;font-weight:600;padding:0 12px;min-width:0;box-sizing:border-box}
+.fb-mvin::placeholder{color:#8a8fa6;font-weight:500}
+.fb-mvin:focus{outline:none;border-color:rgba(201,169,110,.6)}
+.fb-mvin.sum{flex:0 0 78px}
+.fb-mvin.cmt{flex:1 1 40px}
+.fb-mvgo{flex:0 0 auto;height:50px;padding:0 12px;border-radius:14px;border:0;cursor:pointer;white-space:nowrap;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;font-family:inherit;font-size:13px;font-weight:700}
+.fb-mvgo:active{transform:scale(.98)}
+/* «Снять с ЧП»: сумма и кому в один ряд, «за что» второй строкой на всю ширину, кнопка третьей */
+.fb-mvform.np{flex-wrap:wrap}
+.fb-mvform.np .fb-mvin.cmt{flex:1 1 90px}
+.fb-mvform.np .fb-mvin.wide{flex:1 1 100%}
+.fb-mvform.np .fb-mvgo{flex:1 1 auto}
 
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 /* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
@@ -23138,26 +23166,30 @@ function fbMoveRows(b){
 function fbMoveHtml(b){
   const s = b.safe || {}, mv = FB.mv, rows = fbMoveRows(b);
   const day = FB.month === fbMonthNow() ? b.today : b.last;
-  const chips = side => ['b', 'rp', 'np'].map(k => `<button class="chip${mv[side] === k ? ' on' : ''}${mv[side === 'from' ? 'to' : 'from'] === k ? ' off' : ''}"
+  // Карточка — по макету владельца (3 окт 2026): плашки режимов, ряды
+  // «Откуда» / «Куда» с плашками счетов (выбранная — тёмная с золотой рамкой,
+  // занятая другой стороной — погашена), ниже одним рядом «Сумма»,
+  // «Комментарий» и золотая кнопка «Перевести РП → ЧП».
+  const chips = side => ['b', 'rp', 'np'].map(k => `<button class="fb-mvc${mv[side] === k ? ' on' : ''}${mv[side === 'from' ? 'to' : 'from'] === k ? ' off' : ''}"
       onclick="fbMovePick('${side}','${k}')">${FB_MV_T[k]}</button>`).join('');
   const form = mv.mode === 'np'
-    ? `<div class="fb-add fb-lnf">
-        <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-np"
+    ? `<div class="fb-mvform np">
+        <input class="fb-mvin sum" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-np"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbWho-np').focus()}">
-        <input class="fb-txt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
+        <input class="fb-mvin cmt" placeholder="Кому" autocomplete="off" maxlength="60" id="fbWho-np"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-np').focus()}">
-        <input class="fb-txt" placeholder="За что" autocomplete="off" maxlength="120" id="fbCmt-np"
+        <input class="fb-mvin cmt wide" placeholder="За что" autocomplete="off" maxlength="120" id="fbCmt-np"
           onkeydown="if(event.key==='Enter'){fbEntryAdd('np','${day}')}">
-        <button class="aud-b go" onclick="fbEntryAdd('np','${day}')">Снять с ЧП</button>
+        <button class="fb-mvgo" onclick="fbEntryAdd('np','${day}')">Снять с ЧП</button>
       </div>`
-    : `<div class="fb-mvdir"><span>Откуда</span><div class="chip-row fb-chips">${chips('from')}</div></div>
-      <div class="fb-mvdir"><span>Куда</span><div class="chip-row fb-chips">${chips('to')}</div></div>
-      <div class="fb-add fb-lnf">
-        <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-mv" value="${escS(mv.amt || '')}"
+    : `<div class="fb-mvrow"><span>Откуда</span><div class="fb-mvchips">${chips('from')}</div></div>
+      <div class="fb-mvrow"><span>Куда</span><div class="fb-mvchips">${chips('to')}</div></div>
+      <div class="fb-mvform">
+        <input class="fb-mvin sum" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-mv" value="${escS(mv.amt || '')}"
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-mv').focus()}">
-        <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-mv" value="${escS(mv.cmt || '')}"
+        <input class="fb-mvin cmt" placeholder="Комментарий" autocomplete="off" maxlength="120" id="fbCmt-mv" value="${escS(mv.cmt || '')}"
           onkeydown="if(event.key==='Enter'){fbMoveAdd('${day}')}">
-        <button class="aud-b go" onclick="fbMoveAdd('${day}')">Перевести ${FB_MV_T[mv.from]} → ${FB_MV_T[mv.to]}</button>
+        <button class="fb-mvgo" onclick="fbMoveAdd('${day}')">Перевести ${FB_MV_T[mv.from]} → ${FB_MV_T[mv.to]}</button>
       </div>`;
   const list = rows.map(e => `<div class="fb-e">
       <span class="fb-e-b"><b>${e.mv ? `${FB_MV_T[e.from] || '?'} → ${FB_MV_T[e.to] || '?'}` : `Снято с ЧП${e.who ? ' · ' + escS(e.who) : ''}`}</b>
@@ -23173,10 +23205,10 @@ function fbMoveHtml(b){
       ${fbTile('ЧП', 'safe.np', s.np, {mode: 'neg'})}
     </div>
   </div>
-  <div class="sc">${fbCapT(mv.mode === 'np' ? 'Снять с ЧП' : 'Перевести')}
-    <div class="chip-row fb-chips fb-mvmode">
-      <button class="chip${mv.mode === 'np' ? '' : ' on'}" onclick="fbMoveMode('mv')">Между счетами</button>
-      <button class="chip${mv.mode === 'np' ? ' on' : ''}" onclick="fbMoveMode('np')">Снять с ЧП</button>
+  <div class="sc fb-mvcard">${fbCapT(mv.mode === 'np' ? 'Снять с ЧП' : 'Перевести')}
+    <div class="fb-mvmodes">
+      <button class="fb-mvc${mv.mode === 'np' ? '' : ' on'}" onclick="fbMoveMode('mv')">Между счетами</button>
+      <button class="fb-mvc${mv.mode === 'np' ? ' on' : ''}" onclick="fbMoveMode('np')">Снять с ЧП</button>
     </div>
     ${form}
   </div>

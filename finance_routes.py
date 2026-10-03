@@ -190,7 +190,7 @@ async def _spend(days: list[str]) -> dict:
             st = str(e.get("status") or "approved")
             # Заказ в долг уже посчитан в выручке дня, а деньги по нему у
             # клиента: расходом он не становится (владелец, 20 сен 2026).
-            if e.get("nocash"):
+            if e.get("nocash") or _exp.is_bottle(e):      # бутылка охране — товар, не деньги
                 continue
             # Зарплата, оставленная себе из наличных смены (владелец, 3 окт
             # 2026): из выручки дня вычитается, но расход водителя — не она,
@@ -2356,7 +2356,7 @@ async def _hands_info(name: str, day: str) -> dict:
     kept, requests = 0, []
     for e in row.get("extras") or []:
         st = str(e.get("status") or "approved")
-        if st == "approved" and not _exp.is_card(e):
+        if st == "approved" and not _exp.is_card(e) and not _exp.is_bottle(e):
             if e.get("salary_of"):
                 kept += _exp._signed(e)
             else:

@@ -944,7 +944,7 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
     plus_ = lambda x: bool(EXTRA_KINDS.get(x["kind"], {}).get("plus"))
     # Записи «мимо наличных» (заказ в долг) в пачки не идут — ни в наличные,
     # ни в безнал: денег по такому заказу не брали.
-    наличн = [x for x in extras if not x.get("nocash")]
+    наличн = [x for x in extras if not x.get("nocash") and not is_bottle(x)]   # бутылка охране — не деньги
     spent = sum(int(x.get("amount") or 0) for x in наличн if not plus_(x) and not is_card(x))
     got = sum(int(x.get("amount") or 0) for x in наличн if plus_(x) and not is_card(x))
     spent_card = sum(int(x.get("amount") or 0) for x in наличн if not plus_(x) and is_card(x))
@@ -2510,7 +2510,7 @@ async def handle_edit_request(request):
 # был свой короткий список, всё, что не бензин и не мойка, приезжало к старшему
 # безымянным «доп. расходом»: он видел сумму и строчку словами, а к какому виду
 # она относится — угадывал. Два списка рядом расходятся в первую же неделю.
-from expense_routes import EXTRA_KINDS, PAY_T, is_card, asks_pay   # noqa: E402
+from expense_routes import EXTRA_KINDS, PAY_T, is_card, asks_pay, is_bottle   # noqa: E402
 
 # Названия для тех видов, о которых водителя спрашивают каждый день.
 EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "parking": "Парковка", "other": ""}

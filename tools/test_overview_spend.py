@@ -112,6 +112,23 @@ async def main():
     eq("по району — то же число", o["by_district"].get(РАЙОН), o["total"])
     eq("ДВА ЭКРАНА ДАЮТ ОДНО ЧИСЛО", await сбор(), o["total"])
 
+    print("── бутылка охране — товар, не деньги (3 окт 2026) ──────────────")
+    await смена([трата("guard", 86, pay="cash", code="10043", bottle="Black Label 1 ltr", bottle_id="p11"),
+                 трата("guard", 150, pay="cash"), трата("fuel", 240, pay="cash")])
+    o = await обзор()
+    eq("бутылка из наличных не вычитается, деньги охране — вычитаются", o["total"], питание + 150 + 240)
+    eq("два экрана сходятся", await сбор(), o["total"])
+    import cash_math
+    row = await db.get_driver_day(ДЕНЬ, ВОДИТЕЛЬ)
+    p = cash_math.piles([], row["extras"], питание)
+    eq("итоги смены водителя: потрачено без бутылки", p["spent_sum"], 150 + 240)
+    import finance_routes as fr
+    sp = await fr._spend([ДЕНЬ])
+    eq("книга: расход дня без бутылки", sp[ДЕНЬ]["spend"], питание + 150 + 240)
+    import expense_routes as xr
+    r = xr._day_row({"name": ВОДИТЕЛЬ}, row)
+    eq("экран расходов: сумма дня без бутылки, в списке она есть", (r["extra_sum"], len(r["extras"])), (150 + 240, 3))
+
     print(("\nПРОВАЛЫ: " + ", ".join(FAIL)) if FAIL else "\nвсё сошлось")
     return 1 if FAIL else 0
 

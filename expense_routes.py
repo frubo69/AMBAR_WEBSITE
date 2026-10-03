@@ -148,11 +148,21 @@ def asks_pay(kind: str) -> bool:
 ADVANCE_KINDS = {"advance": "Аванс зарплаты", "advance_bonus": "В счёт премии"}
 
 
+def is_bottle(e: dict) -> bool:
+    """Охране отдали бутылку, а не деньги: у записи код с крышки. Со склада
+    бутылка списана, а наличных водителя она не касалась — из того, что он
+    сдаёт, её себестоимость не вычитается нигде (владелец, 3 окт 2026: за
+    29.09 на Алгусесе приложение ждало на 86 меньше, чем должно)."""
+    e = e or {}
+    return str(e.get("kind") or "") == "guard" and bool(e.get("code") or e.get("bottle_id"))
+
+
 def touches_cash(e: dict) -> bool:
-    """Двигает ли запись наличные водителя. Безнал — нет. И авто-запись по
+    """Двигает ли запись наличные водителя. Безнал — нет. Авто-запись по
     заказу в долг — нет (nocash): денег по такому заказу никто не брал, он и
-    так посчитан в выручке дня, а «сдать» от него не меняется."""
-    return not is_card(e) and not bool((e or {}).get("nocash"))
+    так посчитан в выручке дня, а «сдать» от него не меняется. Бутылка охране —
+    тоже нет: это товар, а не деньги."""
+    return not is_card(e) and not bool((e or {}).get("nocash")) and not is_bottle(e)
 
 
 async def note_debt_order(order: dict, who: str = "") -> bool:
@@ -210,8 +220,9 @@ def _day_row(d: dict, saved: dict) -> dict:
     working = (saved or {}).get("working")
     extras = list((saved or {}).get("extras") or [])
     meal = staff.meal_of(saved)
-    extra_sum = sum(_signed(e) for e in extras if _status(e) == "approved")
-    pending = sum(_signed(e) for e in extras if _status(e) == "pending")
+    # бутылка охране — не деньги: в сумму дня не идёт, в списке остаётся
+    extra_sum = sum(_signed(e) for e in extras if _status(e) == "approved" and not is_bottle(e))
+    pending = sum(_signed(e) for e in extras if _status(e) == "pending" and not is_bottle(e))
     return {
         **d,
         "working": working,                 # None — ещё не отмечали

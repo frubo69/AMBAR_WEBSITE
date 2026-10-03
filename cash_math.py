@@ -165,7 +165,7 @@ def piles(orders: list, extras: list, meal: int = 0) -> dict:
     for x in extras:
         # Заказ в долг: денег по нему никто не брал, и «сдать» от него не
         # меняется — такая запись мимо наличных (владелец, 20 сен 2026).
-        if x.get("nocash"):
+        if x.get("nocash") or _exp.is_bottle(x):          # бутылка охране — товар, не деньги
             continue
         kind = kind_of(x)
         a = int(_n(x.get("amount")))

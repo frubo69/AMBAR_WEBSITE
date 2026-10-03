@@ -531,7 +531,7 @@ async def _drivers_spend(start, end) -> dict:
             # Заказ в долг — строка расхода у водителя, но наличных он не
             # тронул: товар уехал, денег за него не брали (владелец, 20 сен
             # 2026). Из выручки такой расход не вычитается нигде.
-            if e.get("nocash"):
+            if e.get("nocash") or _exp.is_bottle(e):      # бутылка охране — товар, не деньги
                 continue
             amt = _exp._signed(e)
             # Оплаченное картой из наличных водителя не уходило. «Сбор выручки»
@@ -4404,7 +4404,10 @@ async def _cash_amounts(day: str, orders: list) -> dict:
                 # такому заказу наличных не брали, а в выручку дня он посчитан
                 # (владелец, 20 сен 2026). Поэтому и в «ждут решения» не идёт —
                 # сбор выручки из-за него не стоит.
-                мимо = bool(e.get("nocash"))
+                # Бутылка охране (код с крышки) — списана со склада, наличных не
+                # трогала: показываем строкой, из сдачи не вычитаем (3 окт 2026).
+                бутылка = _exp.is_bottle(e)
+                мимо = bool(e.get("nocash")) or бутылка
                 if st == "approved" and not мимо:
                     if card:
                         spend_card += amt
@@ -4417,7 +4420,7 @@ async def _cash_amounts(day: str, orders: list) -> dict:
                               "who": d["name"], "amount": amt, "at": str(e.get("at") or ""),
                               "status": st, "note": str(e.get("comment") or "")[:80],
                               "pay": "card" if card else ("cash" if e.get("pay") == "cash" else ""),
-                              "nocash": мимо,
+                              "nocash": мимо, "bottle": бутылка,
                               "photo": bool(e.get("photo") or e.get("thumb") or e.get("car_photo"))})
         # Питание — первой строкой, без времени: это плата за день, а не событие;
         # дальше траты по времени.

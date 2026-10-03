@@ -42,6 +42,16 @@ eq("явные поля: pay_rp своей суммой", (b["pay"], b["pay_rp"]
 r = calc.compute([день(1, pay=16000, pay_src="rp")], op)
 eq("итоги месяца: оплачено, из РП, сейф", (r["b"]["paid"], r["b"]["pay_rp"], r["safe"]["rp_b"], r["rp"]["to_b"]), (16000, 6000, 6000, 6000))
 
+print("— ядро: переводы между стопками")
+r = calc.compute([день(1, moves=[dict(amount=4000, **{"from": "rp", "to": "np"}), dict(amount=1500, **{"from": "np", "to": "b"})])], op)
+d = r["days"][0]
+eq("РП → ЧП 4000, ЧП → Б 1500: стопки", (d["stack_rp"], d["stack_np"], d["stack_b"], d["stack_total"]), (16000, 7500, 11500, 35000))
+eq("суммы по стопкам", (d["mv_rp_out"], d["mv_np_in"], d["mv_np_out"], d["mv_b_in"]), (4000, 4000, 1500, 1500))
+eq("месяц: переводы в сейфе", (r["safe"]["mv_rp_out"], r["safe"]["mv_np_in"], r["safe"]["mv_np_out"], r["safe"]["mv_b_in"]), (4000, 4000, 1500, 1500))
+eq("расходы и прибыль перевод не трогает", (r["rp"]["expenses"], r["np"]["payouts"], r["econ"]), (0, 0, 0))
+d = calc.compute([день(1, moves=[dict(amount=6000, **{"from": "rp", "to": "b"})], pay=16000, pay_src="rp")], op)["days"][0]
+eq("перевод в стопку Барракуды до оплаты: вся оплата из стопки", (d["pay_b"], d["pay_rp"], d["stack_b"], d["stack_rp"]), (16000, 0, 0, 14000))
+
 print("— ядро: долг фонда и возврат сверх нормы")
 days = [день(1, cash=30000, handed=30000, aside=15000, collected=9000, pay=25000, pay_src="rp"),   # стопка 10000+15000=25000: хватает
         день(2, cash=30000, handed=30000, aside=15000, collected=9000, pay=31000, pay_src="rp"),   # стопка 15000 → 16000 из РП
@@ -130,18 +140,37 @@ async def сервер():
     s = отв["book"]["safe"]
     eq("сейф месяца: отдано 6000, вернулось 6000, долг 0", (s["rp_b"], s["rp_back"], s["rp_owed"]), (6000, 6000, 0))
 
-    print("— сервер: «Забрали из РП»")
-    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 1500, "kind": "take", "comment": "", "as": "Т"})
-    eq("без комментария → 400", (код, отв["error"]), (400, "no_comment"))
-    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 1500, "kind": "take", "comment": "на ремонт", "as": "Т"})
-    eq("без чека и статьи — записано", код, 200)
+    print("— сервер: переводы между счетами")
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "mv", "amount": 100, "from": "rp", "to": "rp", "as": "Т"})
+    eq("откуда = куда → 400", (код, отв["error"]), (400, "bad_move"))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "mv", "amount": 100, "from": "x", "to": "np", "as": "Т"})
+    eq("чужая стопка → 400", код, 400)
+    book = await fr.build(МЕС); rp0, np0, b0 = book["safe"]["rp"], book["safe"]["np"], book["safe"]["b"]
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "mv", "amount": rp0 + 1000, "from": "rp", "to": "np", "as": "Т"})
+    eq("больше, чем в РП → 409 с остатком", (код, отв["error"], отв["have"], отв["from_t"]), (409, "not_enough", rp0, "РП"))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "mv", "amount": 5000, "from": "rp", "to": "np", "comment": "прибыль за неделю", "as": "Т"})
+    eq("РП → ЧП 5000 записан", код, 200)
+    s_ = отв["book"]["safe"]
+    eq("стопки: РП −5000, ЧП +5000, сейф тот же", (s_["rp"], s_["np"], s_["total"]), (rp0 - 5000, np0 + 5000, rp0 + np0 + b0))
+    eq("итоги переводов", (s_["mv_rp_out"], s_["mv_np_in"], s_["mv_b_in"], s_["mv_b_out"]), (5000, 5000, 0, 0))
     d = next(x for x in отв["book"]["days"] if x["day"] == СЕГ)
-    e = next(x for x in d["expenses"] if x["kind"] == "take")
-    eq("в книге: вид и подпись", (e["kind_t"], e["comment"], e["amount"]), ("Забрали из РП", "на ремонт", 1500))
-    eq("РП− дня и стопка РП", (d["expenses_sum"], d["stack_rp"] == отв["book"]["safe"]["rp"]), (1500, True))
-    eq("бюджет: вне плана, не зарплата", (отв["book"]["budget"]["off_plan"], отв["book"]["budget"]["salary"]["fact"]), (1500, 0))
-    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "np", "amount": 10, "kind": "take", "comment": "x", "as": "Т"})
-    eq("take только в РП", код, 400)
+    e = d["moves"][0]
+    eq("запись дня: откуда, куда, комментарий", (e["from"], e["to"], e["comment"], e["amount"], d["mv_rp_out"], d["mv_np_in"]), ("rp", "np", "прибыль за неделю", 5000, 5000, 5000))
+    eq("РП− и бюджет перевод не считают", (d["expenses_sum"], отв["book"]["budget"]["off_plan"], отв["book"]["rp"]["expenses"]), (0, 0, 0))
+    mid = отв["id"]
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "mv", "amount": 999999, "from": "np", "to": "b", "force": True, "as": "Т"})
+    eq("force: ЧП → Барракуда сверх остатка записан, ЧП в минусе", (код, отв["book"]["safe"]["np"] < 0, отв["book"]["safe"]["b"]), (200, True, b0 + 999999))
+    код, отв = await зови(fr.handle_entry_del, "DELETE", {"id": отв["id"], "as": "Т"})
+    код, отв = await зови(fr.handle_entry_del, "DELETE", {"id": mid, "as": "Т"})
+    s_ = отв["book"]["safe"]
+    eq("переводы убраны — стопки как были", (s_["rp"], s_["np"], s_["b"]), (rp0, np0, b0))
+    # перевод в стопку Барракуды в день оплаты: ею можно платить в тот же день
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "mv", "amount": 6000, "from": "rp", "to": "b", "as": "Т"})
+    код, отв = await зови(fr.handle_pay_b, "POST", {"day": СЕГ, "pay": 16000, "src": "np", "as": "Т"})
+    d = next(x for x in отв["book"]["days"] if x["day"] == СЕГ)
+    eq("в стопке b0 + 6000 переведённых — оплата 16000 целиком из стопки", (код, d["pay_b"], d["pay_b_extra"], d["mv_b_in"], d["stack_b"]), (200, 16000, 0, 6000, b0 + 6000 - 16000))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "np", "amount": 300, "who": "владелец", "comment": "снял", "as": "Т"})
+    eq("снять с ЧП — прежняя выплата из прибыли", (код, отв["book"]["safe"]["np"]), (200, np0 - 300))
 
 
 asyncio.run(сервер())

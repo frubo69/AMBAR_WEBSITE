@@ -44,7 +44,7 @@ src = open(os.path.join(ROOT, "finance_calc.py"), encoding="utf-8").read()
 for имя, a, b in (
     ("минус выручки снова уменьшает сейф", "np_plus = max(0.0, base) - aside - collected", "np_plus = base - aside - collected"),
     ("неподтверждённый день попал в сейф", "(0.0, 0.0, 0.0) if pending else (aside, collected, np_plus)", "(aside, collected, np_plus)"),
-    ("оплата не делится по стопке", "pay_b = min(pay_total, max(0.0, safe_b + aside_c))", "pay_b = pay_total"),
+    ("оплата не делится по стопке", "pay_b = min(pay_total, max(0.0, safe_b + aside_c + mv_b))", "pay_b = pay_total"),
 ):
     assert src.count(a) == 1, имя
     mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("calc_mut", loader=None))

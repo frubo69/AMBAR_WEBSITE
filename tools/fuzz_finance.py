@@ -102,6 +102,11 @@ def месяц(r, n=None):
         if r.random() < 0.15:
             d["extra_cr"] = _сумма(r)          # часть комиссии вывода, взятая из свободной крипты
         d["payouts"] = [{"amount": _сумма(r) or 1} for _ in range(r.choice([0, 0, 0, 1, 2]))]
+        # переводы между стопками сейфа (3 окт 2026): из какой в какую
+        d["moves"] = []
+        for _ in range(r.choice([0, 0, 0, 1, 1, 2])):
+            откуда, куда = r.sample(["b", "rp", "np"], 2)
+            d["moves"].append({"amount": _сумма(r) or 1, "from": откуда, "to": куда})
         # как на сервере: день «ждёт», если выручка в плюсе и не подтверждён
         d["ok"] = r.random() < 0.6
         d["pending"] = bool(база > 0 and not d["ok"])
@@ -128,16 +133,19 @@ def модель(days, opening):
         rp_cr += (0 if ждёт else C(d.get("collected_cr"))) + C(d.get("extra_cr")) - exp_cr - C(d.get("cr_cash"))
         прибыль = max(0, base) - aside - col
         a_c, c_c, n_c = (0, 0, 0) if ждёт else (aside, col, прибыль)
+        mv = {"b": 0, "rp": 0, "np": 0}
+        for m_ in d.get("moves") or []:
+            mv[m_["from"]] -= C(m_["amount"]); mv[m_["to"]] += C(m_["amount"])
         if d.get("pay") is not None:
-            всего = C(d["pay"]); из_б = min(всего, max(0, b + a_c)); нехват = всего - из_б
+            всего = C(d["pay"]); из_б = min(всего, max(0, b + a_c + mv["b"])); нехват = всего - из_б
             src = d.get("pay_src") or ""
             из_рп = нехват if src == "rp" else min(нехват, max(0, C(d.get("pay_rp")))) if src == "mix" else 0
             из_чп = нехват - из_рп
         else:
             из_б, из_чп, из_рп = C(d.get("pay_b")), C(d.get("pay_b_extra")), C(d.get("pay_rp"))
-        b += a_c - из_б
-        rp += c_c + extra - exp - из_рп
-        np_ += n_c - pays - из_чп
+        b += a_c + mv["b"] - из_б
+        rp += c_c + extra - exp - из_рп + mv["rp"]
+        np_ += n_c - pays - из_чп + mv["np"]
         debt += C(d.get("ordered")) - из_б - из_чп - из_рп
         # долг фонда: отданное сегодня прибавляется, собранное сверх нормы (подтверждённого дня) возвращает
         норма = C(d.get("norm"))
@@ -177,20 +185,27 @@ def проверить_ядро(days, opening, метка):
         if C(d["rp_owed"]) < 0 or C(d["rp_back"]) < 0:
             return беда(метка, "долг фонда или возврат в минусе", день=i)
         prev = C(d["stack_total"])
-        if src.get("pay") is not None and C(d["pay_b"]) > max(0, (m[i - 1]["b"] if i else C(opening.get("safe_b_open"))) + (0 if ждёт else C(src.get("aside")))) + 1:
+        mv_b = sum(C(x["amount"]) * ((x["to"] == "b") - (x["from"] == "b")) for x in src.get("moves") or [])
+        if src.get("pay") is not None and C(d["pay_b"]) > max(0, (m[i - 1]["b"] if i else C(opening.get("safe_b_open"))) + (0 if ждёт else C(src.get("aside"))) + mv_b) + 1:
             return беда(метка, "из стопки Барракуды взято больше, чем в ней было", день=i)
+        # переводы: в книге дня те же суммы по стопкам, что во входе
+        for k in ("b", "rp", "np"):
+            if abs(C(d[f"mv_{k}_in"]) - sum(C(x["amount"]) for x in src.get("moves") or [] if x["to"] == k)) > 1 \
+                    or abs(C(d[f"mv_{k}_out"]) - sum(C(x["amount"]) for x in src.get("moves") or [] if x["from"] == k)) > 1:
+                return беда(метка, "переводы дня ≠ входу", день=i, стопка=k)
     s = book["safe"]
     last = m[-1] if m else {"b": C(opening.get("safe_b_open")), "rp": C(opening.get("rp_open")), "np": C(opening.get("np_open"))}
     if (abs(C(s["b"]) - last["b"]), abs(C(s["rp"]) - last["rp"]), abs(C(s["np"]) - last["np"])) > (1, 1, 1):
         return беда(метка, "сейф месяца ≠ стопки последнего дня")
     for имя, o, i_, u in (("Б", "open_b", "b_in", "b_out"), ("ЧП", "open_np", "np_in", "np_out")):
         ключ = {"Б": "b", "ЧП": "np"}[имя]
-        if abs(C(s[o]) + C(s[i_]) - C(s[u]) - C(s[ключ])) > len(days) + 1:      # допуск: по сотой на день округления
-            return беда(метка, f"стопка {имя}: начало + приход − расход ≠ остаток", s=s)
+        if abs(C(s[o]) + C(s[i_]) - C(s[u]) + C(s[f"mv_{ключ}_in"]) - C(s[f"mv_{ключ}_out"]) - C(s[ключ])) > len(days) + 1:      # допуск: по сотой на день округления
+            return беда(метка, f"стопка {имя}: начало + приход − расход ± переводы ≠ остаток", s=s)
     # РП — фонд целиком, наличные и крипта вместе: РП+ и РП− считают обе части;
     # отданное Барракуде из фонда (rp_b) — отдельной строкой
-    if abs(C(s["open_rp"]) + C(s["open_rp_cr"]) + C(s["rp_in"]) - C(s["rp_out"]) - C(s["rp_b"]) - C(s["rp"]) - C(s["rp_cr"])) > len(days) + 1:
-        return беда(метка, "РП: начало + приход − расход − Барракуде ≠ наличные + крипта", s=s)
+    if abs(C(s["open_rp"]) + C(s["open_rp_cr"]) + C(s["rp_in"]) - C(s["rp_out"]) - C(s["rp_b"]) + C(s["mv_rp_in"]) - C(s["mv_rp_out"])
+           - C(s["rp"]) - C(s["rp_cr"])) > len(days) + 1:
+        return беда(метка, "РП: начало + приход − расход − Барракуде ± переводы ≠ наличные + крипта", s=s)
     if abs(C(s["rp_b"]) - sum(w["pay_rp"] for w in m)) > 1 or abs(C(s["rp_back"]) - sum(w["back"] for w in m)) > 1 \
             or abs(C(s["rp_owed"]) - (m[-1]["owed"] if m else C(opening.get("rp_owed_open")))) > 1:
         return беда(метка, "долг фонда месяца ≠ дням", s=s)
@@ -233,7 +248,7 @@ def экран(books):
     """books: [{days, opening, safe}] в том виде, в каком книгу получает
     приложение. Возвращает список расхождений."""
     src = open(os.path.join(ROOT, "owner", "index.html"), encoding="utf-8").read()
-    js = "\n".join(_функция(src, f) for f in ("fbDdcParts", "fbDdcStart", "fbDdcMonthParts", "fbBParts"))
+    js = "const FB_MV_T = {b: 'Барракуда', rp: 'РП', np: 'ЧП'};\n" + "\n".join(_функция(src, f) for f in ("fbDdcParts", "fbDdcStart", "fbDdcMonthParts", "fbBParts"))
     js += r'''
 const fs = require('fs');
 const books = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -253,7 +268,7 @@ books.forEach((b, bi) => {
     if(B.diff) bad.push({book: bi, day: d.day, what: 'Барракуда дня не сходится со стопкой', end: B.end, stack: d.stack_b});
     // Оплата одной суммой (pay) берёт из стопки не больше, чем в ней есть: день с
     // такой оплатой не может увести стопку ниже нуля (ниже, чем она уже была).
-    if(d.manual && d.manual.pay != null && B.end < Math.min(0, B.from + B.aside) - 0.011) bad.push({book: bi, day: d.day, what: 'оплата увела стопку Барракуды в минус', from: B.from, end: B.end});
+    if(d.manual && d.manual.pay != null && B.end < Math.min(0, B.from + B.aside + B.mvB) - 0.011) bad.push({book: bi, day: d.day, what: 'оплата увела стопку Барракуды в минус', from: B.from, end: B.end});
   });
   const m = fbDdcMonthParts(b);
   const end = m.from + m.p.inSum - m.p.outSum;
@@ -416,11 +431,8 @@ async def сервер(seed, шагов=30):
         body = {"day": r.choice(прошлые), "book": book_, "amount": r.choice([25, 192, 283, 1000, 12.5]),
                 "comment": "фазз", "as": "Фазз"}
         if book_ == "rp":
-            k = r.random()
-            if k < 0.4:
+            if r.random() < 0.5:
                 body.update(kind=r.choice(["salary", "advance"]), who="Худоба")
-            elif k < 0.55:
-                body.update(kind="take")            # «Забрали из РП»: без чека, с комментарием
             else:
                 body.update(photo=КАДР, thumb="")
         if book_ == "np":
@@ -428,6 +440,17 @@ async def сервер(seed, шагов=30):
         if book_ == "in" and r.random() < 0.5:
             body["src"] = "crypto"
         код, отв = await _зови(fr.handle_entry_add, "POST", body)
+        if код == 200 and отв.get("id"):
+            записи.append(отв["id"])
+
+    async def перевод():
+        """Перевод между стопками: сервер пишет, или 409 (в стопке столько нет), или с force пишет всё равно."""
+        откуда, куда = r.sample(["b", "rp", "np"], 2)
+        body = {"day": r.choice(прошлые), "book": "mv", "amount": r.choice([25, 500, 2500, 9000]), "from": откуда, "to": куда,
+                "comment": r.choice(["", "фазз"]), "force": r.random() < 0.3, "as": "Фазз"}
+        код, отв = await _зови(fr.handle_entry_add, "POST", body)
+        if код not in (200, 409):
+            raise RuntimeError(f"перевод: код {код} {отв}")
         if код == 200 and отв.get("id"):
             записи.append(отв["id"])
 
@@ -439,7 +462,7 @@ async def сервер(seed, шагов=30):
         await _зови(fr.handle_month_set, "POST", {"month": МЕС, "field": r.choice(["safe_b_open", "rp_open", "np_open", "debt_b_open"]),
                                                   "value": r.choice([None, 0, 5000, 30902, -22]), "as": "Фазз"})
 
-    ходы = [заказ] * 5 + [расход_водителя] * 2 + [подтвердить] * 3 + [поле] * 3 + [запись] * 3 + [убрать, начало, оплата, оплата]
+    ходы = [заказ] * 5 + [расход_водителя] * 2 + [подтвердить] * 3 + [поле] * 3 + [запись] * 3 + [убрать, начало, оплата, оплата, перевод, перевод]
     for шаг in range(шагов):
         ход = r.choice(ходы)
         try:

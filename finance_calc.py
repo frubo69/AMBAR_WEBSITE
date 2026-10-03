@@ -78,6 +78,11 @@ def compute(days: list[dict], opening: dict) -> dict:
                         фонда; pay='crypto' — платили криптой: вычитается из
                         крипта-части РП, наличные сейфа не трогает
          payouts        [{amount, who, comment}] — выплаты из чистой прибыли
+         moves          [{amount, from, to}] — переводы между стопками сейфа
+                        (владелец, 3 окт 2026: «перевести со счёта РП на счёт
+                        ЧП»): from/to ∈ b | rp | np; сейф целиком не меняют,
+                        деньги переходят из стопки в стопку; идут до оплаты
+                        Баракуде — переложенное в её стопку можно тут же платить
          pending        раскладка дня ещё не подтверждена старшим: aside /
                         collected / прибыль дня показываются как предложение,
                         но в стопки, итоги и остатки не входят
@@ -112,7 +117,8 @@ def compute(days: list[dict], opening: dict) -> dict:
              pay_b=0.0, pay_b_extra=0.0, expenses=0.0, np_plus=0.0,
              payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0, pending=0,
              collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0,
-             pay_rp=0.0, rp_back=0.0)
+             pay_rp=0.0, rp_back=0.0,
+             mv_b_in=0.0, mv_b_out=0.0, mv_rp_in=0.0, mv_rp_out=0.0, mv_np_in=0.0, mv_np_out=0.0)
     for d in days:
         cash = _n(d.get('cash'))
         spend = _n(d.get('spend'))
@@ -136,6 +142,16 @@ def compute(days: list[dict], opening: dict) -> dict:
         cr_cash = _n(d.get('cr_cash'))
         extra_cr = _n(d.get('extra_cr'))
         pay_sum = sum(_n(e.get('amount')) for e in (d.get('payouts') or []))
+        # переводы между стопками: из какой ушло, в какую пришло
+        mv_in = {'b': 0.0, 'rp': 0.0, 'np': 0.0}
+        mv_out = {'b': 0.0, 'rp': 0.0, 'np': 0.0}
+        for mv in (d.get('moves') or []):
+            a = _n(mv.get('amount'))
+            if mv.get('from') in mv_out:
+                mv_out[mv['from']] += a
+            if mv.get('to') in mv_in:
+                mv_in[mv['to']] += a
+        mv_b, mv_rp, mv_np = (mv_in['b'] - mv_out['b'], mv_in['rp'] - mv_out['rp'], mv_in['np'] - mv_out['np'])
         # Выручка в минусе в сейф не ложится (владелец, 30 сен 2026: «пока там
         # минус — пиши 0… деньги на расходы мы берём не из сейфа»). Минус в
         # окошке выручки значит, что водители потратили больше, чем пока
@@ -150,7 +166,7 @@ def compute(days: list[dict], opening: dict) -> dict:
             # подтверждённой раскладки этого дня); недостающее — из ЧП, из РП
             # или понемногу из обоих, как выбрал старший (pay_src)
             pay_total = _n(d.get('pay'))
-            pay_b = min(pay_total, max(0.0, safe_b + aside_c))
+            pay_b = min(pay_total, max(0.0, safe_b + aside_c + mv_b))
             short = pay_total - pay_b
             src = d.get('pay_src') or ''
             if src == 'rp':
@@ -161,7 +177,7 @@ def compute(days: list[dict], opening: dict) -> dict:
                 pay_rp = 0.0
             pay_b_extra = short - pay_rp
         # книга «Баракуда»: сейф и долг — бегущие остатки
-        safe_b = safe_b + aside_c - pay_b
+        safe_b = safe_b + aside_c + mv_b - pay_b
         debt_b = debt_b + ordered - pay_b - pay_b_extra - pay_rp
         # Долг фонда: отданное Баракуде сегодня прибавляется, а собранное в РП+
         # сверх нормы (подтверждённого дня) его возвращает — в тот же день или
@@ -173,15 +189,15 @@ def compute(days: list[dict], opening: dict) -> dict:
         # Фонд целиком (наличные + крипта): перекладка крипты в наличные его
         # не меняет, поэтому cr_cash вычитается из прихода. Отданное Баракуде
         # из фонда уходит; возврат уже сидит в collected.
-        rp = rp + collected_c + collected_cr_c + extra_rp + extra_cr - cr_cash - exp_sum - pay_rp
+        rp = rp + collected_c + collected_cr_c + extra_rp + extra_cr - cr_cash - exp_sum - pay_rp + mv_rp
         np_acc = np_acc + np_c - pay_sum
         # Наличная стопка РП — только то, что в сейфе; оплаченное криптой её
         # не трогает. Крипта-часть — рядом, своим счётом.
-        rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr) - pay_rp
+        rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr) - pay_rp + mv_rp
         rp_cr = rp_cr + collected_cr_c + extra_cr - exp_cr - cr_cash
-        np_st = np_st + np_c - pay_sum - pay_b_extra
+        np_st = np_st + np_c - pay_sum - pay_b_extra + mv_np
         touched = any(d.get(k) is not None for k in DAY_MANUAL) \
-            or bool(d.get('expenses')) or bool(d.get('payouts'))
+            or bool(d.get('expenses')) or bool(d.get('payouts')) or bool(d.get('moves'))
         if d.get('pending'):
             t['pending'] += 1
         out.append(dict(
@@ -198,6 +214,9 @@ def compute(days: list[dict], opening: dict) -> dict:
             rp_owed_before=_i(owed_before), rp_back=_i(rp_back), rp_owed=_i(owed),
             expenses=d.get('expenses') or [], expenses_sum=_i(exp_sum),
             payouts=d.get('payouts') or [], payouts_sum=_i(pay_sum),
+            moves=d.get('moves') or [],
+            mv_b_in=_i(mv_in['b']), mv_b_out=_i(mv_out['b']), mv_rp_in=_i(mv_in['rp']), mv_rp_out=_i(mv_out['rp']),
+            mv_np_in=_i(mv_in['np']), mv_np_out=_i(mv_out['np']),
             np_plus=_i(np_plus), safe_b=_i(safe_b), debt_b=_i(debt_b),
             rp=_i(rp), np_acc=_i(np_acc), touched=touched,
             pay=_i(pay_b + pay_b_extra + pay_rp), ok=bool(d.get('ok')), counted=not pending,
@@ -214,6 +233,8 @@ def compute(days: list[dict], opening: dict) -> dict:
         t['extra_cr'] += extra_cr
         t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra; t['pay_rp'] += pay_rp; t['rp_back'] += rp_back
         t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
+        for k in ('b', 'rp', 'np'):
+            t[f'mv_{k}_in'] += mv_in[k]; t[f'mv_{k}_out'] += mv_out[k]
 
     # «РП + и −»
     # всего собрал за месяц — наличными и криптой; перекладка крипты в
@@ -260,6 +281,8 @@ def compute(days: list[dict], opening: dict) -> dict:
                 rp_b=_i(t['pay_rp']), rp_back=_i(t['rp_back']), rp_owed=_i(owed),
                 open_rp_owed=_i(_n(opening.get('rp_owed_open'))),
                 np_in=_i(t['np_plus']), np_out=_i(t['payouts'] + t['pay_b_extra']),
+                # переводы между стопками за месяц: что в каждую пришло и ушло
+                **{k: _i(t[k]) for k in ('mv_b_in', 'mv_b_out', 'mv_rp_in', 'mv_rp_out', 'mv_np_in', 'mv_np_out')},
                 pending=int(t['pending']))
     return dict(
         days=out,

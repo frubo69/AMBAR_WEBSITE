@@ -50,10 +50,12 @@ PAY_WAYS = ('', 'cash', 'crypto')      # чем платили расход из
 _CR_LOCK = asyncio.Lock()
 OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стопки сейфа и долг на начало
 MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
-BOOKS = ('rp', 'np', 'in')
-# 'take' — «Забрали из РП» (владелец, 3 окт 2026): деньги вынули из фонда не
-# по статье и без чека, с комментарием и датой; в книге — обычный РП−.
-ENTRY_KINDS = ('', 'salary', 'advance', 'loan', 'take')
+# 'mv' — перевод между стопками сейфа (владелец, 3 окт 2026: «перевести со
+# счёта РП на счёт ЧП»): из from в to, сейф целиком не меняется.
+BOOKS = ('rp', 'np', 'in', 'mv')
+STACKS = ('b', 'rp', 'np')
+STACK_T = {"b": "Барракуда", "rp": "РП", "np": "ЧП"}
+ENTRY_KINDS = ('', 'salary', 'advance', 'loan')
 # Откуда взято то, чего не хватило в стопке Барракуды на оплату (владелец,
 # 3 окт 2026): из ЧП (как было всегда), из РП, или понемногу из обоих.
 PAY_SRC = ('', 'np', 'rp', 'mix')
@@ -985,11 +987,13 @@ def _entry_view(e: dict, line_names: dict) -> dict:
     return {"id": e.get("_id"), "amount": e.get("amount"), "comment": e.get("comment") or "",
             "who": e.get("who") or "", "line": lid, "line_name": line_names.get(lid, ""),
             "kind": e.get("kind") or "", "kind_t": {"salary": "Зарплата", "advance": "Аванс",
-                                                    "loan": "Долг", "take": "Забрали из РП"}.get(e.get("kind") or "", ""),
+                                                    "loan": "Долг"}.get(e.get("kind") or "", ""),
             "item": e.get("item") or "", "by": e.get("by") or "", "at": str(e.get("at") or ""),
             "day": e.get("day") or "", "pay_month": e.get("pay_month") or "", "photo": bool(e.get("photo")),
             "route_from": e.get("route_from") or "", "route_to": e.get("route_to") or "",
             "src": e.get("src") or "",
+            # перевод между стопками: откуда и куда
+            "from": e.get("from") or "", "to": e.get("to") or "",
             # чем платили расход из РП; у вывода крипты — сколько из свободной
             # и сколько с крипта-счёта РП
             "pay": e.get("pay") or "", "cr_free": e.get("cr_free") or 0, "cr_rp": e.get("cr_rp") or 0,
@@ -1021,7 +1025,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     by_day_entries: dict = {}
     for e in entries:
         bk = e.get("book") if e.get("book") in BOOKS else "rp"
-        by_day_entries.setdefault(e.get("day"), {"rp": [], "np": [], "in": []})[bk].append(
+        by_day_entries.setdefault(e.get("day"), {"rp": [], "np": [], "in": [], "mv": []})[bk].append(
             _entry_view(e, line_names))
     # Книга крипты (crypto_book): сколько свободной сейчас и сколько на счету
     # РП было на начало месяца. Свободную предлагаем целиком в РП+ первого дня,
@@ -1033,7 +1037,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     rows, meta = [], {}
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
-        en = by_day_entries.get(d) or {"rp": [], "np": [], "in": []}
+        en = by_day_entries.get(d) or {"rp": [], "np": [], "in": [], "mv": []}
         # выручка дня — то, что старший собирает наличными: наличные заказов
         # минус чай (он водителя) минус расходы водителей наличными; как в
         # обзоре. Оплаченное безналом наличных не тронуло — не вычитаем.
@@ -1088,7 +1092,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
             pay_src=m.get("pay_src") or "", pay_rp=m.get("pay_rp"), norm=budget["norm"],
             ok=bool(m.get("ok")), pending=past and base > 0 and not m.get("ok"),
-            expenses=en["rp"], payouts=en["np"]))
+            expenses=en["rp"], payouts=en["np"], moves=en["mv"]))
         meta[d] = dict(aside_src=aside_src, collected_src=collected_src, cr_src=cr_src, ins=en["in"],
                        extra_manual=m.get("extra_rp"), ok_by=m.get("ok_by") or "",
                        tips_cash=s["tips_cash"], base=base)
@@ -1445,12 +1449,15 @@ async def handle_entry_add(request):
         # билет: откуда и куда летит — для учёта, кому что покупали
         route_from = str(body.get("route_from") or "").strip()[:40] if book == "rp" else ""
         route_to = str(body.get("route_to") or "").strip()[:40] if book == "rp" else ""
-        if kind and not who and kind != "take":
+        if kind and not who:
             return _json({"error": "who_required"}, 400)
-        # «Забрали из РП» — без чека и статьи, но обязательно за что (владелец,
-        # 3 окт 2026: «с возможностью оставлять комментарий и дату, когда взяли»)
-        if kind == "take" and not str(body.get("comment") or "").strip():
-            return _json({"error": "no_comment"}, 400)
+        # Перевод между стопками (владелец, 3 окт 2026): откуда и куда — разные
+        # стопки сейфа; комментарий по желанию, дата — день записи.
+        mv_from = str(body.get("from") or "") if book == "mv" else ""
+        mv_to = str(body.get("to") or "") if book == "mv" else ""
+        if book == "mv" and (mv_from not in STACKS or mv_to not in STACKS or mv_from == mv_to):
+            return _json({"error": "bad_move"}, 400)
+        force = bool(body.get("force"))
         # Доп. РП+ «из крипты» (владелец, 30 сен 2026): вывели USDT наличными в
         # фонд. Отметка нужна, чтобы потом знать, сколько крипты уже забрали.
         src = str(body.get("src") or "") if book == "in" else ""
@@ -1496,6 +1503,16 @@ async def handle_entry_add(request):
         doc["route_from"], doc["route_to"] = route_from, route_to
     if src:
         doc["src"] = src
+    if book == "mv":
+        # Больше, чем лежит в стопке (с этого дня и дальше — чтобы ни один
+        # день не ушёл в минус), не перевести: 409 с остатком; force — всё равно.
+        doc["from"], doc["to"] = mv_from, mv_to
+        if not force:
+            книга = await build(day[:7], light=True)
+            have = min(calc._n(r["stack_" + mv_from]) for r in книга["days"] if r["day"] >= day)
+            if amount > have + 0.005:
+                return _json({"error": "not_enough", "have": calc._i(have), "from": mv_from,
+                              "from_t": STACK_T[mv_from]}, 409)
     async with _CR_LOCK:
         if pay_way == "crypto":
             отказ = await _cr_spend_check(day, amount)
@@ -1528,12 +1545,14 @@ async def handle_entry_add(request):
             await db.fin_entry_add(комиссия)
     await _touch(day[:7])
     log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}"
+             + (f" · {STACK_T[mv_from]} → {STACK_T[mv_to]}" + (" · force" if force else "") if book == "mv" else "")
              + (" · криптой" if pay_way == "crypto" else "")
              + (f" · из свободной крипты {doc['cr_free']}, с крипта-счёта РП {doc['cr_rp']}"
                 if src == "crypto" else "")
              + (f" · комиссия {doc['fee_usdt']} USDT = {doc['fee']} AED, наша половина {doc['fee_ours']}"
                 f" (из свободной {doc['fee_free']})" if doc.get("fee_ours") else ""))
-    await backdate.notify(day, by, "финансы: " + ("забрали из РП" if kind == "take" else BOOK_T.get(book, book)),
+    await backdate.notify(day, by, "финансы: " + (f"перевод {STACK_T[mv_from]} → {STACK_T[mv_to]}" if book == "mv"
+                                                 else BOOK_T.get(book, book)),
                           f"{amount} AED {who} {doc['comment']}".strip())
     return _json({"ok": True, "id": doc["_id"], "cr_free": doc.get("cr_free"),
                   "cr_rp": doc.get("cr_rp"), "fee": doc.get("fee"), "fee_ours": doc.get("fee_ours"),
@@ -2283,7 +2302,7 @@ FIELD_T = {
     "extra_rp": "приход в фонд", "pay_b": "оплата Барракуде из отложенного",
     "pay_b_extra": "оплата Барракуде сверх отложенного", "note": "заметка дня",
 }
-BOOK_T = {"rp": "расход из фонда", "np": "выплата из прибыли", "in": "приход в фонд"}
+BOOK_T = {"rp": "расход из фонда", "np": "выплата из прибыли", "in": "приход в фонд", "mv": "перевод между счетами"}
 
 
 async def _opt(request):

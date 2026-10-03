@@ -5236,10 +5236,16 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    сумма недостачи крупно — она здесь главная. */
 .fb-bsrc .crw-ask-t{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;letter-spacing:1.6px;
   text-transform:uppercase;color:var(--gold);margin:2px 0 8px}
-.fb-bsrc .fb-bsrc-sum{display:flex;align-items:baseline;justify-content:center;gap:6px;margin:0 0 6px;
+/* Три зоны: шапка с суммой, выбор источника, кнопки — разделены тонкими
+   линиями во всю ширину окна и воздухом. */
+.fb-bsrc .fb-bsrc-sum{display:flex;align-items:baseline;justify-content:center;gap:6px;margin:0 -16px 0;padding:0 16px 16px;
+  border-bottom:1px solid rgba(255,255,255,.07);
   font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--muted)}
 .fb-bsrc .fb-bsrc-sum b{font-size:36px;line-height:1;font-weight:700;letter-spacing:-.6px;color:var(--text);font-variant-numeric:tabular-nums}
-.fb-bsrc .crw-ask-s + .crw-ask-g{padding-top:14px}
+.fb-bsrc .crw-ask-s + .crw-ask-g{padding-top:16px}
+.fb-bsrc .fb-bsrc-hr{margin:16px -16px 14px;border-top:1px solid rgba(255,255,255,.07)}
+.fb-bsrc .fb-bsrc-hr + .crw-ask-b{margin-top:0}
+.fb-bsrc-note + .fb-bsrc-hr{margin-top:12px}
 .fb-bsrc .crw-ask-i svg.solid{fill:currentColor;stroke:none}
 .fb-bsrc .crw-ask-r.off{opacity:.35;pointer-events:none}
 .fb-bsrc .fb-mix{margin-top:7px;padding:2px 6px;border-radius:12px;background:var(--card2);border:1px solid var(--border2)}
@@ -22948,6 +22954,7 @@ function fbAskBSrc(info){
         </div>
       </div>
       <div class="fb-bsrc-note" id="fbBsrcNote" hidden></div>
+      <div class="fb-bsrc-hr"></div>
       <button class="crw-ask-b go" id="askOk">Записать оплату</button>
       <button class="crw-ask-b no" id="askNo">Отмена</button>`;
     document.body.append(back, box);

@@ -5269,8 +5269,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-bsrc .fb-mix label span{flex:1}
 .fb-bsrc .fb-mix label b{display:flex;align-items:center;gap:6px}
 .fb-bsrc .fb-mix label u{text-decoration:none;font-size:10px;font-weight:600;color:var(--muted)}
-.fb-bsrc-note{margin-top:12px;font-size:12px;font-weight:600;color:var(--dn);line-height:1.4}
-.fb-bsrc-note[hidden]{display:none}
+.fb-bsrc-note{min-height:17px;margin-top:10px;font-size:12px;font-weight:600;color:var(--dn);line-height:1.4}
+.fb-bsrc .fb-mix.off label{color:var(--muted)}
+.fb-bsrc .fb-mix input:disabled{color:var(--muted);opacity:.7;-webkit-text-fill-color:var(--muted)}
 .fb-bsrc .crw-ask-b:disabled{opacity:.45}
 /* «Откуда деньги» у зарплаты водителю (3 окт 2026): под строкой «Из выручки на
    руках» — смена фишками, что на руках, и запросы водителя на согласование.
@@ -5279,7 +5280,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-psrc .chip-row .chip{display:inline-flex;width:auto;padding:6px 10px;margin:0;border-radius:8px;gap:4px}
 .fb-psrc .chip-row .chip.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft);color:var(--gold2)}
 .fb-psrc .fb-hands{margin-top:7px;padding:4px 8px 8px;border-radius:12px;background:var(--card2);border:1px solid var(--border2);text-align:left}
-.fb-psrc .fb-hands[hidden]{display:none}
+.fb-psrc .fb-hands.off{opacity:.45;pointer-events:none}
+.fb-psrc .fb-hands-i{min-height:34px}
+.fb-psrc #fbHandsReq{min-height:30px}
 .fb-psrc .fb-hands .crw-ask-g{padding:6px 2px 2px}
 .fb-psrc .fb-hands-i{font-size:12px;color:var(--sub);line-height:1.4;padding:6px 2px 2px}
 .fb-psrc .fb-hands-i b{color:var(--text)}
@@ -22961,12 +22964,15 @@ function fbAskBSrc(info){
         ${row('np', FB_ICO.np, 'Из ЧП')}
         ${row('rp', FB_ICO.rp, 'Из РП')}
         ${row('mix', FB_ICO_MIX, 'Понемногу отовсюду')}
-        <div class="fb-mix" id="fbMix" hidden>
+        <!-- Поля видны всегда (владелец, 3 окт 2026: «не нравится, когда резко
+             меняется размер окон»): у «из ЧП» и «из РП» они показывают раскладку
+             и не правятся, у «понемногу» — правятся. -->
+        <div class="fb-mix" id="fbMix">
           <label><span>Из ЧП</span><b><input class="fb-num" inputmode="decimal" id="fbMixNp" autocomplete="off"><u>AED</u></b></label>
           <label><span>Из РП</span><b><input class="fb-num" inputmode="decimal" id="fbMixRp" autocomplete="off"><u>AED</u></b></label>
         </div>
       </div>
-      <div class="fb-bsrc-note" id="fbBsrcNote" hidden></div>
+      <div class="fb-bsrc-note" id="fbBsrcNote"></div>
       <div class="fb-bsrc-hr"></div>
       <button class="crw-ask-b go" id="askOk">Записать оплату</button>
       <button class="crw-ask-b no" id="askNo">Отмена</button>`;
@@ -22977,10 +22983,15 @@ function fbAskBSrc(info){
     const q = v => `${fbFmt(v)}<u>AED</u>`;
     const paint = () => {
       box.querySelectorAll('.crw-ask-r').forEach(el => { el.classList.toggle('main', el.dataset.src === src); el.classList.toggle('off', !can[el.dataset.src]); });
-      $('#fbMix').hidden = src !== 'mix';
+      // поля: у «понемногу» правятся, иначе показывают раскладку выбранного и выключены
+      const mixOn = src === 'mix';
+      $('#fbMix').classList.toggle('off', !mixOn);
+      $('#fbMixNp').disabled = !mixOn; $('#fbMixRp').disabled = !mixOn;
+      if(!mixOn){ $('#fbMixNp').value = fbFmt(src === 'np' ? short : 0); $('#fbMixRp').value = fbFmt(src === 'rp' ? short : 0); }
       const p = parts(), lackNp = r2(p.np - npHave), lackRp = r2(p.rp - rpHave);
       $('[data-q="np"]').innerHTML = q(short); $('[data-q="rp"]').innerHTML = q(short);
-      $('[data-q="mix"]').innerHTML = src === 'mix' ? q(r2(p.np + p.rp)) : `${fbFmt(mixNp)} + ${fbFmt(mixRp)}<u>AED</u>`;
+      // справа у всех одна и та же сумма — строка не меняет высоту при выборе
+      $('[data-q="mix"]').innerHTML = q(src === 'mix' ? r2(p.np + p.rp) : short);
       $('[data-sub="np"]').textContent = `в ЧП ${fbFmt(npHave)}`;
       $('[data-sub="rp"]').textContent = `в РП ${fbFmt(rpHave)}`;
       $('[data-sub="mix"]').textContent = `ЧП ${fbFmt(mixNp)} · РП ${fbFmt(mixRp)}`;
@@ -22992,7 +23003,7 @@ function fbAskBSrc(info){
         if(lackRp > 0.005) lacks.push(`РП уйдёт в минус на ${fbFmt(lackRp)}`);
         note = lacks.join(' · ');
       }
-      const nt = $('#fbBsrcNote'); nt.textContent = note; nt.hidden = !note;
+      $('#fbBsrcNote').textContent = note;
       const ok = $('#askOk');
       ok.disabled = bad;
       ok.textContent = !bad && note ? 'Записать всё равно' : 'Записать оплату';
@@ -25254,7 +25265,7 @@ function fbAskPaySrc(p, amount){
       <div class="crw-ask-box">
         ${row('rp', FB_ICO.rp, 'Из РП')}
         ${row('hands', IC('car', 17), 'Из выручки на руках')}
-        <div class="fb-hands" id="fbHands" hidden>
+        <div class="fb-hands" id="fbHands">
           <div class="crw-ask-g">Смена</div>
           <div class="chip-row fb-chips" id="fbHandsDays">${days.map(d => `<button class="chip${d === day ? ' on' : ''}" data-d="${d}">${escS(fbDayT(d))}</button>`).join('')}</div>
           <div class="fb-hands-i" id="fbHandsInfo">Считаю…</div>
@@ -25268,7 +25279,8 @@ function fbAskPaySrc(p, amount){
     const $ = q => box.querySelector(q);
     const paint = () => {
       box.querySelectorAll('.crw-ask-r').forEach(el => el.classList.toggle('main', el.dataset.src === src));
-      $('#fbHands').hidden = src !== 'hands';
+      // панель смены на месте всегда, размер окна не прыгает; при «Из РП» приглушена
+      $('#fbHands').classList.toggle('off', src !== 'hands');
       $('[data-q="rp"]').innerHTML = `${fbFmt(sum)}<u>AED</u>`; $('[data-q="hands"]').innerHTML = `${fbFmt(sum)}<u>AED</u>`;
       $('[data-sub="rp"]').textContent = `в РП ${fbFmt(((fbBook(FB.month) || {}).safe || {}).rp || 0)}`;
       $('[data-sub="hands"]').textContent = info && !busy ? (info.collected ? 'сдано' : `на руках ${fbFmt(info.have)}`) : '';
@@ -25308,7 +25320,6 @@ function fbAskPaySrc(p, amount){
     };
     box.querySelectorAll('.crw-ask-r').forEach(el => el.onclick = () => {
       src = el.dataset.src; paint();
-      if(src === 'hands' && !info && !busy) load();
       try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
     });
     $('#fbHandsDays').querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
@@ -25319,6 +25330,7 @@ function fbAskPaySrc(p, amount){
     $('#askOk').onclick = () => { closePinPop(); resolve(src === 'hands' ? {src, day, req, amount: sum} : {src: 'rp', amount: sum}); };
     $('#askNo').onclick = () => { closePinPop(); resolve(null); };
     paint();
+    load();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
   });
 }

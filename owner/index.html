@@ -5246,7 +5246,6 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-bsrc-note{margin-top:12px;font-size:12px;font-weight:600;color:var(--dn);line-height:1.4}
 .fb-bsrc-note[hidden]{display:none}
 .fb-bsrc .crw-ask-b:disabled{opacity:.45}
-.fb-loan-how{padding:12px 16px 14px;font-size:12px;line-height:1.45;color:var(--muted)}
 /* «Откуда деньги» у зарплаты водителю (3 окт 2026): под строкой «Из выручки на
    руках» — смена фишками, что на руках, и запросы водителя на согласование.
    Фишки внутри окна-вопроса надо вернуть к их обычному виду: .pin-pop button
@@ -22790,7 +22789,7 @@ function fbBBodyHtml(d){
     <div class="dds-tot end long${end < 0 ? ' neg' : ''}"><span>Остаётся в сейфе на Барракуду</span>${v(end)}</div>
     ${diff ? row('out', 'Не сходится с сейфом', diff) : ''}
     <div class="dds-r ${d.debt_b > 0 ? 'out' : ''}"><span>Долг после дня<i class="sub">${долг}</i></span>${v(n(d.debt_b))}</div>
-    ${owed > 0 ? `<div class="dds-r out"><span>Взято из РП — ещё не вернулось<i class="sub">вернётся из выручки: РП+ следующих дней сверх нормы</i></span>${v(owed)}</div>` : ''}
+    ${owed > 0 ? `<div class="dds-r out"><span>Взято из РП — ещё не вернулось</span>${v(owed)}</div>` : ''}
   </div>
   ${FB.bDebt ? fbBDebtHtml(b) : ''}`;
 }
@@ -22945,9 +22944,9 @@ function fbAskBSrc(info){
       const p = parts(), lackNp = r2(p.np - npHave), lackRp = r2(p.rp - rpHave);
       $('[data-q="np"]').innerHTML = q(short); $('[data-q="rp"]').innerHTML = q(short);
       $('[data-q="mix"]').innerHTML = src === 'mix' ? q(r2(p.np + p.rp)) : `${fbFmt(mixNp)} + ${fbFmt(mixRp)}<u>AED</u>`;
-      $('[data-sub="np"]').innerHTML = npHave + 0.005 >= short ? `в ЧП ${fbFmt(npHave)} · берём, возвращать не надо` : `<span class="dn">в ЧП только ${fbFmt(npHave)}</span>`;
-      $('[data-sub="rp"]').innerHTML = rpHave + 0.005 >= short ? `в РП ${fbFmt(rpHave)} · вернётся из выручки следующих дней` : `<span class="dn">в РП только ${fbFmt(rpHave)}</span>`;
-      $('[data-sub="mix"]').innerHTML = 'из ЧП и из РП — суммы можно поправить';
+      $('[data-sub="np"]').innerHTML = npHave + 0.005 >= short ? `в ЧП ${fbFmt(npHave)}` : `<span class="dn">в ЧП только ${fbFmt(npHave)}</span>`;
+      $('[data-sub="rp"]').innerHTML = rpHave + 0.005 >= short ? `в РП ${fbFmt(rpHave)}` : `<span class="dn">в РП только ${fbFmt(rpHave)}</span>`;
+      $('[data-sub="mix"]').innerHTML = `ЧП ${fbFmt(mixNp)} · РП ${fbFmt(mixRp)}`;
       let note = '', bad = false;
       if(src === 'mix' && Math.abs(p.np + p.rp - short) > 0.005){ note = `Вместе должно быть ${fbFmt(short)} AED`; bad = true; }
       else{
@@ -23125,7 +23124,6 @@ function fbBLoanHtml(b){
     </div>
     ${s.open_rp_owed ? fbRow('Не вернулось с прошлого месяца', 'safe.open_rp_owed', s.open_rp_owed, {sub: true}) : ''}
   </div>
-  <div class="sc"><div class="fb-loan-how">Пока фонд не вернул своё, в РП+ каждого дня предлагается норма и сверх неё — долг, в пределах выручки дня. Собранное сверх нормы и есть возврат.</div></div>
   <div class="sc">${fbCapT('По дням')}<div class="fb-one fb-loan">${rows.length ? rows.map(r => `<div class="fb-e">
       <span class="fb-e-b"><b>${r.t}</b><i>${escS(fbDayT(r.day))}${r.at ? ', ' + fbAtT(r.at) : ''} · ${r.sub}<br>осталось вернуть ${fbFmt(r.left)}</i></span>
       <b class="fb-e-v${r.v < 0 ? ' dn' : ' ok'}">${r.v < 0 ? '−' : '+'}${fbFmt(Math.abs(r.v))}<u>AED</u></b></div>`).join('')
@@ -25234,8 +25232,8 @@ function fbAskPaySrc(p, amount){
       box.querySelectorAll('.crw-ask-r').forEach(el => el.classList.toggle('main', el.dataset.src === src));
       $('#fbHands').hidden = src !== 'hands';
       $('[data-q="rp"]').innerHTML = `${fbFmt(sum)}<u>AED</u>`; $('[data-q="hands"]').innerHTML = `${fbFmt(sum)}<u>AED</u>`;
-      $('[data-sub="rp"]').textContent = 'наличные из стопки РП сегодняшним днём';
-      $('[data-sub="hands"]').textContent = 'водитель оставил себе из наличных смены';
+      $('[data-sub="rp"]').textContent = `в РП ${fbFmt(((fbBook(FB.month) || {}).safe || {}).rp || 0)}`;
+      $('[data-sub="hands"]').textContent = info && !busy ? (info.collected ? 'сдано' : `на руках ${fbFmt(info.have)}`) : '';
       let note = '', bad = false;
       if(src === 'hands'){
         if(busy || !info) bad = true;
@@ -25254,7 +25252,7 @@ function fbAskPaySrc(p, amount){
         : `На руках за ${escS(fbDayT(day))}: <b>${fbFmt(info.have)}</b> AED<br><span>наличные ${fbFmt(info.cash)} · чай ${fbFmt(info.tips)} · расходы ${fbFmt(info.spend)}${
             info.kept ? ' · уже зарплата ' + fbFmt(info.kept) : ''}</span>`;
       rq.innerHTML = (info.requests || []).length
-        ? `<span class="fb-hands-l">Прислал на согласование — нажмите, чтобы взять его запрос:</span>` + info.requests.map(r =>
+        ? `<span class="fb-hands-l">Его запросы</span>` + info.requests.map(r =>
             `<button class="chip${req === r.id ? ' on' : ''}" data-r="${escS(r.id)}" data-a="${+r.amount || 0}">${escS(r.kind_t || 'Что-то ещё')} ${fbFmt(r.amount)}${r.comment ? ' · ' + escS(r.comment) : ''}</button>`).join('')
         : '';
       rq.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {

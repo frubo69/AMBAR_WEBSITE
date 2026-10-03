@@ -22921,8 +22921,8 @@ function fbAskBSrc(info){
         <span class="crw-ask-n"><b>${t}</b><i data-sub="${id}"></i></span>
         <span class="crw-ask-q" data-q="${id}"></span></button>`;
     const wait = (info.wait || []).map(x => fbDayT(x.day));
-    box.innerHTML = `<div class="crw-ask-t">Не хватает в стопке Барракуды</div>
-      <div class="crw-ask-s">Оплата ${fbFmt(info.amount)} AED · в стопке ${fbFmt(info.bHave)}<br>не хватает <b>${fbFmt(short)}</b> AED</div>
+    box.innerHTML = `<div class="crw-ask-t">Не хватает в Барракуде</div>
+      <div class="crw-ask-s">Оплата ${fbFmt(info.amount)} AED · в Барракуде ${fbFmt(info.bHave)}<br>не хватает <b>${fbFmt(short)}</b> AED</div>
       <div class="crw-ask-g">Откуда взять недостающее</div>
       <div class="crw-ask-box">
         ${row('np', FB_ICO.np, 'Из ЧП')}
@@ -22934,7 +22934,7 @@ function fbAskBSrc(info){
         </div>
       </div>
       <div class="fb-bsrc-note" id="fbBsrcNote" hidden></div>
-      ${wait.length ? `<div class="fb-bsrc-wait">Распределение не подтверждено: ${escS(wait.join(', '))}. После подтверждения в стопках прибавится.</div>` : ''}
+      ${wait.length ? `<div class="fb-bsrc-wait">Распределение не подтверждено: ${escS(wait.join(', '))}. После подтверждения в Барракуде, РП и ЧП прибавится.</div>` : ''}
       <button class="crw-ask-b go" id="askOk">Записать оплату</button>
       <button class="crw-ask-b no" id="askNo">Отмена</button>`;
     document.body.append(back, box);

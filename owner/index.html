@@ -5233,8 +5233,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    строками, что выбор заявки; у «понемногу отовсюду» два поля под строкой. */
 .fb-bsrc .crw-ask-s b{color:var(--text)}
 .fb-bsrc .crw-ask-i svg.solid{fill:currentColor;stroke:none}
-.fb-bsrc .crw-ask-n i .dn{color:var(--dn)}
-.fb-bsrc .crw-ask-r.main .crw-ask-n i .dn{color:#6b1f1f}
+.fb-bsrc .crw-ask-r.off{opacity:.35;pointer-events:none}
 .fb-bsrc .fb-mix{margin-top:7px;padding:2px 6px;border-radius:12px;background:var(--card2);border:1px solid var(--border2)}
 .fb-bsrc .fb-mix[hidden]{display:none}
 .fb-bsrc .fb-mix label{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 4px 0 10px;
@@ -22904,11 +22903,21 @@ function fbAskBSrc(info){
   return new Promise(resolve => {
     closePinPop();
     const r2 = v => Math.round(v * 100) / 100, short = r2(info.short), npHave = r2(info.np), rpHave = r2(info.rp);
-    let src = npHave + 0.005 >= short ? 'np' : (npHave > 0 && npHave + rpHave + 0.005 >= short) ? 'mix' : 'rp';
-    let mixNp = r2(Math.min(Math.max(0, npHave), short)), mixRp = r2(short - mixNp);
-    // правка записанной оплаты — с тем выбором, что был
-    if(info.cur && ['np', 'rp', 'mix'].includes(info.cur.src)) src = info.cur.src;
-    if(info.cur && info.cur.src === 'mix'){ mixRp = r2(Math.min(Math.max(0, info.cur.rp), short)); mixNp = r2(short - mixRp); }
+    // Источник, где не хватает, выбрать нельзя (владелец, 3 окт 2026: «если там
+    // не хватает — не давай выбрать вообще»). Не хватает нигде — выбирать можно
+    // всё, кнопка станет «Записать всё равно».
+    const canNp = npHave + 0.005 >= short, canRp = rpHave + 0.005 >= short;
+    const canMix = npHave > 0.005 && rpHave > 0.005 && npHave + rpHave + 0.005 >= short;
+    const any = canNp || canRp || canMix;
+    const can = {np: canNp || !any, rp: canRp || !any, mix: canMix || !any};
+    let src = canNp ? 'np' : canMix ? 'mix' : canRp ? 'rp' : 'np';
+    // поля «понемногу»: из ЧП сколько есть, остальное из РП — и ни одно не больше своего счёта
+    const clampNp = v => { let a = r2(Math.min(Math.max(0, v), short, Math.max(0, npHave))), b = r2(short - a);
+      if(b > rpHave + 0.005 && any){ b = r2(Math.max(0, rpHave)); a = r2(short - b); } return [a, b]; };
+    let [mixNp, mixRp] = clampNp(npHave);
+    // правка записанной оплаты — с тем выбором, что был, если он ещё возможен
+    if(info.cur && can[info.cur.src]) src = info.cur.src;
+    if(info.cur && info.cur.src === 'mix' && can.mix) [mixNp, mixRp] = clampNp(short - Math.max(0, info.cur.rp));
     const back = document.createElement('div');
     back.className = 'pin-back ask';
     back.addEventListener('click', () => { closePinPop(); resolve(null); });
@@ -22939,14 +22948,14 @@ function fbAskBSrc(info){
     const parts = () => src === 'np' ? {np: short, rp: 0} : src === 'rp' ? {np: 0, rp: short} : {np: num('fbMixNp'), rp: num('fbMixRp')};
     const q = v => `${fbFmt(v)}<u>AED</u>`;
     const paint = () => {
-      box.querySelectorAll('.crw-ask-r').forEach(el => el.classList.toggle('main', el.dataset.src === src));
+      box.querySelectorAll('.crw-ask-r').forEach(el => { el.classList.toggle('main', el.dataset.src === src); el.classList.toggle('off', !can[el.dataset.src]); });
       $('#fbMix').hidden = src !== 'mix';
       const p = parts(), lackNp = r2(p.np - npHave), lackRp = r2(p.rp - rpHave);
       $('[data-q="np"]').innerHTML = q(short); $('[data-q="rp"]').innerHTML = q(short);
       $('[data-q="mix"]').innerHTML = src === 'mix' ? q(r2(p.np + p.rp)) : `${fbFmt(mixNp)} + ${fbFmt(mixRp)}<u>AED</u>`;
-      $('[data-sub="np"]').innerHTML = npHave + 0.005 >= short ? `в ЧП ${fbFmt(npHave)}` : `<span class="dn">в ЧП только ${fbFmt(npHave)}</span>`;
-      $('[data-sub="rp"]').innerHTML = rpHave + 0.005 >= short ? `в РП ${fbFmt(rpHave)}` : `<span class="dn">в РП только ${fbFmt(rpHave)}</span>`;
-      $('[data-sub="mix"]').innerHTML = `ЧП ${fbFmt(mixNp)} · РП ${fbFmt(mixRp)}`;
+      $('[data-sub="np"]').textContent = `в ЧП ${fbFmt(npHave)}`;
+      $('[data-sub="rp"]').textContent = `в РП ${fbFmt(rpHave)}`;
+      $('[data-sub="mix"]').textContent = `ЧП ${fbFmt(mixNp)} · РП ${fbFmt(mixRp)}`;
       let note = '', bad = false;
       if(src === 'mix' && Math.abs(p.np + p.rp - short) > 0.005){ note = `Вместе должно быть ${fbFmt(short)} AED`; bad = true; }
       else{
@@ -22962,14 +22971,15 @@ function fbAskBSrc(info){
       ok.classList.toggle('bad', !bad && !!note); ok.classList.toggle('go', bad || !note);
     };
     box.querySelectorAll('.crw-ask-r').forEach(el => el.onclick = () => {
+      if(!can[el.dataset.src]) return;
       src = el.dataset.src;
       if(src === 'mix'){ $('#fbMixNp').value = fbFmt(mixNp); $('#fbMixRp').value = fbFmt(mixRp); }
       paint();
       try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
     });
-    // одно поле правят — второе досчитывается до недостающего
-    $('#fbMixNp').oninput = () => { mixNp = r2(Math.min(Math.max(0, num('fbMixNp')), short)); mixRp = r2(short - mixNp); $('#fbMixRp').value = fbFmt(mixRp); paint(); };
-    $('#fbMixRp').oninput = () => { mixRp = r2(Math.min(Math.max(0, num('fbMixRp')), short)); mixNp = r2(short - mixRp); $('#fbMixNp').value = fbFmt(mixNp); paint(); };
+    // одно поле правят — второе досчитывается до недостающего, и ни одно не больше своего счёта
+    $('#fbMixNp').oninput = () => { [mixNp, mixRp] = clampNp(num('fbMixNp')); $('#fbMixRp').value = fbFmt(mixRp); paint(); };
+    $('#fbMixRp').oninput = () => { [mixNp, mixRp] = clampNp(short - Math.min(Math.max(0, num('fbMixRp')), short, Math.max(0, rpHave))); $('#fbMixNp').value = fbFmt(mixNp); paint(); };
     $('#askOk').onclick = () => {
       const p = parts(), force = p.np > npHave + 0.005 || p.rp > rpHave + 0.005;
       closePinPop();

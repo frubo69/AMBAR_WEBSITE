@@ -1908,7 +1908,11 @@ async def _car_assign(cid: str, driver: str, mode: str = "take", expect: str | N
     if driver and driver not in names:
         return "unknown_driver"
     raw = str(x.get("driver") or "")
-    holder = raw if raw in names else ""
+    # Кто держит машину — тем же правилом, что и экран (_fleet_view): уехавший
+    # водитель машину не держит, она свободна. До 4 окт 2026 здесь считали по
+    # всему реестру, с уехавшими: экран показывал машину Фаредуна свободной, а
+    # закрепить её за Диловаром не давало — «список обновлён» на каждое нажатие.
+    holder = raw if raw in names and not staff.is_away(raw) else ""
     if expect is not None and str(expect or "") != holder:
         return "changed"
     if holder == driver:

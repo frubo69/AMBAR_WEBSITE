@@ -288,10 +288,14 @@ async def прогон(seed, шагов):
             return "уехавшему машину не даём"
         mode = r.choice(["take", "swap"])
         прежний, была = m.holder.get(cid, ""), m.car_of.get(n) if n else None
+        # Уехавший машину не держит (4 окт 2026, как _fleet_view и _car_assign):
+        # на экране она свободна, забрать её — не обмен; «снять» с уехавшего —
+        # ничего не меняет, в базе она остаётся за ним до возвращения.
+        держит = прежний if (прежний and прежний not in m.away) else ""
         err = await orr._car_assign(cid, n, mode)
         if err:
             return f"машина: {err}"
-        if прежний == n:
+        if держит == n:
             return "машина: без изменений"
         # модель: как _car_assign
         if прежний:
@@ -301,7 +305,7 @@ async def прогон(seed, шагов):
         if n:
             m.car_of[n] = cid
             if была and была != cid:
-                кому = прежний if (mode == "swap" and прежний) else ""
+                кому = держит if (mode == "swap" and держит) else ""
                 m.holder[была] = кому
                 m.взял[была] = m.шаг()
                 if кому:

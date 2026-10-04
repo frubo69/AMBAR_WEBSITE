@@ -2939,6 +2939,32 @@ async def supply_list(limit: int = 30, status: str = None) -> list:
     return rows
 
 
+async def intake_scanners(sids: list) -> dict:
+    """{(поставка, район): [{who, n, units, first, last}, …]} — кто и сколько
+    кодов отсканировал по приёмке. По именам из самих кодов, а не по задаче:
+    район мог начать водитель, а дочитать старший. Убранные из приёмки коды
+    стёрты из реестра (task_undo → qr_remove), их здесь нет — их число
+    держит сама задача (undo)."""
+    db = _db_or_none()
+    if db is None or not sids: return {}
+    cur = db.qr_codes.aggregate([
+        {"$match": {"supply_id": {"$in": list(sids)}, "src": {"$in": ["intake", "cover"]}}},
+        {"$group": {"_id": {"s": "$supply_id", "o": {"$ifNull": ["$origin", "$district"]},
+                            "w": {"$ifNull": ["$driver", ""]}},
+                    "n": {"$sum": 1}, "u": {"$sum": QR_QTY},
+                    "first": {"$min": "$at"}, "last": {"$max": "$at"}}},
+    ])
+    out: dict = {}
+    for d in await cur.to_list(length=5000):
+        k = d.get("_id") or {}
+        out.setdefault((k.get("s"), k.get("o")), []).append(
+            {"who": k.get("w") or "", "n": int(d.get("n") or 0), "units": _qn(d.get("u") or 0),
+             "first": d.get("first"), "last": d.get("last")})
+    for lst in out.values():
+        lst.sort(key=lambda x: -x["n"])
+    return out
+
+
 async def supply_task_cancel(sid: str, district: str, who: str, now) -> bool:
     """Отменить задачу района точечно: только если она ещё открыта и не
     отменена. Документ целиком не переписываем — скан по соседнему району в

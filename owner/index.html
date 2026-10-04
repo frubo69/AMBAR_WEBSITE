@@ -5326,6 +5326,48 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 /* Выписка: день — подписью над операциями */
 .fb-npday{padding:10px 16px 2px;font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
 .fb-npday + .fb-e{border-top:0}
+/* История приёмок (ih-), 4 окт 2026: день — карточкой, строка — район: слева
+   код района, кто и когда, справа сколько принято из плана; по нажатию —
+   взял / начал / закрыл, кто сколько отсканировал, убранное, недовоз, позиции. */
+.ih-p + .ih-p{border-top:1px solid rgba(255,255,255,.05)}
+.ih-r{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:9px 12px 9px 16px;
+  border:0;background:transparent;color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.ih-r:active{background:rgba(255,255,255,.02)}
+.ih-r .shl-code{width:38px;height:38px;border-radius:11px;font-size:13px;color:var(--sub);
+  background:var(--card3);border-color:var(--border2)}
+.ih-r.open .shl-code{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
+.ih-b{flex:1;min-width:0}
+.ih-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ih-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ih-b i em{font-style:normal;font-weight:600;color:var(--sub)}
+.ih-b i em.warn{color:var(--warn)} .ih-b i em.dn{color:var(--dn)} .ih-b i em.live{color:var(--gold2)}
+.ih-v{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;line-height:1}
+.ih-v b{display:block;font-size:17px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+.ih-v i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-top:3px}
+.ih-v.warn b{color:var(--warn)} .ih-v.dn b{color:var(--dn)} .ih-v.dim b{color:var(--sub)}
+.ih-ch{flex:0 0 auto;display:flex;color:var(--dim);transform:rotate(90deg);transition:transform .18s ease}
+.ih-ch.on{transform:rotate(-90deg);color:var(--gold2)}
+.ih-d{padding:0 16px 12px 66px}
+.ih-tr{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;color:var(--sub)}
+.ih-tr i.dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--gold2)}
+.ih-tr i.dot.ok{background:var(--up)} .ih-tr i.dot.warn{background:var(--warn)} .ih-tr i.dot.dn{background:var(--dn)}
+.ih-tr i.dot.wait{background:none;border:1.5px solid var(--dim)}
+.ih-tr span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ih-tr b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.ih-note{padding:4px 0 0;font-size:12px;color:var(--muted)}
+.ih-ls{margin-top:8px;border-top:1px solid rgba(255,255,255,.07)}
+.ih-ln{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12.5px;border-top:1px solid rgba(255,255,255,.05)}
+.ih-ln:first-child{border-top:0}
+.ih-ln span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ih-ln b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.ih-ln b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:4px}
+.ih-ln.warn b{color:var(--warn)} .ih-ln.dn b{color:var(--dn)}
+/* Вторая строка истории на хабе — под первой, черта между ними тоньше. */
+.ohub .pbox .pd-hist + .pd-hist{border-top-width:1px}
 /* Экран действия: сумма крупно по центру */
 .fb-npamt{padding:6px 16px 10px}
 .fb-amtbig{display:flex;align-items:baseline;justify-content:center;gap:8px;padding:18px 0 14px}
@@ -26100,7 +26142,7 @@ function ordHub(){
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div></div>
     <div class="pbox xbase">${pathExtra()}</div>
-    <div class="pbox grow">${pathDistricts()}${pathShort()}${supHistLine()}</div></div>`;
+    <div class="pbox grow">${pathDistricts()}${pathShort()}${supHistLine()}${intHistLine()}</div></div>`;
   ohubFit();
 }
 
@@ -31232,6 +31274,123 @@ function supHistRow(x){
     <span class="pstat-c ${st[1]}">${st[0]}</span>
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
+}
+
+// ── История приёмок ────────────────────────────────────────────────────────
+// Владелец, 4 окт 2026: «историю приёмок в STAR — кто, что, сколько и когда
+// принимал». Строка — район одной поставки: слева кто и когда, справа сколько
+// из плана; по нажатию — взял / начал / закрыл, кто сколько отсканировал,
+// убранное из приёмки, недовоз и позиции. Данные — /api/owner/supply/intake/history.
+let IH = null;
+const ICO_INTAKE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>';
+const IH_ST = {done: ['', ''], short: ['недобор', 'warn'], noscan: ['без сканирования', 'warn'],
+               live: ['в работе', 'live'], taken: ['взял, не начал', ''], cancelled: ['отменён', 'dn']};
+function intHistLine(){
+  return `<button class="pnav-r pbig ttl pd-hist" onclick="intHistory()">
+    <span class="pnav-i big live">${ICO_INTAKE}</span>
+    <span class="pnav-b"><b>История приёмок</b><i>кто принимал / сколько / когда</i></span>
+    <span class="pnav-go">${ICO_CHEV}</span>
+  </button>`;
+}
+async function intHistory(){
+  ACC_BACK = accOrder;
+  _setText('accTitle', 'История приёмок');
+  _setText('accSub', '');
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accAct').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  IH = {data: null, open: (IH && IH.open) || new Set()};
+  try{ IH.data = await ownerApi.ownerFetch('/api/owner/supply/intake/history', {params: {days: 60}}); }
+  catch(e){ mid.innerHTML = loadFail('intHistory()'); return; }
+  intHistPaint();
+}
+function intHistPaint(){
+  const mid = document.getElementById('accMid'); if(!mid || !IH || !IH.data) return;
+  const d = IH.data, rows = d.rows || [];
+  const days = [];
+  rows.forEach(r => {
+    let g = days.find(x => x.day === r.day);
+    if(!g){ g = {day: r.day, rows: []}; days.push(g); }
+    g.rows.push(r);
+  });
+  const got = rows.reduce((a, r) => a + (+r.got || 0), 0);
+  const who = new Set(rows.map(r => r.driver || r.noscan_by).filter(Boolean));
+  _setText('accSub', rows.length ? `${rows.length} ${pluralize(rows.length, 'приёмка', 'приёмки', 'приёмок')} за ${d.days} дней` : '');
+  mid.innerHTML = `<div class="sc ih-sum">
+      <div class="sc-cap"><span>Приёмки</span></div>
+      <div class="aud-g">
+        <div class="aud-t"><span class="aud-tl">Приёмок</span><b class="aud-tv">${rows.length}</b><span class="aud-tu">за ${d.days} дней</span></div>
+        <div class="aud-t"><span class="aud-tl">Принято</span><b class="aud-tv">${fmtQty(got)}</b><span class="aud-tu">ед</span></div>
+        <div class="aud-t"><span class="aud-tl">Принимали</span><b class="aud-tv">${who.size}</b><span class="aud-tu">${pluralize(who.size, 'человек', 'человека', 'человек')}</span></div>
+      </div></div>` +
+    (days.length ? days.map(g => `<div class="sc">
+      <div class="sc-cap"><span>${escS(_dayName(g.day))}</span><i>${g.rows.length} ${pluralize(g.rows.length, 'район', 'района', 'районов')}</i></div>
+      ${g.rows.map(intHistRow).join('')}</div>`).join('')
+     : `<div class="sc"><div class="fb-none">За ${d.days} дней приёмок не было</div></div>`);
+}
+function intHistRow(r){
+  const key = r.supply_id + ':' + r.district;
+  const open = IH.open.has(key);
+  const кто = r.driver || r.noscan_by || '—';
+  const начало = r.started_at || r.claimed_at;
+  const конец = r.done_at || r.cancelled_at || r.last_at || r.noscan_at;
+  const когда = начало ? _hm(начало) + (конец && _hm(конец) !== _hm(начало) ? ' → ' + _hm(конец) : '') : '';
+  const [слово, кл] = IH_ST[r.status] || ['', ''];
+  const vcls = r.status === 'cancelled' ? 'dn' : (r.status === 'short' || r.status === 'noscan') ? 'warn'
+             : r.status === 'taken' ? 'dim' : '';
+  return `<div class="ih-p">
+    <button class="ih-r${open ? ' open' : ''}" onclick="intHistFold('${escS(key)}')">
+      <span class="shl-code">${escS(r.code || '')}</span>
+      <span class="ih-b"><b>${escS(r.name)}${r.kind === 'extra' ? ' · ' + escS(r.base || 'другая база') : ''}</b>
+        <i><em>${escS(кто)}</em>${когда ? ' · ' + когда : ''}${слово ? ` · <em class="${кл}">${слово}</em>` : ''}</i></span>
+      <span class="ih-v ${vcls}"><b>${fmtQty(r.got)}</b><i>из ${fmtQty(r.plan)}</i></span>
+      <em class="ih-ch${open ? ' on' : ''}">${_SC_CHEV}</em>
+    </button>
+    ${open ? intHistDetail(r) : ''}
+  </div>`;
+}
+// Раскрытая строка: что было по времени, кто сканировал, и позиции.
+function intHistDetail(r){
+  const t = [];
+  const row = (cls, text, when) => `<div class="ih-tr"><i class="dot ${cls}"></i><span>${text}</span><b>${when}</b></div>`;
+  if(r.claimed_at) t.push(row('', `Взял ${escS(r.driver || '—')}`, _hm(r.claimed_at)));
+  // Начало отмечается и при «без сканирования» — без единого кода строка «начал» ничего не добавляет.
+  if(r.started_at && (r.codes > 0 || !r.noscan_at)) t.push(row('', 'Начал приёмку', _hm(r.started_at)));
+  (r.scanners || []).forEach(w => t.push(row('',
+    `Сканировал ${escS(w.who || '—')} · ${w.n} ${pluralize(w.n, 'код', 'кода', 'кодов')}${
+      w.units !== w.n ? ' · ' + fmtQty(w.units) + ' ед' : ''}`,
+    w.first && w.last && _hm(w.first) !== _hm(w.last) ? _hm(w.first) + ' → ' + _hm(w.last) : _hm(w.last || w.first))));
+  if(r.undo) t.push(row('warn', 'Убрано из приёмки', String(r.undo)));
+  if(r.noscan_at) t.push(row('warn', `Без сканирования · ${escS(r.noscan_by || '—')}`, _hm(r.noscan_at)));
+  if(r.short){
+    const n = (r.short.lines || []).reduce((a, l) => a + (+l.qty || 0), 0);
+    const st = {pending: ['ждёт решения', 'wait'], approved: ['подтверждён', 'ok'],
+                rejected: ['отклонён', 'dn']}[r.short.status] || ['', ''];
+    t.push(row(st[1], `Недовоз · ${st[0]}${r.short.note ? ' · «' + escS(r.short.note) + '»' : ''}`, fmtQty(n)));
+  }
+  if(r.done_at) t.push(row('ok', `Закрыл${r.started_at ? ' · ' + intHistMins(r.started_at, r.done_at) : ''}`, _hm(r.done_at)));
+  if(r.cancelled_at) t.push(row('dn', 'Район отменён', _hm(r.cancelled_at)));
+  const closed = r.status === 'done' || r.status === 'short' || r.status === 'cancelled';
+  const lines = (r.lines || []).map(l => {
+    const cls = l.got >= l.plan ? '' : l.miss > 0 ? 'warn' : closed ? 'dn' : 'warn';
+    return `<div class="ih-ln ${cls}"><span>${escS(l.name)}</span>
+      <b>${fmtQty(l.got)}${l.got < l.plan ? ' из ' + fmtQty(l.plan) : ''}<u>${l.unit > 1 ? 'кор' : 'бут'}</u></b></div>`;
+  }).join('');
+  return `<div class="ih-d">${t.join('')}${r.note ? `<div class="ih-note">«${escS(r.note)}»</div>` : ''}
+    <div class="ih-ls">${lines}</div></div>`;
+}
+function intHistMins(a, b){
+  const x = new Date(a), y = new Date(b);
+  if(isNaN(x) || isNaN(y)) return '';
+  const m = Math.max(0, Math.round((y - x) / 60000));
+  return m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`;
+}
+function intHistFold(key){
+  if(!IH) return;
+  IH.open.has(key) ? IH.open.delete(key) : IH.open.add(key);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  intHistPaint();
 }
 
 // Из истории карточка открывается так же, как текущая, — но стрелка ведёт

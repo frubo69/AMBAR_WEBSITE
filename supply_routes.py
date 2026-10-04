@@ -3618,6 +3618,84 @@ async def handle_move_cancel(request):
     return await move_routes.handle_own_cancel(request)
 
 
+# ── история приёмок ─────────────────────────────────────────────────────────
+# Владелец, 4 окт 2026: «историю приёмок в STAR — кто, что, сколько и когда
+# принимал». Строка истории — задача «поставка × район», по которой что-то
+# было: приняли, принимают, приняли без сканирования или взяли и ещё едут.
+# Район, которого никто не брал, и отменённый без единой бутылки — не
+# приёмка, их здесь нет. Кто сканировал — по именам из самих кодов (район мог
+# начать водитель, а дочитать старший); сколько — в единицах склада (пиво
+# коробками); когда — взял / начал / закрыл. Снимков и телефонов здесь нет.
+def _iso(v) -> str:
+    d = db._dt_aware(v)
+    return d.isoformat() if d else ""
+
+
+def _intake_row(sid: str, sup: dict, oid: str, t: dict, who: list) -> dict | None:
+    v = _task_view(sid, sup, oid, t)
+    got = v["got"]
+    cancelled = bool(t.get("cancelled_at"))
+    if not (got > 0 or t.get("noscan_at") or t.get("done_at") or (t.get("driver") and not cancelled)):
+        return None
+    plan = sum(int(l.get("plan") or 0) for l in v["lines"])
+    miss = _qn(sum(float(l.get("miss") or 0) for l in v["lines"]))
+    status = ("cancelled" if cancelled
+              else "done" if t.get("done_at") and not v["left"] and not miss
+              else "short" if t.get("done_at")
+              else "noscan" if t.get("noscan_at")
+              else "live" if got > 0 else "taken")
+    fl = t.get("flags") or []
+    undo = max(sum(1 for f in fl if f.get("kind") == "undo"), int(t.get("undo") or 0))
+    return {
+        "supply_id": sid, "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
+        "day": sup.get("day") or "", "district": oid,
+        "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
+        "driver": t.get("driver") or "", "noscan_by": t.get("noscan_by") or "",
+        "status": status,
+        "claimed_at": _iso(t.get("claimed_at")), "started_at": _iso(t.get("started_at")),
+        "last_at": _iso(t.get("last_at")), "noscan_at": _iso(t.get("noscan_at")),
+        "done_at": _iso(t.get("done_at")), "cancelled_at": _iso(t.get("cancelled_at")),
+        "plan": plan, "need": v["need"], "got": got, "left": v["left"], "miss": miss,
+        "codes": int(t.get("scanned") or 0), "undo": undo, "positions": len(v["lines"]),
+        "note": t.get("note") or "",
+        "short": v["short"],
+        "lines": sorted(({"id": l["id"], "name": l["name"], "unit": l["unit"], "plan": l["plan"],
+                          "need": l["need"], "got": l["got"], "miss": l["miss"]} for l in v["lines"]),
+                        key=lambda l: l["name"]),
+        "scanners": [{"who": w["who"], "n": w["n"], "units": w["units"],
+                      "first": _iso(w["first"]), "last": _iso(w["last"])} for w in who],
+    }
+
+
+@require_owner
+async def handle_intake_history(request):
+    """GET /api/owner/supply/intake/history?days=60 — приёмки за последние
+    дни смен, новые сверху."""
+    try:
+        days = max(1, min(int(request.query.get("days") or 60), 180))
+    except (TypeError, ValueError):
+        days = 60
+    import stock_routes as SR
+    today = SR._biz_day()
+    since = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    sups = await db.supplies_since(since, limit=400)
+    who = await db.intake_scanners([s.get("_id") for s in sups])
+    rows = []
+    for sup in sups:
+        sid = sup.get("_id") or ""
+        for oid, t in (sup.get("tasks") or {}).items():
+            if oid not in OFFICE_IDS or not isinstance(t, dict):
+                continue
+            row = _intake_row(sid, sup, oid, t, who.get((sid, oid)) or [])
+            if row:
+                rows.append(row)
+    rows.sort(key=lambda r: (r["day"], r["done_at"] or r["noscan_at"] or r["last_at"]
+                             or r["started_at"] or r["claimed_at"]), reverse=True)
+    return web.json_response({"today": today, "since": since, "days": days, "rows": rows},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 def setup(app):
     r = app.router
     # Точные пути раньше шаблонных: aiohttp разбирает их в порядке добавления,
@@ -3627,6 +3705,7 @@ def setup(app):
         ("/api/owner/supply/send",   handle_send,   "POST"),
         ("/api/owner/supply/import", handle_import, "POST"),
         ("/api/owner/supply/extra",  handle_extra_create, "POST"),
+        ("/api/owner/supply/intake/history", handle_intake_history, "GET"),
         ("/api/owner/supply/intake/live", handle_own_intake_live, "GET"),
         ("/api/owner/supply/intake", handle_own_intake, "GET"),
         ("/api/owner/supply",        handle_list,   "GET"),

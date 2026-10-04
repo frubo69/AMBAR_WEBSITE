@@ -104,6 +104,18 @@ async def сервер():
     код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "in", "amount": 1, "src": "deposit", "dep_of": dep_id, "as": "Т"})
     eq("закрытый депозит больше не вернуть", (код, отв["have"]), (409, 0))
 
+    print("— сервер: удержали всё")
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 700, "line": "L1", "who": "Алексей",
+                                                       "comment": "депозит", "deposit": True, "photo": FF.КАДР, "as": "Т"})
+    dep2 = next(x for x in отв["book"]["deposits"] if x["who"] == "Алексей")
+    eq("второй депозит открыт, у него статья", (dep2["left"], dep2["line"]), (700, "L1"))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "in", "amount": 0, "src": "deposit", "dep_of": dep2["id"], "lost": 700, "as": "Т"})
+    eq("возврат с нулём и удержанием целиком → 200, депозит закрыт", (код, next(x for x in отв["book"]["deposits"] if x["id"] == dep2["id"])["open"]), (200, False))
+    eq("удержанное за месяц 1200", отв["book"]["safe"]["dep_lost"], 1200)
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "in", "amount": 0, "src": "deposit", "dep_of": dep2["id"], "as": "Т"})
+    eq("ноль без удержания → 400", (код, отв["error"]), (400, "bad_amount"))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "in", "amount": 0, "as": "Т"})
+    eq("обычный приход нулём → 400", (код, отв["error"]), (400, "bad_amount"))
     print("— сервер: убрать записи")
     код, отв = await зови(fr.handle_entry_del, "DELETE", {"id": dep_id, "as": "Т"})
     eq("депозит с возвратами не убрать → 409", (код, отв["error"], отв["n"]), (409, "dep_used", 2))

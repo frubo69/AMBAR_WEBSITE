@@ -5327,6 +5327,13 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-npday{padding:10px 16px 2px;font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
 .fb-npday + .fb-e{border-top:0}
 .fb-dep-off .fb-e-b,.fb-dep-off .fb-e-v{opacity:.55}
+.fb-depgo{flex:0 0 auto;height:30px;padding:0 12px;margin-left:4px;border-radius:9px;cursor:pointer;
+  border:1px solid rgba(201,169,110,.45);background:var(--gold-soft);color:var(--gold2);
+  font-family:inherit;font-size:12px;font-weight:700}
+.fb-depgo.on{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;border-color:transparent}
+.fb-depret{display:flex;gap:8px;padding:2px 16px 14px}
+.fb-depret .fb-num{flex:1;min-width:0}
+.fb-depret .aud-b{flex:0 0 auto}
 /* История приёмок (ih-), 4 окт 2026: день — карточкой, строка — район: слева
    код района, кто и когда, справа сколько принято из плана; по нажатию —
    взял / начал / закрыл, кто сколько отсканировал, убранное, недовоз, позиции. */
@@ -21349,9 +21356,7 @@ function fbAddRow(book, day){
   <div class="fb-add" id="fbAdd-${book}" hidden>
     ${rp ? `<div class="chip-row fb-chips" id="fbLine-rp">${fbLineChips(fbBook(day.slice(0, 7)))}</div>` : ''}
     ${book === 'in' ? `<div class="chip-row fb-chips"><button class="chip${FB.inSrc === 'crypto' ? ' on' : ''}" id="fbSrc-in"
-        onclick="fbInSrc(this)">Из крипты</button><button class="chip${FB.inSrc === 'deposit' ? ' on' : ''}" id="fbDepSrc-in"
-        onclick="fbInDep(this)">Возврат депозита</button></div>
-      <div class="chip-row fb-chips" id="fbDepPick-in"${FB.inSrc === 'deposit' ? '' : ' hidden'}>${fbDepPickChips(day)}</div>
+        onclick="fbInSrc(this)">Из крипты</button></div>
       <div class="fb-crhint" id="fbCrHint" data-day="${day}"${FB.inSrc === 'crypto' ? '' : ' hidden'}>${fbCrHintHtml(day, 0, 0)}</div>` : ''}
     <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbAmt-${book}"${
       book === 'in' ? ' oninput="fbCrHint()"' : ''}
@@ -21364,9 +21369,7 @@ function fbAddRow(book, day){
          столько-то наличных, но в USDT нам отняли комиссию — чтобы было объяснимо,
          куда деньги ушли»). Половина — на нас, половина — посредника. -->
     <label class="fb-feerow" id="fbFeeRow-in"${FB.inSrc === 'crypto' ? '' : ' hidden'}><span>Комиссия, USDT<i>сколько сняли при выводе · половина на нас</i></span>
-      <input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFee-in" oninput="fbCrHint()"></label>
-    <label class="fb-feerow" id="fbLostRow-in"${FB.inSrc === 'deposit' ? '' : ' hidden'}><span>Удержали</span>
-      <input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbLost-in"></label>` : ''}
+      <input class="fb-num" inputmode="decimal" placeholder="0" autocomplete="off" id="fbFee-in" oninput="fbCrHint()"></label>` : ''}
     <button class="aud-b go" onclick="fbEntryAdd('${book}','${day}')">Записать</button>
   </div>`;
 }
@@ -21376,53 +21379,65 @@ function fbAddRow(book, day){
 function fbInSrc(btn){
   FB.inSrc = FB.inSrc === 'crypto' ? '' : 'crypto';
   btn.classList.toggle('on', FB.inSrc === 'crypto');
-  fbInDepReset();
   const c = document.getElementById('fbCmt-in');
   if(c && FB.inSrc === 'crypto' && !c.value.trim()) c.value = 'Из крипты';
   if(c && FB.inSrc !== 'crypto' && c.value.trim() === 'Из крипты') c.value = '';
   fbCrHint();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
-// Доп. РП+ «Возврат депозита» (владелец, 4 окт 2026: «когда забираем обратно —
-// через доп. РП+ он возвращается»): выбирается открытый депозит, сумма
-// подставляется остатком, «Удержали» — то, что контрагент не вернул (станет
-// расходом). На сервер уходит src=deposit, dep_of, lost.
-function fbInDep(btn){
-  FB.inSrc = FB.inSrc === 'deposit' ? '' : 'deposit';
-  btn.classList.toggle('on', FB.inSrc === 'deposit');
-  const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on');
-  FB.depOf = '';
-  const pick = document.getElementById('fbDepPick-in');
-  if(pick){ pick.hidden = FB.inSrc !== 'deposit'; pick.innerHTML = fbDepPickChips(accDay()); }
-  const lr = document.getElementById('fbLostRow-in');
-  if(lr){ lr.hidden = FB.inSrc !== 'deposit'; if(lr.hidden){ const l = document.getElementById('fbLost-in'); if(l) l.value = ''; } }
-  const c = document.getElementById('fbCmt-in');
-  if(c && FB.inSrc !== 'deposit' && /^Возврат депозита/.test(c.value.trim())) c.value = '';
-  fbCrHint();
+// Депозиты статьи (владелец, 4 окт 2026: «там же, где заполнял депозит, оттуда
+// же и забирал — а он сам автоматом вносится обратно в РП через Доп. РП+»):
+// карточка на странице статьи — каждый депозит с остатком; у открытого
+// «Забрать» раскрывает сумму и «Удержали», «Вернуть в РП» пишет запись
+// Доп. РП+ (src=deposit) сегодняшним днём. Депозиты прошлых месяцев по той
+// же статье тут же: статья в каждом месяце своя, имя — одно.
+function fbLineDepsHtml(b, l, day){
+  const all = (b.deposits || []).filter(x => x.line === l.id || (x.line_name && x.line_name === l.name));
+  if(!all.length) return '';
+  const lying = all.filter(x => x.open).reduce((a, x) => a + (+x.left || 0), 0);
+  const row = x => {
+    const open = !!x.open, ret = FB.depRet === x.id;
+    return `<div class="fb-e fb-depr${open ? '' : ' fb-dep-off'}">
+      <span class="fb-e-b"><b>${escS(x.who || x.comment || 'Депозит')}</b>
+        <i>${[escS(fbDayT(x.day)), x.who && x.comment ? escS(x.comment) : '',
+              x.back ? 'вернули ' + fbFmt(x.back) : '', x.lost ? 'удержали ' + fbFmt(x.lost) : ''].filter(Boolean).join(' · ')}</i></span>
+      <b class="fb-e-v${open ? '' : ' ok'}">${fbFmt(open ? x.left : x.amount)}<u>AED</u></b>
+      ${open ? `<button class="fb-depgo${ret ? ' on' : ''}" onclick="fbDepRetToggle('${escS(x.id)}')">Забрать</button>` : ''}
+    </div>
+    ${ret ? `<div class="fb-depret">
+      <input class="fb-num" inputmode="decimal" placeholder="Сумма" autocomplete="off" id="fbDepAmt" value="${x.left}">
+      <input class="fb-num" inputmode="decimal" placeholder="Удержали" autocomplete="off" id="fbDepLost">
+      <button class="aud-b go" onclick="fbDepReturn('${escS(x.id)}','${day}')">Вернуть в РП</button>
+    </div>` : ''}`;
+  };
+  return `<div class="sc">${fbCapT('Депозиты', lying ? 'лежит ' + fbFmt(lying) : 'вернулись')}<div class="fb-one">${all.map(row).join('')}</div></div>`;
+}
+function fbDepRetToggle(id){
+  FB.depRet = FB.depRet === id ? null : id;
+  fbPagePaint();
+  if(FB.depRet) setTimeout(() => { const a = document.getElementById('fbDepAmt'); if(a){ a.focus(); a.select(); } }, 60);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
-function fbInDepReset(){
-  FB.depOf = '';
-  const db_ = document.getElementById('fbDepSrc-in'); if(db_) db_.classList.remove('on');
-  const pick = document.getElementById('fbDepPick-in'); if(pick) pick.hidden = true;
-  const lr = document.getElementById('fbLostRow-in'); if(lr){ lr.hidden = true; const l = document.getElementById('fbLost-in'); if(l) l.value = ''; }
-}
-function fbDepPickChips(day){
-  const b = fbBook(day.slice(0, 7)), list = ((b && b.deposits) || []).filter(x => x.open);
-  if(!list.length) return '<span class="shl-none">Открытых депозитов нет</span>';
-  return list.map(x => `<button class="chip${FB.depOf === x.id ? ' on' : ''}" onclick="fbDepPick('${escS(x.id)}')">${
-    escS(x.who || x.comment || x.line_name || 'Депозит')} · ${fbFmt(x.left)}</button>`).join('');
-}
-function fbDepPick(id){
-  FB.depOf = FB.depOf === id ? '' : id;
-  const day = accDay(), b = fbBook(day.slice(0, 7)), x = ((b && b.deposits) || []).find(z => z.id === id);
-  const box = document.getElementById('fbDepPick-in'); if(box) box.innerHTML = fbDepPickChips(day);
-  const a = document.getElementById('fbAmt-in'), c = document.getElementById('fbCmt-in');
-  if(FB.depOf && x){
-    if(a && !(fbAmt('fbAmt-in') > 0)) a.value = x.left;
-    if(c && (!c.value.trim() || /^Возврат депозита/.test(c.value.trim()))) c.value = `Возврат депозита · ${x.who || x.comment || x.line_name || ''}`.replace(/ · $/, '');
+async function fbDepReturn(id, day){
+  const b = fbBook(FB.month), x = ((b && b.deposits) || []).find(z => z.id === id); if(!x) return;
+  const amount = fbAmt('fbDepAmt') || 0, lost = fbAmt('fbDepLost') || 0;
+  if(!(amount > 0) && !(lost > 0)){ _toast('Нужна сумма'); const a = document.getElementById('fbDepAmt'); if(a) a.focus(); return; }
+  if(amount < 0 || lost < 0 || Number.isNaN(amount) || Number.isNaN(lost)){ _toast('Сумма — число'); return; }
+  if(amount + lost > (+x.left || 0) + 0.005){ _toast(`Больше, чем лежит · ${fbFmt(x.left)} AED`); return; }
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
+      {method: 'POST', body: {day, book: 'in', amount, src: 'deposit', dep_of: id, lost,
+                              comment: `Возврат депозита · ${x.who || x.comment || ''}`.replace(/ · $/, ''), as: _meName()}});
+    FB.depRet = null;
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    fbPagePaint();
+    _toast(amount > 0 ? `В РП вернулось ${fbFmt(amount)} AED${lost ? ` · удержали ${fbFmt(lost)}` : ''}` : `Удержано ${fbFmt(lost)} AED`);
+  }catch(e){
+    const err = (e && (e.payload || {}).error) || '';
+    _toast(err === 'too_much' ? `Больше, чем лежит · ${fbFmt((e.payload || {}).have || 0)} AED`
+         : err === 'before_paid' ? 'Раньше дня внесения' : 'Не удалось записать');
   }
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // «Депозит» у расхода РП (владелец, 4 окт 2026: «там же, где указываем, за что
 // оплатили, доп. графа депозит — пока там, где очевидно, например в
@@ -21494,9 +21509,6 @@ async function fbEntryAdd(book, day){
   if(pay === null) return;
   const feeUsdt = book === 'in' && FB.inSrc === 'crypto' ? fbAmt('fbFee-in') : 0;
   if(feeUsdt < 0 || Number.isNaN(feeUsdt)){ _toast('Комиссия — число в USDT'); return; }
-  if(book === 'in' && FB.inSrc === 'deposit' && !FB.depOf){ _toast('Выберите депозит'); return; }
-  const lost = book === 'in' && FB.inSrc === 'deposit' ? fbAmt('fbLost-in') : 0;
-  if(lost < 0 || Number.isNaN(lost)){ _toast('Удержали — число'); return; }
   const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
   if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
   try{
@@ -21504,7 +21516,6 @@ async function fbEntryAdd(book, day){
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(route_from || route_to ? {route_from, route_to} : {}),
                               ...(book === 'in' && FB.inSrc ? {src: FB.inSrc} : {}),
-                              ...(book === 'in' && FB.inSrc === 'deposit' ? {dep_of: FB.depOf, lost} : {}),
                               ...(book === 'rp' && FB.dep ? {deposit: true} : {}),
                               ...(feeUsdt > 0 ? {fee_usdt: feeUsdt} : {}),
                               ...(pay === 'crypto' ? {pay} : {}),
@@ -21512,9 +21523,9 @@ async function fbEntryAdd(book, day){
     if(book === 'in' && FB.inSrc === 'crypto' && res && (res.cr_free || res.cr_rp))
       _toast(`Выведено: из свободной ${walAed(res.cr_free || 0)}${res.cr_rp ? ' · с крипта-счёта РП ' + walAed(res.cr_rp) : ''} AED${
         res.fee_ours ? ` · комиссия, наша половина ${fmtUsdt(res.fee_ours)}` : ''}`);
-    ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp', 'fbFee-' + book, 'fbLost-in'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp', 'fbFee-' + book].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.dep = false; }
-    if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); fbInDepReset(); fbCrHint(); }
+    if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); fbCrHint(); }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
@@ -23812,6 +23823,7 @@ function fbLinePayHtml(b, l){
         <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек/документ<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
       </div></div>
+    ${fbLineDepsHtml(b, l, day)}
     ${rows.length ? `<div class="sc"><button class="fb-e fb-bl" data-l="${l.id}" onclick="fbHistOpen(this.dataset.l)">
       <span class="fb-e-b"><b>История</b><i>${rows.length} ${pluralize(rows.length, 'запись', 'записи', 'записей')} за месяц · ${fbFmt(rows.reduce((a2, e) => a2 + (e.amount || 0), 0))} AED</i></span>
       <em class="fb-chev">${_SC_CHEV}</em></button></div>` : ''}`;

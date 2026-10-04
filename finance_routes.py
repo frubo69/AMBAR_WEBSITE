@@ -1039,7 +1039,7 @@ async def _deposits() -> list:
         ln = await db.fin_budget_line_get(str(e.get("line"))) if e.get("line") else None
         out.append({"id": e.get("_id"), "day": e.get("day") or "", "amount": calc._i(amount),
                     "comment": e.get("comment") or "", "who": e.get("who") or "",
-                    "line_name": (ln or {}).get("name") or "",
+                    "line": e.get("line") or "", "line_name": (ln or {}).get("name") or "",
                     "back": calc._i(b["back"]), "lost": calc._i(b["lost"]), "left": calc._i(left),
                     "last": b["last"], "open": left > 0.005})
     out.sort(key=lambda x: x["day"], reverse=True)
@@ -1487,7 +1487,11 @@ async def handle_entry_add(request):
         if book not in BOOKS:
             return _json({"error": "bad_book"}, 400)
         amount = _num(body.get("amount"))
-        if amount is None or amount <= 0:
+        # Возврат депозита, удержанный целиком (владелец, 4 окт 2026): в РП
+        # приходит ноль, но запись нужна — она закрывает депозит удержанием.
+        нулевой_возврат = (book == "in" and str(body.get("src") or "") == "deposit"
+                           and (_num(body.get("lost")) or 0) > 0 and amount is not None and amount == 0)
+        if amount is None or amount < 0 or (amount <= 0 and not нулевой_возврат):
             return _json({"error": "bad_amount"}, 400)
         kind = str(body.get("kind") or "")
         if kind not in ENTRY_KINDS or (kind and book != "rp"):

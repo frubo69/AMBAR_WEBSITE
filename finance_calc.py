@@ -72,6 +72,13 @@ def compute(days: list[dict], opening: dict) -> dict:
                         'rp' — всё из РП, 'mix' — из РП pay_rp, остальное из ЧП
          pay_rp         при pay_src='mix' — сколько недостающего взято из РП;
                         при явных pay_b / pay_b_extra — оплата из РП своей суммой
+         dep_back       вернулось депозитов (владелец, 4 окт 2026): возврат
+                        идёт через Доп. РП+ и уже сидит в extra_rp; здесь —
+                        сколько из него закрывает открытые депозиты
+         dep_lost       удержано при возврате депозита: деньги не вернулись и
+                        не вернутся — с этого момента это расход
+                        (у записей расхода с отметкой deposit=True сама сумма
+                        расходом не считается: она лежит у контрагента)
          norm           норма РП+ дня (из бюджета): по ней видно, сколько в
                         РП+ собрано СВЕРХ нормы — это возврат того, что фонд
                         отдал Баракуде (см. rp_owed)
@@ -124,7 +131,12 @@ def compute(days: list[dict], opening: dict) -> dict:
              payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0, pending=0,
              collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0, expenses_hands=0.0, kept=0.0,
              pay_rp=0.0, rp_back=0.0,
-             mv_b_in=0.0, mv_b_out=0.0, mv_rp_in=0.0, mv_rp_out=0.0, mv_np_in=0.0, mv_np_out=0.0)
+             mv_b_in=0.0, mv_b_out=0.0, mv_rp_in=0.0, mv_rp_out=0.0, mv_np_in=0.0, mv_np_out=0.0,
+             dep_paid=0.0, dep_back=0.0, dep_lost=0.0)
+    # Депозиты (владелец, 4 окт 2026): внесённое из РП лежит у контрагента
+    # (ренткар) и вернётся — это наши деньги, не расход. Открытые на начало
+    # месяца переезжают из прошлого (dep_open).
+    dep = _n(opening.get('dep_open'))
     for d in days:
         cash = _n(d.get('cash'))
         spend = _n(d.get('spend'))
@@ -147,6 +159,10 @@ def compute(days: list[dict], opening: dict) -> dict:
                      if e.get('pay') == 'crypto')
         exp_hands = sum(_n(e.get('amount')) for e in (d.get('expenses') or [])
                         if e.get('pay') == 'hands')
+        dep_paid = sum(_n(e.get('amount')) for e in (d.get('expenses') or []) if e.get('deposit'))
+        dep_back = _n(d.get('dep_back'))
+        dep_lost = _n(d.get('dep_lost'))
+        dep = dep + dep_paid - dep_back - dep_lost
         collected_cr = _n(d.get('collected_cr'))
         cr_cash = _n(d.get('cr_cash'))
         extra_cr = _n(d.get('extra_cr'))
@@ -219,6 +235,7 @@ def compute(days: list[dict], opening: dict) -> dict:
             collected_cr=_i(collected_cr), cr_cash=_i(cr_cash), extra_cr=_i(extra_cr),
             expenses_cr_sum=_i(exp_cr), stack_rp_cr=_i(rp_cr),
             expenses_hands_sum=_i(exp_hands), kept=_i(kept),
+            dep_paid=_i(dep_paid), dep_back=_i(dep_back), dep_lost=_i(dep_lost), dep=_i(dep),
             pay_b=_i(pay_b), pay_b_extra=_i(pay_b_extra), pay_rp=_i(pay_rp),
             pay_src=d.get('pay_src') or '', norm=_i(norm),
             rp_owed_before=_i(owed_before), rp_back=_i(rp_back), rp_owed=_i(owed),
@@ -242,6 +259,7 @@ def compute(days: list[dict], opening: dict) -> dict:
         t['collected_cr'] += collected_cr_c; t['expenses_cr'] += exp_cr; t['cr_cash'] += cr_cash
         t['expenses_hands'] += exp_hands; t['kept'] += kept
         t['extra_cr'] += extra_cr
+        t['dep_paid'] += dep_paid; t['dep_back'] += dep_back; t['dep_lost'] += dep_lost
         t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra; t['pay_rp'] += pay_rp; t['rp_back'] += rp_back
         t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
         for k in ('b', 'rp', 'np'):
@@ -277,7 +295,9 @@ def compute(days: list[dict], opening: dict) -> dict:
     # Приход в фонд сюда не входит: перевод с крипты уже сидит в «продали», а
     # возвращённый депозит — не доход. Закупки на других базах тоже мимо: их
     # оплату старший записывает расходом из фонда.
-    econ = t['gross'] - t['ordered'] - t['expenses'] - t['spend'] - t['tips']
+    # Депозит — не расход: деньги наши и вернутся (владелец, 4 окт 2026);
+    # расходом становится только удержанное при возврате.
+    econ = t['gross'] - t['ordered'] - (t['expenses'] - t['dep_paid'] + t['dep_lost']) - t['spend'] - t['tips']
 
     totals = {k: _i(v) for k, v in t.items()}
     safe = dict(open_b=_i(_n(opening.get('safe_b_open'))), open_rp=_i(_n(opening.get('rp_open'))),
@@ -295,6 +315,10 @@ def compute(days: list[dict], opening: dict) -> dict:
                 np_in=_i(t['np_plus']), np_out=_i(t['payouts'] + t['pay_b_extra']),
                 # переводы между стопками за месяц: что в каждую пришло и ушло
                 **{k: _i(t[k]) for k in ('mv_b_in', 'mv_b_out', 'mv_rp_in', 'mv_rp_out', 'mv_np_in', 'mv_np_out')},
+                # депозиты: лежит у контрагентов на конец месяца, на начало,
+                # и за месяц — внесли / вернулось / удержано
+                dep=_i(dep), open_dep=_i(_n(opening.get('dep_open'))),
+                dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']),
                 pending=int(t['pending']))
     return dict(
         days=out,
@@ -302,7 +326,8 @@ def compute(days: list[dict], opening: dict) -> dict:
         rp=dict(collected=_i(t['collected']), collected_cr=_i(t['collected_cr']),
                 extra=_i(t['extra_rp']), cr_cash=_i(t['cr_cash']),
                 rp_in=_i(rp_in), expenses=_i(t['expenses']), result=_i(rp_result),
-                to_b=_i(t['pay_rp']), back=_i(t['rp_back']), owed=_i(owed), hands=_i(t['expenses_hands'])),
+                to_b=_i(t['pay_rp']), back=_i(t['rp_back']), owed=_i(owed), hands=_i(t['expenses_hands']),
+                dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']), dep=_i(dep)),
         np=dict(days=_i(t['np_plus']), rp_result=_i(rp_result), profit=_i(profit),
                 half=_i(half), payouts=_i(t['payouts']), left=_i(np_left),
                 storage=_i(storage), carry=_i(carry_np), should_be=_i(should_be),
@@ -337,4 +362,5 @@ def carry_from(prev: dict | None) -> dict:
         debt_b_open=b.get('debt_end'),
         rp_open=safe.get('rp'), np_open=safe.get('np'),
         rp_owed_open=safe.get('rp_owed'),
+        dep_open=safe.get('dep'),
     )

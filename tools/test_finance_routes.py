@@ -166,7 +166,7 @@ async def main():
     eq("payouts_sum", d4["payouts_sum"], 7)
     eq("cash_need (marina + jbr дома, без отметок)", (d4["cash_need"], d4["cash_got"]), (2, 0))
     print("— бегущие остатки и переносы из августа (по факту пересчёта)")
-    eq("opening carried: стопки августа (старый carry_np → ЧП), факты пересчёта больше не читаются", b["opening_carried"], dict(carry_np=0, safe_b_open=34500, debt_b_open=110198, rp_open=0, np_open=41030, rp_owed_open=0))
+    eq("opening carried: стопки августа (старый carry_np → ЧП), факты пересчёта больше не читаются", b["opening_carried"], dict(carry_np=0, safe_b_open=34500, debt_b_open=110198, rp_open=0, np_open=41030, rp_owed_open=0, dep_open=0))
     eq("opening explicit (storage/факты — не поля)", b["opening_explicit"], {})
     eq("safe_b d3 = 34500 + 100 − 60", d3["safe_b"], 34540)
     eq("debt_b d3 = 110198 + 640 − 60", d3["debt_b"], 110778)

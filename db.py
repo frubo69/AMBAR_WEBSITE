@@ -5930,6 +5930,43 @@ async def get_stock_transfers_since(day_from: str) -> list:
         .sort([("day", -1), ("at", -1)]).to_list(length=5000)
 
 
+async def sold_orders_between(since_iso: str, until_iso: str) -> list:
+    """Доставленные заказы за окно (по моменту доставки, где он есть) — с
+    водителем и номером: лента движений склада показывает, кто продал."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.orders.find({"status": "delivered", "test": {"$ne": True},
+                          "$or": [{"delivered_at": {"$gte": since_iso, "$lt": until_iso}},
+                                  {"delivered_at": {"$exists": False}, "timestamp": {"$gte": since_iso, "$lt": until_iso}},
+                                  {"delivered_at": None, "timestamp": {"$gte": since_iso, "$lt": until_iso}}]},
+                         {"_id": 0, "order_id": 1, "timestamp": 1, "delivered_at": 1, "office_id": 1,
+                          "items": 1, "driver": 1})
+    return await cur.to_list(length=5000)
+
+
+async def qr_codes_between(product_id: str, start, end) -> list:
+    """Коды позиции, заведённые в окно: приёмка (intake/cover) и внесённые
+    руками (new, кроме убранных) — для ленты движений склада."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_codes.find({"product_id": product_id, "at": {"$gte": start, "$lt": end},
+                            "src": {"$in": ["intake", "cover", "new"]}},
+                           {"_id": 1, "at": 1, "qty": 1, "driver": 1, "by": 1, "supply_id": 1,
+                            "origin": 1, "district": 1, "src": 1, "status": 1})
+    return await cur.to_list(length=5000)
+
+
+async def writeoffs_between(product_id: str, start, end) -> list:
+    """Согласованные списания позиции за окно, кроме недостачи ревизии (она
+    уже в самом пересчёте)."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.writeoffs.find({"item": product_id, "at": {"$gte": start, "$lt": end},
+                             "src": {"$ne": "audit"}, **WRITEOFF_COUNTED},
+                            {"_id": 1, "at": 1, "qty": 1, "kind": 1, "district": 1, "by": 1, "note": 1})
+    return await cur.to_list(length=2000)
+
+
 async def stock_transfers_after(at_iso: str) -> list:
     """Переезды с указанного момента (поле at, ISO в UTC) — для основы склада.
 

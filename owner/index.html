@@ -7711,6 +7711,25 @@ button.exp-wait:active{transform:scale(.99)}
 /* Ноль и прочерк — разные ответы, и выглядят по-разному: ноль это знание,
    прочерк — его отсутствие. */
 .stkbd td.nil{color:var(--muted);opacity:.75;font-weight:500}
+/* Движения позиции за день: название — кнопка, под строкой лента (stkf-). */
+.stkbd td.nm{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.stkbd tr.stkbd-on td{background:var(--card2)}
+.stkbd tr.stkbd-on td.nm b{color:var(--gold2)}
+.stkbd tr.stkbd-x td{padding:0;text-align:left;white-space:normal;background:var(--card2);border-top:0}
+.stkf{position:sticky;left:0;max-width:calc(100vw - 62px);padding:4px 12px 10px}
+.stkf-g{padding:6px 0 2px}
+.stkf-g + .stkf-g{border-top:1px solid rgba(201,169,110,.14)}
+.stkf-h{display:flex;align-items:baseline;gap:8px;padding:2px 0 4px;font-size:12px;color:var(--sub)}
+.stkf-h b{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--gold2)}
+.stkf-h i{margin-left:auto;font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.stkf-e{display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12px}
+.stkf-e .t{flex:0 0 auto;min-width:36px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stkf-e .n{flex:1;min-width:0;color:var(--sub)}
+.stkf-e .q{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.stkf-e .q u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;color:var(--muted);margin-left:3px}
+.stkf-e .q.plus{color:var(--up)} .stkf-e .q.minus{color:var(--text)} .stkf-e .q.bad{color:var(--dn)} .stkf-e .q.zero{color:var(--muted)}
+.stkf-none{padding:6px 0 4px;font-size:12px;color:var(--muted)}
+.stkf-none u{text-decoration:none;color:var(--gold2);cursor:pointer}
 .stkbd td.nm b{display:block;font-size:12.5px;font-weight:600;line-height:1.25;
   white-space:normal}
 /* Номер позиции — тот же, что в заявке и на бумажном листе: по нему её
@@ -16603,8 +16622,9 @@ async function stkByDistrict(тихо){
         // нельзя: не пришло — выводим из ячеек, иначе итог молча исчезает.
         const известна = r.known != null ? r.known
           : Object.values(r.have || {}).some(v => v != null);
-        return `<tr>
-          <td class="nm"><b><s>${r.no || ''}</s>${escS(r.name)}</b><i>${r.cost
+        const открыта = STK.flowOpen && STK.flowOpen.has(r.id);
+        return `<tr class="${открыта ? 'stkbd-on' : ''}">
+          <td class="nm" onclick="stkFlowToggle('${escS(r.id)}')"><b><s>${r.no || ''}</s>${escS(r.name)}</b><i>${r.cost
             ? fmt(Math.round(r.cost)) + ' → ' + fmt(Math.round(r.price_list))
             : 'закупка неизвестна'}</i></td>
           ${shown.map(d => {
@@ -16623,7 +16643,7 @@ async function stkByDistrict(тихо){
           ${sel ? '' : `<td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
             !известна ? '—' : (сумма == null ? '—'
               : (режим.деньги ? fmt(Math.round(сумма)) : fmtQty(r.bottles)))}</td>`}
-        </tr>`;
+        </tr>${открыта ? `<tr class="stkbd-x"><td colspan="${shown.length + 1 + (sel ? 0 : 1)}">${stkFlowHtml(r.id, day)}</td></tr>` : ''}`;
       }).join('')}</tbody>
     </table></div>
     <div class="stk-note" style="margin:12px 2px 0">${
@@ -16657,6 +16677,62 @@ async function stkByDistrict(тихо){
     pinWatch('stkMid', 'stkBySum');
   }
   requestAnimationFrame(() => { bindDayBars(); pinMeasure('stkBySum', 'stkMid'); });
+}
+
+// ── Движения позиции за день ──────────────────────────────────────────────
+// Владелец, 4 окт 2026: «каждую позицию можно развернуть и посмотреть, почему
+// и за счёт чего менялось состояние склада, куда ушли бутылки и откуда
+// пришли — за каждый день отдельно». Нажатие на название раскрывает под
+// строкой ленту: по районам (или по выбранному) остаток на начало → конец
+// суток и события по времени. Данные — /api/owner/stock/flow, свои на каждый
+// день и позицию (STK.flow), раскрытые позиции помнятся при листании дней.
+const STK_FLOW_T = {sale: 'Продажа', intake: 'Приёмка', noscan: 'Принято без сканирования', manual: 'Внесено руками',
+                    move_in: 'Приехало из', move_out: 'Уехало в', writeoff: 'Списание', count: 'Ревизия', rescan: 'Досканировано'};
+function stkFlowKey(pid, day){ return `${day}|${pid}|${STK.dsel || ''}`; }
+async function stkFlowToggle(pid){
+  if(!STK.flowOpen) STK.flowOpen = new Set();
+  if(!STK.flow) STK.flow = {};
+  const day = accDay();
+  if(STK.flowOpen.has(pid)) STK.flowOpen.delete(pid); else STK.flowOpen.add(pid);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  stkByDistrict(true);
+  if(STK.flowOpen.has(pid)) stkFlowLoad(pid, day);
+}
+async function stkFlowLoad(pid, day){
+  const key = stkFlowKey(pid, day);
+  if(STK.flow[key] && STK.flow[key] !== 'fail') return;
+  STK.flow[key] = 'wait';
+  try{
+    const d = await ownerApi.ownerFetch('/api/owner/stock/flow', {params: {day, product: pid, ...(STK.dsel ? {district: STK.dsel} : {})}});
+    STK.flow[key] = d;
+  }catch(e){ STK.flow[key] = 'fail'; }
+  if(STK.view === 'bydist' && accDay() === day && STK.flowOpen && STK.flowOpen.has(pid)) stkByDistrict(true);
+}
+function stkFlowHtml(pid, day){
+  const key = stkFlowKey(pid, day), d = (STK.flow || {})[key];
+  if(!d || d === 'wait'){ if(!d) stkFlowLoad(pid, day); return '<div class="stkf"><div class="stkf-none">Загрузка…</div></div>'; }
+  if(d === 'fail') return `<div class="stkf"><div class="stkf-none">Не удалось загрузить · <u onclick="delete STK.flow['${escS(key)}'];stkFlowLoad('${escS(pid)}','${day}')">ещё раз</u></div></div>`;
+  const unit = (d.product || {}).unit > 1 ? 'кор' : 'бут';
+  const q = v => fmtQty(Math.abs(v));
+  const ev = e => {
+    const v = +e.qty || 0;
+    const cls = e.kind === 'rescan' || !v ? 'zero' : (e.kind === 'writeoff' || (e.kind === 'count' && v < 0)) ? 'bad' : v > 0 ? 'plus' : 'minus';
+    const t = e.kind === 'move_in' || e.kind === 'move_out' ? `${STK_FLOW_T[e.kind]} ${escS(e.ref || '')}`
+            : e.kind === 'writeoff' ? `Списание · ${escS(e.ref || '')}`
+            : e.kind === 'count' ? `Ревизия · насчитали ${fmtQty(e.ref || 0)}`
+            : e.kind === 'intake' || e.kind === 'rescan' ? `${STK_FLOW_T[e.kind]} · ${e.n} ${pluralize(e.n, 'код', 'кода', 'кодов')}`
+            : STK_FLOW_T[e.kind] || e.kind;
+    const когда = _hm(e.at) + (e.to && _hm(e.to) !== _hm(e.at) ? '–' + _hm(e.to) : '');
+    return `<div class="stkf-e"><span class="t">${когда}</span><span class="n">${t}${e.who ? ' · ' + escS(e.who) : ''}</span>
+      <b class="q ${cls}">${!v ? '0' : (v > 0 ? '+' : '−') + q(v)}<u>${unit}</u></b></div>`;
+  };
+  const g = x => `<div class="stkf-g">
+      <div class="stkf-h"><b>${escS(x.code)}</b><span>${escS(x.name)}</span>
+        <i>${x.open == null ? '—' : fmtQty(x.open)} → ${x.close == null ? '—' : fmtQty(x.close)}</i></div>
+      ${(x.events || []).length ? x.events.map(ev).join('') : '<div class="stkf-none">Движений не было</div>'}
+    </div>`;
+  const rows = (d.districts || []).filter(x => STK.dsel || (x.events || []).length || x.open || x.close);
+  return `<div class="stkf">${rows.length ? rows.map(g).join('') : '<div class="stkf-none">Движений не было</div>'}</div>`;
 }
 
 // Выбор района на складе: цифры внизу — только по нему. Второе нажатие или

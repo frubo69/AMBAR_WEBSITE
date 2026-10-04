@@ -3316,6 +3316,205 @@ async def handle_result(request):
     return web.json_response(c, headers=CORS_HEADERS)
 
 
+# ── Движения позиции за день ────────────────────────────────────────────────
+# Владелец, 4 окт 2026: «каждую позицию можно развернуть и посмотреть, почему
+# и за счёт чего менялось состояние склада, куда ушли бутылки и откуда пришли
+# — за каждый день отдельно». Лента событий по позиции в районе за учётные
+# сутки: продажи (водитель, заказ), приёмка кодами и без сканирования,
+# внесённое руками, переезды между районами, списания, пересчёт ревизии.
+# Остаток на начало и конец суток — тем же расчётом, что экран склада
+# (stock_at / _district_base), поэтому лента и цифры в таблице из одного
+# источника. Досканирование принятого без кодов и коды cover остаток не
+# меняют — показываются нулём.
+FLOW_KINDS = ("sale", "intake", "noscan", "manual", "move_in", "move_out", "writeoff", "count", "rescan")
+
+
+def _flow_iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "")
+
+
+async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: dict) -> dict:
+    """{район: [события]} за окно [start, end) по позиции pid."""
+    out: dict = {o: [] for o in OFFICE_IDS}
+
+    def put(o, **e):
+        if o in out:
+            out[o].append(e)
+
+    # продажи — по моменту доставки, как в основе склада
+    for o in await db.sold_orders_between(_flow_iso(start), _flow_iso(end)):
+        oid = o.get("office_id") or ""
+        ts = _dt_of(o.get("delivered_at") or o.get("timestamp") or "")
+        if oid not in out or not ts or ts < start or ts >= end:
+            continue
+        for it in (o.get("items") or []):
+            p, q = sale_item(it, cat)
+            if p == pid and q:
+                put(oid, kind="sale", at=ts, qty=-float(q), who=str(o.get("driver") or ""),
+                    ref=str(o.get("order_id") or ""))
+    # коды: приёмка, cover, внесённые руками
+    codes = await db.qr_codes_between(pid, start, end)
+    sids = {str(c.get("supply_id") or "") for c in codes if c.get("src") in ("intake", "cover") and c.get("supply_id")}
+    sups = {sid: (await db.supply_get(sid) or {}) for sid in sids}
+    groups: dict = {}
+    for c in codes:
+        at = c.get("at")
+        at = at if isinstance(at, datetime) else _dt_of(str(at or ""))
+        if not at:
+            continue
+        at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        oid = str(c.get("origin") or c.get("district") or "")
+        if oid not in out:
+            continue
+        try:
+            q = float(c.get("qty") or 1) or 1.0
+        except (TypeError, ValueError):
+            q = 1.0
+        src = c.get("src")
+        if src == "new":
+            if c.get("status") == "deleted":
+                continue
+            key = (oid, "manual", str(c.get("driver") or c.get("by") or ""), at.strftime("%H:%M"))
+            g = groups.setdefault(key, {"kind": "manual", "at": at, "to": at, "qty": 0.0, "n": 0,
+                                        "who": str(c.get("driver") or ""), "ref": ""})
+        else:
+            sid = str(c.get("supply_id") or "")
+            task = ((sups.get(sid) or {}).get("tasks") or {}).get(oid) or {}
+            ns = task.get("noscan_at")
+            ns = ns if isinstance(ns, datetime) else _dt_of(str(ns or ""))
+            if ns is not None and ns.tzinfo is None:
+                ns = ns.replace(tzinfo=timezone.utc)
+            # после отметки «без сканирования» код лишь закрывает долг по кодам
+            neutral = src == "cover" or (ns is not None and at >= ns)
+            kind = "rescan" if neutral else "intake"
+            key = (oid, kind, sid, str(c.get("driver") or ""))
+            g = groups.setdefault(key, {"kind": kind, "at": at, "to": at, "qty": 0.0, "n": 0,
+                                        "who": str(c.get("driver") or ""), "ref": sid})
+        g["n"] += 1
+        g["at"] = min(g["at"], at); g["to"] = max(g["to"], at)
+        if g["kind"] != "rescan":
+            g["qty"] += q
+    for (oid, *_), g in groups.items():
+        put(oid, **g)
+    # принято без сканирования: план − недовоз − отсканированное к той минуте
+    try:
+        import bizday as _bz
+        since_day = (datetime.strptime(day, "%Y-%m-%d") - timedelta(days=5)).strftime("%Y-%m-%d")
+        for sup in await db.supplies_since(since_day, limit=60):
+            sid = str(sup.get("_id") or "")
+            for oid, t in (sup.get("tasks") or {}).items():
+                ns = t.get("noscan_at")
+                ns = ns if isinstance(ns, datetime) else _dt_of(str(ns or ""))
+                if not ns or oid not in out:
+                    continue
+                ns = ns if ns.tzinfo else ns.replace(tzinfo=timezone.utc)
+                if ns < start or ns >= end:
+                    continue
+                it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
+                if not it:
+                    continue
+                need = float((it.get("by_district") or {}).get(oid) or 0)
+                before = await db.supply_codes_until(sid, oid, ns)
+                rem = max(0.0, need - _task_miss(t, pid) - float(before.get(pid) or 0))
+                if rem > 0:
+                    put(oid, kind="noscan", at=ns, qty=rem, who=str(t.get("noscan_by") or t.get("driver") or ""), ref=sid)
+    except Exception as e:                                       # noqa: BLE001
+        log.warning(f"[stock] лента: без сканирования не прочитано: {e}")
+    # переезды между районами
+    for m in await db.stock_transfers_after(_flow_iso(start)):
+        if m.get("product_id") != pid:
+            continue
+        at = _dt_of(m.get("at") or "")
+        if not at or at >= end:
+            continue
+        try:
+            q = float(m.get("qty") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not q:
+            continue
+        who = str(m.get("by_name") or "")
+        f, t = m.get("from"), m.get("to")
+        if f in out:
+            put(f, kind="move_out", at=at, qty=-q, who=who, ref=OFFICE_CODES.get(t, t or ""))
+        if t in out:
+            put(t, kind="move_in", at=at, qty=q, who=who, ref=OFFICE_CODES.get(f, f or ""))
+    # списания
+    for w in await db.writeoffs_between(pid, start, end):
+        oid = w.get("district") or ""
+        at = w.get("at")
+        at = at if isinstance(at, datetime) else _dt_of(str(at or ""))
+        if oid not in out or not at:
+            continue
+        at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        try:
+            q = float(w.get("qty") or 0)
+        except (TypeError, ValueError):
+            q = 0.0
+        if q:
+            put(oid, kind="writeoff", at=at, qty=-q, who=str(w.get("by") or ""), ref=str(w.get("kind") or ""))
+    # пересчёт (ревизия) в этот день: разница с тем, что числилось
+    for oid in OFFICE_IDS:
+        try:
+            counts = await db.get_stock_counts_recent(oid, limit=6)
+        except Exception:                                        # noqa: BLE001
+            counts = []
+        for c in counts:
+            at = _dt_of(c.get("counted_at") or "")
+            if not at or at < start or at >= end:
+                continue
+            ln = next((l for l in (c.get("lines") or []) if l.get("id") == pid), None)
+            if not ln:
+                continue
+            try:
+                diff = float(ln.get("diff") or 0); actual = float(ln.get("actual") or 0)
+            except (TypeError, ValueError):
+                diff, actual = 0.0, 0.0
+            put(oid, kind="count", at=at, qty=diff, who=str(c.get("counted_by_name") or ""), ref=_num(actual))
+    for ev in out.values():
+        ev.sort(key=lambda e: e["at"])
+    return out
+
+
+@require_owner
+async def handle_flow(request):
+    """GET /api/owner/stock/flow?day=&product=&district= — движения позиции за
+    учётные сутки по районам (district пустой — все пять)."""
+    import bizday
+    day = (request.query.get("day") or "").strip() or _biz_day()
+    pid = (request.query.get("product") or "").strip()
+    oid = (request.query.get("district") or "").strip()
+    cat = _catalog()
+    if pid not in cat:
+        return web.json_response({"error": "unknown_product"}, status=400, headers=CORS_HEADERS)
+    if oid and oid not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    try:
+        start = bizday.day_start(day).astimezone(timezone.utc)
+    except ValueError:
+        return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    today = _biz_day()
+    live = day >= today
+    end = datetime.now(timezone.utc) if live else bizday.day_start(bizday.next_day(day)).astimezone(timezone.utc)
+    opening = await stock_at(day)
+    closing = await _district_base(today) if live else await stock_at(bizday.next_day(day))
+    events = await _flow_events(day, pid, start, end, cat)
+    p = cat[pid]
+    rows = []
+    for o in ([oid] if oid else OFFICE_IDS):
+        ob, cb = opening.get(o) or {}, closing.get(o) or {}
+        ev = events.get(o) or []
+        rows.append({"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
+                     "open": _num(float((ob.get("have_exact") or {}).get(pid) or 0)) if ob.get("counted") else None,
+                     "close": _num(float((cb.get("have_exact") or {}).get(pid) or 0)) if cb.get("counted") else None,
+                     "events": [{**e, "at": e["at"].isoformat(), "to": e["to"].isoformat() if isinstance(e.get("to"), datetime) else "",
+                                 "qty": _num(e["qty"])} for e in ev],
+                     "sum": {k: _num(sum(e["qty"] for e in ev if e["kind"] == k)) for k in FLOW_KINDS}})
+    return web.json_response({"day": day, "today": today, "live": live,
+                              "product": {"id": pid, "name": p.get("name", ""), "unit": _unit(p)},
+                              "districts": rows}, headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_order_edit(request):
     """Поправить количество в заявке руками.
@@ -4174,6 +4373,7 @@ def setup(app):
         ("/api/owner/stock/order/edit",  handle_order_edit,  "POST"),
         ("/api/owner/stock/order/district", handle_order_district, "POST"),
         ("/api/owner/stock/order/reset", handle_order_reset, "POST"),
+        ("/api/owner/stock/flow",      handle_flow,      "GET"),
         ("/api/owner/stock/transfers", handle_transfers, "GET"),
         ("/api/owner/stock/audits",    handle_audits,    "GET"),
         ("/api/owner/stock/audit/scan",       handle_audit_scan_state, "GET"),

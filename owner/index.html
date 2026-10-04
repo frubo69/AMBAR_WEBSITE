@@ -2753,6 +2753,45 @@ button.path:active{transform:scale(.995)}
 .ohub .pbox.grow .pd{flex:1;display:flex;flex-direction:column}
 .ohub .pbox.grow .pd-r{flex:1 1 0;min-height:46px;max-height:80px}
 .ohub.tight .pbox.grow .pd-r{min-height:38px}
+/* Карточка районов не режет своё содержимое: у flex-ребёнка с overflow:hidden
+   минимум — ноль, и переполнение пряталось ВНУТРИ карточки, а замер хаба
+   его не видел (владелец, 4 окт 2026: «история закупок отображается
+   некорректно» — строку срезало низом). Теперь содержимое выталкивает хаб
+   наружу, и ohubFit ужимает его по-настоящему. */
+.ohub .pbox.grow{min-height:fit-content}
+/* Второй уровень ужатия — телеграм не во весь экран: без подписей под
+   районами (состояние — цветом квадрата с кодом), всё на шаг ниже и плотнее. */
+.ohub.xtight{gap:5px}
+.ohub.xtight .pbox .path{padding:6px 12px 5px}
+.ohub.xtight .path-s{gap:4px}
+.ohub.xtight .path-s u{font-size:15px}
+.ohub.xtight .pnav-r.pbig{padding:5px 12px}
+.ohub.xtight .pnav-r.ttl .pnav-b b{font-size:14px}
+.ohub.xtight .pnav-r.ttl .pnav-b i{margin-top:2px;font-size:10.5px}
+.ohub.xtight .pnav-i.big{width:34px;height:34px;border-radius:11px}
+.ohub.xtight .pnav-i.big svg{width:17px;height:17px}
+.ohub.xtight .pd .pnav-r.pbig{padding:5px 12px 3px}
+.ohub.xtight .pbox.grow .pd-r{min-height:30px;padding:3px 12px}
+.ohub.xtight .pd-r .shl-code{width:26px;height:26px;border-radius:8px;font-size:10.5px}
+.ohub.xtight .pd-r .pnav-b b{font-size:13px}
+.ohub.xtight .pd-r .pnav-b i{display:none}
+.ohub.xtight .pd-r.ok .shl-code{color:var(--up);background:var(--up-soft);border-color:rgba(76,175,125,.45)}
+.ohub.xtight .pd-r.live .shl-code{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.45)}
+.ohub.xtight .pd-r.warn .shl-code{color:var(--warn);background:rgba(243,180,74,.12);border-color:rgba(243,180,74,.45)}
+.ohub.xtight .pd-r .shl-p{padding:3px 8px;font-size:10.5px}
+.ohub.xtight .pd-r:last-child{padding-bottom:4px}
+.ohub.xtight .pnav-r:not(.pbig){padding:6px 12px}
+.ohub.xtight .pbox .pd-hist{padding:6px 12px 7px}
+.ohub.xtight .pbox.grow .pd-r{min-height:28px}
+.ohub.xtight .pbox .path{padding:5px 12px 4px}
+.ohub.xtight .path-s u{font-size:14px}
+.ohub.xtight .path-s b{font-size:8px}
+.ohub.xtight .pnav-i.big{width:32px;height:32px}
+/* «Докупить на доп. складах» в ужатом виде — одной строкой, без подписи. */
+.ohub.xtight .pnav-r:not(.pbig) .pnav-b i,.ohub.xtight .pd-long{display:none}
+.ohub.xtight .pnav-r:not(.pbig) .pnav-i{width:30px;height:30px}
+/* И ужатое не влезло — хаб листается, но ничего не режется. */
+.ohub.scroll{min-height:0}
 /* История — последней строкой карточки районов, через черту, значок мельче:
    это тот же список, только вчерашний. */
 /* История — своей полосой, а не ещё одной строкой района: тон карточки
@@ -5334,6 +5373,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-depret{display:flex;gap:8px;padding:2px 16px 14px}
 .fb-depret .fb-num{flex:1;min-width:0}
 .fb-depret .aud-b{flex:0 0 auto}
+/* Страница «История»: переключатель закупки / приёмки на всю ширину. */
+.hist-seg{display:flex;margin:2px 0 10px}
+.hist-seg .fb-seg{flex:1 1 auto;display:flex}
+.hist-seg .fb-seg button{flex:1;height:36px;font-size:13.5px;font-weight:700;letter-spacing:.2px}
 /* История приёмок (ih-), 4 окт 2026: день — карточкой, строка — район: слева
    код района, кто и когда, справа сколько принято из плана; по нажатию —
    взял / начал / закрыл, кто сколько отсканировал, убранное, недовоз, позиции. */
@@ -26208,7 +26251,7 @@ function pathShort(){
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
       <path d="M3 6h18"/><path d="M12 11v6M9 14h6"/></svg></span>
-    <span class="pnav-b"><b>Докупить на доп. складах</b>
+    <span class="pnav-b"><b>Докупить<span class="pd-long"> на доп. складах</span></b>
       <i>магазин не дал ${fmt(gap)} ${pluralize(gap,'бутылку','бутылки','бутылок')}${
         left < gap ? ` · в заявках ${fmt(gap - left)}` : ''}</i></span>
     <span class="pstat-c ${left ? 'no' : 'done'}">${left ? fmt(left) : 'в заявках'}</span>
@@ -26218,19 +26261,16 @@ function pathShort(){
 
 // Прошлые закупки. Одна отвечает «как прошло сегодня»; несколько подряд —
 // на вопрос поинтереснее: сколько магазин обычно не даёт и во что это встаёт.
+// Одна строка на обе истории (владелец, 4 окт 2026: «историю закупок и
+// приёмок объедини в одну кнопку, перенеси на отдельную страницу и дай
+// выбрать между ними уже там»). Что внутри — оглавлением через косую.
 function supHistLine(){
-  const list = (ACC_SUP && ACC_SUP.list) || [];
-  // Закрытые закупки на хабе не стоят (_supCur) — значит, строка нужна, как
-  // только есть хоть одна: иначе единственная принятая исчезла бы из виду.
-  if(!list.some(x => x.status !== 'open')) return '';
-  const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
-  return `<button class="pnav-r pbig ttl pd-hist" onclick="supHistory()">
+  return `<button class="pnav-r pbig ttl pd-hist" onclick="accHistory()">
     <span class="pnav-i big live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
       <path d="M12 8v4l3 2"/></svg></span>
-    <span class="pnav-b"><b>История закупок</b>
-      <i>${list.length} ${pluralize(list.length,'закупка','закупки','закупок')} / принято на ${fmt(aed)} AED</i></span>
+    <span class="pnav-b"><b>История</b><i>закупки / приёмки</i></span>
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }
@@ -26274,7 +26314,7 @@ function ordHub(){
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div></div>
     <div class="pbox xbase">${pathExtra()}</div>
-    <div class="pbox grow">${pathDistricts()}${pathShort()}${supHistLine()}${intHistLine()}</div></div>`;
+    <div class="pbox grow">${pathDistricts()}${pathShort()}${supHistLine()}</div></div>`;
   ohubFit();
 }
 
@@ -26285,12 +26325,17 @@ function ohubFit(){
   if(!hub) return;
   // Снять и снова надеть класс — в одном кадре, между ними ничего не рисуется:
   // человек видит только итог замера.
-  hub.classList.remove('tight');
+  hub.classList.remove('tight', 'xtight', 'scroll');
   // Меряем против внутренней высоты, без полей середины: иначе хаб на
   // десяток точек выше места считался влезшим, и страница чуть листалась.
   const cs = getComputedStyle(mid);
   const inner = mid.clientHeight - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
-  if(hub.scrollHeight > inner + 2) hub.classList.add('tight');
+  const over = () => hub.scrollHeight > inner + 2;
+  // Ступени: ужатый → совсем ужатый (телеграм не во весь экран) → и только
+  // если не влезло и так — прокрутка, но без срезанных строк.
+  if(over()) hub.classList.add('tight');
+  if(over()) hub.classList.add('xtight');
+  if(over()) hub.classList.add('scroll');
 }
 // Шрифт заголовков догружается после первой отрисовки, и с ним страница
 // подрастает на две-три строки: меряем ещё раз, когда он встал.
@@ -31350,19 +31395,38 @@ function supRender(){
 // История закупов. Открывается в ту же карточку — это один и тот же экран,
 // просто другой закуп: заводить под прошлый закуп отдельный вид значило бы
 // научить человека читать поставку дважды.
-async function supHistory(){
+// ── «История»: закупки и приёмки на одной странице ────────────────────────
+// Владелец, 4 окт 2026: одна кнопка на хабе, отдельная страница, внутри
+// переключатель. Вкладка держится между открытиями (HIST_TAB).
+let HIST_TAB = 'sup';
+async function accHistory(tab){
+  if(tab) HIST_TAB = tab;
   ACC_BACK = accOrder;
-  _setText('accTitle', 'История закупок');
+  _setText('accTitle', 'История');
   _setText('accSub', '');
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accMid').innerHTML = `<div class="hist-seg">${
+      fbSeg('hist', HIST_TAB, [['sup', 'Закупки'], ['int', 'Приёмки']], 'histTab')}</div>
+    <div id="histBody"><div class="exp-empty">Загрузка…</div></div>`;
+  if(HIST_TAB === 'int') await intHistory(); else await supHistory();
+}
+function histTab(_, v){
+  if(v === HIST_TAB) return;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  accHistory(v);
+}
+async function supHistory(){
+  // Закупки — вкладка страницы «История»: открытая напрямую, страница
+  // собирается там же, а сюда возвращаемся уже внутрь неё.
+  if(!document.getElementById('histBody')) return accHistory('sup');
   let list = (ACC_SUP && ACC_SUP.list) || null;
   if(!list){
     try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
     catch(e){ list = []; }
     ACC_SUP = {list, open: _supMain(list)};
   }
-  const mid = document.getElementById('accMid');
+  const mid = document.getElementById('histBody');
   if(!list.length){
     mid.innerHTML = `<div class="xs-empty"><div class="sh-empty xs-ecard">
         <span class="sh-empty-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -31414,23 +31478,12 @@ function supHistRow(x){
 // из плана; по нажатию — взял / начал / закрыл, кто сколько отсканировал,
 // убранное из приёмки, недовоз и позиции. Данные — /api/owner/supply/intake/history.
 let IH = null;
-const ICO_INTAKE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>';
 const IH_ST = {done: ['', ''], short: ['недобор', 'warn'], noscan: ['без сканирования', 'warn'],
                live: ['в работе', 'live'], taken: ['взял, не начал', ''], cancelled: ['отменён', 'dn']};
-function intHistLine(){
-  return `<button class="pnav-r pbig ttl pd-hist" onclick="intHistory()">
-    <span class="pnav-i big live">${ICO_INTAKE}</span>
-    <span class="pnav-b"><b>История приёмок</b><i>кто принимал / сколько / когда</i></span>
-    <span class="pnav-go">${ICO_CHEV}</span>
-  </button>`;
-}
 async function intHistory(){
-  ACC_BACK = accOrder;
-  _setText('accTitle', 'История приёмок');
-  _setText('accSub', '');
-  document.getElementById('accFoot').innerHTML = '';
-  document.getElementById('accAct').innerHTML = '';
-  const mid = document.getElementById('accMid');
+  // Приёмки — вкладка страницы «История» (см. accHistory).
+  if(!document.getElementById('histBody')) return accHistory('int');
+  const mid = document.getElementById('histBody');
   mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
   IH = {data: null, open: (IH && IH.open) || new Set()};
   try{ IH.data = await ownerApi.ownerFetch('/api/owner/supply/intake/history', {params: {days: 60}}); }
@@ -31438,7 +31491,7 @@ async function intHistory(){
   intHistPaint();
 }
 function intHistPaint(){
-  const mid = document.getElementById('accMid'); if(!mid || !IH || !IH.data) return;
+  const mid = document.getElementById('histBody'); if(!mid || !IH || !IH.data) return;
   const d = IH.data, rows = d.rows || [];
   const days = [];
   rows.forEach(r => {

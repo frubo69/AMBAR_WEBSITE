@@ -23425,9 +23425,12 @@ function fbRpSections(b){
   if(has('auto')) out.push({t: 'Расходы на автомобили', i: 'car', go: "fbSecPage('auto')"});
   if(has('home')) out.push({t: 'Бытовые расходы', i: 'home', go: "fbSecPage('home')"});
   if(has('sim')) out.push({t: 'Sim', i: 'simcard', go: "fbSecPage('sim')"});
-  lines.filter(l => !l.group).forEach(l =>
-    out.push({t: escS(l.name), i: fbHistIco(l.name), go: fbNeedsWho(l) ? `fbWhoPage('${l.id}')` : `fbLinePay('${l.id}')`}));
+  // «Что-то ещё» — последней, после «Рекламы» (владелец, 5 окт 2026).
+  const свои = lines.filter(l => !l.group), плитка = l =>
+    out.push({t: escS(l.name), i: fbHistIco(l.name), go: fbNeedsWho(l) ? `fbWhoPage('${l.id}')` : `fbLinePay('${l.id}')`});
+  свои.filter(l => !fbIsOther(l)).forEach(плитка);
   if(has('ads')) out.push({t: 'Реклама', i: 'megaphone', go: "fbRentPay('ads')"});
+  свои.filter(l => fbIsOther(l)).forEach(плитка);
   return out;
 }
 function fbRpSecTiles(b){

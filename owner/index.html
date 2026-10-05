@@ -3617,22 +3617,36 @@ button.path:active{transform:scale(.995)}
    экрана — листается внутри каждой, страница не прокручивается. */
 .fb-rppage{display:flex;flex-direction:column;gap:10px;height:100%;min-height:0}
 .fb-rppage > .sc{margin:0;flex:0 0 auto}
-.fb-rppage > .fb-half{flex:1 1 auto;min-height:120px;display:flex;flex-direction:column;overflow:hidden}
-/* РП+ — просто кнопка: полоса золотистого тона, видно, что на неё жмут */
-.fb-rpbtn{display:flex;align-items:center;gap:10px;width:100%;min-height:66px;flex:0 0 auto;
-  padding:10px 12px 10px 16px;border-radius:16px;text-align:left;cursor:pointer;
-  /* ровно тот же цвет, что шапка РП−: под ней лежит верх карточки (#161629),
-     поэтому одну золотую подсветку кладём на такую же подложку */
-  background:linear-gradient(rgba(201,169,110,.09),rgba(201,169,110,.09)),#161629;
-  border:1px solid rgba(201,169,110,.28);font-family:inherit;color:var(--text)}
-.fb-rpbtn:active{transform:scale(.995);background:linear-gradient(rgba(201,169,110,.15),rgba(201,169,110,.15)),#161629}
+/* РП (5 окт 2026): две карточки делят остаток экрана, в каждой две КНОПКИ
+   (владелец: «оформи хотя бы так, чтобы они выглядели как кнопки»): крупная
+   объёмная плашка с золотой рамкой и золотым шевроном — РП+ / РП−, под ней
+   «История» — вторичная, тише. */
+.fb-rppage > .fb-rpcard{flex:1 1 0;min-height:150px;display:flex;flex-direction:column;gap:10px;padding:12px;overflow:hidden}
+.fb-rpbig{flex:1 1 auto;display:flex;align-items:center;gap:12px;width:100%;padding:0 16px 0 20px;border-radius:16px;
+  border:1.5px solid rgba(201,169,110,.45);
+  background:linear-gradient(180deg,#242b4c 0%,#181c33 100%);
+  box-shadow:0 8px 22px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08);
+  color:var(--text);font-family:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:transform .12s}
+.fb-rpbig:active{transform:scale(.985);background:linear-gradient(180deg,#2b335a 0%,#1c2139 100%)}
+.fb-rpbig .fb-hcap-t b{font-size:22px;letter-spacing:.8px}
+.fb-rpbig .fb-hcap-v{font-size:22px}
+.fb-rpbig .fb-hcap-v u{font-size:11px}
+.fb-rpbig .fb-chev{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
+  box-shadow:0 4px 12px rgba(201,169,110,.25)}
+.fb-rphist{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;border-radius:13px;
+  border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text);font-family:inherit;
+  font-size:14.5px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+.fb-rphist span{flex:0 0 auto}
+.fb-rphist .fb-chev{width:22px;height:22px;background:none;color:var(--sub)}
+.fb-rphist:active{transform:scale(.985);background:rgba(255,255,255,.08)}
+/* Страница РП−: карточка во весь экран, плитки разделов делят высоту. */
+.fb-rpout{display:flex;flex-direction:column;height:100%;min-height:0}
+.fb-rpout > .sc{flex:1 1 auto;display:flex;flex-direction:column;margin:0;min-height:0}
+.fb-rpout .fb-fgrid{flex:1 1 auto;grid-auto-rows:minmax(84px,1fr);align-content:stretch}
+.fb-rpout .fb-fchip{min-height:0;justify-content:center}
 /* Плитки разделов тянутся по высоте карточки: на большом экране крупнее, на
    маленьком ужимаются — но все помещаются без прокрутки */
-.fb-half .fb-hbody{overflow-y:auto}
-.fb-half .fb-fgrid{min-height:100%;box-sizing:border-box;grid-auto-rows:minmax(58px,1fr)}
-.fb-half .fb-fchip{min-height:0;justify-content:center;gap:6px}
-.fb-half .fb-fchip em{width:28px;height:28px}
-.fb-half .fb-hbody{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 /* Шапка карточки — отдельная полоса, а не первая строка списка */
 .fb-hcap{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:10px 12px 10px 16px;
   background:rgba(201,169,110,.09);border:0;border-bottom:1px solid rgba(201,169,110,.22);
@@ -21297,7 +21311,7 @@ function fbRepaint(){
   if(!document.getElementById('accOv').classList.contains('show')) return;
   // открыта страница расхода (статья, аренда, зарплаты, история) — месяц
   // листается прямо на ней, экран под ней трогать незачем
-  if(FB.hist || FB.lpage || FB.rentGrp || FB.salPage || FB.loanPage || FB.movePage || FB.depPage){ fbPagePaint(); return; }
+  if(FB.hist || FB.lpage || FB.rentGrp || FB.salPage || FB.loanPage || FB.movePage || FB.depPage || FB.rpPage || FB.rpOut){ fbPagePaint(); return; }
   // страница удержаний человека: только список, форму с набранным не трогаем
   if(fbItemOn()){ fbItemPersonPaint(); return; }
   // шаги штрафного листа и удержания от месяца не зависят — не трогаем вовсе
@@ -21834,7 +21848,7 @@ function fbDays(rows){
 }
 async function fbMonthScreen(title){
   _setText('accTitle', title);
-  FB.loanPage = false; FB.movePage = false; FB.depPage = false;
+  FB.loanPage = false; FB.movePage = false; FB.depPage = false; FB.rpPage = false; FB.rpOut = false;
   FB.month = FB.month || fbMonthNow();
   _setText('accSub', fbMonthT(FB.month));
   const m = FB.month;
@@ -23317,7 +23331,7 @@ async function accFinRP(){
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {};
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null; FB.rentGrp = null;
-  FB.salPage = false; FB.hist = null; FB.sec = null; FB.rpPage = false; FB.loanPage = false; FB.movePage = false; FB.depPage = false;
+  FB.salPage = false; FB.hist = null; FB.sec = null; FB.rpPage = false; FB.rpOut = false; FB.loanPage = false; FB.movePage = false; FB.depPage = false;
   // Две карточки одного размера делят остаток экрана: листается ВНУТРИ каждой,
   // страница не прокручивается (владелец: «занимали всю страницу ровно»).
   document.getElementById('accMid').innerHTML = `
@@ -23344,15 +23358,49 @@ async function accFinRP(){
       ${s.mv_rp_out ? fbGo('Переводы с РП', 'safe.mv_rp_out', s.mv_rp_out, 'fbMovePage(accFinRP)', {unit: 'за месяц'}) : ''}
       ${s.mv_rp_in ? fbGo('Переводы на РП', 'safe.mv_rp_in', s.mv_rp_in, 'fbMovePage(accFinRP)', {unit: 'за месяц'}) : ''}
     </div>
-    <button class="sc fb-rpbtn" onclick="fbRpInPage()">
-      <span class="fb-hcap-t"><b>РП+</b><i>смотреть историю по дням</i></span>
-      <b class="fb-hcap-v">${fbFmt(s.rp_in)}<u>AED</u></b><em class="fb-chev">${_SC_CHEV}</em></button>
-    <div class="sc fb-half">
-      <button class="fb-hcap" onclick="fbHistOpen('')">
-        <span class="fb-hcap-t"><b>РП−</b><i>на что тратим · история</i></span>
-        <b class="fb-hcap-v">${fbFmt(s.rp_out)}<u>AED</u></b><em class="fb-chev">${_SC_CHEV}</em></button>
-      <div class="fb-hbody"><div class="fb-fgrid">${fbRpSecTiles(b)}</div></div>
+    <!-- Владелец, 5 окт 2026: «кнопку РП чуть больше, вниз — кнопку История;
+         РП− — кнопкой на отдельную страницу, где выбирают сам расход, и под
+         ней тоже История». Две карточки одной анатомии делят остаток экрана. -->
+    <div class="sc fb-rpcard">
+      <button class="fb-rpbig" onclick="fbRpInPage()">
+        <span class="fb-hcap-t"><b>РП+</b></span>
+        <b class="fb-hcap-v">${fbFmt(s.rp_in)}<u>AED</u></b><em class="fb-chev">${_SC_CHEV}</em></button>
+      <button class="fb-rphist" onclick="fbRpInHist()"><span>История</span><em class="fb-chev">${_SC_CHEV}</em></button>
     </div>
+    <div class="sc fb-rpcard">
+      <button class="fb-rpbig" onclick="fbRpOutPage()">
+        <span class="fb-hcap-t"><b>РП−</b></span>
+        <b class="fb-hcap-v">${fbFmt(s.rp_out)}<u>AED</u></b><em class="fb-chev">${_SC_CHEV}</em></button>
+      <button class="fb-rphist" onclick="fbHistOpen('')"><span>История</span><em class="fb-chev">${_SC_CHEV}</em></button>
+    </div>
+  </div>`;
+}
+// ── Страница РП−: выбрать, на что тратим ──────────────────────────────────
+// Плитки разделов (зарплаты, аренда, автомобили, …) и «Перевод» — на своей
+// странице, а не в хвосте экрана РП (владелец, 5 окт 2026). Назад из любого
+// раздела — сюда.
+function fbRpOutPage(){
+  const b = fbBook(FB.month); if(!b) return;
+  FB.rpOut = true; FB.rpPage = false; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
+  FB.loanPage = false; FB.movePage = false; FB.depPage = false;
+  fbActSet('');
+  _setText('accTitle', 'РП−'); _setText('accSub', fbMonthT(b.month));
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `<div class="fb-page in fb-rpout" id="fbPayBody">${fbRpOutHtml(b)}</div>`;
+  mid.scrollTop = 0;
+  ACC_BACK = accFinRP;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function fbRpOutPaint(){
+  const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
+  if(b && body) body.innerHTML = fbRpOutHtml(b);
+}
+function fbRpOutHtml(b){
+  const s = b.safe || {};
+  return `<div class="sc fb-gut fb-rpout-c">
+    ${fbCap(b.month, true)}
+    ${fbRow('За месяц', 'safe.rp_out', s.rp_out, {sum: true})}
+    <div class="fb-fgrid">${fbRpSecTiles(b)}</div>
   </div>`;
 }
 // Разделы расхода плитками: значок и подпись, нажал — своя страница
@@ -23375,7 +23423,7 @@ function fbRpSecTiles(b){
   const hint = secs.length ? '' : `<button class="fb-fchip" onclick="accOpen('finbud')"><em>${IC('warn', 16)}</em><span>Бюджет не заполнен</span></button>`;
   // «Перевод» (владелец, 3 окт 2026): перевести со счёта РП на счёт ЧП (или
   // между любыми стопками) — с комментарием и датой.
-  secs.push({t: 'Перевод', i: 'export', go: 'fbMovePage(accFinRP)'});
+  secs.push({t: 'Перевод', i: 'export', go: 'fbMovePage(fbRpOutPage)'});
   return hint + secs.map(x => `<button class="fb-fchip" onclick="${x.go}"><em>${IC(x.i, 16)}</em><span>${x.t}</span></button>`).join('');
 }
 // Страница раздела: те же плитки, только его детьми (авто, бытовые, sim)
@@ -23387,7 +23435,7 @@ function fbSecPage(g){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbSecHtml(b)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = accFinRP;
+  ACC_BACK = fbRpOutPage;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbSecPaint(){
@@ -23602,16 +23650,20 @@ async function fbMoveAdd(day){
     }
   }
 }
-function fbRpInPage(){
+// Страница РП+ (владелец, 5 окт 2026): плитки месяца и «Доп. РП+»; список
+// по дням — отдельной «Историей» (fbRpInHist), под кнопкой на экране РП.
+function fbRpInPage(mode){
   const b = fbBook(FB.month); if(!b) return;
-  FB.rpPage = true; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
-  _setText('accTitle', 'РП+'); _setText('accSub', fbMonthT(b.month));
+  FB.rpPage = mode === 'hist' ? 'hist' : 'in'; FB.rpOut = false; FB.sec = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.hist = null;
+  fbActSet('');
+  _setText('accTitle', FB.rpPage === 'hist' ? 'История РП+' : 'РП+'); _setText('accSub', fbMonthT(b.month));
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRpInHtml(b)}</div>`;
   mid.scrollTop = 0;
   ACC_BACK = accFinRP;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
+function fbRpInHist(){ fbRpInPage('hist'); }
 function fbRpInPaint(){
   const b = fbBook(FB.month), body = document.getElementById('fbPayBody');
   if(b && body) body.innerHTML = fbRpInHtml(b);
@@ -23619,6 +23671,8 @@ function fbRpInPaint(){
 function fbRpInHtml(b){
   const s = b.safe || {};
   const n = (b.days || []).filter(d => !d.future && ((d.ok ? (d.collected || 0) + (d.collected_cr || 0) : 0) + (d.extra_rp || 0)) > 0).length;
+  if(FB.rpPage === 'hist') return `<div class="sc fb-gut">${fbCap(b.month, true)}</div>
+  <div class="sc">${fbCapT('По дням')}<div class="fb-one">${fbRpInRows(b)}</div></div>`;
   return `<div class="sc fb-gut">
     ${fbCap(b.month, true)}
     <div class="aud-g">
@@ -23627,8 +23681,7 @@ function fbRpInHtml(b){
       ${fbTile('В среднем', 'rpin.avg', n ? Math.round((s.rp_in || 0) / n) : 0, {unit: 'в день'})}
     </div>
   </div>
-  <div class="sc">${fbAddRow('in', b.today <= b.last ? b.today : b.last)}</div>
-  <div class="sc">${fbCapT('По дням')}<div class="fb-one">${fbRpInRows(b)}</div></div>`;
+  <div class="sc">${fbAddRow('in', b.today <= b.last ? b.today : b.last)}</div>`;
 }
 // ── «Аренда офисов»: страница оплаты ──────────────────────────────────────
 // Та же страница, что в бюджете (план/факт/осталось, «Офис» и «Билдинги» со
@@ -23645,7 +23698,7 @@ function fbSalPay(){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbSalPayHtml(b)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = () => { fbActSet(''); accFinRP(); };
+  ACC_BACK = () => { fbActSet(''); fbRpOutPage(); };
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbSalPayPaint(){
@@ -23719,7 +23772,7 @@ function fbRentPay(grp){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRentPayHtml(b)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = accFinRP;
+  ACC_BACK = fbRpOutPage;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbRentPayPaint(){
@@ -23847,7 +23900,7 @@ function fbLinePay(id, who){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbLinePayHtml(b, l)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = fbNeedsWho(l) ? () => fbWhoPage(id) : accFinRP;
+  ACC_BACK = fbNeedsWho(l) ? () => fbWhoPage(id) : fbRpOutPage;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 // ── Билеты и визы: сначала — кому ────────────────────────────────────────
@@ -23869,7 +23922,7 @@ async function fbWhoPage(id){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody"><div class="exp-empty">Загрузка…</div></div>`;
   mid.scrollTop = 0;
-  ACC_BACK = accFinRP;
+  ACC_BACK = fbRpOutPage;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   if(!CREW) await crewLoad();
   if(FB.who && FB.who.id === id) fbWhoPaint();
@@ -23911,6 +23964,7 @@ function fbPagePaint(){
   else if(FB.salPage) fbSalPayPaint();
   else if(FB.sec) fbSecPaint();
   else if(FB.rpPage) fbRpInPaint();
+  else if(FB.rpOut) fbRpOutPaint();
   else if(FB.who) fbWhoPaint();
   else if(FB.loanPage) fbBLoanPaint();
   else if(FB.movePage) fbMovePaint();

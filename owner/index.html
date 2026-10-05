@@ -736,6 +736,14 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:12px 13px 13px}
 /* Сейф: три стопки и кошелёк — квадратом, а не три в ряд и одна под ними. */
 .aud-g.fb-safe4{grid-template-columns:repeat(2,1fr)}
+/* РП: четыре плитки одним рядом, вдвое ниже обычных (владелец, 5 окт 2026). */
+.aud-g.fb-rp4{grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px 11px}
+.fb-rp4 .aud-t{padding:8px 8px 9px;border-radius:12px}
+.fb-rp4 .aud-t.tap::after{top:8px;right:8px}
+.fb-rp4 .aud-tl{min-height:0;margin-bottom:5px;font-size:7.5px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-rp4 .aud-tv{font-size:19px;letter-spacing:-.6px}
+.fb-rp4 .aud-tv.long{font-size:15.5px;letter-spacing:-.4px}
+.fb-rp4 .aud-tu{font-size:8.5px;margin-top:3px}
 .aud-t{position:relative;min-width:0;padding:11px 10px 12px;border-radius:14px;
   background:var(--card2);border:1px solid var(--border2);text-align:left;
   font-family:inherit;color:var(--text)}
@@ -4212,7 +4220,6 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-add .fb-feerow[hidden]{display:none}
 .fb-feerow > span i{display:block;margin-top:2px;font-style:normal;font-size:10.5px;font-weight:500;color:var(--muted)}
 .crd-cr > span, .fb-cr > span{color:var(--gold2)}
-.aud-g.fb-rp2{padding-top:0}
 .fb-safe-plus{flex:0 0 auto;font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--gold2)}
 .fb-safe-usdt.tap:active{transform:scale(.97);border-color:rgba(201,169,110,.5)}
 /* «Отчёт ДДС» — обычной подписью, как остальные строки: золотом он спорил со
@@ -20746,9 +20753,9 @@ function fbTile(t, key, v, o){
   o = o || {};
   const cls = fbCls(v, o.mode);
   // o.go — плитка ведёт на страницу: та же плашка кнопкой, с уголком-шевроном
-  const at = `class="aud-t${o.go ? ' tap' : ''}${cls ? ' ' + cls : ''}" data-fr="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}`;
+  const at = `class="aud-t${o.go ? ' tap' : ''}${cls ? ' ' + cls : ''}${o.cls ? ' ' + o.cls : ''}" data-fr="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}`;
   const in_ = `<span class="aud-tl">${t}</span>
-    <b class="aud-tv" data-f="${key}"${o.dec ? ' data-dec="1"' : ''}>${fbFmtN(v, o.dec)}</b>
+    <b class="aud-tv${fbFmtN(v, o.dec).length > 6 ? ' long' : ''}" data-f="${key}"${o.dec ? ' data-dec="1"' : ''}>${fbFmtN(v, o.dec)}</b>
     <span class="aud-tu">${o.unit || 'AED'}</span>`;
   return o.go ? `<button ${at} onclick="${o.go}">${in_}</button>` : `<div ${at}>${in_}</div>`;
 }
@@ -23317,15 +23324,14 @@ async function accFinRP(){
   <div class="fb-rppage">
     <div class="sc fb-gut">
       ${fbCap(b.month, true)}
-      <div class="aud-g fb-safe4">
+      <!-- Четыре числа одним рядом (владелец, 5 окт 2026: «сделай покомпактнее»):
+           приход и расход месяца, рядом счёт РП — наличные в сейфе и крипта на
+           кошельке (2 окт 2026). Единицы короткие, чтобы влезть вчетвером. -->
+      <div class="aud-g fb-rp4">
         ${fbTile('РП+', 'safe.rp_in', s.rp_in)}
         ${fbTile('РП−', 'safe.rp_out', s.rp_out)}
-      </div>
-      <!-- На счёте РП: слева наличные (в сейфе), справа крипта (на кошельке) —
-           как в шапке сейфа (владелец, 2 окт 2026). -->
-      <div class="aud-g fb-safe4 fb-rp2">
-        ${fbTile('Наличные', 'safe.rp', s.rp, {mode: 'neg', unit: 'AED · в сейфе'})}
-        ${fbTile('Крипта', 'safe.rp_cr', s.rp_cr || 0, {unit: 'AED · на кошельке', go: 'fbOpenWal(accFinRP)'})}
+        ${fbTile('Наличные', 'safe.rp', s.rp, {mode: 'neg', unit: 'в сейфе'})}
+        ${fbTile('Крипта', 'safe.rp_cr', s.rp_cr || 0, {unit: 'на кошельке', go: 'fbOpenWal(accFinRP)'})}
       </div>
       <!-- Фонд одалживал Барракуде (владелец, 3 окт 2026): сколько ещё не
            вернулось — и страница, как отдавали и как возвращается. -->

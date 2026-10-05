@@ -16740,7 +16740,7 @@ function stkFlowHtml(pid, day){
     const cls = e.kind === 'rescan' || !v ? 'zero' : (e.kind === 'writeoff' || (e.kind === 'count' && v < 0)) ? 'bad' : v > 0 ? 'plus' : 'minus';
     const t = e.kind === 'move_in' || e.kind === 'move_out' ? `${STK_FLOW_T[e.kind]} ${escS(e.ref || '')}`
             : e.kind === 'writeoff' ? `Списание · ${escS(e.ref || '')}`
-            : e.kind === 'count' ? `Ревизия · насчитали ${fmtQty(e.ref || 0)}`
+            : e.kind === 'count' ? (e.was != null ? `Ревизия · числилось ${fmtQty(e.was)}, насчитали ${fmtQty(e.ref || 0)}` : `Ревизия · насчитали ${fmtQty(e.ref || 0)}`)
             : e.kind === 'intake' || e.kind === 'rescan' ? `${STK_FLOW_T[e.kind]} · ${e.n} ${pluralize(e.n, 'код', 'кода', 'кодов')}`
             : STK_FLOW_T[e.kind] || e.kind;
     const когда = _hm(e.at) + (e.to && _hm(e.to) !== _hm(e.at) ? '–' + _hm(e.to) : '');

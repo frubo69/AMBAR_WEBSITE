@@ -65,7 +65,9 @@ async def main():
                                       "tasks": {"jvc": {"driver": "Худоба", "noscan_at": T(15), "noscan_by": "Худоба", "done_at": None}}})
     await db.save_stock_count("jvc", "2026-10-02", {
         "district": "jvc", "day": "2026-10-02", "counted_at": T(16).isoformat(), "first_time": False, "counted_by": 0,
-        "lines": [{"id": "p1", "name": "Absolut 1 ltr", "price": 100, "unit": 1, "expected": 10, "actual": 8, "diff": -2, "counted": True},
+        # diff в самой ревизии нарочно «не тот» (−1): лента обязана считать скачок
+        # от своего бегущего остатка (10 → 8 = −2), а не верить записанной разнице
+        "lines": [{"id": "p1", "name": "Absolut 1 ltr", "price": 100, "unit": 1, "expected": 9, "actual": 8, "diff": -1, "counted": True},
                   {"id": "p31", "name": "Heineken 0.33 can", "price": 200, "unit": 24, "expected": 4, "actual": 4, "diff": 0, "counted": True}]})
     SR.base_drop()
 
@@ -81,6 +83,7 @@ async def main():
     eq("сумма событий = конец − начало", round(sum(e["qty"] for e in j["events"]), 2), j["close"] - j["open"])
     eq("итоги по видам", (j["sum"]["sale"], j["sum"]["intake"], j["sum"]["move_out"], j["sum"]["writeoff"], j["sum"]["manual"], j["sum"]["count"]),
        (-2, 3, -1, -1, 1, -2))
+    eq("у ревизии видно, сколько числилось к её минуте", next(e for e in j["events"] if e["kind"] == "count")["was"], 10)
     d = await flow("2026-10-02", "p1")
     bb = next(x for x in d["districts"] if x["id"] == "bbay")
     eq("все районы: в B2 приехала 1 из B1, остаток там неизвестен", ([(e["kind"], e["qty"], e["ref"]) for e in bb["events"]], bb["open"], bb["close"]),

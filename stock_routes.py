@@ -3504,11 +3504,26 @@ async def handle_flow(request):
     for o in ([oid] if oid else OFFICE_IDS):
         ob, cb = opening.get(o) or {}, closing.get(o) or {}
         ev = events.get(o) or []
+        # Пересчёт — не «разница с тем, что ждала ревизия», а скачок остатка:
+        # сколько числилось по ленте к той минуте и сколько насчитали. Иначе
+        # ревизия, подтвердившая цифру трёхдневной давности, показывала ноль,
+        # а остаток за день менялся на то, чего в ленте не было (владелец,
+        # 5 окт 2026, Gold Label в Бизнес Бее: 1 → 8 при приёмке +3).
+        bal = float((ob.get("have_exact") or {}).get(pid) or 0) if ob.get("counted") else None
+        for e in ev:
+            if e["kind"] == "count":
+                actual = float(e.get("ref") or 0)
+                if bal is not None:
+                    e["was"] = _num(bal)
+                    e["qty"] = actual - bal
+                bal = actual
+            elif bal is not None and e["kind"] != "rescan":
+                bal += float(e["qty"])
         rows.append({"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
                      "open": _num(float((ob.get("have_exact") or {}).get(pid) or 0)) if ob.get("counted") else None,
                      "close": _num(float((cb.get("have_exact") or {}).get(pid) or 0)) if cb.get("counted") else None,
                      "events": [{**e, "at": e["at"].isoformat(), "to": e["to"].isoformat() if isinstance(e.get("to"), datetime) else "",
-                                 "qty": _num(e["qty"])} for e in ev],
+                                 "qty": _num(e["qty"]), **({"was": e["was"]} if "was" in e else {})} for e in ev],
                      "sum": {k: _num(sum(e["qty"] for e in ev if e["kind"] == k)) for k in FLOW_KINDS}})
     return web.json_response({"day": day, "today": today, "live": live,
                               "product": {"id": pid, "name": p.get("name", ""), "unit": _unit(p)},

@@ -2788,12 +2788,21 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
     who = str(who or "").strip()[:60]
+    # Пересчёт ложится временем ПОСЛЕДНЕГО СКАНА, а не нажатия «Завершить»
+    # (владелец, 5 окт 2026): полку считали тогда, когда сканировали, и всё
+    # проданное после сканов приложение вычтет само. Ревизия Бизнес Бея,
+    # отсканированная 22 сен и завершённая 25-го, без этого вернула на склад
+    # ~120 проданных за три дня единиц. Сканов нет — временем начала ревизии.
+    last_scan = _dt_of(stats.get("at") or "")
+    started = _dt_of(a.get("started_at") or "")
+    counted_dt = last_scan or started or now
+    counted_iso = counted_dt.astimezone(timezone.utc).isoformat()
     # Пересчёт — обычным документом, в учётных единицах: с него дальше живут
     # заявка и стоимость склада, и ревизия для них — просто свежий снимок.
     doc_lines = _audit_snapshot_lines(lines)
     doc = {"district": district, "district_name": OFFICE_NAMES.get(district, district),
            "day": day, "first_time": False,
-           "counted_by": by, "counted_at": now_iso,
+           "counted_by": by, "counted_at": counted_iso,
            "lines": doc_lines,
            "short_qty": tot["short_qty"], "short_aed": tot["short_aed"],
            "over_qty": tot["over_qty"],

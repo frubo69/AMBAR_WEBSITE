@@ -17238,6 +17238,16 @@ async function audStart(){
   audScanOpen();
 }
 
+// Учётный день последнего скана ревизии (сдвиг смены — как у _mvhAt).
+function audScanDay(sh){
+  const at = ((sh || {}).scan || {}).at; if(!at) return '';
+  const d = new Date(String(at).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1') + (/Z$|[+-]\d\d:?\d\d$/.test(String(at)) ? '' : 'Z'));
+  if(isNaN(d)) return '';
+  const дуб = new Date(d.toLocaleString('en-US', {timeZone: 'Asia/Dubai'}));
+  if(дуб.getHours() < SHIFT_START_HOUR) дуб.setDate(дуб.getDate() - 1);
+  return дуб.getFullYear() + '-' + String(дуб.getMonth() + 1).padStart(2, '0') + '-' + String(дуб.getDate()).padStart(2, '0');
+}
+function _bizToday_iso(){ return _dayIsoFor(0); }
 async function audFinish(){
   const sh = STK.sheet; if(!sh) return;
   const t = sh.totals || {}, u = audUnits(sh.rows || []);
@@ -17251,7 +17261,9 @@ async function audFinish(){
         'Всё равно завершить', 'Вернуться к сканированию', 'bad')
     : await askDialog('Завершить ревизию?',
         `${fmtQty(u.actual)} из ${fmtQty(u.expected)} · недостача ${fmtQty(u.short)}`
-        + ` · излишки ${fmtQty(u.over)}${u.noqr ? ` · без QR ${fmtQty(u.noqr)}, остаются на складе` : ''}`,
+        + ` · излишки ${fmtQty(u.over)}${u.noqr ? ` · без QR ${fmtQty(u.noqr)}, остаются на складе` : ''}`
+        // Сканировали не сегодня — пересчёт ляжет днём сканов (владелец, 5 окт 2026)
+        + (audScanDay(sh) && audScanDay(sh) !== _bizToday_iso() ? `<br>Сканы ${escS(_dayName(audScanDay(sh)))} — пересчёт ляжет тем днём` : ''),
         'Завершить', 'Не сейчас');
   if(!ok) return;
   const b = document.querySelector('.aud-fin');

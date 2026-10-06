@@ -5967,6 +5967,33 @@ async def writeoffs_between(product_id: str, start, end) -> list:
     return await cur.to_list(length=2000)
 
 
+# ── Визы сотрудников (владелец, 6 окт 2026) ────────────────────────────────
+#   staff_visas {_id: имя, until: 'YYYY-MM-DD' | '', abroad: bool, note: str, by, at}
+#   Имя — как в реестре водителей / у операторов; человек не из реестра тоже
+#   может быть здесь (имя как записали).
+async def visas_all() -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.staff_visas.find({}).to_list(length=500)
+
+
+async def visa_set(name: str, fields: dict) -> dict:
+    d = _db_or_none()
+    if d is None: return {}
+    from pymongo import ReturnDocument
+    doc = await d.staff_visas.find_one_and_update(
+        {"_id": name}, {"$set": {**fields, "_id": name, "at": datetime.now(timezone.utc)}},
+        upsert=True, return_document=ReturnDocument.AFTER)
+    return doc or {}
+
+
+async def visa_del(name: str) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.staff_visas.delete_one({"_id": name})
+    return bool(r.deleted_count)
+
+
 async def stock_transfers_after(at_iso: str) -> list:
     """Переезды с указанного момента (поле at, ISO в UTC) — для основы склада.
 

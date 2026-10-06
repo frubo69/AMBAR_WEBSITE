@@ -5118,6 +5118,19 @@ async def handle_checklist(request):
                     if first else 0})
         rows.append(row)
 
+    # Визы (владелец, 6 окт 2026): строка есть, пока у кого-то срок в ближайшие
+    # две недели или уже вышел. Вышел или три дня — красным, иначе жёлтым.
+    try:
+        визы = await _visas_due(day)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] визы не прочитаны: {e}")
+        визы = []
+    if визы:
+        hint = " · ".join(f"{v['name']} {v['until_t']}" for v in визы[:4]) + (f" · ещё {len(визы) - 4}" if len(визы) > 4 else "")
+        row = _chk_row("visas", "Визы", hint, False, now, day, plan, go="visas", n=len(визы))
+        row.update({"state": "late" if any(v["days"] <= 3 for v in визы) else "now", "due": "", "late_min": 0})
+        rows.append(row)
+
     # Порядок задан планом и не пляшет по цвету: список должен читаться как
     # один и тот же список, а не пересобираться каждый час.
     rank = {p[0]: i for i, p in enumerate(plan)}
@@ -5341,6 +5354,97 @@ async def handle_orders(request):
     }, headers=CORS_HEADERS)
 
 
+# ── Визы (владелец, 6 окт 2026: «нужно придумать этому учёт, и чтобы в
+# чек-листе было, что скоро у кого-то заканчивается виза») ──────────────────
+# У каждого — дата окончания, «за пределами ОАЭ» (виза не считается) и
+# заметка. Список — все водители реестра (и уехавшие) и операторы, плюс те,
+# кого записали руками. В чек-листе строка «Визы», пока у кого-то срок
+# в ближайшие две недели или уже вышел.
+VISA_HORIZON_DAYS = 14
+
+
+def _visa_people() -> list:
+    """Кто есть в штате: (имя, роль, код района)."""
+    out, seen = [], set()
+    for d in staff.all_drivers():
+        n = str(d.get("name") or "").strip()
+        if n and n not in seen and not d.get("test"):
+            seen.add(n); out.append((n, "driver", OFFICE_CODES.get(d.get("district") or "", "")))
+    for n in staff.operator_names():
+        n = str(n or "").strip()
+        if n and n not in seen:
+            seen.add(n); out.append((n, "operator", ""))
+    return out
+
+
+async def _visas_view(day: str) -> list:
+    rows = {str(v.get("_id") or ""): v for v in await db.visas_all()}
+    today = datetime.strptime(day, "%Y-%m-%d").date()
+    out = []
+    for name, role, code in _visa_people() + [(n, "", "") for n in rows if n not in {p[0] for p in _visa_people()}]:
+        v = rows.get(name) or {}
+        until = str(v.get("until") or "")
+        days = None
+        if until:
+            try:
+                days = (datetime.strptime(until, "%Y-%m-%d").date() - today).days
+            except ValueError:
+                until, days = "", None
+        out.append({"name": name, "role": role, "code": code, "until": until, "days": days,
+                    "abroad": bool(v.get("abroad")), "note": str(v.get("note") or ""),
+                    "away": staff.is_away(name), "by": str(v.get("by") or "")})
+    # ближайшие сверху; без даты — после; уехавшие и за пределами ОАЭ — в конце
+    out.sort(key=lambda x: (x["abroad"] or x["away"], x["days"] is None, x["days"] if x["days"] is not None else 0, x["name"]))
+    return out
+
+
+async def _visas_due(day: str, horizon: int = VISA_HORIZON_DAYS) -> list:
+    """Кому пора продлевать: срок в ближайшие horizon дней или уже вышел.
+    Уехавшие и «за пределами ОАЭ» не считаются."""
+    out = []
+    for v in await _visas_view(day):
+        if v["days"] is None or v["abroad"] or v["away"]:
+            continue
+        if v["days"] <= horizon:
+            d = datetime.strptime(v["until"], "%Y-%m-%d")
+            out.append({**v, "until_t": d.strftime("%d.%m")})
+    out.sort(key=lambda x: x["days"])
+    return out
+
+
+@require_owner
+async def handle_visas(request):
+    """GET /api/owner/visas — все люди со сроками виз."""
+    day = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
+    return web.json_response({"today": day, "horizon": VISA_HORIZON_DAYS, "people": await _visas_view(day)},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_visas_set(request):
+    """POST /api/owner/visas {name, until, abroad, note, as} — записать срок."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = str(body.get("name") or "").strip()[:40]
+    if not name:
+        return web.json_response({"error": "no_name"}, status=400, headers=CORS_HEADERS)
+    until = str(body.get("until") or "").strip()[:10]
+    if until:
+        try:
+            datetime.strptime(until, "%Y-%m-%d")
+        except ValueError:
+            return web.json_response({"error": "bad_date"}, status=400, headers=CORS_HEADERS)
+    who = str(body.get("as") or "").strip()[:60] or _owner_name(request)
+    await db.visa_set(name, {"until": until, "abroad": bool(body.get("abroad")),
+                             "note": str(body.get("note") or "").strip()[:80], "by": who})
+    log.info(f"[visa] {name}: до {until or '—'}{' · за пределами ОАЭ' if body.get('abroad') else ''} · {who}")
+    day = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
+    return web.json_response({"ok": True, "today": day, "horizon": VISA_HORIZON_DAYS, "people": await _visas_view(day)},
+                             headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
@@ -5386,6 +5490,9 @@ def setup(app):
         app.router.add_post(_p, _h)
     app.router.add_route("OPTIONS", "/api/owner/cars/repairs", handle_cars_repairs)
     app.router.add_get(             "/api/owner/cars/repairs", handle_cars_repairs)
+    app.router.add_route("OPTIONS", "/api/owner/visas", handle_visas)
+    app.router.add_get(             "/api/owner/visas", handle_visas)
+    app.router.add_post(            "/api/owner/visas", handle_visas_set)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/where", handle_where)

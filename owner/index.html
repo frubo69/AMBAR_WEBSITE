@@ -5394,6 +5394,28 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-depret{display:flex;gap:8px;padding:2px 16px 14px}
 .fb-depret .fb-num{flex:1;min-width:0}
 .fb-depret .aud-b{flex:0 0 auto}
+/* Визы (vs-): человек строкой, срок справа цветом; раскрытие — дата, переключатель, заметка. */
+.vs-p + .vs-p{border-top:1px solid rgba(255,255,255,.05)}
+.vs-r{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 16px;border:0;background:transparent;
+  color:var(--text);font-family:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.vs-r:active{background:rgba(255,255,255,.02)}
+.vs-b{flex:1;min-width:0}
+.vs-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-v{flex:0 0 auto;text-align:right}
+.vs-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.vs-v i{display:block;font-style:normal;font-size:10.5px;font-weight:600;margin-top:3px;color:var(--muted)}
+.vs-r.late .vs-v b,.vs-r.late .vs-v i{color:var(--dn)}
+.vs-r.now .vs-v b,.vs-r.now .vs-v i{color:var(--gold2)}
+.vs-r.ok .vs-v b{color:var(--text)}
+.vs-r.off .vs-b b,.vs-r.off .vs-v{opacity:.5}
+.vs-p.open .vs-b b{color:var(--gold2)}
+.vs-f{display:flex;flex-wrap:wrap;gap:8px;padding:2px 16px 14px}
+.vs-f .vs-date{flex:1 1 150px;min-width:0;color-scheme:dark}
+.vs-f .chip{height:44px;padding:0 14px}
+.vs-f #vsNote{flex:1 1 100%}
+.vs-f .aud-b{flex:1 1 100%}
 /* Страница «История»: переключатель закупки / приёмки на всю ширину. */
 .hist-seg{display:flex;margin:2px 0 10px}
 .hist-seg .fb-seg{flex:1 1 auto;display:flex}
@@ -18732,6 +18754,8 @@ const ACC = [
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
   {id:'check',    t:'Проверка бутылки',  s:'',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
+  {id:'visas',    t:'Визы',              s:'сроки / продления',
+   ico:'<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M8.5 17h7"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
     ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null, ACC_SUP = null,
@@ -19612,6 +19636,7 @@ const CK_GO = {
   prices:    () => chkPrices(),
   // Штрафы на решение: сразу «Штрафы/авансы/долги», прокрученные к окошку.
   fines:     () => { FB.goPend = true; accOpen('finitems'); },
+  visas:     () => accOpen('visas'),
 };
 
 async function chkPrices(){
@@ -26020,6 +26045,7 @@ function accOpen(id){
   if(id === 'intake')   accIntake();
   if(id === 'moves')    accMoves();
   if(id === 'checklist') accChecklist();
+  if(id === 'visas')    accVisas();
   if(id === 'cashround') accCashRound();
   if(id === 'supcancel') accSupCancel();
   if(id === 'finday')   accFinDay();
@@ -37700,6 +37726,72 @@ function _dayLbl(iso){
    от чего отступили и во что это обошлось.                                */
 let NM = null, NM_D = '', NM_PEND = {};
 const NM_SAVE_MS = 400;
+
+// ── Визы ──────────────────────────────────────────────────────────────────
+// Владелец, 6 окт 2026: учёт сроков виз и строка в чек-листе. Список людей
+// штата со сроком: ближайшие сверху, срок цветом (вышел — красным, две недели
+// — золотым), «за пределами ОАЭ» и уехавшие — внизу серым. Нажал на человека —
+// под строкой дата, переключатель «за пределами ОАЭ», заметка, «Сохранить».
+let VS = null, VS_OPEN = null;
+async function accVisas(){
+  ACC_BACK = null;
+  _setText('accTitle', 'Визы');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{ VS = await ownerApi.ownerFetch('/api/owner/visas'); }
+  catch(e){ document.getElementById('accMid').innerHTML = loadFail('accVisas()'); return; }
+  vsPaint();
+}
+function vsDays(p){
+  if(p.abroad) return ['за пределами ОАЭ', 'off'];
+  if(p.away) return ['уехал', 'off'];
+  if(p.days == null) return ['срок не записан', 'none'];
+  if(p.days < 0) return [`истекла · ${Math.abs(p.days)} ${pluralize(Math.abs(p.days), 'день', 'дня', 'дней')}`, 'late'];
+  if(p.days === 0) return ['истекает сегодня', 'late'];
+  return [`через ${p.days} ${pluralize(p.days, 'день', 'дня', 'дней')}`, p.days <= 3 ? 'late' : p.days <= (VS.horizon || 14) ? 'now' : 'ok'];
+}
+function vsPaint(){
+  const d = VS; if(!d) return;
+  const people = d.people || [];
+  const горит = people.filter(p => !p.abroad && !p.away && p.days != null && p.days <= (d.horizon || 14)).length;
+  _setText('accSub', горит ? `${горит} ${pluralize(горит, 'срок', 'срока', 'сроков')} в ближайшие ${d.horizon || 14} дней` : '');
+  const row = p => {
+    const [слово, кл] = vsDays(p), open = VS_OPEN === p.name;
+    return `<div class="vs-p${open ? ' open' : ''}">
+      <button class="vs-r ${кл}" onclick="vsToggle('${escS(p.name)}')">
+        <span class="vs-b"><b>${escS(p.name)}</b><i>${[p.role === 'driver' ? 'водитель' : p.role === 'operator' ? 'оператор' : '', p.code, p.note].filter(Boolean).map(escS).join(' · ')}</i></span>
+        <span class="vs-v"><b>${p.until ? escS(_dayName(p.until)) : '—'}</b><i>${слово}</i></span>
+      </button>
+      ${open ? `<div class="vs-f">
+        <input type="date" class="fb-txt vs-date" id="vsUntil" value="${escS(p.until || '')}">
+        <button class="chip${p.abroad ? ' on' : ''}" id="vsAbroad" onclick="this.classList.toggle('on')">За пределами ОАЭ</button>
+        <input class="fb-txt" id="vsNote" placeholder="Заметка" maxlength="80" autocomplete="off" value="${escS(p.note || '')}">
+        <button class="aud-b go" onclick="vsSave('${escS(p.name)}')">Сохранить</button>
+      </div>` : ''}
+    </div>`;
+  };
+  document.getElementById('accMid').innerHTML = `<div class="sc">${fbCapT('Визы', `${people.length}`)}<div class="fb-one">${
+    people.length ? people.map(row).join('') : '<div class="fb-none">Людей в штате нет</div>'}</div></div>`;
+}
+function vsToggle(name){
+  VS_OPEN = VS_OPEN === name ? null : name;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  vsPaint();
+  if(VS_OPEN) setTimeout(() => { const el = document.getElementById('vsUntil'); if(el && !el.value) el.focus(); }, 60);
+}
+async function vsSave(name){
+  const until = (document.getElementById('vsUntil') || {}).value || '';
+  const abroad = !!(document.getElementById('vsAbroad') || {}).classList?.contains('on');
+  const note = fbTxt('vsNote');
+  try{
+    VS = await ownerApi.ownerFetch('/api/owner/visas', {method: 'POST', body: {name, until, abroad, note, as: _meName()}});
+    VS_OPEN = null;
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    vsPaint();
+    _toast(until ? `${name} — виза до ${_dayName(until)}` : abroad ? `${name} — за пределами ОАЭ` : `${name} — срок снят`);
+  }catch(e){ _toast(((e || {}).payload || {}).error === 'bad_date' ? 'Дата не разобрана' : 'Не удалось сохранить'); }
+}
 
 async function accNorms(district){
   ACC_BACK = null;

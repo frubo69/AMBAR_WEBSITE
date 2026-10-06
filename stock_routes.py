@@ -208,6 +208,19 @@ def sale_item(it: dict, cat: dict) -> tuple:
     return pid, q / _unit(cat.get(pid) or {})
 
 
+def _stock_office(o: dict) -> str:
+    """Район, с полки которого уехал товар заказа.
+
+    Заказ записан на район адреса (office_id), а бутылки везёт водитель со
+    своей полки — и это не всегда один район. 17 сен 2026 заказ на Tecom
+    развёз водитель JVC винами JVC: списалось с Tecom, где этих вин было
+    ноль, то есть ни с кого, а ревизия JVC показала четыре «пропавших»
+    бутылки. С 6 окт при отметке «доставлен» заказ получает stock_office —
+    район водителя (config_staff.stock_office); у старых заказов его нет,
+    там по-прежнему район заказа."""
+    return str(o.get("stock_office") or o.get("office_id") or "")
+
+
 async def _registry_was(district: str, day: str) -> dict:
     """Сколько лежит на точке по реестру кодов — на начало пересчитываемых суток.
 
@@ -226,7 +239,7 @@ async def _registry_was(district: str, day: str) -> dict:
     since_iso = since.isoformat() if hasattr(since, "isoformat") else str(since)
     out = {pid: float(n) for pid, n in codes.items()}       # коды уже в единицах (qty)
     for o in await db.sold_since(min(since_iso, start)):
-        if (o.get("office_id") or "") != district:
+        if _stock_office(o) != district:
             continue
         ts = str(o.get("timestamp") or "")
         if ts < since_iso or ts >= start:
@@ -276,7 +289,7 @@ async def _sold(day: str, district: str | None = None, days: int = 1) -> dict:
     for o in orders:
         if o.get("status") != "delivered":
             continue
-        if district and (o.get("office_id") or "") != district:
+        if district and _stock_office(o) != district:
             continue
         for it in (o.get("items") or []):
             pid, q = sale_item(it, cat)
@@ -1205,9 +1218,66 @@ async def _moved_after(counts: dict, since: dict, until: datetime | None = None)
     return out
 
 
+async def _dropped_after(since: dict, until: datetime | None = None) -> dict:
+    """{район: {позиция: [(момент, единиц), …]}} — коды приёмки и cover, убранные
+    из реестра после пересчёта района («Убрать из реестра», db.qr_drop) и не
+    возвращённые.
+
+    Убранный код бутылку с полки НЕ снимает (владелец, 19 сен 2026: коды
+    перепутали на приёмке, убрали и завели заново — склад не должен падать):
+    бутылка остаётся, просто без кода. Здесь эти коды нужны для пары с
+    «внесено руками» — см. _pair_relabels."""
+    live = [s for s in since.values() if s]
+    if not live:
+        return {}
+    out: dict = {}
+    for c in await db.qr_dropped_after(min(live)):
+        oid, pid = str(c.get("district") or ""), c.get("product_id")
+        at = c.get("del_at")
+        at = at if isinstance(at, datetime) else _dt_of(str(at or ""))
+        if not pid or not at or oid not in OFFICE_IDS:
+            continue
+        at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        edge = since.get(oid)
+        if not edge or at <= edge or (until is not None and at > until):
+            continue
+        try:
+            q = float(c.get("qty") or 1) or 1.0
+        except (TypeError, ValueError):
+            q = 1.0
+        out.setdefault(oid, {}).setdefault(pid, []).append((at, q))
+    return out
+
+
+def _pair_relabels(news: list, drops: list) -> set:
+    """Какие из событий «внесено руками» (news, [(момент, …)]) на деле
+    переклеенный стикер, а не новая бутылка: на каждый убранный после
+    пересчёта код приёмки или cover (drops, [(момент, …)]) — ближайший по
+    времени новый код той же позиции в том же районе. Возвращает индексы news.
+
+    Ревизия JVC 25 сен 2026: бутылку JD Honey со стикером 15162, которого в
+    реестре не было, внесли «новым товаром» (+1), а старый код 27222 убрали —
+    и в отчёт ушла выдуманная недостача: убранный код бутылку не снимает
+    (она остаётся без кода), а новый прибавил вторую. Пара «убран + внесён»
+    в одном районе по одной позиции — это одна бутылка, в любом порядке."""
+    paired: set = set()
+    for d_at, *_ in sorted(drops, key=lambda e: e[0]):
+        best, dist = None, None
+        for i, (n_at, *_r) in enumerate(news):
+            if i in paired:
+                continue
+            gap = abs((n_at - d_at).total_seconds())
+            if dist is None or gap < dist:
+                best, dist = i, gap
+        if best is not None:
+            paired.add(best)
+    return paired
+
+
 async def _sold_after(since: dict, until: datetime | None = None) -> dict:
     """{район: {позиция: [(момент, продано в учётных единицах), …]}} после его
-    пересчёта, по времени.
+    пересчёта, по времени. Район — тот, с чьей полки уехал товар
+    (_stock_office), а не район адреса заказа.
 
     Не суммой, а событиями: продажа списывает то, что лежало на полке в её
     момент, и бутылке, внесённой позже, не достаётся — см. _district_base.
@@ -1223,7 +1293,7 @@ async def _sold_after(since: dict, until: datetime | None = None) -> dict:
     cat = _catalog()
     out = {}
     for o in orders:
-        oid = o.get("office_id") or ""
+        oid = _stock_office(o)
         edge = since.get(oid)
         if not edge:
             continue
@@ -1336,6 +1406,11 @@ async def _base_calc(day: str, until: datetime | None = None) -> dict:
     except Exception as e:
         log.warning(f"[stock] принятое без сканирования не учтено: {e}")
         noscan = {}
+    try:
+        dropped = await _dropped_after(since, until)
+    except Exception as e:
+        log.warning(f"[stock] убранные из реестра не учтены: {e}")
+        dropped = {}
 
     out = {}
     for oid in OFFICE_IDS:
@@ -1386,14 +1461,29 @@ async def _base_calc(day: str, until: datetime | None = None) -> dict:
         # Раньше основа переезды не читала, и коробка, уехавшая из B1 в B3,
         # до следующего пересчёта числилась в B1 (владелец, 16 сен 2026:
         # «перемещение должно происходить мгновенно»).
+        # Убранный из реестра код бутылку не снимает (она остаётся без кода),
+        # но новый код, внесённый руками рядом с убранным того же товара, —
+        # переклеенный стикер той же бутылки, а не вторая бутылка.
+        drops = dropped.get(oid) or {}
+        # Сверх остатка: списание упёрлось в ноль по учёту — товар ушёл, а
+        # числилось меньше. Полка от этого не уходит в минус (внесённая позже
+        # бутылка должна быть видна), но и молчать нельзя: так выглядит заказ,
+        # записанный не на тот район (списалось «в ноль» и ни с кого), или
+        # ошибка пересчёта. Цифру отдаём строкам ревизии и ленте.
+        zero: dict = {}
         for pid in set(sales) | set(manual) | set(moves):
+            news = list(manual.get(pid) or [])
+            skip = _pair_relabels(news, drops.get(pid) or [])
             ev = [(ts, -q) for ts, q in (sales.get(pid) or [])]
-            ev += [(at, q) for at, q in (manual.get(pid) or [])]
+            ev += [(at, q) for i, (at, q) in enumerate(news) if i not in skip]
             ev += list(moves.get(pid) or [])
             ev.sort(key=lambda e: e[0])
             bal = have.get(pid) or 0
             for _, dq in ev:
-                bal = max(0, bal + dq)
+                nb = bal + dq
+                if nb < 0:
+                    zero[pid] = zero.get(pid, 0) - nb
+                bal = max(0, nb)
             have[pid] = bal
         # Разбитая бутылка ушла со склада так же честно, как проданная. Без
         # этого вычитания заявка возит на полку то, чего на ней уже нет, а
@@ -1416,7 +1506,9 @@ async def _base_calc(day: str, until: datetime | None = None) -> dict:
                     # Был ли пересчёт к тому моменту: без него остатка нет
                     # вовсе — склад заведён пересчётом, до него пусто не
                     # потому, что ничего не лежало, а потому, что не считали.
-                    "counted_at": (cnt or {}).get("counted_at", "")}
+                    "counted_at": (cnt or {}).get("counted_at", ""),
+                    # Списано сверх остатка (упёрлось в ноль) — по позициям.
+                    "zero": {pid: _round_step(v) for pid, v in zero.items() if _round_step(v)}}
     return out
 
 
@@ -2241,7 +2333,7 @@ async def _audit_after(district: str, since_dt) -> dict:
         # начатая ДО подсчёта, назад не отматывается.
         since_iso = since_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "")
         for o in await db.sold_since(since_iso):
-            if (o.get("office_id") or "") != district:
+            if _stock_office(o) != district:
                 continue
             ts = min([x for x in (_dt_of(o.get("timestamp") or ""),
                                   _dt_of(o.get("delivered_at") or "")) if x] or [None])
@@ -2319,6 +2411,11 @@ async def _audit_lines(district: str, day: str) -> tuple:
     Позицию, которую не сканировали вовсе, отматывать не от чего — она
     сравнивается с сегодняшним остатком, как и раньше."""
     exp, noqr, counted = await _audit_expected(district, day)
+    # Списано сверх остатка после пересчёта (упёрлось в ноль): товар ушёл, а
+    # числилось меньше — заказ не того района или ошибка пересчёта. В ревизии
+    # Tecom 23 сен это были Chateau Perron и Des Laurets: 0 → 0, а два
+    # заказанных «с Tecom» вина ушли с полки JVC.
+    zero = ((await _district_base(day)).get(district) or {}).get("zero") or {}
     counts = await db.audit_scan_counts(district, day)
     when = await db.audit_scan_times(district, day)
     after = await _audit_after(district, min(when.values())) if when else {}
@@ -2352,6 +2449,7 @@ async def _audit_lines(district: str, day: str) -> tuple:
             "price": _price(p),                        # прайс за учётную единицу
             "expected": e, "coded": c, "actual": a, "diff": d,   # diff>0 — не хватает кодовых
             "noqr": q,
+            "zero": _num(zero.get(pid) or 0),            # списано сверх остатка после пересчёта
             # Ушло заказами (или переездом, боем) после того, как позицию
             # посчитали, и потому в недостачу не пошло.
             "gone": _num(зачёт),
@@ -3335,7 +3433,7 @@ async def handle_result(request):
 # (stock_at / _district_base), поэтому лента и цифры в таблице из одного
 # источника. Досканирование принятого без кодов и коды cover остаток не
 # меняют — показываются нулём.
-FLOW_KINDS = ("sale", "intake", "noscan", "manual", "move_in", "move_out", "writeoff", "count", "rescan")
+FLOW_KINDS = ("sale", "intake", "noscan", "manual", "move_in", "move_out", "writeoff", "count", "rescan", "drop", "relabel")
 
 
 def _flow_iso(dt: datetime) -> str:
@@ -3352,15 +3450,48 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
 
     # продажи — по моменту доставки, как в основе склада
     for o in await db.sold_orders_between(_flow_iso(start), _flow_iso(end)):
-        oid = o.get("office_id") or ""
+        oid = _stock_office(o)                    # с чьей полки уехало, не район адреса
         ts = _dt_of(o.get("delivered_at") or o.get("timestamp") or "")
         if oid not in out or not ts or ts < start or ts >= end:
             continue
+        # Заказ записан на другой район — в ленте это видно: «заказ B5».
+        foreign = (o.get("office_id") or "") not in ("", oid)
         for it in (o.get("items") or []):
             p, q = sale_item(it, cat)
             if p == pid and q:
                 put(oid, kind="sale", at=ts, qty=-float(q), who=str(o.get("driver") or ""),
-                    ref=str(o.get("order_id") or ""))
+                    ref=str(o.get("order_id") or ""),
+                    **({"office": OFFICE_CODES.get(o.get("office_id"), str(o.get("office_id")))} if foreign else {}))
+    # Убранные коды и переклеенные стикеры остаток не меняют, но в ленте видны
+    # нулём: «Убран код» и «Стикер переклеен» (пара — как в основе склада,
+    # _pair_relabels; внесённый руками код из пары приходом не считается).
+    relabeled: set = set()
+    try:
+        from config_staff import display_name as _dn
+
+        def _at(v):
+            v = v if isinstance(v, datetime) else _dt_of(str(v or ""))
+            return (v if v.tzinfo else v.replace(tzinfo=timezone.utc)) if v else None
+        for oid in OFFICE_IDS:
+            cnt = await _count_at(oid, end)
+            edge = _dt_of(str((cnt or {}).get("counted_at") or "")) if cnt else None
+            if not edge:
+                continue
+            drops = [(_at(c.get("del_at")), c) for c in await db.qr_dropped_between(pid, edge, end)
+                     if str(c.get("district") or "") == oid and _at(c.get("del_at"))]
+            news = [(_at(c.get("at")), c) for c in await db.qr_new_since(oid, pid, edge, end) if _at(c.get("at"))]
+            pair = _pair_relabels(news, drops)
+            for at, c in drops:
+                if start <= at < end:
+                    who = _dn(c.get("del_by"), "")
+                    put(oid, kind="drop", at=at, qty=0.0, who="" if who == "—" else who, ref=str(c.get("_id") or ""))
+            for i, (at, c) in enumerate(news):
+                if i in pair:
+                    relabeled.add(str(c.get("_id")))
+                    if start <= at < end:
+                        put(oid, kind="relabel", at=at, qty=0.0, who=str(c.get("driver") or ""), ref=str(c.get("_id") or ""))
+    except Exception as e:                                       # noqa: BLE001
+        log.warning(f"[stock] лента: убранные коды не прочитаны: {e}")
     # коды: приёмка, cover, внесённые руками
     codes = await db.qr_codes_between(pid, start, end)
     sids = {str(c.get("supply_id") or "") for c in codes if c.get("src") in ("intake", "cover") and c.get("supply_id")}
@@ -3381,8 +3512,8 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
             q = 1.0
         src = c.get("src")
         if src == "new":
-            if c.get("status") == "deleted":
-                continue
+            if c.get("status") == "deleted" or str(c.get("_id")) in relabeled:
+                continue                      # убран — или это переклеенный стикер (выше)
             key = (oid, "manual", str(c.get("driver") or c.get("by") or ""), at.strftime("%H:%M"))
             g = groups.setdefault(key, {"kind": "manual", "at": at, "to": at, "qty": 0.0, "n": 0,
                                         "who": str(c.get("driver") or ""), "ref": ""})
@@ -3527,7 +3658,12 @@ async def handle_flow(request):
                     e["qty"] = actual - bal
                 bal = actual
             elif bal is not None and e["kind"] != "rescan":
-                bal += float(e["qty"])
+                # Как в основе: ниже нуля полка не уходит, а списанное сверх
+                # остатка видно у самого события — «сверх остатка N».
+                nb = bal + float(e["qty"])
+                if nb < 0:
+                    e["zero"] = _num(-nb)
+                bal = max(0.0, nb)
         rows.append({"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o),
                      "open": _num(float((ob.get("have_exact") or {}).get(pid) or 0)) if ob.get("counted") else None,
                      "close": _num(float((cb.get("have_exact") or {}).get(pid) or 0)) if cb.get("counted") else None,

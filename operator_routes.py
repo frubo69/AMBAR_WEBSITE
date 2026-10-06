@@ -947,6 +947,8 @@ async def handle_create(request):
         # Deliberately NO eta / deliver_by: timing stays verbal (owner's call).
         # Задним числом — сразу доставлен: заказ уже состоялся.
         "status": "delivered" if back_dt else "approved",
+        # С чьей полки уехал товар — район водителя (stock_routes._stock_office).
+        **({"stock_office": _staff_mod.stock_office(driver, office_id)} if back_dt else {}),
         "confirmed_at": now,
         # День заказа: задним числом — тот день; иначе текущие сутки, а если
         # смену района за них уже закрыли — следующие (bizday.py).
@@ -1670,7 +1672,10 @@ async def _close_delivered(oid: str, order: dict, who: str, by_driver: str = "")
     по-разному в зависимости от того, кто нажал."""
     now = datetime.now(timezone.utc).isoformat()
     fields = {"status": "delivered", "updated_at": now, "delivered_at": now,
-              "delivered_by": who}
+              "delivered_by": who,
+              # С чьей полки уехал товар — район водителя, а не адреса: склад
+              # списывает по нему (stock_routes._stock_office).
+              "stock_office": _staff_mod.stock_office(order.get("driver"), order.get("office_id"))}
     if by_driver:
         fields["delivered_by_driver"] = by_driver
     await db.update_order(oid, **fields)

@@ -1632,7 +1632,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
         else:
-            await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat())
+            order = await db.get_order(oid) or {}
+            await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat(),
+                                  # с чьей полки уехал товар — район водителя (stock_routes._stock_office)
+                                  stock_office=_staff_mod.stock_office(order.get("driver"), order.get("office_id")))
             order = await db.get_order(oid)
             total = (order or {}).get("total", 0)
             _tst = bool((order or {}).get("test"))     # тест-заказ: без счётчиков и долгов

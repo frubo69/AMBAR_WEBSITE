@@ -3741,7 +3741,8 @@ async def sold_since(since_iso: str) -> list:
     cur = db.orders.find({"status": "delivered", "test": {"$ne": True},
                           "$or": [{"delivered_at": {"$gte": since_iso}},
                                   {"timestamp": {"$gte": since_iso}}]},
-                         {"_id": 0, "timestamp": 1, "delivered_at": 1, "office_id": 1, "items": 1})
+                         {"_id": 0, "timestamp": 1, "delivered_at": 1, "office_id": 1, "items": 1,
+                          "stock_office": 1})
     return await cur.to_list(length=None)
 
 
@@ -5940,7 +5941,44 @@ async def sold_orders_between(since_iso: str, until_iso: str) -> list:
                                   {"delivered_at": {"$exists": False}, "timestamp": {"$gte": since_iso, "$lt": until_iso}},
                                   {"delivered_at": None, "timestamp": {"$gte": since_iso, "$lt": until_iso}}]},
                          {"_id": 0, "order_id": 1, "timestamp": 1, "delivered_at": 1, "office_id": 1,
-                          "items": 1, "driver": 1})
+                          "items": 1, "driver": 1, "stock_office": 1})
+    return await cur.to_list(length=5000)
+
+
+async def qr_dropped_after(since) -> list:
+    """Коды, убранные из реестра (qr_drop) после момента since и до того
+    числившиеся на складе: приёмка и cover. Внесённые руками (new) сюда не
+    идут — их из прихода убирает сам qr_manual_events."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_codes.find({"status": "deleted", "src": {"$in": ["intake", "cover"]},
+                            "del_at": {"$gte": since}},
+                           {"_id": 1, "product_id": 1, "qty": 1, "district": 1, "del_at": 1,
+                            "del_by": 1, "src": 1})
+    return await cur.to_list(length=5000)
+
+
+async def qr_new_since(district: str, product_id: str, since, until=None) -> list:
+    """Внесённые руками (src=new, не убранные) коды позиции в районе после
+    since — с моментом и номером: ленте нужна пара «убран + внесён»
+    (stock_routes._pair_relabels), а qr_manual_events номеров не отдаёт."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"src": "new", "status": {"$ne": "deleted"}, "product_id": product_id,
+         "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}],
+         "at": {"$gt": since, **({"$lt": until} if until else {})}}
+    cur = db.qr_codes.find(q, {"_id": 1, "at": 1, "qty": 1, "driver": 1})
+    return await cur.to_list(length=2000)
+
+
+async def qr_dropped_between(product_id: str, start, end) -> list:
+    """Коды позиции, убранные из реестра в окно — для ленты движений склада."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_codes.find({"product_id": product_id, "status": "deleted",
+                            "src": {"$in": ["intake", "cover"]},
+                            "del_at": {"$gte": start, "$lt": end}},
+                           {"_id": 1, "qty": 1, "district": 1, "del_at": 1, "del_by": 1, "src": 1})
     return await cur.to_list(length=5000)
 
 

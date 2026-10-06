@@ -609,6 +609,17 @@ def district_map() -> dict:
     return out
 
 
+def stock_office(driver, office_id) -> str:
+    """Район, с полки которого уехал товар заказа: район водителя, который его
+    везёт (бутылки едут из его машины и с его полки), а не район адреса.
+    Водителя нет или он не из реестра — район заказа. Ставится заказу при
+    отметке «доставлен» (поле stock_office) и читается складом
+    (stock_routes._stock_office): 17 сен 2026 заказ на Tecom развёз водитель
+    JVC винами JVC, списалось с Tecom — ревизия JVC нашла четыре «пропавших»."""
+    d = district_map().get(str(driver or "").strip())
+    return str(d or office_id or "")
+
+
 def driver_names(all: bool = False) -> list:
     """Водители в порядке районов расписания — без уехавших; all=True — все,
     кто в реестре (см. drivers)."""

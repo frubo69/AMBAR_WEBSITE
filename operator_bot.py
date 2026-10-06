@@ -1633,9 +1633,17 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
         else:
             order = await db.get_order(oid) or {}
-            await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat(),
-                                  # с чьей полки уехал товар — район водителя (stock_routes._stock_office)
-                                  stock_office=_staff_mod.stock_office(order.get("driver"), order.get("office_id")))
+            # С чьей полки уехал товар — район водителя по ЖИВОМУ реестру
+            # (stock_routes._stock_office). Перестановки лежат в базе; без sync
+            # бот знал бы только расписание из .env и ставил бы не тот район.
+            # Реестр не прочитался — полка остаётся районом заказа, как раньше.
+            try:
+                await _staff_mod.sync()
+                stamp = {"stock_office": _staff_mod.stock_office(order.get("driver"), order.get("office_id"))}
+            except Exception as e:                                   # noqa: BLE001
+                log.warning(f"[done] реестр не прочитан, полка = район заказа: {e}")
+                stamp = {}
+            await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat(), **stamp)
             order = await db.get_order(oid)
             total = (order or {}).get("total", 0)
             _tst = bool((order or {}).get("test"))     # тест-заказ: без счётчиков и долгов

@@ -84,12 +84,20 @@ def compute(days: list[dict], opening: dict) -> dict:
                         отдал Баракуде (см. rp_owed)
          pay_b          оплатили Баракуде из сейфа Б
          pay_b_extra    добавили оплату Баракуде из ЧП
-         expenses       [{amount, comment, pay}] — расходы предприятия из
-                        фонда; pay='crypto' — платили криптой: вычитается из
-                        крипта-части РП, наличные сейфа не трогает;
-                        pay='hands' — зарплата из наличных на руках у водителя:
-                        фонд её получил (приход «с рук») и тут же выдал, сейф
-                        не трогается, расход фонда — считается
+         expenses       [{amount, comment, pay, deposit, dep_use}] — расходы
+                        предприятия из фонда; pay='crypto' — платили криптой:
+                        вычитается из крипта-части РП, наличные сейфа не
+                        трогает; pay='hands' — зарплата из наличных на руках у
+                        водителя: фонд её получил (приход «с рук») и тут же
+                        выдал, сейф не трогается, расход фонда — считается;
+                        deposit=True — внесённый депозит/аванс: из фонда ушло,
+                        но лежит у контрагента и расходом не считается;
+                        dep_use — часть суммы, покрытая депозитом/авансом,
+                        который уже лежал у контрагента (владелец, 5 окт
+                        2026: «счёт на 3000, платим 2000 — из аванса 1000 он
+                        себе забрал»): из фонда уходит только amount − dep_use,
+                        расходом для прибыли считается вся сумма, депозит
+                        уменьшается на dep_use
          payouts        [{amount, who, comment}] — выплаты из чистой прибыли
          moves          [{amount, from, to}] — переводы между стопками сейфа
                         (владелец, 3 окт 2026: «перевести со счёта РП на счёт
@@ -132,7 +140,7 @@ def compute(days: list[dict], opening: dict) -> dict:
              collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0, expenses_hands=0.0, kept=0.0,
              pay_rp=0.0, rp_back=0.0,
              mv_b_in=0.0, mv_b_out=0.0, mv_rp_in=0.0, mv_rp_out=0.0, mv_np_in=0.0, mv_np_out=0.0,
-             dep_paid=0.0, dep_back=0.0, dep_lost=0.0)
+             dep_paid=0.0, dep_back=0.0, dep_lost=0.0, dep_used=0.0)
     # Депозиты (владелец, 4 окт 2026): внесённое из РП лежит у контрагента
     # (ренткар) и вернётся — это наши деньги, не расход. Открытые на начало
     # месяца переезжают из прошлого (dep_open).
@@ -154,15 +162,25 @@ def compute(days: list[dict], opening: dict) -> dict:
         norm = _n(d.get('norm'))
         ordered = _n(d.get('ordered'))
         ordered_extra = _n(d.get('ordered_extra'))
-        exp_sum = sum(_n(e.get('amount')) for e in (d.get('expenses') or []))
-        exp_cr = sum(_n(e.get('amount')) for e in (d.get('expenses') or [])
-                     if e.get('pay') == 'crypto')
-        exp_hands = sum(_n(e.get('amount')) for e in (d.get('expenses') or [])
-                        if e.get('pay') == 'hands')
-        dep_paid = sum(_n(e.get('amount')) for e in (d.get('expenses') or []) if e.get('deposit'))
+        exps = d.get('expenses') or []
+        # Списано из депозита/аванса (владелец, 5 окт 2026): часть суммы расхода,
+        # покрытая деньгами, которые уже лежали у контрагента. Из фонда она
+        # сегодня не уходит — ушла, когда вносили; расходом для прибыли
+        # считается сейчас. У самого взноса (deposit) списания быть не может.
+        def _use(e):
+            return 0.0 if e.get('deposit') else max(0.0, min(_n(e.get('dep_use')), _n(e.get('amount'))))
+
+        def _cash(e):
+            return _n(e.get('amount')) - _use(e)
+        dep_use = sum(_use(e) for e in exps)
+        exp_full = sum(_n(e.get('amount')) for e in exps)       # расходы целиком, с покрытыми депозитом
+        exp_sum = exp_full - dep_use                             # что фонд отдал сегодня
+        exp_cr = sum(_cash(e) for e in exps if e.get('pay') == 'crypto')
+        exp_hands = sum(_cash(e) for e in exps if e.get('pay') == 'hands')
+        dep_paid = sum(_n(e.get('amount')) for e in exps if e.get('deposit'))
         dep_back = _n(d.get('dep_back'))
         dep_lost = _n(d.get('dep_lost'))
-        dep = dep + dep_paid - dep_back - dep_lost
+        dep = dep + dep_paid - dep_back - dep_lost - dep_use
         collected_cr = _n(d.get('collected_cr'))
         cr_cash = _n(d.get('cr_cash'))
         extra_cr = _n(d.get('extra_cr'))
@@ -236,6 +254,7 @@ def compute(days: list[dict], opening: dict) -> dict:
             expenses_cr_sum=_i(exp_cr), stack_rp_cr=_i(rp_cr),
             expenses_hands_sum=_i(exp_hands), kept=_i(kept),
             dep_paid=_i(dep_paid), dep_back=_i(dep_back), dep_lost=_i(dep_lost), dep=_i(dep),
+            dep_used=_i(dep_use), expenses_full=_i(exp_full),
             pay_b=_i(pay_b), pay_b_extra=_i(pay_b_extra), pay_rp=_i(pay_rp),
             pay_src=d.get('pay_src') or '', norm=_i(norm),
             rp_owed_before=_i(owed_before), rp_back=_i(rp_back), rp_owed=_i(owed),
@@ -259,7 +278,7 @@ def compute(days: list[dict], opening: dict) -> dict:
         t['collected_cr'] += collected_cr_c; t['expenses_cr'] += exp_cr; t['cr_cash'] += cr_cash
         t['expenses_hands'] += exp_hands; t['kept'] += kept
         t['extra_cr'] += extra_cr
-        t['dep_paid'] += dep_paid; t['dep_back'] += dep_back; t['dep_lost'] += dep_lost
+        t['dep_paid'] += dep_paid; t['dep_back'] += dep_back; t['dep_lost'] += dep_lost; t['dep_used'] += dep_use
         t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra; t['pay_rp'] += pay_rp; t['rp_back'] += rp_back
         t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
         for k in ('b', 'rp', 'np'):
@@ -296,8 +315,10 @@ def compute(days: list[dict], opening: dict) -> dict:
     # возвращённый депозит — не доход. Закупки на других базах тоже мимо: их
     # оплату старший записывает расходом из фонда.
     # Депозит — не расход: деньги наши и вернутся (владелец, 4 окт 2026);
-    # расходом становится только удержанное при возврате.
-    econ = t['gross'] - t['ordered'] - (t['expenses'] - t['dep_paid'] + t['dep_lost']) - t['spend'] - t['tips']
+    # расходом становится удержанное при возврате и списанное из депозита в
+    # оплату (expenses — только то, что фонд отдал; покрытое депозитом — рядом).
+    econ = (t['gross'] - t['ordered'] - (t['expenses'] - t['dep_paid'] + t['dep_lost'] + t['dep_used'])
+            - t['spend'] - t['tips'])
 
     totals = {k: _i(v) for k, v in t.items()}
     safe = dict(open_b=_i(_n(opening.get('safe_b_open'))), open_rp=_i(_n(opening.get('rp_open'))),
@@ -319,6 +340,7 @@ def compute(days: list[dict], opening: dict) -> dict:
                 # и за месяц — внесли / вернулось / удержано
                 dep=_i(dep), open_dep=_i(_n(opening.get('dep_open'))),
                 dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']),
+                dep_used=_i(t['dep_used']),
                 pending=int(t['pending']))
     return dict(
         days=out,
@@ -327,7 +349,8 @@ def compute(days: list[dict], opening: dict) -> dict:
                 extra=_i(t['extra_rp']), cr_cash=_i(t['cr_cash']),
                 rp_in=_i(rp_in), expenses=_i(t['expenses']), result=_i(rp_result),
                 to_b=_i(t['pay_rp']), back=_i(t['rp_back']), owed=_i(owed), hands=_i(t['expenses_hands']),
-                dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']), dep=_i(dep)),
+                dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']),
+                dep_used=_i(t['dep_used']), dep=_i(dep)),
         np=dict(days=_i(t['np_plus']), rp_result=_i(rp_result), profit=_i(profit),
                 half=_i(half), payouts=_i(t['payouts']), left=_i(np_left),
                 storage=_i(storage), carry=_i(carry_np), should_be=_i(should_be),

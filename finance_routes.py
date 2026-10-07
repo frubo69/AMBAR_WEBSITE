@@ -440,6 +440,11 @@ async def _budget(month: str, entries: list, mdoc: dict, ndays: int, salary: dic
         if e.get("kind") in pay.PAY_KINDS:
             sal_fact += calc._n(e.get("amount"))
             continue
+        # Внесённый депозит/аванс — не факт статьи: аренда этим не оплачена,
+        # деньги лежат у контрагента (владелец, 5 окт 2026). Списание из него
+        # в оплату — факт целиком: счёт закрыт, пусть и не наличными.
+        if e.get("deposit"):
+            continue
         lid = e.get("line") or ""
         if lid:
             fact[lid] = fact.get(lid, 0.0) + calc._n(e.get("amount"))
@@ -1013,7 +1018,9 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             "fee_entry": e.get("fee_entry") or "", "fee_of": e.get("fee_of") or "",
             # депозит (владелец, 4 окт 2026): у расхода — отметка; у прихода —
             # какой депозит возвращён и сколько при этом удержали
-            "deposit": bool(e.get("deposit")), "dep_of": e.get("dep_of") or "", "lost": e.get("lost") or 0}
+            "deposit": bool(e.get("deposit")), "dep_of": e.get("dep_of") or "", "lost": e.get("lost") or 0,
+            # сколько из суммы покрыто депозитом/авансом, который уже лежал у контрагента
+            "dep_use": e.get("dep_use") or 0}
 
 
 async def _deposits() -> list:
@@ -1023,27 +1030,61 @@ async def _deposits() -> list:
     try:
         paid = await db.fin_entries_where({"book": "rp", "deposit": True})
         back = await db.fin_entries_where({"book": "in", "src": "deposit"})
+        # списано в оплату (владелец, 5 окт 2026): расходы, покрытые депозитом —
+        # у каждого записано, из каких депозитов и сколько (dep_uses)
+        spent = await db.fin_entries_where({"book": "rp", "dep_uses": {"$exists": True}})
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] депозиты не прочитаны: {e}")
         return []
     by: dict = {}
     for r in back:
-        b = by.setdefault(str(r.get("dep_of") or ""), {"back": 0.0, "lost": 0.0, "last": ""})
+        b = by.setdefault(str(r.get("dep_of") or ""), {"back": 0.0, "lost": 0.0, "used": 0.0, "last": ""})
         b["back"] += calc._n(r.get("amount")); b["lost"] += calc._n(r.get("lost"))
         b["last"] = max(b["last"], str(r.get("day") or ""))
+    for r in spent:
+        for u in (r.get("dep_uses") or []):
+            b = by.setdefault(str(u.get("of") or ""), {"back": 0.0, "lost": 0.0, "used": 0.0, "last": ""})
+            b["used"] += calc._n(u.get("amount"))
+            b["last"] = max(b["last"], str(r.get("day") or ""))
     out = []
     for e in paid:
-        b = by.get(str(e.get("_id")), {"back": 0.0, "lost": 0.0, "last": ""})
+        b = by.get(str(e.get("_id")), {"back": 0.0, "lost": 0.0, "used": 0.0, "last": ""})
         amount = calc._n(e.get("amount"))
-        left = max(0.0, amount - b["back"] - b["lost"])
+        left = max(0.0, amount - b["back"] - b["lost"] - b["used"])
         ln = await db.fin_budget_line_get(str(e.get("line"))) if e.get("line") else None
         out.append({"id": e.get("_id"), "day": e.get("day") or "", "amount": calc._i(amount),
                     "comment": e.get("comment") or "", "who": e.get("who") or "",
                     "line": e.get("line") or "", "line_name": (ln or {}).get("name") or "",
-                    "back": calc._i(b["back"]), "lost": calc._i(b["lost"]), "left": calc._i(left),
-                    "last": b["last"], "open": left > 0.005})
+                    "group": _line_group(ln) if ln else "",
+                    "back": calc._i(b["back"]), "lost": calc._i(b["lost"]), "used": calc._i(b["used"]),
+                    "left": calc._i(left), "last": b["last"], "open": left > 0.005})
     out.sort(key=lambda x: x["day"], reverse=True)
     out.sort(key=lambda x: not x["open"])
+    return out
+
+
+async def _line_deposits(ln: dict) -> list:
+    """Открытые депозиты/авансы статьи — за все месяцы, старые первыми. Статья
+    живёт по месяцам своим id, поэтому сшиваем по id и по названию (депозит
+    ренткару внесли в сентябре — списывают в октябре)."""
+    name = str((ln or {}).get("name") or "")
+    lid = str((ln or {}).get("_id") or "")
+    rows = [x for x in await _deposits() if x["open"] and (x["line"] == lid or (name and x["line_name"] == name))]
+    rows.sort(key=lambda x: (x["day"], x["id"]))
+    return rows
+
+
+def _dep_allocate(amount: float, rows: list) -> list:
+    """Разложить списание по открытым депозитам статьи — старые первыми:
+    [{of: id депозита, amount}]. Больше остатка не раскладывается."""
+    out, rest = [], float(amount)
+    for x in rows:
+        if rest <= 0.005:
+            break
+        take = min(rest, calc._n(x.get("left")))
+        if take > 0.005:
+            out.append({"of": x["id"], "amount": calc._i(take)})
+            rest -= take
     return out
 
 
@@ -1526,6 +1567,13 @@ async def handle_entry_add(request):
         lost = (_num(body.get("lost")) or 0) if src == "deposit" else 0
         if src == "deposit" and (not dep_of or lost < 0):
             return _json({"error": "bad_deposit"}, 400)
+        # Списать из депозита/аванса (владелец, 5 окт 2026: «счёт на 3000, платим
+        # 2000 — из аванса 1000 он себе забрал»; у здания при «Оплатил» — «депозит
+        # сгорел»): часть суммы покрывается тем, что уже лежит у контрагента.
+        # Только у расхода по статье без вида; у взноса депозита списания нет.
+        dep_use = (_num(body.get("dep_use")) or 0) if book == "rp" and not kind and not deposit else 0
+        if dep_use < 0 or dep_use > amount + 0.005 or (dep_use > 0 and not line):
+            return _json({"error": "bad_dep_use"}, 400)
         # Чем платили расход из РП (владелец, 2 окт 2026): наличными — из
         # наличных РП, криптой — с крипта-счёта РП.
         pay_way = str(body.get("pay") or "") if book == "rp" else ""
@@ -1578,11 +1626,24 @@ async def handle_entry_add(request):
             return _json({"error": "before_paid"}, 400)
         было = await db.fin_entries_where({"book": "in", "src": "deposit", "dep_of": dep_of})
         left = calc._n(dep.get("amount")) - sum(calc._n(x.get("amount")) + calc._n(x.get("lost")) for x in было)
+        # списанное в оплату (dep_uses у расходов) тоже уже не лежит
+        for r in await db.fin_entries_where({"book": "rp", "dep_uses.of": dep_of}):
+            left -= sum(calc._n(u.get("amount")) for u in (r.get("dep_uses") or []) if str(u.get("of")) == dep_of)
         if amount + lost > left + 0.005:
             return _json({"error": "too_much", "have": calc._i(max(0.0, left))}, 409)
         doc["dep_of"] = dep_of
         if lost > 0:
             doc["lost"] = lost
+    if dep_use > 0:
+        # Покрыть можно только тем, что лежит у контрагента по этой статье
+        # (за все месяцы, по id и названию); раскладывается по депозитам —
+        # старые первыми, у каждого потом видно, сколько из него списано.
+        rows = await _line_deposits(ln)
+        have = sum(calc._n(x.get("left")) for x in rows)
+        if dep_use > have + 0.005:
+            return _json({"error": "no_balance", "have": calc._i(max(0.0, have))}, 409)
+        doc["dep_use"] = calc._i(dep_use)
+        doc["dep_uses"] = _dep_allocate(dep_use, rows)
     if book == "mv":
         # Больше, чем лежит в стопке (с этого дня и дальше — чтобы ни один
         # день не ушёл в минус), не перевести: 409 с остатком; force — всё равно.
@@ -1595,7 +1656,8 @@ async def handle_entry_add(request):
                               "from_t": STACK_T[mv_from]}, 409)
     async with _CR_LOCK:
         if pay_way == "crypto":
-            отказ = await _cr_spend_check(day, amount)
+            # криптой уходит только то, что не покрыто депозитом
+            отказ = await _cr_spend_check(day, amount - dep_use) if amount - dep_use > 0.005 else None
             if отказ:
                 return _json(отказ, 409)
             doc["pay"] = "crypto"
@@ -1627,6 +1689,8 @@ async def handle_entry_add(request):
     log.info(f"[fin] {day} {book} +{amount} «{doc['comment']}» {who} · {by or '—'}"
              + (f" · {STACK_T[mv_from]} → {STACK_T[mv_to]}" + (" · force" if force else "") if book == "mv" else "")
              + (" · криптой" if pay_way == "crypto" else "")
+             + (" · депозит" if deposit else "")
+             + (f" · из депозита {doc['dep_use']}" if doc.get("dep_use") else "")
              + (f" · из свободной крипты {doc['cr_free']}, с крипта-счёта РП {doc['cr_rp']}"
                 if src == "crypto" else "")
              + (f" · комиссия {doc['fee_usdt']} USDT = {doc['fee']} AED, наша половина {doc['fee_ours']}"
@@ -1663,9 +1727,10 @@ async def handle_entry_del(request):
     if not old:
         return _json({"error": "not_found"}, 404)
     if old.get("deposit"):
-        # По депозиту уже записан возврат — сперва убрать его, иначе возврат
-        # повиснет без того, что возвращали.
+        # По депозиту уже записан возврат или списание в оплату — сперва убрать
+        # их, иначе возврат повиснет без того, что возвращали.
         used = await db.fin_entries_where({"book": "in", "src": "deposit", "dep_of": eid})
+        used += await db.fin_entries_where({"book": "rp", "dep_uses.of": eid})
         if used:
             return _json({"error": "dep_used", "n": len(used)}, 409)
     async with _CR_LOCK:

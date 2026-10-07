@@ -47,6 +47,26 @@ eq("депозит переезжает в следующий месяц", c["de
 r2 = calc.compute([день(1, extra_rp=1000, dep_back=1000)], dict(op, dep_open=3000))
 eq("перенесённый депозит возвращается", (r2["safe"]["open_dep"], r2["days"][0]["dep"], r2["safe"]["dep"]), (3000, 2000, 2000))
 
+print("— ядро: списание из депозита/аванса (гараж: аванс 1000, счёт 3000, платим 2000)")
+plain = calc.compute([день(1), день(2, expenses=[{"amount": 3000}])], op)
+adv = calc.compute([день(1, expenses=[{"amount": 1000, "deposit": True}]),
+                    день(2, expenses=[{"amount": 3000, "dep_use": 1000}])], op)
+eq("день 1: аванс ушёл из РП, лежит 1000", (adv["days"][0]["stack_rp"], adv["days"][0]["dep"]), (19000, 1000))
+eq("день 2: из РП ушло только 2000, аванс погашен", (adv["days"][1]["stack_rp"], adv["days"][1]["dep"], adv["days"][1]["expenses_sum"]), (17000, 0, 2000))
+eq("расход дня целиком 3000, из них из аванса 1000", (adv["days"][1]["expenses_full"], adv["days"][1]["dep_used"]), (3000, 1000))
+eq("прибыль по расчёту та же, что при оплате всех 3000 из РП", adv["econ"], plain["econ"])
+eq("из РП за месяц ушло столько же: 3000", (adv["safe"]["rp_out"], plain["safe"]["rp_out"]), (3000, 3000))
+eq("месяц: внесено 1000, списано в оплату 1000, лежит 0", (adv["safe"]["dep_paid"], adv["safe"]["dep_used"], adv["safe"]["dep"], adv["rp"]["dep_used"]), (1000, 1000, 0, 1000))
+eq("РП: начало + приход − расход = наличные", adv["safe"]["open_rp"] + adv["safe"]["rp_in"] - adv["safe"]["rp_out"], adv["safe"]["rp"])
+part = calc.compute([день(1, expenses=[{"amount": 1000, "deposit": True}]),
+                     день(2, expenses=[{"amount": 3000, "dep_use": 1000, "pay": "crypto"}])], dict(op, rp_cr_open=5000))
+eq("остаток криптой: с крипта-счёта ушло 2000, наличные не тронуты", (part["days"][1]["stack_rp_cr"], part["days"][1]["stack_rp"]), (3000, 19000))
+cap = calc.compute([день(1, expenses=[{"amount": 1000, "deposit": True}]), день(2, expenses=[{"amount": 300, "dep_use": 900}])], op)
+eq("списать больше суммы расхода нельзя: покрыто 300, лежит 700", (cap["days"][1]["dep_used"], cap["days"][1]["dep"], cap["days"][1]["stack_rp"]), (300, 700, 19000))
+burn = calc.compute([день(1, expenses=[{"amount": 5000, "deposit": True}]), день(2, expenses=[{"amount": 5000, "dep_use": 5000}])], op)
+eq("здание: депозит сгорел в оплату — из РП ничего, расход 5000", (burn["days"][1]["stack_rp"], burn["days"][1]["expenses_sum"], burn["days"][1]["dep"], burn["econ"] - plain["econ"]), (15000, 0, 0, -2000))
+eq("у взноса депозита dep_use не читается", calc.compute([день(1, expenses=[{"amount": 1000, "deposit": True, "dep_use": 500}])], op)["days"][0]["dep"], 1000)
+
 
 async def сервер():
     db, fr = await FF._сервер_готовь()
@@ -123,6 +143,70 @@ async def сервер():
     код, отв = await зови(fr.handle_entry_del, "DELETE", {"id": ret_id, "as": "Т"})
     eq("возврат убран — депозит снова открыт на 2000", (код, отв["book"]["deposits"][0]["left"], отв["book"]["safe"]["dep"]), (200, 2000, 2000))
     eq("нет данных не для книги: ни байтов, ни id телеграма", "driver_id" in str(отв["book"]["deposits"]), False)
+
+    print("— сервер: гараж — аванс 1000, счёт 3000, платим 2000")
+    for lid, name, group in (("L2", "Гараж и ТО", "auto"), ("L3", "Аренда JVC", "rent"), ("L4", "Пополнение", "sim")):
+        await db.fin_budget_set({"_id": lid, "month": МЕС, "name": name, "group": group, "plan": 3000, "due": "",
+                                 "note": "", "kind": "pool" if group != "rent" else "", "ord": 2, "by": 1, "at": datetime.now()})
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 1000, "line": "L2", "who": "Гараж",
+                                                       "comment": "аванс", "deposit": True, "photo": FF.КАДР, "as": "Т"})
+    eq("аванс записан", код, 200)
+    book = отв["book"]; d = next(x for x in book["days"] if x["day"] == СЕГ)
+    rp0, econ0 = d["stack_rp"], book["econ"]
+    ln2 = next(l for l in book["budget"]["lines"] if l["id"] == "L2")
+    eq("аванс — не факт статьи гаража", ln2["fact"], 0)
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 3000, "line": "L2", "comment": "ремонт",
+                                                       "dep_use": 1000, "photo": FF.КАДР, "as": "Т"})
+    eq("счёт записан", код, 200)
+    book = отв["book"]; d = next(x for x in book["days"] if x["day"] == СЕГ)
+    eq("из РП ушло 2000, прибыль упала на 3000", (rp0 - d["stack_rp"], econ0 - book["econ"]), (2000, 3000))
+    e = next(x for x in d["expenses"] if x["comment"] == "ремонт")
+    eq("у записи: сумма 3000, из аванса 1000", (e["amount"], e["dep_use"]), (3000, 1000))
+    g = next(x for x in book["deposits"] if x["line"] == "L2")
+    eq("аванс гаража погашен: списано 1000, лежит 0", (g["used"], g["left"], g["open"]), (1000, 0, False))
+    eq("факт статьи — весь счёт 3000", next(l for l in book["budget"]["lines"] if l["id"] == "L2")["fact"], 3000)
+    eq("месяц: списано в оплату 1000", (book["safe"]["dep_used"], d["dep_used"]), (1000, 1000))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 500, "line": "L2", "comment": "ещё",
+                                                       "dep_use": 100, "photo": FF.КАДР, "as": "Т"})
+    eq("аванса больше нет → 409 с остатком", (код, отв["error"], отв["have"]), (409, "no_balance", 0))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 500, "comment": "без статьи",
+                                                       "dep_use": 100, "photo": FF.КАДР, "as": "Т"})
+    eq("списать из депозита без статьи → 400", (код, отв["error"]), (400, "bad_dep_use"))
+    код, отв = await зови(fr.handle_entry_del, "DELETE", {"id": g["id"], "as": "Т"})
+    eq("аванс со списанием не убрать → 409", (код, отв["error"]), (409, "dep_used"))
+    код, отв = await зови(fr.handle_entry_del, "DELETE", {"id": e["id"], "as": "Т"})
+    g = next(x for x in отв["book"]["deposits"] if x["line"] == "L2")
+    eq("счёт убран — аванс снова лежит", (код, g["left"], g["open"]), (200, 1000, True))
+
+    print("— сервер: здание — депозит сгорел при «Оплатил»")
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 3000, "line": "L3", "who": "Билдинг",
+                                                       "comment": "депозит", "deposit": True, "as": "Т"})
+    eq("депозит зданию без чека (аренда) записан", код, 200)
+    rp0 = next(x for x in отв["book"]["days"] if x["day"] == СЕГ)["stack_rp"]
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 3000, "line": "L3", "dep_use": 3000, "as": "Т"})
+    book = отв["book"]; d = next(x for x in book["days"] if x["day"] == СЕГ)
+    eq("сгорел: из РП ничего, факт аренды 3000, депозит закрыт",
+       (код, d["stack_rp"] - rp0, next(l for l in book["budget"]["lines"] if l["id"] == "L3")["fact"],
+        next(x for x in book["deposits"] if x["line"] == "L3")["open"]), (200, 0, 3000, False))
+
+    print("— сервер: сим — общий депозит, тратим по чуть-чуть; старые первыми")
+    for a in (300, 500):
+        код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": a, "line": "L4", "who": "Du",
+                                                           "comment": f"депозит {a}", "deposit": True, "photo": FF.КАДР, "as": "Т"})
+    sims = sorted([x for x in отв["book"]["deposits"] if x["line"] == "L4"], key=lambda x: x["amount"])
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 400, "line": "L4", "comment": "минуты",
+                                                       "dep_use": 400, "photo": FF.КАДР, "as": "Т"})
+    e = next(x for x in next(x for x in отв["book"]["days"] if x["day"] == СЕГ)["expenses"] if x["comment"] == "минуты")
+    raw = await db.fin_entry_get(e["id"])
+    eq("раскладка по депозитам: 300 из первого, 100 из второго",
+       [(u["of"] == sims[0]["id"], u["amount"]) for u in raw["dep_uses"]], [(True, 300), (False, 100)])
+    by = {x["id"]: x for x in отв["book"]["deposits"]}
+    eq("первый закрыт, во втором осталось 400", (by[sims[0]["id"]]["open"], by[sims[1]["id"]]["left"]), (False, 400))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "in", "amount": 450, "src": "deposit", "dep_of": sims[1]["id"], "as": "Т"})
+    eq("забрать больше остатка с учётом списанного → 409", (код, отв["error"], отв["have"]), (409, "too_much", 400))
+    код, отв = await зови(fr.handle_entry_add, "POST", {"day": СЕГ, "book": "rp", "amount": 1000, "line": "L4", "comment": "интернет",
+                                                       "dep_use": 1000, "photo": FF.КАДР, "as": "Т"})
+    eq("лежит 400 — списать 1000 нельзя", (код, отв["error"], отв["have"]), (409, "no_balance", 400))
 
 
 asyncio.run(сервер())

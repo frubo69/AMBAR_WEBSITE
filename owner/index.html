@@ -5394,6 +5394,11 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-depret{display:flex;gap:8px;padding:2px 16px 14px}
 .fb-depret .fb-num{flex:1;min-width:0}
 .fb-depret .aud-b{flex:0 0 auto}
+/* строка депозита под зданием/рентом: мельче самой строки, кнопка справа */
+.fb-depsub{min-height:46px;padding:6px 12px 8px 16px;border-top:1px dashed var(--border2)}
+.fb-depsub .fb-e-b b{font-size:13px;font-weight:600;color:var(--sub)}
+.fb-depsub .fb-e-b i{font-size:11.5px}
+.fb-depsub .fb-e-v{font-size:14px}
 /* Визы (vs-): человек строкой, срок справа цветом; раскрытие — дата, переключатель, заметка. */
 .vs-p + .vs-p{border-top:1px solid rgba(255,255,255,.05)}
 .vs-r{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 16px;border:0;background:transparent;
@@ -21514,7 +21519,8 @@ function fbEntries(list, book){
               : escS([e.src === 'crypto' && e.comment !== 'Из крипты' ? 'из крипты'
                       : e.src === 'deposit' && !/депозит/i.test(e.comment || '') ? 'возврат депозита' : '',
                       e.src === 'deposit' && e.lost ? 'удержали ' + fbFmt(e.lost) : '', e.who].filter(Boolean).join(' · '));
-    const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') + (e.deposit ? ' · депозит' : '') + (e.pay === 'crypto' ? ' · криптой' : '')
+    const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') + (e.deposit ? ' · депозит' : '')
+        + (e.dep_use ? ` · из депозита ${fbFmt(e.dep_use)}` : '') + (e.pay === 'crypto' ? ' · криптой' : '')
         + (e.fee_of ? ` · наша половина от ${fmtUsdt(e.fee_usdt)} USDT` : '')
       : book === 'in' && e.src === 'crypto' && (e.cr_free || e.cr_rp)
         ? [e.cr_free ? 'из свободной ' + walAed(e.cr_free) : '', e.cr_rp ? 'с крипта-счёта РП ' + walAed(e.cr_rp) : '',
@@ -21589,6 +21595,7 @@ function fbLineDepsHtml(b, l, day){
     return `<div class="fb-e fb-depr${open ? '' : ' fb-dep-off'}">
       <span class="fb-e-b"><b>${escS(x.who || x.comment || 'Депозит')}</b>
         <i>${[escS(fbDayT(x.day)), x.who && x.comment ? escS(x.comment) : '',
+              x.used ? 'списано в оплату ' + fbFmt(x.used) : '',
               x.back ? 'вернули ' + fbFmt(x.back) : '', x.lost ? 'удержали ' + fbFmt(x.lost) : ''].filter(Boolean).join(' · ')}</i></span>
       <b class="fb-e-v${open ? '' : ' ok'}">${fbFmt(open ? x.left : x.amount)}<u>AED</u></b>
       ${open ? `<button class="fb-depgo${ret ? ' on' : ''}" onclick="fbDepRetToggle('${escS(x.id)}')">Забрать</button>` : ''}
@@ -21599,7 +21606,7 @@ function fbLineDepsHtml(b, l, day){
       <button class="aud-b go" onclick="fbDepReturn('${escS(x.id)}','${day}')">Вернуть в РП</button>
     </div>` : ''}`;
   };
-  return `<div class="sc">${fbCapT('Депозиты', lying ? 'лежит ' + fbFmt(lying) : 'вернулись')}<div class="fb-one">${all.map(row).join('')}</div></div>`;
+  return `<div class="sc">${fbCapT(fbDepT(l) === 'Аванс' ? 'Авансы' : 'Депозиты', lying ? 'лежит ' + fbFmt(lying) : 'закрыты')}<div class="fb-one">${all.map(row).join('')}</div></div>`;
 }
 function fbDepRetToggle(id){
   FB.depRet = FB.depRet === id ? null : id;
@@ -21632,14 +21639,64 @@ async function fbDepReturn(id, day){
 // оплатили, доп. графа депозит — пока там, где очевидно, например в
 // ренткарах»): фишка у статей ренткара и аренды. Отмеченная сумма уходит из
 // РП, но остаётся нашей — лежит у контрагента, расходом не считается.
-function fbDepChipHtml(l){
-  if(!l || !['car', 'rent'].includes(l.group)){ FB.dep = false; return ''; }
-  return `<div class="chip-row fb-chips"><button class="chip${FB.dep ? ' on' : ''}" onclick="fbDepToggle(this)">Депозит</button></div>`;
+// Владелец, 5 окт 2026: «у каждого билдинга строку депозита; сим — общий
+// депозит, с которого тратим по чуть-чуть; гаражу — аванс за следующий раз,
+// счёт 3000 — платим 2000, аванс он себе забрал». Одна механика на всех:
+// внесли (фишка «Депозит»/«Аванс») — лежит у контрагента; списали в оплату
+// (фишка «Из депозита»/«Из аванса») — расход целиком, из РП только остаток.
+const FB_DEP_GROUPS = ['car', 'rent', 'sim', 'auto'];
+function fbDepT(l){ return l && l.group === 'auto' ? 'Аванс' : 'Депозит'; }
+function fbDepFrom(l){ return l && l.group === 'auto' ? 'из аванса' : 'из депозита'; }
+// Что лежит у контрагента по статье — за все месяцы, по id и по названию
+function fbLineDeps(b, l){
+  return ((b && b.deposits) || []).filter(x => x.line === l.id || (x.line_name && x.line_name === l.name));
+}
+function fbLineBal(b, l){ return fbLineDeps(b, l).filter(x => x.open).reduce((a, x) => a + (+x.left || 0), 0); }
+function fbDepChipHtml(b, l){
+  if(!l || !FB_DEP_GROUPS.includes(l.group)){ FB.dep = false; FB.depUse = false; return ''; }
+  const bal = fbLineBal(b, l);
+  if(!(bal > 0)) FB.depUse = false;
+  return `<div class="chip-row fb-chips"><button class="chip${FB.dep ? ' on' : ''}" onclick="fbDepToggle(this)">${fbDepT(l)}</button>${
+    bal > 0 ? `<button class="chip${FB.depUse ? ' on' : ''}" onclick="fbDepUseToggle(this)">${fbDepFrom(l)[0].toUpperCase() + fbDepFrom(l).slice(1)} · ${fbFmt(bal)}</button>` : ''}</div>`;
 }
 function fbDepToggle(btn){
   FB.dep = !FB.dep;
+  if(FB.dep) FB.depUse = false;
   btn.classList.toggle('on', FB.dep);
+  const o = btn.parentElement && btn.parentElement.querySelectorAll('.chip')[1]; if(o) o.classList.remove('on');
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function fbDepUseToggle(btn){
+  FB.depUse = !FB.depUse;
+  if(FB.depUse) FB.dep = false;
+  btn.classList.toggle('on', FB.depUse);
+  const o = btn.parentElement && btn.parentElement.querySelectorAll('.chip')[0]; if(o) o.classList.remove('on');
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+// Строка депозита под зданием или рентом (владелец: «строку везде»): лежит —
+// сумма и «Забрать»; нет — «Внести». Оба ведут на страницу статьи: там та же
+// фишка и карточка депозитов, где его забирают.
+function fbBldDepRow(b, l){
+  if(!l || !FB_DEP_GROUPS.includes(l.group)) return '';
+  const deps = fbLineDeps(b, l), open = deps.filter(x => x.open), bal = open.reduce((a, x) => a + (+x.left || 0), 0);
+  const since = open.length ? open.map(x => x.day).sort()[0] : '';
+  const t = fbDepT(l);
+  // закрытый — чем закончился последний: сгорел в оплату, удержан, вернулся
+  const last = deps.slice().sort((x, y) => (y.last || y.day).localeCompare(x.last || x.day))[0];
+  const was = !last ? 'нет' : last.used ? (l.group === 'auto' ? 'зачтён' : 'сгорел') : last.lost && !last.back ? 'удержан' : 'вернулся';
+  return `<div class="fb-e fb-depsub"><span class="fb-e-b"><b>${t}</b><i>${
+      bal > 0 ? `лежит с ${escS(fbDayT(since))}` : was}</i></span>
+    ${bal > 0 ? `<b class="fb-e-v">${fbFmt(bal)}<u>AED</u></b>` : ''}
+    <button class="fb-depgo" data-l="${escS(l.id)}" onclick="fbDepGo(this.dataset.l, ${bal > 0 ? "'ret'" : "'add'"})">${bal > 0 ? 'Забрать' : 'Внести'}</button>
+  </div>`;
+}
+function fbDepGo(id, mode){
+  const grp = FB.rentGrp;                          // пришли со страницы оплаты — туда и вернёмся
+  fbLinePay(id);
+  if(grp) ACC_BACK = () => fbRentPay(grp);
+  const b = fbBook(FB.month), l = b && ((b.budget || {}).lines || []).find(x => x.id === id);
+  if(mode === 'add'){ FB.dep = true; FB.depUse = false; fbLinePayPaint(); setTimeout(() => { const a = document.getElementById('fbAmt-rp'); if(a) a.focus(); }, 60); }
+  else if(l){ const first = fbLineDeps(b, l).filter(x => x.open).sort((x, y) => x.day.localeCompare(y.day))[0]; if(first) fbDepRetToggle(first.id); }
 }
 // Вывод крипты в наличные: откуда возьмётся сумма (владелец, 2 окт 2026:
 // «надо обязательно писать, сколько мы из свободной крипты должны взять, а
@@ -21694,18 +21751,23 @@ async function fbEntryAdd(book, day){
     _toast('Впишите, за что'); const c = document.getElementById('fbCmt-rp'); if(c) c.focus(); return; }
   if(book === 'rp' && !(FB.shot && FB.shot.photo)){ _toast('Нужен чек/документ'); const rc = document.getElementById('fbRcp'); if(rc) rc.classList.add('need'); return; }
   if(!await fbAskDay(day, book === 'rp' ? 'Расход из РП' : book === 'in' ? 'Приход в РП' : 'Взяли из ЧП')) return;
-  const pay = book === 'rp' ? await fbAskPay(day.slice(0, 7)) : '';
+  const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
+  if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
+  // Из депозита/аванса (владелец, 5 окт 2026): покрываем тем, что лежит у
+  // контрагента, остальное — из РП; «чем платили» спрашиваем только про остаток.
+  const lnCur = book === 'rp' ? lines.find(l => l.id === FB.line) : null;
+  const depUse = book === 'rp' && FB.depUse && lnCur ? Math.min(amount, fbLineBal(fbBook(day.slice(0, 7)), lnCur)) : 0;
+  const pay = book === 'rp' && amount - depUse > 0.005 ? await fbAskPay(day.slice(0, 7)) : '';
   if(pay === null) return;
   const feeUsdt = book === 'in' && FB.inSrc === 'crypto' ? fbAmt('fbFee-in') : 0;
   if(feeUsdt < 0 || Number.isNaN(feeUsdt)){ _toast('Комиссия — число в USDT'); return; }
-  const lines = ((fbBook(day.slice(0, 7)) || {}).budget || {}).lines || [];
-  if(FB.line && !lines.some(l => l.id === FB.line)) FB.line = '';
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
       {method: 'POST', body: {day, book, amount, comment, who, line: book === 'rp' ? FB.line : '', as: _meName(),
                               ...(route_from || route_to ? {route_from, route_to} : {}),
                               ...(book === 'in' && FB.inSrc ? {src: FB.inSrc} : {}),
                               ...(book === 'rp' && FB.dep ? {deposit: true} : {}),
+                              ...(depUse > 0 ? {dep_use: depUse} : {}),
                               ...(feeUsdt > 0 ? {fee_usdt: feeUsdt} : {}),
                               ...(pay === 'crypto' ? {pay} : {}),
                               ...(book === 'rp' ? {photo: FB.shot.photo, thumb: FB.shot.thumb} : {})}});
@@ -21713,7 +21775,7 @@ async function fbEntryAdd(book, day){
       _toast(`Выведено: из свободной ${walAed(res.cr_free || 0)}${res.cr_rp ? ' · с крипта-счёта РП ' + walAed(res.cr_rp) : ''} AED${
         res.fee_ours ? ` · комиссия, наша половина ${fmtUsdt(res.fee_ours)}` : ''}`);
     ['fbAmt-' + book, 'fbCmt-' + book, 'fbWho-np', 'fbFrom-rp', 'fbTo-rp', 'fbFee-' + book].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.dep = false; }
+    if(book === 'rp'){ FB.shot = null; fbShotMark(); FB.line = ''; FB.lineSet = false; FB.dep = false; FB.depUse = false; }
     if(book === 'in'){ FB.inSrc = ''; const sb = document.getElementById('fbSrc-in'); if(sb) sb.classList.remove('on'); fbCrHint(); }
     const f = document.getElementById('fbAdd-' + book); if(f && !f.classList.contains('fb-open')) f.hidden = true;
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -21726,6 +21788,8 @@ async function fbEntryAdd(book, day){
     : err === 'no_comment' ? 'Впишите, за что'
     : err === 'too_much' ? `Больше, чем лежит · ${fbFmt((e.payload || {}).have || 0)} AED`
     : err === 'before_paid' ? 'Раньше дня внесения' : err === 'no_deposit' ? 'Депозит не найден'
+    : err === 'no_balance' ? `У контрагента лежит меньше · ${fbFmt((e.payload || {}).have || 0)} AED`
+    : err === 'bad_dep_use' ? 'Списать из депозита можно только расход по статье'
     : 'Не удалось записать')); }
 }
 async function fbEntryDel(id){
@@ -22082,9 +22146,12 @@ function fbDdcParts(d, month){
   // из крипты»): в ДДС — только то, что платили наличными.
   // Зарплата из наличных на руках у водителя (pay=hands, 3 окт 2026) из
   // сейфа не выходила: её в ДДС нет, как и оплаченного криптой.
+  // Покрытое депозитом из сейфа не выходило: в ДДС — только остаток наличными,
+  // а то, что сгорело из депозита, подписано рядом.
   const rpOut = (d.expenses || []).filter(e => e.pay !== 'crypto' && e.pay !== 'hands').map(e => it((e.deposit ? 'Депозит · ' : '') + (
     month ? (e.kind_t || e.line_name || 'Вне плана')
-          : [e.kind_t || e.line_name || 'Вне плана', e.kind_t ? e.who : e.comment].filter(Boolean).join(' · ')), e.amount));
+          : [e.kind_t || e.line_name || 'Вне плана', e.kind_t ? e.who : e.comment].filter(Boolean).join(' · '))
+    + (e.dep_use ? ` · из депозита ${fbFmt(e.dep_use)}` : ''), n(e.amount) - n(e.dep_use)));
   const npOut = (d.payouts || []).map(e => it(
     (month ? (e.who || e.comment) : [e.who, e.comment].filter(Boolean).join(' · ')) || 'Выплата', e.amount));
   npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra));
@@ -22321,7 +22388,8 @@ function fbHistRow(e){
                e.pay === 'hands' ? 'из выручки на руках' + (e.hands_day ? ' за ' + escS(fbDayT(e.hands_day)) : '') : '',
                e.route_from || e.route_to ? `${escS(e.route_from || '?')} → ${escS(e.route_to || '?')}` : '',
                e.line_name && e.comment ? escS(e.comment) : '', e.kind_t && e.comment ? escS(e.comment) : '',
-               e.deposit ? 'депозит' : '', e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
+               e.deposit ? 'депозит' : '', e.dep_use ? 'из депозита ' + fbFmt(e.dep_use) : '',
+               e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
   return `<div class="fb-e">
     <span class="fb-e-b"><b>${t}</b>${sub ? `<i>${sub}</i>` : ''}</span>
     <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
@@ -22450,7 +22518,7 @@ function fbRentPage(b){
     <div class="sc">${fbCapT('Офис')}<div class="fb-one">${office.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}</div>`).join('')}${
       office.length ? '' : `<div class="fb-card add">${isNew('office') ? fbNewRow('office') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','office')"><span>Добавить офис</span><em>${_FB_PLUS}</em></button>`}</div>`}
     </div></div>
-    <div class="sc">${fbCapT('Билдинги')}<div class="fb-one">${blds.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}</div>`).join('')}
+    <div class="sc">${fbCapT('Билдинги')}<div class="fb-one">${blds.map(l => `<div class="fb-card">${fbLineRow(l, false, fbBldName(l))}${fbBldDepRow(b, l)}</div>`).join('')}
       <div class="fb-card add">${isNew('rent') ? fbNewRow('rent') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','rent')"><span>Добавить билдинг</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
@@ -22464,7 +22532,7 @@ function fbCarPage(b){
       ${fbTile('Фактический расход', 'bu.car_fact', car.fact)}
       ${fbTile('Осталось', 'bu.car_left', car.left, {mode: 'neg'})}
     </div></div>
-    <div class="sc">${fbCapT('Рент')}<div class="fb-one">${all.map(l => `<div class="fb-card">${fbLineRow(l, false)}</div>`).join('')}
+    <div class="sc">${fbCapT('Рент')}<div class="fb-one">${all.map(l => `<div class="fb-card">${fbLineRow(l, false)}${fbBldDepRow(b, l)}</div>`).join('')}
       <div class="fb-card add">${isNew ? fbNewRow('car') : `<button class="sc-r fb-plus" onclick="fbFillEdit('new','car')"><span>Добавить рент</span><em>${_FB_PLUS}</em></button>`}</div>
     </div></div>`;
 }
@@ -22502,7 +22570,8 @@ function fbLineEntries(rows){
   if(!rows.length) return '<div class="fb-none">Расходов по этой статье в этом месяце нет</div>';
   // значок чека — тот же, что в списке месяца: нажал и смотришь снимок
   return rows.map(e => `<div class="fb-e">
-    <span class="fb-e-b"><b>${escS(e.comment || 'Расход')}</b><i>${escS(fbDayT(e.day))}${e.who ? ' · ' + escS(e.who) : ''}</i></span>
+    <span class="fb-e-b"><b>${escS(e.comment || (e.deposit ? 'Депозит' : 'Расход'))}</b><i>${escS(fbDayT(e.day))}${e.who ? ' · ' + escS(e.who) : ''}${
+      e.deposit ? ' · депозит' : ''}${e.dep_use ? ' · из депозита ' + fbFmt(e.dep_use) : ''}</i></span>
     <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
   </div>${fbRcpBtn(e)}`).join('');
@@ -23581,6 +23650,7 @@ function fbDepHtml(b){
         <i>${[x.line_name && x.line_name !== (x.who || x.comment) ? escS(x.line_name) : '', escS(fbDayT(x.day)),
               x.who && x.comment ? escS(x.comment) : '',
               x.back ? 'вернули ' + fbFmt(x.back) + (x.last ? ' · ' + escS(fbDayT(x.last)) : '') : '',
+              x.used ? 'списано в оплату ' + fbFmt(x.used) : '',
               x.lost ? 'удержали ' + fbFmt(x.lost) : ''].filter(Boolean).join(' · ')}</i></span>
       <b class="fb-e-v${x.open ? '' : ' ok'}">${fbFmt(x.open ? x.left : x.amount)}<u>AED</u></b></div>`;
   return `<div class="sc fb-gut">
@@ -23592,6 +23662,7 @@ function fbDepHtml(b){
     </div>
     ${s.open_dep ? fbRow('Лежало на начало месяца', 'safe.open_dep', s.open_dep, {sub: true}) : ''}
     ${s.dep_paid ? fbRow('Внесено за месяц', 'safe.dep_paid', s.dep_paid, {sub: true}) : ''}
+    ${s.dep_used ? fbRow('Списано в оплату за месяц', 'safe.dep_used', s.dep_used, {sub: true}) : ''}
   </div>
   <div class="sc">${fbCapT('Лежит', open.length ? String(open.length) : '')}<div class="fb-one">${
     open.length ? open.map(row).join('') : '<div class="fb-none">Открытых депозитов нет</div>'}</div></div>
@@ -23835,7 +23906,7 @@ function fbRentPayHtml(b){
   const k = FB.rentGrp || 'rent';
   const bu = b.budget || {}, tot = bu[k] || {}, all = (bu.lines || []).filter(l => l.group === k);
   const sect = (cap, list) => list.length ? `<div class="sc">${fbCapT(cap)}<div class="fb-one">${
-    list.map(l => `<div class="fb-card">${fbPayRow(l)}</div>`).join('')}</div></div>` : '';
+    list.map(l => `<div class="fb-card">${fbPayRow(b, l)}</div>`).join('')}</div></div>` : '';
   return `<div class="sc"><div class="aud-g">
       ${fbTile('План', `bu.${k}_plan`, tot.plan)}
       ${fbTile('Фактический расход', `bu.${k}_fact`, tot.fact)}
@@ -23846,7 +23917,7 @@ function fbRentPayHtml(b){
 }
 // Строка здания: сумма плана сверху, под ней «Оплатил». Оплаченное — сумма
 // зелёным и «Отменить»: нажал случайно — вернул как было.
-function fbPayRow(l){
+function fbPayRow(b, l){
   const e = fbPaidOf(l.id), sum = e ? e.amount : fbPaySum(l);
   const usd = !e && l.cur === 'USD' && l.plan > 0 ? `${fbFmt(l.plan)} $` : '';
   const sub = e ? `Оплачено <b class="fb-due ok">${escS(fbDayT(e.day))}</b>`
@@ -23859,7 +23930,7 @@ function fbPayRow(l){
       ${e ? `<button class="fb-paybtn undo" data-e="${escS(e.id)}" onclick="fbPayUndo(this.dataset.e)">Отменить</button>`
           : `<button class="aud-b go fb-paybtn${рчек && !снимок ? ' off' : ''}" data-l="${l.id}"
                onclick="fbPayOpen(this.dataset.l)">Оплатил</button>`}</span></div>${
-    рчек ? fbRentRcp(l, снимок) : ''}`;
+    рчек ? fbRentRcp(l, снимок) : ''}${fbBldDepRow(b, l)}`;
 }
 
 // ── чек к оплате рента ─────────────────────────────────────────────────────
@@ -23890,7 +23961,8 @@ function fbRentShotPick(id){
 function fbPaidOf(id){
   const b = fbBook(FB.month); if(!b || !id) return null;
   let found = null;
-  (b.days || []).forEach(d => (d.expenses || []).forEach(e => { if(e.line === id) found = {...e, day: d.day}; }));
+  // внесённый депозит — не оплата аренды: деньги лежат у контрагента
+  (b.days || []).forEach(d => (d.expenses || []).forEach(e => { if(e.line === id && !e.deposit) found = {...e, day: d.day}; }));
   return found;
 }
 // Платят раньше срока — переспрашиваем. Молча пропускаем только платёж в
@@ -23915,11 +23987,23 @@ async function fbPayOpen(id){
   if(fbPayRcpNeed(l) && !снимок){ _toast('Сначала чек'); fbRentShotPick(id); return; }
   const day = b.today <= b.last ? b.today : b.last;
   if(!await fbAskDay(day, 'Оплата аренды')) return;
-  const pay = await fbAskPay(day.slice(0, 7)); if(pay === null) return;
+  // Депозит лежит у этого контрагента — спрашиваем, сгорел ли он в оплату
+  // (владелец, 5 окт 2026: «когда указывает оплатил — спрашивай, депозит
+  // сгорел или нет»). Сгорел — платёж покрывается им, из РП уходит остаток.
+  let depUse = 0;
+  const bal = fbLineBal(b, l);
+  if(bal > 0){
+    const a = await askChoice(`${fbDepT(l)} сгорел?`, `У контрагента лежит ${fbFmt(bal)} AED${bal < sum ? ` · остальное ${fbFmt(sum - bal)} из РП` : ''}`,
+                              'Сгорел', 'Нет, платим из РП', 'go', 'go');
+    if(a === null) return;
+    if(a === 'ok') depUse = Math.min(sum, bal);
+  }
+  const pay = sum - depUse > 0.005 ? await fbAskPay(day.slice(0, 7)) : ''; if(pay === null) return;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry',
       {method: 'POST', body: {day, book: 'rp', amount: sum, comment: '', who: '', line: id, as: _meName(),
                               ...(pay === 'crypto' ? {pay} : {}),
+                              ...(depUse > 0 ? {dep_use: depUse} : {}),
                               ...(снимок ? {photo: снимок.photo, thumb: снимок.thumb} : {})}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(снимок){ const r = {...(FB.rentShot || {})}; delete r[id]; FB.rentShot = r; }
@@ -24050,7 +24134,7 @@ function fbLinePayHtml(b, l){
           onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-rp').focus()}">
         <input class="fb-txt" placeholder="${fbIsOther(l) ? 'За что' : 'Комментарий'}" autocomplete="off" maxlength="120" id="fbCmt-rp"
           onkeydown="if(event.key==='Enter'){this.blur()}">
-        ${fbDepChipHtml(l)}
+        ${fbDepChipHtml(b, l)}
         <button class="xe-rcp fb-rcp" id="fbRcp" onclick="document.getElementById('fbCam').click()">${IC('note', 16)}<span class="xe-rcp-t">Добавить чек/документ<i>снимок или из галереи</i></span></button>
         <button class="aud-b go" onclick="fbEntryAdd('rp','${day}')">Записать</button>
       </div></div>

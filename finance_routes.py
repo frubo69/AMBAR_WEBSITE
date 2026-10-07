@@ -1052,7 +1052,8 @@ async def _deposits() -> list:
         amount = calc._n(e.get("amount"))
         left = max(0.0, amount - b["back"] - b["lost"] - b["used"])
         ln = await db.fin_budget_line_get(str(e.get("line"))) if e.get("line") else None
-        out.append({"id": e.get("_id"), "day": e.get("day") or "", "amount": calc._i(amount),
+        out.append({"id": e.get("_id"), "day": e.get("day") or "", "at": str(e.get("at") or ""),
+                    "amount": calc._i(amount),
                     "comment": e.get("comment") or "", "who": e.get("who") or "",
                     "line": e.get("line") or "", "line_name": (ln or {}).get("name") or "",
                     "group": _line_group(ln) if ln else "",
@@ -1070,7 +1071,7 @@ async def _line_deposits(ln: dict) -> list:
     name = str((ln or {}).get("name") or "")
     lid = str((ln or {}).get("_id") or "")
     rows = [x for x in await _deposits() if x["open"] and (x["line"] == lid or (name and x["line_name"] == name))]
-    rows.sort(key=lambda x: (x["day"], x["id"]))
+    rows.sort(key=lambda x: (x["day"], x.get("at") or "", x["id"]))      # старые первыми: день, затем время записи
     return rows
 
 

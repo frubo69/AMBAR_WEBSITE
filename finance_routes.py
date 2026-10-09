@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from aiohttp import web
 
 import db
+import cash_math
 import backdate
 import finance_calc as calc
 import finance_pay as pay
@@ -141,6 +142,18 @@ async def _sales(days: list[str]) -> dict:
         s["gross"] += total
         s["orders"] += 1
         s["tips"] += int(o.get("tip") or 0)
+        # Раздельная оплата (владелец, 9 окт 2026): части — по своим столбцам,
+        # наличная часть — в наличные района.
+        parts = cash_math.pay_parts(o)
+        if parts is not None:
+            s["cash"] += parts["cash"]
+            s["crypto"] += parts["crypto"]
+            s["card"] += parts["transfer"]
+            if parts["cash"]:
+                s["tips_cash"] += int(o.get("tip") or 0)
+                oid = o.get("office_id") or ""
+                s["cash_by"][oid] = s["cash_by"].get(oid, 0) + parts["cash"]
+            continue
         if m == "debt":
             s["debt"] += total
         elif m == "crypto" or o.get("crypto_paid"):

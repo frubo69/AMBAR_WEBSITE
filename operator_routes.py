@@ -514,6 +514,67 @@ def _keep_gift(old_items: list, new_items: list) -> list:
     return out + gifts
 
 
+def _norm_parts(raw, total: int):
+    """Раскладка оплаты из тела запроса → (parts | None, payment_method, paid,
+    ошибка). Части — целые дирхамы без минуса, сумма равна итогу заказа. Одна
+    часть — это не раскладка: обычный заказ этим способом."""
+    if not isinstance(raw, dict):
+        return None, "", False, "bad_parts"
+    parts = {}
+    for k in ("cash", "crypto", "transfer"):
+        v = raw.get(k, 0)
+        try:
+            v = int(round(float(v or 0)))
+        except (TypeError, ValueError):
+            return None, "", False, "bad_parts"
+        if v < 0:
+            return None, "", False, "bad_parts"
+        parts[k] = v
+    if sum(parts.values()) != int(total):
+        return None, "", False, "parts_sum"
+    nonzero = [k for k, v in parts.items() if v > 0]
+    if len(nonzero) < 2:
+        m = nonzero[0] if nonzero else "cash"
+        return None, m, m in ("crypto", "transfer"), ""
+    m = "cash" if parts["cash"] > 0 else ("crypto" if parts["crypto"] > 0 else "transfer")
+    return parts, m, parts["cash"] == 0, ""
+
+
+def _fit_parts(parts: dict | None, total: int) -> dict | None:
+    """Итог заказа поменялся (правка состава), а раскладка осталась: разницу
+    берёт на себя наличная часть; не хватает — ужимаем остальные."""
+    if not parts:
+        return None
+    p = {k: int(parts.get(k) or 0) for k in ("cash", "crypto", "transfer")}
+    p["cash"] = int(total) - p["crypto"] - p["transfer"]
+    if p["cash"] < 0:
+        over = -p["cash"]; p["cash"] = 0
+        for k in ("transfer", "crypto"):
+            cut = min(over, p[k]); p[k] -= cut; over -= cut
+    if sum(1 for v in p.values() if v > 0) >= 2:
+        return p
+    # схлопнулось в один способ — он и остаётся
+    return {"_only": next((k for k in ("cash", "crypto", "transfer") if p[k] > 0), "cash")}
+
+
+def _pay_fields(parts: dict | None, method: str) -> dict:
+    """Поля заказа по раскладке: сама раскладка (или её снятие), способ, «оплачено»."""
+    if parts:
+        m = "cash" if parts["cash"] > 0 else ("crypto" if parts["crypto"] > 0 else "transfer")
+        return {"pay_parts": parts, "payment_method": m, "paid": parts["cash"] == 0}
+    return {"pay_parts": None, "payment_method": method, "paid": method in ("crypto", "transfer")}
+
+
+def _pay_text(o: dict) -> str:
+    """Оплата заказа словами: «150 нал · 100 крипта» или способ целиком."""
+    import cash_math
+    lbl = cash_math.parts_label(o)
+    if lbl:
+        return lbl
+    return {"cash": "наличными", "crypto": "криптой", "transfer": "переводом",
+            "debt": "в долг", "free": "без оплаты"}.get(str(o.get("payment_method") or "cash"), "наличными")
+
+
 def _item_lines(items: list) -> str:
     return "\n".join(
         f"  • {i['name']} ×{i['qty']} = {i.get('line_total', i['price'] * i['qty'])} AED"
@@ -733,6 +794,9 @@ def _summary(o: dict) -> dict:
         "deliver_by": o.get("deliver_by", ""),
         "eta": o.get("eta", 0),
         "payment_method": o.get("payment_method", ""),
+        # Раздельная оплата: раскладка и наличная часть (владелец, 9 окт 2026).
+        "pay_parts": __import__("cash_math").pay_parts(o),
+        "cash_due": int(round(__import__("cash_math").cash_due(o))),
         # Оплачено онлайн: у криптового заказа в базе стоит paid и
         # payment_method, а поля prepaid нет вовсе — читаем все три.
         "prepaid": bool(o.get("prepaid") or o.get("paid")
@@ -876,6 +940,15 @@ async def handle_create(request):
     if pay not in ("cash", "crypto", "transfer"):
         return web.json_response({"error": "bad_payment", "need": "cash|crypto|transfer"},
                                  status=400, headers=CORS_HEADERS)
+    # Раздельная оплата (владелец, 9 окт 2026): «175 криптой, 25 наличными» —
+    # раскладка в pay_parts, сумма частей равна итогу; наличная часть идёт
+    # через руки водителя, остальное мимо (cash_math.pay_parts).
+    parts = None
+    if body.get("pay_parts") is not None:
+        parts, pay_, paid_, perr = _norm_parts(body.get("pay_parts"), await _pos_total(items))
+        if perr:
+            return web.json_response({"error": perr}, status=400, headers=CORS_HEADERS)
+        pay = pay_
 
     uid = request["op_id"]
     # Офис ≡ район: ручной заказ приписывается тому району, который выбрал
@@ -962,8 +1035,10 @@ async def handle_create(request):
         "comment": str(body.get("comment", "")).strip(),
         "payment_method": pay,
         # Оплачено мимо водителя — тем же признаком, что у криптозаказов из
-        # бота: водитель не должен ехать забирать деньги второй раз.
-        **({"paid": True} if pay in ("crypto", "transfer") else {}),
+        # бота: водитель не должен ехать забирать деньги второй раз. С
+        # раскладкой — только если наличной части нет.
+        **({"paid": True} if (pay in ("crypto", "transfer") and not parts) or (parts and parts["cash"] == 0) else {}),
+        **({"pay_parts": parts} if parts else {}),
         # dispatch
         "district_id": dist["id"],
         "district": dist["name"],
@@ -1603,7 +1678,8 @@ async def handle_patch(request):
     # Способ оплаты правится вместе с остальным: оператор мог поставить
     # наличные, а клиент перевёл. Заодно снимаем/ставим «оплачено», иначе
     # водитель поедет забирать деньги по заказу, который уже оплачен.
-    if "payment_method" in body:
+    pay_changed = False
+    if "payment_method" in body or body.get("pay_parts") is not None:
         pay = str(body.get("payment_method", "")).strip().lower() or "cash"
         if pay not in ("cash", "crypto", "transfer"):
             return web.json_response({"error": "bad_payment", "need": "cash|crypto|transfer"},
@@ -1611,8 +1687,26 @@ async def handle_patch(request):
         # Долг и «без оплаты» через эту ручку не трогаем: их ставят отдельно,
         # и «наличные» из панели стёрли бы решение владельца.
         if str(order.get("payment_method") or "") not in ("debt", "free"):
-            upd["payment_method"] = pay
-            upd["paid"] = pay in ("crypto", "transfer")
+            new_total = int(upd.get("total", order.get("total") or 0))
+            parts = None
+            if body.get("pay_parts") is not None:
+                parts, pay, _paid, perr = _norm_parts(body.get("pay_parts"), new_total)
+                if perr:
+                    return web.json_response({"error": perr}, status=400, headers=CORS_HEADERS)
+            fields = _pay_fields(parts, pay)
+            import cash_math as _cm
+            if fields["payment_method"] != order.get("payment_method") or fields["pay_parts"] != _cm.pay_parts(order):
+                pay_changed = True
+            upd.update(fields)
+    elif items_changed and order.get("pay_parts"):
+        # Состав поправили, а раскладку нет: наличная часть берёт разницу.
+        import cash_math as _cm
+        fitted = _fit_parts(_cm.pay_parts(order), int(upd.get("total", order.get("total") or 0)))
+        if fitted and "_only" in fitted:
+            upd.update(_pay_fields(None, fitted["_only"]))
+        else:
+            upd.update(_pay_fields(fitted, "cash"))
+        pay_changed = True
     if not upd:
         return web.json_response({"error": "nothing to update"}, status=400, headers=CORS_HEADERS)
 
@@ -1620,6 +1714,8 @@ async def handle_patch(request):
     order.update(upd)
     await _refresh_cards(order)
     await notify_driver(order, "edit")     # у водителя на руках прошлая версия
+    if pay_changed:
+        await _pay_told(order, _op_name(request["op_user"]))
 
     # О правке заказа задним числом сообщаем всегда, даже если поменяли один
     # адрес: день уже закрыт, и владелец должен знать, что в нём что-то трогали.
@@ -1650,6 +1746,80 @@ async def handle_patch(request):
                     f"🛒 Позиции:\n{_items_txt}", test=bool(order.get("test")))
         except Exception as e:
             log.error(f"[pos] edited notify failed: {e}")
+    return web.json_response({"ok": True, "order": _summary(order)}, headers=CORS_HEADERS)
+
+
+async def _pay_told(order: dict, who: str):
+    """Оплата заказа изменилась: водителю — сколько брать наличными, владельцу
+    — что и кто поменял (деньги меняются в его отчётах)."""
+    import cash_math as _cm
+    oid = order.get("order_id") or ""
+    due = int(round(_cm.cash_due(order)))
+    try:
+        if (order.get("driver") or "").strip() and order.get("status") in ("approved", "delivered"):
+            await tell_driver(order["driver"],
+                              f"💳 <b>Оплата заказа #{oid}</b>: {_pay_text(order)}\n"
+                              + (f"Наличными взять <b>{due} AED</b>" if due else "Наличных не брать"))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[pos] оплата #{oid}: водителю не сказали: {e}")
+    try:
+        from owner_routes import notify_owners_force
+        await notify_owners_force(
+            "orders.edited",
+            f"💳 *Оплата заказа #{oid} изменена* — оператором {who}\n"
+            f"Теперь: *{_pay_text(order)}* · итог {order.get('total', 0)} AED"
+            + (f"\nЗаказ уже доставлен ({order.get('driver') or '—'})" if order.get("status") == "delivered" else ""),
+            test=bool(order.get("test")))
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[pos] pay notify failed: {e}")
+
+
+@require_operator
+async def handle_pay(request):
+    """POST /api/operator/orders/{oid}/pay {as, payment_method | pay_parts} —
+    поменять, чем платили: целиком одним способом или раскладкой «150 наличными ·
+    100 криптой» (владелец, 9 окт 2026: клиент заказал за наличные, а у двери
+    часть отдал криптой). Можно у заказа в работе и у доставленного; долг и
+    «без оплаты» не трогаем. Водителю — сколько брать наличными, владельцу —
+    событие."""
+    oid = request.match_info["oid"]
+    order = await _get_pos_order(oid)
+    if not order:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    if order.get("status") not in ("pending", "approved", "delivered"):
+        return web.json_response({"error": "order is closed"}, status=409, headers=CORS_HEADERS)
+    if str(order.get("payment_method") or "") in ("debt", "free"):
+        return web.json_response({"error": "fixed_payment"}, status=409, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    pay = str(body.get("payment_method", "")).strip().lower() or "cash"
+    if pay not in ("cash", "crypto", "transfer"):
+        return web.json_response({"error": "bad_payment", "need": "cash|crypto|transfer"},
+                                 status=400, headers=CORS_HEADERS)
+    parts = None
+    if body.get("pay_parts") is not None:
+        parts, pay, _paid, perr = _norm_parts(body.get("pay_parts"), int(order.get("total") or 0))
+        if perr:
+            return web.json_response({"error": perr}, status=400, headers=CORS_HEADERS)
+    fields = _pay_fields(parts, pay)
+    import cash_math as _cm
+    if fields["payment_method"] == order.get("payment_method") and fields["pay_parts"] == _cm.pay_parts(order):
+        return web.json_response({"ok": True, "order": _summary(order)}, headers=CORS_HEADERS)
+    who = _op_name(request["op_user"])
+    hist = list(order.get("pay_log") or [])
+    hist.append({"at": datetime.now(timezone.utc).isoformat(), "by": who,
+                 "from": _pay_text(order), "to": _pay_text({**order, **fields})})
+    fields["pay_log"] = hist[-20:]
+    await db.update_order(oid, **fields)
+    order.update(fields)
+    try:
+        await _refresh_cards(order)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[pos] оплата #{oid}: карточки не обновлены: {e}")
+    await _pay_told(order, who)
+    log.info(f"[pos] оплата #{oid}: {hist[-1]['from']} → {hist[-1]['to']} ({who})")
     return web.json_response({"ok": True, "order": _summary(order)}, headers=CORS_HEADERS)
 
 
@@ -4278,6 +4448,8 @@ def setup(app):
     r.add_patch("/api/operator/orders/{oid}", handle_patch)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/cancel", _opt)
     r.add_post("/api/operator/orders/{oid}/cancel", handle_cancel)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/pay", _opt)
+    r.add_post("/api/operator/orders/{oid}/pay", handle_pay)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/delivered", _opt)
     r.add_post("/api/operator/orders/{oid}/delivered", handle_delivered)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/undeliver", _opt)

@@ -244,6 +244,20 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .pay-b.on{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-weight:700}
 .pay-b.on::before,.pay-b.on + .pay-b::before{opacity:0}
 .pay-b:active{transform:scale(.97)}
+/* Раздельная оплата (владелец, 9 окт 2026): четвёртая кнопка и три поля —
+   наличная часть считается сама из итога. */
+.pay-seg.four .pay-b{font-size:12.5px;gap:5px;padding:11px 3px}
+.pay-seg.four .pay-b svg{width:15px;height:15px}
+.pay-split{display:none;margin-top:8px;gap:8px}
+.pay-split.on{display:grid;grid-template-columns:1fr 1fr 1fr}
+.pay-split label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--sub)}
+.pay-split input{width:100%;height:42px;border-radius:11px;border:1px solid var(--border2);background:var(--card);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;padding:0 10px}
+.pay-split input[readonly]{color:var(--gold2);border-color:rgba(201,169,110,.45)}
+.pay-split input:focus{outline:none;border-color:var(--gold2)}
+.pay-split .sum{grid-column:1 / -1;font-size:12px;color:var(--sub)}
+.pay-split .sum.bad{color:#E05555}
+#payOv .sheet{max-width:440px}
+#payOv .s{margin:0 0 10px;font-size:13px;color:var(--sub)}
 /* На телефоне панель занимает весь экран, и «Чек» в ней — заголовок страницы,
    а не подпись к колонке (макет владельца, 27 сен 2026). На планшете панель
    узкая, там заголовок остаётся мелким. */
@@ -2951,10 +2965,17 @@ html.kb body{padding-bottom:40vh}
           <!-- Способ оплаты — рядом с районом: это решение о деньгах, и
                принимают его раньше, чем записывают имя клиента. -->
           <div class="lbl">Способ оплаты</div>
-          <div class="pay-seg" id="paySeg">
+          <div class="pay-seg four" id="paySeg">
             <button class="pay-b on" data-p="cash" onclick="payPick('cash')"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>Наличные</button>
             <button class="pay-b" data-p="crypto" onclick="payPick('crypto')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8h4a2.2 2.2 0 0 1 0 4.4h-4zM9.5 12.4h4.4a2.2 2.2 0 0 1 0 4.4H9.5zM11 6.2v1.8M11 16.8v1.8"/></svg>Крипта</button>
             <button class="pay-b" data-p="transfer" onclick="payPick('transfer')"><svg viewBox="0 0 24 24"><path d="M4 8.5h13l-3-3M20 15.5H7l3 3"/></svg>Перевод</button>
+            <button class="pay-b" data-p="split" onclick="payPick('split')"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="9"/></svg>Раздельно</button>
+          </div>
+          <div class="pay-split" id="paySplit">
+            <label>Наличными<input id="psCash" readonly tabindex="-1"></label>
+            <label>Криптой<input id="psCrypto" inputmode="numeric" autocomplete="off" oninput="paySplitPaint()"></label>
+            <label>Переводом<input id="psTransfer" inputmode="numeric" autocomplete="off" oninput="paySplitPaint()"></label>
+            <div class="sum" id="psSum"></div>
           </div>
           <div id="custFields">
           <div class="cust-h">Данные клиента <i>необязательно</i></div>
@@ -3980,8 +4001,28 @@ function payPick(p){
   PAY = p;
   document.querySelectorAll('#paySeg .pay-b').forEach(b =>
     b.classList.toggle('on', b.dataset.p === p));
+  const sp = $('paySplit'); if(sp) sp.classList.toggle('on', p === 'split');
+  if(p === 'split') paySplitPaint();
   haptic('sel');
 }
+// Раздельная оплата (владелец, 9 окт 2026): «клиент заказал на 200 — 175
+// криптой, 25 наличными». Вписывают крипту и перевод, наличные — остаток от
+// итога чека, сам. Сумма не сходится — чек не уходит (и сервер проверит).
+const _psNum = id => { const el = $(id); if(!el) return 0; const v = parseInt(String(el.value || '').replace(/[^\d]/g, ''), 10); return isFinite(v) ? v : 0; };
+function ticketSum(){ return Object.keys(TICKET).reduce((a, k) => a + lineUnit(TICKET[k]) * TICKET[k].qty, 0); }
+function paySplitPaint(){
+  const total = ticketSum(), crypto = _psNum('psCrypto'), transfer = _psNum('psTransfer');
+  const cash = total - crypto - transfer;
+  const c = $('psCash'), sum = $('psSum'); if(!c || !sum) return;
+  c.value = cash >= 0 ? cash : '';
+  sum.textContent = cash < 0 ? `Больше итога на ${_num(-cash)} AED` : `Итого ${_num(total)} AED`;
+  sum.classList.toggle('bad', cash < 0);
+}
+function paySplitParts(){
+  const total = ticketSum(), crypto = _psNum('psCrypto'), transfer = _psNum('psTransfer');
+  return {cash: total - crypto - transfer, crypto, transfer};
+}
+function paySplitOk(){ const p = paySplitParts(); return p.cash >= 0 && (p.crypto > 0 || p.transfer > 0); }
 
 // Комментарий: свёрнут, пока не понадобился. Раскрыли — кнопка уходит, поле
 // встаёт на её место и получает фокус. Обратно не складываем: человек уже
@@ -4326,7 +4367,8 @@ async function doCreate(){
         // Наличные шлём явно, а не пустотой: «оператор сказал наличные» и
         // «способ неизвестен» — разные вещи, и по старым заказам их потом
         // не различить.
-        payment_method: PAY,
+        payment_method: PAY === 'split' ? 'cash' : PAY,
+        ...(PAY === 'split' ? {pay_parts: paySplitParts()} : {}),
         office_id: curOffice,
         district_id: curDist,
         driver: curDriver,
@@ -4506,6 +4548,86 @@ function _age(ts){
 function _distName(id){ const d=(Q.districts||[]).find(x=>x.id===id); return d ? d.name : ''; }
 // Клиент платит валютой и как рассчитались — водитель отметил это на карточке;
 // оператор видит то же самое рядом со способом оплаты.
+// Оплата словами: раскладка «150 наличными · 100 криптой» или способ целиком.
+function _payText(o){
+  const pp = o.pay_parts;
+  if(pp && (pp.cash > 0 || pp.crypto > 0 || pp.transfer > 0))
+    return [pp.cash ? `${_num(pp.cash)} наличными` : '', pp.crypto ? `${_num(pp.crypto)} криптой` : '',
+            pp.transfer ? `${_num(pp.transfer)} переводом` : ''].filter(Boolean).join(' · ');
+  return o.prepaid ? 'Крипта · оплачено'
+       : o.payment_method === 'free' ? 'Без оплаты · денег не брать'
+       : o.payment_method === 'debt' ? 'В долг · наличные не брать'
+       : o.payment_method === 'transfer' ? 'Перевод · наличные не брать' : 'Наличные при получении';
+}
+// Окно «Оплата»: одним способом или раздельно; наличная часть — остаток от итога.
+let PAYE = null;
+const _PAY_X = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function payEdit(oid){
+  const o = (ORDERS || []).find(x => x.order_id === oid) || (curOrder && curOrder.order_id === oid ? curOrder : null);
+  if(!o) return;
+  if(!$('payOv')){
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'payOv';
+    ov.innerHTML = '<div class="sheet" id="paySheet"></div>';
+    ov.addEventListener('click', e => { if(e.target === ov) hideOv('payOv'); });
+    document.body.appendChild(ov);
+  }
+  const pp = o.pay_parts || null;
+  PAYE = {oid, total: o.total || 0, mode: pp ? 'split' : (['crypto','transfer'].includes(o.payment_method) ? o.payment_method : 'cash'), busy: false};
+  $('paySheet').innerHTML = `<div class="t sh-t"><span>Оплата · #${_esc(oid)}</span>
+      <button class="oc-x" onclick="hideOv('payOv')" aria-label="Закрыть">${_PAY_X}</button></div>
+    <div class="s">Итог ${_num(PAYE.total)} AED</div>
+    <div class="pay-seg four" id="payESeg">${[['cash','Наличные'],['crypto','Крипта'],['transfer','Перевод'],['split','Раздельно']]
+      .map(([k, t]) => `<button class="pay-b${PAYE.mode === k ? ' on' : ''}" data-p="${k}" onclick="payEMode('${k}')">${t}</button>`).join('')}</div>
+    <div class="pay-split${PAYE.mode === 'split' ? ' on' : ''}" id="payESplit">
+      <label>Наличными<input id="peCash" readonly tabindex="-1"></label>
+      <label>Криптой<input id="peCrypto" inputmode="numeric" autocomplete="off" value="${pp && pp.crypto ? pp.crypto : ''}" oninput="payEPaint()"></label>
+      <label>Переводом<input id="peTransfer" inputmode="numeric" autocomplete="off" value="${pp && pp.transfer ? pp.transfer : ''}" oninput="payEPaint()"></label>
+      <div class="sum" id="peSum"></div>
+    </div>
+    <div class="btns"><button class="sbtn" id="payEGo" onclick="payESave()">Сохранить</button></div>`;
+  payEPaint(); showOv('payOv'); haptic('light');
+}
+function payEMode(k){
+  if(!PAYE) return; PAYE.mode = k;
+  document.querySelectorAll('#payESeg .pay-b').forEach(b => b.classList.toggle('on', b.dataset.p === k));
+  $('payESplit').classList.toggle('on', k === 'split');
+  payEPaint(); haptic('sel');
+}
+function payEParts(){
+  const crypto = _psNum('peCrypto'), transfer = _psNum('peTransfer');
+  return {cash: PAYE.total - crypto - transfer, crypto, transfer};
+}
+function payEPaint(){
+  if(!PAYE) return;
+  const p = payEParts(), c = $('peCash'), sum = $('peSum'), go = $('payEGo');
+  if(c) c.value = p.cash >= 0 ? p.cash : '';
+  const bad = PAYE.mode === 'split' && (p.cash < 0 || !(p.crypto > 0 || p.transfer > 0));
+  if(sum){ sum.textContent = p.cash < 0 ? `Больше итога на ${_num(-p.cash)} AED` : `Итого ${_num(PAYE.total)} AED`; sum.classList.toggle('bad', p.cash < 0); }
+  if(go) go.disabled = bad || PAYE.busy;
+}
+async function payESave(){
+  if(!PAYE || PAYE.busy) return;
+  const body = {as: curOp, payment_method: PAYE.mode === 'split' ? 'cash' : PAYE.mode,
+                ...(PAYE.mode === 'split' ? {pay_parts: payEParts()} : {})};
+  PAYE.busy = true; payEPaint();
+  try{
+    const r = await opApi.opFetch(`/api/operator/orders/${PAYE.oid}/pay`, {method: 'POST', body});
+    const o = r && r.order;
+    if(o){
+      const i = (ORDERS || []).findIndex(x => x.order_id === o.order_id); if(i >= 0) ORDERS[i] = {...ORDERS[i], ...o};
+      if(curOrder && curOrder.order_id === o.order_id){ Object.assign(curOrder, o); try{ renderOrder(); }catch(e){} }
+    }
+    haptic('ok'); toast('Оплата записана: ' + _payText(o || {}), 'ok');
+    hideOv('payOv'); PAYE = null;
+    try{ renderQueue(); }catch(e){}
+    loadQueue();
+  }catch(e){
+    const err = ((e && e.payload) || {}).error;
+    PAYE.busy = false; payEPaint();
+    toast(err === 'parts_sum' ? 'Сумма частей не равна итогу' : err === 'fixed_payment' ? 'У этого заказа оплату не меняют'
+        : err === 'order is closed' ? 'Заказ закрыт' : 'Не получилось', 'err');
+  }
+}
 function _fxNote(o){
   const f = o.pay_fx, st = o.settle;
   const num = n => Number(n || 0).toLocaleString('ru-RU', {maximumFractionDigits: 2});
@@ -4585,9 +4707,7 @@ function _card(o, lane){
             cancelled:['Отменён','no'],declined:['Отклонён','no']};
   const [stT,stC]=ST[o.status]||[o.status,''];
   const goods=(o.total||0)-(o.tip||0);
-  const pay = (o.prepaid ? 'Крипта · оплачено'
-            : (o.payment_method==='free' ? 'Без оплаты · денег не брать' : (o.payment_method==='debt' ? 'В долг' : (o.payment_method==='transfer' ? 'Перевод · наличные не брать' : 'Наличные при получении'))))
-            + _fxNote(o);
+  const pay = _payText(o) + _fxNote(o);
   const when = lane==='new' ? `${_age(o.timestamp)} назад`
              : (o.deliver_by ? `до ${_esc(o.deliver_by)}` : '');
   const dist = [_distCode(o.office_id), _distName(o.office_id)||o.office_name]
@@ -4757,9 +4877,7 @@ function renderOrder(){
   const [stT,stC]=ST[o.status]||[o.status,''];
   const goods=(o.total||0)-(o.tip||0);
   const lines=(o.items||[]).length;
-  const pay = (o.prepaid ? 'Крипта · оплачено'
-            : (o.payment_method==='free' ? 'Без оплаты · денег не брать' : (o.payment_method==='debt' ? 'В долг · наличные не брать' : (o.payment_method==='transfer' ? 'Перевод · наличные не брать' : 'Наличные при получении'))))
-            + _fxNote(o);
+  const pay = _payText(o) + _fxNote(o);
   const src=(o.source||'app')==='manual';
 
   const when = o.status==='pending' ? `${_age(o.timestamp)} назад`
@@ -4859,6 +4977,10 @@ function renderOrder(){
   }else{
     rest=[['Текст водителю',`showOrderText('${o.order_id}')`]];
   }
+  // Чем платили — меняется у заказа в работе и у доставленного (владелец,
+  // 9 окт 2026: клиент заказал за наличные, а у двери часть отдал криптой).
+  if(['pending','approved','delivered'].includes(o.status) && !['debt','free'].includes(o.payment_method))
+    rest.push(['Оплата', `payEdit('${o.order_id}')`]);
   chatRender();
   $('ordActs').innerHTML = gate + money
     + (main?`<div class="oc-top">
@@ -5460,7 +5582,11 @@ function startEdit(oid){
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
   cmtReset();                       // у заказа есть комментарий — поле раскрыто
   // Способ оплаты заказа: у старых и наличных его в документе нет вовсе.
-  payPick(['crypto','transfer'].includes(o.payment_method) ? o.payment_method : 'cash');
+  { const pp = o.pay_parts || null;
+    const c = $('psCrypto'), t = $('psTransfer');
+    if(c) c.value = pp && pp.crypto ? pp.crypto : '';
+    if(t) t.value = pp && pp.transfer ? pp.transfer : '';
+    payPick(pp ? 'split' : (['crypto','transfer'].includes(o.payment_method) ? o.payment_method : 'cash')); }
   // Район берём из самого заказа: у онлайновых он определён по адресу, и
   // подменять его тем, кто сейчас за планшетом, нельзя.
   // Район и водитель уже назначены — подставляем их, а не заставляем выбирать
@@ -5603,7 +5729,7 @@ function chatRender(toBottom){
                              o.driver ? ('водитель ' + o.driver) : ''].filter(Boolean).join(' · ');
   // Сумма и способ оплаты — прямо здесь: у двери спрашивают именно их.
   $('ochAct').innerHTML = `<div class="och-sum">${_esc(o.total)}<small>AED</small>
-      <i>${o.prepaid ? 'оплачено' : (o.payment_method === 'free' ? 'без оплаты' : (o.payment_method === 'debt' ? 'в долг' : (o.payment_method === 'transfer' ? 'переводом' : 'наличными')))}${_esc(_fxNote(o))}</i></div>`
+      <i>${o.pay_parts ? _esc(_payText(o)) : (o.prepaid ? 'оплачено' : (o.payment_method === 'free' ? 'без оплаты' : (o.payment_method === 'debt' ? 'в долг' : (o.payment_method === 'transfer' ? 'переводом' : 'наличными'))))}${_esc(_fxNote(o))}</i></div>`
     + (o.gmap_link
       ? `<a class="of-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener"><svg
           viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle

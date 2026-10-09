@@ -127,6 +127,9 @@ def sold_lines(orders: list) -> list:
 
 
 def pay_label(o: dict) -> str:
+    split = cash_math.parts_label(o)
+    if split:
+        return split
     m = str(o.get("payment_method") or "").lower()
     if m == "free":
         return "без оплаты"

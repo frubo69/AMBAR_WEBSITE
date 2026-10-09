@@ -446,6 +446,9 @@ def _order_summary(o):
         "phone": o.get("phone","—"),
         "total": o.get("total", 0),
         "crypto": bool(o.get("payment_method") == "crypto" and o.get("paid")),
+        # Раздельная оплата (9 окт 2026): сколько из суммы пришло криптой.
+        "crypto_aed": int(round(__import__("cash_math").crypto_part(o))),
+        "pay_parts": __import__("cash_math").pay_parts(o),
         # Клиент платил валютой и как рассчитались — отметки водителя.
         "pay_fx": o.get("pay_fx") or None,
         "settle": o.get("settle") or None,
@@ -824,11 +827,14 @@ async def handle_finance(request):
     debt_aed = sum(int(o.get("total", 0) or 0) for o in debt_delivered)
     # Перевод — свой способ расчёта: денег в кассе нет, как и при оплате
     # криптой, но приходят они на счёт, а не на кошелёк.
-    transfer_delivered = [o for _, o in curr_orders
-                          if o.get("payment_method") == "transfer"]
-    transfer_aed = sum(int(o.get("total", 0) or 0) for o in transfer_delivered)
-    crypto_delivered = [o for _, o in curr_orders if _is_crypto(o)]
-    crypto_aed  = sum(o.get("total", 0) for o in crypto_delivered)
+    # Раздельная оплата (9 окт 2026): у заказа может быть часть криптой и
+    # часть переводом — суммы берём по частям (cash_math), заказ считается в
+    # каждом способе, где у него есть часть.
+    import cash_math as _cm
+    transfer_delivered = [o for _, o in curr_orders if _cm.transfer_part(o) > 0]
+    transfer_aed = int(round(sum(_cm.transfer_part(o) for o in transfer_delivered)))
+    crypto_delivered = [o for _, o in curr_orders if _is_crypto(o) or _cm.crypto_part(o) > 0]
+    crypto_aed  = int(round(sum(_cm.crypto_part(o) for o in crypto_delivered)))
     crypto_usdt = round(sum(_usdt(o) for o in crypto_delivered), 2)
     # Paid on-chain but still in flight — the money is ALREADY on the wallet.
     inflight = [o for _, o in curr_all
@@ -2691,10 +2697,11 @@ async def handle_office(request):
 
     # каналы и способ оплаты
     _phone = [(dt, o) for dt, o in curr if o.get("source") == "manual"]
-    _crypto = [(dt, o) for dt, o in curr if o.get("payment_method") == "crypto" and o.get("paid")]
-    _crypto_aed = _sum_field(_crypto, "total")
-    _transfer = [(dt, o) for dt, o in curr if o.get("payment_method") == "transfer"]
-    _transfer_aed = _sum_field(_transfer, "total")
+    import cash_math as _cm
+    _crypto = [(dt, o) for dt, o in curr if _cm.crypto_part(o) > 0]
+    _crypto_aed = int(round(sum(_cm.crypto_part(o) for _, o in _crypto)))
+    _transfer = [(dt, o) for dt, o in curr if _cm.transfer_part(o) > 0]
+    _transfer_aed = int(round(sum(_cm.transfer_part(o) for _, o in _transfer)))
     _phone_aed = _sum_field(_phone, "total")
 
     # рейтинг

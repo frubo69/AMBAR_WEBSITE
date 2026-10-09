@@ -4795,6 +4795,14 @@ let OPEN_OID = '';   // какой из активных заказов раск
 // cash (берём наличными). Значки у экранов свои, слова — общие.
 function payOf(o){
   o = o || {};
+  // Раздельная оплата (владелец, 9 окт 2026): «175 криптой, 25 наличными» —
+  // водитель берёт только наличную часть, остальное пришло мимо его рук.
+  const pp = o.pay_parts;
+  if(pp && (pp.cash > 0 || pp.crypto > 0 || pp.transfer > 0)){
+    const rest = [pp.crypto ? fmt(pp.crypto) + ' криптой' : '', pp.transfer ? fmt(pp.transfer) + ' переводом' : ''].filter(Boolean).join(' · ');
+    if(pp.cash > 0) return {k: 'cash', tone: 'cash', t: `Наличными ${fmt(pp.cash)}`, s: rest, split: true};
+    return {k: pp.crypto ? 'crypto' : 'transfer', tone: 'ok', t: rest, s: 'денег не брать', split: true};
+  }
   const m = String(o.payment_method || '');
   if(m === 'free')     return {k: 'free',     tone: 'warn', t: 'Без оплаты',      s: 'денег не брать'};
   if(m === 'debt')     return {k: 'debt',     tone: 'warn', t: 'В долг',          s: 'денег не брать'};
@@ -6815,6 +6823,7 @@ function shsMoney(m){
       <div class="shs-cash"><span class="xpr-in"><input id="shsCash" inputmode="numeric" maxlength="7" value="${c == null ? '' : fmt(c)}" autocomplete="off" ${SHS_VIEW ? 'disabled' : ''} oninput="shsCashIn(this.value)" onblur="shsCashFlush()"><u>AED</u></span>${shsDiffHtml()}</div>
       ${shsRow('По приложению', fmt(r.cash_app != null ? r.cash_app : 0) + ' AED', 'sub')}
     </div>
+    ${shsPayCard(m)}
     <div class="dcard shs-card"><div class="shs-h">Остаётся у вас</div>
       ${h.meal ? shsRow('Питание за день', shsAed(h.meal)) : ''}
       ${h.bonus ? shsRow('Бонус за допродажу', shsAed(h.bonus)) : ''}
@@ -6830,6 +6839,18 @@ function shsMoney(m){
   if(h.debt) html += `<div class="dcard shs-card"><div class="shs-h">В долг</div>
       ${(h.debt_list || []).map(x => shsRow(esc(x.who || x.id), shsAed(x.aed))).join('')}</div>`;
   return html;
+}
+
+// Выручка смены по способам оплаты (владелец, 9 окт 2026: «сколько у него в
+// руках наличные, сколько сдать и сколько были криптой»).
+function shsPayCard(m){
+  const p = m.pay || {};
+  const rows = [['cash', 'Наличными'], ['crypto', 'Криптой'], ['app', 'Переводом'], ['debt', 'В долг'], ['free', 'Без оплаты']]
+    .filter(([k]) => p[k] && p[k].aed);
+  if(!rows.length) return '';
+  return `<div class="dcard shs-card"><div class="shs-h">Выручка смены</div>
+    ${rows.map(([k, t]) => shsRow(`${t} · ${p[k].n}`, shsAed(p[k].aed))).join('')}
+    ${shsRow('Всего', shsAed(m.gross || 0), 'sum')}</div>`;
 }
 
 // Шаг 2 — заказы смены: время · адрес · способ оплаты · сумма.
@@ -7546,14 +7567,15 @@ function fxChips(amount){
 function stlOpen(oid){
   const o = _ordById(oid); if(!o) return;
   const fx = o.pay_fx || null;
-  STL = {oid, total: o.total || 0, mode: 'take', fx};
+  const due = o.cash_due != null ? o.cash_due : (o.total || 0);
+  STL = {oid, total: due, mode: 'take', fx, split: !!o.pay_parts};
   const st = o.settle || {};
   const was = fx ? (st.fx && st.fx.code === fx.code ? st.fx.amount : null) : st.taken;
   document.getElementById('stlT').textContent = fx ? `Сколько взяли в ${esc(fx.code)}` : 'Сколько взяли наличными';
   document.getElementById('stlS').textContent = fx
     ? `По заказу ${fxFmt(fx.amount, fx.sym)} (${fmt(STL.total)} AED по курсу ${fxFmt(fx.rate)}). ` +
       `Впишите, сколько ${fx.sym} на руках — разницу посчитаем в дирхамах.`
-    : `По заказу ${fmt(STL.total)} AED. Впишите, сколько денег реально у вас на руках — ` +
+    : `По заказу ${fmt(STL.total)} AED${STL.split ? ' наличными' : ''}. Впишите, сколько денег реально у вас на руках — ` +
       `разницу посчитаем сами.`;
   const chips = fx ? fxChips(fx.amount) : stlChips(STL.total);
   document.getElementById('stlBody').innerHTML = `
@@ -7839,8 +7861,9 @@ function ordHead(active){
   const free = o => !!o.prepaid || o.payment_method === 'crypto'
                  || o.payment_method === 'debt' || o.payment_method === 'transfer'
                  || o.payment_method === 'free';
-  const cash = active.filter(o => !free(o)).reduce((a, o) => a + (o.total || 0), 0);
-  const paid = active.filter(free).reduce((a, o) => a + (o.total || 0), 0);
+  const due = o => free(o) ? 0 : (o.cash_due != null ? o.cash_due : (o.total || 0));
+  const cash = active.reduce((a, o) => a + due(o), 0);
+  const paid = active.reduce((a, o) => a + ((o.total || 0) - due(o)), 0);
   const units = active.reduce((a, o) =>
     a + (o.items || []).reduce((b, i) => b + (i.qty || 0), 0), 0);
   const late = active.filter(o => _isLate(o.deliver_by)).length;

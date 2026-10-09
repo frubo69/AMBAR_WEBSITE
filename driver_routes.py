@@ -45,6 +45,7 @@ import bizday                 # день заказа = смена, в кото�
 import car_intake
 import photos
 import config_staff as staff
+import cash_math as _cash
 import close_req
 from owner_auth import CORS_HEADERS
 
@@ -203,7 +204,9 @@ def _fx_view(o: dict) -> dict | None:
     if not fx or not fx.get("code") or not fx.get("rate"):
         return None
     try:
-        rate, total = float(fx["rate"]), float(o.get("total") or 0)
+        # Раздельная оплата: валютой считают наличную часть — остальное мимо рук.
+        rate = float(fx["rate"])
+        total = float(_cash.cash_due(o)) if _cash.pay_parts(o) is not None else float(o.get("total") or 0)
     except (TypeError, ValueError):
         return None
     if rate <= 0:
@@ -250,6 +253,10 @@ def _order_view(o: dict) -> dict:
         "tip": o.get("tip", 0) or 0,
         "comment": o.get("comment", ""),
         "payment_method": o.get("payment_method", ""),
+        # Раздельная оплата (владелец, 9 окт 2026): раскладка и сколько из
+        # суммы водитель берёт наличными — остальное мимо его рук.
+        "pay_parts": _cash.pay_parts(o),
+        "cash_due": int(round(_cash.cash_due(o))),
         # Клиент платит валютой: код, курс на момент выбора, сумма в валюте.
         "pay_fx": _fx_view(o),
         # Последний ответ оператора — на карточку, не открывая разговор.
@@ -919,6 +926,26 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
         if m == "free":
             pay["free"]["n"] += 1; pay["free"]["aed"] += total
             continue
+        # Раздельная оплата (владелец, 9 окт 2026): каждая часть — в свою
+        # корзину (заказ считается в каждой, где у него есть часть), наличными
+        # взято — по расчёту или наличная часть.
+        parts = _cash.pay_parts(o)
+        if parts is not None:
+            for k_, key in (("cash", "cash"), ("crypto", "crypto"), ("transfer", "app")):
+                if parts[k_]:
+                    pay[key]["n"] += 1; pay[key]["aed"] += parts[k_]
+            if parts["cash"]:
+                s = o.get("settle") or {}
+                try:
+                    taken = float(s["taken"]) if s.get("taken") is not None else float(parts["cash"])
+                except (TypeError, ValueError):
+                    taken = float(parts["cash"])
+                cash_taken += taken
+                tips_cash += tip
+            tips += tip
+            who = staff.base_operator(o.get("office_id") or "") or "Оператор"
+            by_op[who] = by_op.get(who, 0) + tip
+            continue
         if m == "debt":
             k = "debt"
         elif m == "crypto" or o.get("crypto_paid"):
@@ -1258,7 +1285,8 @@ async def handle_settle(request):
             else (0.0 if isinstance(body.get("fx"), dict) else round(float(None), 2))
     except (TypeError, ValueError):
         return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
-    total = int(o.get("total") or 0)
+    # Раздельная оплата: считаем от наличной части, остальное пришло мимо рук.
+    total = int(round(_cash.cash_due(o)))
     # Взяли валютой: сумма приходит в ней, в дирхамы переводим по курсу
     # заказа (зафиксирован при выборе валюты) — тем же, что назвали клиенту.
     fx_in = body.get("fx") if isinstance(body.get("fx"), dict) else None
@@ -2292,7 +2320,7 @@ async def handle_delivered(request):
     # и заказ «в долг» — это другая история, и спрашивать про сдачу с человека,
     # который денег не брал, значит приучить его нажимать не глядя.
     if _needs_settle(o) and not (body.get("settled") is True or (o.get("settle") or {})):
-        return web.json_response({"error": "need_settle", "total": o.get("total") or 0},
+        return web.json_response({"error": "need_settle", "total": int(round(_cash.cash_due(o)))},
                                  status=400, headers=CORS_HEADERS)
     # Просьба водителя — одна на заказ. Открытая правка состава или отмена
     # затиралась бы отметкой о доставке молча: сначала решение по ней.

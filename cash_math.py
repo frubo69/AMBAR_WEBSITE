@@ -82,6 +82,62 @@ def order_tea(o: dict, rates: dict = None) -> int:
     return t + int(_n(o.get("tip")))
 
 
+# ── раздельная оплата (владелец, 9 окт 2026) ─────────────────────────────────
+# «Клиент заказал на 200: 175 криптой, 25 наличными». У заказа может лежать
+# раскладка pay_parts = {cash, crypto, transfer} (целые дирхамы, сумма = total);
+# тогда через руки водителя идёт только наличная часть, остальное — мимо.
+# payment_method у такого заказа 'cash', если наличная часть есть (водитель
+# должен её взять), иначе — способ оставшейся части; paid стоит только когда
+# наличных нет. Заказ без раскладки считается как раньше — весь одним способом.
+PART_KEYS = ("cash", "crypto", "transfer")
+
+
+def pay_parts(o: dict) -> dict | None:
+    """Раскладка оплаты заказа или None, если её нет (или она не раздельная)."""
+    p = (o or {}).get("pay_parts")
+    if not isinstance(p, dict):
+        return None
+    out = {k: int(_n(p.get(k))) for k in PART_KEYS}
+    if sum(1 for v in out.values() if v > 0) < 2:
+        return None
+    return out
+
+
+def cash_due(o: dict) -> float:
+    """Сколько наличных водитель должен взять по заказу: наличная часть
+    раскладки, иначе вся сумма (если заказ вообще наличный)."""
+    p = pay_parts(o)
+    if p is not None:
+        return float(p["cash"])
+    return _n(o.get("total")) if pays_cash(o) else 0.0
+
+
+def crypto_part(o: dict) -> float:
+    """Сколько по заказу пришло криптой: часть раскладки, иначе весь заказ,
+    если он криптовый и оплачен."""
+    p = pay_parts(o)
+    if p is not None:
+        return float(p["crypto"])
+    m = str(o.get("payment_method") or "").lower()
+    return _n(o.get("total")) if (m == "crypto" or o.get("crypto_paid")) and (o.get("paid") or o.get("crypto_paid") or m == "crypto") else 0.0
+
+
+def transfer_part(o: dict) -> float:
+    p = pay_parts(o)
+    if p is not None:
+        return float(p["transfer"])
+    return _n(o.get("total")) if str(o.get("payment_method") or "").lower() == "transfer" else 0.0
+
+
+def parts_label(o: dict) -> str:
+    """«150 нал · 100 крипта» — короткая подпись раскладки; пусто, если её нет."""
+    p = pay_parts(o)
+    if p is None:
+        return ""
+    names = {"cash": "нал", "crypto": "крипта", "transfer": "перевод"}
+    return " · ".join(f"{p[k]} {names[k]}" for k in PART_KEYS if p[k] > 0)
+
+
 def is_prepaid(o: dict) -> bool:
     """Оплачено мимо водителя: крипта, карта, перевод — денег он не брал."""
     m = str(o.get("payment_method") or "").lower()
@@ -98,7 +154,8 @@ def pays_cash(o: dict) -> bool:
 def order_money(o: dict) -> dict:
     """Что водитель держит за наличный заказ: {"aed": в дирхамах (для валюты —
     по курсу), "fx": (код, сумма в валюте) или None}."""
-    total = _n(o.get("total"))
+    # Раздельная оплата: в руках водителя только наличная часть.
+    total = cash_due(o) if pay_parts(o) is not None else _n(o.get("total"))
     s = o.get("settle") or {}
     taken = _n(s.get("taken"), total) if s.get("taken") is not None else total
     fx = s.get("fx") if isinstance(s.get("fx"), dict) else None

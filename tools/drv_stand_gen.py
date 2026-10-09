@@ -1,7 +1,7 @@
 """Стенд водителя из НАСТОЯЩЕГО driver/index.html: телеграм и api.js подменены
 заглушками с фикстурами, boot() → standBoot(). Параметры: ?fx=1 (заказ с
 оплатой в валюте), ?req=edit|cancel (открытая просьба), ?chat=1 (ответ
-оператора), ?pay=crypto|transfer|debt|free (способ оплаты), ?car=1|free (машина не принята), ?open=odo[&km=&err=less|jump] (экран пробега), ?w=390. python3 tools/drv_stand_gen.py <dir> → <dir>/drv.html"""
+оператора), ?pay=crypto|transfer|debt|free|split (способ оплаты, split — раздельная), ?car=1|free (машина не принята), ?open=odo[&km=&err=less|jump] (экран пробега), ?w=390. python3 tools/drv_stand_gen.py <dir> → <dir>/drv.html"""
 import os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -86,6 +86,9 @@ const ST_ORDER = {
   timestamp: _agoIso(5), confirmed_at: _agoIso(1),
   delivered_at: '', deliver_by: '03:49', eta: 30, driver_ack_at: 'x', driver_req: null, chat_n: 1, chat_new: 0, chat_at: '',
   settle: null, owed: 0, pay_fx: null, chat_last: {text: 'Ждите 5 минут, звоню клиенту', at: _agoIso(2), name: 'Парвиз'}};
+// Раздельная оплата (9 окт 2026): ?pay=split — 150 наличными, 145 криптой.
+if(ST_Q.get('pay') === 'split'){ ST_ORDER.payment_method = 'cash'; ST_ORDER.prepaid = false;
+  ST_ORDER.pay_parts = {cash: 150, crypto: 145, transfer: 0}; ST_ORDER.cash_due = 150; }
 if(ST_Q.get('fx')) ST_ORDER.pay_fx = {code: 'USD', name: 'Доллар США', sym: '$', rate: 3.67, amount: 80.38, at: ''};
 if(ST_Q.get('req')) ST_ORDER.driver_req = {kind: ST_Q.get('req'), status: 'open', text: ST_Q.get('req') === 'cancel' ? 'Клиент отказался' : '',
   diff: ST_Q.get('req') === 'edit' ? [{kind: 'add', name: 'Beluga', qty: 1}] : [], total: 400, at: _agoIso(1)};

@@ -2121,6 +2121,13 @@ body.safe-open .cvo-hdr{opacity:0}
 .shl-t b{color:var(--gold);font-weight:800;margin-right:4px}
 .shl-c{display:block;font-size:12px;line-height:1.4;color:var(--muted);margin-top:3px}
 .shl-c i{font-style:normal;opacity:.75}
+/* Сверка смены (владелец, 9 окт 2026): несовпадение без ответа — район мигает
+   красным: пилюли «Итоги» и «Смена», код района в окне смены. */
+.pill.recon{border-color:rgba(224,85,85,.55);background:rgba(224,85,85,.12);color:#E05555;animation:reconBlink 1s steps(2) infinite}
+.pill.recon .ic{color:#E05555}
+@keyframes reconBlink{50%{opacity:.35}}
+.sh-r.recon .sh-code{background:rgba(224,85,85,.18);color:#E05555;animation:reconBlink 1s steps(2) infinite}
+.sh-rc{display:block;margin-top:3px;font-size:12px;color:#E05555}
 .pill.hot{border-color:rgba(243,180,74,.5);background:rgba(243,180,74,.1);
   color:var(--warn-t)}
 
@@ -4447,6 +4454,7 @@ async function loadQueue(){
          {params:{as:curOp, ...(BACK_DAY ? {day:BACK_DAY} : {})}}); }
   catch(e){ return; }
   Q = r;
+  reconPills(r.recon_alert || []);
   // Первая загрузка после выбора оператора решает, где мы стоим: пустая
   // очередь — не повод смотреть на надпись «Новых заказов нет».
   if(!_landed){
@@ -6664,6 +6672,32 @@ function whFocusSel(){
 let SHIFT = null, SHIFT_BUSY = false;
 const _num = n => Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
 
+// Сверка смены (владелец, 9 окт 2026): где несовпадение без ответа оператора
+// — район мигает: пилюли «Итоги» и «Смена» красным с кодом района, строка
+// района в окне смены. Приходит с каждым опросом очереди (recon_alert).
+let RECON_ALERT = [];
+function reconPills(list){
+  const было = JSON.stringify(RECON_ALERT);
+  RECON_ALERT = Array.isArray(list) ? list : [];
+  const codes = RECON_ALERT.map(x => x.code).filter(Boolean);
+  const sum = $('sumBtn');
+  if(sum){
+    sum.classList.toggle('recon', !!codes.length);
+    const sp = sum.querySelector('span');
+    if(sp) sp.textContent = codes.length ? `Сверка ${codes.join(', ')}` : 'Итоги';
+  }
+  const sb = $('shiftBtn'); if(sb) sb.classList.toggle('recon', !!codes.length);
+  if(SHIFT && было !== JSON.stringify(RECON_ALERT) && $('shiftOv').classList.contains('show')) shiftPaint();
+}
+function reconLine(oid){
+  const a = RECON_ALERT.find(x => x.district === oid);
+  const ds = a ? a.drivers : [];
+  if(!ds.length) return '';
+  return `<span class="sh-rc">сверка: ${ds.map(d => _esc(d.name)
+    + (d.diff != null ? ' ' + (d.diff > 0 ? '+' : '−') + _num(Math.abs(d.diff)) : '')
+    + (d.fixes ? ` · ${d.fixes} ${plural(d.fixes,'правка','правки','правок')}` : '')).join(', ')}</span>`;
+}
+
 // Тихая проверка на старте: состояние смены нужно и пилюле в шапке, и
 // решению, показывать ли экран сразу.
 async function shiftCheck(){
@@ -6732,10 +6766,11 @@ function shiftPaint(){
         onclick="shCrewOpen('${x.district}')">Бригада</button>`;
     // Водители — отдельной строкой во всю ширину, под кнопками: рядом с ними
     // на имя и время не хватало места, и время обрезалось.
-    return `<div class="sh-r ${x.closed ? 'off' : ''}${crewLine ? ' has-dl' : ''}">
+    const rc = reconLine(x.district);
+    return `<div class="sh-r ${x.closed ? 'off' : ''}${crewLine ? ' has-dl' : ''}${rc ? ' recon' : ''}">
       <span class="sh-code">${_esc(x.code)}</span>
       <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
-        <span class="sh-s">${sub}</span></span>
+        <span class="sh-s">${sub}</span>${rc}</span>
       ${crewBtn}
       <button class="sh-go ${x.closed ? 'ghost' : ''}"
         onclick="${x.closed ? `shiftReopen('${x.district}')` : `shiftClose('${x.district}')`}">
@@ -6979,7 +7014,8 @@ async function shiftClose(oid, opts){
   SHIFT_BUSY = true;
   try{
     const r = await opApi.opFetch('/api/operator/shift/close',
-      {method:'POST', body:{district: oid, as: curOp, ...(opts.force ? {force: 1} : {})}});
+      {method:'POST', body:{district: oid, as: curOp, ...(opts.force ? {force: 1} : {}),
+                            ...(opts.forceRecon ? {force_recon: 1} : {})}});
     haptic('ok');
     toast(r.all_closed ? 'Смена закрыта у всех — заявка ушла старшему'
                        : `Смена закрыта · ${_num(r.revenue)} AED`, 'ok');
@@ -7003,8 +7039,16 @@ async function shiftClose(oid, opts){
           + `\n\nЕсли закрыть сейчас, заказы до утра запишутся СЛЕДУЮЩИМ днём.`
           + `\nВсё равно закрыть?`)){
         SHIFT_BUSY = false;
-        return shiftClose(oid, {force: true});
+        return shiftClose(oid, {...opts, force: true});
       }
+    } else if(p.error === 'recon_open'){
+      // Сверка смены (владелец, 9 окт 2026): у района висит сверка — кто-то
+      // итоги не подтвердил, у кого-то наличных не столько, правки без ответа.
+      // Закрыть можно, но осознанно: вопрос, не запрет.
+      const pick = await askPickOp(`Закрыть район${x ? ' ' + x.code : ''}?\n${p.text || 'Сверка смены не закончена'}`,
+        [['back', 'Вернуться к сверке'], ['force', 'Закрыть всё равно']]);
+      if(pick === 'force'){ SHIFT_BUSY = false; return shiftClose(oid, {...opts, forceRecon: true}); }
+      if(pick === 'back'){ hideOv('shiftOv'); opDay.open(); }
     } else {
       toast('Не удалось закрыть', 'err');
     }

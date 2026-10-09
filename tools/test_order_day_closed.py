@@ -94,7 +94,10 @@ async def main():
     o = SAVED[-1]
     eq("200, как заказ задним числом за закрытый день", (код, тело.get("back_date")), (200, СЕГ))
     eq("день — закрытая смена, сразу доставлен, помечен", (o["day"], o["status"], o["backfilled"], o["backfill_day"]), (СЕГ, "delivered", True, СЕГ))
-    eq("время настоящее, а не 20:00 той смены", (o["timestamp"] == o["delivered_at"], o["timestamp"][11:13] != "16"), (True, True))
+    # Настоящее время, а не 20:00 той смены: сравниваем с «сейчас» (проверка по
+    # часу суток мигала бы ровно в 16:00 UTC — тогда «сейчас» и есть 20:00 Дубая).
+    ts = datetime.fromisoformat(o["timestamp"].replace("Z", "+00:00"))
+    eq("время настоящее, а не 20:00 той смены", (o["timestamp"] == o["delivered_at"], abs((datetime.now(timezone.utc) - ts).total_seconds()) < 120), (True, True))
     eq("полка — район водителя", o.get("stock_office"), "tecom")
 
     print("── «новая»: следующим днём, обычным путём ───────────────────")

@@ -1212,7 +1212,18 @@ async def handle_queue(request):
                                              route_by_driver=route_by, waiting_by_district=wait_by)
         except Exception as e:
             log.warning(f"[pos] просьбы закрыть смену не прочитаны: {e}")
+    # Сверка смены: районы, где горит несовпадение, — панель мигает ими и
+    # «Итогами», пока оператор не ответил (владелец, 9 окт 2026).
+    recon_alert = []
+    if not _tflag(request):
+        try:
+            import shift_recon
+            recon_alert = await shift_recon.alerts_for(
+                today.isoformat(), set(scope), list((await db.get_all_orders()).values()))
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[pos] сверка в очереди: {e}")
     return web.json_response({
+        "recon_alert": recon_alert,
         "as": who, "senior": next(x["senior"] for x in people if x["name"] == who),
         # Панель берёт водителей для назначения отсюда: тест-оператору — только
         # тест-водитель, иначе лист назначения показывает настоящих, а сервер
@@ -2330,6 +2341,20 @@ async def handle_day_board(request):
         drv.sort(key=lambda x: (-x["aed"], -x["done"], x["name"]))
         rows.append({"id": d["id"], "code": d.get("code", ""), "name": d.get("name", ""),
                      "operator": d.get("operator", ""), **fix(по_району[d["id"]]), "drivers": drv})
+    # Сверка смены (shift_recon): под водителем — наличных на руках против
+    # приложения, правки товара, ответы оператора.
+    try:
+        import shift_recon
+        rviews = await shift_recon.day_views(day.isoformat(), orders)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[pos] сверка в итогах: {e}")
+        rviews = {}
+    for r in rows:
+        for v in r["drivers"]:
+            rv = rviews.get(v["name"])
+            if rv and (rv.get("district") or r["id"]) == r["id"]:
+                v["recon"] = rv
+        r["recon_alert"] = any((v.get("recon") or {}).get("alert") for v in r["drivers"])
     rows.sort(key=lambda r: r["code"])
     итог = пусто()
     for r in rows:
@@ -2338,6 +2363,172 @@ async def handle_day_board(request):
     return _mv_json({"day": day.isoformat(), "today": not вчера,
                      "at": datetime.now(timezone.utc).isoformat(),
                      "mine": mine, "total": итог, "districts": rows})
+
+
+# ── сверка смены: ответы оператора ──────────────────────────────────────────
+# Владелец, 9 окт 2026: правки бутылок водителем «не сразу одобряются, а лишь
+# высвечиваются у оператора на сверку»; подтверждённый факт наличных уходит
+# старшему в «Сбор выручки» и в книгу дня (shift_recon.py).
+async def _recon_ctx(request):
+    """Общее для ручек сверки: тело, водитель в зоне оператора, день, заказы,
+    «по приложению» сейчас. (ctx, None) или (None, ответ-отказ)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    districts = await _fresh_districts()
+    people = _people_for(request, districts)
+    who = str(body.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    name = str(body.get("driver") or "").strip()
+    today = _biz_date(datetime.now(DUBAI_TZ))
+    day = str(body.get("day") or "").strip() or today.isoformat()
+    try:
+        dd = datetime.strptime(day, "%Y-%m-%d").date()
+    except ValueError:
+        return None, web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    # Сверяют смену под утро, а разбираются иногда днём, уже следующими
+    # сутками; дальше трёх дней — не трогать.
+    if dd > today or (today - dd).days > 3:
+        return None, web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    doc = await db.recon_get(day, name)
+    if not doc:
+        return None, web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    oid = doc.get("district") or _staff_mod.base_district(name) or ""
+    if oid not in scope:
+        return None, web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    import shift_recon
+    orders = list((await db.orders_from(_bizday.since_utc(day))).values())
+    dday = await db.get_driver_day(day, name) or {}
+    return {"body": body, "who": who, "name": name, "day": day, "oid": oid, "doc": doc,
+            "orders": orders, "cash_now": shift_recon.cash_app(orders, dday, name, day),
+            "op_name": _op_name(request["op_user"]), "uid": request["op_id"],
+            "districts": districts}, None
+
+
+async def _recon_cash_now(ctx: dict) -> int:
+    import shift_recon
+    orders = list((await db.orders_from(_bizday.since_utc(ctx["day"]))).values())
+    return shift_recon.cash_app(orders, await db.get_driver_day(ctx["day"], ctx["name"]) or {},
+                                ctx["name"], ctx["day"])
+
+
+async def _recon_order(ctx: dict, pid: str, qty: int, pcs: int) -> str:
+    """Заказ по принятой правке «+N»: та же смена, тот же водитель, наличные,
+    сразу доставлен и помечен backfilled — как заказ задним числом."""
+    items, err = _build_items([{"id": pid, "qty": qty, **({"pcs": pcs} if pcs else {})}])
+    if err:
+        raise ValueError(err)
+    total = await _pos_total(items)
+    oid = ctx["oid"]
+    dist = next((d for d in ctx["districts"] if d["id"] == oid), None) or {
+        "id": oid, "name": OFFICE_NAMES.get(oid, oid), "operator": ""}
+    now = datetime.now(timezone.utc).isoformat()
+    order = {
+        "order_id": _new_oid(), "customer_id": 0, "customer_name": "—", "username": "—",
+        "phone": "", "address": "", "location": {}, "gmap_link": "", "is_gps": False,
+        "items": items, "item_lines": _item_lines(items), "tip": 0, "total": total, "lang": "ru",
+        "office_id": oid, "office_name": OFFICE_NAMES.get(oid, oid),
+        "comment": "по сверке смены", "payment_method": "cash",
+        "district_id": oid, "district": dist.get("name") or "", "dispatch_operator": dist.get("operator") or "",
+        "driver": ctx["name"], "status": "delivered",
+        "stock_office": _staff_mod.stock_office(ctx["name"], oid),
+        "confirmed_at": now, "day": ctx["day"], "operator_id": ctx["uid"], "source": "manual",
+        "created_by": ctx["uid"], "created_by_name": ctx["op_name"], "timestamp": now,
+        "delivered_at": now, "delivered_by": ctx["op_name"],
+        "backfilled": True, "backfill_day": ctx["day"], "backfill_at": now, "recon": True,
+    }
+    await db.save_order(order["order_id"], order)
+    try:
+        from owner_routes import notify_owners_force
+        await notify_owners_force(
+            "orders.backfilled",
+            f"📅 *Заказ по сверке смены*\n"
+            f"За {ctx['day'][8:10]}.{ctx['day'][5:7]} · #{order['order_id']}\n"
+            f"Внёс: {ctx['op_name']} · район {dist.get('name') or oid} · водитель {ctx['name']}\n"
+            f"💰 *{total} AED* — уже числится доставленным\n"
+            f"🛒 " + ", ".join(f"{i.get('name', '')} ×{i.get('qty', 1)}" for i in items))
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[pos] recon order notify failed: {e}")
+    log.info(f"[pos] заказ по сверке #{order['order_id']} за {ctx['day']} "
+             f"({ctx['op_name']}, {total} AED, {ctx['name']})")
+    return order["order_id"]
+
+
+@require_operator
+@no_test_mode
+async def handle_recon_fact(request):
+    """POST {as, driver, day?, ok} — «Так и есть»: наличных у водителя столько,
+    сколько он насчитал; разница с приложением — факт за ним. ok:false —
+    снять. Недостача уходит на решение старшему (fines_auto cash_short)."""
+    ctx, err = await _recon_ctx(request)
+    if err:
+        return err
+    import shift_recon
+    if ctx["body"].get("ok") is False:
+        doc = await shift_recon.op_fact_undo(ctx["day"], ctx["name"])
+        log.info(f"[pos] сверка {ctx['name']} {ctx['day']}: подтверждение наличных снято ({ctx['who']})")
+    else:
+        doc = await shift_recon.op_fact(ctx["day"], ctx["name"], ctx["who"], ctx["cash_now"])
+        if not doc:
+            return web.json_response({"error": "no_cash"}, status=409, headers=CORS_HEADERS)
+        gap = int(doc.get("op_gap") or 0)
+        f = shift_recon._fmt
+        await tell_driver(ctx["name"], f"✅ Оператор подтвердил наличные: <b>{f(doc['op_fact'])} AED</b>"
+                          + (f" · по приложению {f(doc.get('op_cash_app'))}, разница "
+                             f"<b>{'+' if gap > 0 else '−'}{f(abs(gap))}</b>" if gap else ""))
+        if gap < 0:
+            try:
+                import fines_auto
+                await fines_auto.propose(
+                    "cash_short", ctx["name"], ctx["oid"], ctx["day"],
+                    note=f"сверка {ctx['day'][8:10]}.{ctx['day'][5:7]}: на руках {f(doc['op_fact'])}, "
+                         f"по приложению {f(doc.get('op_cash_app'))}",
+                    key="recon", amount=-gap)
+            except Exception as e:                           # noqa: BLE001
+                log.warning(f"[pos] недостача по сверке в штрафы не ушла: {e}")
+    return web.json_response({"ok": True, "recon": shift_recon.view(doc, ctx["cash_now"])},
+                             headers=CORS_HEADERS)
+
+
+@require_operator
+@no_test_mode
+async def handle_recon_fix(request):
+    """POST {as, driver, day?, pid, delta, pcs?, ok} — ответ на правку товара.
+    Принятая «+N» — заказ той же смены этим водителем; «−N» оператор правит в
+    заказе руками и отвечает «Готово» (ok:true). Отклонил — ok:false."""
+    ctx, err = await _recon_ctx(request)
+    if err:
+        return err
+    import shift_recon
+    b = ctx["body"]
+    pid = str(b.get("pid") or "")
+    try:
+        delta, pcs = int(float(b.get("delta") or 0)), int(float(b.get("pcs") or 0))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_fix"}, status=400, headers=CORS_HEADERS)
+    ok = bool(b.get("ok"))
+    fix = next((x for x in ctx["doc"].get("fixes") or []
+                if x.get("pid") == pid and int(x.get("delta") or 0) == delta
+                and int(x.get("pcs") or 0) == pcs), None)
+    if not fix:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if fix.get("ok") is not None:
+        return web.json_response({"error": "answered"}, status=409, headers=CORS_HEADERS)
+    order_id = ""
+    if ok and delta > 0:
+        try:
+            order_id = await _recon_order(ctx, pid, delta, pcs)
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400, headers=CORS_HEADERS)
+    doc = await shift_recon.op_fix(ctx["day"], ctx["name"], pid, delta, pcs, ok, ctx["who"], order_id)
+    what = f"{'+' if delta > 0 else '−'}{abs(delta)} {fix.get('name') or pid}" + (f" ×{pcs}" if pcs else "")
+    await tell_driver(ctx["name"], (f"✅ Оператор принял правку: {what}" + (f" — заказ #{order_id}" if order_id else ""))
+                      if ok else f"❌ Оператор отклонил правку: {what}")
+    log.info(f"[pos] сверка {ctx['name']} {ctx['day']}: правка {what} — {'принята' if ok else 'отклонена'} ({ctx['who']})")
+    return web.json_response({"ok": True, "order_id": order_id,
+                              "recon": shift_recon.view(doc, await _recon_cash_now(ctx))},
+                             headers=CORS_HEADERS)
 
 
 # ── остатки по районам: только смотреть ─────────────────────────────────────
@@ -3055,6 +3246,17 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
             "crew_shift": {n: crew_shift.get(n) or {"open": False, "closed": False}
                            for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])},
         })
+    # Сверка смены (shift_recon, владелец, 9 окт 2026): у кого несовпадение
+    # без ответа оператора — район мигает в панели.
+    try:
+        import shift_recon
+        rc = await shift_recon.alerts_for(day.isoformat(), None, orders)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[pos] сверка смены: {e}")
+        rc = []
+    by_rc = {r["district"]: r["drivers"] for r in rc}
+    for x in out:
+        x["recon"] = by_rc.get(x["district"]) or []
     return {"day": day.isoformat(), "districts": out,
             "all_closed": bool(out) and all(x["closed"] for x in out),
             "all_open": bool(out) and all(x["opened"] for x in out)}
@@ -3478,6 +3680,23 @@ async def handle_shift_close(request):
             {"error": "too_early", "hours": round(часов, 1),
              "drivers": await _on_shift(day.isoformat(), oid)},
             status=409, headers=CORS_HEADERS)
+    # Сверка смены (владелец, 9 окт 2026): район с висящей сверкой — кто
+    # итоги не подтвердил, у кого наличных не столько, чьи правки без ответа —
+    # закрывают только осознанно. Вопрос, не запрет: панель спрашивает
+    # «Вернуться к сверке» / «Закрыть всё равно» и повторяет с force_recon.
+    if not body.get("force_recon"):
+        try:
+            import shift_recon
+            probs = await shift_recon.district_problems(
+                day.isoformat(), oid, await _on_shift(day.isoformat(), oid),
+                list((await db.orders_from(_bizday.since_utc(day.isoformat()))).values()))
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[pos] сверка перед закрытием {oid}: {e}")
+            probs = []
+        if probs:
+            return web.json_response({"error": "recon_open", "problems": probs,
+                                      "text": shift_recon.problems_text(probs)},
+                                     status=409, headers=CORS_HEADERS)
     ok = await db.shift_close(day.isoformat(), oid, {
         "closed_at": datetime.now(timezone.utc), "by": request.get("op_id") or 0,
         "by_name": who, "operator": mine["operator"],
@@ -4044,6 +4263,10 @@ def setup(app):
         r.add_route(_m, _p, _h)
     r.add_route("OPTIONS", "/api/operator/day/board", _opt)
     r.add_get("/api/operator/day/board", handle_day_board)
+    r.add_route("OPTIONS", "/api/operator/recon/fact", _opt)
+    r.add_post("/api/operator/recon/fact", handle_recon_fact)
+    r.add_route("OPTIONS", "/api/operator/recon/fix", _opt)
+    r.add_post("/api/operator/recon/fix", handle_recon_fix)
     r.add_route("OPTIONS", "/api/operator/stock/board", _opt)
     r.add_get("/api/operator/stock/board", handle_stock_board)
     r.add_get("/api/operator/move/board", handle_move_board)

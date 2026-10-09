@@ -7071,3 +7071,43 @@ async def close_reqs_of_day(day: str) -> list:
         {"day": day, "close_req": {"$exists": True}},
         {"_id": 0, "driver": 1, "day": 1, "close_req": 1, "shift_open_at": 1,
          "shift_close_at": 1, "meal_rate": 1, "meal_cut": 1}).to_list(length=200)
+
+
+# ── Сверка смены (shift_recon.py, владелец, 9 окт 2026) ─────────────────────
+#   shift_recon {_id: день:водитель, day, driver, district,
+#                cash — наличных на руках по счёту водителя (дирхамы, без валюты),
+#                cash_app — по приложению на момент отметки, ok: [1,2,3] — отмеченные
+#                шаги (деньги, заказы, товар), ok_at, confirmed_at — все три отмечены,
+#                fixes: [{pid, name, delta, pcs, at, ok: None|True|False, by, order_id}],
+#                fixes_status: '' | sent | done, op_fact/op_gap/op_fact_by/op_fact_at —
+#                оператор подтвердил наличные, alert_sig/alert_at — что и когда ушло
+#                оператору ярким сообщением}
+async def recon_get(day: str, driver: str) -> dict | None:
+    d = _db_or_none()
+    if d is None or not driver: return None
+    return await d.shift_recon.find_one({"_id": f"{day}:{driver}"})
+
+
+async def recon_put(day: str, driver: str, fields: dict) -> dict | None:
+    """Записать поля сверки (upsert) и вернуть документ целиком."""
+    d = _db_or_none()
+    if d is None or not driver: return None
+    from pymongo import ReturnDocument
+    f = {k: v for k, v in fields.items() if k != "_id"}
+    return await d.shift_recon.find_one_and_update(
+        {"_id": f"{day}:{driver}"},
+        {"$set": {**f, "day": day, "driver": driver}},
+        upsert=True, return_document=ReturnDocument.AFTER)
+
+
+async def recon_for_day(day: str) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    return await d.shift_recon.find({"day": day}).to_list(length=200)
+
+
+async def recon_between(day_from: str, day_to: str) -> list:
+    """Сверки за отрезок — книге дня нужны подтверждённые оператором факты."""
+    d = _db_or_none()
+    if d is None: return []
+    return await d.shift_recon.find({"day": {"$gte": day_from, "$lte": day_to}}).to_list(length=2000)

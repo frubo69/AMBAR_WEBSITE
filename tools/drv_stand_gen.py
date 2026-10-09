@@ -42,6 +42,29 @@ const ST_SUM = {day:'2026-09-14', opened_at:'2026-09-14T08:12:00+04:00', on_hand
         spent:[{t:'Заправка', aed:150}, {t:'Парковка', aed:36}, {t:'Охрана', aed:60}], spent_sum:246,
         got:30, got_list:[{t:'Нам вернули', aed:30}], meal:80, bonus:15, card_spent:0, card_got:0, pending:2,
         revenue:1619, revenue_aed:1514, keep:95, in_hand:1834}};
+// Сверка смены (9 окт 2026): заказы и товар строками, состояние сверки.
+// ?recon=sent — правки уже у оператора; ?recon=ok — всё сверено.
+ST_SUM.list = [
+  {id:'AMB1', t:'13:05', a:'Marina · Dusit Residence', aed:295, pay:''}, {id:'AMB2', t:'14:40', a:'JBR · Sadaf 4', aed:380, pay:''},
+  {id:'AMB3', t:'16:10', a:'Marina · Botanica', aed:260, pay:'крипта'}, {id:'AMB4', t:'17:55', a:'Al Sufouh · Acacia', aed:420, pay:''},
+  {id:'AMB5', t:'19:30', a:'Marina · Marina Gate 2', aed:170, pay:''}, {id:'AMB6', t:'20:45', a:'JBR · Rimal 3', aed:600, pay:''},
+  {id:'AMB7', t:'22:15', a:'Marina · Princess Tower', aed:365, pay:'перевод'}, {id:'AMB8', t:'23:50', a:'Media City · Loft Offices', aed:570, pay:''},
+  {id:'AMB9', t:'01:20', a:'Marina · Ocean Heights', aed:95, pay:'без оплаты'}];
+ST_SUM.sold = [
+  {id:'p10', name:'Red Label 1 ltr', cat:'Виски', qty:2, aed:200}, {id:'p14', name:'Jameson 1 ltr', cat:'Виски', qty:1, aed:170},
+  {id:'p1', name:'Absolut 1 ltr', cat:'Водка', qty:4, aed:380}, {id:'p7', name:'Grey Goose 1 ltr', cat:'Водка', qty:1, aed:260},
+  {id:'p5', name:'Smirnoff Vodka 1 ltr', cat:'Водка', qty:2, aed:190},
+  {id:'p55', name:"Gordon's 1 ltr", cat:'Джин', qty:2, aed:200}, {id:'p56', name:'Bombay Sapphire 1 ltr', cat:'Джин', qty:1, aed:150},
+  {id:'p78', name:'Baileys 1 ltr', cat:'Ликёр', qty:2, aed:360},
+  {id:'p105', name:'Jacob Creek Shiraz 0.75', cat:'Вино', qty:3, aed:300},
+  {id:'p43', name:'Corona Extra 0.355', cat:'Пиво', pack:12, qty:2, aed:600}, {id:'p37', name:'Red Horse 0.5', cat:'Пиво', pack:12, qty:1, aed:220},
+  {id:'p31', name:'Heineken 0.33', cat:'Пиво', pack:12, qty:1, aed:125}];
+ST_SUM.recon = {ok: [], cash: null, cash_app: 1729, diff: null, confirmed: false, fixes: [], fixes_status: '', fix_open: 0,
+  op_fact: null, op_gap: null, mismatch: false, alert: false, started: false};
+if(ST_Q.get('recon') === 'sent') Object.assign(ST_SUM.recon, {ok: [1, 2], cash: 2029, diff: 300,
+  fixes: [{pid: 'p10', name: 'Red Label 1 ltr', delta: 2, ok: null}, {pid: 'p78', name: 'Baileys 1 ltr', delta: -1, ok: null}], fixes_status: 'sent', fix_open: 2, mismatch: true, alert: true});
+if(ST_Q.get('recon') === 'ok') Object.assign(ST_SUM.recon, {ok: [1, 2, 3], cash: 1729, diff: 0, confirmed: true,
+  fixes: [{pid: 'p10', name: 'Red Label 1 ltr', delta: 2, ok: true, order_id: 'AMB0000X'}], fixes_status: 'done'});
 // &debt=1 — в смене был заказ в долг: товар уехал, денег за него нет.
 if(ST_Q.get('debt')){
   ST_SUM.pay.debt = {n:1, aed:250};
@@ -168,6 +191,22 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     return taken ? {mine: [], free: [], extra: [], taken: [{...t, driver: 'Фарух'}]} : {mine: [], free: [t], extra: [], taken: []};
   }
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
+  if(path === '/api/driver/shift/recon' && m === 'POST'){
+    // Сервер сверки (shift_recon) в двух словах: число снимает отметку «Деньги»,
+    // правки снимают «Товар» и уходят на сверку, три отметки — подтверждено.
+    const b = opts.body || {}, r = ST_SUM.recon; stLog('API POST recon ' + JSON.stringify(b));
+    const fail = err => { throw Object.assign(new Error(err), {payload: {error: err}}); };
+    if('cash' in b){ r.cash = b.cash; r.ok = r.ok.filter(x => x !== 1); }
+    if('step' in b){
+      if(b.ok){ if(b.step === 1 && r.cash == null) fail('need_cash'); if(b.step === 3 && r.fixes_status === 'sent') fail('fixes_open');
+                if(!r.ok.includes(b.step)) r.ok.push(b.step); }
+      else r.ok = r.ok.filter(x => x !== b.step); }
+    if('fixes' in b){ r.fixes = (b.fixes || []).map(f => ({...f, name: (ST_SUM.sold.find(x => x.id === f.pid) || {name: f.pid}).name, ok: null}));
+      r.fixes_status = r.fixes.length ? 'sent' : ''; r.fix_open = r.fixes.length; r.ok = r.ok.filter(x => x !== 3); }
+    r.ok.sort(); r.confirmed = [1, 2, 3].every(n => r.ok.includes(n)); r.diff = r.cash == null ? null : r.cash - r.cash_app;
+    r.mismatch = r.ok.includes(1) && !!r.diff; r.alert = r.mismatch || r.fix_open > 0;
+    return {recon: JSON.parse(JSON.stringify(r))};
+  }
   if(path.split('?')[0] === '/api/driver/shift/summary') return {...ST_SUM, ...(ST_SHIFT.after_close ? {closed_at: ST_SHIFT.report_closed_at} : {})};   // ?day= — просмотр закрытой
   if(path === '/api/driver/shift/close' && m === 'POST'){ stLog('API POST ' + path); const at = new Date().toISOString(); return {...ST_SHIFT, closed: true, closed_at: at, after_close: true, report_day: ST_SHIFT.day, report_closed_at: at, can_close: false, can_open: false, in_route: [], must: []}; }
   if(path === '/api/driver/shift') return ST_SHIFT;

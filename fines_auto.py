@@ -49,6 +49,10 @@ KINDS = {
     "exp_rejected": {"reason": "Отклонённый расход", "action": "fine"},
     "noscan_debt": {"reason": "Приёмка без сканирования не досканирована", "action": "fine"},
     "shift_left": {"reason": "Смена не закрыта", "action": "fine"},
+    # Сверка смены (владелец, 9 окт 2026): оператор подтвердил, что наличных
+    # у водителя меньше, чем по приложению, — недостача на решение старшему.
+    # Сумма — сама недостача, а не из правил: var — «сумма из события».
+    "cash_short": {"reason": "Недостача наличных по сверке смены", "action": "fine", "var": True},
 }
 
 
@@ -88,7 +92,7 @@ def full_text(d: dict) -> str:
         r = re.search(r"до (\d{1,2}):00", note)
         rule = d.get("rule_hour") or (int(r.group(1)) if r else 18)
         return f"Открытие смены позже {rule}:00" + (f"{nb}— смена открыта в{nb}{hm}" if hm else "")
-    if kind in ("exp_rejected", "noscan_debt", "shift_left"):
+    if kind in ("exp_rejected", "noscan_debt", "shift_left", "cash_short"):
         note = str(d.get("note") or "").strip()
         return (KINDS[kind]["reason"] + (f"{nb}— {note}" if note else ""))
     return d.get("reason") or ""
@@ -159,7 +163,7 @@ async def geo_off(name: str, district: str, day: str, at_hm: str, by_signal: boo
 
 
 async def propose(kind: str, name: str, district: str, day: str, note: str = "",
-                  key: str = "", ref: dict | None = None) -> bool:
+                  key: str = "", ref: dict | None = None, amount: int | None = None) -> bool:
     """Нарушение, которое заметила программа, — на решение старшему, с суммой
     из правил. True — новая запись (о ней стоит сказать).
 
@@ -178,7 +182,11 @@ async def propose(kind: str, name: str, district: str, day: str, note: str = "",
             return False
     except Exception:                                        # noqa: BLE001
         pass
-    amount = await fine_rules.amount(kind, 0)
+    # Сумма из события (недостача по сверке) — как есть; иначе из правил, и
+    # ноль там значит «не предлагать».
+    if amount is None or not KINDS[kind].get("var"):
+        amount = await fine_rules.amount(kind, 0)
+    amount = int(amount or 0)
     if amount <= 0:
         return False
     doc = {"_id": f"{kind}:{day}:{name}" + (f":{key}" if key else ""), "kind": kind, "name": name,

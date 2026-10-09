@@ -81,7 +81,7 @@ async def main():
     eq("районы по порядку кодов", [z["code"] for z in r["districts"]], sorted(z["code"] for z in r["districts"]))
     eq("мои районы", r["mine"], ["jvc"])
     eq("в ответе только числа и имена", sorted(x.keys()),
-       sorted(["id", "code", "name", "operator", "done", "aed", "work", "work_aed", "new", "cancelled", "drivers"]))
+       sorted(["id", "code", "name", "operator", "done", "aed", "work", "work_aed", "new", "cancelled", "drivers", "recon_alert"]))
 
     r = await board(**{"as": "x", "day": "yesterday"})
     x = next(z for z in r["districts"] if z["id"] == d0["id"])

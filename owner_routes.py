@@ -4583,6 +4583,34 @@ async def cash_round(day: str) -> dict:
                     "empty": empty, "done": done, "solo_today": solo_today,
                     "done_at": str(m.get("at") or ""),
                     "later": later, "later_at": str(m.get("at") or "") if later else ""})
+    # Сверка смены (shift_recon, владелец, 9 окт 2026): у района — факт
+    # («Сдали по факту», вписанный старшим, или подтверждённые оператором
+    # наличные водителей), разница с приложением и строки водителей.
+    try:
+        import shift_recon
+        rc = await shift_recon.star_rows(day, orders, marks)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] сверка за {day}: {e}")
+        rc = {}
+    for x in out:
+        r = rc.get(x["id"]) or {}
+        fact = r.get("fact")
+        if fact is not None:
+            gap, src = int(fact) - int(x["net"]), "fact"
+            # Вписали раньше, заказы с тех пор поменялись — разница в отметке
+            # освежается: по ней книга дня считает «Собрал по факту».
+            if r.get("fact_gap") != gap:
+                try:
+                    await db.checklist_put(day, f"cashfact:{x['id']}",
+                                           {**(marks.get(f"cashfact:{x['id']}") or {}), "gap": gap})
+                except Exception as e:                       # noqa: BLE001
+                    log.warning(f"[cash] разница факта {x['id']}: {e}")
+        elif r.get("op_n"):
+            gap, src = int(r.get("op_gap") or 0), "op"
+        else:
+            gap, src = 0, ""
+        x.update({"fact": fact, "fact_at": r.get("fact_at") or "", "gap": gap, "gap_src": src,
+                  "recon": r.get("rows") or []})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
             "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
             # Решено по всем: получил или «Соберу завтра» — строка чек-листа
@@ -4627,6 +4655,46 @@ async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "")
             if m.get("via") == day:
                 await db.checklist_put(d, f"cash:{oid}", None)
         await db.checklist_set(day, f"cash:{oid}", False, who)
+
+
+@require_owner
+async def handle_cash_fact(request):
+    """POST /api/owner/cash-round/fact {day, district, fact} — «Сдали по
+    факту»: сколько старший получил по району на самом деле (null — снять).
+    Последнее слово за тем, кто считал деньги руками: это число главнее
+    подтверждённого оператором. Разница с приложением уходит в книгу дня
+    (shift_recon.book_gaps)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    day = str(body.get("day") or "").strip()
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    oid = str(body.get("district") or "").strip()
+    if oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    fact = body.get("fact")
+    who = str(request.get("owner_id") or "")
+    if fact is None or str(fact).strip() == "":
+        await db.checklist_put(day, f"cashfact:{oid}", None)
+        log.info(f"[cash] {day} {OFFICE_CODES.get(oid, oid)}: «сдали по факту» снято")
+    else:
+        try:
+            v = int(round(float(fact)))
+        except (TypeError, ValueError):
+            return web.json_response({"error": "bad_fact"}, status=400, headers=CORS_HEADERS)
+        if v < 0 or v > 9_999_999:
+            return web.json_response({"error": "bad_fact"}, status=400, headers=CORS_HEADERS)
+        await _staff_fresh()
+        cr0 = await cash_round(day)
+        x = next((d for d in cr0["districts"] if d["id"] == oid), None) or {"net": 0}
+        await db.checklist_put(day, f"cashfact:{oid}", {"fact": v, "gap": v - int(x["net"]), "by": who})
+        log.info(f"[cash] {day} {OFFICE_CODES.get(oid, oid)}: сдали по факту {v} · по приложению {x['net']}")
+    return web.json_response({"ok": True, **(await cash_round(day))}, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 @require_owner
@@ -5131,6 +5199,26 @@ async def handle_checklist(request):
         row.update({"state": "late" if any(v["days"] <= 3 for v in визы) else "now", "due": "", "late_min": 0})
         rows.append(row)
 
+    # Сверка смены (владелец, 9 окт 2026): несовпадения без ответа оператора и
+    # правки без ответа — красным; подтверждённые факты с разницей — пока
+    # владелец не отметил, что посмотрел (излишек остаётся доходом дня, но
+    # горит здесь).
+    try:
+        import shift_recon
+        rc_items = await shift_recon.checklist_items(
+            day, list((await db.orders_from(_bizday.since_utc(day))).values()))
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] сверка не прочитана: {e}")
+        rc_items = []
+    if rc_items:
+        seen = bool((marks.get("recon") or {}).get("done"))
+        bad = any(x["bad"] for x in rc_items)
+        hint = " · ".join(x["text"] for x in rc_items[:4]) + (f" · ещё {len(rc_items) - 4}" if len(rc_items) > 4 else "")
+        row = _chk_row("recon", "Сверка смены", hint, seen and not bad, now, day, plan, go="cash", n=len(rc_items))
+        row.update({"state": "done" if (seen and not bad) else ("late" if bad else "now"),
+                    "due": "", "late_min": 0})
+        rows.append(row)
+
     # Порядок задан планом и не пляшет по цвету: список должен читаться как
     # один и тот же список, а не пересобираться каждый час.
     rank = {p[0]: i for i, p in enumerate(plan)}
@@ -5199,7 +5287,7 @@ async def handle_checklist_mark(request):
         body = {}
     day = (body.get("day") or "").strip()
     item = (body.get("item") or "").strip()
-    ok_item = item in CHK_MANUAL | {"shortfall"} or (
+    ok_item = item in CHK_MANUAL | {"shortfall", "recon"} or (
         item.startswith("cash:") and item[5:] in OFFICE_IDS)
     if not day or not ok_item:
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
@@ -5534,6 +5622,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/cash-round", handle_cash_round)
     app.router.add_route("OPTIONS", "/api/owner/cash-round/later", handle_cash_later)
     app.router.add_post(            "/api/owner/cash-round/later", handle_cash_later)
+    app.router.add_route("OPTIONS", "/api/owner/cash-round/fact", handle_cash_fact)
+    app.router.add_post(            "/api/owner/cash-round/fact", handle_cash_fact)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)

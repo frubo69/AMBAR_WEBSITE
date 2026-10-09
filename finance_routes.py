@@ -1119,6 +1119,15 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     cb = await crypto_book.state()
     opening["opening"]["rp_cr_open"] = crypto_book.rp_before(cb["by_day"], days[0])
     free_run = cb["free_fact"] if cb["ready"] else 0.0     # по факту на кошельке, не по книге
+    # Сверка смены (shift_recon, владелец, 9 окт 2026): разница по факту —
+    # подтверждённая оператором у водителя или вписанная старшим в «Сборе
+    # выручки» — встаёт в «Собрал по факту», пока число не вписано руками здесь.
+    try:
+        import shift_recon
+        recon_gaps = await shift_recon.book_gaps(days[0], days[-1])
+    except Exception as e:                        # noqa: BLE001
+        log.warning(f"[fin] сверка {month}: {e}")
+        recon_gaps = {}
     rows, meta = [], {}
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
@@ -1127,10 +1136,13 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         # минус чай (он водителя) минус расходы водителей наличными; как в
         # обзоре. Оплаченное безналом наличных не тронуло — не вычитаем.
         handed = s["cash"] - s["tips_cash"] - (sp["spend"] - sp["card"]) - sp["kept"]
+        past = d <= today
         fact = m.get("handed_fact")
+        fact_src = "manual" if fact is not None else ""
+        if fact is None and past and recon_gaps.get(d):
+            fact, fact_src = handed + recon_gaps[d], "recon"
         base = handed if fact is None else calc._n(fact)
         ordered = m["ordered_fact"] if m.get("ordered_fact") is not None else pu["ordered"]
-        past = d <= today
         # предложение раскладки (владелец, 12 сен 2026): Барракуде — ровно
         # половина выручки, в РП+ — норма дня из бюджета, остаток — ЧП+;
         # старший подтверждает или правит, вписанное руками главнее
@@ -1175,7 +1187,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
             debt=s["debt"], tips=s["tips"], spend=sp["spend"], handed=handed,
-            handed_fact=fact, ordered=ordered, ordered_extra=pu["ordered_extra"], kept=sp["kept"],
+            handed_fact=fact, handed_src=fact_src, ordered=ordered, ordered_extra=pu["ordered_extra"], kept=sp["kept"],
             aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash, extra_cr=extra_cr,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             dep_back=dep_back, dep_lost=dep_lost,

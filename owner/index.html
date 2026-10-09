@@ -2418,6 +2418,28 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* «Соберу завтра» — своя у каждого района, рядом с «Получил» и тише его:
    главное действие — получить. Нажата — янтарная, как отметка в шапке
    карточки; нажать ещё раз — снять. */
+/* Сверка смены (владелец, 9 окт 2026): «Сдали по факту» — поле и разница с
+   приложением; под ним строки водителей — что насчитал, что сказал оператор. */
+.cr-fact{display:flex;align-items:center;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)}
+.cr-fact i{flex:0 0 auto;font-style:normal;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.cr-fact .in{flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:42px;padding:0 13px;border-radius:12px;background:var(--card2);border:1px solid var(--border3)}
+.cr-fact .in input{width:100%;min-width:0;background:none;border:0;outline:none;color:var(--text);font:700 19px/1 'Space Grotesk',sans-serif;letter-spacing:-.3px}
+.cr-fact .in input::placeholder{color:var(--muted)}
+.cr-fact .in u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted)}
+.cr-fact b{flex:0 0 auto;min-width:54px;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+.cr-fact b.dn{color:var(--dn)}
+.cr-fact b.ok{color:var(--up);display:inline-flex;justify-content:flex-end;align-items:center;gap:5px;font-size:13px}
+.cr-fact b.ok svg{width:14px;height:14px}
+.cr-rcs{margin-top:8px}
+.cr-rc{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2);font-size:12.5px}
+.cr-rc .nm{flex:0 0 auto;font-weight:600;color:var(--text)}
+.cr-rc .st{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr-rc .st.warn{color:var(--warn,#F3B44A)}
+.cr-rc b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+.cr-rc b.dn{color:var(--dn)}
+.cr-rc b.ok{color:var(--up);display:inline-flex;align-items:center}
+.cr-rc b.ok svg{width:13px;height:13px}
+
 .cr-acts{display:flex;gap:8px;margin-top:12px}
 .cr-acts .cr-ok{margin-top:0;flex:1 1 auto;min-width:0}
 .cr-later{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:6px;
@@ -19958,6 +19980,7 @@ function crCard(x){
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}${
       долг ? ` · ${долг}` : ''}</div>
+    ${crFactRow(x)}${crReconRows(x)}
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
@@ -19975,6 +19998,49 @@ function crCard(x){
         x.later ? IC('check', 14) : ''}Соберу завтра</button>` : ''}
     </div>
   </div>`;
+}
+
+// «Сдали по факту» (владелец, 9 окт 2026): сколько старший получил по району
+// на самом деле. Пусто — по приложению; подтверждённые оператором наличные
+// водителей дают подсказку и разницу сами. Разница уходит в книгу дня строкой
+// «Собрал по факту». Последнее слово за тем, кто считал деньги руками.
+function crFactRow(x){
+  const факт = x.fact, оп = x.gap_src === 'op' ? x.gap : null;
+  const разн = факт != null ? факт - x.net : оп;
+  const right = разн == null ? '<b></b>'
+    : разн === 0 ? `<b class="ok">${IC('check', 14)}сошлось</b>`
+    : `<b class="${разн < 0 ? 'dn' : ''}">${разн > 0 ? '+' : '−'}${fmt(Math.abs(разн))}</b>`;
+  return `<div class="cr-fact"><i>Сдали по факту</i><span class="in"><input inputmode="numeric" maxlength="8"
+      value="${факт == null ? '' : fmt(факт)}" placeholder="${fmt(x.net + (оп || 0))}"
+      onchange="crFact('${escS(x.id)}', this.value)" ${x.done && факт == null ? '' : ''}><u>AED</u></span>${right}</div>`;
+}
+// Сверка водителей района: что насчитал, что ответил оператор, правки товара.
+function crReconRows(x){
+  const rows = x.recon || [];
+  if(!rows.length) return '';
+  return `<div class="cr-rcs">${rows.map(r => {
+    const d = r.op_fact != null ? r.op_gap : (r.diff != null && r.ok >= 1 ? r.diff : null);
+    const st = r.op_fact != null ? `оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`
+      : r.mismatch ? 'ждёт оператора' : r.confirmed ? 'сверил' : r.ok ? `сверил ${r.ok} из 3` : 'считает';
+    const fixes = (r.fixes || []).length ? ' · ' + r.fixes.map(f => (f.delta > 0 ? '+' : '−') + Math.abs(f.delta) + ' ' + escS(f.name)
+      + (f.ok === true ? ' — принято' : f.ok === false ? ' — отклонено' : ' — ждёт')).join(', ') : '';
+    const num = d == null ? '' : d === 0 ? `<b class="ok">${IC('check', 13)}</b>`
+      : `<b class="${d < 0 ? 'dn' : ''}">${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}</b>`;
+    return `<div class="cr-rc"><span class="nm">${escS(r.name)}</span><span class="st${r.mismatch || r.fix_open ? ' warn' : ''}">${
+      r.cash != null ? `на руках ${fmt(r.cash)} · ` : ''}${st}${fixes}</span>${num}</div>`;
+  }).join('')}</div>`;
+}
+async function crFact(id, v){
+  if(!CR || CR_BUSY) return;
+  const n = String(v || '').replace(/[^\d]/g, '');
+  CR_BUSY = true;
+  try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round/fact',
+         {method: 'POST', body: {day: CR.day, district: id, fact: n === '' ? null : +n}}); }
+  catch(e){ _toast('Не удалось записать'); CR_BUSY = false; return; }
+  CR_BUSY = false;
+  crRender();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  CKL = null;                       // чек-лист перечитается при возврате
 }
 
 // Строка расхода: когда · что · кто · сколько. Ждущее решения — серым и без
@@ -20231,7 +20297,7 @@ function crDistCard(day){
   return `<div class="sc fb-gut crd${b.ok ? ' ok' : ''}" id="crd-${day}">
     <div class="sc-cap"><span>${escS(title)}</span><i class="crd-st${b.ok ? ' ok' : ''}">${
       b.ok ? IC('check', 12) + 'согласовано' + (b.ok_by ? ' · ' + escS(b.ok_by) : '') : 'ждёт согласования'}</i></div>
-    <div class="sc-r fb-r"><span>Выручка${b.handed_fact != null ? '<i>по факту</i>' : ''}</span><b>${fbFmt(b.base)}<u>AED</u></b></div>
+    <div class="sc-r fb-r"><span>Выручка${b.handed_fact != null ? (b.handed_src === 'recon' ? '<i>по сверке</i>' : '<i>по факту</i>') : ''}</span><b>${fbFmt(b.base)}<u>AED</u></b></div>
     <div class="sc-r fb-r crd-r${ed ? ' fb-i' : ''}"><em class="fb-sign">−</em><span>Барракуда<i>${
       !ed && aside === half ? 'половина выручки' : 'половина — ' + fbFmt(half)}</i></span>${val('aside', aside)}</div>
     ${crOn ? `<div class="sc-r fb-r crd-r crd-cr${ed ? ' fb-i' : ''}"><em class="fb-sign">+</em><span>РП+ криптой<i>${

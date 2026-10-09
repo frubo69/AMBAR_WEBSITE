@@ -50,6 +50,10 @@ opr._staff_mod.DISTRICT_DRIVERS = {"alguses": ["Джавид", "Сунат", "Д
 db.shift_close = _close
 db.get_driver_day = _dd
 db.driver_track_clear = lambda names: asyncio.sleep(0, 0)
+# Сверка смены (9 окт 2026) задаёт свой вопрос перед закрытием — здесь проверяем
+# возраст дня, сверку выключаем (у неё свой тест: test_shift_recon).
+import shift_recon                                                # noqa: E402
+shift_recon.district_problems = lambda *a, **k: asyncio.sleep(0, [])
 
 
 async def закрыть(**body):

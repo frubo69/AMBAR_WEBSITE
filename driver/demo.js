@@ -338,6 +338,28 @@ function shiftView(){
     released: !!(S.cr && S.cr.status === 'ok'), operator: 'Умар',
   };
 }
+function hhmmOf(ms){ if(!ms) return ''; const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function soldLines(done){
+  const acc = {};
+  done.forEach(o => (o.items || []).forEach(it => {
+    const k = it.id + '|' + (it.pcs || 0);
+    const r = acc[k] || (acc[k] = {id: it.id, name: String(it.name || '').split(' ×')[0], cat: 'Продано', qty: 0, aed: 0, ...(it.pcs ? {pack: it.pcs} : {})});
+    r.qty += +it.qty || 0; r.aed += (+it.line_total || (+it.price || 0) * (+it.qty || 0));
+  }));
+  return Object.values(acc);
+}
+// Состояние сверки — как shift_recon.view на сервере, в памяти демо.
+function reconView(done){
+  const r = S.recon || (S.recon = {ok: [], cash: null, fixes: [], fixes_status: ''});
+  const h = demoHand(done || S.ord.filter(o => o.delivered_at));
+  const cashApp = Math.round(h.in_hand - h.fx.reduce((a, x) => a + x.aed, 0));
+  const diff = r.cash == null ? null : r.cash - cashApp;
+  const open = r.fixes.filter(f => f.ok == null).length;
+  const mismatch = r.ok.includes(1) && !!diff;
+  return {ok: r.ok.slice().sort(), cash: r.cash, cash_app: cashApp, diff, confirmed: [1, 2, 3].every(n => r.ok.includes(n)),
+          confirmed_at: '', fixes: r.fixes, fixes_status: r.fixes_status, fix_open: open, op_fact: null, op_gap: null,
+          op_fact_by: '', op_fact_at: '', mismatch, alert: mismatch || open > 0, started: !!(r.ok.length || r.cash != null || r.fixes.length)};
+}
 function summary(){
   const c = cashOnHand();
   const done = S.ord.filter(o => o.delivered_at);
@@ -359,6 +381,11 @@ function summary(){
     hand: demoHand(done),
     exp_pending: S.exp.filter(e => e.status === 'pending').length,
     writeoffs: S.wo.length, writeoff_qty: S.wo.length,
+    // Сверка смены (9 окт 2026): заказы и товар строками, состояние сверки.
+    list: done.map(o => ({id: o.order_id, t: hhmmOf(o.delivered_at), a: o.address || o.customer_name || ('#' + o.order_id),
+                          pay: o.prepaid ? 'в приложении' : '', aed: o.total})),
+    sold: soldLines(done),
+    recon: reconView(done),
     ...(S.sh.closed ? {closed_at: iso(S.sh.closed_at)} : {}),
   };
 }
@@ -507,6 +534,26 @@ function route(path, opts){
     return shiftView();
   }
   if(p === '/api/driver/shift/summary') return summary();
+  if(p === '/api/driver/shift/recon'){
+    // Сверка смены (9 окт 2026): число снимает отметку «Деньги», правки снимают
+    // «Товар» и уходят «оператору» (в демо ответа не будет), три отметки — подтверждено.
+    const r = S.recon || (S.recon = {ok: [], cash: null, fixes: [], fixes_status: ''});
+    if('cash' in body){ r.cash = body.cash == null ? null : +body.cash; r.ok = r.ok.filter(x => x !== 1); }
+    if('step' in body){
+      if(body.ok){
+        if(body.step === 1 && r.cash == null) err(400, {error: 'need_cash'});
+        if(body.step === 3 && r.fixes_status === 'sent') err(400, {error: 'fixes_open'});
+        if(!r.ok.includes(body.step)) r.ok.push(body.step);
+      } else r.ok = r.ok.filter(x => x !== body.step);
+    }
+    if('fixes' in body){
+      const names = {}; S.ord.forEach(o => (o.items || []).forEach(it => { names[it.id] = String(it.name || '').split(' ×')[0]; }));
+      r.fixes = (body.fixes || []).map(f => ({pid: f.pid, delta: +f.delta, ...(f.pcs ? {pcs: +f.pcs} : {}), name: names[f.pid] || f.pid, ok: null, by: '', order_id: '', at: ''}));
+      r.fixes_status = r.fixes.length ? 'sent' : ''; r.ok = r.ok.filter(x => x !== 3);
+    }
+    save();
+    return {recon: reconView()};
+  }
   if(p === '/api/driver/shift/close-request'){
     const v = shiftView();
     if(v.in_route.length) err(409, {error: 'orders_in_route', ids: v.in_route});

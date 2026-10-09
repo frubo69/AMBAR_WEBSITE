@@ -986,9 +986,21 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
               "aed": round(sum(float(u.get("aed") or 0) for u in ups), 2),
               "n": sum(int(l.get("qty") or 0) for u in ups for l in (u.get("lines") or [])),
               "orders": len(ups)}
+    # Сверка смены (shift_recon, владелец, 9 окт 2026): заказы и товар смены
+    # строками для шагов «Заказы» и «Товар», состояние сверки; «по приложению»
+    # для шага «Деньги» — дирхамы без валюты.
+    import shift_recon
+    try:
+        rdoc = await db.recon_get(day, me["name"])
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] сверка {me['name']} {day}: {e}")
+        rdoc = None
+    cash_now = int(round(hand["in_hand"] - sum(x["aed"] for x in hand["fx"])))
     return {
         "day": day, "opened_at": _iso_at(d.get("shift_open_at")),
         "upsell": upsell,
+        "list": shift_recon.order_rows(mine), "sold": shift_recon.sold_lines(mine),
+        "recon": shift_recon.view(rdoc, cash_now),
         "closed_at": _iso_at(d.get("shift_close_at")),
         "on_hand": int(round(cash_taken - spent + got)),
         "cash_taken": int(round(cash_taken)), "spent": spent, "got": got,
@@ -1014,6 +1026,45 @@ async def handle_shift_summary(request):
         day = ""
     return web.json_response(await _shift_summary(request["driver"], day or None),
                              headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_shift_recon(request):
+    """POST — шаг сверки смены (shift_recon, владелец, 9 окт 2026): {cash} —
+    наличных на руках по счёту водителя (дирхамы); {step, ok} — отметка на
+    шаг 1|2|3 (деньги, заказы, товар) или её снятие; {fixes: [{pid, delta,
+    pcs}]} — правки товара оператору (пустой список — отозвать). Правки сами
+    ничего не меняют — их принимает оператор. Только за текущие сутки и
+    пока своя смена не закрыта: закрытую смотрят, не правят."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    day = _biz_day()
+    d = await db.get_driver_day(day, me["name"]) or {}
+    if d.get("shift_close_at"):
+        return web.json_response({"error": "shift_closed"}, status=409, headers=CORS_HEADERS)
+    since, until = bizday.window_utc(day, day)
+    try:
+        orders = await db.get_orders_in_range(since, until, test=_tq(me))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] сверка {me['name']}: заказы не прочитаны: {e}")
+        orders = []
+    import shift_recon
+    cash_now = shift_recon.cash_app(orders, d, me["name"], day)
+    district = me.get("district") or staff.base_district(me["name"]) or ""
+    try:
+        doc = await shift_recon.driver_apply(me["name"], day, district, body, cash_now)
+    except ValueError as e:
+        return web.json_response({"error": str(e)}, status=400, headers=CORS_HEADERS)
+    try:
+        await shift_recon.maybe_alert(doc, cash_now, test=_tq(me))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] сверка {me['name']}: оператору не сказали: {e}")
+    return web.json_response({"recon": shift_recon.view(doc, cash_now)}, headers=CORS_HEADERS)
 
 
 @require_driver
@@ -3427,6 +3478,7 @@ def setup(app):
         ("/api/driver/profile",                 handle_profile,     "GET"),
         ("/api/driver/shift",                   handle_shift,       "GET"),
         ("/api/driver/shift/summary",           handle_shift_summary, "GET"),
+        ("/api/driver/shift/recon",             handle_shift_recon, "POST"),
         ("/api/driver/shift/open",              handle_shift_open,  "POST"),
         ("/api/driver/shift/close",             handle_shift_close, "POST"),
         ("/api/driver/shift/close-request",     handle_close_request, "POST"),

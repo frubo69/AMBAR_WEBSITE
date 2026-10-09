@@ -4342,7 +4342,18 @@ async function doCreate(){
       }
       toast('Заказ #'+editingOid+' обновлён','ok');
     } else {
-      const r = await opApi.opFetch('/api/operator/orders', {method:'POST', body});
+      let r;
+      try{ r = await opApi.opFetch('/api/operator/orders', {method:'POST', body}); }
+      catch(e){
+        // Смена района за эти сутки уже закрыта: заказ закрытой смены или
+        // новой — решает оператор, сервер сам не угадывает (9 окт 2026).
+        if(!(e.payload && e.payload.error==='day_closed')) throw e;
+        const p = e.payload;
+        const pick = await askPickOp(`Это заказ закрытой смены?\n${p.district||''} · ${_dayName(p.day)}${p.closed_hm ? ' · закрыта в '+p.closed_hm : ''}`,
+                                     [['closed','Вчерашняя'],['next','Новая']]);
+        if(!pick){ btn.disabled=false; renderTicket(); return; }
+        r = await opApi.opFetch('/api/operator/orders', {method:'POST', body:{...body, day_pick: pick}});
+      }
       if(r.back_date){
         toast('Заказ за '+_dayName(r.back_date)+' добавлен · '+r.total+' AED','ok');
       }else{
@@ -6391,6 +6402,21 @@ function askYesOp(текст){
       if(tg && tg.showConfirm){ tg.showConfirm(текст, ok => готово(!!ok)); return; }
     }catch(e){}
     готово(confirm(текст));
+  });
+}
+// Вопрос с двумя настоящими ответами (кнопки [[id, подпись], …]); закрыли
+// окно мимо — null. В телеграме — его окно, вне телеграма — confirm.
+function askPickOp(текст, кнопки){
+  return new Promise(готово => {
+    try{
+      if(tg && tg.showPopup){
+        tg.showPopup({message: текст, buttons: кнопки.map(([id, t]) => ({id, type: 'default', text: t}))},
+                     id => готово(id || null));
+        return;
+      }
+    }catch(e){}
+    const ok = confirm(текст + '\n\nOK — ' + кнопки[0][1] + ', Отмена — ' + кнопки[1][1]);
+    готово(ok ? кнопки[0][0] : кнопки[1][0]);
   });
 }
 

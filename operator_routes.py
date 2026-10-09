@@ -917,6 +917,32 @@ async def handle_create(request):
             back_dt = datetime(d.year, d.month, d.day, 20, n.minute, n.second,
                                tzinfo=DUBAI_TZ).astimezone(timezone.utc)
 
+    # Смену района за текущие учётные сутки уже закрыли (владелец, 9 окт
+    # 2026: два ночных заказа, вписанные в 06:13 после закрытия в 05:57,
+    # уехали в новый день). Запоздалая запись закрытой смены или настоящий
+    # новый заказ — знает только оператор: без ответа отказываем 409
+    # day_closed, ответ приходит в day_pick. «closed» — заказ той, закрытой
+    # смены: он уже случился, идёт тем же путём, что заказ задним числом
+    # (сразу доставлен, помечен backfilled), только временем — настоящим.
+    # «next» — новый: как и раньше, следующим днём (db.order_day_now).
+    if not back:
+        today_s = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+        closed = await db.shift_day_get(today_s, office_id)
+        if closed:
+            pick = str(body.get("day_pick") or "").strip()
+            if pick not in ("closed", "next"):
+                at = closed.get("closed_at")
+                try:
+                    hm = datetime.fromisoformat(str(at).replace("Z", "+00:00")).astimezone(DUBAI_TZ).strftime("%H:%M")
+                except (ValueError, TypeError):
+                    hm = ""
+                return web.json_response({"error": "day_closed", "day": today_s,
+                                          "next_day": _bizday.next_day(today_s), "closed_hm": hm,
+                                          "district": dist["name"]}, status=409, headers=CORS_HEADERS)
+            if pick == "closed":
+                back = today_s
+                back_dt = datetime.now(timezone.utc)
+
     now = (back_dt or datetime.now(timezone.utc)).isoformat()
     entered_at = datetime.now(timezone.utc).isoformat()
     op_display = _op_name(request["op_user"])

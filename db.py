@@ -2696,6 +2696,14 @@ async def order_day_now(district: str) -> str:
     return day
 
 
+async def shift_day_get(day: str, district: str) -> dict | None:
+    """Запись закрытия смены района за день (shift_days {day}:{district}) или
+    None — смену ещё не закрывали."""
+    db = _db_or_none()
+    if db is None or not district: return None
+    return await db.shift_days.find_one({"_id": f"{day}:{district}"})
+
+
 async def claim_order(oid: str, fields: dict) -> dict | None:
     db = _db_or_none()
     if db is None: return None

@@ -3101,7 +3101,8 @@ async def _send_md(token, chat_id, text, parse_mode="Markdown", reply_markup=Non
 
 async def notify_new_order(oid, total, user_name, phone, address, office,
                            uid, founder_id, premium_ids, worldwide_ids,
-                           items=None, prepaid=None, held=False, manual=None, test=False):
+                           items=None, prepaid=None, held=False, manual=None, test=False,
+                           free=False):
     """Send exactly one new-order message per user at their highest matching tier
     (orders.new1000 → orders.new500 → orders.new). VIP notification is independent.
     Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
@@ -3120,6 +3121,12 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     if prepaid:
         base += (f"\n\n✅💎 *ОПЛАЧЕНО КРИПТОЙ*\n"
                  f"{prepaid.get('amount_usdt')} USDT · TRC-20 — наличные НЕ брать")
+    if free:
+        # Заказ без оплаты (владелец, 11 окт 2026): свои, подарок, замена — денег
+        # по нему не будет и в выручку он не идёт. Такой заказ обязан быть
+        # замечен: тревога всем владельцам, мимо настроек и тихих часов.
+        base += (f"\n\n🆓 *БЕЗ ОПЛАТЫ* — денег по заказу не будет, в выручку не идёт"
+                 + (" · клиент: Фаундер" if uid and uid == founder_id else ""))
     if held:
         base = ("⏳ *ОЖИДАЕТ ВЕРИФИКАЦИИ* — клиент ещё не подтверждён.\n"
                 "Оператор получит заказ после заполнения формы.\n\n") + base
@@ -3153,17 +3160,27 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
                                          meta={"manual": True} if manual else None)
         except Exception:
             pass
+    if free:
+        # Своё событие в ленте STAR — красное, чтобы не потерялось среди новых заказов.
+        try:
+            await db.insert_notification("orders.free", f"🆓 *ЗАКАЗ БЕЗ ОПЛАТЫ #{oid}*\n\n{base}",
+                                         meta={"free": True})
+        except Exception:
+            pass
 
     if not OWNER_BOT_TOKEN:
         log.warning("[owner-notif] OWNER_BOT_TOKEN empty — skipping new-order notify")
         return
 
-    if prepaid or manual:
-        # CRYPTO (money already on the wallet) and MANUAL phone-in orders reach EVERY
-        # owner/manager, ignoring tier filters + quiet hours — a manual order once
-        # slipped past tier prefs unseen; the owner wants 100% visibility on them.
+    if prepaid or manual or free:
+        # CRYPTO (money already on the wallet), MANUAL phone-in orders and FREE
+        # (без оплаты) orders reach EVERY owner/manager, ignoring tier filters +
+        # quiet hours — a manual order once slipped past tier prefs unseen; the
+        # owner wants 100% visibility on them.
         head = ("💎 Очень крупный заказ" if total >= 1000
                 else ("💰 Крупный заказ" if total >= 500 else "🆕 Новый заказ"))
+        if free:
+            head = "🆓 ЗАКАЗ БЕЗ ОПЛАТЫ"
         tag = " · 💳 КРИПТА" if prepaid else ""
         force_text = f"*{head} #{oid}*{tag}\n\n{base}"
         try:
@@ -3173,7 +3190,7 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
             recipients = set()
         if founder_id:
             recipients.add(founder_id)
-        kind = "CRYPTO" if prepaid else "MANUAL"
+        kind = "CRYPTO" if prepaid else ("FREE" if free else "MANUAL")
         log.info(f"[owner-notif] {kind} order #{oid} → force {len(recipients)} owners: {recipients}")
         for uid_sub in recipients:
             try:

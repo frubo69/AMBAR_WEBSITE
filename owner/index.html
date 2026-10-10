@@ -36216,7 +36216,7 @@ function _buildAlerts(){
     const sevMap = {
       'orders.cancelled':'warn','orders.declined':'dn','orders.delivered':'info',
       'orders.driver_done':'warn','orders.verify_stuck':'warn','orders.reverted':'warn','orders.edited':'info',
-      'orders.backfilled':'info',
+      'orders.backfilled':'info','orders.free':'dn',
       'orders.new':'info','orders.new500':'info','orders.new1000':'info',
       'timing.late25':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
       'reviews.bad3':'dn','reviews.good5':'info','reviews.comment':'info','reviews.any':'info',
@@ -36232,7 +36232,7 @@ function _buildAlerts(){
       'orders.new':IC('box'),'orders.new500':IC('coin'),'orders.new1000':IC('gem'),
       'orders.cancelled':IC('ban'),'orders.declined':IC('xmark'),'orders.delivered':IC('check'),
       'orders.driver_done':IC('truck'),'orders.verify_stuck':IC('clock'),'orders.reverted':IC('revert'),'orders.edited':IC('edit'),
-      'orders.backfilled':IC('cal'),
+      'orders.backfilled':IC('cal'),'orders.free':IC('warn'),
       'timing.late25':IC('clock'),'timing.notAccepted5':IC('timer'),'timing.enroute30':IC('car'),
       'reviews.bad3':IC('warn'),'reviews.good5':IC('star'),'reviews.comment':IC('chat'),
       'reviews.any':IC('note'),
@@ -40578,7 +40578,7 @@ notifOv.addEventListener('click',e=>{ if(e.target===notifOv) closeNotif(); });
 
 // ======= PRESETS =======
 // 'important' mirrors default checked attrs from HTML
-const PRESET_IMPORTANT = new Set(['orders.new','orders.new1000','orders.cancelled','orders.declined',
+const PRESET_IMPORTANT = new Set(['orders.new','orders.new1000','orders.free','orders.cancelled','orders.declined',
   'timing.late25','timing.notAccepted5','timing.enroute30',
   'reviews.bad3','reviews.comment',
   'digest.morning','digest.evening',

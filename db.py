@@ -936,6 +936,7 @@ async def get_quiet_msg_id(owner_id: int) -> int | None:
 
 _DEFAULT_PREFS = {
     "orders.new": True, "orders.new500": False, "orders.new1000": True,
+    "orders.free": True,                     # заказ без оплаты — тревога всем, мимо настроек
     "orders.delivered": False, "orders.cancelled": True, "orders.declined": True,
     "orders.driver_done": True, "orders.reverted": True, "orders.edited": True,
     "orders.backfilled": True,

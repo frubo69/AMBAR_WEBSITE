@@ -59,11 +59,11 @@ ST_SUM.sold = [
   {id:'p105', name:'Jacob Creek Shiraz 0.75', cat:'Вино', qty:3, aed:300},
   {id:'p43', name:'Corona Extra 0.355', cat:'Пиво', pack:12, qty:2, aed:600}, {id:'p37', name:'Red Horse 0.5', cat:'Пиво', pack:12, qty:1, aed:220},
   {id:'p31', name:'Heineken 0.33', cat:'Пиво', pack:12, qty:1, aed:125}];
-ST_SUM.recon = {ok: [], cash: null, cash_app: 1729, diff: null, confirmed: false, fixes: [], fixes_status: '', fix_open: 0,
+ST_SUM.recon = {ok: [], cash: null, cash_app: 1634, diff: null, confirmed: false, fixes: [], fixes_status: '', fix_open: 0,
   op_fact: null, op_gap: null, mismatch: false, alert: false, started: false};
 if(ST_Q.get('recon') === 'sent') Object.assign(ST_SUM.recon, {ok: [1, 2], cash: 2029, diff: 300,
   fixes: [{pid: 'p10', name: 'Red Label 1 ltr', delta: 2, ok: null}, {pid: 'p78', name: 'Baileys 1 ltr', delta: -1, ok: null}], fixes_status: 'sent', fix_open: 2, mismatch: true, alert: true});
-if(ST_Q.get('recon') === 'ok') Object.assign(ST_SUM.recon, {ok: [1, 2, 3], cash: 1729, diff: 0, confirmed: true,
+if(ST_Q.get('recon') === 'ok') Object.assign(ST_SUM.recon, {ok: [1, 2, 3], cash: 1634, diff: 0, confirmed: true,
   fixes: [{pid: 'p10', name: 'Red Label 1 ltr', delta: 2, ok: true, order_id: 'AMB0000X'}], fixes_status: 'done'});
 // &debt=1 — в смене был заказ в долг: товар уехал, денег за него нет.
 if(ST_Q.get('debt')){

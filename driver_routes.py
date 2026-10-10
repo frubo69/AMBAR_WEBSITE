@@ -1022,7 +1022,7 @@ async def _shift_summary(me: dict, day: str | None = None) -> dict:
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] сверка {me['name']} {day}: {e}")
         rdoc = None
-    cash_now = int(round(hand["in_hand"] - sum(x["aed"] for x in hand["fx"])))
+    cash_now = int(round(hand["revenue_aed"] + hand["tea"]))       # к сдаче: выручка + чай, без своего
     return {
         "day": day, "opened_at": _iso_at(d.get("shift_open_at")),
         "upsell": upsell,

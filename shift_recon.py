@@ -75,14 +75,17 @@ def mine(orders: list, name: str, day: str) -> list:
 
 
 def cash_app(orders: list, driver_day: dict | None, name: str, day: str) -> int:
-    """Дирхамы на руках по приложению — без валюты (валюта сдаётся как есть).
-    Та же арифметика, что в итогах смены водителя и в «Сборе выручки»
-    (cash_math.piles)."""
+    """Сколько дирхамов водитель должен сдать по приложению: выручка плюс чай
+    операторов, без валюты (она сдаётся как есть) и без своего — питания и
+    бонуса. 10 окт 2026: первая версия сравнивала с «на руках» вместе с
+    питанием, и у всех водителей вышло −80 — восемьдесят на еду они себе уже
+    оставили, а считали то, что сдают. Та же арифметика, что в итогах смены и
+    в «Сборе выручки» (cash_math.piles)."""
     d = driver_day or {}
     extras = [x for x in (d.get("extras") or []) if (x.get("status") or "approved") != "rejected"]
     meal = staff.meal_of(d) if d.get("working") is not None else 0
     h = cash_math.piles(mine(orders, name, day), extras, meal)
-    return _i(h["in_hand"] - sum(x["aed"] for x in h["fx"]))
+    return _i(h["revenue_aed"] + h["tea"])
 
 
 def _catalog() -> tuple[dict, dict]:
@@ -265,7 +268,7 @@ def alert_text(doc: dict, v: dict) -> str:
     lines = [f"🔴 <b>Сверка смены · {где}</b>"]
     if v["mismatch"]:
         d = v["diff"]
-        lines.append(f"Наличных на руках <b>{_fmt(v['cash'])}</b> · по приложению {_fmt(v['cash_app'])} · "
+        lines.append(f"Насчитал к сдаче <b>{_fmt(v['cash'])}</b> · по приложению {_fmt(v['cash_app'])} · "
                      f"<b>{'+' if d > 0 else '−'}{_fmt(abs(d))} AED</b>")
     open_f = [f for f in v["fixes"] if f["ok"] is None]
     if open_f:

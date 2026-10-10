@@ -106,12 +106,15 @@ async def main():
         заказ("A1", "Али", [{"id": "p10", "qty": 2, "price": 100, "line_total": 200}], 200),
         заказ("A2", "Али", [{"id": "p78", "qty": 2, "price": 180, "line_total": 360}], 360),
         заказ("F1", "Фарух", [{"id": "p10", "qty": 5, "price": 100, "line_total": 500}], 500)])
-    await db._db.driver_days.insert_many([{"day": D, "driver": "Али", "working": True, "shift_open_at": "x"},
-                                          {"day": D, "driver": "Фарух", "working": True, "shift_open_at": "x"}])
+    # Без отметки «на смене» питания нет — числа ниже без него; правило про
+    # питание проверяется отдельно.
+    await db._db.driver_days.insert_many([{"day": D, "driver": "Али", "shift_open_at": "x"},
+                                          {"day": D, "driver": "Фарух", "shift_open_at": "x"}])
     orders = await _range()
 
     print("── что по приложению ───────────────────────────────────────")
-    eq("наличных на руках по приложению — без валюты", R.cash_app(orders, {"working": True}, "Али", D), 560)
+    eq("к сдаче по приложению — выручка + чай, без валюты", R.cash_app(orders, {}, "Али", D), 560)
+    eq("питание (80) и бонус — своё, в «к сдаче» не входят (10 окт: у всех было −80)", R.cash_app(orders, {"working": True}, "Али", D), 480)
     sold = R.sold_lines(R.mine(orders, "Али", D))
     eq("продано по позициям, порядок каталога", [(x["id"], x["qty"], x["aed"], x["cat"]) for x in sold], [("p10", 2, 200, "Виски"), ("p78", 2, 360, "Ликёр")])
     eq("заказы строками", [(x["t"], x["a"], x["pay"], x["aed"]) for x in R.order_rows(R.mine(orders, "Али", D))],

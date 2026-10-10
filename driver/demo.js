@@ -352,7 +352,7 @@ function soldLines(done){
 function reconView(done){
   const r = S.recon || (S.recon = {ok: [], cash: null, fixes: [], fixes_status: ''});
   const h = demoHand(done || S.ord.filter(o => o.delivered_at));
-  const cashApp = Math.round(h.in_hand - h.fx.reduce((a, x) => a + x.aed, 0));
+  const cashApp = Math.round(h.revenue_aed + h.tea);   // к сдаче: выручка + чай, без своего
   const diff = r.cash == null ? null : r.cash - cashApp;
   const open = r.fixes.filter(f => f.ok == null).length;
   const mismatch = r.ok.includes(1) && !!diff;

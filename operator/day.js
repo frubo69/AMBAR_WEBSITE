@@ -156,7 +156,7 @@
         : (ok1 && d) ? `<div class="orc-act"><button class="orc-btn gold" onclick="opDay.fact('${who}', true)">Так и есть</button></div>` : '';
       money = `<div class="orc-z"><div class="orc-h">Деньги</div>
         <div class="orc-money">
-          <span class="orc-num"><i>На руках</i><b>${n(r.cash)}</b></span>
+          <span class="orc-num"><i>Насчитал</i><b>${n(r.cash)}</b></span>
           <span class="orc-num"><i>По приложению</i><b>${n(r.cash_app)}</b></span>${badge}</div>${after}</div>`;
     }
     // товар

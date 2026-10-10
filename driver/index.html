@@ -6803,7 +6803,9 @@ function shsPick(){
 }
 
 // Шаг 1 — деньги: сдать старшему (выручка, чай, «Сдать» в дирхамах, валюта
-// последней как есть), наличных на руках против приложения, своё, расходы.
+// последней как есть), насчитанное к сдаче против приложения, своё, расходы.
+// «По приложению» — выручка + чай, без питания и бонуса (10 окт 2026: с ними
+// у всех водителей выходило −80 — восемьдесят на еду они себе уже оставили).
 function shsMoney(m){
   const h = m.hand || {}, r = shsRecon(), c = shsCashNow();
   const neg = v => (v < 0 ? '−' : '') + fmt(Math.abs(v)) + '<u>AED</u>';
@@ -6819,7 +6821,7 @@ function shsMoney(m){
       <div class="shs-m sum"><span>Сдать</span><b>${neg(give)}</b></div>
       ${fx}
     </div>
-    <div class="dcard shs-card"><div class="shs-h">Наличных на руках</div>
+    <div class="dcard shs-card"><div class="shs-h">Насчитал к сдаче</div>
       <div class="shs-cash"><span class="xpr-in"><input id="shsCash" inputmode="numeric" maxlength="7" value="${c == null ? '' : fmt(c)}" autocomplete="off" ${SHS_VIEW ? 'disabled' : ''} oninput="shsCashIn(this.value)" onblur="shsCashFlush()"><u>AED</u></span>${shsDiffHtml()}</div>
       ${shsRow('По приложению', fmt(r.cash_app != null ? r.cash_app : 0) + ' AED', 'sub')}
     </div>

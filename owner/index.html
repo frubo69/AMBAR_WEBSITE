@@ -2534,6 +2534,13 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   transition-property:var(--tp);transition-duration:.15s;transition-timing-function:var(--e1)}
 .ck-r:active{transform:scale(.995)}
 .ck-r > *{pointer-events:none}
+/* Действие внутри строки (владелец, 11 окт 2026: «Сегодня не заказываем» у
+   заявки в магазин) — своя плашка под подписью, нажимается отдельно от строки. */
+.ck-r .ck-act{pointer-events:auto;display:inline-flex;align-items:center;margin-top:7px;padding:6px 11px;border-radius:9px;
+  font-size:11.5px;font-weight:700;letter-spacing:.02em;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.32);cursor:pointer}
+.ck-r .ck-act:active{transform:scale(.97)}
+.ck-r.done .ck-act{color:var(--sub);background:var(--card2);border-color:var(--border2)}
+.ck-r .ck-act + .ck-act{margin-left:6px}
 .ck-r.done{opacity:.72}
 /* Светофор в квадрате: красный — просрочено, жёлтый — пора, зелёный —
    сделано, серый — ещё впереди. Галочка у сделанного, крестик у остальных:
@@ -19636,10 +19643,43 @@ function chkRow(r){
            stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`}</span>
     <span class="ck-b">
       <span class="ck-t">${escS(r.t)}</span>
-      <span class="ck-s">${escS(r.s)}</span>
+      <span class="ck-s">${escS(r.s)}</span>${chkRowAct(r)}
     </span>
     <span class="ck-go">${ICO_CHEV}</span>
   </button>`;
+}
+
+// Плашки-действия на строке «Заявка в магазин» (владелец, 11 окт 2026).
+// Отправил ли файл магазину, знает только старший — «Отправил в магазин»;
+// «Сегодня не заказываем» гасит зелёным и заявку, и поставку («сегодня заявки
+// нет»), «Заказываем» возвращает. Магазин ответил — действий больше нет.
+function chkRowAct(r){
+  if(r.id !== 'order_sent' || !CKL) return '';
+  const act = (t, fn) => `<span class="ck-act" role="button" onclick="event.stopPropagation(); ${fn}">${t}</span>`;
+  if(CKL.order_skip) return act('Заказываем', 'chkOrderSkip(false)');
+  if(CKL.order_answered) return '';
+  if(CKL.order_sent) return act('Не отправляли', 'chkOrderSent(false)');
+  return act('Отправил в магазин', 'chkOrderSent(true)') + act('Сегодня не заказываем', 'chkOrderSkip(true)');
+}
+async function chkOrderSent(on){
+  if(!CKL) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day: CKL.day, item:'order_sent', done: !!on}});
+  }catch(e){ _toast('Не удалось отметить'); return; }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast(on ? 'Заявка отправлена — ждём ответ магазина' : 'Отметка «отправлена» снята');
+  accChecklist();
+}
+async function chkOrderSkip(on){
+  if(!CKL) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day: CKL.day, item:'order_skip', done: !!on}});
+  }catch(e){ _toast('Не удалось отметить'); return; }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(on ? 'warning' : 'success'); }catch(e){}
+  _toast(on ? 'Сегодня заявку в магазин не отправляем' : 'Заявка в магазин снова в плане');
+  accChecklist();
 }
 
 // Каждая строка ведёт туда, где дело делают, — и возвращает обратно в пульт.

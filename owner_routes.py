@@ -4810,11 +4810,15 @@ async def _chk_supply(day: str):
         rows = []
     sup = next((r for r in rows if (r.get("day") or "") == day), None)
     if not sup:
-        return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0}
+        return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0, "planned": 0}
     tasks = {o: t for o, t in (sup.get("tasks") or {}).items() if not t.get("cancelled_at")}
     free = sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at"))
+    # Сколько районов было в заявке (без «не везём сюда»): заявки «появились у
+    # всех», когда задача есть у каждого из них (владелец, 11 окт 2026).
+    dists = [d for d in (sup.get("districts") or []) if isinstance(d, dict) and not d.get("off")]
     return {"exists": True, "free": free, "gap": int(sup.get("gap_qty") or 0),
-            "done": (sup.get("status") or "open") != "open", "total": len(tasks)}
+            "done": (sup.get("status") or "open") != "open", "total": len(tasks),
+            "planned": len(dists) if dists else len(tasks)}
 
 
 async def _chk_noscan() -> list:
@@ -4889,6 +4893,47 @@ def _chk_at(day: str, hour: float, next_day: bool = False) -> datetime:
         d += timedelta(days=1)
     return d.replace(hour=int(hour), minute=int(round((hour % 1) * 60)),
                      tzinfo=DUBAI_TZ)
+
+
+def _order_rows(sup: dict, marks: dict, now, day: str, plan) -> list:
+    """Строки «Заявка в магазин» и «Поставка принята» (владелец, 11 окт 2026).
+
+    Отправил ли файл магазину, знает только старший — отметка order_sent; ответ
+    магазина виден по поставке; заявки «появились у всех», когда задача есть у
+    каждого района заявки. «Сегодня не заказываем» (order_skip) гасит обе
+    строки зелёным с подписью «сегодня заявки нет». «Поставка принята»
+    появляется только после ответа магазина с заявками у всех районов — до
+    того принимать нечего, и строка только пугала бы красным."""
+    skip = bool((marks.get("order_skip") or {}).get("done"))
+    sent = bool((marks.get("order_sent") or {}).get("done"))
+    answered = bool(sup.get("exists"))
+    total, planned = int(sup.get("total") or 0), int(sup.get("planned") or sup.get("total") or 0)
+    all_in = answered and total > 0 and total >= planned
+    if skip:
+        return [_chk_row("order_sent", "Заявка в магазин", "сегодня заявки нет", True, now, day, plan, go="order"),
+                _chk_row("supply_in", "Поставка принята", "сегодня заявки нет", True, now, day, plan, go="supply")]
+    if answered:
+        hint = ("магазин ответил · заявки у всех районов" if all_in
+                else f"магазин ответил · заявки у {total} из {planned} районов")
+    elif sent:
+        hint = "отправлена · ждём ответ магазина"
+    else:
+        hint = "не отправлена"
+    rows = [_chk_row("order_sent", "Заявка в магазин", hint, all_in, now, day, plan, go="order")]
+    if all_in:
+        rows.append(_chk_row("supply_in", "Поставка принята",
+                             ("приём закрыт" if sup.get("done")
+                              else (f"{sup['free']} районов без водителя" if sup.get("free")
+                                    else "везут, ни один район не закрыт")),
+                             bool(sup.get("done")), now, day, plan, go="supply", n=int(sup.get("free") or 0)))
+    return rows
+
+
+def _cash_hot(cr: dict) -> bool:
+    """Выручка за прошлые дни не получена — строка горит красным сразу, не
+    дожидаясь утреннего окна (владелец, 11 окт 2026: «крестик красный не
+    горит» при 0 из 5 и переносе за прошлые дни)."""
+    return bool(cr.get("carry_total")) and not (cr.get("all_done") or cr.get("settled"))
 
 
 def _chk_state(done: bool, now: datetime, since: datetime, due: datetime) -> str:
@@ -5050,16 +5095,7 @@ async def handle_checklist(request):
         })
     rows = [
         shift_row,
-        _chk_row("order_sent", "Заявка в магазин",
-                 ("магазин уже ответил" if sup["exists"] else "магазин ещё не отвечал"),
-                 sup["exists"], now, day, plan, go="order"),
-        _chk_row("supply_in", "Поставка принята",
-                 ("ответа магазина нет" if not sup["exists"]
-                  else ("приём закрыт" if sup["done"]
-                        else (f"{sup['free']} районов без водителя" if sup["free"]
-                              else "везут, ни один район не закрыт"))),
-                 sup["exists"] and sup["done"], now, day, plan,
-                 go="supply", n=sup["free"]),
+        *_order_rows(sup, marks, now, day, plan),
         _chk_row("expenses", "Расходы водителей",
                  (f"{exp} ждут решения" if exp else "все разобраны"),
                  exp == 0, now, day, plan, go="expenses", n=exp),
@@ -5089,6 +5125,10 @@ async def handle_checklist(request):
                  now, day, plan, go="cash",
                  n=max(0, cr["need"] - cr["done"] - cr.get("later", 0))),
     ]
+    if _cash_hot(cr):
+        for r in rows:
+            if r["id"] == "cash":
+                r.update({"state": "late", "due": "", "late_min": 0})
     # Недобор появляется в списке только когда он есть: пункт, который штатно
     # выполнен, каждый день занимал бы строку и приучал не читать список.
     if sup["gap"]:
@@ -5252,6 +5292,10 @@ async def handle_checklist(request):
     return web.json_response({
         "now": now.isoformat(), "time": now.strftime("%H:%M"), "day": day,
         "rows": rows, "counts": counts,
+        # Состояние заявки для плашек-действий на строке (11 окт 2026).
+        "order_skip": bool((marks.get("order_skip") or {}).get("done")),
+        "order_sent": bool((marks.get("order_sent") or {}).get("done")),
+        "order_answered": bool(sup["exists"]),
     }, headers=CORS_HEADERS)
 
 
@@ -5311,7 +5355,7 @@ async def handle_checklist_mark(request):
         body = {}
     day = (body.get("day") or "").strip()
     item = (body.get("item") or "").strip()
-    ok_item = item in CHK_MANUAL | {"shortfall", "recon"} or (
+    ok_item = item in CHK_MANUAL | {"shortfall", "recon", "order_skip"} or (
         item.startswith("cash:") and item[5:] in OFFICE_IDS)
     if not day or not ok_item:
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)

@@ -1021,6 +1021,9 @@ def _entry_view(e: dict, line_names: dict) -> dict:
             # чем платили расход из РП; у вывода крипты — сколько из свободной
             # и сколько с крипта-счёта РП
             "pay": e.get("pay") or "", "cr_free": e.get("cr_free") or 0, "cr_rp": e.get("cr_rp") or 0,
+            # из отчёта владельца кошелька (wallet_ledger): ключ строки журнала;
+            # статья угадана по словам и ещё не подтверждена — wal_guess=False
+            "wal": e.get("wal") or "", "wal_guess": e.get("wal_guess") is not False,
             # зарплата из наличных на руках у водителя: за какую смену и какой
             # записью расхода водителя она вычтена
             "hands_day": e.get("hands_day") or "", "hands_extra": e.get("hands_extra") or "",
@@ -1193,6 +1196,9 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         # наша половина комиссии вывода, взятая из свободной крипты: на счёт РП
         # она приходит и тут же тратится записью РП− «криптой»
         extra_cr = sum(calc._n(x.get("fee_free")) for x in en["in"] if x.get("src") == "crypto")
+        # расходы из отчёта кошелька (wallet_ledger, 12 окт 2026): крипта пришла
+        # на счёт РП из свободной и тем же днём потрачена — записью РП− «криптой»
+        extra_cr += sum(calc._n(x.get("cr_free")) for x in en["rp"] if x.get("pay") == "crypto")
         # возврат депозита (владелец, 4 окт 2026): пришёл в фонд через Доп. РП+
         # (он уже в extra_in); удержанное контрагентом — отдельным числом
         dep_back = sum(calc._n(x.get("amount")) for x in en["in"] if x.get("src") == "deposit")

@@ -4928,6 +4928,23 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
    многоточием прячет ровно то, по чему и принимают решение. */
 .wal-r.match{align-items:flex-start}
 .wal-r.match .wal-r-s{white-space:normal;line-height:1.45}
+/* Журнал по отчёту владельца кошелька (12 окт 2026): вид операции — меткой у
+   строки; остаток после операции — серым под суммой. */
+.wal-kd{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:6px;font-size:9.5px;
+  font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--sub);
+  background:rgba(255,255,255,.05);vertical-align:1px}
+.wal-kd.in{color:var(--up);background:var(--up-soft)}
+.wal-kd.out,.wal-kd.sim{color:var(--dn);background:rgba(224,92,92,.12)}
+.wal-kd.cash{color:var(--gold2);background:var(--gold-soft)}
+.wal-kd.bk{color:var(--muted);background:none;border:1px solid var(--border2)}
+.wal-kd.un{color:var(--warn);background:rgba(240,170,60,.12)}
+.wal-r-bal{display:block;margin-top:2px;font-size:10px;color:var(--muted);text-align:right;
+  font-family:'DM Sans',sans-serif;font-weight:500;font-variant-numeric:tabular-nums}
+.wal-un{padding:11px 0 6px;border-top:1px solid var(--border2)}
+.wal-un:first-child{border-top:none}
+.wal-un .wal-r{border-top:none;padding:0 0 7px}
+.wal-un .chip-row{padding-top:0}
+.wal-un .chip.no{color:var(--dn);border-color:rgba(224,92,92,.3)}
 .sup-allgood{padding:14px;margin-bottom:10px;border-radius:15px;font-size:13px;
   color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.25)}
 
@@ -21628,6 +21645,7 @@ function fbEntries(list, book){
     const line = book === 'rp' ? (e.line_name ? escS(e.line_name) : 'вне плана') + (e.deposit ? ' · депозит' : '')
         + (e.dep_use ? ` · из депозита ${fbFmt(e.dep_use)}` : '') + (e.pay === 'crypto' ? ' · криптой' : '')
         + (e.fee_of ? ` · наша половина от ${fmtUsdt(e.fee_usdt)} USDT` : '')
+        + (e.wal ? (e.wal_guess === false ? ' · по отчёту кошелька, статья не разобрана' : ' · по отчёту кошелька') : '')
       : book === 'in' && e.src === 'crypto' && (e.cr_free || e.cr_rp)
         ? [e.cr_free ? 'из свободной ' + walAed(e.cr_free) : '', e.cr_rp ? 'с крипта-счёта РП ' + walAed(e.cr_rp) : '',
            e.fee_ours ? `комиссия ${fmtUsdt(e.fee_usdt)} USDT, наша половина ${fmtUsdt(e.fee_ours)}` : ''].filter(Boolean).join(' · ') : '';
@@ -30018,15 +30036,31 @@ function walBody(d){
   // следующее распределение РП+, — и сколько уже лежит на счёте РП. Разница с
   // тем, что на кошельке на самом деле, — то, что ушло и ещё не записано.
   const k = (WAL_SEL < 0 && d && d.book) || {};
+  // Отчёт владельца кошелька загружен (12 окт 2026): остаток и расходы — по
+  // нему, он главный; сеть видит только адрес, деньги лежат на бирже.
+  const L = (WAL_SEL < 0 && d && d.ledger) || {}, поОтчёту = L.balance != null;
+  const rep = (k.report) || null;
   const книга = k.ready ? `<div class="wal-led wal-ord">
       <div class="wal-ord-h">Крипта по книге</div>
       <div><span>Свободная</span><b>${walAed(k.free)}<u>AED</u></b></div>
       <div><span>пойдёт в РП+ при распределении</span><i></i></div>
       <div><span>На счёте РП</span><b>${walAed(k.rp)}<u>AED</u></b></div>
       <div class="rest"><span>Всего по книге</span><b>${walAed(k.book)}<u>AED</u></b></div>
-      ${Math.abs(k.diff || 0) >= 0.01 ? `<div class="${k.diff < 0 ? 'out' : ''}"><span>${
+      ${rep ? `${rep.inflow_after ? `<div><span>пришло после отчёта</span><i>${walAed(rep.inflow_after)} AED</i></div>` : ''}${
+        rep.spent_after ? `<div class="out"><span>потрачено после отчёта</span><i>${walAed(rep.spent_after)} AED</i></div>` : ''}`
+      : Math.abs(k.diff || 0) >= 0.01 ? `<div class="${k.diff < 0 ? 'out' : ''}"><span>${
         k.diff < 0 ? 'С кошелька ушло, а в книгу не внесено' : 'На кошельке больше, чем по книге'}</span><b>${
         walAed(Math.abs(k.diff))}<u>AED</u></b></div>` : ''}
+    </div>` : '';
+  const отчёт = поОтчёту ? `<div class="wal-led wal-ord">
+      <div class="wal-ord-h">По отчёту · ${escS(_walWhen(L.balance_ts))}</div>
+      <div><span>Остаток</span><b style="color:var(--text)">${walAed(L.balance)}<u>AED</u></b></div>
+      <div><span>${L.balance_usdt != null ? fmtUsdt(L.balance_usdt) + ' USDT' : ''}</span><i></i></div>
+      <div><span>Приход · ${escS(MONTHS_NOM[+String(L.month).slice(5) - 1] || '')}</span><b>${walAed(L.month_in)}<u>AED</u></b></div>
+      <div class="out"><span>Расход · ${escS(MONTHS_NOM[+String(L.month).slice(5) - 1] || '')}</span><b>−${walAed(L.month_out)}<u>AED</u></b></div>
+      ${L.unassigned_n ? `<div><span style="color:var(--warn)">Неразобранных</span><i style="color:var(--warn)">${L.unassigned_n}</i></div>` : ''}
+      <button class="cat-block-open" onclick="walLedger()">Журнал · ${L.rows_n || 0} ${
+        pluralize(L.rows_n || 0, 'строка', 'строки', 'строк')} →</button>
     </div>` : '';
   _setText('accSub', v && v.address ? v.address : 'USDT · TRC-20');
   const переключатель = old.length ? `<div class="periods wal-sw" id="walSw" style="--count:${1 + old.length}">
@@ -30043,15 +30077,21 @@ function walBody(d){
   // свои USDT. Говорим об этом только когда его почти не осталось.
   const газ = (b.trx != null && b.trx < 5)
     ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
+  // Главное число — остаток по книге (от отчёта, с приходом после него), а
+  // на адресе в сети лежит лишь то, что биржа ещё не забрала к себе.
+  const наСчёте = поОтчёту && k.ready && k.wallet != null;
   mid.innerHTML = переключатель + `
     <div class="wal-c">
-      <div class="wal-v" style="color:var(--gold2)">${walAed(v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
-      <div class="wal-our"><span>На кошельке</span><b>${fmtUsdt(b.usdt)}<u>USDT</u></b><i>по ${
+      <div class="wal-v" style="color:var(--gold2)">${walAed(наСчёте ? k.wallet : v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
+      <div class="wal-our"><span>${наСчёте ? 'На счёте' : 'На кошельке'}</span><b>${
+        fmtUsdt(наСчёте ? k.wallet / курс : b.usdt)}<u>USDT</u></b><i>по ${
         String(курс).replace('.', ',')} за USDT</i></div>
+      ${наСчёте ? `<div class="wal-our"><span>На адресе в сети</span><b>${fmtUsdt(b.usdt)}<u>USDT</u></b></div>` : ''}
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
         _walWhen(d && d.at) || 'только что'}</div>
       ${газ}${сеть}
     </div>
+    ${отчёт}
     ${p.orders ? `<div class="wal-c" style="padding:13px 14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span style="font-size:12.5px">Оплачено криптой по нашим счетам</span>
@@ -30193,6 +30233,7 @@ function walReportBody(){
     <div class="wal-l">${a.map(строка).join('')}</div>
     <div class="wal-note" style="margin:6px 0 0">${пояснение}${
       n > a.length ? ` · показаны первые ${a.length}` : ''}</div>` : '';
+  const L = r.ledger || {};
   document.getElementById('accMid').innerHTML = `
     <div class="wal-led">
       <div><span>Платежей получили назначение</span><b>${r.matched || 0}</b></div>
@@ -30200,8 +30241,22 @@ function walReportBody(){
         r.disputed_n || спорные.length}</i></div>` : ''}
       ${r.spent_n ? `<div><span>Трат из остатка</span><i>${r.spent_n}</i></div>` : ''}
       ${r.missed_n ? `<div><span>Платежей нет на кошельке</span><i>${r.missed_n}</i></div>` : ''}
+      ${r.offline ? `<div><span style="color:var(--warn)">Сеть не ответила — сверка с переводами при следующей загрузке</span><i></i></div>` : ''}
       <div class="rest"><span>Строк в отчёте</span><b>${r.rows || 0}</b></div>
     </div>
+    ${L.error ? `<div class="wal-warn">Журнал не записан — попробуйте загрузить ещё раз</div>`
+    : L.rows != null ? `<div class="wal-led wal-ord">
+      <div class="wal-ord-h">Журнал</div>
+      <div><span>Новых строк</span><b style="color:var(--text)">${L.new || 0}</b></div>
+      <div><span>обновлено ${L.updated || 0}</span><i></i></div>
+      <div><span>В книгу финансов</span><b style="color:var(--text)">${L.booked || 0}</b></div>
+      ${L.dup ? `<div><span>уже были вписаны рукой</span><i>${L.dup}</i></div>` : ''}
+      ${L.history ? `<div><span>до начала учёта — только журнал</span><i>${L.history}</i></div>` : ''}
+      ${L.pending ? `<div><span>возвраты — решает человек</span><i>${L.pending}</i></div>` : ''}
+      ${L.unassigned ? `<div><span style="color:var(--warn)">Неразобранных</span><i style="color:var(--warn)">${L.unassigned}</i></div>` : ''}
+      ${L.balance != null ? `<div class="rest"><span>Остаток по отчёту · ${escS(_walWhen(L.balance_ts))}</span><b>${walAed(L.balance)}<u>AED</u></b></div>` : ''}
+      ${L.unassigned ? `<button class="cat-block-open" onclick="walLedger()">Разобрать →</button>` : ''}
+    </div>` : ''}
     ${спорные.length ? `
       <div class="wal-g"><span>Спорные</span><i>${r.disputed_n || спорные.length}</i></div>
       <div class="wal-pick">${спорные.map((x, i) => `
@@ -30251,6 +30306,91 @@ async function walReportPick(i, txid){
   // разбора, а человек ещё не закончил с ним.
   try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params: {fresh: 1}}); }
   catch(e){}
+}
+
+// ── Журнал по отчёту (владелец, 12 окт 2026) ───────────────────────────────
+// Каждая строка отчёта владельца кошелька — навсегда, с остатком после неё и
+// с тем, что из неё сделано в книге. Неразобранные расходы (статья не
+// угадалась по словам) разносит владелец фишками статей месяца.
+let WAL_L = null;
+async function walLedger(month){
+  _setText('accTitle', 'Журнал кошелька');
+  ACC_BACK = () => { WAL_L = null; accWallet(); };
+  if(!WAL_L) document.getElementById('accMid').innerHTML = '<div class="scan-empty">Загрузка…</div>';
+  try{ WAL_L = await ownerApi.ownerFetch('/api/owner/wallet/ledger', {params: month ? {month} : undefined}); }
+  catch(e){ document.getElementById('accMid').innerHTML = loadFail('walLedger()'); return; }
+  walLedgerBody();
+}
+function _walKd(r){
+  return `<span class="wal-kd ${escS(r.kind)}">${escS(r.kind === 'in' ? 'приход' : r.kind === 'out' ? 'расход'
+    : r.kind === 'cash' ? 'наличные' : r.kind === 'sim' ? 'sim' : r.kind === 'refund' ? 'возврат' : 'пополнение')}</span>`;
+}
+function _walBk(r){
+  if(r.unassigned) return `<span class="wal-kd un">неразобрано</span>`;
+  if(r.book === 'entry') return `<span class="wal-kd bk">в книге</span>`;
+  if(r.book === 'dup') return `<span class="wal-kd bk">вписано рукой</span>`;
+  if(r.book === 'skip') return `<span class="wal-kd bk">не в книге</span>`;
+  if(r.book === 'pending') return `<span class="wal-kd un">ждёт решения</span>`;
+  return '';
+}
+function _walRow(r){
+  const aed = +r.aed || 0;
+  return `<div class="wal-r">
+      <span class="wal-r-b">
+        <span class="wal-r-t">${_walKd(r)}${_walBk(r)}${escS(r.desc || r.op || '')}</span>
+        <span class="wal-r-s">${escS(_walWhen(r.ts))}${r.op && r.desc ? ' · ' + escS(r.op) : ''}${
+          r.matched ? ' · перевод найден' : ''}</span>
+      </span>
+      <span class="wal-r-v ${aed < 0 ? 'out' : ''}">${aed < 0 ? '−' : '+'}${walAed(Math.abs(aed))}<u>AED</u>${
+        r.balance != null ? `<span class="wal-r-bal">остаток ${walAed(r.balance)}</span>` : ''}</span>
+    </div>`;
+}
+function walLedgerBody(){
+  const L = WAL_L || {}, months = L.months || [], rows = L.rows || [], un = L.unassigned || [];
+  const t = L.totals || {}, b = L.balance || null;
+  _setText('accSub', b ? `остаток по отчёту ${walAed(b.aed)} AED · ${_walWhen(b.ts)}` : 'отчёт ещё не загружали');
+  const монеты = months.slice(-4);
+  const переключатель = монеты.length > 1 ? `<div class="periods wal-sw" id="walLSw" style="--count:${монеты.length}">
+      <div class="period-pill"></div>
+      ${монеты.map(m => `<button class="${m.month === L.month ? 'on' : ''}" onclick="walLedger('${escS(m.month)}')">${
+        escS(MONTHS_RU_SHORT[+String(m.month).slice(5) - 1] || m.month)}</button>`).join('')}
+    </div>` : '';
+  const имя = m => `${MONTHS_NOM[+String(m).slice(5) - 1] || ''} ${String(m).slice(0, 4)}`;
+  document.getElementById('accMid').innerHTML = переключатель + `
+    ${un.length ? `<div class="wal-g"><span>Неразобранные</span><i>${un.length}</i></div>
+    <div class="wal-pick">${un.map(r => `<div class="wal-un" id="walUn-${escS(r.key)}">${_walRow(r)}
+        <div class="chip-row">${((L.lines_by_month || {})[String(r.day).slice(0, 7)] || L.lines || []).map(l =>
+          `<button class="chip${r.line === l.id ? ' on' : ''}" onclick="walAssign('${escS(r.key)}','${escS(l.id)}')">${escS(l.name)}</button>`).join('')}
+          <button class="chip no" onclick="walSkip('${escS(r.key)}')">Не в книгу</button></div>
+      </div>`).join('')}</div>` : ''}
+    <div class="wal-led wal-ord" style="margin-top:${un.length ? 14 : 0}px">
+      <div class="wal-ord-h">${escS(имя(L.month || ''))}</div>
+      <div><span>Приход</span><b>${walAed(t.in)}<u>AED</u></b></div>
+      <div class="out"><span>Расход</span><b>−${walAed(t.out)}<u>AED</u></b></div>
+      <div class="rest"><span>Строк</span><b>${t.n || 0}</b></div>
+    </div>
+    ${rows.length ? `<div class="wal-l">${rows.map(_walRow).join('')}</div>`
+      : `<div class="scan-empty">За этот месяц строк нет</div>`}`;
+  const sw = document.getElementById('walLSw'); if(sw) requestAnimationFrame(() => movePill(sw));
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap"><button class="qb" onclick="ACC_BACK()">Готово</button></div>`;
+}
+// Статья расходу из отчёта: фишка нажата — записано, строка уходит из
+// неразобранных, кошелёк перечитывается молча.
+async function walAssign(key, line){
+  try{ await ownerApi.ownerFetch('/api/owner/wallet/ledger/assign', {method: 'POST', body: {key, line, as: _meName()}}); }
+  catch(e){ return _toast('Не удалось записать статью'); }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  await walLedger(WAL_L && WAL_L.month);
+  try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params: {fresh: 1}}); }catch(e){}
+}
+async function walSkip(key){
+  const a = await askChoice('Не писать в книгу?', 'Запись расхода уберётся, строка останется в журнале', 'Не писать', 'Оставить', 'no', 'go');
+  if(a !== 'ok') return;
+  try{ await ownerApi.ownerFetch('/api/owner/wallet/ledger/assign', {method: 'POST', body: {key, skip: true, as: _meName()}}); }
+  catch(e){ return _toast('Не удалось убрать'); }
+  await walLedger(WAL_L && WAL_L.month);
+  try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params: {fresh: 1}}); }catch(e){}
 }
 
 // Файлом в чат: посмотреть можно и на экране, а свести с бухгалтерией,

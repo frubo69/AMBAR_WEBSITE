@@ -198,17 +198,31 @@ async def _build() -> dict:
         await crypto_book.sync()
         st = await crypto_book.state()
         книга = {k: st.get(k) for k in ("ready", "free", "rp", "book", "open", "inflow", "alloc",
-                                         "exp", "wd_free", "wd_rp", "out", "out_book")}
-        # На кошельке на самом деле (по курсу) против книги: плюс — на кошельке
-        # больше, чем числится (приход ещё не дочитан или вывод записан раньше,
-        # чем ушёл); минус — с кошелька ушло, а в книгу не внесли.
-        книга["wallet"] = _ours(всего)
-        книга["diff"] = round(_ours(всего) - float(st.get("book") or 0), 2)
+                                         "exp", "wd_free", "wd_rp", "out", "out_book", "src", "report", "chain")}
+        if st.get("src") == "report":
+            # Отчёт владельца кошелька загружен (12 окт 2026): на счёте — по
+            # отчёту с приходом после него; адрес в сети — не мера.
+            книга["wallet"] = st.get("wallet")
+            книга["diff"] = 0.0
+        else:
+            # На кошельке на самом деле (по курсу) против книги: плюс — на кошельке
+            # больше, чем числится (приход ещё не дочитан или вывод записан раньше,
+            # чем ушёл); минус — с кошелька ушло, а в книгу не внесли.
+            книга["wallet"] = _ours(всего)
+            книга["diff"] = round(_ours(всего) - float(st.get("book") or 0), 2)
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] книга крипты не прочитана: {e}")
+    # Журнал по отчёту владельца кошелька (12 окт 2026): остаток по отчёту —
+    # главный, сеть видит только адрес, а деньги лежат на бирже.
+    журнал = {}
+    try:
+        import wallet_ledger
+        журнал = await wallet_ledger.summary()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] сводка журнала не прочитана: {e}")
     return {**main, "label": "Кошелёк", "paid": paid, "old": old,
             "rate": _rate(), "usdt_all": round(всего, 2), "ours_all_aed": _ours(всего),
-            "orders": заказы, "book": книга, "at": int(_t.time() * 1000)}
+            "orders": заказы, "book": книга, "ledger": журнал, "at": int(_t.time() * 1000)}
 
 
 def _is_crypto(o: dict) -> bool:
@@ -631,6 +645,12 @@ _HEAD_TEXT = ("назначен", "purpose", "описан", "description", "к�
 _HEAD_TX = ("hash", "хеш", "txid", "tx", "транзак", "id перевода")
 # Вид операции: в отчёте владельца это колонка «Заказ» / «Расход» / «Операция».
 _HEAD_OP = ("операц", "заказ", "расход", "тип", "вид")
+# Деньги в дирхамах, курс и остаток после операции — то, ради чего отчёт и
+# стал журналом (владелец, 12 окт 2026): «Приход AED», «Сумма AED»,
+# «Приход/расход AED», «Курс AED», «Баланс после».
+_HEAD_AED = ("aed", "дирхам", "dhs")
+_HEAD_RATE = ("курс", "rate")
+_HEAD_BAL = ("баланс", "balance", "остаток")
 
 
 def _num(v):
@@ -740,6 +760,14 @@ def _columns(rows: list) -> tuple:
         for j, h in enumerate(имена):
             if not h:
                 continue
+            # Курс и остаток — раньше суммы: «Курс AED» и «Баланс после» иначе
+            # читались бы как дирхамы или как приход.
+            if any(w in h for w in _HEAD_RATE):
+                col.setdefault("rate", j); continue
+            if any(w in h for w in _HEAD_BAL):
+                col.setdefault("balance", j); continue
+            if any(w in h for w in _HEAD_AED):
+                col.setdefault("aed", j); continue
             for ключ, слова in (("date", _HEAD_DATE), ("sum", _HEAD_SUM),
                                 ("text", _HEAD_TEXT), ("tx", _HEAD_TX)):
                 if ключ not in col and any(w in h for w in слова):
@@ -747,13 +775,58 @@ def _columns(rows: list) -> tuple:
         # Вид операции («Приход от клиента», «Вывод USDT») — слева от монеты;
         # вместе с описанием из него и получается назначение платежа.
         if "text" in col:
+            занято = set(col.values())
             for j, h in enumerate(имена):
-                if j < col["text"] and any(w in h for w in _HEAD_OP):
+                if j < col["text"] and j not in занято and any(w in h for w in _HEAD_OP):
                     col["op"] = j
                     break
-        if "text" in col and ("sum" in col or "tx" in col):
+        if "text" in col and ("sum" in col or "tx" in col or "aed" in col):
             return i, col
     return None, {}
+
+
+def _infer(data: list, col: dict) -> dict:
+    """Чего в шапке не было — угадываем по самим строкам.
+
+    На листах месяца в отчёте владельца кошелька над первыми колонками («№ ·
+    Дата · Вид · Монета · Сумма crypto») стоят итоги месяца, и в строке шапки
+    эти пять ячеек заняты числами. Колонки на месте — только названий нет.
+    Дату узнаём по тому, что она разбирается как дата; вид операции — по
+    словам «приход», «вывод», «возврат»; сумму в USDT — по тому, что она,
+    умноженная на курс, даёт сумму в дирхамах той же строки."""
+    width = max((len(r) for r in data), default=0)
+    занято = set(col.values())
+
+    def доля(j, годится):
+        строки = [r for r in data if len(r) > j and r[j] is not None and str(r[j]).strip()]
+        return (sum(1 for r in строки if годится(r)) / len(строки)) if len(строки) >= 2 else 0.0
+
+    if "date" not in col:
+        for c in range(width):
+            if c in занято:
+                continue
+            if доля(c, lambda r, c=c: _when(r[c]) is not None) >= 0.6:
+                col["date"] = c; занято.add(c); break
+    if "op" not in col and "text" in col:
+        for c in range(col["text"]):
+            if c in занято:
+                continue
+            if доля(c, lambda r, c=c: _way(str(r[c])) is not None and _num(r[c]) is None) >= 0.6:
+                col["op"] = c; занято.add(c); break
+    if "sum" not in col and "aed" in col and "rate" in col:
+        a, k = col["aed"], col["rate"]
+
+        def сходится(r, c):
+            u, курс, aed = _num(r[c]), _num(r[k]) if len(r) > k else None, _num(r[a]) if len(r) > a else None
+            if u is None or not курс or aed is None:
+                return False
+            return abs(abs(u) * курс - abs(aed)) <= max(0.06, abs(aed) * 0.006)
+        for c in range(width):
+            if c in занято:
+                continue
+            if доля(c, lambda r, c=c: сходится(r, c)) >= 0.6:
+                col["sum"] = c; занято.add(c); break
+    return col
 
 
 def _report_rows(name: str, raw: bytes) -> list:
@@ -765,18 +838,27 @@ def _report_rows(name: str, raw: bytes) -> list:
     out, seen = [], {}
     for rows in _cells(name, raw):
         head, col = _columns(rows)
-        for row in rows[(head + 1) if head is not None else 0:]:
+        data = rows[(head + 1) if head is not None else 0:]
+        if col:
+            col = _infer(data, col)
+        for row in data:
             row = list(row)
+            aed = курс = остаток = None
+            вид = описание = ""
             if col:
                 бери = lambda k: row[col[k]] if col.get(k) is not None and len(row) > col[k] else None
-                текст = " ".join(str(бери("text") or "").split())
+                описание = " ".join(str(бери("text") or "").split())
                 вид = " ".join(str(бери("op") or "").split())
                 сумма = _num(бери("sum"))
                 когда = _when(бери("date"))
                 хеш = _tx(бери("tx"))
+                aed, курс, остаток = _num(бери("aed")), _num(бери("rate")), _num(бери("balance"))
+                # Суммы в USDT в шапке нет, а дирхамы и курс есть — считаем.
+                if сумма is None and aed is not None and курс:
+                    сумма = round(abs(aed) / курс, 2)
                 # Назначение — вид операции и описание вместе: «Вывод USDT ·
                 # снятие наличных», «Приход от клиента · заказ».
-                части = [ч for ч in (вид, текст) if ч]
+                части = [ч for ч in (вид, описание) if ч]
                 if len(части) == 2 and части[0].lower() == части[1].lower():
                     части = части[:1]
                 текст = " · ".join(части)
@@ -788,6 +870,7 @@ def _report_rows(name: str, raw: bytes) -> list:
                 текст = " ".join(str(c).strip() for c in row
                                  if str(c or "").strip() and _num(c) is None and _when(c) is None
                                  and not _tx(c))[:200]
+                описание = текст
             текст = " ".join(текст.split())[:200]
             if not текст or (сумма is None and not хеш):
                 continue
@@ -795,13 +878,25 @@ def _report_rows(name: str, raw: bytes) -> list:
             # имеют — они сюда и не попадают: без даты и без хеша не берём.
             if когда is None and not хеш:
                 continue
+            way = _way(текст)
+            if way is None and aed is not None:
+                way = aed < 0                      # знак дирхамов: минус — ушло
             ключ = (хеш or "", round(abs(сумма or 0), 2),
                     когда.strftime("%Y%m%d%H%M") if когда else "", текст.lower())
             if ключ in seen:
+                # Та же операция с другого листа: дописываем, чего не хватало
+                # (на листе месяца есть остаток после операции, в сводном — нет).
+                r = seen[ключ]
+                for k, v in (("aed", aed), ("rate", курс), ("balance", остаток), ("txid", хеш)):
+                    if r.get(k) in (None, "") and v not in (None, ""):
+                        r[k] = v
+                if not r.get("op") and вид:
+                    r["op"] = вид
                 continue
-            seen[ключ] = True
-            out.append({"when": когда, "amount": сумма, "text": текст, "txid": хеш,
-                        "way": _way(текст)})
+            r = {"when": когда, "amount": сумма, "text": текст, "txid": хеш, "way": way,
+                 "op": вид, "desc": описание[:200], "aed": aed, "rate": курс, "balance": остаток}
+            seen[ключ] = r
+            out.append(r)
     return out
 
 
@@ -909,10 +1004,15 @@ async def handle_report(request):
         return web.json_response({"error": "unreadable"}, status=400, headers=CORS_HEADERS)
     if not rows:
         return web.json_response({"error": "no_rows"}, status=400, headers=CORS_HEADERS)
+    # Сеть молчит — отчёт всё равно ложится в журнал: он главный источник
+    # (владелец, 12 окт 2026), и ждать блокчейн, чтобы записать расходы с
+    # биржи, незачем. Сверка с переводами тогда просто откладывается до
+    # следующей загрузки.
     transfers = await _all_transfers()
-    if transfers is None:
-        return web.json_response({"error": "offline"}, status=502, headers=CORS_HEADERS)
-    нашли, спорные, мимо = _match_report(rows, transfers)
+    offline = transfers is None
+    нашли, спорные, мимо = _match_report(rows, transfers or [])
+    if offline:
+        спорные, мимо = [], []
     # Не нашли — это две разные вещи. Трата из остатка («снятие наличных с
     # банкомата») перевода на кошельке и не оставляет: её не ищут, о ней
     # сообщают. А вот платёж без перевода — повод посмотреть глазами.
@@ -921,19 +1021,39 @@ async def handle_report(request):
     who = str(body.get("as") or "").strip()[:60]
     now = datetime.now(timezone.utc)
     for r, t in нашли:
+        r["txid_match"] = t["txid"]
         await db.wallet_purpose_set(t["txid"], {
             "text": r["text"], "amount": t.get("amount"), "ts": t.get("ts"),
             "src": "report", "report": имя, "by_name": who, "at": now})
+    # Журнал по отчёту (владелец, 12 окт 2026): каждая строка — навсегда, а
+    # расходы и снятия с первого дня учёта — в книгу финансов. Ошибка здесь
+    # назначений не отменяет: они уже записаны.
+    журнал: dict = {}
+    try:
+        import wallet_ledger
+        wallet_ledger.with_keys(rows)
+        журнал = await wallet_ledger.store(rows, who, имя)
+        журнал.update(await wallet_ledger.book([r["key"] for r in rows], who))
+        bal = await wallet_ledger.report_balance()
+        журнал["balance"] = bal["aed"] if bal else None
+        журнал["balance_ts"] = bal["ts"] if bal else 0
+        журнал["rows"] = len(rows)
+    except Exception as e:                       # noqa: BLE001
+        log.exception(f"[wallet] журнал по отчёту «{имя}» не записан: {e}")
+        журнал = {"error": "ledger_failed"}
     _drop_cache()
     await db.wallet_report_add({"at": now, "by_name": who, "name": имя,
                                 "rows": len(rows), "matched": len(нашли),
                                 "disputed": len(спорные), "missed": len(мимо),
-                                "spent": len(траты)})
+                                "spent": len(траты), "offline": offline,
+                                "ledger": {k: v for k, v in журнал.items() if isinstance(v, (int, float))}})
     log.info(f"[wallet] отчёт «{имя}»: строк {len(rows)} · назначено {len(нашли)} · "
              f"спорных {len(спорные)} · трат без перевода {len(траты)} · "
-             f"платежей не нашли {len(платежи)} · {who or '—'}")
+             f"платежей не нашли {len(платежи)} · журнал: новых {журнал.get('new', 0)}, "
+             f"в книгу {журнал.get('booked', 0)}, неразобрано {журнал.get('unassigned', 0)}"
+             f"{' · сеть молчала' if offline else ''} · {who or '—'}")
     return web.json_response({
-        "ok": True, "rows": len(rows), "matched": len(нашли),
+        "ok": True, "rows": len(rows), "matched": len(нашли), "offline": offline, "ledger": журнал,
         "disputed": [{**_row_out(r), "candidates": [
             {"txid": t["txid"], "amount": t.get("amount"), "ts": t.get("ts")} for t in c[:4]]}
             for r, c in спорные[:20]],
@@ -968,6 +1088,44 @@ async def handle_purpose(request):
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+@require_owner
+async def handle_ledger(request):
+    """GET ?month=YYYY-MM — журнал по отчёту за месяц: строки, статьи месяца
+    для разбора, остаток по отчёту, неразобранные за всё время."""
+    import wallet_ledger
+    month = str(request.query.get("month") or "")[:7]
+    try:
+        data = await wallet_ledger.page(month)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] журнал не прочитан: {e}")
+        return web.json_response({"error": "ledger_failed"}, status=500, headers=CORS_HEADERS)
+    return web.json_response(data, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_ledger_assign(request):
+    """POST {key, line, as} — статья расходу из отчёта; {key, skip: true, as} —
+    в книгу не писать (запись убирается, строка журнала остаётся)."""
+    import wallet_ledger
+    try:
+        body = await request.json()
+    except Exception:                            # noqa: BLE001
+        return web.json_response({"error": "bad_request"}, status=400, headers=CORS_HEADERS)
+    k = str(body.get("key") or "").strip()[:32]
+    if not k:
+        return web.json_response({"error": "no_key"}, status=400, headers=CORS_HEADERS)
+    who = str(body.get("as") or "").strip()[:60]
+    if body.get("skip"):
+        r = await wallet_ledger.skip(k, who)
+    else:
+        r = await wallet_ledger.assign(k, str(body.get("line") or "")[:24], who)
+    if r.get("error"):
+        код = 404 if r["error"] in ("not_found", "removed") else 400
+        return web.json_response(r, status=код, headers=CORS_HEADERS)
+    _drop_cache()
+    return web.json_response(r, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -989,4 +1147,9 @@ def setup(app):
     app.router.add_post("/api/owner/wallet/report", handle_report)
     app.router.add_route("OPTIONS", "/api/owner/wallet/purpose", _opt)
     app.router.add_post("/api/owner/wallet/purpose", handle_purpose)
+    # Журнал по отчёту (12 окт 2026): строки отчёта и их место в книге.
+    app.router.add_route("OPTIONS", "/api/owner/wallet/ledger", _opt)
+    app.router.add_get("/api/owner/wallet/ledger", handle_ledger)
+    app.router.add_route("OPTIONS", "/api/owner/wallet/ledger/assign", _opt)
+    app.router.add_post("/api/owner/wallet/ledger/assign", handle_ledger_assign)
     log.info("[wallet] routes mounted")

@@ -68,6 +68,43 @@ async def seed():
                                         "total": 38000 + 1500 * n, "tip": 0, "office_id": "jvc"})
     move(1000)
     await cb.sync()
+    await seed_report()
+
+
+async def seed_report():
+    """Отчёт владельца кошелька (12 окт 2026): статьи как в бою, переводы в
+    сети под приходы отчёта, сам отчёт — через настоящую ручку."""
+    import base64, json
+    from datetime import datetime, timezone, timedelta
+    from aiohttp.test_utils import make_mocked_request
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from wallet_report_fixture import ОПЕРАЦИИ, отчёт_xlsx
+    month = fr._biz_day()[:7]
+    import secrets
+    for i, (имя, kind, group) in enumerate((("Билеты", "pool", ""), ("Бензин", "pool", ""), ("Визы", "pool", ""),
+                                            ("Хоз. нужды", "pool", "home"), ("Покупка", "pool", "sim"),
+                                            ("Пополнение", "pool", "sim"), ("Что-то ещё", "pool", ""))):
+        await db.fin_budget_set({"_id": secrets.token_hex(4), "month": month, "name": имя, "plan": 1500, "due": 0,
+                                 "note": "", "kind": kind, "group": group, "cur": "AED", "period": 1, "next": "",
+                                 "span": 0, "ord": 10 + i, "by": ""})
+    DUBAI = timezone(timedelta(hours=4))
+    for op in ОПЕРАЦИИ:
+        if op[2] != "Приход от клиента":
+            continue
+        когда = datetime.strptime(op[1], "%d.%m.%Y %H:%M").replace(tzinfo=DUBAI)
+        W["n"] += 1
+        W["tr"].append({"txid": f"rep{W['n']:04d}{'b' * 40}", "amount": float(op[4]), "in": True,
+                        "peer": "TStandClient00000000000000000000002", "ts": int(когда.timestamp() * 1000) + 15000})
+    await cb.sync()
+    r = make_mocked_request("POST", "/api/owner/wallet/report"); r["owner_id"] = 1
+    r._read_bytes = json.dumps({"name": "crypto_wallet_report_stand.xlsx", "as": "Владелец",
+                                "data": base64.b64encode(отчёт_xlsx()).decode()}).encode()
+    h = wr.handle_report
+    while hasattr(h, "__wrapped__"):
+        h = h.__wrapped__
+    resp = await h(r)
+    W["report"] = json.loads(resp.text)
+    wr._drop_cache()
 
 
 async def h_inflow(request):
@@ -85,6 +122,11 @@ async def h_out(request):
     return web.json_response({"ok": True})
 
 
+async def h_report(request):
+    """Ответ последней загрузки отчёта — экрану «Отчёт кошелька» стенда."""
+    return web.json_response(W.get("report") or {})
+
+
 async def h_any(request):
     return web.json_response({"error": "stand"}, status=404)
 
@@ -98,6 +140,7 @@ def main():
     fr.setup(app); wr.setup(app)
     app.router.add_get("/stand/inflow", h_inflow)
     app.router.add_get("/stand/out", h_out)
+    app.router.add_get("/stand/report", h_report)
     app.router.add_route("*", "/api/{tail:.*}", h_any)
     app.router.add_get("/", lambda r: web.FileResponse(os.path.join(ROOT, "owner", "index.html")))
     app.router.add_static("/", os.path.join(ROOT, "owner"))

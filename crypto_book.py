@@ -40,6 +40,20 @@
 
 Правило времени: счёт РП не уходит в минус НИ В ОДИН день. Расход криптой днём
 D проходит, только если на конец D и каждого следующего дня в РП хватает.
+
+Отчёт владельца кошелька (12 окт 2026, wallet_ledger). Кошелёк — счёт на бирже:
+в сети видны лишь переводы на адрес, а траты с баланса биржи и сам остаток —
+нет. Поэтому, как только отчёт загружен, остаток берём из него:
+
+  на счёте по книге = остаток по отчёту (последняя строка с «Баланс после»)
+                      + пришло по сети после неё (переводы, не вошедшие в отчёт)
+                      − потрачено после неё по нашим записям (РП− криптой,
+                        выводы в наличные — те, что не из самого отчёта);
+  свободная         = на счёте по книге − счёт РП.
+
+Расходы из отчёта ложатся в книгу записями РП− «криптой» с cr_free: крипта
+пришла на счёт РП из свободной (cr_in) и тем же днём ушла (exp) — счёт РП не
+меняется, статья получает факт. До отчёта — как раньше, по сети и открытию.
 """
 import logging
 import time
@@ -172,7 +186,11 @@ def wallet_aed() -> float | None:
 
 
 def _deltas(days: list, entries: list) -> tuple:
-    """Движения по дням: счёт РП {день: изменение} и итоги для свободной."""
+    """Движения по дням: счёт РП {день: изменение} и итоги для свободной.
+
+    fee_in — всё, что пришло на счёт РП из свободной мимо распределения: часть
+    комиссии вывода и расходы из отчёта кошелька (cr_free у РП− «криптой»):
+    те и другие тем же днём тратятся, счёт РП в итоге не меняют."""
     по_дням: dict = {}
     alloc = exp = wd_free = wd_rp = fee_in = 0.0
     def put(day, v):
@@ -186,6 +204,10 @@ def _deltas(days: list, entries: list) -> tuple:
         if e.get("book") == "rp" and e.get("pay") == "crypto":
             v = float(e.get("amount") or 0)
             exp += v; put(day, -v)
+            # расход из отчёта кошелька: крипта пришла из свободной и ушла
+            cf = float(e.get("cr_free") or 0)
+            if cf:
+                fee_in += cf; put(day, cf)
         elif e.get("book") == "in" and e.get("src") == "crypto":
             f, r = float(e.get("cr_free") or 0), float(e.get("cr_rp") or 0)
             wd_free += f; wd_rp += r
@@ -197,6 +219,47 @@ def _deltas(days: list, entries: list) -> tuple:
             if ff:
                 fee_in += ff; put(day, ff)
     return по_дням, _r(alloc), _r(exp), _r(wd_free), _r(wd_rp), _r(fee_in)
+
+
+async def _by_report(entries: list, rp: float) -> dict | None:
+    """Остаток по отчёту владельца кошелька и что было после него. None —
+    отчёта ещё не загружали."""
+    import wallet_ledger
+    bal = await wallet_ledger.report_balance()
+    if not bal or bal.get("aed") is None:
+        return None
+    ts0, day0 = int(bal["ts"] or 0), str(bal.get("day") or "")
+    k = rate()
+    # Пришло по сети после отчёта: переводы, которых в отчёте нет (сошедшиеся
+    # с его строками уже сидят в остатке).
+    свои = await db.wallet_ledger_txids()
+    moves = await db.crypto_moves("in")
+    inflow_after = _r(sum(float(m.get("usdt") or 0) * k for m in moves
+                          if int(m.get("ts") or 0) > ts0 - 60_000 and m.get("txid") not in свои
+                          and int(m.get("ts") or 0) > ts0 - 60_000))
+    # Потрачено после отчёта по нашим записям — не из самого отчёта: РП−
+    # криптой (кроме строк комиссии: комиссия целиком сидит в выводе) и выводы
+    # в наличные вместе с комиссией.
+    spent_after = 0.0
+    for e in entries:
+        if e.get("wal"):
+            continue
+        day = str(e.get("day") or "")
+        at = e.get("at")
+        try:
+            at_ms = int(at.timestamp() * 1000) if at else 0
+        except Exception:                                   # noqa: BLE001
+            at_ms = 0
+        после = day > day0 or (day == day0 and at_ms > ts0)
+        if not после:
+            continue
+        if e.get("book") == "rp" and e.get("pay") == "crypto" and not e.get("fee_of"):
+            spent_after += float(e.get("amount") or 0)
+        elif e.get("book") == "in" and e.get("src") == "crypto":
+            spent_after += float(e.get("amount") or 0) + float(e.get("fee") or 0)
+    total = _r(float(bal["aed"]) + inflow_after - spent_after)
+    return {"balance": _r(bal["aed"]), "ts": ts0, "day": day0, "inflow_after": inflow_after,
+            "spent_after": _r(spent_after), "total": total, "free": _r(total - rp)}
 
 
 def rp_min_from(по_дням: dict, day: str) -> float:
@@ -243,7 +306,22 @@ async def state() -> dict:
     # Свободная по факту: не больше того, что лежит на кошельках сверх счёта
     # РП. Ушло с кошелька без записи в книге — в РП+ этого не предложим.
     wallet = wallet_aed()
+    chain = wallet
     free_fact = free if wallet is None else max(0.0, min(free, _r(wallet - rp)))
+    src = "chain"
+    # Отчёт владельца кошелька загружен — остаток берём из него (владелец, 12
+    # окт 2026): деньги лежат на бирже, адрес в сети показывает лишь то, что
+    # биржа ещё не забрала к себе.
+    rep = None
+    try:
+        rep = await _by_report(entries, rp)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[crypto] остаток по отчёту не посчитан: {e}")
+    if rep:
+        src = "report"
+        wallet = rep["total"]
+        free = rep["free"]
+        free_fact = max(0.0, free)
     return {"ready": True, "rate": float(c.get("rate") or rate()), "open": open_,
             "inflow": inflow, "alloc": alloc, "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp,
             "fee_in": fee_in,
@@ -251,6 +329,7 @@ async def state() -> dict:
             # Ушло с кошелька по сети и записано в книге (РП− криптой + выводы):
             # разница — то, что ушло, а в книгу ещё не внесли (или наоборот).
             "out": out, "out_book": _r(exp + wd_free + wd_rp),
+            "src": src, "chain": chain, "report": rep,
             "by_day": по_дням, "start_day": START_DAY}
 
 

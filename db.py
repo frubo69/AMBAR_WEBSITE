@@ -6390,6 +6390,14 @@ async def fin_entry_del(eid: str) -> bool:
     return bool(r.deleted_count)
 
 
+async def fin_entry_set(eid: str, fields: dict) -> bool:
+    """Поправить поля записи книги (статья у расхода из отчёта кошелька)."""
+    d = _db_or_none()
+    if d is None or not fields: return False
+    r = await d.fin_entries.update_one({"_id": eid}, {"$set": fields})
+    return r.matched_count > 0
+
+
 async def fin_entry_unset(eid: str, fields: list) -> None:
     """Снять поля записи книги (у вывода крипты — комиссию, когда её строку убрали)."""
     d = _db_or_none()
@@ -6681,7 +6689,7 @@ async def fin_entries_crypto() -> list:
     cur = d.fin_entries.find({"$or": [{"book": "rp", "pay": "crypto"},
                                       {"book": "in", "src": "crypto"}]},
                              {"day": 1, "book": 1, "amount": 1, "pay": 1, "src": 1,
-                              "cr_free": 1, "cr_rp": 1, "fee_free": 1})
+                              "cr_free": 1, "cr_rp": 1, "fee_free": 1, "wal": 1, "at": 1})
     return await cur.to_list(length=20000)
 
 
@@ -7112,3 +7120,90 @@ async def recon_between(day_from: str, day_to: str) -> list:
     d = _db_or_none()
     if d is None: return []
     return await d.shift_recon.find({"day": {"$gte": day_from, "$lte": day_to}}).to_list(length=2000)
+
+
+# ── Журнал кошелька по отчёту (wallet_routes, владелец, 12 окт 2026) ────────
+#   wallet_ledger {_id: ключ строки (минута·вид·USDT·описание), ts, when, day,
+#                  month, kind: in|topup|refund|cash|sim|out, op, text, usdt,
+#                  rate, aed (со знаком, как в отчёте), balance (по отчёту),
+#                  txid/order_id (если сошлось с переводом), matched, report,
+#                  by, at, book: ''|entry:<id>|pending|skip|dup|history}
+# Отчёт владельца кошелька — главный и окончательный: сеть видит только
+# переводы на адрес и с адреса, траты с баланса биржи — нет. Строки лежат
+# навсегда, повторная загрузка дописывает и обновляет.
+async def wallet_ledger_get(keys: list) -> dict:
+    d = _db_or_none()
+    if d is None or not keys: return {}
+    out = {}
+    async for r in d.wallet_ledger.find({"_id": {"$in": list(keys)}}):
+        out[r["_id"]] = r
+    return out
+
+
+async def wallet_ledger_upsert(doc: dict) -> None:
+    d = _db_or_none()
+    if d is None: return
+    key = doc["_id"]
+    await d.wallet_ledger.update_one({"_id": key}, {"$set": {k: v for k, v in doc.items() if k != "_id"},
+                                                    "$setOnInsert": {"_id": key}}, upsert=True)
+
+
+async def wallet_ledger_set(key: str, fields: dict) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.wallet_ledger.update_one({"_id": key}, {"$set": fields})
+    return r.matched_count > 0
+
+
+async def wallet_ledger_list(month: str = "", kinds: list | None = None) -> list:
+    d = _db_or_none()
+    if d is None: return []
+    q: dict = {}
+    if month: q["month"] = month
+    if kinds: q["kind"] = {"$in": list(kinds)}
+    return await d.wallet_ledger.find(q).sort("ts", 1).to_list(length=5000)
+
+
+async def wallet_ledger_months() -> list:
+    """[{month, n, in_aed, out_aed, balance (последний по времени)}]."""
+    d = _db_or_none()
+    if d is None: return []
+    out: dict = {}
+    async for r in d.wallet_ledger.find({}, {"month": 1, "aed": 1, "ts": 1, "balance": 1, "kind": 1}).sort("ts", 1):
+        m = r.get("month") or ""
+        o = out.setdefault(m, {"month": m, "n": 0, "in_aed": 0.0, "out_aed": 0.0, "balance": None, "ts": 0})
+        o["n"] += 1
+        a = float(r.get("aed") or 0)
+        if a >= 0: o["in_aed"] += a
+        else: o["out_aed"] += -a
+        if int(r.get("ts") or 0) >= o["ts"] and r.get("balance") is not None:
+            o["ts"] = int(r.get("ts") or 0); o["balance"] = float(r.get("balance"))
+    return [out[m] for m in sorted(out)]
+
+
+async def wallet_ledger_txids() -> set:
+    """Переводы, сошедшиеся со строками отчёта: они уже сидят в его остатке."""
+    d = _db_or_none()
+    if d is None: return set()
+    out = set()
+    async for r in d.wallet_ledger.find({"txid": {"$nin": ["", None]}}, {"txid": 1}):
+        out.add(r["txid"])
+    return out
+
+
+async def wallet_ledger_last() -> dict | None:
+    """Последняя по времени строка отчёта — её «баланс после» и есть деньги
+    на кошельке по отчёту."""
+    d = _db_or_none()
+    if d is None: return None
+    rows = await d.wallet_ledger.find({"balance": {"$ne": None}}).sort("ts", -1).limit(1).to_list(1)
+    return rows[0] if rows else None
+
+
+async def fin_entries_same(day: str, amount: float, q: dict) -> list:
+    """Записи книги того же дня с той же суммой (±1) — чтобы отчёт кошелька не
+    задвоил расход, который старший уже вписал руками."""
+    d = _db_or_none()
+    if d is None: return []
+    rows = await d.fin_entries.find({"day": day, **q}).to_list(length=200)
+    return [r for r in rows if abs(float(r.get("amount") or 0) - float(amount)) <= 1.0]

@@ -70,6 +70,7 @@ async def main():
                                   "read_from": МС(datetime(2026, 10, 2, 1, 1, tzinfo=DUBAI)),
                                   "open_usdt": 80.43203, "open_aed": 281.51, "rate": 3.5})
     await cb.sync()
+    await db.setting_set(L.BOOK_KEY, {"on": True})      # запись в книгу включена владельцем
     # бюджет октября: статьи как в бою («Что-то ещё» книга заводит сама)
     зови = FF._зови
     for имя, kind, group in (("Билеты", "pool", ""), ("Бензин", "pool", ""), ("Визы", "pool", ""),
@@ -102,6 +103,13 @@ async def main():
         while hasattr(h, "__wrapped__"): h = h.__wrapped__
         resp = await h(r)
         return resp.status, json.loads(resp.text)
+
+    print("── выключатель: без него отчёт только в журнал ────────────────")
+    await db.setting_set(L.BOOK_KEY, {"on": False})
+    st, r = await загрузить(отчёт_xlsx(ОПЕРАЦИИ[:3]))
+    eq("выключено: строки в журнале, в книгу ничего, остаток в книгу не идёт", (st, r["ledger"]["new"], r["ledger"]["booked"], r["ledger"].get("off"), (await cb.state())["src"]), (200, 3, 0, True, "chain"))
+    await db._db.wallet_ledger.delete_many({}); await db._db.wallet_reports.delete_many({}); await db._db.wallet_purposes.delete_many({})
+    await db.setting_set(L.BOOK_KEY, {"on": True})
 
     print("── разбор настоящего формата ──────────────────────────────────")
     rows = W._report_rows("r.xlsx", отчёт_xlsx(ОПЕРАЦИИ))

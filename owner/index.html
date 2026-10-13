@@ -41,6 +41,7 @@ html.kb .stk-mid{padding-bottom:50vh}
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script src="/vendor/ambar-fail.js?v=1"></script>
+<script src="book.js?v=1" defer></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -8673,6 +8674,15 @@ button.exp-wait:active{transform:scale(.99)}
 
   <!-- Секции — карточками с шапкой (макет владельца, 16 сен 2026): плитка со
        значком, название с подписью, число справа, стрелка — в общий список. -->
+  <!-- Книжка клиентов операторов (13 окт 2026): телефоны, адреса, личные ценники -->
+  <div class="cust-box" id="custBook" style="padding-bottom:14px">
+    <div class="cb-h" style="padding-bottom:0;margin-bottom:0;border-bottom:0" onclick="accOpen('book')">
+      <div class="ch-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z"/><path d="M5 4v16a3 3 0 0 1 3-3h11"/></svg></div>
+      <div class="ch-lbl"><div class="ch-t">Книжка клиентов</div><div class="ch-s">телефоны · адреса · личные ценники</div></div>
+      <span class="ch-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+  </div>
+
   <!-- TOP-10 by spending -->
   <div class="cust-box" id="custTop">
     <div class="cb-h" onclick="openAllClients()">
@@ -26252,6 +26262,7 @@ function accOpen(id){
   if(id === 'gift')     accGift();
   if(id === 'qr')       accQR();
   if(id === 'wallet')   accWallet();
+  if(id === 'book')     accBook();
   if(id === 'supply')   accSupply();
   if(id === 'check')    accCheck();
   if(id === 'writeoff') accWriteoffs();

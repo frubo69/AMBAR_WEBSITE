@@ -50,6 +50,18 @@ def start_day() -> str:
 
 
 KINDS = ("in", "topup", "refund", "cash", "sim", "out")
+# Выключатель (13 окт 2026): строки отчёта в журнал ложатся всегда, а в книгу
+# финансов и в остаток крипты идут только когда владелец включил — модель
+# учёта крипты (курс расходов, один баланс) он ещё решает.
+BOOK_KEY = "wallet_ledger_book"
+
+
+async def book_enabled() -> bool:
+    try:
+        c = await db.setting_get(BOOK_KEY)
+    except Exception:                             # noqa: BLE001
+        return False
+    return bool(c and c.get("on"))
 KIND_T = {"in": "приход от клиента", "topup": "пополнение владельцем", "refund": "возврат расхода",
           "cash": "снятие наличных", "sim": "в SIM-кошелёк", "out": "расход криптой"}
 
@@ -252,10 +264,13 @@ async def _dup_of(row: dict) -> dict | None:
 async def book(keys: list, who: str) -> dict:
     """Строки журнала с этими ключами — в книгу финансов (кто ещё не там).
     Возвращает счётчики: booked, dup, unassigned, history, pending."""
+    st = {"booked": 0, "dup": 0, "unassigned": 0, "history": 0, "pending": 0, "skipped": 0}
+    if not await book_enabled():
+        st["off"] = True
+        return st
     rows = await db.wallet_ledger_get(keys)
     sd = start_day()
     now = datetime.now(timezone.utc)
-    st = {"booked": 0, "dup": 0, "unassigned": 0, "history": 0, "pending": 0, "skipped": 0}
     lines_by_month: dict = {}
     for k in keys:
         row = rows.get(k)
@@ -373,8 +388,11 @@ async def skip(k: str, who: str) -> dict:
 
 
 # ── Остаток по отчёту и сводки ──────────────────────────────────────────────
-async def report_balance() -> dict | None:
-    """Последний известный остаток по отчёту: {aed, usdt, ts, day, key}."""
+async def report_balance(for_book: bool = False) -> dict | None:
+    """Последний известный остаток по отчёту: {aed, usdt, ts, day, key}.
+    for_book — для книги крипты: пока выключатель не включён, None."""
+    if for_book and not await book_enabled():
+        return None
     last = await db.wallet_ledger_last()
     if not last:
         return None

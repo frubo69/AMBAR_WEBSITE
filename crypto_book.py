@@ -225,7 +225,7 @@ async def _by_report(entries: list, rp: float) -> dict | None:
     """Остаток по отчёту владельца кошелька и что было после него. None —
     отчёта ещё не загружали."""
     import wallet_ledger
-    bal = await wallet_ledger.report_balance()
+    bal = await wallet_ledger.report_balance(for_book=True)
     if not bal or bal.get("aed") is None:
         return None
     ts0, day0 = int(bal["ts"] or 0), str(bal.get("day") or "")

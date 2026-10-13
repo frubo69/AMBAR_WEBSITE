@@ -28,6 +28,7 @@
 <script src="stock.js?v=2" defer></script>
 <script src="day.js?v=1" defer></script>
 <script src="extra.js?v=2" defer></script>
+<script src="book.js?v=1" defer></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script src="/vendor/ambar-fail.js?v=1"></script>
@@ -181,16 +182,22 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
    27 сен 2026). */
 .tk-card{background:var(--card);border:1px solid var(--border2);border-radius:16px;
   overflow:hidden;margin:2px 0 4px}
-.tline{display:flex;align-items:center;gap:11px;padding:10px 13px;
-  border-bottom:1px solid var(--border2)}
+/* Строка чека в два яруса (владелец, 13 окт 2026: «название наверху, плюс-минус
+   вниз»): название во всю ширину, под ним плюс-минус слева и сумма справа.
+   Раньше название, плюс-минус и сумма стояли в один ряд, и «Don Julio Reposado
+   70/75cl» ломалось на четыре строки. */
+.tline{display:grid;grid-template-columns:44px minmax(0,1fr) auto;
+  grid-template-areas:"img nm nm" "img st lt";align-items:center;column-gap:11px;row-gap:7px;
+  padding:10px 13px;border-bottom:1px solid var(--border2)}
 /* Снимок бутылки — чтобы оператор видел, что кладёт, не читая название
    (владелец, 27 сен 2026). Нет файла — прячем, строка не разъезжается. */
-.tline .tk-img{width:44px;height:44px;flex-shrink:0;border-radius:10px;
+.tline .tk-img{grid-area:img;align-self:start;width:44px;height:44px;flex-shrink:0;border-radius:10px;
   object-fit:cover;background:var(--card2)}
 .tline:last-child{border-bottom:0}
-.tline .nm{flex:1;min-width:0;font-size:14px;font-weight:700;line-height:1.25}
+.tline .nm{grid-area:nm;min-width:0;font-size:14px;font-weight:700;line-height:1.25}
 .tline .nm small{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:2px}
-.tline .lt{font-size:15px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;min-width:52px;text-align:right}
+.tline .stepper{grid-area:st;justify-self:start}
+.tline .lt{grid-area:lt;justify-self:end;font-size:15px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;min-width:52px;text-align:right}
 .stepper{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--border2);border-radius:10px}
 .stepper button{width:34px;height:34px;font-size:17px;font-weight:700;color:var(--gold2);display:flex;align-items:center;justify-content:center}
 .stepper .q{min-width:24px;text-align:center;font-size:14px;font-weight:700}
@@ -2236,7 +2243,7 @@ body.safe-open .cvo-hdr{opacity:0}
      кнопку и открывается списком, где у каждой строки есть имя. */
   /* Наверху остаётся то, чем пользуются в смену: события, поддержка, оператор,
      водители, смена и связь. Под «ещё» уходит редкое — выбор дня и тема. */
-  #dayBtn,#sumBtn{display:none}
+  #dayBtn,#sumBtn,#bookBtn{display:none}
 
   /* На телефоне в шапке остаются одни значки. Слова «События», «Парвиз»,
      «Сегодня» выталкивали последнюю кнопку за край экрана — а именно она
@@ -2878,6 +2885,8 @@ html.kb body{padding-bottom:40vh}
         <button class="pill" id="dayBtn" onclick="dayOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
           id="dayLbl">Сегодня</span></button>
+        <button class="pill" id="bookBtn" onclick="bookOpen()"><svg class="ic" viewBox="0 0 24 24"
+          aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z"/><path d="M5 4v16a3 3 0 0 1 3-3h11"/></svg><span>Клиенты</span></button>
         <button class="pill" id="whereBtn" onclick="whereOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle
           cx="12" cy="10" r="2.6"/></svg><span id="whereLbl">Водители</span></button>
@@ -3987,6 +3996,8 @@ function addLine(pid, pcs, d){
   renderTicket(); syncBadges();
 }
 function lineUnit(l){
+  // книжка клиентов (book.js): у оптовика цена строки — его личная
+  if(window.BOOK){ const own = BOOK.price(l); if(own != null) return own; }
   const p = CATALOG.find(x=>x.id===l.id); if(!p) return 0;
   return l.pcs===24 ? p.pack24 : (l.pcs===12 ? p.pack12 : p.price);
 }
@@ -4056,16 +4067,17 @@ function renderTicket(){
       return `<div class="tline">
         <img class="tk-img" src="/products/${l.id}.webp" alt="" loading="lazy"
           onerror="this.style.display='none'">
-        <div class="nm">${lineName(l)}<small>${u} AED</small></div>
+        <div class="nm">${lineName(l)}<small>${u} AED${(window.BOOK && BOOK.regOf(l) != null) ? ' <s>' + BOOK.regOf(l) + '</s>' : ''}</small></div>
         <div class="stepper">
           <button onclick="addLine('${l.id}',${l.pcs||null},-1)">−</button>
           <span class="q">${l.qty}</span>
           <button onclick="addLine('${l.id}',${l.pcs||null},1)">+</button>
         </div>
-        <div class="lt">${u*l.qty}</div>
+        <div class="lt">${u*l.qty}${(window.BOOK && BOOK.regOf(l) != null) ? '<s>' + (BOOK.regOf(l) * l.qty) + '</s>' : ''}</div>
       </div>`;
     }).join('') + '</div>';
   }
+  if(window.BOOK) BOOK.afterTicket();      // скидка по ценнику под строками
   const total = keys.reduce((s,k)=>s+lineUnit(TICKET[k])*TICKET[k].qty,0);
   $('totalV').textContent = total;
   // Слева в подвале — сколько позиций, а не слово «Итого»: сумма и так стоит
@@ -4294,6 +4306,7 @@ function clearTicket(confirmIt){
   dayPaint();
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
+  if(window.BOOK) BOOK.detach();    // клиент из книжки снят вместе с чеком
   cmtReset();                       // чек очистили — комментарий снова свёрнут
   payPick('cash');                  // и способ оплаты обратно на наличные
   curDist=''; curDriver=''; editDrvWas=''; editDistWas='';   // район и водитель — под заказ
@@ -4313,7 +4326,7 @@ function _editSig(){
   if(editOnline) return JSON.stringify([items, curDist, curDriver]);
   return JSON.stringify([items, curDist, curDriver,
     $('cName').value.trim(), $('cPhone').value.trim(),
-    $('cAddr').value.trim(), $('cComment').value.trim()]);
+    $('cAddr').value.trim(), $('cComment').value.trim(), window.BOOK ? BOOK.clientId() : '']);
 }
 
 function askCreate(){
@@ -4376,6 +4389,8 @@ async function doCreate(){
         office_id: curOffice,
         district_id: curDist,
         driver: curDriver,
+        // книжка клиентов: кто это и какой из его адресов
+        ...(window.BOOK && BOOK.clientId() ? {client_id: BOOK.clientId(), address_id: BOOK.addressId()} : {}),
         // Пустая строка = сегодня, обычный заказ.
         ...(BACK_DAY && !editingOid ? {back_date: BACK_DAY} : {}),
       };
@@ -4773,6 +4788,7 @@ function _card(o, lane){
       <span class="q-card-id">#${_esc(o.order_id)}</span>
       <span class="oc-st ${stC}">${stT}</span>
       ${_dayFlag(o)}
+      ${o.wholesale?'<span class="q-flag w">Оптовик</span>':''}
       ${o.needs_verify?'<span class="q-flag">не проверен</span>':''}
       ${rq?`<span class="q-flag req">${_esc((DRQ[rq.kind]||DRQ.note).t)}</span>`:''}
       <span class="q-card-when">${when}</span>
@@ -5584,6 +5600,7 @@ function startEdit(oid){
   _editWas=null;
   $('cName').value=o.customer_name||'';
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
+  if(window.BOOK) BOOK.fromOrder(o); // клиент и снимок его ценника — из заказа
   cmtReset();                       // у заказа есть комментарий — поле раскрыто
   // Способ оплаты заказа: у старых и наличных его в документе нет вовсе.
   { const pp = o.pay_parts || null;
@@ -6416,6 +6433,7 @@ const MORE_ITEMS = [
   {id:'teaBtn',   t:'Чай', ico:'<path d="M4.5 9.5h12v3.5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M16.5 10.5h1.2a2.4 2.4 0 0 1 0 4.8h-1.6"/><path d="M8.5 3.5c-.9 1 .9 1.9 0 3M12.5 3.5c-.9 1 .9 1.9 0 3M5 21h11"/>'},
   {id:'sumBtn',   t:'Итоги смены', ico:'<rect x="3.5" y="4" width="17" height="16" rx="2.5"/><path d="M7.5 15.5v-3M12 15.5v-7M16.5 15.5v-5"/>'},
   {id:'dayBtn',   t:'День',  ico:'<rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/>'},
+  {id:'bookBtn',  t:'Клиенты', ico:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z"/><path d="M5 4v16a3 3 0 0 1 3-3h11"/>'},
   // Тест-режим — только тестерам (сервер отдаёт test_allowed); строка
   // показывает, включён он или нет, нажатие переключает и перезагружает панель.
   {id:'testBtn',  t:'Тест-режим', ico:'<path d="M9 3h6"/><path d="M10 3v6.5L5 18a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-8.5V3"/><path d="M7.5 15h9"/>'},

@@ -411,6 +411,10 @@ async def _pos_total(items: list) -> int:
             qty = 0
         if qty <= 0:
             continue
+        if it.get("own"):
+            # личный ценник клиента (clients.apply_prices): цена строки — его
+            total += float(it.get("price") or 0) * qty
+            continue
         p = cat.get(it.get("id"))
         if p:
             total += _full_price(p, it.get("pcs")) * qty
@@ -775,8 +779,13 @@ def _summary(o: dict) -> dict:
         "driver": o.get("driver", ""),
         "total": o.get("total", 0),
         "items": [{"id": i.get("id"), "name": i.get("name"), "qty": i.get("qty", 1),
-                   "price": i.get("price", 0), "pcs": i.get("pcs")}
+                   "price": i.get("price", 0), "pcs": i.get("pcs"),
+                   **({"reg": i.get("reg"), "own": True} if i.get("own") else {})}
                   for i in (o.get("items") or [])],
+        # книжка клиентов: кто это и по какому ценнику посчитан заказ
+        "client_id": o.get("client_id") or "",
+        "wholesale": bool(o.get("own_prices")),
+        "own_prices": o.get("own_prices") or {},
         "created_by_name": o.get("created_by_name", ""),
         "customer_id": o.get("customer_id", 0),
         "username": o.get("username", ""),
@@ -927,6 +936,20 @@ async def handle_create(request):
     items, err = _build_items(body.get("items"))
     if err:
         return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
+    # Книжка клиентов (clients.py, владелец, 13 окт 2026): клиент, выбранный
+    # из книжки, или знакомый по номеру. У оптовика личный ценник ложится в
+    # цены строк, снимок цен — в заказ: правка ценника потом его не тронет.
+    import clients as _clients
+    client = await _clients.resolve(body.get("client_id"), phone)
+    own_prices: dict = {}
+    if client:
+        # выбрали из книжки, а поля не трогали — имя и номер берём из неё
+        if not phone and client.get("phones"):
+            phone = client["phones"][0]["pretty"]
+        if not name:
+            name = client.get("name") or ""
+        if _clients.wholesale_active(client):
+            items, own_prices = _clients.apply_prices(items, client["wholesale"]["prices"])
 
     # Способ оплаты (владелец, 27 сен 2026). До этого крипту вбивали обычным
     # заказом с комментарием «крипта»: в выручке она была, а система считала
@@ -1059,6 +1082,10 @@ async def handle_create(request):
         "created_by": uid,
         "created_by_name": op_display,
         "timestamp": now,
+        # книжка клиентов: кто это и по какому ценнику посчитано
+        **({"client_id": client["_id"], "client_name": client.get("name") or ""} if client else {}),
+        **({"own_prices": own_prices, "wholesale": True} if own_prices else {}),
+        **({"address_id": str(body.get("address_id") or "")[:16]} if body.get("address_id") else {}),
         # Тест-оператор заводит только тест-заказы (db.py прячет их от всех).
         **({"test": True} if _tflag(request) else {}),
         **({"delivered_at": now, "delivered_by": op_display,
@@ -1068,6 +1095,10 @@ async def handle_create(request):
            if back_dt else {}),
     }
     await db.save_order(order["order_id"], order)
+    try:
+        await _clients.remember(order, by=op_display)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[pos] книжка клиентов: {e}")
 
     if back_dt:
         # Ни карточек операторам, ни сообщения водителю: решать по этому заказу
@@ -1649,6 +1680,17 @@ async def handle_patch(request):
         if err:
             return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
         items = _keep_gift(order.get("items"), items)
+        # личный ценник клиента: снимок заказа главнее, текущий ценник — для
+        # строк, которых в снимке не было (clients.py)
+        import clients as _clients
+        prices = dict(order.get("own_prices") or {})
+        cl = await _clients.get(str(order.get("client_id") or "")) if order.get("client_id") else None
+        if cl and _clients.wholesale_active(cl):
+            prices = {**cl["wholesale"]["prices"], **prices}
+        if prices:
+            items, used = _clients.apply_prices(items, prices)
+            upd["own_prices"] = used
+            upd["wholesale"] = bool(used)
         total = await _order_total_for(order, items)
         items_changed = _items_sig(items) != _items_sig(order.get("items"))
         upd.update(items=items, item_lines=_item_lines(items),
@@ -1712,6 +1754,12 @@ async def handle_patch(request):
 
     await db.update_order(oid, **upd)
     order.update(upd)
+    if any(k in upd for k in ("phone", "address", "customer_name")):
+        try:
+            import clients as _clients
+            await _clients.remember(order, by=_op_name(request["op_user"]), count=False)
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[pos] книжка клиентов при правке: {e}")
     await _refresh_cards(order)
     await notify_driver(order, "edit")     # у водителя на руках прошлая версия
     if pay_changed:

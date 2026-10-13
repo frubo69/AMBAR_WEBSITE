@@ -7207,3 +7207,73 @@ async def fin_entries_same(day: str, amount: float, q: dict) -> list:
     if d is None: return []
     rows = await d.fin_entries.find({"day": day, **q}).to_list(length=200)
     return [r for r in rows if abs(float(r.get("amount") or 0) - float(amount)) <= 1.0]
+
+
+# ── Книжка клиентов (clients.py, владелец, 13 окт 2026) ─────────────────────
+async def client_get(cid: str) -> dict | None:
+    d = _db_or_none()
+    if d is None or not cid: return None
+    return await d.clients.find_one({"_id": cid})
+
+
+async def client_by_phone(key: str) -> dict | None:
+    d = _db_or_none()
+    if d is None or not key: return None
+    return await d.clients.find_one({"phones.key": key})
+
+
+async def client_put(doc: dict) -> None:
+    d = _db_or_none()
+    if d is None: return
+    await d.clients.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
+
+
+async def client_set(cid: str, fields: dict) -> bool:
+    d = _db_or_none()
+    if d is None or not fields: return False
+    r = await d.clients.update_one({"_id": cid}, {"$set": fields})
+    return r.matched_count > 0
+
+
+async def client_del(cid: str) -> bool:
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.clients.delete_one({"_id": cid})
+    await d.orders.update_many({"client_id": cid}, {"$unset": {"client_id": ""}})
+    return bool(r.deleted_count)
+
+
+async def clients_find(q: dict, limit: int = 8) -> list:
+    """Недавние первыми: last_order_at у кого-то None — такие в конец."""
+    d = _db_or_none()
+    if d is None: return []
+    return await d.clients.find(q).sort([("last_order_at", -1), ("updated_at", -1)]).to_list(length=limit)
+
+
+async def clients_count() -> int:
+    d = _db_or_none()
+    if d is None: return 0
+    return await d.clients.count_documents({})
+
+
+async def orders_with_phone() -> list:
+    """Все не тестовые заказы с телефоном, старые первыми — для сборки книжки."""
+    d = _db_or_none()
+    if d is None: return []
+    cur = d.orders.find({"phone": {"$nin": ["", "—", None]}, "test": {"$ne": True}},
+                        {"order_id": 1, "phone": 1, "customer_name": 1, "customer_id": 1, "address": 1,
+                         "total": 1, "status": 1, "timestamp": 1}).sort("timestamp", 1)
+    return await cur.to_list(length=100000)
+
+
+async def orders_set_client(oids: list, cid: str) -> None:
+    d = _db_or_none()
+    if d is None or not oids: return
+    await d.orders.update_many({"order_id": {"$in": list(oids)}, "client_id": {"$exists": False}},
+                               {"$set": {"client_id": cid}})
+
+
+async def orders_by_client(cid: str, limit: int = 30) -> list:
+    d = _db_or_none()
+    if d is None or not cid: return []
+    return await d.orders.find({"client_id": cid, "test": {"$ne": True}}).sort("timestamp", -1).to_list(length=limit)

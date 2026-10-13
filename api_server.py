@@ -190,6 +190,18 @@ async def on_startup(app):
         app["crypto_book"] = asyncio.create_task(crypto_book.loop())
     except Exception as e:
         log.warning(f"[crypto] книга крипты не запущена: {e}")
+    # Книжка клиентов: при первом запуске собирается из прошлых заказов (один
+    # раз, отметка в настройках), дальше наполняется сама с каждого заказа.
+    async def _clients_seed():
+        await asyncio.sleep(15)
+        try:
+            import clients as _clients
+            r = await _clients.seed()
+            if not r.get("skipped"):
+                log.info(f"[clients] книжка собрана: {r}")
+        except Exception as e:                           # noqa: BLE001
+            log.warning(f"[clients] книжка не собрана: {e}")
+    app["clients_seed"] = asyncio.create_task(_clients_seed())
     # Переписка владельца с ботом живёт не дольше 47 часов: позже телеграм
     # запретит её удалять, и в тревожный момент она останется в телефоне.
     try:
@@ -869,6 +881,13 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     # механизм AMBAR_TEST_IDS (заказ только в сообщениях) тест-режима не касается.
     if test or uid not in _TEST_ACCOUNTS:
         await db.save_order(oid, order_doc)
+        # книжка клиентов (clients.py): заказ из приложения с телефоном тоже
+        # заводит или дополняет клиента — у операторов одна книжка на всех
+        try:
+            import clients as _clients
+            await _clients.remember(order_doc, by="app")
+        except Exception as e:                           # noqa: BLE001
+            log.warning(f"[clients] книжка по заказу из приложения: {e}")
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
                            last_name=user.get("last_name",""), username=username,
                            language_code=user.get("language_code", ""),
@@ -2988,6 +3007,12 @@ def build_app() -> web.Application:
         wallet_routes.setup(app)
     except Exception as e:
         _setup_failed("wallet", e)
+    # Книжка клиентов: подсказки оператору, адреса, личные ценники (13 окт 2026).
+    try:
+        import clients_routes
+        clients_routes.setup(app)
+    except Exception as e:
+        _setup_failed("clients", e)
     # Сколько склад стоит: бутылки, закупка и выручка по двум ценам.
     try:
         import stock_value

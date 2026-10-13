@@ -63,7 +63,26 @@ import db
 
 log = logging.getLogger("crypto_book")
 
-START_DAY = "2026-10-01"     # первый день, в чьё распределение идёт крипта
+START_DAY = "2026-10-01"     # первый день, в чьё распределение идёт крипта (нижняя планка)
+
+
+async def start() -> str:
+    """Действующий первый день книги крипты: не раньше START_DAY и не раньше
+    дня старта учёта (fin_start). Чистый старт (владелец, 14 окт 2026): всё,
+    что пришло на кошелёк до него, — «до учёта», в РП+ не предлагается."""
+    import fin_start
+    return max(START_DAY, await fin_start.get() or "")
+
+
+def start_cached() -> str:
+    import fin_start
+    return max(START_DAY, fin_start.cached() or "")
+
+
+def _since_ms(day: str) -> int:
+    """Начало учётного дня в миллисекундах — граница для переводов сети."""
+    import bizday
+    return int(bizday.day_start(day).timestamp() * 1000)
 KEY = "crypto_book"
 EPS = 0.005
 OVERLAP_MS = 6 * 3600 * 1000  # насколько назад перечитываем сеть при сверке
@@ -288,19 +307,26 @@ async def state() -> dict:
     книга ещё не заведена (сеть не ответила при первом запуске): крипту в
     распределение не предлагаем и не принимаем."""
     c = await cfg()
-    days = await db.fin_days_crypto()
-    entries = await db.fin_entries_crypto()
+    sd = await start()
+    days = [d for d in await db.fin_days_crypto() if str(d.get("_id") or d.get("day")) >= sd]
+    entries = [e for e in await db.fin_entries_crypto() if str(e.get("day") or "") >= sd]
     по_дням, alloc, exp, wd_free, wd_rp, fee_in = _deltas(days, entries)
     if not c:
         return {"ready": False, "rate": rate(), "open": 0.0, "inflow": 0.0, "alloc": alloc,
                 "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp, "fee_in": fee_in, "free": 0.0,
                 "free_fact": 0.0, "wallet": wallet_aed(),
                 "rp": _r(alloc + fee_in - exp - wd_rp), "book": 0.0, "out": 0.0,
-                "by_day": по_дням, "start_day": START_DAY}
+                "by_day": по_дням, "start_day": sd}
     moves = await db.crypto_moves()
+    # Чистый старт позже заведения книги: открытие и всё, что пришло до утра
+    # дня старта, — «до учёта»; свободная начинается с нуля.
+    late_start = sd > START_DAY and _since_ms(sd) > int(c["start_ts"])
+    if late_start:
+        граница = _since_ms(sd)
+        moves = [m for m in moves if int(m.get("ts") or 0) >= граница]
     inflow = _r(sum(float(m.get("aed") or 0) for m in moves if m.get("dir") == "in"))
     out = _r(sum(float(m.get("aed") or 0) for m in moves if m.get("dir") == "out"))
-    open_ = _r(c.get("open_aed"))
+    open_ = 0.0 if late_start else _r(c.get("open_aed"))
     free = _r(open_ + inflow - alloc - fee_in - wd_free)
     rp = _r(alloc + fee_in - exp - wd_rp)
     # Свободная по факту: не больше того, что лежит на кошельках сверх счёта
@@ -330,7 +356,7 @@ async def state() -> dict:
             # разница — то, что ушло, а в книгу ещё не внесли (или наоборот).
             "out": out, "out_book": _r(exp + wd_free + wd_rp),
             "src": src, "chain": chain, "report": rep,
-            "by_day": по_дням, "start_day": START_DAY}
+            "by_day": по_дням, "start_day": sd}
 
 
 async def loop(every: int = 300):

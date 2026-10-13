@@ -4455,6 +4455,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-an-bar s{position:absolute;top:-3px;width:2px;height:12px;margin-left:-1px;border-radius:1px;background:var(--text);opacity:.5}
 .fb-an-s{font-size:11px;color:var(--muted)} .fb-an-s.dn{color:var(--dn)} .fb-an-s.warn{color:var(--warn)} .fb-an-s.ok{color:var(--up)}
 .fb-okday{width:100%;height:46px;border-radius:12px;font-size:14px;font-weight:700}
+.fb-before span{color:var(--dim)}
+.fb-before em{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--dim);background:var(--bg2)}
+.fb-i .fb-date{flex:0 0 156px;width:156px;margin-right:0;text-align:right;-webkit-appearance:none;appearance:none;color-scheme:dark}
+.fb-i .fb-date::-webkit-date-and-time-value{text-align:right}
 .fb-okdone span{color:var(--up)}
 .fb-okdone em{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--up);background:rgba(76,175,125,.14)}
 /* Календарь одной даты: без отрезков и подвала */
@@ -20815,6 +20819,7 @@ const FB_T = {collected_cr: 'РП+ криптой', handed_fact: 'Собрал �
               pay: 'Оплатили Барракуде', note: 'Заметка',
               norm: 'Норма в день', usd: 'Курс доллара',
               safe_b_open: 'Барракуда на начало', rp_open: 'РП на начало', np_open: 'ЧП на начало', debt_b_open: 'Долг на начало',
+              safe_b_fact: 'Пересчёт · Барракуда', safe_rp_fact: 'Пересчёт · РП', safe_np_fact: 'Пересчёт · ЧП',
               rate: 'Оклад', days: 'Дни'};
 // hold — «Свободное удержание»: пишется только своей кнопкой, в фишках вида его нет
 const FB_KIND_T = {fine: 'Штраф', advance: 'Аванс', loan: 'Долг', bonus: 'Премия', hold: 'Удержание'};
@@ -21458,7 +21463,8 @@ function fbCrErr(e){
                                                 : `В РП криптой только ${f(p.have)} AED`)
     : p.error === 'cr_spent' ? `Из этой крипты уже потрачено — меньше ${f(p.min)} AED не поставить`
     : p.error === 'crypto_unready' ? 'Кошелёк ещё не прочитан — попробуйте через минуту'
-    : p.error === 'crypto_early' ? 'Крипта в РП+ идёт с 1 октября' : '';
+    : p.error === 'crypto_early' ? `Крипта в РП+ идёт с ${p.from ? fbDayT(p.from) : '1 октября'}`
+    : p.error === 'before_start' ? `До начала учёта · учёт с ${p.from ? fbDayT(p.from) : '—'}` : '';
 }
 // «Чем платили?» — последним вопросом расхода из РП (владелец: «в РП− надо
 // учитывать в конце, чем платили — наличными или криптой»). Крипты на счёте РП
@@ -21571,7 +21577,7 @@ function fbValues(){
          V['d.rp_plus_all'] = (d.collected || 0) + (d.collected_cr || 0);
          // оплата Барракуде из РП и долг фонда (3 окт 2026)
          V['d.pay_rp_on'] = d.pay_rp ? 1 : 0; V['d.owed_on'] = d.rp_owed > 0 ? 1 : 0; V['d.back_on'] = d.rp_back_plan > 0 ? 1 : 0;
-         V['d.kept_on'] = d.kept ? 1 : 0; }
+         V['d.kept_on'] = d.kept ? 1 : 0; V['d.tea_on'] = d.tea ? 1 : 0; }
   const mb = fbBook(FB.month || fbMonthNow());
   if(mb){
     for(const g of ['totals', 'rp', 'np', 'b', 'safe']) for(const k in mb[g]) V[(g === 'totals' ? 't' : g) + '.' + k] = mb[g][k];
@@ -22002,7 +22008,8 @@ function fbDayBodyHtml(d){
   const cr = fbCr(day.slice(0, 7));
   // Строка крипты — с того дня, с которого она идёт в РП+, и когда кошелёк прочитан.
   const crOn = !!cr.ready && day >= (cr.start_day || '9999') && !d.future && (d.base > 0 || d.collected_cr > 0);
-  const okRow = d.future || !(d.base > 0) ? ''
+  const okRow = d.before ? `<div class="sc-r fb-r sub fb-before"><span>До учёта</span><em>${IC('lock', 15)}</em></div>`
+    : d.future || !(d.base > 0) ? ''
     : d.ok ? `<div class="sc-r fb-r sub fb-okdone"><span>Подтверждено${d.ok_by ? ' · ' + escS(d.ok_by) : ''}</span><em>${IC('check', 15)}</em></div>`
            : `<div class="fb-okwrap"><button class="aud-b go fb-okday" data-d="${day}" onclick="fbDayOk(this.dataset.d)">Подтвердить</button></div>`;
   return `
@@ -22010,6 +22017,9 @@ function fbDayBodyHtml(d){
     ${fbCapT('Выручка')}
     ${fbRow('Наличными за день', 'd.cash', d.cash)}
     ${fbRow('Чай водителям', 'd.tips_cash', d.tips_cash, {sign: '−'})}
+    <!-- Чай операторов по каталогу (14 окт 2026): сидит в цене бутылки,
+         сдаётся отдельной пачкой — в сейф не едет, как в сборе выручки. -->
+    ${fbRow('Чай операторов', 'd.tea', d.tea || 0, {sign: '−', show: 'd.tea_on', hide: !d.tea})}
     ${fbRow('Расходы водителей', 'd.spend_cash', d.spend_cash ?? d.spend, {sign: '−'})}
     <!-- Зарплата, которую водитель оставил себе из наличных смены (3 окт 2026):
          в сейф не доехала, в выручке дня её нет; сама зарплата — в РП−. -->
@@ -22125,7 +22135,9 @@ function fbOpenIn(label, field, b, o){
 async function accFinSafe(){
   const b = await fbMonthScreen('Сейф'); if(!b) return;
   const s = b.safe || {}, wal = fbWal(b);
-  const days = (b.days || []).filter(d => !d.future && d.base > 0).reverse();
+  const days = (b.days || []).filter(d => !d.future && !d.before && d.base > 0).reverse();
+  // «Учёт с» внутри этого месяца — открытие значит «на утро дня старта».
+  const startIn = !!b.start_day && b.start_day.slice(0, 7) === b.month && b.start_day > b.first;
   document.getElementById('accMid').innerHTML = `
   <div class="sc fb-gut">
     ${fbCap(b.month, true)}
@@ -22143,13 +22155,51 @@ async function accFinSafe(){
   </div>
   <div class="sc">${fbCapT('Распределение по дням')}<div class="fb-one">${
     days.length ? days.map(fbSafeDayRow).join('') : '<div class="fb-none">Выручки в этом месяце ещё нет</div>'}</div></div>
+  ${fbFactBlock(b)}
   <div class="sc fb-gut">
-    ${fbCapT('На начало месяца')}
+    ${fbCapT(startIn ? 'На начало учёта' : 'На начало месяца', startIn ? fbDayT(b.start_day) : '')}
     ${fbOpenIn('Барракуда', 'safe_b_open', b)}
     ${fbOpenIn('РП', 'rp_open', b)}
     ${fbOpenIn('ЧП', 'np_open', b)}
     ${fbOpenIn('Долг Барракуде', 'debt_b_open', b)}
+    ${fbStartRow(b)}
   </div>`;
+}
+// «Учёт с» (владелец, 14 окт 2026: чистый старт — октябрь никто не вёл):
+// день, с которого ведётся книга. Всё раньше — «до учёта»: дни не ждут
+// подтверждения и в стопки не входят, сбор выручки и крипта в РП+ — с него.
+// Одна настройка на всё приложение, лежит в сейфе рядом с открытием.
+function fbStartRow(b){
+  return `<label class="sc-r fb-r fb-i"><span>Учёт с</span><b>
+    <input class="fb-txt fb-date" type="date" value="${escS(b.start_day || '')}" data-was="${escS(b.start_day || '')}"
+      onchange="fbStartSave(this)"></b></label>`;
+}
+async function fbStartSave(inp){
+  const day = inp.value || '';
+  if(day === (inp.dataset.was || '')) return;
+  if(!await askYes(day ? `Учёт с ${fbDayT(day)}: всё раньше — до учёта, в сейф не входит.\n\nЗаписать?`
+                        : 'Снять день старта: книга считается с начала.\n\nЗаписать?')){ inp.value = inp.dataset.was || ''; return; }
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/start', {method: 'POST', body: {day, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    FB.months = {}; FB.at = {};                       // день старта меняет каждый месяц
+    inp.dataset.was = day;
+    if(res.book) fbApply(res.book);
+    fbRepaint();
+  }catch(e){
+    inp.value = inp.dataset.was || '';
+    _toast(e && e.payload && e.payload.error === 'future' ? 'Этот день ещё не наступил' : 'Не удалось сохранить');
+  }
+}
+// Пересчёт сейфа по стопкам (владелец, 14 окт 2026): что лежит на самом деле
+// против книги на день пересчёта; разница — по каждой стопке. Пустое поле —
+// стопку не считали.
+function fbFactBlock(b){
+  const f = b.safe_fact || {}, s = b.safe || {}, sc = `data-month="${b.month}"`;
+  const row = (t, k) => fbIn(t, `safe_${k}_fact`, f[k] ?? null, sc, {ph: fbFmt(f[`book_${k}`] ?? s[k])})
+    + (f[k] != null ? fbRow('Разница с книгой', `fact.diff_${k}`, f[`diff_${k}`], {sub: true, mode: 'diff'}) : '');
+  return `<div class="sc fb-gut">${fbCapT('Пересчёт сейфа', f.day ? fbDayT(f.day) : '')}
+    ${row('Барракуда', 'b')}${row('РП', 'rp')}${row('ЧП', 'np')}</div>`;
 }
 // День в сейфе: выручка и предложенная раскладка. Не подтверждён — золотая
 // «Подтвердить» прямо в строке; подтверждён — зелёное окошко и карандаш.
@@ -22301,6 +22351,7 @@ function fbDdcParts(d, month){
 function fbDdcBodyHtml(d, start){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
   if(d.future) return '<div class="exp-empty">Этот день ещё не наступил</div>';
+  if(d.before) return '<div class="exp-empty">До учёта</div>';
   return fbDdcTable(fbDdcParts(d), start.all, d.stack_total, {from: 'Сейф начало дня', to: 'Сейф конец дня'},
     d.pending && +d.base ? {name: 'Выручка дня', sub: 'день не подтверждён — в сейф ещё не легла', v: +d.base} : null);
 }
@@ -23324,6 +23375,7 @@ function fbBParts(d, b){
 }
 function fbBBodyHtml(d){
   if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
+  if(d.before) return '<div class="exp-empty">До учёта</div>';
   const day = d.day, b = fbBook(day.slice(0, 7)) || {}, n = v => +v || 0;
   const paid = d.manual.pay !== null && d.manual.pay !== undefined;
   const sup = (d.supplies || []).find(x => x.kind === 'main');

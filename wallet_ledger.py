@@ -46,7 +46,7 @@ DUBAI = timezone(timedelta(hours=4))
 # Что считать первым днём учёта — тем же, что у книги крипты.
 def start_day() -> str:
     import crypto_book
-    return crypto_book.START_DAY
+    return crypto_book.start_cached()
 
 
 KINDS = ("in", "topup", "refund", "cash", "sim", "out")

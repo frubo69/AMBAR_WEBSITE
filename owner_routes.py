@@ -4473,10 +4473,19 @@ async def _cash_amounts(day: str, orders: list) -> dict:
     return out
 
 
-def _cash_back_days(day: str) -> list:
+async def _cash_from() -> str:
+    """С какого дня считается сбор: не раньше CASH_CARRY_FROM и не раньше дня
+    старта учёта (fin_start, владелец 14 окт 2026: чистый старт — несобранное
+    до него уже лежит в пересчёте сейфа)."""
+    import fin_start
+    return max(CASH_CARRY_FROM, await fin_start.get() or "")
+
+
+def _cash_back_days(day: str, since: str = "") -> list:
     """Дни, откуда может приехать несобранное: вчера, позавчера… не раньше
     начала переноса и не дальше месяца."""
     from datetime import date as _date
+    since = max(since or "", CASH_CARRY_FROM)
     try:
         d0 = _date.fromisoformat(day)
     except ValueError:
@@ -4484,7 +4493,7 @@ def _cash_back_days(day: str) -> list:
     out = []
     for i in range(1, CASH_CARRY_MAX + 1):
         d = (d0 - timedelta(days=i)).isoformat()
-        if d < CASH_CARRY_FROM:
+        if d < since:
             break
         out.append(d)
     return out
@@ -4529,7 +4538,7 @@ async def cash_round(day: str) -> dict:
     Несобранное за прошлые дни (с CASH_CARRY_FROM) едет сюда же — carry по
     району, и «выручка» / «чаевые» района — вместе с ним (net_all, tips_all):
     столько старший и забирает. later — «Соберу завтра»."""
-    back = _cash_back_days(day)
+    back = _cash_back_days(day, await _cash_from())
     try:
         marks_all = await db.checklist_many([day] + back)
     except Exception as e:                                   # noqa: BLE001
@@ -4665,7 +4674,7 @@ async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "")
         else:
             await db.checklist_put(only, f"cash:{oid}", None)
         return
-    back = _cash_back_days(day)
+    back = _cash_back_days(day, await _cash_from())
     marks_all = await db.checklist_many(back) if back else {}
     if done:
         for d in _cash_chain(day, oid, back, marks_all):

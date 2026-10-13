@@ -50,7 +50,10 @@ PAY_WAYS = ('', 'cash', 'crypto')      # чем платили расход из
 # замком, иначе два запроса разом оба увидят остаток и оба его потратят.
 _CR_LOCK = asyncio.Lock()
 OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стопки сейфа и долг на начало
-MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd')
+# Пересчёт сейфа по стопкам (владелец, 14 окт 2026: «экран „Пересчитал сейф“»):
+# что лежит на самом деле, против того, что по книге на тот день.
+FACT_FIELDS = ('safe_b_fact', 'safe_rp_fact', 'safe_np_fact')
+MONTH_FIELDS = OPEN_FIELDS + ('norm', 'usd') + FACT_FIELDS
 # 'mv' — перевод между стопками сейфа (владелец, 3 окт 2026: «перевести со
 # счёта РП на счёт ЧП»): из from в to, сейф целиком не меняется.
 BOOKS = ('rp', 'np', 'in', 'mv')
@@ -125,8 +128,9 @@ async def _sales(days: list[str]) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] заказы не прочитаны: {e}")
         orders = []
-    out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, free=0, tips=0, tips_cash=0, orders=0,
+    out = {d: dict(gross=0, cash=0, crypto=0, card=0, debt=0, free=0, tips=0, tips_cash=0, tea=0, orders=0,
                    cash_by=dict()) for d in days}
+    rates = cash_math.tea_rates()
     for o in orders:
         day = bizday.order_day(o)
         s = out.get(day)
@@ -134,6 +138,11 @@ async def _sales(days: list[str]) -> dict:
             continue
         total = int(o.get("total") or 0)
         m = str(o.get("payment_method") or "").lower()
+        # Чай операторов — со всех доставленных заказов дня, как в сборе
+        # выручки (owner_routes._cash_amounts): сидит в цене бутылки, водитель
+        # отдаёт его отдельной пачкой, в сейф он не едет (владелец, 14 окт 2026;
+        # до того книга клала его в сейф — 50–700 AED в день лишних).
+        s["tea"] += cash_math.order_tea(o, rates) - int(o.get("tip") or 0)
         # «Без оплаты» — товар уехал, денег нет: в выручку дня такой заказ не
         # входит вовсе, считаем его отдельно (владелец, 12 сен 2026)
         if m == "free":
@@ -1002,8 +1011,16 @@ async def _opening(month: str, depth: int = 0) -> dict:
     opening = {**{k: v for k, v in carried.items() if v is not None}, **explicit}
     if opening.get("np_open") is None and (doc.get("carry_np") is not None or doc.get("storage") is not None):
         opening["np_open"] = calc._n(doc.get("carry_np")) + calc._n(doc.get("storage"))   # старые поля
+    # Вписанное руками главнее переноса целиком: если ЧП на начало вписали,
+    # перенос прошлого месяца («должно быть») — это оно же, а не хвост месяца,
+    # который не вели (14 окт 2026: сентябрь без прихода с четырьмя зарплатами
+    # давал октябрю −60 200 при вписанном ЧП 0).
+    if "np_open" in explicit:
+        opening["carry_np"] = calc._n(explicit["np_open"])
+    import fin_start
+    start = await fin_start.get()
     return {"opening": opening, "explicit": explicit, "carried": carried,
-            "note": doc.get("note") or "", "doc": doc}
+            "note": doc.get("note") or "", "doc": doc, "start": start}
 
 
 def _entry_view(e: dict, line_names: dict) -> dict:
@@ -1144,16 +1161,22 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] сверка {month}: {e}")
         recon_gaps = {}
+    import fin_start
+    start = opening.get("start")
     rows, meta = [], {}
     for d in days:
         s, sp, pu, m = sales[d], spend[d], purch[d], manual.get(d) or {}
         en = by_day_entries.get(d) or {"rp": [], "np": [], "in": [], "mv": []}
         # выручка дня — то, что старший собирает наличными: наличные заказов
-        # минус чай (он водителя) минус расходы водителей наличными; как в
-        # обзоре. Оплаченное безналом наличных не тронуло — не вычитаем.
-        handed = s["cash"] - s["tips_cash"] - (sp["spend"] - sp["card"]) - sp["kept"]
-        past = d <= today
-        fact = m.get("handed_fact")
+        # минус чай клиента (он водителя) минус чай операторов (по каталогу,
+        # отдельной пачкой) минус расходы водителей наличными; как в сборе
+        # выручки. Оплаченное безналом наличных не тронуло — не вычитаем.
+        handed = s["cash"] - s["tips_cash"] - s["tea"] - (sp["spend"] - sp["card"]) - sp["kept"]
+        # До начала учёта (fin_start): день показывается, но ничего не
+        # предлагает и в деньги не входит — compute() его обнулит.
+        before = fin_start.before(d, start)
+        past = d <= today and not before
+        fact = None if before else m.get("handed_fact")
         fact_src = "manual" if fact is not None else ""
         if fact is None and past and recon_gaps.get(d):
             fact, fact_src = handed + recon_gaps[d], "recon"
@@ -1174,7 +1197,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         cr, cr_src = 0.0, ""
         if m.get("ok"):
             cr, cr_src = calc._n(m.get("collected_cr")), "manual"
-        elif past and base > 0 and d >= crypto_book.START_DAY and cb["ready"]:
+        elif past and base > 0 and d >= cb["start_day"] and cb["ready"]:
             if m.get("collected_cr") is not None:
                 cr, cr_src = min(calc._n(m.get("collected_cr")), max(0.0, free_run)), "manual"
             else:
@@ -1205,14 +1228,14 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
         dep_lost = sum(calc._n(x.get("lost")) for x in en["in"] if x.get("src") == "deposit")
         rows.append(dict(
             day=d, gross=s["gross"], cash=s["cash"], card=s["card"], crypto=s["crypto"],
-            debt=s["debt"], tips=s["tips"], spend=sp["spend"], handed=handed,
+            debt=s["debt"], tips=s["tips"], tea=s["tea"], spend=sp["spend"], handed=handed, before=before,
             handed_fact=fact, handed_src=fact_src, ordered=ordered, ordered_extra=pu["ordered_extra"], kept=sp["kept"],
             aside=aside, collected=collected, collected_cr=cr, cr_cash=cr_cash, extra_cr=extra_cr,
             extra_rp=calc._n(m.get("extra_rp")) + extra_in,
             dep_back=dep_back, dep_lost=dep_lost,
             pay=m.get("pay"), pay_b=m.get("pay_b"), pay_b_extra=m.get("pay_b_extra"),
             pay_src=m.get("pay_src") or "", pay_rp=m.get("pay_rp"), norm=budget["norm"],
-            ok=bool(m.get("ok")), pending=past and base > 0 and not m.get("ok"),
+            ok=bool(m.get("ok")) and not before, pending=past and base > 0 and not m.get("ok"),
             expenses=en["rp"], payouts=en["np"], moves=en["mv"]))
         meta[d] = dict(aside_src=aside_src, collected_src=collected_src, cr_src=cr_src, ins=en["in"],
                        extra_manual=m.get("extra_rp"), ok_by=m.get("ok_by") or "",
@@ -1250,7 +1273,7 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                  ok_by=meta[d]["ok_by"], tips_cash=meta[d]["tips_cash"],
                  pay_by=m.get("pay_by") or "",
                  pay_at=_utc_iso(m["pay_at"]) if isinstance(m.get("pay_at"), datetime) else str(m.get("pay_at") or ""),
-                 pending=bool(d <= today and r["base"] > 0 and not r["ok"]),
+                 pending=bool(d <= today and r["base"] > 0 and not r["ok"] and not r.get("before")),
                  salary_sum=calc._i(sum(calc._n(e["amount"]) for e in r["expenses"]
                                         if e.get("kind") in ("salary", "advance", "loan"))))
         r["manual"] = {k: m.get(k) for k in calc.DAY_MANUAL}
@@ -1273,6 +1296,8 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     book.update(month=month, today=today, first=days[0], last=days[-1],
                 opening=opening["opening"], opening_explicit=opening["explicit"],
                 opening_carried=opening["carried"], month_note=opening["note"],
+                # учёт с какого дня (fin_start) и пересчёт сейфа по стопкам
+                start_day=start, safe_fact=_safe_fact(mdoc, book["days"]),
                 prev_month=_prev_month(month), budget=budget,
                 # крипта сейчас: свободная и на счету РП — экранам, которые
                 # предлагают раскладку и спрашивают, чем платили
@@ -1347,8 +1372,8 @@ async def _cr_alloc_check(day: str, new: float, was: float) -> dict | None:
     st = await crypto_book.state()
     if new > 0 and not st["ready"]:
         return {"error": "crypto_unready"}
-    if new > 0 and day < crypto_book.START_DAY:
-        return {"error": "crypto_early", "from": crypto_book.START_DAY}
+    if new > 0 and day < st["start_day"]:
+        return {"error": "crypto_early", "from": st["start_day"]}
     delta = round(new - was, 2)
     if delta > st["free_fact"] + crypto_book.EPS:
         return {"error": "no_free", "free": st["free_fact"], "max": round(st["free_fact"] + was, 2)}
@@ -1412,6 +1437,8 @@ async def handle_day_set(request):
             value = _num(body.get("value"))
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
+    if field != "note" and (отказ := await _before_start(day)):
+        return _json(отказ, 409)
     who = _who(body)
     async with _CR_LOCK:
         if field == "collected_cr":
@@ -1460,6 +1487,8 @@ async def handle_pay_b(request):
         return _json({"error": "bad_request"}, 400)
     if day > _biz_day():
         return _json({"error": "future"}, 400)
+    if отказ := await _before_start(day):
+        return _json(отказ, 409)
     who = _who(body)
     month = day[:7]
     from_b = from_np = from_rp = 0.0
@@ -1520,6 +1549,8 @@ async def handle_day_ok(request):
         return _json({"error": "bad_request"}, 400)
     if day > _biz_day():
         return _json({"error": "future"}, 400)
+    if отказ := await _before_start(day):
+        return _json(отказ, 409)
     who = _who(body)
     async with _CR_LOCK:
         m = (await db.fin_days_get(day, day)).get(day) or {}
@@ -1538,6 +1569,55 @@ async def handle_day_ok(request):
     log.info(f"[fin] {day} раскладка подтверждена: Барракуде {aside}, РП+ наличными {collected}, "
              f"криптой {cr} · {who or '—'}")
     return _json({"ok": True, "day": day, "book": await build(day[:7])})
+
+
+async def _before_start(day: str) -> dict | None:
+    """День раньше начала учёта — деньгами не двигать (владелец, 14 окт 2026)."""
+    import fin_start
+    start = await fin_start.get()
+    if fin_start.before(day, start):
+        return {"error": "before_start", "from": start}
+    return None
+
+
+def _safe_fact(mdoc: dict, days: list) -> dict | None:
+    """Пересчёт сейфа по стопкам против книги на день пересчёта: разница по
+    каждой стопке. None — не считали."""
+    vals = {k[5:-5]: mdoc.get(k) for k in FACT_FIELDS if mdoc.get(k) is not None}
+    if not vals:
+        return None
+    day = str(mdoc.get("safe_fact_day") or "")
+    row = next((r for r in days if r["day"] == day), None) or (days[-1] if days else {})
+    out = {"day": day, "by": mdoc.get("safe_fact_by") or ""}
+    for k in ("b", "rp", "np"):
+        v = vals.get(k)
+        book = calc._n(row.get(f"stack_{k}"))
+        out[k] = None if v is None else calc._i(calc._n(v))
+        out[f"book_{k}"] = calc._i(book)
+        out[f"diff_{k}"] = None if v is None else calc._i(calc._n(v) - book)
+    return out
+
+
+@require_owner
+async def handle_start_set(request):
+    """POST {day, as} — «Учёт с»: день, с которого ведётся книга (fin_start).
+    Пустой day — снять. Всё раньше — «до учёта»."""
+    import fin_start
+    try:
+        body = await request.json()
+        raw = str(body.get("day") or "").strip()
+        day = _day_arg(raw) if raw else ""
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if day and day > _biz_day():
+        return _json({"error": "future"}, 400)
+    who = _who(body)
+    was = await fin_start.get()
+    await fin_start.set_day(day or None, who)
+    for m in {(day or was or _biz_day())[:7], (was or day or _biz_day())[:7]}:
+        await _touch(m)
+    log.info(f"[fin] учёт с {day or '—'} (было {was or '—'}) · {who or '—'}")
+    return _json({"ok": True, "day": day or None, "book": await build((day or _biz_day())[:7])})
 
 
 async def _line_get(month: str, lid: str):
@@ -1634,6 +1714,12 @@ async def handle_entry_add(request):
     rent = bool(ln) and _line_group(ln) in ("rent", "ads")
     if book == "rp" and not kind and not photo and not rent:
         return _json({"error": "no_photo"}, 400)
+    # До начала учёта (fin_start): расход по статье записать можно — он ляжет в
+    # факт бюджета, стопки не тронет (compute обнуляет день). Всё, что двигает
+    # деньги между счетами или депозиты, — только с дня старта.
+    if book != "rp" or deposit or src or pay_way == "crypto":
+        if отказ := await _before_start(day):
+            return _json(отказ, 409)
     # «Что-то ещё» без слов — просто сумма в никуда: за что, обязательно.
     if ln and (ln.get("name") or "") == OTHER_NAME and not str(body.get("comment") or "").strip():
         return _json({"error": "no_comment"}, 400)
@@ -1806,10 +1892,11 @@ async def handle_month_set(request):
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
     who = _who(body)
+    extra = {"safe_fact_day": _biz_day(), "safe_fact_by": who} if field in FACT_FIELDS else {}
     if value is None or value == "":
-        await db.fin_month_set(month, {"by": who}, unset=[field])
+        await db.fin_month_set(month, {"by": who, **extra}, unset=[field])
     else:
-        await db.fin_month_set(month, {field: value, "by": who})
+        await db.fin_month_set(month, {field: value, "by": who, **extra})
     await _touch(month)
     log.info(f"[fin] {month} {field} → {value!r} · {who or '—'}")
     return _json({"ok": True, "month": month, "field": field, "value": value,
@@ -2662,6 +2749,7 @@ def setup(app):
         ("/api/owner/finance/book/entry", handle_entry_add, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_del, "DELETE"),
         ("/api/owner/finance/book/month", handle_month_set, "POST"),
+        ("/api/owner/finance/book/start", handle_start_set, "POST"),
         ("/api/owner/finance/book/budget", handle_budget_set, "POST"),
         ("/api/owner/finance/book/budget", handle_budget_del, "DELETE"),
         ("/api/owner/finance/book/budget/fill", handle_budget_fill, "POST"),

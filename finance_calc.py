@@ -49,6 +49,13 @@ def compute(days: list[dict], opening: dict) -> dict:
                         её нет; сама зарплата — записью расхода с pay='hands'
          handed_fact    сдали всего по факту пересчёта (None — как в приложении);
                         раскладка дня идёт от факта, разница с приложением — gap
+         tea            чай операторов за «чайные» бутылки (по каталогу): сидит в
+                        цене, водитель отдаёт его отдельной пачкой — из выручки
+                        вычтен, для прибыли расход (владелец, 14 окт 2026)
+         before         день раньше начала учёта (fin_start): показывается, но
+                        ни в стопки, ни в итоги, ни в «ждут» не входит; его
+                        записи — только в факт бюджета (владелец, 14 окт 2026:
+                        чистый старт, всё до — «до учёта»)
          ordered        заказали у Баракуды (закупочные цены)
          ordered_extra  закупили на других базах (для справки)
          aside          отложили в сейф Б
@@ -138,7 +145,7 @@ def compute(days: list[dict], opening: dict) -> dict:
     t = dict(gross=0.0, cash=0.0, spend=0.0, handed=0.0, ordered=0.0,
              ordered_extra=0.0, aside=0.0, collected=0.0, extra_rp=0.0,
              pay_b=0.0, pay_b_extra=0.0, expenses=0.0, np_plus=0.0,
-             payouts=0.0, card=0.0, crypto=0.0, tips=0.0, base=0.0, gap=0.0, pending=0,
+             payouts=0.0, card=0.0, crypto=0.0, tips=0.0, tea=0.0, base=0.0, gap=0.0, pending=0,
              collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0, expenses_hands=0.0, kept=0.0,
              pay_rp=0.0, rp_back=0.0,
              mv_b_in=0.0, mv_b_out=0.0, mv_rp_in=0.0, mv_rp_out=0.0, mv_np_in=0.0, mv_np_out=0.0,
@@ -148,23 +155,29 @@ def compute(days: list[dict], opening: dict) -> dict:
     # месяца переезжают из прошлого (dep_open).
     dep = _n(opening.get('dep_open'))
     for d in days:
+        # До начала учёта (fin_start): день виден, но денег не двигает — всё,
+        # что он бы положил или снял, обнуляется здесь, а не в вызывающем коде,
+        # чтобы ни один путь не забыл.
+        before = bool(d.get('before'))
+        z = (lambda v: 0.0) if before else _n
         cash = _n(d.get('cash'))
         spend = _n(d.get('spend'))
         kept = _n(d.get('kept'))
-        handed = _n(d['handed']) if d.get('handed') is not None else cash - spend - kept
-        fact = d.get('handed_fact')
+        tea = _n(d.get('tea'))
+        handed = _n(d['handed']) if d.get('handed') is not None else cash - spend - kept - tea
+        fact = None if before else d.get('handed_fact')
         base = handed if fact is None else _n(fact)
         gap = handed - base
-        aside = _n(d.get('aside'))
-        collected = _n(d.get('collected'))
-        extra_rp = _n(d.get('extra_rp'))
-        pay_b = _n(d.get('pay_b'))
-        pay_b_extra = _n(d.get('pay_b_extra'))
-        pay_rp = _n(d.get('pay_rp'))
+        aside = z(d.get('aside'))
+        collected = z(d.get('collected'))
+        extra_rp = z(d.get('extra_rp'))
+        pay_b = z(d.get('pay_b'))
+        pay_b_extra = z(d.get('pay_b_extra'))
+        pay_rp = z(d.get('pay_rp'))
         norm = _n(d.get('norm'))
-        ordered = _n(d.get('ordered'))
-        ordered_extra = _n(d.get('ordered_extra'))
-        exps = d.get('expenses') or []
+        ordered = z(d.get('ordered'))
+        ordered_extra = z(d.get('ordered_extra'))
+        exps = [] if before else (d.get('expenses') or [])
         # Списано из депозита/аванса (владелец, 5 окт 2026): часть суммы расхода,
         # покрытая деньгами, которые уже лежали у контрагента. Из фонда она
         # сегодня не уходит — ушла, когда вносили; расходом для прибыли
@@ -180,17 +193,17 @@ def compute(days: list[dict], opening: dict) -> dict:
         exp_cr = sum(_cash(e) for e in exps if e.get('pay') == 'crypto')
         exp_hands = sum(_cash(e) for e in exps if e.get('pay') == 'hands')
         dep_paid = sum(_n(e.get('amount')) for e in exps if e.get('deposit'))
-        dep_back = _n(d.get('dep_back'))
-        dep_lost = _n(d.get('dep_lost'))
+        dep_back = z(d.get('dep_back'))
+        dep_lost = z(d.get('dep_lost'))
         dep = dep + dep_paid - dep_back - dep_lost - dep_use
-        collected_cr = _n(d.get('collected_cr'))
-        cr_cash = _n(d.get('cr_cash'))
-        extra_cr = _n(d.get('extra_cr'))
-        pay_sum = sum(_n(e.get('amount')) for e in (d.get('payouts') or []))
+        collected_cr = z(d.get('collected_cr'))
+        cr_cash = z(d.get('cr_cash'))
+        extra_cr = z(d.get('extra_cr'))
+        pay_sum = 0.0 if before else sum(_n(e.get('amount')) for e in (d.get('payouts') or []))
         # переводы между стопками: из какой ушло, в какую пришло
         mv_in = {'b': 0.0, 'rp': 0.0, 'np': 0.0}
         mv_out = {'b': 0.0, 'rp': 0.0, 'np': 0.0}
-        for mv in (d.get('moves') or []):
+        for mv in ([] if before else (d.get('moves') or [])):
             a = _n(mv.get('amount'))
             if mv.get('from') in mv_out:
                 mv_out[mv['from']] += a
@@ -201,12 +214,14 @@ def compute(days: list[dict], opening: dict) -> dict:
         # минус — пиши 0… деньги на расходы мы берём не из сейфа»). Минус в
         # окошке выручки значит, что водители потратили больше, чем пока
         # привезли наличными, — это их деньги на руках, а не дыра в сейфе.
-        np_plus = max(0.0, base) - aside - collected
-        pending = bool(d.get('pending'))
-        # неподтверждённый день — только предложение: в деньгах его ещё нет
-        aside_c, collected_c, np_c = (0.0, 0.0, 0.0) if pending else (aside, collected, np_plus)
-        collected_cr_c = 0.0 if pending else collected_cr
-        if d.get('pay') is not None:
+        np_plus = 0.0 if before else max(0.0, base) - aside - collected
+        pending = bool(d.get('pending')) and not before
+        # неподтверждённый день — только предложение: в деньгах его ещё нет;
+        # день до начала учёта — тоже мимо стопок
+        skip = pending or before
+        aside_c, collected_c, np_c = (0.0, 0.0, 0.0) if skip else (aside, collected, np_plus)
+        collected_cr_c = 0.0 if skip else collected_cr
+        if d.get('pay') is not None and not before:
             # одна сумма оплаты: из стопки Баракуды, сколько в ней есть (с учётом
             # подтверждённой раскладки этого дня); недостающее — из ЧП, из РП
             # или понемногу из обоих, как выбрал старший (pay_src)
@@ -241,15 +256,15 @@ def compute(days: list[dict], opening: dict) -> dict:
         rp_st = rp_st + collected_c + extra_rp - (exp_sum - exp_cr - exp_hands) - pay_rp + mv_rp
         rp_cr = rp_cr + collected_cr_c + extra_cr - exp_cr - cr_cash
         np_st = np_st + np_c - pay_sum - pay_b_extra + mv_np
-        touched = any(d.get(k) is not None for k in DAY_MANUAL) \
-            or bool(d.get('expenses')) or bool(d.get('payouts')) or bool(d.get('moves'))
-        if d.get('pending'):
+        touched = not before and (any(d.get(k) is not None for k in DAY_MANUAL)
+                                  or bool(d.get('expenses')) or bool(d.get('payouts')) or bool(d.get('moves')))
+        if pending:
             t['pending'] += 1
         out.append(dict(
             day=d['day'], gross=_i(_n(d.get('gross'))), cash=_i(cash),
             card=_i(_n(d.get('card'))), crypto=_i(_n(d.get('crypto'))),
-            tips=_i(_n(d.get('tips'))), spend=_i(spend), handed=_i(handed),
-            handed_fact=None if fact is None else _i(_n(fact)), handed_src=d.get('handed_src') or '',
+            tips=_i(_n(d.get('tips'))), tea=_i(tea), spend=_i(spend), handed=_i(handed),
+            handed_fact=None if fact is None else _i(_n(fact)), handed_src='' if before else (d.get('handed_src') or ''),
             base=_i(base), gap=_i(gap),
             ordered=_i(ordered), ordered_extra=_i(ordered_extra),
             aside=_i(aside), collected=_i(collected), extra_rp=_i(extra_rp),
@@ -268,13 +283,16 @@ def compute(days: list[dict], opening: dict) -> dict:
             mv_np_in=_i(mv_in['np']), mv_np_out=_i(mv_out['np']),
             np_plus=_i(np_plus), safe_b=_i(safe_b), debt_b=_i(debt_b),
             rp=_i(rp), np_acc=_i(np_acc), touched=touched,
-            pay=_i(pay_b + pay_b_extra + pay_rp), ok=bool(d.get('ok')), counted=not pending,
+            pay=_i(pay_b + pay_b_extra + pay_rp), ok=bool(d.get('ok')) and not before,
+            counted=not skip, before=before,
             stack_b=_i(safe_b), stack_rp=_i(rp_st), stack_np=_i(np_st), stack_total=_i(safe_b + rp_st + np_st),
             manual={k: d.get(k) for k in DAY_MANUAL},
         ))
+        if before:
+            continue                                 # до учёта: в итоги месяца не идёт
         t['gross'] += _n(d.get('gross')); t['cash'] += cash; t['spend'] += spend
         t['card'] += _n(d.get('card')); t['crypto'] += _n(d.get('crypto'))
-        t['tips'] += _n(d.get('tips'))
+        t['tips'] += _n(d.get('tips')); t['tea'] += tea
         t['handed'] += handed; t['base'] += base; t['gap'] += gap; t['ordered'] += ordered
         t['ordered_extra'] += ordered_extra; t['aside'] += aside_c
         t['collected'] += collected_c; t['extra_rp'] += extra_rp
@@ -321,7 +339,7 @@ def compute(days: list[dict], opening: dict) -> dict:
     # расходом становится удержанное при возврате и списанное из депозита в
     # оплату (expenses — только то, что фонд отдал; покрытое депозитом — рядом).
     econ = (t['gross'] - t['ordered'] - (t['expenses'] - t['dep_paid'] + t['dep_lost'] + t['dep_used'])
-            - t['spend'] - t['tips'])
+            - t['spend'] - t['tips'] - t['tea'])
 
     totals = {k: _i(v) for k, v in t.items()}
     safe = dict(open_b=_i(_n(opening.get('safe_b_open'))), open_rp=_i(_n(opening.get('rp_open'))),

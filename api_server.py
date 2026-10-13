@@ -190,6 +190,12 @@ async def on_startup(app):
         app["crypto_book"] = asyncio.create_task(crypto_book.loop())
     except Exception as e:
         log.warning(f"[crypto] книга крипты не запущена: {e}")
+    # «Учёт с» (fin_start): синхронным местам нужен день старта в кэше.
+    try:
+        import fin_start
+        log.info(f"[fin] учёт с {await fin_start.load() or 'начала'}")
+    except Exception as e:
+        log.warning(f"[fin] день старта не прочитан: {e}")
     # Книжка клиентов: при первом запуске собирается из прошлых заказов (один
     # раз, отметка в настройках), дальше наполняется сама с каждого заказа.
     async def _clients_seed():

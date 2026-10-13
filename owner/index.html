@@ -38,7 +38,7 @@ html.kb .stk-mid{padding-bottom:50vh}
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
 <script src="/vendor/ambar-torch.js?v=1"></script>
-<script src="/vendor/ambar-call.js?v=75"></script>
+<script src="/vendor/ambar-call.js?v=76"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script src="/vendor/ambar-fail.js?v=1"></script>
 <script src="book.js?v=1" defer></script>
@@ -44381,6 +44381,7 @@ function _долгое(эл, долго, коротко){
 function _caRole(role){
   return role === 'водитель' ? 'Водители'
        : role === 'оператор' || role === 'свой оператор' ? 'Операторы'
+       : role === 'планшет' ? 'Планшет'
        : role;
 }
 
@@ -44401,8 +44402,11 @@ const ICO_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none"
 // Как человек подписан под именем: в приложении, не в сети, или дозвонимся
 // через телеграм. Одно и то же нужно в списке, в шторках и в карточке.
 function _caГде(r){
-  return r.online ? 'в приложении'
-       : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети';
+  // С чего человек в сети — владелец должен видеть, куда попадёт звонок:
+  // «в приложении · планшет» и «· телефон» (13 окт 2026).
+  const devs = (r.devs || []).join(', ');
+  return r.online ? 'в приложении' + (devs ? ' · ' + devs : '')
+       : /^(drv|star|dev):/.test(r.key) || r.ring ? 'позвоним в телеграм' : 'не в сети';
 }
 function _caКто(key){ return ((CALL && CALL.roster) || []).find(r => r.key === key); }
 

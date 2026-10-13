@@ -252,7 +252,7 @@
   // ведёт себя по-разному на каждом телефоне, а увидеть его отсюда нельзя —
   // и трижды подряд это кончалось починкой вслепую.
   AmbarCall.prototype._diag = function (text) {
-    if ((this._diagN = (this._diagN || 0) + 1) > 8) return;
+    if ((this._diagN = (this._diagN || 0) + 1) > 12) return;
     this._send({t: 'diag', text: String(text).slice(0, 200)});
   };
 
@@ -361,8 +361,12 @@
     }));
   };
   AmbarCall.prototype.micLive = function () {
+    // Замолчавшая дорожка (muted) тоже не живая: айфон глушит захват, когда
+    // приложение уходило в фон, и обратно сам не включает. Такую дорожку
+    // отдавать в звонок нельзя — собеседник слышал бы тишину (13 окт 2026:
+    // «я их слышу, а они меня нет»).
     return !!(this.stream && this.stream.getAudioTracks().some(
-      function (t) { return t.readyState === 'live'; }));
+      function (t) { return t.readyState === 'live' && !t.muted; }));
   };
 
   // ── сокет ────────────────────────────────────────────────────────────────
@@ -570,6 +574,10 @@
     // нажатию, и человек слышал его ещё стоя перед окном «разрешить
     // микрофон»: выходило, что телефон гудит, никуда не звоня.
     this.tones.prime();
+    // Элемент, которым потом заиграет голос собеседника, — тоже внутри
+    // касания. Раньше он рождался после окна микрофона, уже вне жеста, и на
+    // айфоне такой элемент играть не начинал: собеседника не было слышно.
+    this._prepAudio();
     return (this.video ? this._micCam() : this._mic()).then(function () {
       self.tones.ringback();
       self._send({t: 'call', to: toKey || self.defaultTarget || '',
@@ -585,6 +593,7 @@
     if (!this.call) return Promise.resolve();
     var self = this, id = this.call.id;
     this.tones.prime();
+    this._prepAudio();           // см. dial: элемент воспроизведения — внутри касания
     this.video = !!this.call.video;
     return (this.video ? this._micCam() : this._mic())
       .then(function () { self._send({t: 'accept', call: id}); })
@@ -647,6 +656,7 @@
       s.getVideoTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
       var only = new MediaStream(s.getAudioTracks());
       self.stream = only;
+      self._wireMic();
       self._prepAudio();
       try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
       try { localStorage.setItem('ambar_cam_ok', '1'); } catch (e) {}
@@ -697,6 +707,7 @@
         self.stream.getAudioTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
       }
       self.stream = new MediaStream(зв);
+      self._wireMic();
       self._prepAudio();
       try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
       try { localStorage.setItem('ambar_cam_ok', '1'); } catch (e) {}
@@ -725,6 +736,13 @@
       this.stream.getAudioTracks().forEach(function (t) { t.enabled = true; });
       return Promise.resolve(this.stream);
     }
+    if (this.stream) {
+      // Дорожка умерла или замолчала между звонками — берём микрофон заново.
+      var old = this.stream.getAudioTracks()[0];
+      this._diag('mic reacquire: ' + (old ? old.readyState + (old.muted ? '/muted' : '') : 'none'));
+      this.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      this.stream = null;
+    }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       this._emit('nomic', {why: 'unsupported'});
       return Promise.reject(new Error('no getUserMedia'));
@@ -733,6 +751,7 @@
       audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}
     }).then(function (s) {
       self.stream = s;
+      self._wireMic();
       try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
       self._prepAudio();
       // Имена устройств вывода видны только после разрешения микрофона —
@@ -744,6 +763,61 @@
       if (why === 'NotAllowedError') { try { localStorage.removeItem('ambar_mic_ok'); } catch (e) {} }
       self._emit('nomic', {why: why});
       throw err;
+    });
+  };
+
+  // Дорожка микрофона тоже рассказывает о себе. Айфон глушит её, когда
+  // приложение ушло в фон или систему перебил другой звук, и обратно не
+  // включает: собеседник слышит тишину, а человек говорит дальше. Замолчала
+  // посреди разговора — берём микрофон заново и подменяем дорожку в
+  // соединении, не кладя трубку.
+  AmbarCall.prototype._wireMic = function () {
+    var self = this, t = this.stream && this.stream.getAudioTracks()[0];
+    if (!t) return;
+    t.onmute = function () {
+      if (!self.call) return;
+      self._diag('mic muted in call');
+      self._send({t: 'micstate', on: false});
+      self._remic();
+    };
+    t.onunmute = function () {
+      if (!self.call) return;
+      self._send({t: 'micstate', on: !self.muted()});
+    };
+    t.onended = function () {
+      if (!self.call) return;
+      self._diag('mic ended in call');
+      self._remic();
+    };
+  };
+
+  AmbarCall.prototype._remic = function () {
+    var self = this, now = Date.now();
+    if (this._remicAt && now - this._remicAt < 3000) return;   // не чаще раза в три секунды
+    this._remicAt = now;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    navigator.mediaDevices.getUserMedia({
+      audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}
+    }).then(function (s) {
+      var nt = s.getAudioTracks()[0];
+      if (!nt) return;
+      var wasMuted = self.muted();
+      var old = self.stream;
+      self.stream = s;
+      self._wireMic();
+      nt.enabled = !wasMuted;
+      var pc = self.pc;
+      var sn = pc && pc.getSenders().find(function (x) { return x.track && x.track.kind === 'audio'; });
+      if (!sn && pc) sn = pc.getSenders().find(function (x) { return !x.track; });
+      var p = sn ? sn.replaceTrack(nt) : Promise.resolve();
+      return p.then(function () {
+        if (old) old.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+        self._diag('mic reacquired, ' + (sn ? 'track replaced' : 'no sender'));
+        self._send({t: 'micstate', on: !self.muted()});
+        self._emit('mic', {ok: true});
+      });
+    }).catch(function (e) {
+      self._diag('mic reacquire failed: ' + ((e && e.name) || e));
     });
   };
 
@@ -1016,6 +1090,39 @@
     try { this.audio.play().catch(function () {}); } catch (e) {}
   };
 
+  // Запустить голос собеседника. До 13 окт 2026 этой функции не существовало:
+  // её звали из ontrack и из обработчика паузы, вызов падал исключением, и
+  // элемент играл только если айфон соизволил сам — тот, кто взял трубку из
+  // телеграма на свежей странице, собеседника не слышал.
+  //
+  // Айфон отказывает (NotAllowedError), если элемент не был «разбужен» жестом:
+  // тогда ждём любого касания экрана и пробуем снова, а экрану говорим
+  // «needtap» — пусть попросит нажать.
+  AmbarCall.prototype._resume = function () {
+    var self = this, a = this.audio;
+    if (!a || !a.srcObject) return;
+    var p;
+    try { p = a.play(); } catch (e) { p = Promise.reject(e); }
+    if (!p || !p.then) return;
+    p.then(function () {
+      if (self._needTap) { self._needTap = false; self._emit('needtap', {on: false}); }
+    }).catch(function (e) {
+      var why = (e && e.name) || String(e);
+      self._diag('play blocked: ' + why);
+      if (why === 'NotAllowedError' && !self._needTap) {
+        self._needTap = true;
+        self._emit('needtap', {on: true});
+        var once = function () {
+          document.removeEventListener('touchend', once, true);
+          document.removeEventListener('click', once, true);
+          if (self.call && self.audio && self.audio.srcObject) self._resume();
+        };
+        document.addEventListener('touchend', once, true);
+        document.addEventListener('click', once, true);
+      }
+    });
+  };
+
 
   AmbarCall.prototype._freeMic = function () {
     if (!this.stream) return;
@@ -1080,8 +1187,10 @@
       this.stream.getAudioTracks().forEach(function (t) {
         t.enabled = true;
         pc.addTrack(t, self.stream);
+        self._diag('mic track ' + t.readyState + (t.muted ? '/muted' : '') + ', audio el ' + (self.audio ? 'ok' : 'NONE'));
       });
     } else {
+      this._diag('no mic stream: recvonly');
       // Микрофон не дали, но слышать собеседника человек всё равно должен, и
       // соединение обязано собраться. Без этого разговор просто рвался бы на
       // ровном месте: своей дорожки нет, добавлять нечего, дальше исключение.
@@ -1127,6 +1236,7 @@
         self._safety();          // ключи сверены — можно показать смайлики
         self._quality('good');
         self._rejoining(false);  // если собирались заново — собрались
+        self._pathDiag();        // каким путём пошёл звук — в журнал
       }
       // Разрыв в тоннеле или в лифте — не повод класть трубку. Даём связи
       // собраться заново и только потом сдаёмся.
@@ -1159,6 +1269,26 @@
         .then(function () { self._send({t: 'sdp', data: pc.localDescription}); })
         .catch(function (e) { console.warn('[call] offer', e); });
     }
+  };
+
+  // Каким путём идёт звук: напрямую, через внешний адрес или через TURN. Одна
+  // строка в журнале сервера после соединения — чтобы «они меня не слышат»
+  // можно было разбирать по записи, а не по догадкам.
+  AmbarCall.prototype._pathDiag = function () {
+    var self = this, pc = this.pc;
+    if (!pc || !pc.getStats) return;
+    pc.getStats().then(function (rep) {
+      var pair = null, byId = {};
+      rep.forEach(function (r) { byId[r.id] = r; });
+      rep.forEach(function (r) {
+        if (r.type === 'transport' && r.selectedCandidatePairId) pair = byId[r.selectedCandidatePairId];
+      });
+      if (!pair) rep.forEach(function (r) { if (r.type === 'candidate-pair' && (r.selected || r.nominated) && r.state === 'succeeded') pair = pair || r; });
+      if (!pair) return;
+      var l = byId[pair.localCandidateId] || {}, r2 = byId[pair.remoteCandidateId] || {};
+      self._diag('path ' + (l.candidateType || '?') + '/' + (r2.candidateType || '?') + ' ' + (l.protocol || '') +
+                 (l.candidateType === 'relay' || r2.candidateType === 'relay' ? ' via TURN' : ''));
+    }).catch(function () {});
   };
 
   // Пересборка связи без потери разговора: та же сессия, новые кандидаты.
@@ -1335,6 +1465,8 @@
     this._pendingIce = [];
     this.quality = '';
     this._rejoin = false;
+    this._diagN = 0;             // строки в журнал считаем на звонок
+    this._needTap = false;
     this._emit('ended', {why: why, say: say || ''});
   };
 

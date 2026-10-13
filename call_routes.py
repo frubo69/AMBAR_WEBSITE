@@ -137,6 +137,9 @@ def _имя_ключа(key: str) -> str:
     kind, _, ident = key.partition(":")
     if kind == "star" and str(ident).isdigit():
         return _star_name(int(ident))
+    if kind == "dev":
+        d = next((x for x in staff.DEVICES if x.get("id") == ident), None)
+        return (d or {}).get("name") or "Планшет"
     return KEY_ALIASES.get(ident, ident) or "—"
 
 
@@ -191,13 +194,23 @@ def _drivers_of_operator(name: str) -> list:
 # Всё в памяти процесса: переживать перезапуск здесь нечему — звонок и так
 # рвётся вместе с сокетом, а сокеты переподключаются сами.
 class Peer:
-    __slots__ = ("sid", "ws", "kind", "key", "label", "call", "own_op")
+    __slots__ = ("sid", "ws", "kind", "key", "label", "call", "own_op",
+                 "account", "device", "dlabel", "keys")
 
-    def __init__(self, sid, ws, kind, key, label, own_op=""):
+    def __init__(self, sid, ws, kind, key, label, own_op="", account=0):
         self.sid, self.ws, self.kind = sid, ws, kind
         self.key, self.label = key, label
         self.own_op = own_op        # у водителя — его оператор по району
         self.call = None
+        # Устройство (владелец, 13 окт 2026: «сделай так, чтобы можно было
+        # дозвониться конкретно на планшет»). account — чей телеграм открыл
+        # сокет; device — «планшет» / «телефон» / «компьютер»; dlabel — имя с
+        # устройством для звонящего («Умар · планшет»); keys — все адреса, под
+        # которыми сокет отвечает: своё имя и, у планшета, общий «dev:tablet».
+        self.account = int(account or 0)
+        self.device = ""
+        self.dlabel = label
+        self.keys = [key]
 
     async def send(self, **msg):
         try:
@@ -235,7 +248,38 @@ _PENDING: dict = {}      # key водителя → (cid, до какого вр
 
 def _bind(p: Peer):
     _PEERS[p.sid] = p
-    _BY_KEY.setdefault(p.key, set()).add(p.sid)
+    for k in (p.keys or [p.key]):
+        _BY_KEY.setdefault(k, set()).add(p.sid)
+
+
+TABLET_KEY = "dev:tablet"
+
+
+def _device_of(p: Peer, env: dict) -> str:
+    """Чем открыт сокет. Общий планшет узнаём по его аккаунту (config_staff.
+    DEVICES), любой широкий экран тоже считаем планшетом; телеграм для
+    компьютера — компьютером."""
+    if p.account and p.account in staff.DEVICE_BY_TG:
+        return "планшет"
+    tg = str((env or {}).get("tg") or "").lower()
+    try:
+        w = int((env or {}).get("w") or 0)
+    except (TypeError, ValueError):
+        w = 0
+    if tg in ("web", "weba", "webk", "tdesktop", "macos"):
+        return "компьютер"
+    return "планшет" if w >= 600 else "телефон"
+
+
+def _device_bind(p: Peer, env: dict) -> None:
+    """Подписать сокет устройством и раздать ему адреса до _bind."""
+    p.device = _device_of(p, env)
+    if p.kind == "op":
+        p.dlabel = f"{p.label} · {p.device}"
+        p.keys = [p.key] + ([TABLET_KEY] if p.device == "планшет" else [])
+    else:
+        p.dlabel = p.label
+        p.keys = [p.key]
 
 
 # Когда человека видели в последний раз. Нужно ровно затем, чтобы вместо
@@ -247,12 +291,13 @@ _LAST_SEEN: dict = {}
 
 def _unbind(p: Peer):
     _PEERS.pop(p.sid, None)
-    s = _BY_KEY.get(p.key)
-    if s:
-        s.discard(p.sid)
-        if not s:
-            _BY_KEY.pop(p.key, None)
-            _LAST_SEEN[p.key] = time.time()   # ушёл последний сокет — значит ушёл сам
+    for k in (p.keys or [p.key]):
+        s = _BY_KEY.get(k)
+        if s:
+            s.discard(p.sid)
+            if not s:
+                _BY_KEY.pop(k, None)
+                _LAST_SEEN[k] = time.time()   # ушёл последний сокет — значит ушёл сам
 
 
 async def _broadcast_roster():
@@ -437,6 +482,12 @@ def _ring_to(kind: str, name: str):
         uid = int(name) if str(name).isdigit() else 0
         url = os.getenv("OWNER_WEBAPP_URL", "").strip().rstrip("/")
         return (os.getenv("AMBAR_OWNER_BOT_TOKEN", "").strip(), uid, url)
+    if kind == "dev":
+        # Общий планшет: у него свой аккаунт в телеграме, панель открыта из
+        # операторского бота — туда и звоним, когда сокет планшета спит.
+        d = next((x for x in staff.DEVICES if x.get("id") == name), None)
+        return (os.getenv("OPERATOR_BOT_TOKEN", "").strip(), int((d or {}).get("telegram_id") or 0),
+                os.getenv("OPERATOR_WEBAPP_URL", "").strip().rstrip("/"))
     return ("", 0, "")
 
 
@@ -645,14 +696,16 @@ async def _accept(p: Peer, cid: str):
     for other in _sessions(call.callee_key):
         if other.sid != p.sid:
             await other.send(t="cancel", call=cid)
-    await call.caller.send(t="accepted", call=cid, by=p.label)
+    # Звонящему — не только кто, но и с чего взяли: «Умар · планшет» и «Умар ·
+    # телефон» для владельца разные вещи (13 окт 2026).
+    await call.caller.send(t="accepted", call=cid, by=p.dlabel)
     await p.send(t="joined", call=cid, peer=call.caller.label)
     # Сразу говорим каждой стороне, что ей можно с камерой. Роль собеседника
     # клиент угадывать не должен: он живёт в трёх разных приложениях, а правило
     # одно, и знает его сервер. Заодно панель оператора узнаёт, что кнопка
     # «разрешить камеру» здесь вообще уместна.
     await _cam_state(call)
-    log.info(f"[call] {call.caller.label} → {call.callee_key} принят")
+    log.info(f"[call] {call.caller.label} → {call.callee_key} принят: {p.dlabel}")
 
 
 async def _cam_state(call: "Call"):
@@ -697,6 +750,7 @@ async def handle_ws(request: web.Request):
             await ws.close(code=4403, message=b"forbidden")
             return ws
         peer.ws = ws
+        _device_bind(peer, hello.get("env") if isinstance(hello.get("env"), dict) else {})
         _bind(peer)
 
         await ws.send_json({
@@ -720,14 +774,17 @@ async def handle_ws(request: web.Request):
             log.info(f"[call] на связи: {peer.label} ({peer.kind})")
         await _broadcast_roster()
 
-        # Водителя мог поднять пинок — тогда его ждёт входящий.
-        pend = _PENDING.get(peer.key)
-        if pend and pend[1] > time.time():
-            call = _CALLS.get(pend[0])
-            if call and not call.answered:
-                await peer.send(t="ring", call=call.cid, frm=call.caller.label,
-                                kind=call.caller.kind, order=call.order,
-                                video=call.video)
+        # Водителя мог поднять пинок — тогда его ждёт входящий. Планшет —
+        # тоже: ему звонят и по имени оператора, и как устройству.
+        for k in peer.keys:
+            pend = _PENDING.get(k)
+            if pend and pend[1] > time.time():
+                call = _CALLS.get(pend[0])
+                if call and not call.answered:
+                    await peer.send(t="ring", call=call.cid, frm=call.caller.label,
+                                    kind=call.caller.kind, order=call.order,
+                                    video=call.video)
+                    break
 
         async for msg in ws:
             if msg.type != WSMsgType.TEXT:
@@ -749,7 +806,7 @@ async def handle_ws(request: web.Request):
             if peer.call:
                 await _end(peer.call, "link", quiet_sid=peer.sid)
             _unbind(peer)
-            log.info(f"[call] отключился: {peer.label}, код {ws.close_code}")
+            log.info(f"[call] отключился: {peer.dlabel}, код {ws.close_code}")
             await _broadcast_roster()
     return ws
 
@@ -890,7 +947,7 @@ async def _identify(hello: dict):
         if u and u.get("id") in operator_routes.OPERATOR_IDS:
             asked = (hello.get("as") or "").strip()
             name = asked if asked in _operator_names() else operator_routes._op_name(u)
-            return Peer(sid, None, "op", f"op:{name}", name)
+            return Peer(sid, None, "op", f"op:{name}", name, account=int(u.get("id") or 0))
     except Exception as e:
         log.warning(f"[call] проверка оператора: {e}")
 
@@ -948,12 +1005,23 @@ def _roster(peer: Peer) -> list:
                 for k, v in extra.items():
                     r.setdefault(k, v)
                 return r
+        live = _sessions(key)
         row = {"key": key, "name": name, "role": role,
-               "online": bool(_sessions(key)), "ring": _ringable(key), **extra}
+               "online": bool(live), "ring": _ringable(key),
+               # с чего человек в сети: «планшет», «телефон» — владелец должен
+               # видеть, куда попадёт звонок (13 окт 2026)
+               "devs": sorted({p.device for p in live if p.device}), **extra}
         if not row["online"] and _LAST_SEEN.get(key):
             row["seen"] = int(_LAST_SEEN[key])
         rows.append(row)
         return row
+
+    def add_tablet():
+        # Общий планшет операторов — отдельной строкой: звонок на него идёт
+        # тому, кто сейчас за планшетом, под любым именем; спит — звоним в
+        # телеграм самого планшета.
+        for d in staff.DEVICES:
+            add(f"dev:{d['id']}", d.get("name") or "Планшет", "планшет")
 
     # Старшие (AMBAR STAR) — у всех (владелец, 30 сен 2026: «чтобы и водители
     # и операторы могли звонить старшему обратно, чтобы все у всех были в
@@ -996,6 +1064,7 @@ def _roster(peer: Peer) -> list:
             if str(uid) == me:
                 continue
             add(f"star:{uid}", _star_name(uid), "AMBAR STAR")
+        add_tablet()
         for n in sorted(_operator_names()):
             add(f"op:{n}", n, "оператор")
         for n in _all_drivers():
@@ -1008,6 +1077,8 @@ def _roster(peer: Peer) -> list:
     for n in _drivers_of_operator(peer.label):
         add(f"drv:{n}", n, "свой водитель")
     add_stars()
+    if peer.device != "планшет":
+        add_tablet()              # с телефона оператор звонит на общий планшет
     ops: dict = {}
     for d in staff.DISTRICT_STAFF:
         n = (d.get("operator") or "").strip()
@@ -1045,9 +1116,11 @@ def _kind_of_key(key: str) -> str:
 
 
 def _audio_only(a_key: str, b_key: str) -> bool:
-    """Пара, которая НАБИРАЕТСЯ только голосом: с оператором на любом конце.
-    Камера внутри такого разговора всё равно возможна — см. _cam_default."""
-    return "op" in (_kind_of_key(a_key), _kind_of_key(b_key))
+    """Пара, которая НАБИРАЕТСЯ только голосом: с оператором (или его
+    планшетом) на любом конце. Камера внутри такого разговора всё равно
+    возможна — см. _cam_default."""
+    kinds = (_kind_of_key(a_key), _kind_of_key(b_key))
+    return "op" in kinds or "dev" in kinds
 
 
 def _cam_default(a_key: str, b_key: str) -> set:

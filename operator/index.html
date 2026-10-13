@@ -29,7 +29,7 @@
 <script src="day.js?v=1" defer></script>
 <script src="extra.js?v=2" defer></script>
 <script src="book.js?v=1" defer></script>
-<script src="/vendor/ambar-call.js?v=75"></script>
+<script src="/vendor/ambar-call.js?v=76"></script>
 <script src="/vendor/ambar-kb.js?v=2"></script>
 <script src="/vendor/ambar-fail.js?v=1"></script>
 <style>
@@ -9403,7 +9403,7 @@ function caPerson(r){
     <div class="ca-rb" onclick="callDial('${r.key}')">
       <div class="ca-rn">${r.name}</div>
       <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>
-        ${r.online ? 'в приложении' : r.ring ? 'позвоним в телеграм' : 'не в сети'}</div>
+        ${r.online ? 'в приложении' + ((r.devs || []).length ? ' · ' + r.devs.join(', ') : '') : r.ring ? 'позвоним в телеграм' : 'не в сети'}</div>
     </div>
     <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
   </div>`;
@@ -9452,7 +9452,7 @@ function caContacts(){
   rows.forEach(r => {
     if(r.role !== last){ last = r.role;
       h += `<div class="ca-sec">${r.role === 'водитель' ? 'Водители' : r.role === 'свой водитель' ? 'Ваши водители'
-        : r.role === 'оператор' ? 'Операторы' : r.role === 'старший' ? 'Старшие' : r.role}</div>`; }
+        : r.role === 'оператор' ? 'Операторы' : r.role === 'старший' ? 'Старшие' : r.role === 'планшет' ? 'Планшет' : r.role}</div>`; }
     h += caPerson(r);
   });
   return h;

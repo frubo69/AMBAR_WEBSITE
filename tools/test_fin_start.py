@@ -64,6 +64,8 @@ async def main():
     print("— учёт с 14 октября")
     st, r = await зови(fr.handle_start_set, "POST", {"day": "2026-10-20", "as": "Ст"})
     eq("будущий день — 400", st, 400)
+    st, r = await зови(fr.handle_start_set, "POST", {"day": "2026-10-16", "as": "Ст"})
+    eq("завтрашняя смена — можно (назначают накануне)", (st, r.get("day")), (200, "2026-10-16"))
     st, r = await зови(fr.handle_start_set, "POST", {"day": СТАРТ, "as": "Ст"})
     eq("ручка «Учёт с»", (st, r.get("day")), (200, СТАРТ))
     eq("настройка записана", await fin_start.get(), СТАРТ)

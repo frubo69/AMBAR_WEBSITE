@@ -1609,7 +1609,9 @@ async def handle_start_set(request):
         day = _day_arg(raw) if raw else ""
     except Exception:                             # noqa: BLE001
         return _json({"error": "bad_request"}, 400)
-    if day and day > _biz_day():
+    # Старт назначают и накануне вечером — на смену, что откроется утром:
+    # завтрашний учётный день можно, дальше — нет.
+    if day and day > (datetime.strptime(_biz_day(), "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d"):
         return _json({"error": "future"}, 400)
     who = _who(body)
     was = await fin_start.get()

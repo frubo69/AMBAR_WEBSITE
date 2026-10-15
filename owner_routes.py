@@ -4569,6 +4569,11 @@ async def cash_round(day: str) -> dict:
         log.warning(f"[cash] заказы с {since}: {e}")
         orders = []
     today_amounts = await _cash_amounts(day, orders)
+    if before:
+        # и расходы водителей того дня (питание, разовые) — тоже до учёта
+        for a in today_amounts.values():
+            a.update(cash=0, tips=0, spend=0, debt=0, debt_n=0, spend_card=0, spend_pending=0,
+                     fx=[], items=[], net=0, empty=True)
     past = {d: await _cash_amounts(d, orders) for d in need_days}
     legacy = bool((marks.get("cash") or {}).get("done"))     # старая отметка на весь день
     out, done_n, need_n, later_n = [], 0, 0, 0

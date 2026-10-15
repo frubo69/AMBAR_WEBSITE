@@ -152,6 +152,7 @@ async def main():
     eq("перенос с дня старта", await own._cash_from(), СТАРТ)
     eq("дни назад от 16-го", own._cash_back_days("2026-10-16", СТАРТ), ["2026-10-15", "2026-10-14"])
     eq("дни назад от 14-го — пусто", own._cash_back_days(СТАРТ, СТАРТ), [])
+    await db._db.driver_days.insert_one({"day": "2026-10-13", "driver": "Али", "working": True, "extras": []})
     cr13 = await own.cash_round("2026-10-13")
     eq("сбор за день до учёта: получать нечего, суммы не показаны", (cr13["before"], cr13["need"], cr13["net_total"], cr13["cash_total"]), (True, 0, 0, 0))
     cr14 = await own.cash_round(СТАРТ)

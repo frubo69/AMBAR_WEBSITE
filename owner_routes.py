@@ -4539,6 +4539,13 @@ async def cash_round(day: str) -> dict:
     району, и «выручка» / «чаевые» района — вместе с ним (net_all, tips_all):
     столько старший и забирает. later — «Соберу завтра»."""
     back = _cash_back_days(day, await _cash_from())
+    # День раньше начала учёта (fin_start, владелец 16 окт 2026: «сбор выручки
+    # как будто начинается с сегодняшнего дня, всё остальное уже собрано»):
+    # получать нечего, суммы не показываем — они в открытии сейфа.
+    import fin_start
+    before = fin_start.before(day, await fin_start.get())
+    if before:
+        back = []
     try:
         marks_all = await db.checklist_many([day] + back)
     except Exception as e:                                   # noqa: BLE001
@@ -4557,7 +4564,7 @@ async def cash_round(day: str) -> dict:
                        | {d for s in solo.values() for d in s})
     since = min(need_days) if need_days else day
     try:
-        orders = list((await db.orders_from(_bizday.since_utc(since))).values())
+        orders = [] if before else list((await db.orders_from(_bizday.since_utc(since))).values())
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[cash] заказы с {since}: {e}")
         orders = []
@@ -4651,7 +4658,7 @@ async def cash_round(day: str) -> dict:
             "later": later_n, "settled": need_n > 0 and done_n + later_n >= need_n,
             "net_total": net_total, "tips_total": tips_total,
             "cash_total": cash_total, "spend_total": spend_total,
-            "carry_total": carry_total}
+            "carry_total": carry_total, "before": before}
 
 
 async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "") -> None:

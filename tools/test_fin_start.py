@@ -41,7 +41,7 @@ async def main():
 
     async def заказ(day, total, items=None, **kw):
         await db._db.orders.insert_one({"order_id": f"o{int(time.time()*1e6)%10**9}{day[-2:]}", "timestamp": f"{day}T12:00:00",
-                                        "status": "delivered", "total": total, "tip": 0, "office_id": "jbr",
+                                        "status": "delivered", "total": total, "tip": 0, "office_id": "jvc",
                                         "items": items or [], **kw})
     # до старта: 12 и 13 октября; после: 14 и 15
     await заказ("2026-10-12", 5000)
@@ -152,6 +152,10 @@ async def main():
     eq("перенос с дня старта", await own._cash_from(), СТАРТ)
     eq("дни назад от 16-го", own._cash_back_days("2026-10-16", СТАРТ), ["2026-10-15", "2026-10-14"])
     eq("дни назад от 14-го — пусто", own._cash_back_days(СТАРТ, СТАРТ), [])
+    cr13 = await own.cash_round("2026-10-13")
+    eq("сбор за день до учёта: получать нечего, суммы не показаны", (cr13["before"], cr13["need"], cr13["net_total"], cr13["cash_total"]), (True, 0, 0, 0))
+    cr14 = await own.cash_round(СТАРТ)
+    eq("сбор за день старта считается как обычно", (cr14["before"], cr14["need"] > 0, cr14["cash_total"]), (False, True, 3000))
 
     print()
     print("FAIL:", FAIL) if FAIL else print("ALL OK")

@@ -19902,7 +19902,7 @@ function crRender(){
     <div class="ck-h-l">Сбор выручки</div>
     <div class="ck-h-n">
       <span class="ck-h-v">${d.done}<u>/${d.need}</u></span>
-      <span class="ck-h-w">${d.need ? 'районов получил' + (d.later ? ` · ${d.later} соберу завтра` : '') : 'получать нечего'}</span>
+      <span class="ck-h-w">${d.before ? 'до учёта' : d.need ? 'районов получил' + (d.later ? ` · ${d.later} соберу завтра` : '') : 'получать нечего'}</span>
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
     <div class="cr-tot">
@@ -21261,7 +21261,7 @@ function fbCrcHtml(){
     return `<span class="fb-crc-d ${cls}${!x.empty && !(x.later && !x.done) && v < 0 ? ' neg' : ''}"><b>${
       x.done ? IC('check', 10) : ''}${escS(x.code)}</b><s>${escS(x.name || '')}</s><i>${txt}</i></span>`;
   }).join('');
-  const s1 = !c.need ? 'получать нечего' : st.got ? 'получено со всех' : `${c.done} из ${c.need} районов`;
+  const s1 = c.before ? 'до учёта' : !c.need ? 'получать нечего' : st.got ? 'получено со всех' : `${c.done} из ${c.need} районов`;
   // «получено из всего» — пока есть что получать; выручка дня в минусе (одни
   // расходы) — просто итог красным, «0 из −550» не читается.
   const v1 = !c.need ? '' : st.got || st.total <= 0 ? `${fbFmt(st.total)}<u>AED</u>`

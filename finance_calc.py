@@ -52,10 +52,12 @@ def compute(days: list[dict], opening: dict) -> dict:
          tea            чай операторов за «чайные» бутылки (по каталогу): сидит в
                         цене, водитель отдаёт его отдельной пачкой — из выручки
                         вычтен, для прибыли расход (владелец, 14 окт 2026)
-         before         день раньше начала учёта (fin_start): показывается, но
-                        ни в стопки, ни в итоги, ни в «ждут» не входит; его
-                        записи — только в факт бюджета (владелец, 14 окт 2026:
-                        чистый старт, всё до — «до учёта»)
+         before         день раньше начала учёта (fin_start): стопки, долг,
+                        депозиты и «ждут» его не видят (чистый старт, владелец
+                        14 окт 2026), но аналитика месяца — вал, закупка,
+                        расходы, прибыль по расчёту — считается за весь месяц
+                        (владелец, 15 окт 2026: «с какой радости всё по нулям»);
+                        движения с начала учёта лежат в итогах ключами *_since
          ordered        заказали у Баракуды (закупочные цены)
          ordered_extra  закупили на других базах (для справки)
          aside          отложили в сейф Б
@@ -149,7 +151,11 @@ def compute(days: list[dict], opening: dict) -> dict:
              collected_cr=0.0, expenses_cr=0.0, cr_cash=0.0, extra_cr=0.0, expenses_hands=0.0, kept=0.0,
              pay_rp=0.0, rp_back=0.0,
              mv_b_in=0.0, mv_b_out=0.0, mv_rp_in=0.0, mv_rp_out=0.0, mv_np_in=0.0, mv_np_out=0.0,
-             dep_paid=0.0, dep_back=0.0, dep_lost=0.0, dep_used=0.0)
+             dep_paid=0.0, dep_back=0.0, dep_lost=0.0, dep_used=0.0,
+             # движения с начала учёта (дни «до учёта» не входят): по ним
+             # считаются фонд, прибыль в остатке и строка Барракуды
+             ordered_since=0.0, expenses_since=0.0, dep_paid_since=0.0, dep_back_since=0.0,
+             dep_lost_since=0.0, dep_used_since=0.0)
     # Депозиты (владелец, 4 окт 2026): внесённое из РП лежит у контрагента
     # (ренткар) и вернётся — это наши деньги, не расход. Открытые на начало
     # месяца переезжают из прошлого (dep_open).
@@ -177,7 +183,8 @@ def compute(days: list[dict], opening: dict) -> dict:
         norm = _n(d.get('norm'))
         ordered = z(d.get('ordered'))
         ordered_extra = z(d.get('ordered_extra'))
-        exps = [] if before else (d.get('expenses') or [])
+        exps_all = d.get('expenses') or []
+        exps = [] if before else exps_all
         # Списано из депозита/аванса (владелец, 5 окт 2026): часть суммы расхода,
         # покрытая деньгами, которые уже лежали у контрагента. Из фонда она
         # сегодня не уходит — ушла, когда вносили; расходом для прибыли
@@ -288,20 +295,30 @@ def compute(days: list[dict], opening: dict) -> dict:
             stack_b=_i(safe_b), stack_rp=_i(rp_st), stack_np=_i(np_st), stack_total=_i(safe_b + rp_st + np_st),
             manual={k: d.get(k) for k in DAY_MANUAL},
         ))
-        if before:
-            continue                                 # до учёта: в итоги месяца не идёт
+        # Аналитика месяца — за весь месяц, и за дни до учёта тоже: вал,
+        # закупка, расходы фонда, депозиты — из записей как есть.
+        dep_use_a = sum(_use(e) for e in exps_all)
+        exp_sum_a = sum(_n(e.get('amount')) for e in exps_all) - dep_use_a
+        dep_paid_a = sum(_n(e.get('amount')) for e in exps_all if e.get('deposit'))
         t['gross'] += _n(d.get('gross')); t['cash'] += cash; t['spend'] += spend
         t['card'] += _n(d.get('card')); t['crypto'] += _n(d.get('crypto'))
         t['tips'] += _n(d.get('tips')); t['tea'] += tea
-        t['handed'] += handed; t['base'] += base; t['gap'] += gap; t['ordered'] += ordered
-        t['ordered_extra'] += ordered_extra; t['aside'] += aside_c
+        t['handed'] += handed; t['base'] += base; t['gap'] += gap; t['kept'] += kept
+        t['ordered'] += _n(d.get('ordered')); t['ordered_extra'] += _n(d.get('ordered_extra'))
+        t['expenses'] += exp_sum_a
+        t['dep_paid'] += dep_paid_a; t['dep_back'] += _n(d.get('dep_back'))
+        t['dep_lost'] += _n(d.get('dep_lost')); t['dep_used'] += dep_use_a
+        # Движения с начала учёта — то, что прошло через стопки.
+        t['ordered_since'] += ordered; t['expenses_since'] += exp_sum
+        t['dep_paid_since'] += dep_paid; t['dep_back_since'] += dep_back
+        t['dep_lost_since'] += dep_lost; t['dep_used_since'] += dep_use
+        t['aside'] += aside_c
         t['collected'] += collected_c; t['extra_rp'] += extra_rp
         t['collected_cr'] += collected_cr_c; t['expenses_cr'] += exp_cr; t['cr_cash'] += cr_cash
-        t['expenses_hands'] += exp_hands; t['kept'] += kept
+        t['expenses_hands'] += exp_hands
         t['extra_cr'] += extra_cr
-        t['dep_paid'] += dep_paid; t['dep_back'] += dep_back; t['dep_lost'] += dep_lost; t['dep_used'] += dep_use
         t['pay_b'] += pay_b; t['pay_b_extra'] += pay_b_extra; t['pay_rp'] += pay_rp; t['rp_back'] += rp_back
-        t['expenses'] += exp_sum; t['np_plus'] += np_c; t['payouts'] += pay_sum
+        t['np_plus'] += np_c; t['payouts'] += pay_sum
         for k in ('b', 'rp', 'np'):
             t[f'mv_{k}_in'] += mv_in[k]; t[f'mv_{k}_out'] += mv_out[k]
 
@@ -310,7 +327,7 @@ def compute(days: list[dict], opening: dict) -> dict:
     # наличные приходом не считается
     # зарплата с рук водителя — приход в фонд мимо сейфа (и тут же расход)
     rp_in = t['collected'] + t['collected_cr'] + t['extra_rp'] + t['extra_cr'] - t['cr_cash'] + t['expenses_hands']
-    rp_result = rp_in - t['expenses']               # ИТОГО месяц (фонд)
+    rp_result = rp_in - t['expenses_since']         # ИТОГО месяц (фонд) — с начала учёта
     # «ЧП +»
     profit = t['np_plus'] + rp_result               # ИТОГО месяц
     half = profit / 2                               # Итого / 2
@@ -323,7 +340,7 @@ def compute(days: list[dict], opening: dict) -> dict:
     safe_np_diff = None if safe_np_fact is None else _n(safe_np_fact) - should_be
     # «Баракуда» — итог
     sold = t['gross'] if t['gross'] else t['handed']
-    bought = t['ordered']
+    bought = t['ordered']                           # закупка за месяц (аналитика)
     ratio = (bought / (sold / 100.0)) if sold else None
     paid = t['pay_b'] + t['pay_b_extra'] + t['pay_rp']
     safe_b_fact = opening.get('safe_b_fact')
@@ -346,7 +363,7 @@ def compute(days: list[dict], opening: dict) -> dict:
                 open_np=_i(_n(opening.get('np_open'))),
                 b=_i(safe_b), rp=_i(rp_st), np=_i(np_st), total=_i(safe_b + rp_st + np_st),
                 b_in=_i(t['aside']), b_out=_i(t['pay_b']),
-                rp_in=_i(rp_in), rp_out=_i(t['expenses']),
+                rp_in=_i(rp_in), rp_out=_i(t['expenses_since']),
                 # крипта-часть РП: не в сейфе (total — только наличные), рядом
                 open_rp_cr=_i(_n(opening.get('rp_cr_open'))), rp_cr=_i(rp_cr),
                 rp_all=_i(rp_st + rp_cr),
@@ -360,18 +377,18 @@ def compute(days: list[dict], opening: dict) -> dict:
                 # депозиты: лежит у контрагентов на конец месяца, на начало,
                 # и за месяц — внесли / вернулось / удержано
                 dep=_i(dep), open_dep=_i(_n(opening.get('dep_open'))),
-                dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']),
-                dep_used=_i(t['dep_used']),
+                dep_paid=_i(t['dep_paid_since']), dep_back=_i(t['dep_back_since']),
+                dep_lost=_i(t['dep_lost_since']), dep_used=_i(t['dep_used_since']),
                 pending=int(t['pending']))
     return dict(
         days=out,
         totals=totals,
         rp=dict(collected=_i(t['collected']), collected_cr=_i(t['collected_cr']),
                 extra=_i(t['extra_rp']), cr_cash=_i(t['cr_cash']),
-                rp_in=_i(rp_in), expenses=_i(t['expenses']), result=_i(rp_result),
+                rp_in=_i(rp_in), expenses=_i(t['expenses_since']), result=_i(rp_result),
                 to_b=_i(t['pay_rp']), back=_i(t['rp_back']), owed=_i(owed), hands=_i(t['expenses_hands']),
-                dep_paid=_i(t['dep_paid']), dep_back=_i(t['dep_back']), dep_lost=_i(t['dep_lost']),
-                dep_used=_i(t['dep_used']), dep=_i(dep)),
+                dep_paid=_i(t['dep_paid_since']), dep_back=_i(t['dep_back_since']),
+                dep_lost=_i(t['dep_lost_since']), dep_used=_i(t['dep_used_since']), dep=_i(dep)),
         np=dict(days=_i(t['np_plus']), rp_result=_i(rp_result), profit=_i(profit),
                 half=_i(half), payouts=_i(t['payouts']), left=_i(np_left),
                 storage=_i(storage), carry=_i(carry_np), should_be=_i(should_be),
@@ -379,7 +396,9 @@ def compute(days: list[dict], opening: dict) -> dict:
                 diff=None if safe_np_diff is None else _i(safe_np_diff)),
         b=dict(safe_open=_i(_n(opening.get('safe_b_open'))),
                debt_open=_i(_n(opening.get('debt_b_open'))),
-               sold=_i(sold), bought=_i(bought),
+               # «на начало + заказали − оплатили = долг»: заказали — с начала
+               # учёта, как и долг; закупка за весь месяц — в totals.ordered
+               sold=_i(sold), bought=_i(t['ordered_since']),
                ratio=None if ratio is None else round(ratio, 1),
                paid=_i(paid), pay_safe=_i(t['pay_b']), pay_extra=_i(t['pay_b_extra']),
                pay_rp=_i(t['pay_rp']),

@@ -80,7 +80,7 @@ async def main():
     eq("13 окт стопки = открытие", (d13["stack_b"], d13["stack_rp"], d13["stack_np"]), (1000, 2000, 0))
     eq("14 окт ждёт", (d14["before"], d14["pending"]), (False, True))
     eq("14 окт выручка: 3000 − чай 50", (d14["handed"], d14["tea"]), (2950, 50))
-    eq("итоги месяца без дней до учёта", (b["totals"]["gross"], b["totals"]["cash"], b["totals"]["pending"]), (5000, 5000, 2))
+    eq("аналитика месяца — за весь месяц, ждут — только с начала", (b["totals"]["gross"], b["totals"]["cash"], b["totals"]["pending"]), (14000, 14000, 2))
     eq("долг Барракуде не трогали", d13["debt_b"], 300)
 
     print("— до старта деньгами не двигать")
@@ -102,6 +102,8 @@ async def main():
     eq("запись видна в дне", [e["amount"] for e in d13["expenses"]], [700])
     eq("…но стопка РП не тронута", (d13["stack_rp"], d13["expenses_sum"]), (2000, 0))
     eq("…а в факт зарплат вошла", b["budget"]["salary"]["fact"], 700)
+    eq("…и в расходы месяца (аналитика), но не в движения фонда", (b["totals"]["expenses"], b["totals"]["expenses_since"], b["rp"]["expenses"], b["safe"]["rp_out"]), (700, 0, 0, 0))
+    eq("прибыль по расчёту считает весь месяц: 14000 − 700 − чай 150", b["econ"], 13150)
     st, r = await зови(fr.handle_day_ok, "POST", {"day": "2026-10-14", "aside": 1000, "collected": 100, "as": "Ст"})
     eq("подтвердить 14 окт — можно", st, 200)
     d14 = next(x for x in r["book"]["days"] if x["day"] == "2026-10-14")

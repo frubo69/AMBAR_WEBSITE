@@ -132,6 +132,20 @@ async def main():
     eq("снят старт — как раньше: открытие + всё", (stt["open"], stt["inflow"], stt["free"], stt["start_day"]), (350.0, 1050.0, 1400.0, "2026-10-01"))
     await fin_start.set_day(СТАРТ, "т")
 
+    print("— крипта на счету РП на утро старта (остаток держателя)")
+    st, r = await зови(fr.handle_month_set, "POST", {"month": m, "field": "rp_cr_open", "value": 9610.79, "as": "Ст"})
+    eq("поле открытия принято", st, 200)
+    stt = await cb.state()
+    eq("счёт РП = открытие, свободная без него", (stt["open_rp"], stt["rp"], stt["free"]), (9610.79, 9610.79, 700.0))
+    eq("по_дням держит открытие в день старта", stt["by_day"].get(СТАРТ), 9610.79)
+    b = r["book"]
+    eq("книга: РП криптой на начало = открытие", b["opening"]["rp_cr_open"], 9610.79)
+    d15 = next(x for x in b["days"] if x["day"] == СЕГОДНЯ)
+    eq("счёт РП криптой в дне — от открытия", d15["stack_rp_cr"], 9610.79)
+    eq("свободная всё ещё предлагается в РП+ дня (14-е подтверждено с 0 криптой)", d15["collected_cr"], 700)
+    st, r = await зови(fr.handle_month_set, "POST", {"month": m, "field": "rp_cr_open", "value": "", "as": "Ст"})
+    eq("снято — счёт РП 0", (await cb.state())["rp"], 0.0)
+
     print("— сбор выручки")
     eq("перенос с дня старта", await own._cash_from(), СТАРТ)
     eq("дни назад от 16-го", own._cash_back_days("2026-10-16", СТАРТ), ["2026-10-15", "2026-10-14"])

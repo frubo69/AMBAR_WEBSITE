@@ -83,6 +83,20 @@ def _since_ms(day: str) -> int:
     """Начало учётного дня в миллисекундах — граница для переводов сети."""
     import bizday
     return int(bizday.day_start(day).timestamp() * 1000)
+
+
+async def open_rp(sd: str) -> float:
+    """Крипта на счету РП на утро дня старта (владелец, 15 окт 2026: остаток у
+    держателя по его отчёту — деньги фонда, в РП+ заново не предлагаются).
+    Вписывается в открытие месяца старта полем rp_cr_open; без дня старта — 0."""
+    import fin_start
+    if not fin_start.cached() and not await fin_start.get():
+        return 0.0
+    try:
+        doc = await db.fin_month_get(sd[:7])
+    except Exception:                                        # noqa: BLE001
+        return 0.0
+    return _r((doc or {}).get("rp_cr_open"))
 KEY = "crypto_book"
 EPS = 0.005
 OVERLAP_MS = 6 * 3600 * 1000  # насколько назад перечитываем сеть при сверке
@@ -308,19 +322,32 @@ async def state() -> dict:
     распределение не предлагаем и не принимаем."""
     c = await cfg()
     sd = await start()
-    days = [d for d in await db.fin_days_crypto() if str(d.get("_id") or d.get("day")) >= sd]
-    entries = [e for e in await db.fin_entries_crypto() if str(e.get("day") or "") >= sd]
+    # Чистый старт позже первого дня книги крипты (fin_start): дни, записи и
+    # переводы раньше него — «до учёта». Без дня старта книга считает всё, как
+    # раньше: выводы и расходы любого дня.
+    late = sd > START_DAY
+    days = await db.fin_days_crypto()
+    entries = await db.fin_entries_crypto()
+    if late:
+        days = [d for d in days if str(d.get("_id") or d.get("day")) >= sd]
+        entries = [e for e in entries if str(e.get("day") or "") >= sd]
     по_дням, alloc, exp, wd_free, wd_rp, fee_in = _deltas(days, entries)
+    # Открытие счёта РП криптой в день старта: лежит в по_дням тем же днём —
+    # остаток по дням, «можно ли снять» и открытие следующих месяцев видят его
+    # сами; в свободную не входит.
+    rp0 = await open_rp(sd)
+    if rp0:
+        по_дням[sd] = _r(по_дням.get(sd, 0.0) + rp0)
     if not c:
         return {"ready": False, "rate": rate(), "open": 0.0, "inflow": 0.0, "alloc": alloc,
                 "exp": exp, "wd_free": wd_free, "wd_rp": wd_rp, "fee_in": fee_in, "free": 0.0,
                 "free_fact": 0.0, "wallet": wallet_aed(),
-                "rp": _r(alloc + fee_in - exp - wd_rp), "book": 0.0, "out": 0.0,
+                "rp": _r(rp0 + alloc + fee_in - exp - wd_rp), "open_rp": rp0, "book": 0.0, "out": 0.0,
                 "by_day": по_дням, "start_day": sd}
     moves = await db.crypto_moves()
     # Чистый старт позже заведения книги: открытие и всё, что пришло до утра
     # дня старта, — «до учёта»; свободная начинается с нуля.
-    late_start = sd > START_DAY and _since_ms(sd) > int(c["start_ts"])
+    late_start = late and _since_ms(sd) > int(c["start_ts"])
     if late_start:
         граница = _since_ms(sd)
         moves = [m for m in moves if int(m.get("ts") or 0) >= граница]
@@ -328,7 +355,7 @@ async def state() -> dict:
     out = _r(sum(float(m.get("aed") or 0) for m in moves if m.get("dir") == "out"))
     open_ = 0.0 if late_start else _r(c.get("open_aed"))
     free = _r(open_ + inflow - alloc - fee_in - wd_free)
-    rp = _r(alloc + fee_in - exp - wd_rp)
+    rp = _r(rp0 + alloc + fee_in - exp - wd_rp)
     # Свободная по факту: не больше того, что лежит на кошельках сверх счёта
     # РП. Ушло с кошелька без записи в книге — в РП+ этого не предложим.
     wallet = wallet_aed()
@@ -355,7 +382,7 @@ async def state() -> dict:
             # Ушло с кошелька по сети и записано в книге (РП− криптой + выводы):
             # разница — то, что ушло, а в книгу ещё не внесли (или наоборот).
             "out": out, "out_book": _r(exp + wd_free + wd_rp),
-            "src": src, "chain": chain, "report": rep,
+            "src": src, "chain": chain, "report": rep, "open_rp": rp0,
             "by_day": по_дням, "start_day": sd}
 
 

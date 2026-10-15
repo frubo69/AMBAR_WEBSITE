@@ -49,7 +49,8 @@ PAY_WAYS = ('', 'cash', 'crypto')      # чем платили расход из
 # Крипту РП двигают несколько ручек; проверка «хватает ли» и запись — под одним
 # замком, иначе два запроса разом оба увидят остаток и оба его потратят.
 _CR_LOCK = asyncio.Lock()
-OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open')   # стопки сейфа и долг на начало
+OPEN_FIELDS = ('safe_b_open', 'debt_b_open', 'rp_open', 'np_open',   # стопки сейфа и долг на начало
+               'rp_cr_open')                                         # крипта на счету РП (день старта)
 # Пересчёт сейфа по стопкам (владелец, 14 окт 2026: «экран „Пересчитал сейф“»):
 # что лежит на самом деле, против того, что по книге на тот день.
 FACT_FIELDS = ('safe_b_fact', 'safe_rp_fact', 'safe_np_fact')
@@ -1150,7 +1151,14 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
     # который ждёт подтверждения; следующему ждущему — уже ноль.
     import crypto_book
     cb = await crypto_book.state()
-    opening["opening"]["rp_cr_open"] = crypto_book.rp_before(cb["by_day"], days[0])
+    # Крипта на счету РП на начало: по книге крипты (по_дням уже держит
+    # открытие в день старта); в месяце старта — само открытие (дни до него
+    # обнулены, счёт начинается с него).
+    sd = cb.get("start_day") or ""
+    if sd and days[0] <= sd <= days[-1]:
+        opening["opening"]["rp_cr_open"] = cb.get("open_rp") or 0.0
+    else:
+        opening["opening"]["rp_cr_open"] = crypto_book.rp_before(cb["by_day"], days[0])
     free_run = cb["free_fact"] if cb["ready"] else 0.0     # по факту на кошельке, не по книге
     # Сверка смены (shift_recon, владелец, 9 окт 2026): разница по факту —
     # подтверждённая оператором у водителя или вписанная старшим в «Сборе

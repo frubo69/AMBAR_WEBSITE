@@ -131,6 +131,12 @@ async def main():
     eq("остаток по отчёту — последняя строка", (j["balance"], j["balance_ts"] > 0), (6553.0, True))
     лента = await db.wallet_ledger_list()
     eq("в журнале все строки", len(лента), 11)
+    sh = await L.shifts("2026-10")
+    дни = {x["day"]: x for x in sh["days"]}
+    eq("по сменам: месяц, приход клиентов = сумма строк «приход» октября",
+       (sh["month"], sh["totals"]["in"], all(set(x) >= {"in", "orders", "diff", "out", "cash"} for x in sh["days"])),
+       ("2026-10", round(sum(float(x["aed"]) for x in лента if x["kind"] == "in" and x["month"] == "2026-10"), 2), True))
+    eq("по сменам: расход и выдача за день — положительными числами", all(x["out"] >= 0 and x["cash"] >= 0 for x in sh["days"]), True)
     по = {x["desc"]: x for x in лента}
     eq("ENOC сентября — история, в книгу не пошёл", по["VIP ENOC: баланс 400"]["book"], "history")
     eq("приход — не в книгу (его знает сеть), перевод найден", (по["Заказ"]["book"], по["Заказ"]["matched"], по["Заказ"]["txid"][:3]), ("", True, "aaa"))

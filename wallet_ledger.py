@@ -433,6 +433,48 @@ async def summary() -> dict:
             "rows_n": sum(x["n"] for x in months)}
 
 
+async def shifts(month: str) -> dict:
+    """По сменам (учётный день, граница 10:00 Дубай): что пришло на кошелёк
+    от клиентов по отчёту против заказов криптой в приложении (держатель
+    кошелька, 18 окт 2026: «считать по сменам и сравнивать с Амбаром»).
+    Расходы и выдача наличных за смену — рядом, одним числом."""
+    import finance_routes
+    days = finance_routes._month_days(month) if month else []
+    rows = await db.wallet_ledger_list(month)
+    by: dict = {}
+    for r in rows:
+        d = str(r.get("day") or "")
+        x = by.setdefault(d, {"day": d, "in": 0.0, "in_n": 0, "extra_in": 0.0, "out": 0.0, "out_n": 0, "cash": 0.0})
+        aed = float(r.get("aed") or 0)
+        k = r.get("kind")
+        if k == "in":
+            x["in"] += aed; x["in_n"] += 1
+        elif k in ("topup", "refund"):
+            x["extra_in"] += aed
+        elif k == "cash":
+            x["cash"] += -aed; x["out"] += -aed; x["out_n"] += 1
+        else:
+            x["out"] += -aed; x["out_n"] += 1
+    orders: dict = {}
+    if days:
+        try:
+            sales = await finance_routes._sales(days)
+            orders = {d: float(sales[d]["crypto"]) for d in days}
+        except Exception as e:                            # noqa: BLE001
+            log.warning(f"[ledger] заказы криптой по дням не прочитаны: {e}")
+    today = finance_routes._biz_day()
+    out = []
+    for d in sorted(set(by) | {d for d in days if d <= today and orders.get(d)}, reverse=True):
+        x = by.get(d) or {"day": d, "in": 0.0, "in_n": 0, "extra_in": 0.0, "out": 0.0, "out_n": 0, "cash": 0.0}
+        o = orders.get(d, 0.0)
+        out.append({**{k: (_r(v) if isinstance(v, float) else v) for k, v in x.items()},
+                    "orders": _r(o), "diff": _r(x["in"] - o)})
+    return {"month": month, "days": out,
+            "totals": {"in": _r(sum(x["in"] for x in out)), "orders": _r(sum(x["orders"] for x in out)),
+                       "diff": _r(sum(x["diff"] for x in out)), "out": _r(sum(x["out"] for x in out)),
+                       "cash": _r(sum(x["cash"] for x in out))}}
+
+
 async def page(month: str) -> dict:
     months = await db.wallet_ledger_months()
     if not month and months:

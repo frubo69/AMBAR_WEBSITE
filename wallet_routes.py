@@ -215,14 +215,17 @@ async def _build() -> dict:
     # Журнал по отчёту владельца кошелька (12 окт 2026): остаток по отчёту —
     # главный, сеть видит только адрес, а деньги лежат на бирже.
     журнал = {}
+    смены = {}
     try:
         import wallet_ledger
         журнал = await wallet_ledger.summary()
+        if журнал:
+            смены = await wallet_ledger.shifts(журнал.get("month") or "")
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] сводка журнала не прочитана: {e}")
     return {**main, "label": "Кошелёк", "paid": paid, "old": old,
             "rate": _rate(), "usdt_all": round(всего, 2), "ours_all_aed": _ours(всего),
-            "orders": заказы, "book": книга, "ledger": журнал, "at": int(_t.time() * 1000)}
+            "orders": заказы, "book": книга, "ledger": журнал, "shifts": смены, "at": int(_t.time() * 1000)}
 
 
 def _is_crypto(o: dict) -> bool:
@@ -1103,6 +1106,20 @@ async def handle_ledger(request):
 
 
 @require_owner
+async def handle_shifts(request):
+    """GET ?month=YYYY-MM — по сменам: приход на кошелёк по отчёту против
+    заказов криптой в приложении, расходы и выдача за смену."""
+    import wallet_ledger
+    month = str(request.query.get("month") or "")[:7] or datetime.now(timezone(timedelta(hours=4))).strftime("%Y-%m")
+    try:
+        data = await wallet_ledger.shifts(month)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] смены не посчитаны: {e}")
+        return web.json_response({"error": "shifts_failed"}, status=500, headers=CORS_HEADERS)
+    return web.json_response(data, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_ledger_assign(request):
     """POST {key, line, as} — статья расходу из отчёта; {key, skip: true, as} —
     в книгу не писать (запись убирается, строка журнала остаётся)."""
@@ -1152,4 +1169,6 @@ def setup(app):
     app.router.add_get("/api/owner/wallet/ledger", handle_ledger)
     app.router.add_route("OPTIONS", "/api/owner/wallet/ledger/assign", _opt)
     app.router.add_post("/api/owner/wallet/ledger/assign", handle_ledger_assign)
+    app.router.add_route("OPTIONS", "/api/owner/wallet/shifts", _opt)
+    app.router.add_get("/api/owner/wallet/shifts", handle_shifts)
     log.info("[wallet] routes mounted")

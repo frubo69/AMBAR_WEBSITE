@@ -30039,7 +30039,7 @@ function _walWhen(ms){
 
 async function accWallet(){
   ACC_BACK = null;
-  WAL_N = 60;
+  WAL_N = 60; WAL_CHAIN = false;
   _setRail('accRail', '');
   _setText('accTitle', 'Кошелёк');
   _setText('accSub', 'загрузка…');
@@ -30061,8 +30061,7 @@ async function walRefresh(btn){
   try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params:{fresh:1}}); }
   catch(e){ _toast('Не удалось обновить'); }
   if(ACC_VIEW === 'wallet'){
-    _setText('accTitle', 'Кошелёк');
-    ACC_BACK = null;
+    if(!WAL_CHAIN){ _setText('accTitle', 'Кошелёк'); ACC_BACK = null; }
     walBody(ACC_WAL);
   }
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -30077,8 +30076,61 @@ function walSwitch(i){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(ACC_WAL) walBody(ACC_WAL);
 }
+// Экран кошелька (владелец, 18 окт 2026: «сделай так, чтобы я видел инфу с
+// отчёта, а то, что отслеживаем через транзакции, — отдельным подокошком;
+// убери воду и формулировки вроде „по книге“»). Главный экран — отчёт
+// держателя: остаток, приход и расход месяца, журнал. Сеть, заказы криптой,
+// распределение и лента переводов — на втором экране «Переводы в сети».
+// Отчёта ещё не было — второй экран и есть главный, как раньше.
+let WAL_CHAIN = false;
+function walChain(){
+  WAL_CHAIN = true;
+  ACC_BACK = () => { WAL_CHAIN = false; ACC_BACK = null; _setText('accTitle', 'Кошелёк'); if(ACC_WAL) walBody(ACC_WAL); };
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  if(ACC_WAL) walBody(ACC_WAL);
+}
 function walBody(d){
   const mid = document.getElementById('accMid'); if(!mid) return;
+  const L = (d && d.ledger) || {}, поОтчёту = L.balance != null;
+  if(!поОтчёту || WAL_CHAIN){ walChainBody(d, поОтчёту); return; }
+  _setText('accTitle', 'Кошелёк');
+  _setText('accSub', 'отчёт · ' + (_walWhen(L.balance_ts) || ''));
+  const mon = MONTHS_NOM[+String(L.month).slice(5) - 1] || '';
+  mid.innerHTML = `
+    <div class="wal-c">
+      <div class="wal-v" style="color:var(--gold2)">${walAed(L.balance)}<u>AED</u></div>
+      <div class="wal-our"><span>Остаток</span><b>${L.balance_usdt != null ? fmtUsdt(L.balance_usdt) : '—'}<u>USDT</u></b><i>по ${
+        String(+(d && d.rate) || 3.5).replace('.', ',')} за USDT</i></div>
+    </div>
+    <div class="wal-led wal-ord">
+      <div class="wal-ord-h">${escS(mon ? mon[0].toUpperCase() + mon.slice(1) : 'Месяц')}</div>
+      <div><span>Приход</span><b>${walAed(L.month_in)}<u>AED</u></b></div>
+      <div class="out"><span>Расход</span><b>−${walAed(L.month_out)}<u>AED</u></b></div>
+      ${L.unassigned_n ? `<div><span style="color:var(--warn)">Неразобранных</span><i style="color:var(--warn)">${L.unassigned_n}</i></div>` : ''}
+      <button class="cat-block-open" onclick="walLedger()">Журнал · ${L.rows_n || 0} ${
+        pluralize(L.rows_n || 0, 'строка', 'строки', 'строк')} →</button>
+    </div>
+    <div class="wal-led wal-ord">
+      <button class="cat-block-open" onclick="walChain()">Переводы в сети →</button>
+    </div>`;
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap qb-row">
+      <button class="qb" onclick="walReport()">Загрузить отчёт</button>
+      <button class="qb qb-ico" onclick="walSend(this)" aria-label="Прислать файлом"
+        title="Файлом в чат">${ICO_TG}</button>
+      <button class="qb qb-ico" onclick="walRefresh(this)" aria-label="Обновить"
+        title="Обновить"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>`;
+}
+// Второй экран: что видно в сети и как эта крипта разложена. Кошельков может
+// быть два: текущий и прежний («Старый кошелёк»). Сверху переключатель, ниже —
+// выбранный. Итог «оплачено по счетам» — только у текущего: он про заказы, а
+// не про адрес.
+function walChainBody(d, поОтчёту){
+  const mid = document.getElementById('accMid'); if(!mid) return;
+  _setText('accTitle', поОтчёту ? 'Переводы в сети' : 'Кошелёк');
   const old = (d && d.old) || [];
   if(WAL_SEL >= old.length) WAL_SEL = -1;
   const v = WAL_SEL < 0 ? (d || {}) : old[WAL_SEL];
@@ -30097,35 +30149,19 @@ function walBody(d){
         escS(fbDayT(o.day))}</span><i>${fbFmt(o.total)} AED · ${fmtUsdt(o.usdt)} USDT</i></div>`).join('')}
       ${z.free_n > 12 ? `<div class="wal-ord-r"><span>и ещё ${z.free_n - 12}</span><i></i></div>` : ''}
     </div>` : '';
-  // Крипта по книге (владелец, 2 окт 2026): сколько свободной — её предложат в
-  // следующее распределение РП+, — и сколько уже лежит на счёте РП. Разница с
-  // тем, что на кошельке на самом деле, — то, что ушло и ещё не записано.
+  // Распределение (crypto_book): что пришло и ещё не разложено в РП+, что уже
+  // в фонде РП, и сходится ли это с тем, что лежит на кошельке.
   const k = (WAL_SEL < 0 && d && d.book) || {};
-  // Отчёт владельца кошелька загружен (12 окт 2026): остаток и расходы — по
-  // нему, он главный; сеть видит только адрес, деньги лежат на бирже.
-  const L = (WAL_SEL < 0 && d && d.ledger) || {}, поОтчёту = L.balance != null;
   const rep = (k.report) || null;
   const книга = k.ready ? `<div class="wal-led wal-ord">
-      <div class="wal-ord-h">Крипта по книге</div>
-      <div><span>Свободная</span><b>${walAed(k.free)}<u>AED</u></b></div>
-      <div><span>пойдёт в РП+ при распределении</span><i></i></div>
-      <div><span>На счёте РП</span><b>${walAed(k.rp)}<u>AED</u></b></div>
-      <div class="rest"><span>Всего по книге</span><b>${walAed(k.book)}<u>AED</u></b></div>
+      <div class="wal-ord-h">Распределение</div>
+      <div><span>К распределению</span><b>${walAed(k.free)}<u>AED</u></b></div>
+      <div><span>В фонде РП</span><b>${walAed(k.rp)}<u>AED</u></b></div>
       ${rep ? `${rep.inflow_after ? `<div><span>пришло после отчёта</span><i>${walAed(rep.inflow_after)} AED</i></div>` : ''}${
         rep.spent_after ? `<div class="out"><span>потрачено после отчёта</span><i>${walAed(rep.spent_after)} AED</i></div>` : ''}`
       : Math.abs(k.diff || 0) >= 0.01 ? `<div class="${k.diff < 0 ? 'out' : ''}"><span>${
-        k.diff < 0 ? 'С кошелька ушло, а в книгу не внесено' : 'На кошельке больше, чем по книге'}</span><b>${
+        k.diff < 0 ? 'Ушло без записи' : 'Пришло без записи'}</span><b>${
         walAed(Math.abs(k.diff))}<u>AED</u></b></div>` : ''}
-    </div>` : '';
-  const отчёт = поОтчёту ? `<div class="wal-led wal-ord">
-      <div class="wal-ord-h">По отчёту · ${escS(_walWhen(L.balance_ts))}</div>
-      <div><span>Остаток</span><b style="color:var(--text)">${walAed(L.balance)}<u>AED</u></b></div>
-      <div><span>${L.balance_usdt != null ? fmtUsdt(L.balance_usdt) + ' USDT' : ''}</span><i></i></div>
-      <div><span>Приход · ${escS(MONTHS_NOM[+String(L.month).slice(5) - 1] || '')}</span><b>${walAed(L.month_in)}<u>AED</u></b></div>
-      <div class="out"><span>Расход · ${escS(MONTHS_NOM[+String(L.month).slice(5) - 1] || '')}</span><b>−${walAed(L.month_out)}<u>AED</u></b></div>
-      ${L.unassigned_n ? `<div><span style="color:var(--warn)">Неразобранных</span><i style="color:var(--warn)">${L.unassigned_n}</i></div>` : ''}
-      <button class="cat-block-open" onclick="walLedger()">Журнал · ${L.rows_n || 0} ${
-        pluralize(L.rows_n || 0, 'строка', 'строки', 'строк')} →</button>
     </div>` : '';
   _setText('accSub', v && v.address ? v.address : 'USDT · TRC-20');
   const переключатель = old.length ? `<div class="periods wal-sw" id="walSw" style="--count:${1 + old.length}">
@@ -30142,34 +30178,25 @@ function walBody(d){
   // свои USDT. Говорим об этом только когда его почти не осталось.
   const газ = (b.trx != null && b.trx < 5)
     ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
-  // Главное число — остаток по книге (от отчёта, с приходом после него), а
-  // на адресе в сети лежит лишь то, что биржа ещё не забрала к себе.
-  const наСчёте = поОтчёту && k.ready && k.wallet != null;
   mid.innerHTML = переключатель + `
     <div class="wal-c">
-      <div class="wal-v" style="color:var(--gold2)">${walAed(наСчёте ? k.wallet : v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
-      <div class="wal-our"><span>${наСчёте ? 'На счёте' : 'На кошельке'}</span><b>${
-        fmtUsdt(наСчёте ? k.wallet / курс : b.usdt)}<u>USDT</u></b><i>по ${
+      <div class="wal-v" style="color:var(--gold2)">${walAed(v.ours_aed != null ? v.ours_aed : (+b.usdt || 0) * курс)}<u>AED</u></div>
+      <div class="wal-our"><span>На адресе</span><b>${fmtUsdt(b.usdt)}<u>USDT</u></b><i>по ${
         String(курс).replace('.', ',')} за USDT</i></div>
-      ${наСчёте ? `<div class="wal-our"><span>На адресе в сети</span><b>${fmtUsdt(b.usdt)}<u>USDT</u></b></div>` : ''}
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
         _walWhen(d && d.at) || 'только что'}</div>
       ${газ}${сеть}
     </div>
-    ${отчёт}
     ${p.orders ? `<div class="wal-c" style="padding:13px 14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span style="font-size:12.5px">Оплачено криптой по нашим счетам</span>
         <b style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
            color:var(--gold2);font-variant-numeric:tabular-nums">${fmtUsdt(p.usdt)}</b>
       </div>
-      <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}
-        за всё время · растёт с каждой оплатой через приложение</div>
+      <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}</div>
     </div>` : ''}
     ${книга}
     ${заказы}
-    <!-- Откуда взялся остаток: пришло минус ушло. Пока этих двух строк не было,
-         ноль на балансе при полной ленте выглядел поломкой экрана. -->
     <div class="wal-led">
       <div><span>Входящие</span><b>${fmtUsdt(t.in)}</b></div>
       <div><span>из них не через приложение</span><i>${fmtUsdt(t.direct)}</i></div>
@@ -30190,15 +30217,8 @@ function walBody(d){
           <span class="wal-r-s">${escS(_walWhen(r.ts))}${
             r.peer ? ' · ' + escS(r.peer) : ''}${
             r.linked && r.linked_by ? ' · ' + escS(r.linked_by) : ''}</span>
-          <!-- Назначение платежа из отчёта владельца кошелька: за что эти
-               деньги. Пустое — строка не занимает места. -->
           ${r.purpose ? `<span class="wal-r-p">${escS(r.purpose)}</span>` : ''}
         </span>
-        <!-- Привязывать руками из ленты больше нечем: разносит сверка, а
-             человек только разбирает спорное. Кнопка на каждой строке звала
-             перебирать сто с лишним поступлений глазами — работу, которую
-             система делает по сумме и дню. Снять привязку по-прежнему можно:
-             отменяемость решения важнее его способа. -->
         ${r.in && r.txid && r.linked
           ? `<button class="wal-link" onclick="walUnlink('${escS(r.txid)}')">снять</button>`
           : ''}
@@ -30215,12 +30235,12 @@ function walBody(d){
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap qb-row">
       <button class="qb" onclick="walMatch(this)">Сверить с заказами</button>
-      <button class="qb qb-ico" onclick="walReport()" aria-label="Загрузить отчёт"
+      ${поОтчёту ? '' : `<button class="qb qb-ico" onclick="walReport()" aria-label="Загрузить отчёт"
         title="Отчёт с назначениями"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></button>
       <button class="qb qb-ico" onclick="walSend(this)" aria-label="Прислать файлом"
-        title="Файлом в чат">${ICO_TG}</button>
+        title="Файлом в чат">${ICO_TG}</button>`}
       <button class="qb qb-ico" onclick="walRefresh(this)" aria-label="Обновить"
         title="Обновить"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round"

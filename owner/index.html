@@ -3495,6 +3495,9 @@ button.path:active{transform:scale(.995)}
 .fb-e-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
+.fb-e-dep{flex:0 0 auto;height:26px;padding:0 9px;border-radius:8px;border:1px solid #2a2b3e;background:none;
+  color:var(--muted);font:600 11px/1 'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.fb-e-dep:active{color:#c9a96e;border-color:rgba(201,169,110,.55)}
 .fb-none{padding:13px 16px;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,.05)}
 /* Отчёт ДДС (dds-): сейф на начало → поступления → выплаты → итог и сейф на
    конец. Карточки и золотые заголовки — общие (.sc / .sc-cap), свои здесь
@@ -22591,7 +22594,7 @@ function fbHistRow(e){
                e.by ? 'записал ' + escS(e.by) : ''].filter(Boolean).join(' · ');
   return `<div class="fb-e">
     <span class="fb-e-b"><b>${t}</b>${sub ? `<i>${sub}</i>` : ''}</span>
-    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
+    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>${fbDepBtn(e)}
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
   </div>${fbRcpBtn(e)}`;
 }
@@ -22771,9 +22774,57 @@ function fbLineEntries(rows){
   return rows.map(e => `<div class="fb-e">
     <span class="fb-e-b"><b>${escS(e.comment || (e.deposit ? 'Депозит' : 'Расход'))}</b><i>${escS(fbDayT(e.day))}${e.who ? ' · ' + escS(e.who) : ''}${
       e.deposit ? ' · депозит' : ''}${e.dep_use ? ' · из депозита ' + fbFmt(e.dep_use) : ''}</i></span>
-    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>
+    <b class="fb-e-v">${fbFmt(e.amount)}<u>AED</u></b>${fbDepBtn(e)}
     <button class="fb-e-x" onclick="fbEntryDel('${escS(e.id)}')" aria-label="Убрать">${IC('xmark', 15)}</button>
   </div>${fbRcpBtn(e)}`).join('');
+}
+// Депозит из уже записанного расхода (владелец, 20 окт 2026: рентакару ушло
+// 7 400 одним переводом — 6 400 аренда и 1 000 депозит; из отчёта кошелька
+// строка легла одной записью). Кнопка у расхода по статье, где депозит бывает.
+function fbDepBtn(e){
+  const lines = ((fbBook(FB.month) || {}).budget || {}).lines || [];
+  const l = lines.find(x => x.id === e.line);
+  if(!l || !FB_DEP_GROUPS.includes(l.group) || e.deposit || e.kind || e.kind_t || e.dep_use || e.src || !(e.amount > 0)) return '';
+  return `<button class="fb-e-dep" onclick="fbEntrySplit('${escS(e.id)}')">${fbDepT(l)}</button>`;
+}
+function fbEntrySplit(id){
+  const b = fbBook(FB.month); if(!b) return;
+  let e = null; (b.days || []).forEach(d => (d.expenses || []).forEach(x => { if(x.id === id) e = x; }));
+  if(!e) return;
+  const l = ((b.budget || {}).lines || []).find(x => x.id === e.line) || {};
+  closePinPop();
+  const bk = document.createElement('div'); bk.className = 'pin-back ask'; bk.addEventListener('click', closePinPop);
+  const box = document.createElement('div'); box.className = 'pin-pop crw-ask rep-ask';
+  box.innerHTML = `<div class="crw-ask-t">${escS(fbDepT(l))} из суммы</div>
+    <div class="crw-ask-s">${escS([l.name, fbFmt(e.amount) + ' AED', e.comment].filter(Boolean).join(' · '))}</div>
+    <input class="fb-pen-inp" id="fbSplitAmt" inputmode="decimal" placeholder="Сумма ${escS(fbDepT(l).toLowerCase() === 'аванс' ? 'аванса' : 'депозита')}" autocomplete="off">
+    <div class="rep-err" id="fbSplitErr"></div>
+    <button class="crw-ask-b go" id="fbSplitGo">Выделить</button>
+    <button class="crw-ask-b no" onclick="closePinPop()">Отмена</button>`;
+  document.body.append(bk, box);
+  box.querySelector('#fbSplitGo').onclick = () => fbEntrySplitSend(id, e.amount);
+  setTimeout(() => { const i = document.getElementById('fbSplitAmt'); if(i) i.focus(); }, 60);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e2){}
+}
+async function fbEntrySplitSend(id, total){
+  const btn = document.getElementById('fbSplitGo'), err = document.getElementById('fbSplitErr');
+  const amount = parseFloat(String((document.getElementById('fbSplitAmt') || {}).value || '').replace(/\s/g, '').replace(',', '.'));
+  if(!(amount > 0)){ err.textContent = 'Нужна сумма'; return; }
+  if(amount >= total - 0.005){ err.textContent = `Меньше всей суммы (${fbFmt(total)})`; return; }
+  btn.disabled = true;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/finance/book/entry/split', {method: 'POST', body: {id, amount, as: _meName()}});
+    closePinPop();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(res.book){ fbApply(res.book); fbPaint(); }
+    if(FB.page) fbBudRepaint();
+    fbPagePaint();
+  }catch(e){
+    const p = (e && e.payload) || {};
+    btn.disabled = false;
+    err.textContent = p.error === 'too_much' ? `Меньше всей суммы (${fbFmt(p.have)})` : p.error === 'no_split' ? 'Эту запись не разделить'
+      : p.error === 'not_found' ? 'Записи уже нет' : fbCrErr(e) || 'Не удалось записать';
+  }
 }
 // Расход со страницы статьи: сегодняшним днём; в прошлом месяце — его
 // последним днём, чтобы запись легла в тот же месяц, что и статья.

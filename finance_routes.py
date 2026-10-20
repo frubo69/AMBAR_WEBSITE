@@ -1863,6 +1863,15 @@ async def handle_entry_del(request):
             return _json({"error": "dep_used", "n": len(used)}, 409)
     async with _CR_LOCK:
         await db.fin_entry_del(eid)
+        if old.get("split_of"):
+            # Депозит, выделенный из расхода (handle_entry_split): убрали его —
+            # сумма возвращается в тот расход, деньги-то ушли одним переводом.
+            parent = await db.fin_entry_get(str(old["split_of"]))
+            if parent:
+                back = {"amount": calc._i(calc._n(parent.get("amount")) + calc._n(old.get("amount")))}
+                if old.get("cr_free") or parent.get("cr_free"):
+                    back["cr_free"] = calc._i(calc._n(parent.get("cr_free")) + calc._n(old.get("cr_free")))
+                await db.fin_entry_set(str(old["split_of"]), back)
         if old.get("hands_extra"):
             await _hands_extra_drop(old)
         # Вывод крипты убрали — его комиссия уходит вместе с ним. Убрали одну
@@ -1883,6 +1892,66 @@ async def handle_entry_del(request):
     await backdate.notify(str(old.get("day") or ""), who, "финансы: строка убрана",
                           f"{old.get('amount')} AED {old.get('comment') or ''}".strip())
     return _json({"ok": True, "book": await build(str(old.get("day") or "")[:7])})
+
+
+@require_owner
+async def handle_entry_split(request):
+    """POST {id, amount, as} — выделить из расхода депозит (владелец, 20 окт
+    2026: рентакару ушло 7 400 одним переводом — 6 400 аренда и 1 000 депозит;
+    из отчёта кошелька строка легла в книгу одной записью, депозит в ней не
+    отмечен, а вписать депозит рукой поверх — задвоить сумму).
+
+    Расход становится меньше на часть, часть — отдельной записью «депозит» тем
+    же днём, статьёй, оплатой, временем и связью с журналом кошелька; крипта
+    «из свободной» делится так же. Денег не прибавляется и не убавляется.
+    Убрали депозит — сумма вернётся в расход (handle_entry_del)."""
+    try:
+        body = await request.json()
+        eid = str(body.get("id") or "")
+        part = _num(body.get("amount"))
+    except Exception:                             # noqa: BLE001
+        return _json({"error": "bad_request"}, 400)
+    if part is None or part <= 0:
+        return _json({"error": "bad_amount"}, 400)
+    old = await db.fin_entry_get(eid)
+    if not old:
+        return _json({"error": "not_found"}, 404)
+    # делится только обычный расход по статье: не зарплата, не сам депозит,
+    # не возврат/вывод, без списания из депозита и без комиссий
+    if (old.get("book") != "rp" or old.get("kind") or old.get("deposit") or old.get("src") == "deposit"
+            or old.get("dep_use") or old.get("fee_of") or old.get("fee_entry") or old.get("hands_extra")
+            or old.get("pay") == "hands"):
+        return _json({"error": "no_split"}, 400)
+    total = calc._n(old.get("amount"))
+    if part >= total - 0.005:
+        return _json({"error": "too_much", "have": calc._i(total)}, 400)
+    day = str(old.get("day") or "")
+    if отказ := await _before_start(day):
+        return _json(отказ, 409)
+    by = _who(body)
+    new_id = secrets.token_hex(6)
+    doc = {"_id": new_id, "day": day, "book": "rp", "amount": calc._i(part),
+           "comment": str(old.get("comment") or "")[:120], "who": old.get("who") or "",
+           "line": old.get("line") or "", "kind": "", "by": by,
+           "at": old.get("at") or datetime.now(timezone.utc), "photo": False,
+           "deposit": True, "split_of": eid}
+    for k in ("pay", "src", "wal"):
+        if old.get(k):
+            doc[k] = old[k]
+    fields = {"amount": calc._i(total - part)}
+    cf = calc._n(old.get("cr_free"))
+    if cf > 0:
+        take = min(cf, part)
+        doc["cr_free"] = calc._i(take)
+        fields["cr_free"] = calc._i(cf - take)
+    async with _CR_LOCK:
+        await db.fin_entry_add(doc)
+        await db.fin_entry_set(eid, fields)
+    await _touch(day[:7])
+    log.info(f"[fin] {day} из расхода {calc._i(total)} выделен депозит {calc._i(part)} «{doc['comment']}» · {by or '—'}")
+    await backdate.notify(day, by, "финансы: из расхода выделен депозит",
+                          f"{calc._i(part)} AED из {calc._i(total)} {doc['comment']}".strip())
+    return _json({"ok": True, "id": new_id, "book": await build(day[:7])})
 
 
 @require_owner
@@ -2758,6 +2827,7 @@ def setup(app):
         ("/api/owner/finance/book/photo/{id}", handle_entry_photo, "GET"),
         ("/api/owner/finance/book/entry", handle_entry_add, "POST"),
         ("/api/owner/finance/book/entry", handle_entry_del, "DELETE"),
+        ("/api/owner/finance/book/entry/split", handle_entry_split, "POST"),
         ("/api/owner/finance/book/month", handle_month_set, "POST"),
         ("/api/owner/finance/book/start", handle_start_set, "POST"),
         ("/api/owner/finance/book/budget", handle_budget_set, "POST"),

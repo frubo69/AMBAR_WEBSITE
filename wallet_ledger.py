@@ -147,14 +147,13 @@ def with_keys(rows: list) -> list:
 
 
 def book_day(when: datetime) -> str:
-    """День книги: смена, в которую попала операция (граница 10:00 Дубай).
-    Первые часы первого дня учёта прижимаем к нему, иначе операция 1 октября в
-    00:39 ушла бы в сентябрь, который уже закрыт руками."""
-    d = bizday.biz_day(when)
-    sd = start_day()
-    if when.astimezone(DUBAI).strftime("%Y-%m-%d") >= sd and d < sd:
-        return sd
-    return d
+    """День книги: смена, в которую попала операция, — то же правило, что у
+    заказов и всей книги (bizday, граница 10:00 Дубай). Перевод в 01:22 ночи —
+    ещё вчерашняя смена, даже в первые часы дня старта учёта: такая операция
+    сидит в открытии и в книгу не идёт (владелец, 20 окт 2026: «смена у нас с
+    12 до 6, а не сутки в сутки, и это применимо везде» — журнал прижимал
+    ночь на 15 октября к 15-му, и по сменам 14-е ушло в минус, 15-е в плюс)."""
+    return bizday.biz_day(when)
 
 
 def _doc(r: dict, who: str, report: str, now: datetime) -> dict:
@@ -167,7 +166,7 @@ def _doc(r: dict, who: str, report: str, now: datetime) -> dict:
     k = kind(r.get("op") or "", r.get("desc") or "", aed, r.get("way"))
     return {
         "_id": r["key"], "ts": int(when.timestamp() * 1000), "when": when.astimezone(timezone.utc),
-        "day": book_day(when), "month": when.astimezone(DUBAI).strftime("%Y-%m"),
+        "day": book_day(when), "month": book_day(when)[:7],
         "kind": k, "op": r.get("op") or "", "desc": r.get("desc") or "", "text": r.get("text") or "",
         "usdt": round(usdt, 6), "rate": float(rate) if rate else None,
         "aed": None if aed is None else _r(aed),
@@ -286,8 +285,7 @@ async def book(keys: list, who: str) -> dict:
             continue                              # решено раньше: человеком или прошлой загрузкой
         if row["kind"] == "in" or row["kind"] == "topup":
             continue                              # приход учитывает сеть; пополнение — только журнал
-        cal_day = datetime.fromtimestamp(int(row["ts"]) / 1000, DUBAI).strftime("%Y-%m-%d")
-        if cal_day < sd:
+        if str(row.get("day") or "") < sd:        # смена до начала учёта — история: она уже в открытии
             await db.wallet_ledger_set(k, {"book": "history"})
             st["history"] += 1
             continue

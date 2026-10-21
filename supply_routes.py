@@ -1360,6 +1360,12 @@ async def tasks_for_driver(me: str, district: str) -> dict:
             # и досканировать его надо в тот документ, куда он записан.
             if not свежее and not v["got"] and not v["noscan_at"]:
                 continue
+            # Принятое без сканирования, которое держит старший («Принимаю
+            # сам» в STAR), для водителя свободно: товар на его полке, иначе
+            # оно висело бы во «взятых другими» и досканировать было бы некому
+            # (владелец, 21 окт 2026).
+            if v["noscan_at"] and held_by_staff(task):
+                v["driver"] = ""; v["mine"] = False
             v["home"] = (oid == district)
             v["stale"] = not свежее             # незакончено с прошлой поставки
             if v["mine"]:
@@ -1375,6 +1381,34 @@ async def tasks_for_driver(me: str, district: str) -> dict:
     # Свой район первым и в доп. заявках тоже.
     extra.sort(key=lambda v: (not v["home"], v["at"]))
     return {"mine": mine, "free": free, "extra": extra, "taken": other}
+
+
+def held_by_staff(task: dict) -> bool:
+    """Район держит не водитель, а старший: «Принимаю сам» в STAR пишет в
+    driver имя старшего. Пустой реестр водителей — никого не считаем старшим:
+    иначе при сбое реестра чужими стали бы все."""
+    d = str((task or {}).get("driver") or "").strip()
+    if not d:
+        return False
+    try:
+        import config_staff as _staff
+        names = set(_staff.all_driver_names())
+    except Exception:                                        # noqa: BLE001
+        return False
+    return bool(names) and d not in names
+
+
+async def task_claim(sid: str, oid: str, me: str, tg_id: int, now) -> tuple:
+    """Водитель берёт район. Принятое без сканирования, которое держит
+    старший (владелец, 21 окт 2026: «товар приняли без сканирования, а
+    водитель не может отсканировать»), сперва отпускается — товар на полке
+    района, досканировать его должен водитель района."""
+    sup = await db.supply_get(sid) or {}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("noscan_at") and not task.get("done_at") and held_by_staff(task):
+        await db.supply_task_release(sid, oid)
+        log.info(f"[supply] {sid}/{oid}: принятое без сканирования отпущено от {task.get('driver')} — берёт {me}")
+    return await db.supply_task_claim(sid, oid, me, tg_id, now)
 
 
 def _can_touch(task: dict, me: str, owner: bool) -> bool:
@@ -1874,6 +1908,13 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
     doc = await db.supply_task_noscan(sid, oid, me, now)
     if not doc:
         return {"ok": False, "verdict": "closed"}
+    # Старший принял без сканирования — район остаётся районом: если он сам
+    # держал задачу («Принимаю сам»), отпускаем, чтобы водитель района увидел
+    # её свободной и досканировал (владелец, 21 окт 2026: товар «исчез у
+    # водителя»). Своего водителя с задачи не снимаем.
+    if owner and held_by_staff((doc.get("tasks") or {}).get(oid) or {}):
+        await db.supply_task_release(sid, oid)
+        doc = await db.supply_get(sid) or doc
     if photo:
         await db.supply_noscan_photo_set(sid, oid, photo, thumb)
         doc = await db.supply_get(sid) or doc

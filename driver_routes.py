@@ -3092,9 +3092,9 @@ async def handle_supply_claim(request):
         body = {}
     sid = request.match_info.get("sid") or ""
     oid = str(body.get("district") or "").strip()
-    ok, task = await db.supply_task_claim(sid, oid, me["name"],
-                                          request["tg"].get("id") or 0,
-                                          datetime.now(timezone.utc))
+    ok, task = await supply_routes.task_claim(sid, oid, me["name"],
+                                              request["tg"].get("id") or 0,
+                                              datetime.now(timezone.utc))
     if not ok:
         return web.json_response({"ok": False, "error": "taken",
                                   "driver": (task or {}).get("driver") or ""},

@@ -4560,8 +4560,19 @@ async def cash_round(day: str) -> dict:
     solo = {oid: [d for d in back
                   if ((marks_all.get(d) or {}).get(f"cash:{oid}") or {}).get("solo") == day]
             for oid in OFFICE_IDS}
+    # Дни с начала переноса, чьё распределение в книге ещё не согласовано
+    # (владелец, 20 окт 2026: «распределить любые собранные суммы»): забранные
+    # «именно за день» с другой страницы иначе не нашлись бы — здесь они
+    # готовыми, пока не согласуют; согласованные уходят с экрана.
+    try:
+        agreed = ({d: bool((r or {}).get("ok")) for d, r in (await db.fin_days_get(min(back), max(back))).items()}
+                  if back else {})
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] согласованные дни: {e}")
+        agreed = {}
+    open_days = {d for d in back if not agreed.get(d)}
     need_days = sorted({d for ch in chains.values() for d in ch}
-                       | {d for s in solo.values() for d in s})
+                       | {d for s in solo.values() for d in s} | open_days)
     since = min(need_days) if need_days else day
     try:
         orders = [] if before else list((await db.orders_from(_bizday.since_utc(since))).values())

@@ -22808,7 +22808,7 @@ function fbLineEntries(rows){
 function fbDepBtn(e){
   const lines = ((fbBook(FB.month) || {}).budget || {}).lines || [];
   const l = lines.find(x => x.id === e.line);
-  if(!l || !FB_DEP_GROUPS.includes(l.group) || e.deposit || e.kind || e.kind_t || e.dep_use || e.src || !(e.amount > 0)) return '';
+  if(!l || !FB_DEP_GROUPS.includes(l.group) || e.deposit || e.kind || e.kind_t || e.dep_use || !(e.amount > 0)) return '';
   return `<button class="fb-e-dep" onclick="fbEntrySplit('${escS(e.id)}')">${fbDepT(l)}</button>`;
 }
 function fbEntrySplit(id){

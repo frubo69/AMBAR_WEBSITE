@@ -19094,6 +19094,7 @@ function expDayRow(t){
         <span class="exp-day-p">
           <span><i>питание</i><b>${fmt(t.meal)}</b></span>
           <span><i>доп. расходы</i><b>${fmt(t.extra)}</b></span>
+          <span><i>по карте</i><b>${fmt(t.card || 0)}</b></span>
         </span></span>` : ''}
     </span>
     ${_dayNav('expDay')}
@@ -20159,16 +20160,19 @@ function crFold(id, снизу){
 function crFoot(){
   const f = document.getElementById('accFoot'); if(!f) return;
   const d = CR;
-  if(!d || CRD.open || !(d.need > 0)){ f.innerHTML = ''; return; }
-  // Шаг 2 — после шага 1: пока не со всех районов получено, кнопка не
-  // нажимается и говорит, кого ещё ждём.
+  if(!d || CRD.open){ f.innerHTML = ''; return; }
+  // Шаг 2 — по готовым дням: сдали за день со всех районов — он
+  // распределяется, даже если сегодняшний ещё собирают.
   const st = crDistState();
-  if(st.wait.length){
-    f.innerHTML = `<div class="qb-wrap"><div class="cr-foot-cap">Сначала получите выручку: ${crWaitTxt(st.wait)}</div>
+  if(st.locked){
+    if(!(d.need > 0) && !st.waiting.length){ f.innerHTML = ''; return; }
+    f.innerHTML = `<div class="qb-wrap"><div class="cr-foot-cap">Сначала получите выручку: ${st.wait.length ? crWaitTxt(st.wait) : crWaitDaysTxt(st.waiting)}</div>
       <button class="qb quiet" disabled>Распределить выручку</button></div>`;
     return;
   }
-  f.innerHTML = `<div class="qb-wrap">${st.done
+  const cap = st.waiting.length ? `<div class="cr-foot-cap">Ещё ждём: ${crWaitDaysTxt(st.waiting)}</div>` : '';
+  const seen = st.known && st.any && !st.pend.length;
+  f.innerHTML = `<div class="qb-wrap">${cap}${seen
     ? `<button class="qb quiet" onclick="crDist()">${IC('check', 17)}Распределено · посмотреть</button>`
     : st.known && !st.any
     ? '<button class="qb quiet" disabled>Распределять нечего — выручки нет</button>'
@@ -20177,13 +20181,15 @@ function crFoot(){
 // Состояние второго этапа — одно на подвал и переключатель этапов.
 function crDistState(){
   const wait = crWait();
-  const days = crDistDays().map(crDistBook);
+  const all = crDistDays();
+  const ready = all.filter(crDayReady), waiting = all.filter(d => !crDayReady(d));
+  const days = ready.map(crDistBook);
   const known = days.every(Boolean);
   const pend = days.filter(b => b && b.base > 0 && !b.ok);
   const any = days.some(b => b && b.base > 0);
-  return {wait, known, any, pend, sum: pend.reduce((a, b) => a + b.base, 0),
-          locked: !CR || !(CR.need > 0) || wait.length > 0,
-          done: known && any && !pend.length};
+  return {wait, waiting, ready, known, any, pend, sum: pend.reduce((a, b) => a + b.base, 0),
+          locked: !CR || !ready.length,
+          done: known && any && !pend.length && !waiting.length};
 }
 function crWaitTxt(wait){ return wait.map(x => escS(x.code) + (x.later ? ' — завтра' : '')).join(', '); }
 
@@ -20197,9 +20203,10 @@ function crSteps(stage){
   const d = CR || {}, st = crDistState();
   const got = d.need > 0 && d.done >= d.need;
   const s1 = !d.need ? 'получать нечего' : got ? `получено со всех · ${d.need}` : `${d.done} из ${d.need} районов`;
-  const s2 = st.locked ? (d.need > 0 ? 'после сбора' : 'нечего распределять')
-    : !st.known ? 'выручка дня' : st.done ? 'согласовано' : !st.any ? 'нечего распределять'
-    : `${fbFmt(st.sum)} AED`;
+  const nw = st.waiting.length;
+  const s2 = st.locked ? (d.need > 0 || nw ? 'после сбора' : 'нечего распределять')
+    : !st.known ? 'выручка дня' : st.pend.length ? `${fbFmt(st.sum)} AED`
+    : nw ? `ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : st.done ? 'согласовано' : 'нечего распределять';
   return `<div class="cr-steps">
     <button class="cr-step${stage === 1 ? ' on' : ''}${got ? ' done' : ''}" onclick="crStage(1)">
       <span class="cr-step-n">${got && stage !== 1 ? IC('check', 14) : '1'}</span>
@@ -20306,6 +20313,7 @@ async function crToggle(id){
 
 function crDistDays(){
   const d = CR; if(!d) return [];
+  if(d.days) return d.days.map(x => x.day).sort();
   const set = new Set([d.day]);
   (d.districts || []).forEach(x => (x.carry || []).forEach(c => { if(c.day) set.add(c.day); }));
   return [...set].sort();
@@ -20313,6 +20321,15 @@ function crDistDays(){
 // Кого ещё ждём: районы, где было что брать и «Получил» не отмечено.
 // «Соберу завтра» — тоже ещё не получено: распределим, когда заберут.
 function crWait(){ return ((CR && CR.districts) || []).filter(x => !x.empty && !x.done); }
+// Готовность по дням (владелец, 20 окт 2026: «сделай так, чтобы можно было
+// распределить любые собранные суммы»): день распределяется, когда за него
+// сдали все районы; сегодняшний, пока смена идёт, ждёт — и не держит остальные.
+function crDayInfo(day){ return ((CR && CR.days) || []).find(x => x.day === day) || null; }
+function crDayReady(day){ const x = crDayInfo(day); return x ? !!x.ready : !crWait().length; }
+function crDayWait(day){ const x = crDayInfo(day); return x ? (x.wait || []) : crWait().map(z => z.code); }
+function crWaitDaysTxt(days){
+  return days.map(d => `${CR && d === CR.today ? 'сегодня' : escS(fbDayT(d))} — ${escS(crDayWait(d).join(', '))}`).join('; ');
+}
 function crDistBook(day){ return fbDayOf(fbBook(day.slice(0, 7)), day); }
 function crDistNorm(day){ return (((fbBook(day.slice(0, 7)) || {}).budget) || {}).norm || 0; }
 // Книгу месяца (двух — перенос через первое число) подтягиваем, пока идёт
@@ -20357,6 +20374,8 @@ function crDistRender(){
 function crDistCard(day){
   const b = crDistBook(day), norm = crDistNorm(day);
   const title = CR && day === CR.today ? 'Сегодня' : fbDayT(day);
+  if(!crDayReady(day)) return `<div class="sc fb-gut crd wait">${fbCapT(escS(title), 'ждём ' + escS(crDayWait(day).join(', ')))}
+    <div class="sc-r fb-r"><span>Выручка</span><b>${b ? fbFmt(b.base) : '—'}<u>AED</u></b></div></div>`;
   if(!b) return `<div class="sc fb-gut crd">${fbCapT(escS(title))}
     <div class="crd-note">За этот день в книге ничего нет</div></div>`;
   if(!(b.base > 0)) return `<div class="sc fb-gut crd">${fbCapT(escS(title), 'распределять нечего')}
@@ -20460,7 +20479,7 @@ async function crDistOk(day, aside, collected, collected_cr){
   const nb = crDistBook(day) || b;
   _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)}${
     nb.collected_cr ? ' + криптой ' + fbFmt(nb.collected_cr) : ''} · ЧП ${fbFmt(nb.np_plus)}`);
-  const left = crDistDays().map(crDistBook).filter(x => x && x.base > 0 && !x.ok);
+  const left = crDistDays().filter(crDayReady).map(crDistBook).filter(x => x && x.base > 0 && !x.ok);
   if(!left.length){ crDistBack(); return; }
   crDistRender();
 }
@@ -21057,6 +21076,7 @@ function fbCashLoad(){
 // действие: собрать, согласовать прямо отсюда (день один — цифры те, что на
 // карточке) или «распределено». Строка «Сбор выручки» в карточке месяца снята.
 function fbCrcDays(c){
+  if(c.days) return c.days.map(x => x.day).sort();
   const set = new Set([c.day]);
   (c.districts || []).forEach(x => (x.carry || []).forEach(k => { if(k.day) set.add(k.day); }));
   return [...set].sort();
@@ -21239,15 +21259,18 @@ function fbCrcState(){
   const ds = c.districts || [], net = x => x.net_all != null ? x.net_all : (x.net || 0);
   const live = ds.filter(x => !x.empty);
   const wait = live.filter(x => !x.done);
-  const bs = fbCrcDays(c).map(d => fbDayOf(fbBook(d.slice(0, 7)), d));
+  // по дням: готовые распределяются, остальные ждут и не держат готовые
+  const rd = d => { const x = (c.days || []).find(z => z.day === d); return x ? !!x.ready : !wait.length; };
+  const all = fbCrcDays(c), ready = all.filter(rd), waiting = all.filter(d => !rd(d));
+  const bs = ready.map(d => fbDayOf(fbBook(d.slice(0, 7)), d));
   const known = bs.every(Boolean);
   const pend = bs.filter(b => b && b.base > 0 && !b.ok);
   const real = bs.filter(b => b && b.base > 0);
-  return {c, ds, net, wait, known, pend, real, bs,
+  return {c, ds, net, wait, waiting, known, pend, real, bs,
           total: live.reduce((a, x) => a + net(x), 0),
           inHand: live.filter(x => x.done).reduce((a, x) => a + net(x), 0),
-          got: c.need > 0 && !wait.length, locked: !(c.need > 0) || wait.length > 0,
-          done: known && real.length > 0 && !pend.length};
+          got: c.need > 0 && !wait.length, locked: !ready.length,
+          done: known && real.length > 0 && !pend.length && !waiting.length};
 }
 function fbCrcHtml(){
   const st = fbCrcState(), today = _dayIsoFor(0);
@@ -21297,10 +21320,11 @@ function fbCrcHtml(){
   const norm = ((fbBook(c.day.slice(0, 7)) || {}).budget || {}).norm || 0;
   const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0) - (b.collected_cr || 0)), 0) : 0;
   const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';
-  const s2 = st.locked ? (c.need ? 'после сбора' : 'нечего распределять')
-    : !known ? 'загрузка…' : !real.length ? 'нечего распределять'
-    : st.done ? 'согласовано' + okBy
-    : pend.length > 1 ? `ждут согласования · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}` : 'ждёт согласования';
+  const nw = st.waiting.length;
+  const s2 = st.locked ? (c.need || nw ? 'после сбора' : 'нечего распределять')
+    : !known ? 'загрузка…' : !real.length ? (nw ? 'ждём сбора' : 'нечего распределять')
+    : pend.length > 1 ? `ждут согласования · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}` : pend.length ? 'ждёт согласования'
+    : nw ? `ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : 'согласовано' + okBy;
   const has = known && real.length > 0;
   const g = (t, v, dn) => `<span><i>${t}</i><b${dn ? ' class="dn"' : ''}>${has ? fbFmt(v) : '—'}</b></span>`;
   const stage2 = `<div class="fb-crc-s${st.locked ? ' locked' : ''}" role="button" onclick="${st.locked ? 'fbCrcLocked()' : 'fbOpenDist()'}">
@@ -33965,6 +33989,7 @@ function renderExpenses(){
       <span class="exp-tot-r">
         <span>питание<b>${fmt(t.meal)}</b></span>
         <span>доп. расходы<b>${fmt(t.extra)}</b></span>
+        <span>по карте<b>${fmt(t.card || 0)}</b></span>
       </span>
     </div>
     ${t.pending_count ? `<button class="exp-wait" onclick="expPendGo()">

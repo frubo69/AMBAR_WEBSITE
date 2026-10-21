@@ -78,6 +78,12 @@ async def main():
         eq("Бизнес Бей 20-го пуст сам, но везёт 400 за 19-е — в сборе", (b["net"], b["net_all"], b["empty"]), (0, 400, False))
         eq("18-е Бизнес Бея получено в свой день — дальше не едет", [c["day"] for c in b["carry"]], [D2])
         eq("итог дня — со всем перенесённым", (cr["net_total"], cr["carry_total"], cr["need"]), (1700, 1400, 2))
+        # Готовность по дням (владелец, 20 окт 2026: распределять любые собранные суммы)
+        JVC, BB = own.OFFICE_CODES["jvc"], own.OFFICE_CODES["bbay"]
+        дни = {x["day"]: x for x in cr["days"]}
+        eq("по дням: 18-е ждёт JVC (Бизнес Бей сдал в свой день), 19-е ждёт Бизнес Бей, 20-е ждёт JVC — ни один не готов",
+           [(d, x["ready"], x["wait"], x["got"]) for d, x in sorted(дни.items())],
+           [(D1, False, [JVC], [BB]), (D2, False, [BB], []), (D3, False, [JVC], [])])
 
         print("── «Получил» закрывает и перенесённое ───────────────────────")
         await post("/api/owner/checklist/mark", {"day": D3, "item": "cash:jvc", "done": True})
@@ -85,6 +91,10 @@ async def main():
         j = dist(cr, "jvc")
         eq("JVC получил 20-го — перенесённое остаётся видно в этом дне", (j["done"], j["net_all"], [c["day"] for c in j["carry"]]),
            (True, 1300, [D1]))
+        дни = {x["day"]: x for x in cr["days"]}
+        eq("по дням: 18-е готово (JVC через 20-е, Бизнес Бей в свой день) и 20-е готово, 19-е всё ещё ждёт Бизнес Бей",
+           [(d, x["ready"], x["wait"]) for d, x in sorted(дни.items())], [(D1, True, []), (D2, False, [BB]), (D3, True, [])])
+        eq("готовый день знает свою выручку: 18-е 1000 + 700", дни[D1]["net"], 1700)
         c18 = await get("/api/owner/cash-round", day=D1)
         eq("18-е JVC теперь «получил» (через 20-е)", dist(c18, "jvc")["done"], True)
         m = (await db.checklist_get(D1)).get("cash:jvc") or {}
@@ -96,6 +106,7 @@ async def main():
         cr = await get("/api/owner/cash-round", day=D3)
         eq("снял отметку — 18-е снова в переносе, не получено", (dist(cr, "jvc")["done"], [c["day"] for c in dist(cr, "jvc")["carry"]],
            dist(await get("/api/owner/cash-round", day=D1), "jvc")["done"]), (False, [D1], False))
+        eq("и по дням 18-е снова ждёт JVC", [(x["day"], x["ready"]) for x in cr["days"]], [(D1, False), (D2, False), (D3, False)])
 
         print("── «Соберу завтра» ──────────────────────────────────────────")
         r = await post("/api/owner/cash-round/later", {"day": D3})

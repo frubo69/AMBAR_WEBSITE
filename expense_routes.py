@@ -222,6 +222,8 @@ def _day_row(d: dict, saved: dict) -> dict:
     meal = staff.meal_of(saved)
     # бутылка охране — не деньги: в сумму дня не идёт, в списке остаётся
     extra_sum = sum(_signed(e) for e in extras if _status(e) == "approved" and not is_bottle(e))
+    # безналом (владелец, 21 окт 2026: «добавь общую сумму расходов по карте»)
+    card_sum = sum(_signed(e) for e in extras if _status(e) == "approved" and not is_bottle(e) and is_card(e))
     pending = sum(_signed(e) for e in extras if _status(e) == "pending" and not is_bottle(e))
     return {
         **d,
@@ -229,6 +231,7 @@ def _day_row(d: dict, saved: dict) -> dict:
         "meal": meal,
         "extras": extras,
         "extra_sum": extra_sum,
+        "card_sum": card_sum,
         "pending_sum": pending,
         "pending_count": sum(1 for e in extras if _status(e) == "pending"),
         "total": meal + extra_sum,
@@ -240,6 +243,7 @@ def _totals(rows: list) -> dict:
     return {
         "meal":     sum(r["meal"] for r in rows),
         "extra":    sum(r["extra_sum"] for r in rows),
+        "card":     sum(r.get("card_sum") or 0 for r in rows),
         "all":      sum(r["total"] for r in rows),
         "pending":  sum(r["pending_sum"] for r in rows),
         "pending_count": sum(r["pending_count"] for r in rows),

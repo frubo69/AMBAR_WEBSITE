@@ -4628,6 +4628,29 @@ async def cash_round(day: str) -> dict:
                     "empty": empty, "done": done, "solo_today": solo_today,
                     "done_at": str(m.get("at") or ""),
                     "later": later, "later_at": str(m.get("at") or "") if later else ""})
+    # Готовность по дням (владелец, 20 окт 2026: «сделай так, чтобы можно было
+    # распределить любые собранные суммы»): день готов к распределению, когда
+    # все районы, где за него было что брать, его сдали — целиком, «именно за
+    # этот день» (solo) или через перенос (via). Сегодняшний день, пока смена
+    # идёт, ждёт — и не держит уже собранные прошлые.
+    days_out = []
+    for d in sorted(set(need_days) | {day}):
+        amounts = today_amounts if d == day else past[d]
+        wait, got = [], []
+        for oid in OFFICE_IDS:
+            p = amounts[oid]
+            if p["empty"]:
+                continue
+            if d == day:
+                ok = bool((marks.get(f"cash:{oid}") or {}).get("done")) or legacy
+            else:
+                mk = marks_all.get(d) or {}
+                ok = bool((mk.get(f"cash:{oid}") or {}).get("done")) or bool((mk.get("cash") or {}).get("done"))
+            (got if ok else wait).append(OFFICE_CODES.get(oid, oid))
+        if not wait and not got:
+            continue
+        days_out.append({"day": d, "ready": not wait, "wait": wait, "got": got,
+                         "net": sum(amounts[o]["net"] for o in OFFICE_IDS if not amounts[o]["empty"])})
     # Сверка смены (shift_recon, владелец, 9 окт 2026): у района — факт
     # («Сдали по факту», вписанный старшим, или подтверждённые оператором
     # наличные водителей), разница с приложением и строки водителей.
@@ -4663,7 +4686,7 @@ async def cash_round(day: str) -> dict:
             "later": later_n, "settled": need_n > 0 and done_n + later_n >= need_n,
             "net_total": net_total, "tips_total": tips_total,
             "cash_total": cash_total, "spend_total": spend_total,
-            "carry_total": carry_total, "before": before}
+            "carry_total": carry_total, "before": before, "days": days_out}
 
 
 async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "") -> None:

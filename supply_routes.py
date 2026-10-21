@@ -1384,18 +1384,11 @@ async def tasks_for_driver(me: str, district: str) -> dict:
 
 
 def held_by_staff(task: dict) -> bool:
-    """Район держит не водитель, а старший: «Принимаю сам» в STAR пишет в
-    driver имя старшего. Пустой реестр водителей — никого не считаем старшим:
-    иначе при сбое реестра чужими стали бы все."""
-    d = str((task or {}).get("driver") or "").strip()
-    if not d:
-        return False
-    try:
-        import config_staff as _staff
-        names = set(_staff.all_driver_names())
-    except Exception:                                        # noqa: BLE001
-        return False
-    return bool(names) and d not in names
+    """Район держит не водитель, а старший: «Принимаю сам» в STAR ставит у
+    задачи флаг staff (db.supply_task_claim). По имени не угадываем — имя
+    водителя, которого нет в реестре, не повод снимать его с района."""
+    t = task or {}
+    return bool(str(t.get("driver") or "").strip()) and bool(t.get("staff"))
 
 
 async def task_claim(sid: str, oid: str, me: str, tg_id: int, now) -> tuple:
@@ -3293,7 +3286,7 @@ async def handle_own_claim(request):
     я = _owner_name(request, body)
     ok, task = await db.supply_task_claim(sid, oid, я,
                                           int(request.get("owner_id") or 0),
-                                          datetime.now(timezone.utc))
+                                          datetime.now(timezone.utc), staff=True)
     if not ok:
         return web.json_response({"ok": False, "error": "taken",
                                   "driver": (task or {}).get("driver") or ""},

@@ -3050,7 +3050,10 @@ async def supply_bump(sid: str, product_id: str, by: int) -> dict | None:
 # водителей района, и тянутся к ней сразу двое. Обычный update молча пропустил
 # бы обоих, и в магазин поехали бы две машины за одним товаром.
 async def supply_task_claim(sid: str, district: str, driver: str,
-                            driver_id: int, now) -> tuple:
+                            driver_id: int, now, staff: bool = False) -> tuple:
+    """staff — район взял на себя старший из STAR («Принимаю сам»), а не
+    водитель: по этому флагу «без сканирования» потом отпускает район
+    водителям (supply_routes.held_by_staff), по имени не угадываем."""
     db = _db_or_none()
     if db is None: return False, None
     from pymongo import ReturnDocument
@@ -3060,7 +3063,9 @@ async def supply_task_claim(sid: str, district: str, driver: str,
          f"tasks.{district}.cancelled_at": None},
         {"$set": {f"tasks.{district}.driver": driver,
                   f"tasks.{district}.driver_id": driver_id,
-                  f"tasks.{district}.claimed_at": now}},
+                  f"tasks.{district}.claimed_at": now,
+                  **({f"tasks.{district}.staff": True} if staff else {})},
+         **({} if staff else {"$unset": {f"tasks.{district}.staff": ""}})},
         return_document=ReturnDocument.AFTER)
     if doc:
         return True, (doc.get("tasks") or {}).get(district)
@@ -3081,9 +3086,11 @@ async def supply_task_release(sid: str, district: str, driver: str = None,
     if untouched:
         q[f"tasks.{district}.noscan_at"] = None
         q[f"tasks.{district}.scanned"] = {"$in": [0, None]}
+    # флаг старшего снимаем $unset: $set False на задаче без флага считался бы
+    # правкой, и «снять с водителя» с ничейного района отвечал бы «снято»
     r = await db.supplies.update_one(q, {"$set": {
         f"tasks.{district}.driver": "", f"tasks.{district}.driver_id": 0,
-        f"tasks.{district}.claimed_at": None}})
+        f"tasks.{district}.claimed_at": None}, "$unset": {f"tasks.{district}.staff": ""}})
     return r.modified_count > 0
 
 

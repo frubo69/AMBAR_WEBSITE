@@ -424,11 +424,8 @@ async def scenarios():
     eq("строка её помнит", next(l["got"] for l in (await task(sid, "jvc"))["lines"] if l["id"] == "p1"), 1)
 
     print("\nСтарший принял без сканирования — район у водителя не исчезает (владелец, 21 окт 2026)")
-    import config_staff as _staff
-    _names = _staff.all_driver_names
-    _staff.all_driver_names = lambda: ["Худоба", "Авазбек"]
     sid = await fresh(claimed=False)
-    ok, _ = await db.supply_task_claim(sid, "jvc", "Макар", 7, datetime.now(timezone.utc))
+    ok, _ = await db.supply_task_claim(sid, "jvc", "Макар", 7, datetime.now(timezone.utc), staff=True)
     eq("«Принимаю сам»: старший держит район", ok, True)
     eq("без сканирования из STAR", (await sr.task_noscan(sid, "jvc", "Макар", owner=True)).get("ok"), True)
     tk = (await db.supply_get(sid))["tasks"]["jvc"]
@@ -443,7 +440,7 @@ async def scenarios():
     eq("и сканирует на полке", (await scan(sid, "jvc", "p1")).get("verdict"), "taken")
     # Старые данные: держит старший и отметка уже стоит (как B5 20 окт) — водитель всё равно берёт
     sid = await fresh(claimed=False)
-    await db.supply_task_claim(sid, "bbay", "старший", 7, datetime.now(timezone.utc))
+    await db.supply_task_claim(sid, "bbay", "старший", 7, datetime.now(timezone.utc), staff=True)
     await db._db.supplies.update_one({"_id": sid}, {"$set": {"tasks.bbay.noscan_at": datetime.now(timezone.utc),
                                                              "tasks.bbay.noscan_by": "старший",
                                                              "tasks.bbay.started_at": datetime.now(timezone.utc)}})
@@ -455,12 +452,11 @@ async def scenarios():
     sid = await fresh()
     eq("без сканирования из STAR при водителе на задаче", (await sr.task_noscan(sid, "jvc", "Макар", owner=True)).get("ok"), True)
     eq("водитель остался на задаче", (await db.supply_get(sid))["tasks"]["jvc"]["driver"], "Худоба")
-    # Пустой реестр — никого не считаем старшим: водителя с задачи не снимет
-    _staff.all_driver_names = lambda: []
-    sid = await fresh()
+    # Имя не из реестра, но флага старшего нет — это водитель, его не трогаем
+    sid = await fresh(claimed=False)
+    await db.supply_task_claim(sid, "jvc", "Новенький", 9, datetime.now(timezone.utc))
     await sr.task_noscan(sid, "jvc", "Макар", owner=True)
-    eq("реестр пуст — хватку не трогаем", (await db.supply_get(sid))["tasks"]["jvc"]["driver"], "Худоба")
-    _staff.all_driver_names = _names
+    eq("водитель вне реестра без флага — остаётся на задаче", (await db.supply_get(sid))["tasks"]["jvc"]["driver"], "Новенький")
 
 
 # ── 2. случайные цепочки ─────────────────────────────────────────────────────

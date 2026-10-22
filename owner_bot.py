@@ -230,7 +230,7 @@ async def on_writeoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:                                   # noqa: BLE001
             cur = {}
         if str(cur.get("kind") or "") == "потеря" and cur.get("state") == "pending":
-            await q.answer("Утерю не отклоняют: «Списать» здесь или «Удержать с виновного» в STAR",
+            await q.answer("Утерю не отклоняют: «Списать без виновного» здесь или «Удержать с виновного» в STAR",
                            show_alert=True)
             return
     try:

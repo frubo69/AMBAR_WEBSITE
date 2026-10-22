@@ -38,7 +38,7 @@ def keyboard(wid: str, kind: str = "") -> dict:
         import os
         url = os.getenv("OWNER_WEBAPP_URL", "https://owner.ambar-delivery.com/")
         return {"inline_keyboard": [
-            [{"text": "✅ Списать на компанию", "callback_data": cb(wid, True)}],
+            [{"text": "✅ Списать без виновного", "callback_data": cb(wid, True)}],
             [{"text": "Удержать с виновного — в STAR", "web_app": {"url": url}}],
         ]}
     return {"inline_keyboard": [[

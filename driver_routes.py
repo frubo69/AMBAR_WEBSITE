@@ -1562,7 +1562,7 @@ async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
         cap = wm.caption(p.get("name", ""), qty, kind, me["name"],
                          me.get("district_code") or "", note, aed)
         sent = await notify_owners_photo("stock.writeoff", cap, photo,
-                                         reply_markup=wm.keyboard(wid))
+                                         reply_markup=wm.keyboard(wid, kind))
         # Запоминаем, куда ушло: когда один владелец решит, у остальных надо
         # снять кнопки — иначе второй жмёт по решённому и упирается в отказ.
         if sent:

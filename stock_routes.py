@@ -4308,6 +4308,15 @@ async def handle_writeoff_decide(request):
     # телефоне разошёлся бы с этим молча.
     blame = body.get("blame")
     сумма = body.get("comp")
+    # Утерю не отклоняют (владелец, 22 окт 2026: «у потери два варианта —
+    # согласовать со списанием или без списания, там нечего отклонять»):
+    # бутылки нет, и вопрос только кто платит — компания или виновный. Отказ
+    # оставил бы её «на полке» до пересчёта, где она всё равно вылезет утерей.
+    if not ok:
+        cur = await db.writeoff_get(wid)
+        if cur and str(cur.get("kind") or "") == "потеря" and cur.get("state") == "pending":
+            return web.json_response({"error": "no_reject", "kind": "потеря"}, status=400,
+                                     headers=CORS_HEADERS)
     doc = await db.writeoff_decide(wid, ok, request.get("owner_id") or 0, who, note)
     if not doc:
         cur = await db.writeoff_get(wid)

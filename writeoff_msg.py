@@ -27,9 +27,20 @@ def parse_cb(data: str):
     return parts[2], parts[1] == "ok"
 
 
-def keyboard(wid: str) -> dict:
+def keyboard(wid: str, kind: str = "") -> dict:
     """Две кнопки под фотографией. Больше здесь быть не должно: решение
-    двоичное, а «разберусь позже» — это просто не нажимать."""
+    двоичное, а «разберусь позже» — это просто не нажимать.
+
+    У утери отклонять нечего (владелец, 22 окт 2026): бутылки нет, вопрос
+    только кто платит. «Списать» — на компанию, здесь же; удержать с
+    виновного — в STAR, там выбирают с кого и сколько."""
+    if kind == "потеря":
+        import os
+        url = os.getenv("OWNER_WEBAPP_URL", "https://owner.ambar-delivery.com/")
+        return {"inline_keyboard": [
+            [{"text": "✅ Списать на компанию", "callback_data": cb(wid, True)}],
+            [{"text": "Удержать с виновного — в STAR", "web_app": {"url": url}}],
+        ]}
     return {"inline_keyboard": [[
         {"text": "✅ Согласовать", "callback_data": cb(wid, True)},
         {"text": "🚫 Отклонить",  "callback_data": cb(wid, False)},

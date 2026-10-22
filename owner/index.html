@@ -38548,12 +38548,17 @@ function woPendRow(r){
         <i>${escS(_woSub(r))}${r.note ? ' · ' + escS(r.note) : ''}</i></span>
       <span class="wo-i-v"><b class="warn">${fmt(r.aed)}<u>AED</u></b></span>
     </button>
-    <div class="aud-act">
-      <button class="aud-b soft dn" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
-      <button class="aud-b go" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Согласовать</button>
+    <div class="aud-act">${r.kind === 'потеря'
+      ? `<button class="aud-b soft" onclick="woDecide(event,'${escS(r.id)}',true,true)">Списать</button>
+         <button class="aud-b go" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Удержать с виновного</button>`
+      : `<button class="aud-b soft dn" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
+         <button class="aud-b go" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Согласовать</button>`}
     </div>
   </div>`;
 }
+// Утеря (владелец, 22 окт 2026): отклонять нечего — бутылки нет. Два исхода:
+// «Списать» — на компанию, без виновного; «Удержать с виновного» — то же
+// согласование, но платит человек. Со склада уходит в обоих случаях.
 
 // Решённая запись — той же строкой, тише: справа сумма и слово решения.
 function woRow(r){
@@ -39211,7 +39216,7 @@ async function woCompSave(on){
 // Решение по ожидающей записи. Отклонить — с вопросом: бутылки останутся
 // недостачей у водителя. Кнопки гаснут на время запроса — второго нажатия не
 // бывает; второй владелец мог решить первым — это новость, а не ошибка.
-async function woDecide(ev, id, ok){
+async function woDecide(ev, id, ok, noBlame){
   if(ev && ev.stopPropagation) ev.stopPropagation();
   const r = _woFind(id);
   if(!ok){
@@ -39220,19 +39225,25 @@ async function woDecide(ev, id, ok){
         : 'Бутылки останутся недостачей на водителе', 'Отклонить', 'Вернуться назад', 'bad');
     if(!yes) return false;
   }
+  if(ok && noBlame){
+    const yes = await askDialog('Списать на компанию?',
+      r ? `${r.name} × ${fmt(r.qty)} · без виновного` : 'Без виновного', 'Списать', 'Вернуться назад');
+    if(!yes) return false;
+  }
   const box = document.getElementById('wo-' + id);
   if(box) box.querySelectorAll('button').forEach(b => b.disabled = true);
   let done = false;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/decide',
-      {method:'POST', body:{ok: !!ok, as: _meName()}});
+      {method:'POST', body:{ok: !!ok, as: _meName(), ...(ok && noBlame ? {blame: false} : {})}});
     _audHap(ok ? 'ok' : 'warn');
-    _toast(ok ? 'Согласовано — списано со склада' : 'Отклонено — осталось недостачей');
+    _toast(ok ? (noBlame ? 'Списано на компанию' : 'Согласовано — списано со склада') : 'Отклонено — осталось недостачей');
     done = true;
   }catch(e){
     const p = (e || {}).payload || {};
     _toast(p.error === 'already_decided'
       ? 'Уже решено' + (p.by ? ' — ' + p.by : '')
+      : p.error === 'no_reject' ? 'Утерю не отклоняют: списать или удержать'
       : 'Не удалось — попробуйте ещё раз');
     if(box) box.querySelectorAll('button').forEach(b => b.disabled = false);
   }
@@ -39259,8 +39270,11 @@ function _phvPaintWo(){
   document.getElementById('phvRej').hidden = true;
   const pend = r.state === 'pending', no = r.state === 'no';
   document.getElementById('phvActs').innerHTML = pend
-    ? `<button class="phv-no" onclick="phvWoReject()">Отклонить</button>
-       <button class="phv-ok" onclick="phvWoApprove()">Согласовать</button>`
+    ? (r.kind === 'потеря'
+      ? `<button class="phv-no" onclick="phvWoWrite()">Списать</button>
+         <button class="phv-ok" onclick="phvWoApprove()">Удержать с виновного</button>`
+      : `<button class="phv-no" onclick="phvWoReject()">Отклонить</button>
+         <button class="phv-ok" onclick="phvWoApprove()">Согласовать</button>`)
     : (!no && !r.comp)
       ? `<button class="phv-ok" onclick="phvWoHold()">Удержать с виновного</button>` : '';
   const st = document.getElementById('phvSt');
@@ -39273,6 +39287,10 @@ function _phvPaintWo(){
 async function phvWoReject(){
   const c = PHV.ctx; if(!c || c.kind !== 'wo') return;
   if(await woDecide(null, c.id, false)) phvClose();
+}
+async function phvWoWrite(){
+  const c = PHV.ctx; if(!c || c.kind !== 'wo') return;
+  if(await woDecide(null, c.id, true, true)) phvClose();
 }
 function phvWoApprove(){
   const c = PHV.ctx; if(!c || c.kind !== 'wo') return;

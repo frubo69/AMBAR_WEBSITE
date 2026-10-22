@@ -222,6 +222,17 @@ async def on_writeoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # обещанием, которое ещё не факт что сбудется.
     await q.answer()
     name = (update.effective_user.full_name or "").strip()[:60]
+    if not ok:
+        # Утерю не отклоняют (владелец, 22 окт 2026): списать на компанию
+        # или удержать с виновного — второе только в STAR, там выбирают кого.
+        try:
+            cur = await db.writeoff_get(wid) or {}
+        except Exception:                                   # noqa: BLE001
+            cur = {}
+        if str(cur.get("kind") or "") == "потеря" and cur.get("state") == "pending":
+            await q.answer("Утерю не отклоняют: «Списать» здесь или «Удержать с виновного» в STAR",
+                           show_alert=True)
+            return
     try:
         doc = await db.writeoff_decide(wid, ok, uid, name)
     except Exception as e:

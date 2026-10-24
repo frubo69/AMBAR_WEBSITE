@@ -4524,6 +4524,25 @@ def _cash_chain(day: str, oid: str, back: list, marks: dict) -> list:
     return out
 
 
+async def _cash_fact(day: str, oid: str, net: int, marks_all: dict) -> dict:
+    """«Сдали по факту» за ОДИН день по району (владелец, 24 окт 2026: «по
+    каждому району за каждый день указать, сколько денег реально сдали, и
+    видеть остаток»). Отметка cashfact лежит в своём дне, и книга того дня
+    берёт её же (shift_recon.book_gaps). Разница с приложением в отметке
+    освежается: заказы могли поменяться после того, как число вписали."""
+    m = (marks_all.get(day) or {}).get(f"cashfact:{oid}") or {}
+    fact = m.get("fact")
+    if fact is None:
+        return {"fact": None, "fact_at": ""}
+    gap = int(fact) - int(net)
+    if m.get("gap") != gap:
+        try:
+            await db.checklist_put(day, f"cashfact:{oid}", {**m, "gap": gap})
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[cash] разница факта {day} {oid}: {e}")
+    return {"fact": int(fact), "fact_at": str(m.get("at") or "")}
+
+
 async def cash_round(day: str) -> dict:
     """Сбор денег по районам за учётный день.
 
@@ -4597,7 +4616,8 @@ async def cash_round(day: str) -> dict:
             if p["empty"]:
                 continue
             carry.append({"day": d, "net": p["net"], "tips": p["tips"], "cash": p["cash"],
-                          "spend": p["spend"], "orders": p["orders"]})
+                          "spend": p["spend"], "orders": p["orders"],
+                          **(await _cash_fact(d, oid, p["net"], marks_all))})
         # Забранные поимённо — своей строкой, серыми: деньги уже в кассе.
         taken = []
         for d in solo[oid]:
@@ -4606,7 +4626,8 @@ async def cash_round(day: str) -> dict:
                 continue
             m_ = (marks_all.get(d) or {}).get(f"cash:{oid}") or {}
             taken.append({"day": d, "net": p["net"], "tips": p["tips"],
-                          "at": str(m_.get("at") or "")})
+                          "at": str(m_.get("at") or ""),
+                          **(await _cash_fact(d, oid, p["net"], marks_all))})
         c_net = sum(c["net"] for c in carry)
         c_tips = sum(c["tips"] for c in carry)
         m = marks.get(f"cash:{oid}") or {}
@@ -4738,11 +4759,15 @@ async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "")
 
 @require_owner
 async def handle_cash_fact(request):
-    """POST /api/owner/cash-round/fact {day, district, fact} — «Сдали по
+    """POST /api/owner/cash-round/fact {day, district, fact, page?} — «Сдали по
     факту»: сколько старший получил по району на самом деле (null — снять).
     Последнее слово за тем, кто считал деньги руками: это число главнее
     подтверждённого оператором. Разница с приложением уходит в книгу дня
-    (shift_recon.book_gaps)."""
+    (shift_recon.book_gaps).
+
+    day — день, ЗА который сдали (строка дня в разбивке района, владелец,
+    24 окт 2026: по дням, а не одной суммой за все); page — день открытой
+    страницы сбора, его и возвращаем."""
     try:
         body = await request.json()
     except Exception:
@@ -4755,6 +4780,11 @@ async def handle_cash_fact(request):
     oid = str(body.get("district") or "").strip()
     if oid not in OFFICE_IDS:
         return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    page = str(body.get("page") or "").strip() or day
+    try:
+        datetime.strptime(page, "%Y-%m-%d")
+    except ValueError:
+        page = day
     fact = body.get("fact")
     who = str(request.get("owner_id") or "")
     if fact is None or str(fact).strip() == "":
@@ -4772,7 +4802,7 @@ async def handle_cash_fact(request):
         x = next((d for d in cr0["districts"] if d["id"] == oid), None) or {"net": 0}
         await db.checklist_put(day, f"cashfact:{oid}", {"fact": v, "gap": v - int(x["net"]), "by": who})
         log.info(f"[cash] {day} {OFFICE_CODES.get(oid, oid)}: сдали по факту {v} · по приложению {x['net']}")
-    return web.json_response({"ok": True, **(await cash_round(day))}, headers=CORS_HEADERS,
+    return web.json_response({"ok": True, **(await cash_round(page))}, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 

@@ -2434,6 +2434,16 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-fact b.dn{color:var(--dn)}
 .cr-fact b.ok{color:var(--up);display:inline-flex;justify-content:flex-end;align-items:center;gap:5px;font-size:13px}
 .cr-fact b.ok svg{width:14px;height:14px}
+.cr-fact b small{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-right:5px;opacity:.8}
+/* Факт за день внутри разбивки (владелец, 24 окт 2026): под строкой дня,
+   компактнее районного, без своей черты — черта у следующего дня. */
+.cr-carry .cr-fact{margin-top:0;padding:0 0 8px;border-top:0;gap:10px}
+.cr-carry .cr-fact i{font-size:10px;letter-spacing:.8px}
+.cr-carry .cr-fact .in{height:36px;padding:0 11px;border-radius:10px}
+.cr-carry .cr-fact .in input{font-size:16px}
+.cr-carry .cr-fact b{font-size:14px;min-width:0}
+.cr-carry .cr-fact b.ok{font-size:12px}
+.cr-carry-note b{color:var(--text)}
 .cr-rcs{margin-top:8px}
 .cr-rc{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2);font-size:12.5px}
 .cr-rc .nm{flex:0 0 auto;font-weight:600;color:var(--text)}
@@ -20112,10 +20122,23 @@ function crCard(x){
   const есть_сегодня = x.cash || x.spend || x.tips;
   // Подпись — одна дата: «не получили» рядом с «ЗАБРАТЬ» переносило строку
   // и говорило то же самое, а у полученных то же делает галочка.
+  // Под каждым днём — сколько за него сдали на самом деле и остаток
+  // (владелец, 24 окт 2026: «по каждому району за каждый день указать,
+  // сколько денег реально сдали, и видеть остаток; сейф и приложение должны
+  // совпасть в момент сбора, разницу — потом на разбирательство»). Раньше
+  // поле было одно на район и сравнивалось с одним днём, а старший считал
+  // всю пачку за несколько дней.
+  const дниФакта = [есть_сегодня ? {net: x.net, fact: x.fact} : null, ...carry, ...взятые].filter(c => c && c.fact != null);
+  const сдали = дниФакта.reduce((a, c) => a + c.fact, 0), остаток = дниФакта.reduce((a, c) => a + (c.net - c.fact), 0);
+  const итог = дниФакта.length && (carry.length + взятые.length + (есть_сегодня ? 1 : 0)) >= 2
+    ? `<div class="cr-carry-note">сдали <b>${fmt(сдали)}</b> за ${дниФакта.length} ${pluralize(дниФакта.length, 'день', 'дня', 'дней')} · ${
+        остаток > 0 ? `остаток <b>${fmt(остаток)}</b>` : остаток < 0 ? `сверх <b>+${fmt(-остаток)}</b>` : 'сошлось'}</div>` : '';
   const разбивка = (carry.length || взятые.length) ? `<div class="cr-carry">${
-      есть_сегодня ? деньРяд(сегодня, x.net, x.tips, CR.day, !!x.solo_today) : ''}${
-      carry.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, false)).join('')}${
-      взятые.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, true)).join('')}</div>` : '';
+      есть_сегодня ? деньРяд(сегодня, x.net, x.tips, CR.day, !!x.solo_today)
+        + crFactLine(x, CR.day, x.net, x.fact, {cls: 'd', op: x.gap_src === 'op' ? x.gap : null}) : ''}${
+      carry.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, false) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'})).join('')}${
+      взятые.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, true) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'})).join('')}${
+      итог}</div>` : '';
   return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
@@ -20132,7 +20155,7 @@ function crCard(x){
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}${
       долг ? ` · ${долг}` : ''}</div>
-    ${crFactRow(x)}${crReconRows(x)}
+    ${разбивка ? '' : crFactRow(x)}${crReconRows(x)}
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
@@ -20157,14 +20180,22 @@ function crCard(x){
 // водителей дают подсказку и разницу сами. Разница уходит в книгу дня строкой
 // «Собрал по факту». Последнее слово за тем, кто считал деньги руками.
 function crFactRow(x){
-  const факт = x.fact, оп = x.gap_src === 'op' ? x.gap : null;
-  const разн = факт != null ? факт - x.net : оп;
+  return crFactLine(x, CR.day, x.net, x.fact, {label: 'Сдали по факту', op: x.gap_src === 'op' ? x.gap : null});
+}
+// Строка факта за ОДИН день: поле и справа остаток — что по приложению за
+// этот день ещё не сдано (красным), «+N» — сдали больше, «сошлось». Пишется
+// в отметку того дня (cashfact), и книга того дня берёт её же. Пусто —
+// по приложению; подтверждённые оператором наличные дают подсказку (op).
+function crFactLine(x, day, net, fact, opt){
+  opt = opt || {};
+  const разн = fact != null ? fact - net : (opt.op != null ? opt.op : null);
   const right = разн == null ? '<b></b>'
     : разн === 0 ? `<b class="ok">${IC('check', 14)}сошлось</b>`
-    : `<b class="${разн < 0 ? 'dn' : ''}">${разн > 0 ? '+' : '−'}${fmt(Math.abs(разн))}</b>`;
-  return `<div class="cr-fact"><i>Сдали по факту</i><span class="in"><input inputmode="numeric" maxlength="8"
-      value="${факт == null ? '' : fmt(факт)}" placeholder="${fmt(x.net + (оп || 0))}"
-      onchange="crFact('${escS(x.id)}', this.value)" ${x.done && факт == null ? '' : ''}><u>AED</u></span>${right}</div>`;
+    : разн < 0 ? `<b class="dn"><small>остаток</small>${fmt(-разн)}</b>`
+    : `<b>+${fmt(разн)}</b>`;
+  return `<div class="cr-fact${opt.cls ? ' ' + opt.cls : ''}"><i>${opt.label || 'Сдали'}</i><span class="in"><input inputmode="numeric" maxlength="8"
+      value="${fact == null ? '' : fmt(fact)}" placeholder="${fmt(net + (opt.op || 0))}"
+      onchange="crFact('${escS(x.id)}', this.value, '${day}')"><u>AED</u></span>${right}</div>`;
 }
 // Сверка водителей района: что насчитал, что ответил оператор, правки товара.
 function crReconRows(x){
@@ -20182,12 +20213,13 @@ function crReconRows(x){
       r.cash != null ? `насчитал ${fmt(r.cash)} · ` : ''}${st}${fixes}</span>${num}</div>`;
   }).join('')}</div>`;
 }
-async function crFact(id, v){
+async function crFact(id, v, day){
   if(!CR || CR_BUSY) return;
   const n = String(v || '').replace(/[^\d]/g, '');
   CR_BUSY = true;
+  // day — за какой день сдали (строка разбивки); страница остаётся своя.
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round/fact',
-         {method: 'POST', body: {day: CR.day, district: id, fact: n === '' ? null : +n}}); }
+         {method: 'POST', body: {day: day || CR.day, page: CR.day, district: id, fact: n === '' ? null : +n}}); }
   catch(e){ _toast('Не удалось записать'); CR_BUSY = false; return; }
   CR_BUSY = false;
   crRender();

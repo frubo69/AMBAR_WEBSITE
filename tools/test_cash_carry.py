@@ -157,6 +157,34 @@ async def main():
         r = await post("/api/owner/cash-round/later", {"day": D3, "districts": ["bbay"]})
         eq("полученный район не откладывается", (r["changed"], dist(r, "bbay")["done"], dist(r, "bbay")["later"]),
            ([], True, False))
+
+        # Владелец, 24 окт 2026: «по каждому району за каждый день указать,
+        # сколько денег реально сдали, и видеть остаток» — факт пишется в день
+        # строки, страница сбора остаётся своя, книга того дня берёт его же.
+        print("── «Сдали по факту» по дням ─────────────────────────────────")
+        import shift_recon as R
+        await db.checklist_set(D2, "cash", False, "1")          # цепочка JVC снова до 18-го
+        cr = await get("/api/owner/cash-round", day=D3)
+        eq("JVC 20-го везёт 18-е, факта ещё нет", [(c["day"], c["fact"]) for c in dist(cr, "jvc")["carry"]], [(D1, None)])
+        r = await post("/api/owner/cash-round/fact", {"day": D1, "page": D3, "district": "jvc", "fact": 940})
+        j = dist(r, "jvc")
+        eq("ответ — страница 20-го; факт лёг в строку 18-го, сегодняшний пуст",
+           (r["day"], [(c["day"], c["fact"]) for c in j["carry"]], j["fact"]), (D3, [(D1, 940)], None))
+        eq("отметка — в дне 18-го, с разницей", {k: v for k, v in (await db.checklist_get(D1))["cashfact:jvc"].items() if k in ("fact", "gap")},
+           {"fact": 940, "gap": -60})
+        eq("книга: разница 18-го из факта, 20-е не тронуто", (await R.book_gaps(D1, D1), await R.book_gaps(D3, D3)), ({D1: -60}, {}))
+        order("g", D1, "jvc", 100)                              # заказ 18-го появился после того, как вписали
+        cr = await get("/api/owner/cash-round", day=D3)
+        eq("заказы 18-го поменялись — разница в отметке освежилась на экране 20-го",
+           (dist(cr, "jvc")["carry"][0]["net"], (await db.checklist_get(D1))["cashfact:jvc"]["gap"], await R.book_gaps(D1, D1)),
+           (1100, -160, {D1: -160}))
+        r = await post("/api/owner/cash-round/fact", {"day": D3, "page": D3, "district": "jvc", "fact": 300})
+        eq("факт за сегодня — в сегодняшней отметке, сошлось", (dist(r, "jvc")["fact"], dist(r, "jvc")["gap"]), (300, 0))
+        r = await post("/api/owner/cash-round/fact", {"day": D1, "page": D3, "district": "jvc", "fact": None})
+        eq("снять факт 18-го — строка пуста, книга 18-го без разницы",
+           ([(c["day"], c["fact"]) for c in dist(r, "jvc")["carry"]], await R.book_gaps(D1, D1)), ([(D1, None)], {}))
+        r = await post("/api/owner/cash-round/fact", {"day": "2026-13-01", "page": D3, "district": "jvc", "fact": 1})
+        eq("кривой день — отказ", r.get("error"), "bad_day")
     print("\nвсё прошло" if not FAIL else f"\nНЕ ПРОШЛИ: {FAIL}")
     return 1 if FAIL else 0
 

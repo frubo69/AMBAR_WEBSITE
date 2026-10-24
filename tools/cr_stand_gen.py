@@ -51,16 +51,17 @@ D = {"day": "2026-09-27", "today": "2026-09-27"}
     "drivers": ["Водитель"], "orders": 14, "cash": 6120, "tips": 700, "spend": 285,
     "debt": 0, "debt_n": 0, "spend_card": 0, "fx": [], "spend_pending": 0,
     "net": 5135, "items": [], "carry": [
-        {"day": "2026-09-26", "net": 4310, "tips": 550, "cash": 5000, "spend": 140, "orders": 11},
-        {"day": "2026-09-25", "net": 2780, "tips": 400, "cash": 3300, "spend": 120, "orders": 8},
+        {"day": "2026-09-26", "net": 4310, "tips": 550, "cash": 5000, "spend": 140, "orders": 11, "fact": 4200, "fact_at": ""},
+        {"day": "2026-09-25", "net": 2780, "tips": 400, "cash": 3300, "spend": 120, "orders": 8, "fact": 2780, "fact_at": ""},
     ],
     "carry_net": 7090, "carry_tips": 950, "taken": [],
     "net_all": 12225, "tips_all": 1650, "empty": False, "done": False,
     "solo_today": False, "done_at": "", "later": False, "later_at": "",
+    "fact": None, "fact_at": "", "gap": 0, "gap_src": "", "recon": [],
 }
 if ВИД == "taken":
     РАЙОН = dict(РАЙОН, carry=[РАЙОН["carry"][0]], carry_net=4310, carry_tips=550,
-                 taken=[{"day": "2026-09-25", "net": 2780, "tips": 400, "at": ""}],
+                 taken=[{"day": "2026-09-25", "net": 2780, "tips": 400, "at": "", "fact": 2780, "fact_at": ""}],
                  net_all=9445, tips_all=1250)
 elif ВИД == "done":
     РАЙОН = dict(РАЙОН, done=True, done_at="2026-09-27T18:12:00+00:00")
@@ -91,6 +92,9 @@ function conv(a){{ return +a || 0; }}
 {кусок("const _hm = iso =>", "timeZone:'Asia/Dubai'}) : ''; };")}
 const CR = {json.dumps(D)}, CR_OPEN = new Set();
 {fn("crItem")}
+{fn("crFactLine")}
+{fn("crFactRow")}
+{fn("crReconRows")}
 {fn("crCard")}
 document.getElementById('stand').innerHTML = crCard({json.dumps(РАЙОН, ensure_ascii=False)});
 </script></body></html>"""

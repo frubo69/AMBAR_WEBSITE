@@ -851,6 +851,9 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
 .sc-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
   color:var(--muted);margin-left:4px;letter-spacing:.2px}
+/* подпись до числа, число у правой стенки (владелец, 24 окт 2026) */
+.sc-r b.pre{display:inline-flex;align-items:baseline;gap:6px}
+.sc-r b.pre u{margin-left:0}
 .sc-r em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
 .sc-r.dn{color:var(--dn)} .sc-r.dn b{color:var(--dn)} .sc-r.dn b u{color:var(--dn);opacity:.8}
@@ -21001,13 +21004,20 @@ function fbRow(label, key, v, o){
   return `<div class="${cls}"${o.show ? ` data-show="${o.show}"${o.hide ? ' hidden' : ''}` : ''}>${
     o.sign ? `<em class="fb-sign">${o.sign}</em>` : ''}<span>${label}</span>${fbB(key, v, o)}</div>`;
 }
+// Строка-вход: подпись до числа, число у правой стенки (владелец, 24 окт 2026:
+// «цифры справа по стенке, а текст до: в сейфе 0; в сейфе · криптой 3 306  17 536»).
+function fbBpre(key, v, o){
+  o = o || {};
+  const cls = ['pre', fbCls(v, o.mode)].filter(Boolean).join(' ');
+  return `<b class="${cls}" data-f="${key}"${o.mode ? ` data-fc="${o.mode}"` : ''}${o.dec ? ' data-dec="1"' : ''}><u>${o.unit || 'AED'}</u>${fbFmtN(v, o.dec)}</b>`;
+}
 function fbGo(label, key, v, go, o){
   o = o || {};
   // Значок слева — только там, где его попросили (макет сейфа, 27 сен 2026).
   // Остальные строки «Финансов» остаются как были.
   const ic = o.ico ? `<span class="fb-ic">${o.ico}</span>` : '';
   return `<button class="sc-r fb-r ${o.cls || ''}" onclick="${go}" style="cursor:pointer">${ic}<span>${label}</span>${
-    fbB(key, v, o)}<em${o.em ? ` class="${o.em}"` : ''}>${_SC_CHEV}</em></button>`;
+    fbBpre(key, v, o)}<em${o.em ? ` class="${o.em}"` : ''}>${_SC_CHEV}</em></button>`;
 }
 // Значки стопок сейфа. Рисуем сами: рыба — Барракуда, люди — РП, монеты —
 // крипта, закладка — ЧП, лист — отчёт ДДС.
@@ -21713,7 +21723,9 @@ function fbPaint(){
   document.querySelectorAll('#accMid [data-f]').forEach(el => {
     const v = V[el.dataset.f]; if(v === undefined) return;
     const u = el.querySelector('u');
-    el.innerHTML = fbFmtN(v, el.dataset.dec) + (u ? u.outerHTML : '');
+    // .pre — подпись стоит до числа (fbBpre): порядок при обновлении тот же
+    el.innerHTML = el.classList.contains('pre') ? (u ? u.outerHTML : '') + fbFmtN(v, el.dataset.dec)
+                                                : fbFmtN(v, el.dataset.dec) + (u ? u.outerHTML : '');
     if(el.dataset.fc){ el.classList.remove('dn', 'ok', 'none'); const c = fbCls(v, el.dataset.fc); if(c) el.classList.add(c); }
   });
   document.querySelectorAll('#accMid [data-fr]').forEach(el => {

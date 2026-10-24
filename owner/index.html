@@ -26451,8 +26451,9 @@ async function accLoadSummaries(){
   if(exp){ EXP.data = exp; EXP.day = exp.day; }
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
   if(chk) ACC_CHK = chk;
-  if(sup) ACC_SUP = {list: sup.supplies || [],
-                     open: (sup.supplies || []).find(x => x.status === 'open') || null};
+  // «Открытая» — основная, не на другую базу: иначе при принятой Барракуде и
+  // открытой доп. заявке хаб Барракуды показывал бы чужую поставку.
+  if(sup) ACC_SUP = {list: sup.supplies || [], open: _supMain(sup.supplies || [])};
   accRender(); mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender();
 }
 

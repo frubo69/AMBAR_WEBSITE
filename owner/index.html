@@ -26663,7 +26663,11 @@ async function accOrder(){
   document.getElementById('accFoot').innerHTML = '';
   prLoad();              // прайс под «Закупаем» — пока открывают заявку, он уже здесь
   let d;
-  try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}}); }
+  // Вход в закупку — про сегодня: день, выбранный стрелками в другом разделе,
+  // сюда не тянется (владелец, 24 окт 2026: «сначала 80, потом 172» — первый
+  // раз страница открылась днём, оставшимся от «Расходов смены»).
+  const день = ORD_BRANCH ? accDay() : _dayIsoFor(0);
+  try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: день}}); }
   catch(e){ document.getElementById('accMid').innerHTML =
     loadFail(); return; }
   ACC_ORDER = d;
@@ -26718,19 +26722,28 @@ function ordPick(){
   document.getElementById('accFoot').innerHTML = '';
   const mid = document.getElementById('accMid');
   mid.classList.remove('xs-fix'); mid.classList.add('ap-host');
-  const st = supStage(), sup = st.sup, d = ORD.d || {};
-  const live = !!(sup && sup.status === 'open');
+  const st = supStage(), d = ORD.d || {};
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  // Открытой поставки нет, но сегодняшнюю уже приняли (или отменили) — она
+  // ушла в историю, а карточка обязана показать «принято · 100%», а не
+  // «заявка» (владелец, 24 окт 2026: «почему не видно, что приёмку приняли»).
+  const today = d.buy_day || _dayIsoFor(0);
+  const closed = st.k === 'none' ? list.find(x => (x.kind || 'main') !== 'extra' && x.status !== 'open' && x.day === today) : null;
+  const sup = st.sup || closed;
+  const live = !!(st.sup && st.sup.status === 'open');
   const code = o => ((d.districts || []).find(x => x.id === o) || {}).code || o;
   // ── Барракуда ──
   const taking = live && Object.values(sup.tasks || {}).some(t => t.driver && !t.done_at && !t.cancelled_at);
-  const complete = st.k === 'done';
-  const phase = st.k === 'none' ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
-    : complete ? 'принято' : st.k === 'cancelled' ? 'отменена' : taking ? 'идёт приёмка' : 'ждёт приёма';
-  const pct = live ? (sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0) : (complete ? 100 : null);
+  const cancelled = st.k === 'cancelled' || (!!closed && closed.status === 'cancelled');
+  const complete = st.k === 'done' || (!!closed && !cancelled);
+  const phase = !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
+    : cancelled ? 'отменена' : complete ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
+  const took = live ? st.took : (closed ? (closed.took || closed.total_qty || 0) : 0);
+  const pct = sup && !cancelled ? (sup.total_qty ? Math.round(took / sup.total_qty * 100) : 0) : null;
   let who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
   const bar = {key: 'bar', ico: 'list', name: 'Барракуда', phase, live: taking, complete, idle: false,
-    asked: live ? (sup.asked_qty || 0) : (d.total_qty || 0), gave: live ? (sup.total_qty || 0) : null, pct, who,
+    asked: sup ? (sup.asked_qty || 0) : (d.total_qty || 0), gave: sup ? (sup.total_qty || 0) : null, pct, who,
     qty: d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0),
     unit: pluralize(d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0), 'единица', 'единицы', 'единиц'),
     aed: d.buy && d.buy.cost != null ? d.buy.cost : (d.total_cost != null ? d.total_cost : null)};

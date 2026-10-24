@@ -3543,10 +3543,14 @@ button.path:active{transform:scale(.995)}
 #accMid .ap-stage-value small{font-size:11px;line-height:15px;font-weight:400;letter-spacing:0;color:var(--ap-muted);min-height:15px;overflow-wrap:anywhere}
 #accMid .ap-progress{display:block;flex-shrink:0;width:100%;height:4px;overflow:hidden;border-radius:4px;background:#302a3d}
 #accMid .ap-progress>span{display:block;width:var(--ap-progress,0%);height:100%;border-radius:inherit;background:var(--ap-gold)}
-#accMid .ap-progress.is-complete>span{background:#8bc9a9}
+/* Принято: полоса остаётся золотой, число — белым, зелёный только у слова,
+   и тот свой (--up), а не мятный из эталона (владелец, 24 окт 2026: «этот
+   зелёный выглядит дёшево»). */
+#accMid .ap-progress.is-complete>span{background:var(--ap-gold)}
 #accMid .ap-receiver{display:block;min-width:0;max-width:100%;text-align:center;font-size:12px;line-height:18px;overflow-wrap:anywhere;color:var(--ap-muted);letter-spacing:0}
 #accMid .ap-idle .ap-stage-value strong{color:#8b8297}
-#accMid .ap-phase.is-complete,#accMid .ap-received.is-complete{color:#8bc9a9}
+#accMid .ap-phase.is-complete{color:var(--up)}
+#accMid .ap-received.is-complete{color:var(--ap-text)}
 #accMid .ap-choice:hover{border-color:#786242;background:#1b1725}
 #accMid .ap-choice:hover .ap-open-mark{background:#c4aa7626}
 #accMid .ap-choice:active{border-color:#c4aa76;background:#24202d}

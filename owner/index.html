@@ -3505,14 +3505,26 @@ button.path:active{transform:scale(.995)}
 .opick-i{width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;
   color:var(--gold2);background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
 .opick-i svg{width:22px;height:22px}
+.opick-h{display:flex;align-items:center;gap:12px;width:100%}
+.opick-h .opick-t{margin:0;flex:1;min-width:0}
 .opick-t{display:block;margin-top:14px;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
   letter-spacing:.8px;text-transform:uppercase;line-height:1.15}
+.opick-path{display:flex;align-items:flex-start;gap:12px;margin-top:20px;font-family:'Space Grotesk',sans-serif}
+.opick-path span{display:flex;flex-direction:column;align-items:flex-start}
+.opick-path b{font-size:22px;font-weight:700;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.opick-path i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--muted);margin-top:5px}
+.opick-path em{font-style:normal;color:var(--muted);font-size:18px;line-height:1;margin-top:2px}
+.opick-live{display:block;margin-top:12px;font-size:13.5px;font-weight:600;color:var(--gold2)}
+.opick-n{width:100%}
+.opick-n u{text-decoration:none;margin-left:auto;font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.2px}
+.opick-n u s{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;letter-spacing:.4px;
+  color:var(--muted);margin-left:4px}
 .opick-n{display:flex;align-items:baseline;gap:7px;margin-top:auto;padding-top:14px;
   font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;letter-spacing:-.6px;
   color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
 .opick-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
   letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
-.opick-s{display:block;margin-top:8px;font-size:12.5px;color:var(--sub)}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
 .oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -26636,7 +26648,10 @@ async function accOrder(){
   ordPick();
 }
 
-// Две крупные кнопки на весь экран: имя, число, состояние — без оглавлений.
+// Две крупные кнопки на весь экран (владелец, 24 окт 2026). Барракуда: имя и
+// слово цикла; путь тремя числами (заявка → магазин дал → приняли); кто
+// принимает сейчас — пока принимают; внизу крупно единицы и закупка в AED.
+// Другие базы: имя, состояние, бутылки в открытых и черновиках.
 function ordPick(){
   ORD_BRANCH = null; ACC_BACK = null;
   _setText('accTitle', 'Закупка'); _setText('accSub', '');
@@ -26644,27 +26659,43 @@ function ordPick(){
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').classList.remove('xs-fix');
   const st = supStage(), sup = st.sup, d = ORD.d || {};
-  const bn = sup && sup.status === 'open' ? (sup.total_qty || 0) : (d.total_qty || 0);
-  const bs = st.k === 'none' ? (d.phase === 'asked' ? 'ждём ответ магазина' : 'заявка')
-    : st.k === 'live' ? `принято ${st.done} из ${st.all}` : st.k === 'wait' ? 'ждёт приёма'
+  const live = !!(sup && sup.status === 'open');
+  const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
+  const word = st.k === 'none' ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
+    : st.k === 'live' ? 'идёт приёмка' : st.k === 'wait' ? 'ждёт приёма'
     : st.k === 'done' ? 'принято' : st.k === 'cancelled' ? 'отменена' : '';
+  const asked = live ? (sup.asked_qty || 0) : (d.total_qty || 0);
+  const gave = live ? (sup.total_qty || 0) : null;
+  const pct = live && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : null;
+  const code = o => ((d.districts || []).find(x => x.id === o) || {}).code || o;
+  let who = live ? Object.entries(sup.tasks || {})
+      .filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
+      .map(([o, t]) => `${code(o)} · ${t.driver}`) : [];
+  if(live && !who.length && st.done < st.all) who = (sup.drivers || []).slice();
+  const units = d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0);
+  const aed = d.buy && d.buy.cost != null ? d.buy.cost : (d.total_cost != null ? d.total_cost : (d.total_aed || 0));
   const ex = _xList(), open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft');
   const xn = [...open, ...wait].reduce((a, x) => a + (x.total_qty || 0), 0);
-  const xs = !ex.length ? 'нет заявок'
-    : [open.length ? `${open.length} в работе` : '',
-       wait.length ? `${wait.length} ${pluralize(wait.length,'черновик','черновика','черновиков')}` : ''].filter(Boolean).join(' · ') || 'все закрыты';
+  const xw = !ex.length ? 'нет заявок' : open.length ? 'в работе' : wait.length ? 'черновик' : 'закрыты';
+  const xs = [open.length ? `${open.length} в работе` : '',
+              wait.length ? `${wait.length} ${pluralize(wait.length,'черновик','черновика','черновиков')}` : ''].filter(Boolean).join(' · ');
   document.getElementById('accMid').innerHTML = `<div class="opick">
     <button class="opick-b" onclick="ordBranch('bar')">
-      <span class="opick-i">${ICO_LIST}</span>
-      <span class="opick-t">Барракуда</span>
-      <span class="opick-n"><b>${fmt(bn)}</b><i>${pluralize(bn,'единица','единицы','единиц')}</i></span>
-      <span class="opick-s">${escS(bs)}</span>
+      <span class="opick-h"><span class="opick-i">${ICO_LIST}</span><span class="opick-t">Барракуда</span>${
+        word ? `<span class="pstat-c ${CHIP[st.k] || ''}">${word}</span>` : ''}</span>
+      <span class="opick-path">
+        <span><b>${fmt(asked)}</b><i>заявка</i></span><em>→</em>
+        <span><b>${gave == null ? '—' : fmt(gave)}</b><i>магазин дал</i></span><em>→</em>
+        <span><b>${pct == null ? '—' : pct + '%'}</b><i>приняли</i></span>
+      </span>
+      ${who.length ? `<span class="opick-live">${who.map(escS).join(', ')}</span>` : ''}
+      <span class="opick-n"><b>${fmt(units)}</b><i>${pluralize(units,'единица','единицы','единиц')}</i><u>${fmt(Math.round(aed))}<s>AED</s></u></span>
     </button>
     <button class="opick-b" onclick="ordBranch('extra')">
-      <span class="opick-i">${ICO_BASE}</span>
-      <span class="opick-t">Другие базы</span>
+      <span class="opick-h"><span class="opick-i">${ICO_BASE}</span><span class="opick-t">Другие базы</span><span class="pstat-c ${
+        open.length ? 'live' : wait.length ? 'wait' : ''}">${xw}</span></span>
+      ${xs ? `<span class="opick-live">${escS(xs)}</span>` : ''}
       <span class="opick-n"><b>${fmt(xn)}</b><i>${pluralize(xn,'бутылка','бутылки','бутылок')}</i></span>
-      <span class="opick-s">${escS(xs)}</span>
     </button>
   </div>`;
 }

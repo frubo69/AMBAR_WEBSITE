@@ -22187,9 +22187,10 @@ function fbDayBodyHtml(d){
          нормы (владелец, 2 окт 2026). В сейф не ложится: остаётся на кошельке,
          но числится за РП. Предлагается вся свободная; поправить можно. -->
     ${fbIn('РП+ криптой', 'collected_cr', d.manual.collected_cr, sc, {sign: '+', ph: fbInFmt(d.collected_cr || 0, true), phk: 'd.collected_cr', dec: true, eu: d.cr_src === 'free' ? 'вся свободная' : 'AED', cls: 'fb-cr'})}` : ''}
-    ${fbIn(crOn ? 'РП+ наличными' : 'РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? (d.rp_owed_before > 0 ? 'норма + возврат' : crOn && d.collected_cr ? 'до нормы' : 'норма') : 'AED'})}
-    <!-- Фонд отдал Барракуде — РП+ предлагается с возвратом сверх нормы, пока
-         долг не закрыт (владелец, 3 окт 2026). -->
+    ${fbIn(crOn ? 'РП+ наличными' : 'РП+', 'collected', d.manual.collected, sc, {sign: '−', ph: fbFmt(d.collected), phk: 'd.collected', eu: d.collected_src === 'norm' ? (crOn && d.collected_cr ? 'до нормы' : 'норма') : 'AED'})}
+    <!-- Фонд отдал Барракуде — в предложение РП+ долг не входит (владелец,
+         24 окт 2026: норма в РП+, остальное ЧП); вписали в РП+ больше нормы —
+         столько и вернулось, строкой ниже. -->
     ${fbRow('В том числе возврат в РП за Барракуду', 'd.rp_back_plan', d.rp_back_plan, {sub: true, show: 'd.back_on', hide: !(d.rp_back_plan > 0)})}
     ${fbRow('ЧП+', 'd.np_plus', d.np_plus, {sum: true, sign: '=', mode: 'neg'})}
     ${crOn ? fbRow('РП+ всего — наличными и криптой', 'd.rp_plus_all', (d.collected || 0) + (d.collected_cr || 0), {sub: true}) : ''}

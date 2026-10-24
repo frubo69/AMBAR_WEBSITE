@@ -117,7 +117,7 @@ async def сервер():
     d = next(x for x in отв["book"]["days"] if x["day"] == СЕГ)
     eq("старый путь (поле pay) сбрасывает источник — из ЧП", (код, d["pay_b_extra"], d["pay_rp"], d["manual"]["pay_src"]), (200, 6000, 0, None))
 
-    print("— сервер: предложение РП+ с возвратом долга")
+    print("— сервер: предложение РП+ при долге фонда — норма, долг не добавляется (24 окт 2026)")
     await зови(fr.handle_pay_b, "POST", {"day": "2026-09-20", "pay": 16000, "src": "rp", "as": "Т"})
     await зови(fr.handle_pay_b, "POST", {"day": СЕГ, "pay": None, "as": "Т"})
     # выручка 21 сен — заказ наличными 30 000
@@ -126,16 +126,16 @@ async def сервер():
     book = await fr.build(МЕС)
     d20 = next(x for x in book["days"] if x["day"] == "2026-09-20"); d21 = next(x for x in book["days"] if x["day"] == "2026-09-21")
     eq("20 сен: 6000 из РП (стопка 10000), долг фонда 6000", (d20["pay_rp"], d20["rp_owed"]), (6000, 6000))
-    eq("21 сен: ждёт; РП+ предложен нормой + долг (9000 + 6000), в пределах выручки − Барракуда", (d21["pending"], d21["aside"], d21["collected"], d21["collected_src"], d21["rp_back_plan"]),
-       (True, 15000, 15000, "norm", 6000))
+    eq("21 сен: ждёт; РП+ предложен просто нормой (9000), долг фонда в предложение не входит", (d21["pending"], d21["aside"], d21["collected"], d21["collected_src"], d21["rp_back_plan"], d21["rp_owed_before"]),
+       (True, 15000, 9000, "norm", 0, 6000))
     await db._db.orders.insert_one({"order_id": "B2", "timestamp": "2026-09-22T10:00:00", "status": "delivered",
                                     "total": 20000, "tip": 0, "office_id": "jvc"})
     book = await fr.build(МЕС)
     d22 = next(x for x in book["days"] if x["day"] == "2026-09-22")
-    eq("22 сен тоже ждёт: долг пока не вернулся — предложение снова с ним, в пределах 10 000", (d22["collected"], d22["rp_back_plan"]), (10000, 1000))
+    eq("22 сен тоже ждёт: долг не вернулся, но предложение — норма", (d22["collected"], d22["rp_back_plan"]), (9000, 0))
     код, отв = await зови(fr.handle_day_ok, "POST", {"day": "2026-09-21", "aside": 15000, "collected": 15000, "as": "Т"})
     d21 = next(x for x in отв["book"]["days"] if x["day"] == "2026-09-21"); d22 = next(x for x in отв["book"]["days"] if x["day"] == "2026-09-22")
-    eq("21 сен подтверждён: вернулось 6000, долг закрыт", (d21["rp_back"], d21["rp_owed"]), (6000, 0))
+    eq("21 сен подтверждён с 15000 в РП+ руками: сверх нормы 6000 вернулось, долг закрыт", (d21["rp_back"], d21["rp_owed"]), (6000, 0))
     eq("22 сен: предложение снова просто норма", (d22["collected"], d22["rp_back_plan"]), (9000, 0))
     s = отв["book"]["safe"]
     eq("сейф месяца: отдано 6000, вернулось 6000, долг 0", (s["rp_b"], s["rp_back"], s["rp_owed"]), (6000, 6000, 0))

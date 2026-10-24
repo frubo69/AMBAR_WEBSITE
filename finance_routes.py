@@ -1249,24 +1249,13 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
                        extra_manual=m.get("extra_rp"), ok_by=m.get("ok_by") or "",
                        tips_cash=s["tips_cash"], base=base)
     book = calc.compute(rows, opening["opening"])
-    # Долг фонда (владелец, 3 окт 2026): день, который ждёт подтверждения,
-    # предлагает собрать в РП+ ещё и то, что фонд отдал Барракуде и не вернул —
-    # в пределах выручки дня. Первый расчёт даёт долг на каждый день, второй —
-    # раскладку с его учётом; на сам долг она не влияет (ждущие дни в стопки
-    # не входят), поэтому двух проходов достаточно.
-    changed = False
-    for i, d in enumerate(days):
-        r, row = book["days"][i], rows[i]
-        if row["pending"] and meta[d]["collected_src"] == "norm" and calc._n(r["rp_owed_before"]) > 0:
-            cap = max(0.0, meta[d]["base"] - calc._n(row["aside"]))
-            want = math.ceil(max(0.0, calc._n(budget["norm"]) - calc._n(row["collected_cr"]))
-                             + calc._n(r["rp_owed_before"]) - 1e-9)
-            new = float(min(want, cap))
-            if new != row["collected"]:
-                row["collected"] = new
-                changed = True
-    if changed:
-        book = calc.compute(rows, opening["opening"])
+    # Долг фонда (то, что фонд отдал Барракуде сверх её стопки) в предложение
+    # РП+ НЕ добавляется (владелец, 24 окт 2026: «нам только 8 900 надо, что
+    # является ежедневной нормой, а остальное всё ЧП»). До 24 окт ждущий день
+    # предлагал норму + весь долг в пределах выручки, и при нескольких
+    # неподтверждённых днях каждый из них забирал в РП+ всё, а ЧП получал ноль.
+    # Долг остаётся на виду («Барракуде из РП · не вернулось») и возвращается
+    # тем, что подтвердят в РП+ сверх нормы руками, или переводом.
     marks = {} if light else await _marks([d for d in days if d <= today])
     for i, d in enumerate(days):
         r, s, sp, pu, m = book["days"][i], sales[d], spend[d], purch[d], manual.get(d) or {}

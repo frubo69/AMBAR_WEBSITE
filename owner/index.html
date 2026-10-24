@@ -3495,36 +3495,60 @@ button.path:active{transform:scale(.995)}
 .fb-e-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
-/* Вход в закупку — две крупные кнопки на весь экран (владелец, 24 окт 2026) */
-.opick{display:flex;flex-direction:column;gap:12px;min-height:100%}
-.opick-b{flex:1 1 0;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;
-  min-height:190px;padding:22px 20px;border-radius:22px;background:var(--card);border:1px solid var(--border2);
-  color:var(--text);text-align:left;font-family:inherit;cursor:pointer;
-  background-image:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%)}
-.opick-b:active{background-color:rgba(255,255,255,.03)}
-.opick-i{width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;
-  color:var(--gold2);background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
-.opick-i svg{width:22px;height:22px}
-.opick-h{display:flex;align-items:center;gap:12px;width:100%}
-.opick-h .opick-t{margin:0;flex:1;min-width:0}
-.opick-t{display:block;margin-top:14px;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
-  letter-spacing:.8px;text-transform:uppercase;line-height:1.15}
-.opick-path{display:flex;align-items:flex-start;gap:12px;margin-top:20px;font-family:'Space Grotesk',sans-serif}
-.opick-path span{display:flex;flex-direction:column;align-items:flex-start}
-.opick-path b{font-size:22px;font-weight:700;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
-.opick-path i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;letter-spacing:.4px;
-  text-transform:uppercase;color:var(--muted);margin-top:5px}
-.opick-path em{font-style:normal;color:var(--muted);font-size:18px;line-height:1;margin-top:2px}
-.opick-live{display:block;margin-top:12px;font-size:13.5px;font-weight:600;color:var(--gold2)}
-.opick-n{width:100%}
-.opick-n u{text-decoration:none;margin-left:auto;font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.2px}
-.opick-n u s{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;letter-spacing:.4px;
-  color:var(--muted);margin-left:4px}
-.opick-n{display:flex;align-items:baseline;gap:7px;margin-top:auto;padding-top:14px;
-  font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;letter-spacing:-.6px;
-  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
-.opick-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
-  letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+/* Вход в закупку — две карточки-кнопки на весь экран по макету владельца
+   (24 окт 2026, AMBAR-CLAUDE-HANDOFF): геометрия, цвета, шрифты и формулы
+   clamp/cqw/cqh взяты из исходника буквально. Контейнер .ap-app — середина
+   раздела (#accMid) целиком: ширина и высота — те, что даёт оболочка. */
+#accMid.ap-host{padding:0}
+#accMid .ap-app{--ap-radius:24px;--ap-bg:#07070c;--ap-surface:#12111f;--ap-text:#ece9e3;--ap-muted:#a39baa;--ap-gold:#e2c386;--ap-line:#2c2938;
+  box-sizing:border-box;width:100%;height:100%;display:grid;grid-template-rows:minmax(0,1fr);color-scheme:dark;color:var(--ap-text);
+  background:var(--ap-bg);font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;container-type:size;container-name:ap-phone}
+#accMid .ap-app *{box-sizing:border-box}
+#accMid .ap-app button{font-family:inherit;appearance:none;-webkit-tap-highlight-color:transparent}
+#accMid .ap-content{--ap-outer:clamp(12px,calc(2cqh - .8px),16px);--ap-pad-y:clamp(12px,calc(4cqh - 13.6px),20px);--ap-pad-x:clamp(14px,calc(5.5cqw - 3.5px),20px);
+  --ap-space:clamp(8px,calc(2cqh - 4.8px),12px);--ap-cycle-gap:clamp(8px,calc(1cqh + 1.6px),10px);--ap-head-bottom:clamp(10px,calc(3cqh - 9.2px),16px);
+  --ap-foot-top:clamp(10px,calc(2cqh - 2.8px),14px);padding:var(--ap-outer);padding-bottom:calc(var(--ap-outer) + var(--safe-bottom));
+  min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain}
+#accMid .ap-options{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,1fr);gap:12px;min-height:100%;align-content:stretch}
+#accMid .ap-choice{display:grid;grid-template-rows:max-content max-content minmax(0,1fr) max-content;row-gap:0;width:100%;min-width:0;min-height:min-content;margin:0;
+  padding:var(--ap-pad-y) var(--ap-pad-x);text-align:left;white-space:normal;color:var(--ap-text);background:linear-gradient(135deg,#1d1925 0%,#12111f 76%);
+  border:1px solid #37313f;border-radius:var(--ap-radius);box-shadow:inset 0 1px 0 #ffffff03;transition:border-color .15s,background-color .15s;cursor:pointer}
+#accMid .ap-choice-head{grid-row:1;display:grid;grid-template-columns:clamp(36px,10.5cqw,44px) minmax(0,1fr) clamp(30px,9cqw,38px);align-items:center;
+  gap:clamp(8px,2.5cqw,10px);min-width:0;padding-bottom:var(--ap-head-bottom);border-bottom:1px solid #37303f}
+#accMid .ap-heading{display:flex;flex-direction:column;gap:4px;min-width:0}
+#accMid .ap-section-icon{display:grid;place-items:center;width:100%;aspect-ratio:1;border:1px solid #5b4d37;border-radius:12px;background:#c4aa7612;color:var(--ap-gold)}
+#accMid .ap-section-icon svg{width:24px;height:24px;stroke-width:1.7}
+#accMid .ap-open-mark{display:grid;place-items:center;width:100%;aspect-ratio:1;border-radius:50%;background:#c4aa7612;color:var(--ap-gold)}
+#accMid .ap-phase{font-size:12px;line-height:17px;overflow-wrap:anywhere;color:var(--ap-gold);font-weight:400;letter-spacing:0}
+#accMid .ap-idle .ap-phase{color:var(--ap-muted)}
+#accMid .ap-name{font-size:clamp(18px,calc(5cqw + 2px),24px);line-height:1.2;letter-spacing:0;font-weight:700;overflow-wrap:anywhere;color:var(--ap-text);text-transform:uppercase}
+#accMid .ap-phase.is-live{color:var(--ap-gold);animation:ambar-receiving-pulse 3.6s ease-in-out infinite}
+@keyframes ambar-receiving-pulse{0%,100%{opacity:1}50%{opacity:.72}}
+#accMid .ap-chevron{width:20px;height:20px;color:var(--ap-gold);stroke-width:1.8}
+#accMid .ap-choice-foot{grid-row:4;display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);align-items:end;gap:12px;border-top:1px solid #302a3b;padding-top:var(--ap-foot-top)}
+#accMid .ap-amount{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;max-width:100%}
+#accMid .ap-amount strong{display:block;max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-variant-numeric:tabular-nums;
+  font-size:clamp(28px,min(8.2cqw,calc(3cqh + 10px)),34px);line-height:1.12;letter-spacing:-.035em;font-weight:500;color:var(--ap-gold);white-space:normal;overflow-wrap:anywhere}
+#accMid .ap-amount small{font-size:12px;line-height:16px;font-weight:400;letter-spacing:0;overflow-wrap:anywhere;color:var(--ap-muted)}
+#accMid .ap-money{align-items:flex-end;text-align:right}
+#accMid .ap-money strong{color:var(--ap-text)}
+#accMid .ap-cycle{grid-row:2;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:var(--ap-cycle-gap);padding-block:var(--ap-space);min-width:0}
+#accMid .ap-route{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:8px;width:100%;min-width:0}
+#accMid .ap-stage-value{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;text-align:center}
+#accMid .ap-stage-value strong{display:block;max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(26px,min(7.2cqw,calc(2cqh + 14px)),30px);
+  line-height:1.15;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ap-text);white-space:normal;overflow-wrap:anywhere}
+#accMid .ap-stage-value small{font-size:11px;line-height:15px;font-weight:400;letter-spacing:0;color:var(--ap-muted);min-height:15px;overflow-wrap:anywhere}
+#accMid .ap-progress{display:block;flex-shrink:0;width:100%;height:4px;overflow:hidden;border-radius:4px;background:#302a3d}
+#accMid .ap-progress>span{display:block;width:var(--ap-progress,0%);height:100%;border-radius:inherit;background:var(--ap-gold)}
+#accMid .ap-progress.is-complete>span{background:#8bc9a9}
+#accMid .ap-receiver{display:block;min-width:0;max-width:100%;text-align:center;font-size:12px;line-height:18px;overflow-wrap:anywhere;color:var(--ap-muted);letter-spacing:0}
+#accMid .ap-idle .ap-stage-value strong{color:#8b8297}
+#accMid .ap-phase.is-complete,#accMid .ap-received.is-complete{color:#8bc9a9}
+#accMid .ap-choice:hover{border-color:#786242;background:#1b1725}
+#accMid .ap-choice:hover .ap-open-mark{background:#c4aa7626}
+#accMid .ap-choice:active{border-color:#c4aa76;background:#24202d}
+#accMid .ap-app [hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){#accMid .ap-choice{transition:none}#accMid .ap-phase.is-live{animation:none;opacity:1}}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
 .oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -26428,7 +26452,7 @@ function accOpen(id){
   ACC_VIEW = id;
   _navSave();
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
-  document.getElementById('accMid').classList.remove('xs-fix');
+  document.getElementById('accMid').classList.remove('xs-fix', 'ap-host');
   document.getElementById('accFoot').innerHTML = '';   // подвал у каждого свой
   document.getElementById('accAct').innerHTML = '';    // и действие в шапке тоже
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -26648,56 +26672,71 @@ async function accOrder(){
   ordPick();
 }
 
-// Две крупные кнопки на весь экран (владелец, 24 окт 2026). Барракуда: имя и
-// слово цикла; путь тремя числами (заявка → магазин дал → приняли); кто
-// принимает сейчас — пока принимают; внизу крупно единицы и закупка в AED.
-// Другие базы: имя, состояние, бутылки в открытых и черновиках.
+// Две карточки-кнопки на весь экран по макету владельца (24 окт 2026,
+// AMBAR-CLAUDE-HANDOFF): визуал — из исходника, числа — свои. Карточка: шапка
+// (иконка, имя, слово цикла, стрелка), инфографика (три числа, полоса приёмки,
+// кто принимает), свободная строка, итоги (количество золотом, сумма светлой).
+const AP_ICO = {
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg>',
+  store: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>',
+  right: '<svg class="ap-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
+};
+// Одна карточка. o: {key, ico, name, phase, live, complete, idle, asked, gave, pct, who, qty, unit, aed}
+function apCard(o){
+  const v = x => (x == null ? '—' : x);
+  const pct = o.pct == null ? null : Math.max(0, Math.min(100, Math.round(o.pct)));
+  return `<button type="button" class="ap-choice${o.idle ? ' ap-idle' : ''}" onclick="ordBranch('${o.key}')">
+    <span class="ap-choice-head"><span class="ap-section-icon" aria-hidden="true">${AP_ICO[o.ico]}</span><span class="ap-heading"><span class="ap-name">${escS(o.name)}</span><span class="ap-phase${
+      o.complete ? ' is-complete' : o.live ? ' is-live' : ''}">${escS(o.phase)}</span></span><span class="ap-open-mark" aria-hidden="true">${AP_ICO.right}</span></span>
+    <span class="ap-cycle">
+      <span class="ap-route">
+        <span class="ap-stage-value"><strong>${o.asked == null ? '—' : fmt(o.asked)}</strong><small>Заявка</small></span><span class="ap-stage-value"><strong>${o.gave == null ? '—' : fmt(o.gave)}</strong><small>Магазин дал</small></span><span class="ap-stage-value"><strong class="ap-received${o.complete ? ' is-complete' : ''}">${pct == null ? '—' : pct + '%'}</strong><small>Приняли</small></span>
+      </span>
+      ${pct == null ? '<span class="ap-progress ap-progress-idle" aria-hidden="true"></span>'
+        : `<span class="ap-progress${o.complete ? ' is-complete' : ''}" role="progressbar" aria-label="Прогресс приёмки" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="--ap-progress:${pct}%"><span></span></span>`}
+      ${o.who ? `<span class="ap-receiver">${escS(o.who)}</span>` : ''}
+    </span>
+    <span class="ap-choice-foot"><span class="ap-amount"><strong>${fmt(o.qty || 0)}</strong><small>${escS(o.unit)}</small></span><span class="ap-amount ap-money"><strong>${o.aed == null ? '—' : fmt(Math.round(o.aed))}</strong><small>AED</small></span></span>
+  </button>`;
+}
 function ordPick(){
   ORD_BRANCH = null; ACC_BACK = null;
   _setText('accTitle', 'Закупка'); _setText('accSub', '');
   document.getElementById('accAct').innerHTML = '';
   document.getElementById('accFoot').innerHTML = '';
-  document.getElementById('accMid').classList.remove('xs-fix');
+  const mid = document.getElementById('accMid');
+  mid.classList.remove('xs-fix'); mid.classList.add('ap-host');
   const st = supStage(), sup = st.sup, d = ORD.d || {};
   const live = !!(sup && sup.status === 'open');
-  const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
-  const word = st.k === 'none' ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
-    : st.k === 'live' ? 'идёт приёмка' : st.k === 'wait' ? 'ждёт приёма'
-    : st.k === 'done' ? 'принято' : st.k === 'cancelled' ? 'отменена' : '';
-  const asked = live ? (sup.asked_qty || 0) : (d.total_qty || 0);
-  const gave = live ? (sup.total_qty || 0) : null;
-  const pct = live && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : null;
   const code = o => ((d.districts || []).find(x => x.id === o) || {}).code || o;
-  let who = live ? Object.entries(sup.tasks || {})
-      .filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
-      .map(([o, t]) => `${code(o)} · ${t.driver}`) : [];
-  if(live && !who.length && st.done < st.all) who = (sup.drivers || []).slice();
-  const units = d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0);
-  const aed = d.buy && d.buy.cost != null ? d.buy.cost : (d.total_cost != null ? d.total_cost : (d.total_aed || 0));
+  // ── Барракуда ──
+  const taking = live && Object.values(sup.tasks || {}).some(t => t.driver && !t.done_at && !t.cancelled_at);
+  const complete = st.k === 'done';
+  const phase = st.k === 'none' ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
+    : complete ? 'принято' : st.k === 'cancelled' ? 'отменена' : taking ? 'идёт приёмка' : 'ждёт приёма';
+  const pct = live ? (sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0) : (complete ? 100 : null);
+  let who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
+      .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
+  const bar = {key: 'bar', ico: 'list', name: 'Барракуда', phase, live: taking, complete, idle: false,
+    asked: live ? (sup.asked_qty || 0) : (d.total_qty || 0), gave: live ? (sup.total_qty || 0) : null, pct, who,
+    qty: d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0),
+    unit: pluralize(d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0), 'единица', 'единицы', 'единиц'),
+    aed: d.buy && d.buy.cost != null ? d.buy.cost : (d.total_cost != null ? d.total_cost : null)};
+  // ── Другие базы: открытые доп. заявки одним итогом, черновики — словом ──
   const ex = _xList(), open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft');
-  const xn = [...open, ...wait].reduce((a, x) => a + (x.total_qty || 0), 0);
-  const xw = !ex.length ? 'нет заявок' : open.length ? 'в работе' : wait.length ? 'черновик' : 'закрыты';
-  const xs = [open.length ? `${open.length} в работе` : '',
-              wait.length ? `${wait.length} ${pluralize(wait.length,'черновик','черновика','черновиков')}` : ''].filter(Boolean).join(' · ');
-  document.getElementById('accMid').innerHTML = `<div class="opick">
-    <button class="opick-b" onclick="ordBranch('bar')">
-      <span class="opick-h"><span class="opick-i">${ICO_LIST}</span><span class="opick-t">Барракуда</span>${
-        word ? `<span class="pstat-c ${CHIP[st.k] || ''}">${word}</span>` : ''}</span>
-      <span class="opick-path">
-        <span><b>${fmt(asked)}</b><i>заявка</i></span><em>→</em>
-        <span><b>${gave == null ? '—' : fmt(gave)}</b><i>магазин дал</i></span><em>→</em>
-        <span><b>${pct == null ? '—' : pct + '%'}</b><i>приняли</i></span>
-      </span>
-      ${who.length ? `<span class="opick-live">${who.map(escS).join(', ')}</span>` : ''}
-      <span class="opick-n"><b>${fmt(units)}</b><i>${pluralize(units,'единица','единицы','единиц')}</i><u>${fmt(Math.round(aed))}<s>AED</s></u></span>
-    </button>
-    <button class="opick-b" onclick="ordBranch('extra')">
-      <span class="opick-h"><span class="opick-i">${ICO_BASE}</span><span class="opick-t">Другие базы</span><span class="pstat-c ${
-        open.length ? 'live' : wait.length ? 'wait' : ''}">${xw}</span></span>
-      ${xs ? `<span class="opick-live">${escS(xs)}</span>` : ''}
-      <span class="opick-n"><b>${fmt(xn)}</b><i>${pluralize(xn,'бутылка','бутылки','бутылок')}</i></span>
-    </button>
-  </div>`;
+  const xa = open.reduce((a, x) => a + (x.asked_qty || x.total_qty || 0), 0);
+  const xg = open.reduce((a, x) => a + (x.total_qty || 0), 0);
+  const xt = open.reduce((a, x) => a + (x.took || 0), 0);
+  const xm = open.reduce((a, x) => a + (((x.money || {}).confirmed) || 0), 0);
+  const xwho = open.flatMap(x => Object.entries(x.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
+      .map(([o, t]) => `${x.base ? x.base + ' · ' : ''}${t.driver}`)).join(', ');
+  const xqty = [...open, ...wait].reduce((a, x) => a + (x.total_qty || 0), 0);
+  const other = {key: 'extra', ico: 'store', name: 'Другие базы', idle: !open.length,
+    phase: open.length ? (xwho ? 'идёт приёмка' : 'в работе') : wait.length ? `${wait.length} ${pluralize(wait.length, 'черновик', 'черновика', 'черновиков')}` : 'нет заявок',
+    live: !!xwho, complete: false,
+    asked: open.length ? xa : null, gave: open.length ? xg : null, pct: open.length ? (xg ? Math.round(xt / xg * 100) : 0) : null, who: xwho,
+    qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'), aed: open.length ? xm : null};
+  mid.innerHTML = `<div class="ap-app" aria-label="Закупка"><div class="ap-content"><div class="ap-options">${apCard(bar)}${apCard(other)}</div></div></div>`;
 }
 function ordBranch(b){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -26929,6 +26968,7 @@ function supHistLine(){
 // он живёт на своей странице и не мешает увидеть, где мы сейчас.
 function ordHub(){
   const d = ORD.d; if(!d) return;
+  document.getElementById('accMid').classList.remove('ap-host');
   ORD_BRANCH = 'bar';
   ACC_BACK = ordPickBack;           // назад — к выбору Барракуда / другие базы
   _setText('accTitle', 'Барракуда');
@@ -31344,6 +31384,7 @@ function pathExtra(){
 }
 
 async function accExtra(){
+  document.getElementById('accMid').classList.remove('ap-host');
   ORD_BRANCH = 'extra';
   ACC_BACK = ordPickBack;           // назад — к выбору Барракуда / другие базы
   XS = null;

@@ -3495,6 +3495,24 @@ button.path:active{transform:scale(.995)}
 .fb-e-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
+/* Вход в закупку — две крупные кнопки на весь экран (владелец, 24 окт 2026) */
+.opick{display:flex;flex-direction:column;gap:12px;min-height:100%}
+.opick-b{flex:1 1 0;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;
+  min-height:190px;padding:22px 20px;border-radius:22px;background:var(--card);border:1px solid var(--border2);
+  color:var(--text);text-align:left;font-family:inherit;cursor:pointer;
+  background-image:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%)}
+.opick-b:active{background-color:rgba(255,255,255,.03)}
+.opick-i{width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;
+  color:var(--gold2);background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
+.opick-i svg{width:22px;height:22px}
+.opick-t{display:block;margin-top:14px;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;line-height:1.15}
+.opick-n{display:flex;align-items:baseline;gap:7px;margin-top:auto;padding-top:14px;
+  font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;letter-spacing:-.6px;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.opick-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.opick-s{display:block;margin-top:8px;font-size:12.5px;color:var(--sub)}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
 .oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -26403,7 +26421,7 @@ function accOpen(id){
   document.getElementById('accAct').innerHTML = '';    // и действие в шапке тоже
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   if(id === 'expenses') accExpenses();
-  if(id === 'order')    accOrder();
+  if(id === 'order')    { ORD_BRANCH = null; accOrder(); }
   if(id === 'promo')    accPromo();
   if(id === 'gift')     accGift();
   if(id === 'qr')       accQR();
@@ -26609,9 +26627,53 @@ async function accOrder(){
       ACC_SUP = {list: r.supplies || [], open: _supMain(r.supplies || [])};
     }catch(e){ ACC_SUP = {list: [], open: null}; }
   }
-  supActShow();          // кнопка отмены знает про заявку только теперь
-  ordHub();
+  // Первый шаг — выбор: Барракуда или другие базы (владелец, 24 окт 2026:
+  // «ногу сломать можно; первым этапом — выбор между Барракудой и другими
+  // базами, две крупные кнопки»). Ветка помнится: из поставки «назад» ведёт в
+  // свою ветку, а не на выбор; вход с панели — всегда с выбора.
+  if(ORD_BRANCH === 'extra'){ accExtra(); return; }
+  if(ORD_BRANCH === 'bar'){ ordHub(); return; }
+  ordPick();
 }
+
+// Две крупные кнопки на весь экран: имя, число, состояние — без оглавлений.
+function ordPick(){
+  ORD_BRANCH = null; ACC_BACK = null;
+  _setText('accTitle', 'Закупка'); _setText('accSub', '');
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').classList.remove('xs-fix');
+  const st = supStage(), sup = st.sup, d = ORD.d || {};
+  const bn = sup && sup.status === 'open' ? (sup.total_qty || 0) : (d.total_qty || 0);
+  const bs = st.k === 'none' ? (d.phase === 'asked' ? 'ждём ответ магазина' : 'заявка')
+    : st.k === 'live' ? `принято ${st.done} из ${st.all}` : st.k === 'wait' ? 'ждёт приёма'
+    : st.k === 'done' ? 'принято' : st.k === 'cancelled' ? 'отменена' : '';
+  const ex = _xList(), open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft');
+  const xn = [...open, ...wait].reduce((a, x) => a + (x.total_qty || 0), 0);
+  const xs = !ex.length ? 'нет заявок'
+    : [open.length ? `${open.length} в работе` : '',
+       wait.length ? `${wait.length} ${pluralize(wait.length,'черновик','черновика','черновиков')}` : ''].filter(Boolean).join(' · ') || 'все закрыты';
+  document.getElementById('accMid').innerHTML = `<div class="opick">
+    <button class="opick-b" onclick="ordBranch('bar')">
+      <span class="opick-i">${ICO_LIST}</span>
+      <span class="opick-t">Барракуда</span>
+      <span class="opick-n"><b>${fmt(bn)}</b><i>${pluralize(bn,'единица','единицы','единиц')}</i></span>
+      <span class="opick-s">${escS(bs)}</span>
+    </button>
+    <button class="opick-b" onclick="ordBranch('extra')">
+      <span class="opick-i">${ICO_BASE}</span>
+      <span class="opick-t">Другие базы</span>
+      <span class="opick-n"><b>${fmt(xn)}</b><i>${pluralize(xn,'бутылка','бутылки','бутылок')}</i></span>
+      <span class="opick-s">${escS(xs)}</span>
+    </button>
+  </div>`;
+}
+function ordBranch(b){
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  if(b === 'extra'){ ORD_BRANCH = 'extra'; accExtra(); } else ordHub();
+}
+// Назад из ветки — к выбору, а не из раздела.
+function ordPickBack(){ ordPick(); }
 
 // Путь закупки одним блоком: три шага и число под каждым.
 //
@@ -26836,7 +26898,11 @@ function supHistLine(){
 // он живёт на своей странице и не мешает увидеть, где мы сейчас.
 function ordHub(){
   const d = ORD.d; if(!d) return;
+  ORD_BRANCH = 'bar';
+  ACC_BACK = ordPickBack;           // назад — к выбору Барракуда / другие базы
+  _setText('accTitle', 'Барракуда');
   _setText('accSub', '');
+  supActShow();                     // кнопка отмены знает про заявку только теперь
   const st = supStage();
   // Две зоны, а не четыре куска. Первая — сегодняшний закуп: вход в заявку,
   // путь и состояние приёмки. Вторая — то, что рядом: недобор и прошлые
@@ -26870,7 +26936,6 @@ function ordHub(){
   // прошлые дни, а отдельной карточкой она отбирала у строк районов высоту.
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div></div>
-    <div class="pbox xbase">${pathExtra()}</div>
     <div class="pbox grow">${pathDistricts()}${pathPrices()}${pathShort()}${supHistLine()}</div></div>`;
   ohubFit();
 }
@@ -27065,6 +27130,8 @@ function ordSumInner(){
 // без закупочной цены — своей красной строкой: по нажатию прайс показывает
 // только их. Все цены известны — строки нет.
 let PR_D = null, _prBusy = null;
+// Ветка закупки: 'bar' — Барракуда, 'extra' — другие базы, null — выбор.
+let ORD_BRANCH = null;
 function prLoad(){
   if(_prBusy) return _prBusy;
   _prBusy = ownerApi.ownerFetch('/api/owner/stock/prices')
@@ -31246,7 +31313,8 @@ function pathExtra(){
 }
 
 async function accExtra(){
-  ACC_BACK = accOrder;
+  ORD_BRANCH = 'extra';
+  ACC_BACK = ordPickBack;           // назад — к выбору Барракуда / другие базы
   XS = null;
   document.getElementById('accMid').classList.remove('xs-fix');
   _setText('accTitle', 'Другие базы');

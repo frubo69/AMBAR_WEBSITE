@@ -315,6 +315,7 @@ async def handle_prices(request):
     return web.json_response({
         "rows": rows, "total": len(rows), "cost_known": known,
         "cost_cover": round(known / len(rows) * 100) if rows else 0,
+        "proposals": await price_proposals_pending(),
     }, headers=CORS_HEADERS)
 
 
@@ -348,6 +349,102 @@ async def handle_cost_set(request):
                              headers=CORS_HEADERS)
 
 
+# ── Цены магазина: предложения поменять закупочную ──────────────────────────
+# Магазин правит «Price, AED» в файле заявки (владелец, 24 окт 2026: «должен
+# приходить алерт с предложением в прайсе поменять цену на новую»). Разница
+# ложится предложением: принять — закупочная меняется рукой владельца,
+# оставить — предложение закрывается, цена остаётся.
+PROPOSALS_KEY = "price_proposals"
+
+
+async def price_changes(file_prices: dict) -> list:
+    """Позиции, где цена из файла отличается от нашей закупочной за ту же
+    учётную единицу (бутылка / коробка). Нет нашей цены — тоже разница."""
+    costs = await cost_map()
+    cat = stock_routes._catalog()
+    from config_stock_order import order_key
+    out = []
+    for pid, theirs in (file_prices or {}).items():
+        p = cat.get(pid)
+        if not p:
+            continue
+        try:
+            theirs = float(theirs)
+        except (TypeError, ValueError):
+            continue
+        ours = float(costs.get(pid) or 0)
+        if theirs <= 0 or abs(theirs - ours) < 0.01:
+            continue
+        out.append({"id": pid, "name": p.get("name", ""), "ours": round(ours, 2) if ours else None,
+                    "theirs": round(theirs, 2), "unit": stock_routes._unit(p)})
+    out.sort(key=lambda r: order_key(r["id"]))
+    return out
+
+
+async def price_proposals_add(changes: list, sid: str = "") -> None:
+    if not changes:
+        return
+    from datetime import datetime, timezone
+    doc = await db.setting_get(PROPOSALS_KEY) or {}
+    rows = doc.get("rows") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    for c in changes:
+        rows[c["id"]] = {**c, "at": now, "sid": sid or "", "state": "pending"}
+    await db.setting_set(PROPOSALS_KEY, {"rows": rows, "at": now})
+
+
+async def price_proposals_pending() -> list:
+    doc = await db.setting_get(PROPOSALS_KEY) or {}
+    from config_stock_order import order_key
+    rows = [r for r in (doc.get("rows") or {}).values() if r.get("state") == "pending"]
+    rows.sort(key=lambda r: order_key(r["id"]))
+    return rows
+
+
+async def price_proposal_decide(pid: str, accept: bool, who: str = "") -> dict | None:
+    from datetime import datetime, timezone
+    doc = await db.setting_get(PROPOSALS_KEY) or {}
+    rows = doc.get("rows") or {}
+    r = rows.get(pid)
+    if not r or r.get("state") != "pending":
+        return None
+    if accept:
+        await db.cost_override_set(pid, float(r["theirs"]), who)
+        _COST["at"] = 0.0
+    r = {**r, "state": "accepted" if accept else "kept",
+         "decided_at": datetime.now(timezone.utc).isoformat(), "by": who}
+    rows[pid] = r
+    await db.setting_set(PROPOSALS_KEY, {**doc, "rows": rows})
+    log.info(f"[value] цена магазина {pid}: {'принята ' + str(r['theirs']) if accept else 'оставлена'} · {who or '—'}")
+    return r
+
+
+@require_owner
+async def handle_proposal(request):
+    """POST {id, accept, as} или {all: true, accept, as} — решение по
+    предложению цены: принять (закупочная = цена магазина) или оставить."""
+    try:
+        body = await request.json()
+    except Exception:                               # noqa: BLE001
+        return web.json_response({"error": "bad_json"}, status=400, headers=CORS_HEADERS)
+    accept = bool(body.get("accept"))
+    who = str(body.get("as") or "").strip()[:40]
+    if body.get("all"):
+        for r in await price_proposals_pending():
+            await price_proposal_decide(r["id"], accept, who)
+    else:
+        pid = str(body.get("id") or "").strip()
+        if not pid:
+            return web.json_response({"error": "no_id"}, status=400, headers=CORS_HEADERS)
+        if not await price_proposal_decide(pid, accept, who):
+            return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    cost = await cost_map()
+    return web.json_response({"ok": True, "proposals": await price_proposals_pending(),
+                              "cost": {k: v for k, v in cost.items()},
+                              "cost_src": dict(_COST.get("src") or {})},
+                             headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_value(request):
     return web.json_response(await build(request.query.get("day") or ""),
@@ -365,4 +462,6 @@ def setup(app):
     app.router.add_get("/api/owner/stock/prices", handle_prices)
     app.router.add_route("OPTIONS", "/api/owner/stock/cost", _opt)
     app.router.add_post("/api/owner/stock/cost", handle_cost_set)
+    app.router.add_route("OPTIONS", "/api/owner/stock/prices/proposal", _opt)
+    app.router.add_post("/api/owner/stock/prices/proposal", handle_proposal)
     log.info("[value] routes mounted")

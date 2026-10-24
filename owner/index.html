@@ -3495,6 +3495,11 @@ button.path:active{transform:scale(.995)}
 .fb-e-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
+.oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
+.oprp-b{flex:1;min-width:0}
+.oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oprp-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.oprp .aud-b{min-width:0;padding:0 12px;height:34px;font-size:12.5px}
 .fb-e-dep{flex:0 0 auto;height:26px;padding:0 9px;border-radius:8px;border:1px solid #2a2b3e;background:none;
   color:var(--muted);font:600 11px/1 'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
 .fb-e-dep:active{color:#c9a96e;border-color:rgba(201,169,110,.55)}
@@ -26726,7 +26731,10 @@ function pathNav(){
 function pathDistricts(){
   const d = ORD.d || {};
   const st = supStage(), sup = st.sup;
-  const dist = d.districts || [];
+  // Только районы, куда везём: заявка на один район не должна показывать
+  // четыре пустых строки (владелец, 24 окт 2026).
+  const tasks = (sup && sup.tasks) || {};
+  const dist = Object.keys(tasks).length ? (d.districts || []).filter(x => tasks[x.id]) : (d.districts || []);
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   // Строка района — название и одно слово о состоянии. Подписей про бутылки
   // и ожидание тут нет (они повторяли приёмку), но принятый район обязан
@@ -26863,8 +26871,21 @@ function ordHub(){
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div></div>
     <div class="pbox xbase">${pathExtra()}</div>
-    <div class="pbox grow">${pathDistricts()}${pathShort()}${supHistLine()}</div></div>`;
+    <div class="pbox grow">${pathDistricts()}${pathPrices()}${pathShort()}${supHistLine()}</div></div>`;
   ohubFit();
+}
+
+// Цены магазина из его файла против наших закупочных (владелец, 24 окт 2026:
+// «должен приходить алерт с предложением в прайсе поменять цену на новую»):
+// пока есть нерешённые — строка на пути, решение в прайсе.
+function pathPrices(){
+  const n = ((PR_D && PR_D.proposals) || []).length;
+  if(!n) return '';
+  return `<button class="pnav-r" onclick="ordPrices()">
+    <span class="pnav-i warn">${ICO_LIST}</span>
+    <span class="pnav-b"><b>Новые цены магазина</b><i>${n} ${pluralize(n,'позиция','позиции','позиций')} · принять или оставить</i></span>
+    <span class="pnav-go">${ICO_CHEV}</span>
+  </button>`;
 }
 
 // Хаб обязан помещаться в экран без прокрутки. Меряем по факту: не влезло —
@@ -27416,6 +27437,81 @@ async function ordPrices(only){
   oprPaint();
 }
 
+// Предложения магазина: цена из его файла против нашей закупочной. «Принять»
+// — закупочная становится ценой магазина (рукой владельца), «Оставить» —
+// предложение закрывается. Денег не двигает: это прайс, а не книга.
+const fmtP = v => (v == null ? '—' : Number.isInteger(+v) ? fmt(+v) : (+v).toFixed(2).replace('.', ','));
+function oprProps(){
+  const rows = (OPR.d && OPR.d.proposals) || [];
+  if(!rows.length) return '';
+  return `<div class="sc oprp">
+    <div class="sc-cap"><span>Новые цены магазина</span><b>${rows.length}</b></div>
+    ${rows.map(r => `<div class="oprp-r" id="oprp-${escS(r.id)}">
+      <span class="oprp-b"><b>${escS(r.name)}</b><i>${fmtP(r.ours)} → ${fmtP(r.theirs)} AED · ${r.unit > 1 ? 'за коробку' : 'за бутылку'}</i></span>
+      <button class="aud-b soft" onclick="oprPropDecide('${escS(r.id)}', false)">Оставить</button>
+      <button class="aud-b go" onclick="oprPropDecide('${escS(r.id)}', true)">Принять</button>
+    </div>`).join('')}
+    ${rows.length > 1 ? `<div class="aud-act">
+      <button class="aud-b soft" onclick="oprPropAll(false)">Оставить все</button>
+      <button class="aud-b go" onclick="oprPropAll(true)">Принять все</button></div>` : ''}
+  </div>`;
+}
+function _oprPropApply(res){
+  if(!res) return;
+  if(OPR.d) OPR.d.proposals = res.proposals || [];
+  if(PR_D) PR_D.proposals = res.proposals || [];
+  // принятые цены — в строки прайса, не перечитывая его целиком
+  if(res.cost){
+    (OPR.rows || []).forEach(r => {
+      if(res.cost[r.id] != null){ r.cost = res.cost[r.id]; r.cost_src = (res.cost_src || {})[r.id] || r.cost_src; }
+    });
+    const known = (OPR.rows || []).filter(x => x.cost).length;
+    if(OPR.d){ OPR.d.cost_known = known; OPR.d.cost_cover = OPR.rows.length ? Math.round(known / OPR.rows.length * 100) : 0; }
+  }
+  oprPaint();
+}
+async function oprPropDecide(id, accept){
+  if(OPR.busy) return; OPR.busy = true;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/stock/prices/proposal', {method:'POST', body:{id, accept, as:_meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _oprPropApply(res);
+  }catch(e){ _toast('Не удалось — попробуйте ещё раз'); }
+  OPR.busy = false;
+}
+async function oprPropAll(accept){
+  if(OPR.busy) return;
+  const n = ((OPR.d && OPR.d.proposals) || []).length;
+  if(!await askDialog(accept ? 'Принять все цены магазина?' : 'Оставить наши цены?',
+                      `${n} ${pluralize(n,'позиция','позиции','позиций')}`, accept ? 'Принять все' : 'Оставить все', 'Вернуться назад')) return;
+  OPR.busy = true;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/stock/prices/proposal', {method:'POST', body:{all: true, accept, as:_meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _oprPropApply(res);
+  }catch(e){ _toast('Не удалось — попробуйте ещё раз'); }
+  OPR.busy = false;
+}
+// Файл магазина только ради цен: ответ уже загружали, поставку не трогаем.
+async function oprPropFile(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f || OPR.busy) return;
+  OPR.busy = true; _toast('Читаю файл…');
+  try{
+    const fd = new FormData(); fd.append('file', f, f.name);
+    const res = await fetch((ownerApi.AMBAR_API || '') + '/api/owner/supply/prices',
+      {method:'POST', body:fd, headers:{'Authorization':'tma ' + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
+    const j = await res.json();
+    if(!res.ok) throw j;
+    _toast(`Строк с ценой ${j.rows} · отличий ${(j.changes || []).length}`);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _oprPropApply(j);
+  }catch(e){
+    const E = {not_xlsx:'Это не .xlsx', no_key_column:'В файле нет колонки №', no_price_column:'В файле нет колонки Price, AED'};
+    _toast(E[(e || {}).error] || 'Не удалось прочитать файл');
+  }
+  OPR.busy = false;
+}
 function oprFilter(v){ OPR.q = v || ''; oprPaint(true); }
 function oprOnly(){ OPR.only = !OPR.only; oprPaint(); }
 
@@ -27428,11 +27524,14 @@ function oprPaint(keepFocus){
   _setText('oprSub', `${all.length} ${pluralize(all.length,'позиция','позиции','позиций')}
     · закупка у ${d.cost_known || 0}`);
   document.getElementById('oprMid').innerHTML = `
+    ${oprProps()}
     ${oprSumCard()}
     <div class="oprx-bar">
       <input class="oprx-q" id="oprQ" placeholder="Найти позицию"
              value="${escS(OPR.q)}" oninput="oprFilter(this.value)">
       <button class="oprx-f ${OPR.only ? 'on' : ''}" onclick="oprOnly()">Без цены</button>
+      <button class="oprx-f" onclick="document.getElementById('oprFile').click()">Файл</button>
+      <input type="file" id="oprFile" accept=".xlsx" style="display:none" onchange="oprPropFile(this)">
     </div>
     ${rows.length ? `<div class="oprx-list">${rows.map(r => oprRow(r)).join('')}</div>`
       : '<div class="opr-none">Ничего не нашлось</div>'}`;

@@ -515,6 +515,91 @@ def _name_index(cat: dict) -> dict:
     return out
 
 
+def _cell_price(v):
+    """Цена из ячейки: 65, «65,5», «AED 65». Формула или пусто — None."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).replace(",", ".").strip()
+    if s.startswith("="):
+        return None
+    digits = "".join(ch for ch in s if ch.isdigit() or ch == ".")
+    try:
+        return float(digits) if digits else None
+    except ValueError:
+        return None
+
+
+def _header_row(ws) -> tuple:
+    """(номер строки заголовков, {заголовок: колонка}) — по слову «№» или «Code»,
+    а не по номеру строки: магазин мог вставить сверху свою шапку."""
+    for row in ws.iter_rows(min_row=1, max_row=15):
+        vals = {str(c.value).strip(): c.column for c in row if c.value}
+        if NUM_COL in vals or CODE_COL in vals:
+            return row[0].row, vals
+    return None, {}
+
+
+def _file_prices(ws, hdr_row: int, cols: dict, cat: dict) -> dict:
+    """{позиция: цена} — что магазин написал в колонке «Price, AED». Строку
+    узнаём так же, как количества: по коду (старые файлы), названию, номеру."""
+    col = cols.get(PRICE_COL)
+    if not col or not hdr_row:
+        return {}
+    _, по_номеру = _nums()
+    по_имени = _name_index(cat)
+    код_кол, ном_кол, имя_кол = cols.get(CODE_COL), cols.get(NUM_COL), cols.get(ITEM_COL)
+    итоги = ("TOTAL", "AMOUNT")
+    out = {}
+    for row in ws.iter_rows(min_row=hdr_row + 1):
+        pid = None
+        if код_кол:
+            v = row[код_кол - 1].value
+            if v and str(v).strip() in cat:
+                pid = str(v).strip()
+        if not pid:
+            номер = row[ном_кол - 1].value if ном_кол else None
+            имя = str((row[имя_кол - 1].value if имя_кол else "") or "").strip()
+            if str(номер or "").strip().upper().startswith(итоги) or имя.upper().startswith(итоги):
+                continue
+            pid, _ = match_row(номер, имя, cat, по_номеру, по_имени)
+        if not pid or pid in out:
+            continue
+        price = _cell_price(row[col - 1].value)
+        if price and price > 0:
+            out[pid] = round(price, 2)
+    return out
+
+
+def _fmt_price(v) -> str:
+    if v is None:
+        return "—"
+    v = float(v)
+    return str(int(v)) if v.is_integer() else f"{v:.2f}"
+
+
+async def _prices_tell(changes: list, sid: str) -> None:
+    """Разницы цен — в предложения прайса и владельцам в бот. Принять или
+    оставить — в STAR: Учёт → Закупка → Прайс."""
+    if not changes:
+        return
+    import stock_value
+    await stock_value.price_proposals_add(changes, sid)
+    try:
+        from owner_routes import notify_owners_force
+        lines = [f"{_md(c['name'])}: {_fmt_price(c.get('ours'))} → {_fmt_price(c['theirs'])}"
+                 for c in changes[:12]]
+        more = f"\n… и ещё {len(changes) - 12}" if len(changes) > 12 else ""
+        n = len(changes)
+        text = (f"💰 *Магазин прислал другие цены — {n} {_plural(n, 'позиция', 'позиции', 'позиций')}*\n"
+                + "\n".join(lines) + more
+                + "\n\nПринять или оставить: STAR → Учёт → Закупка → Прайс")
+        await notify_owners_force("supply.prices", text)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] владельцам о ценах не сказали: {e}")
+
+
 def match_row(num, name, cat: dict, by_num: dict, names: dict | None = None) -> tuple:
     """Чья это строка в ответе магазина: (позиция | None, как узнали).
 
@@ -755,8 +840,21 @@ async def handle_import(request):
                         # просто не прислал строку. Спросить с него — разное.
                         "missing": True})
 
+    # Цены магазина из того же файла — сверка с нашими закупочными (владелец,
+    # 24 окт 2026: «магазин прислал заявку со скорректированной ценой —
+    # программа должна это увидеть»). Считаем до отказа «ничего не дал»:
+    # цены он мог поправить и в пустом ответе.
+    price_changes = []
+    try:
+        import stock_value
+        price_changes = await stock_value.price_changes(_file_prices(ws, hdr_row, cols, cat))
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] цены из файла не прочитаны: {e}")
     if not items:
-        return web.json_response({"error": "nothing_confirmed", "dropped": len(dropped)},
+        if price_changes:
+            await _prices_tell(price_changes, "")
+        return web.json_response({"error": "nothing_confirmed", "dropped": len(dropped),
+                                  "price_changes": price_changes},
                                  status=400, headers=CORS_HEADERS)
 
     now = datetime.now(timezone.utc)
@@ -776,7 +874,7 @@ async def handle_import(request):
     doc = {"_id": sid, "at": now, "status": "open", "day": day,
            "by": request.get("owner_id") or 0,
            "items": items, "dropped": dropped, "short": short, "extra": extra,
-           "unknown": unknown, "tasks": tasks,
+           "unknown": unknown, "tasks": tasks, "price_changes": price_changes,
            "total_qty": sum(i["qty"] for i in items),
            "asked_qty": sum(int(v) for v in asked_map.values()),
            "gap_qty": sum(d["asked"] for d in dropped) + sum(s["gap"] for s in short)}
@@ -848,10 +946,22 @@ async def handle_import(request):
     #
     # Правки живут днём. Смена кончилась — наступил новый день, правок там нет,
     # и заявка снова считается сама. Тот самый круг.
+    # Заявка, которой отвечает магазин, лежит под днём закрытой смены, а
+    # поставка — под днём загрузки (днём закупки). Правки — в документ заявки,
+    # иначе они ложились на завтрашний черновик (24 окт 2026).
     try:
-        await _answer_to_order(day, items, asked_full)
+        order_day = (await db.zayavka_freeze_for_buy(day)).get("day") or day
+    except Exception:                                # noqa: BLE001
+        order_day = day
+    try:
+        await _answer_to_order(order_day, items, asked_full)
     except Exception as e:                           # noqa: BLE001
         log.error(f"[supply] ответ в заявку не записан: {e}")
+    # Цены магазина: что он написал в «Price, AED» против нашей закупочной.
+    try:
+        await _prices_tell(price_changes, sid)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] цены из ответа не сверены: {e}")
     if перенумеровано[0]:
         log.info(f"[supply] поставка {sid}: магазин перенумеровал строки — "
                  f"{перенумеровано[0]} узнаны по названию")
@@ -3414,6 +3524,41 @@ async def handle_own_short(request):
 
 
 @require_owner
+async def handle_prices_file(request):
+    """POST /api/owner/supply/prices (multipart file) — файл магазина только
+    ради цен: что он написал в «Price, AED» против нашей закупочной. Поставку
+    не трогает — для файла, который уже загружали как ответ."""
+    from openpyxl import load_workbook
+    reader = await request.multipart()
+    field = await reader.next()
+    if field is None or field.name != "file":
+        return web.json_response({"error": "file_required"}, status=400, headers=CORS_HEADERS)
+    raw = await field.read(decode=False)
+    if not raw:
+        return web.json_response({"error": "empty_file"}, status=400, headers=CORS_HEADERS)
+    try:
+        wb = load_workbook(io.BytesIO(raw), data_only=True)
+    except Exception as e:                           # noqa: BLE001
+        return web.json_response({"error": "not_xlsx", "detail": str(e)[:120]},
+                                 status=400, headers=CORS_HEADERS)
+    ws = wb[SHEET_MAIN] if SHEET_MAIN in wb.sheetnames else wb.worksheets[0]
+    hdr_row, cols = _header_row(ws)
+    if not hdr_row:
+        return web.json_response({"error": "no_key_column", "need": NUM_COL},
+                                 status=400, headers=CORS_HEADERS)
+    if PRICE_COL not in cols:
+        return web.json_response({"error": "no_price_column"}, status=400, headers=CORS_HEADERS)
+    import stock_value
+    prices = _file_prices(ws, hdr_row, cols, _catalog_by_id())
+    changes = await stock_value.price_changes(prices)
+    await stock_value.price_proposals_add(changes, "")
+    log.info(f"[supply] цены из файла: строк {len(prices)}, отличий {len(changes)}")
+    return web.json_response({"ok": True, "rows": len(prices), "changes": changes,
+                              "proposals": await stock_value.price_proposals_pending()},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_own_noscan(request):
     """Товар забрали, коды не читали — задача остаётся открытой."""
     try:
@@ -3738,6 +3883,7 @@ def setup(app):
         ("/api/owner/supply/export", handle_export, "GET"),
         ("/api/owner/supply/send",   handle_send,   "POST"),
         ("/api/owner/supply/import", handle_import, "POST"),
+        ("/api/owner/supply/prices", handle_prices_file, "POST"),
         ("/api/owner/supply/extra",  handle_extra_create, "POST"),
         ("/api/owner/supply/intake/history", handle_intake_history, "GET"),
         ("/api/owner/supply/intake/live", handle_own_intake_live, "GET"),

@@ -2519,9 +2519,12 @@ async def zayavka_save(day: str, asked: dict, by: dict = None):
     «сколько не хватает», а «в какой район не доедет»."""
     db = _db_or_none()
     if db is None: return
-    await db.zayavki.replace_one(
-        {"_id": day}, {"_id": day, "asked": asked, "by": by or {},
-                       "at": datetime.now(timezone.utc)},
+    # $set, а не replace: в том же документе лежит заморозка дня (base,
+    # buy_day) — replace_one стирал её при каждой отправке файла, и экран
+    # заявки жил «предварительным расчётом» (найдено 24 окт 2026).
+    await db.zayavki.update_one(
+        {"_id": day}, {"$set": {"asked": asked, "by": by or {},
+                                "at": datetime.now(timezone.utc)}},
         upsert=True)
 
 

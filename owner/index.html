@@ -26738,7 +26738,7 @@ function ordPick(){
   const complete = st.k === 'done' || (!!closed && !cancelled);
   const phase = !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
     : cancelled ? 'отменена' : complete ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
-  const took = live ? st.took : (closed ? (closed.took || closed.total_qty || 0) : 0);
+  const took = !sup ? 0 : st.sup ? st.took : (closed.took || closed.total_qty || 0);
   const pct = sup && !cancelled ? (sup.total_qty ? Math.round(took / sup.total_qty * 100) : 0) : null;
   let who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
@@ -26829,16 +26829,20 @@ function pathInner(){
   // первом шаге показывает сегодняшнюю заявку: то, что просим сейчас, а не
   // то, что просили в прошлый раз.
   const live = !!(sup && sup.status === 'open');
-  const step = live ? 2 : (sup && sup.status !== 'cancelled' ? 3 : 1);
+  // Принятая поставка документа — тоже числа пути: заявка → дал → 100%.
+  // Прочерки только когда поставки нет или её отменили.
+  const done = !!(sup && sup.status !== 'open' && sup.status !== 'cancelled');
+  const has = live || done;
+  const step = live ? 2 : (done ? 3 : 1);
   const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
   // Третий шаг меряется в процентах, а не в бутылках: «179» рядом с «469» надо
   // делить в уме, а «38%» отвечает сразу. Сами бутылки — на экране приёмки.
   const vals = [
-    fmt(live ? (sup.asked_qty || 0) : (d.total_qty || 0)),
-    live ? fmt(sup.total_qty || 0) : '—',
-    live ? pct + '%' : '—',
+    fmt(has ? (sup.asked_qty || 0) : (d.total_qty || 0)),
+    has ? fmt(sup.total_qty || 0) : '—',
+    has ? pct + '%' : '—',
   ];
-  const m = (live && sup.money) || null;
+  const m = (has && sup.money) || null;
   // Под «приняли» — бутылки, а не деньги: пока идёт приём, там всегда был
   // ноль дирхамов, и он отвечал не на тот вопрос.
   // Под первым шагом — закупочная сумма заявки, как и в шапке «Закупаем»:
@@ -31221,7 +31225,14 @@ function _supMain(list){
 // заявками»). Раньше сегодняшняя закрытая оставалась на хабе «новостью дня» с
 // именами водителей по районам, и было не понять, идёт приём или кончился.
 function _supCur(list){
-  return _supMain(list);
+  const open = _supMain(list); if(open) return open;
+  // Открытой нет — текущая та, что принадлежит документу заявки (сервер
+  // находит её по дню закупки): принятая или отменённая сегодня остаётся
+  // текущей, пока не соберётся новая заявка. Иначе карточка входа говорила
+  // «принято», а хаб — «ждём магазин» (владелец, 24 окт 2026: «разберись в
+  // логике, чтобы не было противоречий»). В историю она попадает и так.
+  const sid = ORD && ORD.d && ORD.d.supply && ORD.d.supply.supply_id;
+  return sid ? ((list || []).find(x => x.supply_id === sid) || null) : null;
 }
 
 async function accSupply(goto, district, sid){

@@ -27,9 +27,45 @@ _cache: dict = {}
 # Когда рамка приходила за числом в последний раз. Нужно сторожу в домашней
 # сети (tools/pixoo_watch.py): отсюда видно, что рамка замолчала, а изнутри
 # дома этого не видно — она может стоять на нашем канале и не ходить никуда
-# (так и было 29 сен 2026). Число в памяти процесса: переживать перезапуск ему
-# незачем, после него сторож просто подождёт лишнюю минуту.
+# (так и было 29 сен 2026).
+#
+# 26 окт 2026: держалось только в памяти процесса, и после каждого
+# перезапуска (а выкладки идут по нескольку в день) ответ был «-1 —
+# неизвестно». Сторож считал неизвестное порядком, и рамка молчала два дня,
+# пока владелец не спросил, где клиенты. Теперь отметка переживает
+# перезапуск (настройка в базе, пишется не чаще раза в минуту), а «-1»
+# отдаётся вместе с временем жизни процесса — сторож сам решит, молчание это
+# или свежий старт.
 _seen: dict = {}
+_STARTED = time.time()
+SEEN_KEY = "pixoo_seen"
+SEEN_WRITE_SEC = 60
+
+
+async def _seen_touch() -> None:
+    now = time.time()
+    _seen["at"] = now
+    if now - float(_seen.get("saved") or 0) < SEEN_WRITE_SEC:
+        return
+    _seen["saved"] = now
+    try:
+        await db.setting_set(SEEN_KEY, {"at": now})
+    except Exception as e:                         # noqa: BLE001
+        log.warning(f"[pixoo] отметка прихода не записана: {e}")
+
+
+async def _seen_at() -> float:
+    if _seen.get("at"):
+        return float(_seen["at"])
+    try:
+        doc = await db.setting_get(SEEN_KEY) or {}
+        at = float(doc.get("at") or 0)
+    except Exception as e:                         # noqa: BLE001
+        log.warning(f"[pixoo] отметка прихода не прочитана: {e}")
+        at = 0.0
+    if at:
+        _seen["at"] = at
+    return at
 
 
 def pixoo_key() -> str:
@@ -84,15 +120,16 @@ async def handle_pixoo(request):
     # Не показание, а вопрос о самой рамке: сколько секунд назад она приходила.
     # Отвечаем по тому же ключу — чужой сюда не попадёт.
     if what == "seen":
-        было = _seen.get("at") or 0
-        return web.json_response({"ago": int(time.time() - было) if было else -1},
+        было = await _seen_at()
+        return web.json_response({"ago": int(time.time() - было) if было else -1,
+                                  "up": int(time.time() - _STARTED)},
                                  headers={"Cache-Control": "no-store"})
     if what not in ("customers", "online"):
         return web.Response(status=404, text="no")
     # Считаем приходом только запрос самой рамки, а не наши проверки curl-ом:
     # иначе сторож решит, что всё хорошо, глядя на собственный след.
     if "ESP32" in request.headers.get("User-Agent", ""):
-        _seen["at"] = time.time()
+        await _seen_touch()
     # Формат — как у эталона Divoom (appin.divoom-gz.com/Device/ReturnCurrentDate):
     # JSON с полем DispData. Голый текст рамка молча не рисует — проверено на
     # Pixoo-64 владельца 17 сен 2026. ?plain=1 — голый текст для глаз.

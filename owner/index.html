@@ -3813,6 +3813,13 @@ button.path:active{transform:scale(.995)}
 #ambar-receiving-finished .au-receiving-head[onclick]{cursor:pointer}
 /* Одна плитка на весь ряд (владелец, 26 окт 2026: докупка ушла в другие базы). */
 #ambar-receiving-finished .au-operations.au-one{grid-template-columns:minmax(0,1fr)}
+/* Только текст единственной кнопки свободной закупки Барракуды
+   (AMBAR-FREE-PURCHASE-TEXT-FOR-CLAUDE, 27 окт 2026): два слова одно под другим,
+   крупнее; helper с потолком 18px эти два элемента не уменьшает — правила без
+   его переменных и с !important. cqw — от контейнера .au-app. */
+[data-barracuda-free-purchase] .ambar-free-purchase-title{font-size:22px!important;font-size:clamp(20px,5.8cqw,23px)!important;line-height:1.3!important;font-weight:700!important;letter-spacing:-0.015em!important;white-space:normal;overflow-wrap:anywhere}
+[data-barracuda-free-purchase] .ambar-free-purchase-title>span{display:block}
+[data-barracuda-free-purchase] .ambar-free-purchase-caption{font-size:14px!important;line-height:20px!important;font-weight:400!important}
 #accOv:has(#ambar-receiving-finished) .stk-top-a{display:flex;align-items:center;gap:4px}
 #accOv:has(#ambar-receiving-finished) .stk-top-a .acc-act.au-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
 #accOv:has(#ambar-receiving-finished) .stk-top-a .au-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid transparent;border-radius:13px;background:transparent;color:#a8a0ad!important;cursor:pointer}
@@ -27528,10 +27535,10 @@ function auOrderCard(){
 // «Свободная закупка · Барракуда» — поток под клиентов ещё не построен.
 function auOps(){
   return `<div class="au-operations au-one" aria-label="Закупки">
-    <button type="button" class="au-panel au-operation" disabled>
+    <button type="button" class="au-panel au-operation" disabled data-barracuda-free-purchase>
       <span class="au-op-top">${AR_ICO.file}${AR_ICO.right}</span>
-      <span class="au-op-title">СВОБОДНАЯ<span class="au-op-break"> </span>ЗАКУПКА</span>
-      <span class="au-op-caption">Барракуда</span>
+      <span class="au-op-title ambar-free-purchase-title"><span>СВОБОДНАЯ</span><span>ЗАКУПКА</span></span>
+      <span class="au-op-caption ambar-free-purchase-caption">Барракуда</span>
     </button></div>`;
 }
 

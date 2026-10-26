@@ -3814,6 +3814,115 @@ button.path:active{transform:scale(.995)}
 #ambar-history-refined .ah-pin{grid-row:2;min-width:0;padding:4px 10px 0}
 #ambar-history-refined .ah-pin:empty{display:none}
 #ambar-history-refined .ah-scroll{grid-row:3;padding-bottom:calc(16px + var(--safe-bottom))}
+/* ── «Другие базы» — список заявок по эталону владельца (AMBAR-OTHER-BASES-
+   LIST-FOR-CLAUDE, 27 окт 2026). other-bases-visual.css дословно, корень
+   #ambar-other-bases-priority; следом other-bases-integration.css и адаптер
+   оболочки STAR. ── */
+#ambar-other-bases-priority{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-other-bases-priority .bp-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-other-bases-priority .bp-app{--bp-width:390px;--bp-height:844px;--bp-bg:#07070c;--bp-text:#ece9e3;--bp-muted:#a8a0ad;--bp-gold:#e2c386;--bp-green:#899b8a;--bp-red:#b98e95;box-sizing:border-box;display:grid;grid-template-rows:auto minmax(0,1fr) auto;width:var(--bp-width);max-width:100%;height:var(--bp-height);overflow:hidden;min-width:0;border:1px solid #26232f;border-radius:24px;background:var(--bp-bg);color:var(--bp-text);color-scheme:dark;font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;container-type:size;container-name:bp-phone}
+#ambar-other-bases-priority .bp-app *{box-sizing:border-box}
+#ambar-other-bases-priority .bp-app button{appearance:none;-webkit-tap-highlight-color:transparent;font-family:inherit;white-space:normal}
+#ambar-other-bases-priority svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important;stroke-width:1.7}
+#ambar-other-bases-priority .bp-header{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #25212d;background:#0b0a11}
+#ambar-other-bases-priority .bp-back{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #292534;border-radius:13px;background:#12111f;color:var(--bp-muted)}
+#ambar-other-bases-priority .bp-header h1{margin:0;min-width:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.02em;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-scroll{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:16px 12px 18px;scrollbar-width:thin;scrollbar-color:#3b3445 transparent}
+#ambar-other-bases-priority .bp-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;margin:0 2px 10px}
+#ambar-other-bases-priority .bp-section-head h2{margin:0;min-width:0;font-size:12px;line-height:18px;font-weight:700;letter-spacing:.045em;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-pending{overflow:hidden;border:1px solid #5a4c40;border-radius:18px;background:#25212e}
+#ambar-other-bases-priority .bp-pending .bp-section-head{min-height:52px;margin:0;padding:12px 16px;gap:12px;border-bottom:1px solid #463b44;background:#2c2631;color:var(--bp-gold)}
+#ambar-other-bases-priority .bp-count{flex:none;min-width:20px;text-align:right;color:var(--bp-gold);font-family:"Space Grotesk","Manrope",sans-serif;font-size:18px;line-height:24px;font-weight:500;font-variant-numeric:tabular-nums}
+#ambar-other-bases-priority .bp-pending-list{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+#ambar-other-bases-priority .bp-request{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr) minmax(54px,auto) 16px;align-items:start;gap:12px 11px;min-width:0;width:100%;min-height:116px;padding:18px 16px;border:0;border-radius:0;background:transparent;color:var(--bp-text);text-align:left}
+#ambar-other-bases-priority .bp-request::after{content:"";position:absolute;left:0;top:18px;bottom:18px;width:2px;border-radius:0 2px 2px 0;background:var(--bp-gold);pointer-events:none}
+#ambar-other-bases-priority .bp-request+.bp-request::before{content:"";position:absolute;top:0;left:49px;right:16px;height:1px;background:#443a49;pointer-events:none}
+#ambar-other-bases-priority .bp-request-icon{display:grid;place-items:center;width:22px;height:24px;margin-top:2px;color:var(--bp-gold)}
+#ambar-other-bases-priority .bp-request-icon>svg.lucide{width:21px!important;height:21px!important;stroke-width:1.45}
+#ambar-other-bases-priority .bp-request-identity{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+#ambar-other-bases-priority .bp-request-identity>strong{min-width:0;font-size:16px;line-height:22px;font-weight:700;letter-spacing:-.02em;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-draft{display:inline-flex;align-items:center;gap:6px;color:var(--bp-gold);font-size:12px;line-height:18px;font-weight:500}
+#ambar-other-bases-priority .bp-draft>span{width:4px;height:4px;border-radius:50%;background:currentColor;flex:none}
+#ambar-other-bases-priority .bp-quantity{display:flex;flex-direction:column;align-items:flex-end;gap:0;min-width:0;text-align:right}
+#ambar-other-bases-priority .bp-quantity>strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:30px;line-height:32px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:var(--bp-gold);overflow-wrap:anywhere;max-width:100%}
+#ambar-other-bases-priority .bp-quantity>span{font-size:11px;line-height:15px;font-weight:400;color:#aba3b2}
+#ambar-other-bases-priority .bp-request-arrow{display:grid;place-items:center;align-self:center;width:16px;min-height:24px;color:var(--bp-gold)}
+#ambar-other-bases-priority .bp-request-arrow>svg.lucide{width:16px!important;height:20px!important;stroke-width:2}
+#ambar-other-bases-priority .bp-request-meta{grid-column:2/4;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 7px;min-width:0;color:var(--bp-muted);font-size:12px;line-height:18px;font-weight:400}
+#ambar-other-bases-priority .bp-request-meta>*{min-width:0;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-request-meta>*+*::before{content:"·";margin-right:7px;color:#817788}
+#ambar-other-bases-priority .bp-reviewed{margin-top:24px;overflow:hidden;border:1px solid #37303f;border-radius:18px;background:#11101b}
+#ambar-other-bases-priority .bp-reviewed .bp-section-head{min-height:52px;margin:0;padding:4px 10px 4px 15px;gap:8px;border-bottom:1px solid #302936;background:linear-gradient(115deg,#1c1825,#171420);color:#c9c1ce}
+#ambar-other-bases-priority .bp-filter{--bp-filter-width:66px;position:relative;display:block;flex:0 1 auto;min-width:0;max-width:54%}
+#ambar-other-bases-priority .bp-filter[data-value="accepted"],#ambar-other-bases-priority .bp-filter[data-value="cancelled"]{--bp-filter-width:132px}
+#ambar-other-bases-priority .bp-filter-select{display:block;appearance:none;width:var(--bp-filter-width);max-width:100%;min-height:44px;margin:0;padding:10px 25px 10px 8px;border:0;border-radius:8px;background:transparent;color:var(--bp-gold);font-family:inherit;font-size:12px;line-height:20px;font-weight:500;text-align:right;text-align-last:right}
+#ambar-other-bases-priority .bp-filter-select:hover{background:#e2c38608}
+#ambar-other-bases-priority .bp-filter>svg.lucide{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:13px!important;height:13px!important;color:var(--bp-gold);pointer-events:none}
+#ambar-other-bases-priority .bp-filter-select option{background:#17131f;color:var(--bp-text)}
+#ambar-other-bases-priority .bp-records{min-width:0;background:transparent}
+#ambar-other-bases-priority .bp-record{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr) minmax(54px,max-content) 12px;align-items:center;gap:10px 10px;min-width:0;width:100%;min-height:100px;padding:13px 15px;border:0;background:transparent;text-align:left;color:var(--bp-text)}
+#ambar-other-bases-priority .bp-record:not([hidden])~.bp-record:not([hidden])::before{content:"";position:absolute;top:0;left:59px;right:15px;height:1px;background:#2c2634;pointer-events:none}
+#ambar-other-bases-priority [hidden]{display:none!important}
+#ambar-other-bases-priority .bp-record-icon{grid-column:1;grid-row:2;display:grid;place-items:center;width:34px;height:34px;border:1px solid #36303f;border-radius:10px;background:linear-gradient(145deg,#24202d,#1a1725);color:#b3a8bc}
+#ambar-other-bases-priority .bp-record-icon>svg.lucide{width:18px!important;height:18px!important;stroke-width:1.5}
+#ambar-other-bases-priority .bp-record-identity{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:2px;min-width:0}
+#ambar-other-bases-priority .bp-record-identity>strong{font-size:14px;line-height:20px;font-weight:600;letter-spacing:-.015em;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-record-identity>span{font-size:12px;line-height:18px;font-weight:400;color:var(--bp-muted);overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-record-quantity{grid-column:3;grid-row:2;display:flex;flex-direction:column;align-items:flex-end;min-width:0;gap:0;text-align:right}
+#ambar-other-bases-priority .bp-record-quantity>strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:22px;line-height:25px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+#ambar-other-bases-priority .bp-record-quantity>span{font-size:11px;line-height:15px;font-weight:400;color:var(--bp-muted)}
+#ambar-other-bases-priority .bp-record-head{grid-column:1/-1;grid-row:1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 12px;min-width:0}
+#ambar-other-bases-priority .bp-record-date{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-height:24px;padding:2px 6px;border:1px solid #322c3b;border-radius:6px;background:#ffffff02;font-size:12px;line-height:18px;font-weight:500;color:#b9b0c1;font-variant-numeric:tabular-nums}
+#ambar-other-bases-priority .bp-record-date>svg.lucide{width:13px!important;height:13px!important;color:#96899f;stroke-width:1.6}
+#ambar-other-bases-priority .bp-record-date>span{min-width:0;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-status{display:inline-flex;align-items:center;gap:4px;max-width:100%;min-height:22px;padding:2px 7px;border-radius:6px;font-size:11px;line-height:18px;font-weight:500;overflow-wrap:anywhere}
+#ambar-other-bases-priority .bp-status.is-cancelled{color:#c399a0;background:#b98e950d}
+#ambar-other-bases-priority .bp-status.is-accepted{color:#a1b29f;background:#899b8a12}
+#ambar-other-bases-priority .bp-status>svg.lucide{width:12px!important;height:12px!important}
+#ambar-other-bases-priority .bp-record>.bp-chevron{grid-column:4;grid-row:2;align-self:center;justify-self:end;width:12px!important;height:16px!important;color:#8f829d}
+#ambar-other-bases-priority .bp-footer{padding:10px 12px 14px;border-top:1px solid #25212d;background:#0b0a11}
+#ambar-other-bases-priority .bp-new{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-width:0;min-height:50px;padding:12px 14px;border:1px solid #514533;border-radius:14px;background:#e2c38609;color:var(--bp-gold);font-size:15px;line-height:22px;font-weight:600}
+#ambar-other-bases-priority .bp-new>svg.lucide{width:18px!important;height:18px!important}
+#ambar-other-bases-priority .bp-request:hover{background:#ffffff03}
+#ambar-other-bases-priority .bp-request:active{background:#e2c38609}
+#ambar-other-bases-priority .bp-record:hover{background:#ffffff03}
+#ambar-other-bases-priority .bp-record:active{background:#e2c38608}
+@container bp-phone (max-width:340px){
+  #ambar-other-bases-priority .bp-scroll{padding-left:10px;padding-right:10px}
+  #ambar-other-bases-priority .bp-request{padding-left:13px;padding-right:13px;column-gap:9px}
+  #ambar-other-bases-priority .bp-request+.bp-request::before{left:44px;right:13px}
+  #ambar-other-bases-priority .bp-record{padding-left:11px;padding-right:11px;column-gap:8px}
+  #ambar-other-bases-priority .bp-record:not([hidden])~.bp-record:not([hidden])::before{left:53px;right:11px}
+}
+/* other-bases-integration.css: без рамки телефона, размер от контейнера приложения,
+   длинные числа переносятся внутри колонки (обычные 34/81/60/128 — как в эталоне). */
+#ambar-other-bases-priority{--bp-safe-bottom:0px;width:100%;height:100%;min-width:0;min-height:0}
+#ambar-other-bases-priority .bp-stage{display:block;width:100%;height:100%;min-width:0;min-height:0;padding:0}
+#ambar-other-bases-priority .bp-app{width:100%;max-width:none;height:100%;min-width:0;min-height:0;border:0;border-radius:0}
+#ambar-other-bases-priority .bp-footer{padding-bottom:calc(14px + var(--bp-safe-bottom))}
+#ambar-other-bases-priority .bp-request{grid-template-columns:22px minmax(0,1fr) fit-content(28%) 16px}
+#ambar-other-bases-priority .bp-record{grid-template-columns:34px minmax(0,1fr) fit-content(28%) 12px}
+#ambar-other-bases-priority .bp-quantity,#ambar-other-bases-priority .bp-record-quantity{min-width:54px}
+#ambar-other-bases-priority .bp-quantity>strong,#ambar-other-bases-priority .bp-record-quantity>strong{max-width:100%;overflow-wrap:anywhere}
+/* Адаптер оболочки STAR: шапка раздела своя и в bp-app не дублируется (две
+   строки — список и подвал), середина раздела без полей и без своей прокрутки,
+   safe-area один раз — в подвале. Группа «В работе» (открытые заявки, их везут
+   водители) — той же поверхностью, что отработанные, без фильтра. Сигареты и
+   прежнее пустое состояние — внутри той же прокрутки. */
+#accMid:has(> #ambar-other-bases-priority){padding:0;overflow:hidden}
+#ambar-other-bases-priority{--bp-safe-bottom:var(--safe-bottom)}
+#ambar-other-bases-priority .bp-app{grid-template-rows:minmax(0,1fr) auto}
+#ambar-other-bases-priority .bp-scroll>section:first-child{margin-top:0}
+#ambar-other-bases-priority .bp-active .bp-count{color:#c9c1ce}
+#ambar-other-bases-priority .bp-status.is-waiting{color:#d6c08f;background:#e2c3860f}
+#ambar-other-bases-priority .bp-none{padding:16px 15px;font-size:12px;line-height:18px;color:var(--bp-muted);text-align:left}
+#ambar-other-bases-priority .bp-request-drop{color:#8f829d;align-self:start;margin-top:2px;min-height:24px}
+#ambar-other-bases-priority .bp-request-drop>svg.lucide{width:16px!important;height:16px!important;stroke-width:1.8}
+#ambar-other-bases-priority .xs-tob{margin:0 0 16px}
+#ambar-other-bases-priority .xs-empty{min-height:0;flex:1 1 auto;padding:24px 0}
+#ambar-other-bases-priority .bp-scroll:has(> .xs-empty){display:flex;flex-direction:column}
+#ambar-other-bases-priority button:enabled{cursor:pointer}
+#ambar-other-bases-priority button:focus-visible,#ambar-other-bases-priority select:focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
 /* barracuda-integration.css: размер от настоящего контейнера, без оболочки предпросмотра. */
 #ambar-receiving-finished{width:100%;height:100%;min-width:0;min-height:0}
 #ambar-receiving-finished .au-stage{display:contents;padding:0}
@@ -32002,6 +32111,95 @@ function pathExtra(){
   </button>`;
 }
 
+// ── «Другие базы» — список заявок по эталону владельца (AMBAR-OTHER-BASES-
+// LIST-FOR-CLAUDE, 27 окт 2026). Одна прокрутка, сверху «Требуют решения»:
+// черновики, собранные программой из недобора, и незаконченные заявки мастера
+// (память телефона); ниже «Отработанные» с фильтром. Открытые заявки, которые
+// везут водители, — своей группой «В работе» между ними: они не ждут решения,
+// но и не отработаны. Иконки Lucide с class="lucide" — по нему стили эталона.
+const OB_ICO = (() => {
+  const w = (n, body, cls) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls ? cls + ' ' : ''}lucide lucide-${n}" aria-hidden="true">${body}</svg>`;
+  return {
+    file: w('file-text', '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'),
+    pen: w('file-pen-line', '<path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><path d="M8 18h1"/>'),
+    store: w('store', '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/>'),
+    cal: w('calendar-days', '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>'),
+    x: w('x', '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+    check: w('check', '<path d="M20 6 9 17l-5-5"/>'),
+    clock: w('clock-3', '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/>'),
+    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>'),
+    chev: w('chevron-right', '<path d="m9 18 6-6-6-6"/>', 'bp-chevron'),
+    down: w('chevron-down', '<path d="m6 9 6 6 6-6"/>'),
+    plus: w('plus', '<path d="M5 12h14"/><path d="M12 5v14"/>'),
+  };
+})();
+
+// Дата записи — «24 октября» общим правилом (_dayName); год дописывается,
+// только если он не текущий: история прошлых лет читается однозначно.
+function _xbDay(dt){
+  const y = String(dt || '').slice(0, 4), cur = _dayIsoFor(0).slice(0, 4);
+  return _dayName(dt) + (y && y !== cur ? ' ' + y : '');
+}
+
+// Фильтр отработанных живёт между перерисовками: обновление данных его не
+// сбрасывает. Меняет только видимость строк нижней группы, статусов не трогает.
+let XB_FILTER = 'all';
+function xbFilter(v){
+  XB_FILTER = ['all', 'accepted', 'cancelled'].includes(v) ? v : 'all';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  xbFilterPaint();
+}
+function xbFilterPaint(){
+  const sec = document.querySelector('#ambar-other-bases-priority .bp-reviewed:not(.bp-active)'); if(!sec) return;
+  const sel = sec.querySelector('.bp-filter-select'), wrap = sec.querySelector('.bp-filter');
+  if(sel) sel.value = XB_FILTER;
+  if(wrap) wrap.dataset.value = XB_FILTER;
+  let n = 0;
+  sec.querySelectorAll('.bp-record').forEach(r => {
+    const show = XB_FILTER === 'all' || r.dataset.status === XB_FILTER;
+    r.hidden = !show; if(show) n++;
+  });
+  const none = sec.querySelector('.bp-none'); if(none) none.hidden = n > 0;
+}
+
+// Черновик из недобора: вся строка — прежняя дверь в окно «назвать базу и
+// отправить / отменить» (xSend). Штрих слева и иконки — украшение.
+function xbRequest(x){
+  const dt = x.day || String(x.at || '').slice(0, 10);
+  const было = (x.tried_bases || []).filter(Boolean);
+  const q = x.total_qty || 0, p = x.positions || 0;
+  return `<button type="button" class="bp-request" onclick="xSend('${escS(x.supply_id)}')" data-record="${escS(x.supply_id)}" data-status="draft">
+    <span class="bp-request-icon" aria-hidden="true">${OB_ICO.file}</span>
+    <span class="bp-request-identity"><strong>${escS(x.base || 'База не названа')}</strong><span class="bp-draft"><span aria-hidden="true"></span>${_xState(x)[0]}</span></span>
+    <span class="bp-quantity"><strong>${fmt(q)}</strong><span>${pluralize(q,'бутылка','бутылки','бутылок')}</span></span>
+    <span class="bp-request-arrow" aria-hidden="true">${OB_ICO.right}</span>
+    <span class="bp-request-meta"><span>${p} ${pluralize(p,'позиция','позиции','позиций')}</span><time datetime="${escS(dt)}">${escS(_xbDay(dt))}</time>${
+      было.length ? `<span>нет на: ${escS(было.join(', '))}</span>` : ''}${
+      x.short_left ? `<span>докупить ${fmt(x.short_left)}</span>` : ''}</span>
+  </button>`;
+}
+
+// Открытая или отработанная заявка: два ряда — дата слева вверху и статус
+// справа вверху, ниже иконка базы, название с позициями, объём и стрелка.
+// Вся строка — прежняя дверь в приёмку (xOpen). data-status — категория
+// показа для фильтра, не статус сервера.
+function xbRecord(x){
+  const st = _xState(x);
+  const dt = x.day || String(x.at || '').slice(0, 10);
+  const q = x.total_qty || 0, p = x.positions || 0;
+  const kind = x.status === 'cancelled' ? ['cancelled', 'is-cancelled', OB_ICO.x]
+             : x.status === 'open' ? ['working', 'is-waiting', OB_ICO.clock]
+             : ['accepted', 'is-accepted', OB_ICO.check];
+  return `<button type="button" class="bp-record" onclick="xOpen('${escS(x.supply_id)}')" data-record="${escS(x.supply_id)}" data-status="${kind[0]}">
+    <span class="bp-record-icon" aria-hidden="true">${OB_ICO.store}</span>
+    <span class="bp-record-identity"><strong>${escS(x.base || 'База')}</strong><span>${p} ${pluralize(p,'позиция','позиции','позиций')}${
+      x.short_left ? ` · докупить ${fmt(x.short_left)}` : ''}</span></span>
+    <span class="bp-record-quantity"><strong>${fmt(q)}</strong><span>${pluralize(q,'бутылка','бутылки','бутылок')}</span></span>
+    ${OB_ICO.chev}
+    <span class="bp-record-head"><time class="bp-record-date" datetime="${escS(dt)}">${OB_ICO.cal}<span>${escS(_xbDay(dt))}</span></time><span class="bp-status ${kind[1]}">${kind[2]}${st[0]}</span></span>
+  </button>`;
+}
+
 async function accExtra(){
   document.getElementById('accMid').classList.remove('ap-host'); arVisOff();
   ORD_BRANCH = 'extra';
@@ -32029,36 +32227,30 @@ async function accExtra(){
   // «Закрытых» со словом «недобор», и отправить их было нечем.
   const open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft'),
         past = ex.filter(x => x.status !== 'open' && x.status !== 'draft');
-  _setText('accSub', '');
-  const row = x => {
-    const st = _xState(x);
-    const dt = x.day || String(x.at || '').slice(0, 10);
-    const чер = x.status === 'draft';
-    const было = (x.tried_bases || []).filter(Boolean);
-    return `<button class="pnav-r" onclick="${чер ? 'xSend' : 'xOpen'}('${escS(x.supply_id)}')">
-      <span class="pnav-i ${st[1] === 'live' ? 'live' : st[1] === 'done' ? 'ok' : ''}">${ICO_BASE}</span>
-      <span class="pnav-b"><b>${escS(x.base || (чер ? 'База не названа' : 'База'))}</b>
-        <i>${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')} · ${
-          x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')} · ${_dayName(dt)}${
-          чер && было.length ? ` · нет на: ${escS(было.join(', '))}` : ''}${
-          x.short_left ? ` · <b class="sh-cov warn">докупить ${fmt(x.short_left)}</b>` : ''}</i></span>
-      <span class="pstat-c ${st[1]}">${st[0]}</span>
-      <span class="pnav-go">${ICO_CHEV}</span>
-    </button>`;
-  };
-  mid.innerHTML = (tob ? `<div class="exp-grp">Закупаем отдельно</div><div class="xs-tob" id="xTob">${tob}</div>` : '')
-    + (!ex.length
-    ? `<div class="xs-empty${tob ? ' after' : ''}"><div class="sh-empty xs-ecard">
+  const local = xDraftRows();
+  const nWait = wait.length + xDrafts().length;
+  const head = (id, t, right) => `<div class="bp-section-head"><h2 id="${id}">${t}</h2>${right || ''}</div>`;
+  const pending = nWait ? `<section class="bp-pending" aria-labelledby="bp-pending-title">${
+      head('bp-pending-title', 'ТРЕБУЮТ РЕШЕНИЯ', `<span class="bp-count" aria-label="${nWait} ${pluralize(nWait,'заявка','заявки','заявок')}">${nWait}</span>`)}
+    <div class="bp-pending-list">${wait.map(xbRequest).join('')}${local}</div></section>` : '';
+  const active = open.length ? `<section class="bp-reviewed bp-active" aria-labelledby="bp-active-title">${
+      head('bp-active-title', 'В РАБОТЕ', `<span class="bp-count" aria-label="${open.length} ${pluralize(open.length,'заявка','заявки','заявок')}">${open.length}</span>`)}
+    <div class="bp-records">${open.map(xbRecord).join('')}</div></section>` : '';
+  const filt = `<span class="bp-filter" data-value="${XB_FILTER}"><select class="bp-filter-select" aria-label="Фильтр отработанных заявок" onchange="xbFilter(this.value)">${
+      [['all', 'Все'], ['accepted', 'Выполненные'], ['cancelled', 'Отменённые']].map(([v, t]) =>
+        `<option value="${v}"${XB_FILTER === v ? ' selected' : ''}>${t}</option>`).join('')}</select>${OB_ICO.down}</span>`;
+  const done = past.length ? `<section class="bp-reviewed" aria-labelledby="bp-reviewed-title">${head('bp-reviewed-title', 'ОТРАБОТАННЫЕ', filt)}
+    <div class="bp-records">${past.map(xbRecord).join('')}<div class="bp-none" hidden>Пока пусто</div></div></section>` : '';
+  const empty = (pending || active || done) ? '' : `<div class="xs-empty${tob ? ' after' : ''}"><div class="sh-empty xs-ecard">
         <span class="sh-empty-i">${ICO_BASE}</span>
         <div class="sh-empty-t">Пока пусто</div>
         <div class="sh-empty-s">Магазин дал не всё — соберите заявку на другую базу</div>
-      </div></div>`
-    : (wait.length ? `<div class="exp-grp">Ждут отправки</div><div class="pbox">${wait.map(row).join('')}</div>` : '')
-      + (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
-      + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : ''));
-  mid.innerHTML += xDraftRows();
-  document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
-    <button class="qb" onclick="xNew()">${ICO_XPLUS}Новая заявка</button></div>`;
+      </div></div>`;
+  mid.innerHTML = `<div id="ambar-other-bases-priority" lang="ru"><div class="bp-stage"><div class="bp-app" aria-label="Другие базы — заявки">
+    <main class="bp-scroll">${tob ? `${head('bp-tob-title', 'ЗАКУПАЕМ ОТДЕЛЬНО')}<div class="xs-tob" id="xTob">${tob}</div>` : ''}${pending}${active}${done}${empty}</main>
+    <footer class="bp-footer"><button type="button" class="bp-new" onclick="xNew()">${OB_ICO.plus}<span>Новая заявка</span></button></footer>
+  </div></div></div>`;
+  xbFilterPaint();
 }
 
 // Черновик, собранный программой: назвать базу и отправить водителям — или
@@ -32573,18 +32765,22 @@ async function xDraftOpen(id){
   xRender();
 }
 function xDraftRows(){
+  // Строки незаконченных заявок мастера — в группе «Требуют решения» рядом с
+  // черновиками из недобора. Нажатие открывает мастер на том же шаге; крестик
+  // справа (вместо стрелки) убирает черновик — прежний обработчик.
   const list = xDrafts(); if(!list.length) return '';
   const qty = d => Object.values(d.rows || {}).reduce((a, r) => a + Object.values(r.by || {}).reduce((x, n) => x + (n || 0), 0), 0);
   const pos = d => Object.values(d.rows || {}).filter(r => Object.values(r.by || {}).some(n => n > 0)).length;
   const where = d => d.step === 1 ? 'куда едем' : d.step === 3 ? 'итог' : `район ${(d.di || 0) + 1}`;
-  return `<div class="exp-grp">Черновики</div><div class="pbox">${list.map(d => {
+  return list.map(d => {
     const n = qty(d), p = pos(d);
-    return `<button class="pnav-r xd-row" onclick="xDraftOpen('${escS(d.id)}')">
-      <span class="pnav-i">${IC('edit', 16)}</span>
-      <span class="pnav-b"><b>${escS(d.base || 'Без названия')}</b>
-        <i>${n ? `${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')} · ${p} ${pluralize(p,'позиция','позиции','позиций')} · ` : ''}${where(d)} · ${_hm(d.at)}</i></span>
-      <span class="xd-x" onclick="event.stopPropagation(); xDraftDrop('${escS(d.id)}'); accExtra()" aria-label="Убрать">✕</span>
-    </button>`; }).join('')}</div>`;
+    return `<button type="button" class="bp-request bp-local" onclick="xDraftOpen('${escS(d.id)}')" data-record="${escS(d.id)}" data-status="draft">
+      <span class="bp-request-icon" aria-hidden="true">${OB_ICO.pen}</span>
+      <span class="bp-request-identity"><strong>${escS(d.base || 'Без названия')}</strong><span class="bp-draft"><span aria-hidden="true"></span>не закончена</span></span>
+      ${n ? `<span class="bp-quantity"><strong>${fmt(n)}</strong><span>${pluralize(n,'бутылка','бутылки','бутылок')}</span></span>` : '<span class="bp-quantity"></span>'}
+      <span class="bp-request-arrow bp-request-drop" role="button" aria-label="Убрать" onclick="event.stopPropagation(); xDraftDrop('${escS(d.id)}'); accExtra()">${OB_ICO.x}</span>
+      <span class="bp-request-meta">${n ? `<span>${p} ${pluralize(p,'позиция','позиции','позиций')}</span>` : ''}<span>${where(d)}</span><span>${_hm(d.at)}</span></span>
+    </button>`; }).join('');
 }
 
 function xBack(){

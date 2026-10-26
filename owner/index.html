@@ -3698,6 +3698,23 @@ button.path:active{transform:scale(.995)}
   @container au-finished-phone (min-height:760px){#ambar-receiving-finished .au-app[data-sparse="true"] .au-operation{grid-template-rows:auto minmax(min-content,1fr) auto}}
 }
 @media(prefers-reduced-motion:reduce){#ambar-receiving-finished .au-live{animation:none}#ambar-receiving-finished .au-rail>span{transition:none}}
+/* Завершённое состояние основной заявки (AMBAR-BARRACUDA-COMPLETED, 26 окт 2026):
+   иллюстрация, две строки, «История» внутри карточки. completion.css буквально. */
+#ambar-receiving-finished .au-completion{display:flex;flex-direction:column;flex:1 0 auto;min-width:0;min-height:min-content}
+#ambar-receiving-finished .au-completion-main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex:1 0 auto;padding:14px 18px 20px;min-width:0}
+#ambar-receiving-finished .au-completion-art{display:block;width:clamp(170px,56cqw,224px);max-width:100%;height:auto;aspect-ratio:1;object-fit:contain;flex:none}
+#ambar-receiving-finished .au-completion-message{display:grid;gap:6px;margin:0;width:100%;max-width:280px;min-width:0;text-align:center;overflow-wrap:anywhere;text-wrap:balance;color:var(--au-text)}
+#ambar-receiving-finished .au-completion-context{display:block;font-size:clamp(12px,3.3cqw,13px);line-height:1.45;font-weight:400;letter-spacing:0;color:var(--au-muted)}
+#ambar-receiving-finished .au-completion-result{display:block;font-size:clamp(17px,4.7cqw,19px);line-height:1.3;font-weight:600;letter-spacing:-.025em;color:var(--au-text)}
+#ambar-receiving-finished .au-completion-footer{flex:0 0 auto;padding:0 14px 14px}
+#ambar-receiving-finished .au-completion-history{display:grid;grid-template-columns:18px minmax(0,1fr) 18px;align-items:center;gap:10px;width:100%;min-height:48px;padding:12px 16px;border:1px solid #514533;border-radius:12px;background:#e2c38609;color:var(--au-gold);font-size:14px;line-height:22px;font-weight:600;text-align:center}
+#ambar-receiving-finished .au-completion-history>.au-chevron{color:var(--au-gold);justify-self:end}
+@container au-finished-phone (max-height:700px){
+  #ambar-receiving-finished .au-completion-main{padding:8px 16px 12px}
+  #ambar-receiving-finished .au-completion-art{width:144px}
+  #ambar-receiving-finished .au-completion-message{gap:5px}
+  #ambar-receiving-finished .au-completion-footer{padding-bottom:12px}
+}
 /* barracuda-integration.css: размер от настоящего контейнера, без оболочки предпросмотра. */
 #ambar-receiving-finished{width:100%;height:100%;min-width:0;min-height:0}
 #ambar-receiving-finished .au-stage{display:contents;padding:0}
@@ -27246,10 +27263,29 @@ function ordAttn(){
     const count = list && !list.hidden
       ? Array.from(list.children).filter(row => row.matches('.au-district') && !row.hidden).length
       : 0;
-    app.dataset.sparse = String(count <= 2);
+    const completed = app.dataset.orderCompleted === 'true';
+    app.dataset.sparse = String(completed || count <= 2);
     app.style.setProperty('--au-receiving-grow', String(count * .35));
-    app.style.setProperty('--au-order-grow', String(.3 + count * .35));
+    app.style.setProperty('--au-order-grow', String(completed ? .65 : .3 + count * .35));
     return count;
+  }
+
+  // The boolean must come from the application's existing completion rules.
+  // This switches presentation only; it does not calculate or persist status.
+  function setCompleted(app, completed) {
+    if (!app || !app.matches('.au-app')) throw new TypeError('Expected .au-app element');
+    if (typeof completed !== 'boolean') throw new TypeError('Expected a completion boolean');
+    const completion = app.querySelector('[data-completion]');
+    const summary = app.querySelector('.au-summary');
+    const receiving = app.querySelector('.au-receiving');
+    if (!completion || !summary || !receiving) throw new TypeError('Completion and active views must exist');
+    app.dataset.orderCompleted = String(completed);
+    completion.hidden = !completed;
+    summary.hidden = completed;
+    receiving.hidden = completed;
+    const session = sessions.get(app);
+    if (session) session.refresh();
+    else sync(app);
   }
 
   function fitTypography(app) {
@@ -27321,7 +27357,7 @@ function ordAttn(){
     refresh();
     return controller;
   }
-  scope.AmbarReceivingVisual = Object.freeze({sync, mount});
+  scope.AmbarReceivingVisual = Object.freeze({sync, mount, setCompleted});
 })(globalThis);
 let AR_VIS = null;                // помощник, пока хаб на экране
 function arVisOff(){ if(AR_VIS){ try{ AR_VIS.destroy(); }catch(e){} AR_VIS = null; } }
@@ -27377,6 +27413,16 @@ function auOrderCard(){
         done && !prN ? ' is-complete' : ''}${taking || prN ? ' au-live' : ''}" data-phase>${phase}</span></span>
       <span class="au-open" aria-hidden="true">${AR_ICO.right}</span>
     </button>
+    <div class="au-completion" data-completion hidden>
+      <div class="au-completion-main">
+        <img class="au-completion-art" src="/owner/order-completed.webp" width="1254" height="1254" alt="Закрытая поставка и список выполненных задач">
+        <p class="au-completion-message"><span class="au-completion-context">${
+          sup && sup.day === _dayIsoFor(0) ? 'Сегодняшняя основная заявка' : `Основная заявка${sup && sup.day ? ' · ' + escS(_dayName(sup.day)) : ''}`}</span><strong class="au-completion-result">Полностью отработана</strong></p>
+      </div>
+      <div class="au-completion-footer">
+        <button type="button" class="au-completion-history cursor-interaction" onclick="accHistory()">${AR_ICO.history}<span>История</span>${AR_ICO.right}</button>
+      </div>
+    </div>
     <div class="au-summary"><div class="au-route" aria-label="Этапы общей заявки">
       <div class="au-rail" aria-hidden="true"><span data-rail style="width:${fill}%"></span></div>${steps}
     </div></div>
@@ -27413,7 +27459,18 @@ function auBottom(){
     <input type="file" id="ordFile" accept=".xlsx" style="display:none" onchange="supImport(this,'ordUp')"></div>`;
 }
 
-// Хаб закупки: одна карточка, две плитки, ответ магазина. Списка здесь нет
+// Полностью отработана (AMBAR-BARRACUDA-COMPLETED, 26 окт 2026): поставка
+// документа закрыта — сервер ставит done только когда закрыт последний район
+// — районов больше нуля и все неотменённые приняты. Отменённая, отсутствующая,
+// ещё не загруженная, с пустым списком — нет. Только чтение существующих
+// данных: ничего не пишет и статусов не выдумывает.
+function ordCompleted(){
+  if(!ORD || !ORD.d || !(ACC_SUP && ACC_SUP.list)) return false;
+  const st = supStage();
+  return st.k === 'done' && st.all > 0 && st.done === st.all;
+}
+
+// Хаб закупки: одна карточка, плитка, ответ магазина. Списка здесь нет
 // намеренно — он живёт на своей странице и не мешает увидеть, где мы сейчас.
 function ordHub(){
   const d = ORD.d; if(!d) return;
@@ -27434,7 +27491,11 @@ function ordHub(){
   mid.innerHTML = `<div id="ambar-receiving-finished" lang="ru"><div class="au-stage"><div class="au-app" data-sparse="${card.n <= 2}" aria-label="Барракуда — заявка и приёмка в одной карточке"><main class="au-content">${
     card.html}${auOps()}${auBottom()}</main></div></div></div>`;
   mid.scrollTop = 0;
-  try{ AR_VIS = AmbarReceivingVisual.mount(mid.querySelector('.au-app')); }catch(e){ AR_VIS = null; }
+  const app = mid.querySelector('.au-app');
+  try{ AR_VIS = AmbarReceivingVisual.mount(app); }catch(e){ AR_VIS = null; }
+  // Завершённый вид — по условию приложения; помощник только прячет и
+  // показывает зоны и пересчитывает высоту.
+  try{ AmbarReceivingVisual.setCompleted(app, ordCompleted()); }catch(e){}
 }
 
 // Цены магазина из его файла против наших закупочных (владелец, 24 окт 2026:

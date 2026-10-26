@@ -3518,80 +3518,113 @@ button.path:active{transform:scale(.995)}
 .fb-e-x{flex:0 0 auto;width:32px;height:32px;border-radius:9px;border:0;background:none;
   color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fb-e-x:active{color:var(--dn)}
-/* Вход в закупку — две карточки-кнопки на весь экран по макету владельца
-   (24 окт 2026, AMBAR-CLAUDE-HANDOFF): геометрия, цвета, шрифты и формулы
-   clamp/cqw/cqh взяты из исходника буквально. Контейнер .ap-app — середина
-   раздела (#accMid) целиком: ширина и высота — те, что даёт оболочка. */
-#accMid.ap-host{padding:0}
-#accMid .ap-app{--ap-radius:24px;--ap-bg:#07070c;--ap-surface:#12111f;--ap-text:#ece9e3;--ap-muted:#a39baa;--ap-gold:#e2c386;--ap-line:#2c2938;
-  box-sizing:border-box;width:100%;height:100%;display:grid;grid-template-rows:minmax(0,1fr);color-scheme:dark;color:var(--ap-text);
-  background:var(--ap-bg);font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;container-type:size;container-name:ap-phone}
-#accMid .ap-app *{box-sizing:border-box}
-#accMid .ap-app button{font-family:inherit;appearance:none;-webkit-tap-highlight-color:transparent}
-#accMid .ap-content{--ap-outer:clamp(12px,calc(2cqh - .8px),16px);--ap-pad-y:clamp(12px,calc(4cqh - 13.6px),20px);--ap-pad-x:clamp(14px,calc(5.5cqw - 3.5px),20px);
-  --ap-space:clamp(8px,calc(2cqh - 4.8px),12px);--ap-cycle-gap:clamp(8px,calc(1cqh + 1.6px),10px);--ap-head-bottom:clamp(10px,calc(3cqh - 9.2px),16px);
-  --ap-foot-top:clamp(10px,calc(2cqh - 2.8px),14px);padding:var(--ap-outer);padding-bottom:calc(var(--ap-outer) + var(--safe-bottom));
-  min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain}
-#accMid .ap-options{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,1fr);gap:12px;min-height:100%;align-content:stretch}
-#accMid .ap-choice{display:grid;grid-template-rows:max-content max-content minmax(0,1fr) max-content;row-gap:0;width:100%;min-width:0;min-height:min-content;margin:0;
-  padding:var(--ap-pad-y) var(--ap-pad-x);text-align:left;white-space:normal;color:var(--ap-text);background:linear-gradient(135deg,#1d1925 0%,#12111f 76%);
-  border:1px solid #37313f;border-radius:var(--ap-radius);box-shadow:inset 0 1px 0 #ffffff03;transition:border-color .15s,background-color .15s;cursor:pointer}
-#accMid .ap-choice-head{grid-row:1;display:grid;grid-template-columns:clamp(36px,10.5cqw,44px) minmax(0,1fr) clamp(30px,9cqw,38px);align-items:center;
-  gap:clamp(8px,2.5cqw,10px);min-width:0;padding-bottom:var(--ap-head-bottom);border-bottom:1px solid #37303f}
-#accMid .ap-heading{display:flex;flex-direction:column;gap:4px;min-width:0}
-#accMid .ap-section-icon{display:grid;place-items:center;width:100%;aspect-ratio:1;border:1px solid #5b4d37;border-radius:12px;background:#c4aa7612;color:var(--ap-gold)}
-#accMid .ap-section-icon svg{width:24px;height:24px;stroke-width:1.7}
-#accMid .ap-open-mark{display:grid;place-items:center;width:100%;aspect-ratio:1;border-radius:50%;background:#c4aa7612;color:var(--ap-gold)}
-#accMid .ap-phase{font-size:12px;line-height:17px;overflow-wrap:anywhere;color:var(--ap-gold);font-weight:400;letter-spacing:0}
-#accMid .ap-idle .ap-phase{color:var(--ap-muted)}
-#accMid .ap-name{font-size:clamp(18px,calc(5cqw + 2px),24px);line-height:1.2;letter-spacing:0;font-weight:700;overflow-wrap:anywhere;color:var(--ap-text);text-transform:uppercase}
-#accMid .ap-phase.is-live{color:var(--ap-gold);animation:ambar-receiving-pulse 3.6s ease-in-out infinite}
+/* ── Хаб «Закупка» по эталону владельца (AMBAR-PURCHASE-HUB-CLAUDE, 28 окт 2026):
+   две карточки на весь экран (44/56), у Барракуды три состояния заявки и ровно
+   два показателя. purchase-hub-visual.css дословно, корень
+   #ambar-purchase-completion-trial; затем purchase-hub-integration.css и
+   адаптер оболочки STAR. ── */
+#ambar-purchase-completion-trial{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-purchase-completion-trial .pt-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-purchase-completion-trial .pt-app{--pt-width:390px;--pt-height:844px;--pt-top:44fr;--pt-bottom:56fr;--pt-bg:#07070c;--pt-text:#ece9e3;--pt-muted:#a8a0ad;--pt-gold:#e2c386;--pt-green:#99ab98;box-sizing:border-box;display:grid;grid-template-rows:auto minmax(0,1fr);width:var(--pt-width);max-width:100%;height:var(--pt-height);min-width:0;overflow:hidden;border:1px solid #26232f;border-radius:24px;background:var(--pt-bg);color:var(--pt-text);font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container-type:size;container-name:pt-phone}
+#ambar-purchase-completion-trial .pt-app *{box-sizing:border-box}
+#ambar-purchase-completion-trial .pt-app button{appearance:none;font-family:inherit;white-space:normal;-webkit-tap-highlight-color:transparent}
+#ambar-purchase-completion-trial svg.lucide{display:block;width:20px!important;height:20px!important;margin:0!important;flex:none;stroke-width:1.7}
+#ambar-purchase-completion-trial .pt-header{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;min-height:68px;padding:11px 14px;border-bottom:1px solid #25212d;background:#0b0a11}
+#ambar-purchase-completion-trial .pt-header h1{margin:0;min-width:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.025em;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-back{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #292534;border-radius:13px;background:#12111f;color:#a29aaf}
+#ambar-purchase-completion-trial .pt-scroll{min-width:0;min-height:0;padding:12px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#41394b transparent}
+#ambar-purchase-completion-trial .pt-cards{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(min-content,var(--pt-top)) minmax(min-content,var(--pt-bottom));gap:12px;height:100%;min-width:0}
+#ambar-purchase-completion-trial .pt-card{display:grid;grid-template-columns:minmax(0,1fr);width:100%;min-width:0;min-height:min-content;margin:0;padding:16px;border:1px solid #37313f;border-radius:24px;background:linear-gradient(135deg,#1d1925 0%,#12111f 76%);box-shadow:inset 0 1px 0 #ffffff03;text-align:left;color:var(--pt-text)}
+#ambar-purchase-completion-trial .pt-barracuda{grid-template-rows:auto minmax(min-content,1fr) auto}
+#ambar-purchase-completion-trial .pt-other{grid-template-rows:auto minmax(min-content,1fr)}
+#ambar-purchase-completion-trial .pt-card-head{display:grid;grid-template-columns:40px minmax(0,1fr) 32px;align-items:center;gap:10px;min-width:0;padding-bottom:13px;border-bottom:1px solid #37303f}
+#ambar-purchase-completion-trial .pt-icon{display:grid;place-items:center;width:40px;height:40px;border:1px solid #5b4d37;border-radius:12px;background:#c4aa7612;color:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-icon>svg.lucide{width:23px!important;height:23px!important}
+#ambar-purchase-completion-trial .pt-card-name{min-width:0;font-size:clamp(18px,5.4cqw,22px);line-height:1.25;font-weight:700;letter-spacing:-.025em;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-open{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#c4aa7612;color:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-completion{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);align-items:center;gap:6px;min-width:0;padding:8px 0}
+#ambar-purchase-completion-trial .pt-completion-art{display:block;justify-self:center;width:clamp(108px,17cqh,150px);max-width:100%;height:auto;aspect-ratio:1;object-fit:contain}
+#ambar-purchase-completion-trial .pt-completion-copy{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+#ambar-purchase-completion-trial .pt-eyebrow{font-size:12px;line-height:18px;color:var(--pt-muted);font-weight:400;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-completion-copy>strong{font-size:clamp(18px,5.1cqw,21px);line-height:1.3;font-weight:600;letter-spacing:-.025em;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-confirmed{display:inline-flex;align-items:center;gap:4px;min-width:0;margin-top:4px;font-size:11px;line-height:16px;font-weight:400;color:var(--pt-green)}
+#ambar-purchase-completion-trial .pt-status-icon>svg.lucide{width:14px!important;height:14px!important}
+#ambar-purchase-completion-trial .pt-status-icon[hidden]{display:none!important}
+#ambar-purchase-completion-trial .pt-barracuda:not([data-cycle="completed"]) .pt-confirmed{color:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;min-width:0;padding-top:12px;border-top:1px solid #37303f}
+#ambar-purchase-completion-trial .pt-metric{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding-right:8px}
+#ambar-purchase-completion-trial .pt-metric+.pt-metric{padding-left:12px;border-left:1px solid #302a3b}
+#ambar-purchase-completion-trial .pt-metric>strong{max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(22px,6.2cqw,25px);line-height:1.15;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-metric>span{font-size:11px;line-height:16px;font-weight:400;color:var(--pt-muted);overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-received>strong{color:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-total{align-items:flex-end;text-align:right;padding-right:0}
+#ambar-purchase-completion-trial .pt-decision{display:flex;justify-content:center;align-items:center;min-width:0;padding:14px 0}
+#ambar-purchase-completion-trial .pt-decision-group{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;min-width:0;text-align:center}
+#ambar-purchase-completion-trial .pt-decision-art{display:block;flex:none;width:clamp(144px,23cqh,184px);max-width:100%;height:auto;aspect-ratio:1;object-fit:contain;margin-bottom:5px}
+#ambar-purchase-completion-trial .pt-decision-message{max-width:100%;font-size:18px;line-height:25px;font-weight:600;letter-spacing:-.025em;text-wrap:balance;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-decision-amount{display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;gap:5px;min-width:0;color:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-decision-amount>strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:28px;line-height:34px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-decision-amount>span{font-size:14px;line-height:20px;font-weight:400}
+#ambar-purchase-completion-trial .pt-card:hover{border-color:#786242}
+#ambar-purchase-completion-trial .pt-card:active{background:#211c2a}
+@container pt-phone (max-width:340px){
+  #ambar-purchase-completion-trial .pt-scroll{padding:10px}
+  #ambar-purchase-completion-trial .pt-card{padding:14px;border-radius:21px}
+  #ambar-purchase-completion-trial .pt-card-head{grid-template-columns:36px minmax(0,1fr) 28px;gap:8px}
+  #ambar-purchase-completion-trial .pt-icon{width:36px;height:36px;border-radius:11px}
+  #ambar-purchase-completion-trial .pt-open{width:28px;height:28px}
+  #ambar-purchase-completion-trial .pt-completion{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:5px}
+  #ambar-purchase-completion-trial .pt-metric+.pt-metric{padding-left:8px}
+  #ambar-purchase-completion-trial .pt-metric{padding-right:6px}
+  #ambar-purchase-completion-trial .pt-total{padding-right:0}
+  #ambar-purchase-completion-trial .pt-decision-message{font-size:17px;line-height:24px}
+}
+@container pt-phone (max-height:700px){
+  #ambar-purchase-completion-trial .pt-card{padding-top:13px;padding-bottom:13px}
+  #ambar-purchase-completion-trial .pt-card-head{padding-bottom:10px}
+  #ambar-purchase-completion-trial .pt-completion-art{width:96px}
+  #ambar-purchase-completion-trial .pt-completion{padding-block:7px}
+  #ambar-purchase-completion-trial .pt-decision-art{width:120px;margin-bottom:0}
+  #ambar-purchase-completion-trial .pt-decision{padding-block:10px}
+  #ambar-purchase-completion-trial .pt-decision-group{gap:4px}
+}
+/* purchase-hub-integration.css: без рамки эталона, высота — от оболочки. */
+#ambar-purchase-completion-trial{--pt-safe-bottom:0px;width:100%;height:100%;min-width:0;min-height:0}
+#ambar-purchase-completion-trial .pt-stage{display:block;width:100%;height:100%;min-width:0;min-height:0;padding:0}
+#ambar-purchase-completion-trial .pt-app{width:100%;max-width:none;height:100%;min-width:0;min-height:0;border:0;border-radius:0}
+#ambar-purchase-completion-trial .pt-scroll{padding-bottom:calc(12px + var(--pt-safe-bottom))}
+#ambar-purchase-completion-trial[data-header="external"] .pt-app{grid-template-rows:minmax(0,1fr)}
+#ambar-purchase-completion-trial[data-header="external"] .pt-header{display:none}
+@container pt-phone (max-width:340px){#ambar-purchase-completion-trial .pt-scroll{padding-bottom:calc(10px + var(--pt-safe-bottom))}}
+/* Адаптер оболочки STAR: шапка раздела своя (data-header="external"), середина
+   раздела без полей и без своей прокрутки, safe-area один раз — в .pt-scroll.
+   Фаза под названием — только сверх трёх утверждённых состояний: «новые цены · N»
+   (мигает, владелец 26 окт 2026) и слово стадии при прежней инфографике.
+   Прежняя инфографика пути (заявка → магазин дал → приняли, шкала, кто
+   принимает) — для стадий, которых в эталоне нет: правила перенесены из
+   прежней карточки хаба (24 окт 2026). */
+#accMid:has(> #ambar-purchase-completion-trial){padding:0;overflow:hidden}
+#ambar-purchase-completion-trial{--pt-safe-bottom:var(--safe-bottom)}
+#ambar-purchase-completion-trial .pt-heading{display:flex;flex-direction:column;gap:4px;min-width:0}
+#ambar-purchase-completion-trial .pt-card-name{text-transform:uppercase}
+#ambar-purchase-completion-trial .pt-phase{font-size:12px;line-height:17px;font-weight:400;overflow-wrap:anywhere;color:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-phase.is-live{animation:ambar-receiving-pulse 3.6s ease-in-out infinite}
+#ambar-purchase-completion-trial .pt-phase.is-complete{color:var(--up)}
+#ambar-purchase-completion-trial .pt-idle .pt-phase{color:var(--pt-muted)}
 @keyframes ambar-receiving-pulse{0%,100%{opacity:1}50%{opacity:.72}}
-#accMid .ap-chevron{width:20px;height:20px;color:var(--ap-gold);stroke-width:1.8}
-#accMid .ap-choice-foot{grid-row:4;display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);align-items:end;gap:12px;border-top:1px solid #302a3b;padding-top:var(--ap-foot-top)}
-#accMid .ap-amount{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;max-width:100%}
-#accMid .ap-amount strong{display:block;max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-variant-numeric:tabular-nums;
-  font-size:clamp(28px,min(8.2cqw,calc(3cqh + 10px)),34px);line-height:1.12;letter-spacing:-.035em;font-weight:500;color:var(--ap-gold);white-space:normal;overflow-wrap:anywhere}
-#accMid .ap-amount small{font-size:12px;line-height:16px;font-weight:400;letter-spacing:0;overflow-wrap:anywhere;color:var(--ap-muted)}
-#accMid .ap-money{align-items:flex-end;text-align:right}
-#accMid .ap-money strong{color:var(--ap-text)}
-#accMid .ap-cycle{grid-row:2;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:var(--ap-cycle-gap);padding-block:var(--ap-space);min-width:0}
-#accMid .ap-route{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:8px;width:100%;min-width:0}
-#accMid .ap-stage-value{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;text-align:center}
-#accMid .ap-stage-value strong{display:block;max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(26px,min(7.2cqw,calc(2cqh + 14px)),30px);
-  line-height:1.15;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ap-text);white-space:normal;overflow-wrap:anywhere}
-#accMid .ap-stage-value small{font-size:11px;line-height:15px;font-weight:400;letter-spacing:0;color:var(--ap-muted);min-height:15px;overflow-wrap:anywhere}
-#accMid .ap-progress{display:block;flex-shrink:0;width:100%;height:4px;overflow:hidden;border-radius:4px;background:#302a3d}
-#accMid .ap-progress>span{display:block;width:var(--ap-progress,0%);height:100%;border-radius:inherit;background:var(--ap-gold)}
-/* Принято: полоса остаётся золотой, число — белым, зелёный только у слова,
-   и тот свой (--up), а не мятный из эталона (владелец, 24 окт 2026: «этот
-   зелёный выглядит дёшево»). */
-#accMid .ap-progress.is-complete>span{background:var(--ap-gold)}
-#accMid .ap-receiver{display:block;min-width:0;max-width:100%;text-align:center;font-size:12px;line-height:18px;overflow-wrap:anywhere;color:var(--ap-muted);letter-spacing:0}
-#accMid .ap-idle .ap-stage-value strong{color:#8b8297}
-#accMid .ap-phase.is-complete{color:var(--up)}
-#accMid .ap-received.is-complete{color:var(--ap-text)}
-#accMid .ap-choice:hover{border-color:#786242;background:#1b1725}
-#accMid .ap-choice:hover .ap-open-mark{background:#c4aa7626}
-#accMid .ap-choice:active{border-color:#c4aa76;background:#24202d}
-#accMid .ap-app [hidden]{display:none!important}
-@media(prefers-reduced-motion:reduce){#accMid .ap-choice{transition:none}#accMid .ap-phase.is-live{animation:none;opacity:1}}
-/* ── Карточка «Другие базы», два утверждённых состояния (AMBAR-OTHER-BASES-CLAUDE,
-   27 окт 2026): нет активных заявок / заявка ждёт решения. Шапка карточки своя,
-   середина — иллюстрация и одна надпись (+ количество). Правила эталона с
-   корнем, перенесённым на нашу карточку; cqw — от контейнера .ap-app. ── */
-#accMid .ap-choice.ap-ob{grid-template-rows:max-content minmax(min-content,1fr)}
-#accMid .ap-choice.ap-ob .ob-state{grid-row:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:16px 0;text-align:center;gap:8px}
-#accMid .ap-choice.ap-ob .ob-art{display:block;flex:none;aspect-ratio:1;width:140px;max-width:100%;height:auto;object-fit:contain}
-#accMid .ap-choice.ap-ob .ob-empty .ob-art{width:clamp(160px,54cqw,210px)}
-#accMid .ap-choice.ap-ob .ob-empty{gap:12px}
-#accMid .ap-choice.ap-ob .ob-message{max-width:100%;font-size:18px;line-height:25px;font-weight:600;letter-spacing:-.02em;overflow-wrap:anywhere;text-wrap:balance;color:var(--ap-text)}
-#accMid .ap-choice.ap-ob .ob-decision .ob-art{width:clamp(150px,48cqw,188px)}
-#accMid .ap-choice.ap-ob .ob-decision{gap:4px;padding:12px 0 16px}
-#accMid .ap-choice.ap-ob .ob-request-amount{display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:5px;max-width:100%;min-width:0;color:var(--ap-gold)}
-#accMid .ap-choice.ap-ob .ob-request-amount strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:26px;line-height:32px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.025em;overflow-wrap:anywhere}
-#accMid .ap-choice.ap-ob .ob-request-amount>span{font-size:14px;line-height:20px;font-weight:400}
-@container ap-phone (max-width:320px){#accMid .ap-choice.ap-ob .ob-message{font-size:17px;line-height:24px}}
+#ambar-purchase-completion-trial .pt-card.pt-with-summary{grid-template-rows:auto minmax(min-content,1fr) auto}
+#ambar-purchase-completion-trial .pt-cycle{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:10px;padding-block:10px;min-width:0}
+#ambar-purchase-completion-trial .pt-route{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:8px;width:100%;min-width:0}
+#ambar-purchase-completion-trial .pt-stage-value{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;text-align:center}
+#ambar-purchase-completion-trial .pt-stage-value>strong{display:block;max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(26px,min(7.2cqw,calc(2cqh + 14px)),30px);line-height:1.15;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--pt-text);overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-stage-value>small{font-size:11px;line-height:15px;font-weight:400;color:var(--pt-muted);min-height:15px;overflow-wrap:anywhere}
+#ambar-purchase-completion-trial .pt-idle .pt-stage-value>strong{color:#8b8297}
+#ambar-purchase-completion-trial .pt-progress{display:block;width:100%;height:4px;overflow:hidden;border-radius:4px;background:#302a3d}
+#ambar-purchase-completion-trial .pt-progress>span{display:block;width:var(--pt-progress,0%);height:100%;border-radius:inherit;background:var(--pt-gold)}
+#ambar-purchase-completion-trial .pt-receiver{display:block;min-width:0;max-width:100%;text-align:center;font-size:12px;line-height:18px;overflow-wrap:anywhere;color:var(--pt-muted)}
+#ambar-purchase-completion-trial button:enabled{cursor:pointer}
+#ambar-purchase-completion-trial button:focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
+@media(prefers-reduced-motion:reduce){#ambar-purchase-completion-trial .pt-phase.is-live{animation:none;opacity:1}}
 
 /* ── Хаб «Барракуда» по эталону владельца, версия 2 (AMBAR-BARRACUDA-CLAUDE-V2.txt,
    26 окт 2026): одна карточка заявки с приёмкой внутри, компактные этапы, две
@@ -27115,45 +27148,72 @@ async function accOrder(){
   ordPick();
 }
 
-// Две карточки-кнопки на весь экран по макету владельца (24 окт 2026,
-// AMBAR-CLAUDE-HANDOFF): визуал — из исходника, числа — свои. Карточка: шапка
-// (иконка, имя, слово цикла, стрелка), инфографика (три числа, полоса приёмки,
-// кто принимает), свободная строка, итоги (количество золотом, сумма светлой).
-const AP_ICO = {
-  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg>',
-  store: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>',
-  right: '<svg class="ap-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
+// Хаб «Закупка» по эталону владельца (AMBAR-PURCHASE-HUB-CLAUDE, 28 окт 2026):
+// две карточки-кнопки на весь экран, 44/56. У Барракуды три утверждённых
+// состояния заявки — собрана и ждёт отправки / отправлена и ждёт ответа /
+// отработана — и ровно два показателя: бутылки и стоимость закупки. Расчёт до
+// закрытия смены, приёмка и отмена — прежняя инфографика пути. Иконки Lucide
+// с class="lucide": по нему их отбирают стили эталона.
+const PT_ICO = (() => {
+  const w = (n, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-${n}" aria-hidden="true">${body}</svg>`;
+  return {
+    list: w('list', '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>'),
+    store: w('store', '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/>'),
+    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>'),
+    check: w('check', '<path d="M20 6 9 17l-5-5"/>'),
+  };
+})();
+// Три утверждённых состояния: заголовок, строка под ним, слова для озвучки.
+const PT_MODES = {
+  ready: ['Ожидает отправки', 'в магазин', 'ожидает отправки в магазин'],
+  sent: ['Ожидает ответа', 'магазина', 'ожидает ответа магазина'],
+  completed: ['Отработана', 'Всё принято', 'отработана'],
 };
-// Одна карточка. o: {key, ico, name, phase, live, complete, idle, asked, gave, pct, who, qty, unit, aed}
-function apCard(o){
-  const v = x => (x == null ? '—' : x);
-  const pct = o.pct == null ? null : Math.max(0, Math.min(100, Math.round(o.pct)));
-  // Два утверждённых состояния «Других баз» (27 окт 2026): вместо чисел и
-  // шкалы — иллюстрация и одна надпись; ждёт решения — ещё количество из
-  // самой заявки. Шапка и действие карточки те же.
-  if(o.state){
-    const st = o.state, n = st.qty || 0;
-    return `<button type="button" class="ap-choice ap-ob" onclick="ordBranch('${o.key}')" aria-label="${escS(o.name)} — ${st.kind === 'decision' ? 'заявка ждёт решения' : 'нет активных заявок'}">
-    <span class="ap-choice-head"><span class="ap-section-icon" aria-hidden="true">${AP_ICO[o.ico]}</span><span class="ap-heading"><span class="ap-name">${escS(o.name)}</span></span><span class="ap-open-mark" aria-hidden="true">${AP_ICO.right}</span></span>
-    <span class="ob-state ${st.kind === 'decision' ? 'ob-decision' : 'ob-empty'}">
-      <img class="ob-art" src="/owner/other-bases-${st.kind === 'decision' ? 'decision' : 'empty'}.webp" width="1254" height="1254" alt="" aria-hidden="true">
-      <span class="ob-message">${st.kind === 'decision' ? 'Заявка ждёт решения' : 'Нет активных заявок'}</span>${
-      st.kind === 'decision' ? `<span class="ob-request-amount"><strong>${fmt(n)}</strong><span>${pluralize(n, 'бутылка', 'бутылки', 'бутылок')}</span></span>` : ''}
-    </span>
-  </button>`;
+// Все районы заявки приняли — то же правило, что у завершённого вида хаба
+// (ordCompleted): поставка закрыта, районы в ней есть, и у каждого живого
+// стоит done_at. Одного «100%» или закрытой поставки мало.
+function _supAllDone(sup){
+  if(!sup || sup.status === 'open' || sup.status === 'cancelled') return false;
+  const live = Object.values(sup.tasks || {}).filter(t => !t.cancelled_at);
+  return live.length > 0 && live.every(t => t.done_at);
+}
+// Одна карточка. o: {key, ico, name, mode?, phase, live, complete, idle, label,
+//   body: {kind:'completion', img, eyebrow, title, detail, check}
+//       | {kind:'decision', img, message, qty?}
+//       | {kind:'cycle', asked, gave, pct, who},
+//   summary?: {qty, unit, cost, costLabel}}
+function ptCard(o){
+  const b = o.body || {};
+  let body;
+  if(b.kind === 'completion'){
+    body = `<span class="pt-completion">
+      <img class="pt-completion-art" src="${b.img}" width="1254" height="1254" alt="" aria-hidden="true">
+      <span class="pt-completion-copy"><span class="pt-eyebrow">${escS(b.eyebrow)}</span><strong class="pt-status-title">${escS(b.title)}</strong><span class="pt-confirmed"><span class="pt-status-icon"${b.check ? '' : ' hidden'}>${PT_ICO.check}</span><span class="pt-status-detail">${escS(b.detail)}</span></span></span>
+    </span>`;
+  }else if(b.kind === 'decision'){
+    body = `<span class="pt-decision"><span class="pt-decision-group">
+      <img class="pt-decision-art" src="${b.img}" width="1254" height="1254" alt="" aria-hidden="true">
+      <span class="pt-decision-message">${escS(b.message)}</span>${
+      b.qty != null ? `<span class="pt-decision-amount"><strong>${fmtQty(b.qty)}</strong><span>${pluralize(b.qty, 'бутылка', 'бутылки', 'бутылок')}</span></span>` : ''}
+    </span></span>`;
+  }else{
+    const pct = b.pct == null ? null : Math.max(0, Math.min(100, Math.round(b.pct)));
+    body = `<span class="pt-cycle">
+      <span class="pt-route"><span class="pt-stage-value"><strong>${b.asked == null ? '—' : fmtQty(b.asked)}</strong><small>Заявка</small></span><span class="pt-stage-value"><strong>${b.gave == null ? '—' : fmtQty(b.gave)}</strong><small>Магазин дал</small></span><span class="pt-stage-value"><strong>${pct == null ? '—' : pct + '%'}</strong><small>Приняли</small></span></span>
+      ${pct == null ? '<span class="pt-progress" aria-hidden="true"></span>'
+        : `<span class="pt-progress" role="progressbar" aria-label="Прогресс приёмки" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="--pt-progress:${pct}%"><span></span></span>`}
+      ${b.who ? `<span class="pt-receiver">${escS(b.who)}</span>` : ''}
+    </span>`;
   }
-  return `<button type="button" class="ap-choice${o.idle ? ' ap-idle' : ''}" onclick="ordBranch('${o.key}')">
-    <span class="ap-choice-head"><span class="ap-section-icon" aria-hidden="true">${AP_ICO[o.ico]}</span><span class="ap-heading"><span class="ap-name">${escS(o.name)}</span><span class="ap-phase${
-      o.complete ? ' is-complete' : o.live ? ' is-live' : ''}">${escS(o.phase)}</span></span><span class="ap-open-mark" aria-hidden="true">${AP_ICO.right}</span></span>
-    <span class="ap-cycle">
-      <span class="ap-route">
-        <span class="ap-stage-value"><strong>${o.asked == null ? '—' : fmt(o.asked)}</strong><small>Заявка</small></span><span class="ap-stage-value"><strong>${o.gave == null ? '—' : fmt(o.gave)}</strong><small>Магазин дал</small></span><span class="ap-stage-value"><strong class="ap-received${o.complete ? ' is-complete' : ''}">${pct == null ? '—' : pct + '%'}</strong><small>Приняли</small></span>
-      </span>
-      ${pct == null ? '<span class="ap-progress ap-progress-idle" aria-hidden="true"></span>'
-        : `<span class="ap-progress${o.complete ? ' is-complete' : ''}" role="progressbar" aria-label="Прогресс приёмки" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="--ap-progress:${pct}%"><span></span></span>`}
-      ${o.who ? `<span class="ap-receiver">${escS(o.who)}</span>` : ''}
-    </span>
-    <span class="ap-choice-foot"><span class="ap-amount"><strong>${fmt(o.qty || 0)}</strong><small>${escS(o.unit)}</small></span><span class="ap-amount ap-money"><strong>${o.aed == null ? '—' : fmt(Math.round(o.aed))}</strong><small>AED</small></span></span>
+  const s = o.summary;
+  const summary = !s ? '' : `<span class="pt-summary">
+      <span class="pt-metric pt-received"><strong>${s.qty == null ? '—' : fmtQty(s.qty)}</strong><span>${escS(s.unit)}</span></span>
+      <span class="pt-metric pt-total"><strong>${s.cost == null ? '—' : fmt(Math.round(s.cost))}</strong><span>${escS(s.costLabel)}</span></span>
+    </span>`;
+  return `<button type="button" class="pt-card ${o.key === 'bar' ? 'pt-barracuda' : 'pt-other'}${s ? ' pt-with-summary' : ''}${o.idle ? ' pt-idle' : ''}" onclick="ordBranch('${o.key}')"${o.mode ? ` data-cycle="${o.mode}"` : ''} aria-label="${escS(o.label)}">
+    <span class="pt-card-head"><span class="pt-icon" aria-hidden="true">${PT_ICO[o.ico]}</span><span class="pt-heading"><span class="pt-card-name">${escS(o.name)}</span>${
+      o.phase ? `<span class="pt-phase${o.complete ? ' is-complete' : o.live ? ' is-live' : ''}">${escS(o.phase)}</span>` : ''}</span><span class="pt-open" aria-hidden="true">${PT_ICO.right}</span></span>
+    ${body}${summary}
   </button>`;
 }
 function ordPick(){
@@ -27162,12 +27222,12 @@ function ordPick(){
   document.getElementById('accAct').innerHTML = '';
   document.getElementById('accFoot').innerHTML = '';
   const mid = document.getElementById('accMid');
-  mid.classList.remove('xs-fix'); mid.classList.add('ap-host'); arVisOff();
+  mid.classList.remove('xs-fix', 'ap-host'); arVisOff();
   const st = supStage(), d = ORD.d || {};
   const list = (ACC_SUP && ACC_SUP.list) || [];
   // Открытой поставки нет, но сегодняшнюю уже приняли (или отменили) — она
-  // ушла в историю, а карточка обязана показать «принято · 100%», а не
-  // «заявка» (владелец, 24 окт 2026: «почему не видно, что приёмку приняли»).
+  // ушла в историю, а карточка обязана показать «отработана», а не «заявка»
+  // (владелец, 24 окт 2026: «почему не видно, что приёмку приняли»).
   const today = d.buy_day || _dayIsoFor(0);
   const closed = st.k === 'none' ? list.find(x => (x.kind || 'main') !== 'extra' && x.status !== 'open' && x.day === today) : null;
   const sup = st.sup || closed;
@@ -27177,22 +27237,39 @@ function ordPick(){
   const taking = live && Object.values(sup.tasks || {}).some(t => t.driver && !t.done_at && !t.cancelled_at);
   const cancelled = st.k === 'cancelled' || (!!closed && closed.status === 'cancelled');
   const complete = st.k === 'done' || (!!closed && !cancelled);
-  const phase = !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
-    : cancelled ? 'отменена' : complete ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
+  // Три состояния (владелец, 28 окт 2026: «наступила новая смена, заявка
+  // составлена, отправить ещё не нажимали — ждёт отправки в магазин; нажали,
+  // ответ не загружен — ждёт ответа магазина»). Собрана = снимок при закрытии
+  // смены (phase asked); отправлена = отметка order_sent чек-листа дня закупки
+  // — её ставит кнопка «Отправить в магазин» или старший рукой; отработана =
+  // все районы приняли. «Сегодня не заказываем» и всё остальное — путь.
+  const mode = _supAllDone(sup) ? 'completed'
+    : (!sup && d.phase === 'asked' && !d.skip) ? (d.sent ? 'sent' : 'ready') : null;
   const took = !sup ? 0 : st.sup ? st.took : (closed.took || closed.total_qty || 0);
   const pct = sup && !cancelled ? (sup.total_qty ? Math.round(took / sup.total_qty * 100) : 0) : null;
-  let who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
+  const who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
-  // Новые цены магазина ждут решения — слово цикла уступает им и мигает:
-  // это единственное, что здесь просит руки (владелец, 26 окт 2026).
+  const phase = !sup ? (d.skip ? 'сегодня не заказываем' : d.phase === 'asked' ? 'ждём ответ' : 'заявка')
+    : cancelled ? 'отменена' : complete ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
+  // Новые цены магазина ждут решения — это единственное, что здесь просит
+  // руки, и слово под названием мигает (владелец, 26 окт 2026).
   const prN = prCount();
-  const bar = {key: 'bar', ico: 'list', name: 'Барракуда', phase: prN ? `новые цены · ${prN}` : phase,
-    live: prN ? true : taking, complete: prN ? false : complete, idle: false,
-    asked: sup ? (sup.asked_qty || 0) : (d.total_qty || 0), gave: sup ? (sup.total_qty || 0) : null, pct, who,
-    qty: d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0),
-    unit: pluralize(d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0), 'единица', 'единицы', 'единиц'),
-    aed: d.buy && d.buy.cost != null ? d.buy.cost : (d.total_cost != null ? d.total_cost : null)};
-  // ── Другие базы: открытые доп. заявки одним итогом, черновики — словом ──
+  // Два показателя из одной записи заявки: пока магазин не ответил — что
+  // просим и предварительная стоимость по нашим закупочным ценам; ответил —
+  // что даёт и стоимость этой закупки. Ноль — число, нет значения — прочерк.
+  const qty = d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty != null ? d.total_qty : null);
+  const cost = d.buy && d.buy.cost != null ? d.buy.cost : (d.total_cost != null ? d.total_cost : null);
+  const bar = {key: 'bar', ico: 'list', name: 'Барракуда', mode, idle: false,
+    phase: prN ? `новые цены · ${prN}` : (mode ? '' : phase),
+    live: !!prN || (!mode && taking), complete: !prN && !mode && complete,
+    body: mode ? {kind: 'completion', img: mode === 'completed' ? '/owner/order-completed.webp' : '/owner/order-waiting.webp',
+                  eyebrow: 'Основная заявка', title: PT_MODES[mode][0], detail: PT_MODES[mode][1], check: mode === 'completed'}
+               : {kind: 'cycle', asked: sup ? (sup.asked_qty || 0) : (d.total_qty || 0), gave: sup ? (sup.total_qty || 0) : null, pct, who},
+    summary: {qty, unit: pluralize(qty || 0, 'бутылка', 'бутылки', 'бутылок') + (sup ? '' : ' в заявке'),
+              cost, costLabel: sup ? 'Стоимость закупки · AED' : 'Предварительно · AED'},
+    label: `Барракуда. Основная заявка ${mode ? PT_MODES[mode][2] : phase}.`};
+  // ── Другие базы: черновик из недобора ждёт решения — его количество; ни
+  // открытых, ни черновиков — пусто; открытые заявки — прежняя инфографика ──
   const ex = _xList(), open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft');
   const xa = open.reduce((a, x) => a + (x.asked_qty || x.total_qty || 0), 0);
   const xg = open.reduce((a, x) => a + (x.total_qty || 0), 0);
@@ -27202,17 +27279,21 @@ function ordPick(){
       .map(([o, t]) => `${x.base ? x.base + ' · ' : ''}${t.driver}`)).join(', ');
   const xqty = [...open, ...wait].reduce((a, x) => a + (x.total_qty || 0), 0);
   const dr = arShortDraft();
-  const other = {key: 'extra', ico: 'store', name: 'Другие базы', idle: !open.length && !dr,
-    phase: dr ? `докупка ждёт · ${fmt(dr.total_qty || 0)} бут.`
-      : open.length ? (xwho ? 'идёт приёмка' : 'в работе') : wait.length ? `${wait.length} ${pluralize(wait.length, 'черновик', 'черновика', 'черновиков')}` : 'нет заявок',
-    live: !!dr || !!xwho, complete: false,
-    asked: open.length ? xa : null, gave: open.length ? xg : null, pct: open.length ? (xg ? Math.round(xt / xg * 100) : 0) : null, who: xwho,
-    qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'), aed: open.length ? xm : null,
-    // Состояния эталона: черновик докупки ждёт решения — его количество (та
-    // же заявка, что открывает карточка); ни открытых, ни черновиков — пусто.
-    // Открытые заявки и прочие стадии — прежняя инфографика.
-    state: dr ? {kind: 'decision', qty: dr.total_qty || 0} : (!open.length && !wait.length ? {kind: 'empty'} : null)};
-  mid.innerHTML = `<div class="ap-app" aria-label="Закупка"><div class="ap-content"><div class="ap-options">${apCard(bar)}${apCard(other)}</div></div></div>`;
+  const kind = dr ? 'decision' : (!open.length && !wait.length) ? 'empty' : 'cycle';
+  const xphase = kind !== 'cycle' ? '' : open.length ? (xwho ? 'идёт приёмка' : 'в работе')
+    : `${wait.length} ${pluralize(wait.length, 'черновик', 'черновика', 'черновиков')}`;
+  const drQty = dr ? (dr.total_qty || 0) : 0;
+  const other = {key: 'extra', ico: 'store', name: 'Другие базы', idle: kind === 'empty',
+    phase: xphase, live: kind === 'cycle' && !!xwho, complete: false,
+    body: kind === 'decision' ? {kind: 'decision', img: '/owner/order-waiting.webp', message: 'Заявка ждёт решения', qty: drQty}
+        : kind === 'empty' ? {kind: 'decision', img: '/owner/other-bases-empty.webp', message: 'Нет активных заявок'}
+        : {kind: 'cycle', asked: open.length ? xa : null, gave: open.length ? xg : null,
+           pct: open.length ? (xg ? Math.round(xt / xg * 100) : 0) : null, who: xwho},
+    summary: kind === 'cycle' ? {qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'),
+                                 cost: open.length ? xm : null, costLabel: 'Стоимость закупки · AED'} : null,
+    label: `Другие базы. ${kind === 'decision' ? `Заявка ждёт решения, ${fmtQty(drQty)} ${pluralize(drQty, 'бутылка', 'бутылки', 'бутылок')}`
+      : kind === 'empty' ? 'Нет активных заявок' : xphase}.`};
+  mid.innerHTML = `<div id="ambar-purchase-completion-trial" lang="ru" data-header="external"><div class="pt-stage"><div class="pt-app" aria-label="Закупка"><main class="pt-scroll"><div class="pt-cards">${ptCard(bar)}${ptCard(other)}</div></main></div></div></div>`;
 }
 function ordBranch(b){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -28858,12 +28939,13 @@ async function ordShare(){
       await navigator.share({files:[file], title:'AMBAR — закупка'});
       b.innerHTML = 'Отправлено';
       try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      _ordMarkSent();
     }else{
       const u = URL.createObjectURL(file);
       const a = document.createElement('a');
       a.href = u; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(()=>URL.revokeObjectURL(u), 4000);
-      b.innerHTML = 'Файл сохранён';
+      b.innerHTML = 'Файл сохранён'; _ordMarkSent();
     }
   }catch(e){
     // Человек закрыл системное окно — это не ошибка, и пугать его нечем.
@@ -28872,10 +28954,24 @@ async function ordShare(){
     }
     b.innerHTML = 'Не вышло — шлём в телеграм';
     try{ await ownerApi.ownerFetch('/api/owner/supply/send',
-      {method:'POST', body:{day: ORD.d.day}}); b.innerHTML = 'Готово — файл в чате с ботом'; }
+      {method:'POST', body:{day: ORD.d.day}}); b.innerHTML = 'Готово — файл в чате с ботом'; _ordMarkSent(); }
     catch(e2){ b.innerHTML = 'Не отправилось — попробуйте ещё раз'; }
   }
   setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+}
+
+// Файл ушёл магазину из приложения — ставим «отправлена» в чек-листе дня
+// закупки: ту же отметку order_sent, что старший ставит рукой («Отправил в
+// магазин»); по ней карточка «Закупки» пишет «Ожидает ответа магазина»
+// (владелец, 28 окт 2026). Не ушёл — отметки нет; снять её можно там же,
+// в чек-листе («Не отправляли»).
+async function _ordMarkSent(){
+  const d = ORD && ORD.d; if(!d || d.sent) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day: d.buy_day || d.day, item:'order_sent', done:true}});
+    d.sent = true;
+  }catch(e){}
 }
 
 async function ordSend(){
@@ -28883,7 +28979,7 @@ async function ordSend(){
   b.disabled = true; b.style.opacity = '.5';
   try{
     await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{day: ORD.d.day}});
-    _toast('Файл в чате с ботом');
+    _toast('Файл в чате с ботом'); _ordMarkSent();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   }catch(e){
     _toast('Не отправилось — попробуйте ещё раз');

@@ -1623,6 +1623,15 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
             waiting = await _sup_mod.pending_qty()
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[stock] заказанное и не забранное не прочитано: {e}")
+    # Отправлена ли заявка магазину — отметка order_sent чек-листа ДНЯ ЗАКУПКИ:
+    # её ставит старший («Отправил в магазин») или кнопка отправки файла в
+    # приложении. order_skip — «сегодня не заказываем». Карточка «Закупки»
+    # читает их вместе с заявкой, одним ответом (владелец, 28 окт 2026).
+    try:
+        _marks = await db.checklist_get(_fr.get("buy_day") or next_day(day))
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[stock] отметки заявки не прочитаны: {e}")
+        _marks = {}
     try:
         import stock_value
         costs = await stock_value.cost_map()
@@ -1747,6 +1756,8 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
         # 2026): до ответа на экране «просим столько-то», после — «магазин
         # даёт столько, а столько не даёт».
         "phase": _order_phase(frozen_base, _sup),
+        "sent": bool((_marks.get("order_sent") or {}).get("done")),
+        "skip": bool((_marks.get("order_skip") or {}).get("done")),
         # Что покупаем на самом деле. Пока магазин не ответил — то, что
         # просим; ответил — то, что он даёт (владелец, 25 сен 2026: «тут тоже
         # число, которое дал магазин»). Деньги считаются теми же закупочными

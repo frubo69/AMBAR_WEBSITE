@@ -3226,8 +3226,11 @@ button.path:active{transform:scale(.995)}
 .xs-in:focus{border-color:rgba(201,169,110,.55)}
 .xs-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 /* окно отправки черновика доп. заявки */
-/* сверху, а не по центру: в окне поле ввода, и клавиатура закрыла бы кнопки */
-.pin-pop.crw-ask.xsend{width:min(360px,calc(100vw - 32px));top:max(20px,7vh)!important;transform:translate(-50%,0)!important;animation:none!important}
+/* По центру, как все окна-вопросы (владелец, 26 окт 2026: «отцентруй»).
+   Пока в поле базы фокус, окно уезжает наверх — иначе клавиатура закрыла бы
+   кнопки; отпустили поле — возвращается в центр. */
+.pin-pop.crw-ask.xsend{width:min(360px,calc(100vw - 32px))}
+.pin-pop.crw-ask.xsend.kb{top:max(20px,7vh)!important;transform:translate(-50%,0)!important;animation:none!important}
 .xsend .xs-in{font-size:15.5px;padding:13px 14px}
 .xsend .xs-chips{margin:10px 0 4px}
 .xsend-l{margin:-4px 0 12px;font-size:12.5px}
@@ -31808,7 +31811,8 @@ async function xSend(sid){
       было.length ? `<br>Нет в наличии на: ${escS(было.join(', '))}` : ''}</div>
     <div class="xsend-l" id="xSendL"></div>
     <input class="xs-in" id="xSendIn" placeholder="Название базы" maxlength="60" autocomplete="off"
-           oninput="xSendPaint()">
+           oninput="xSendPaint()" onfocus="this.closest('.xsend').classList.add('kb')"
+           onblur="this.closest('.xsend').classList.remove('kb')">
     ${recent.length ? `<div class="xs-chips">${recent.map(b =>
       `<button class="xs-chip" data-b="${escS(b)}" onclick="xSendPick(this.dataset.b)">${escS(b)}</button>`).join('')}</div>` : ''}
     <button class="crw-ask-b go" id="xSendGo" disabled onclick="xSendGo()">Отправить водителям</button>

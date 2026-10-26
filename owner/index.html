@@ -3711,6 +3711,8 @@ button.path:active{transform:scale(.995)}
 #ambar-receiving-finished .au-app{grid-template-rows:minmax(0,1fr)}
 #ambar-receiving-finished .au-content{padding-bottom:calc(var(--au-gap) + var(--safe-bottom))}
 #ambar-receiving-finished .au-receiving-head[onclick]{cursor:pointer}
+/* Одна плитка на весь ряд (владелец, 26 окт 2026: докупка ушла в другие базы). */
+#ambar-receiving-finished .au-operations.au-one{grid-template-columns:minmax(0,1fr)}
 #accOv:has(#ambar-receiving-finished) .stk-top-a{display:flex;align-items:center;gap:4px}
 #accOv:has(#ambar-receiving-finished) .stk-top-a .acc-act.au-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
 #accOv:has(#ambar-receiving-finished) .stk-top-a .au-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid transparent;border-radius:13px;background:transparent;color:#a8a0ad!important;cursor:pointer}
@@ -27390,29 +27392,18 @@ function auOrderCard(){
   return {html, n: rows.length};
 }
 
-// Две плитки рядом (владелец, 26 окт 2026): «Докупка» — мигает, пока ждёт
-// черновик докупки из недобора (собирается сам при загрузке ответа); нажатие —
-// отправить водителям или отклонить (xSend). Без черновика — остаток недобора
-// и экран докупки (accShort). Нечего — плитка погашена, не исчезает.
+// Одна плитка (владелец, 26 окт 2026: «оставим только свободная закупка
+// Барракуда, уберём докупку — она формируется сама и живёт в закупках на
+// других базах»). Черновик докупки из недобора мигает на карточке «Другие
+// базы» и на входе в закупку, отправляют или отклоняют его там же.
 // «Свободная закупка · Барракуда» — поток под клиентов ещё не построен.
 function auOps(){
-  const st = supStage(), sup = st.sup;
-  const gap = sup && sup.status === 'open' ? (sup.short_qty != null ? sup.short_qty : (sup.gap_qty || 0)) : 0;
-  const left = gap ? (sup.short_left != null ? sup.short_left : gap) : 0;
-  const dr = arShortDraft();
-  const tile = (on, go, ico, title, qty, cap, live) => `<button type="button" class="au-panel au-operation${on ? ' cursor-interaction' : ''}" ${
-      on ? `onclick="${go}"` : 'disabled'}>
-      <span class="au-op-top">${ico}${AR_ICO.right}</span>
-      <span class="au-op-title${live ? ' au-live' : ''}">${title}${qty ? `<span class="au-op-quantity">${qty}</span>` : ''}</span>
-      <span class="au-op-caption">${cap}</span>
-    </button>`;
-  const buy = dr
-    ? tile(true, `xSend('${escS(dr.supply_id)}')`, AR_ICO.pkg, '<span class="au-op-name">ДОКУПКА</span>', `${fmt(dr.total_qty || 0)} бут.`, 'черновик · отправить или отклонить', true)
-    : gap
-    ? tile(true, 'accShort()', AR_ICO.pkg, '<span class="au-op-name">ДОКУПКА</span>', left ? `${fmt(left)} бут.` : 'в заявках', 'Доп. базы', false)
-    : tile(false, '', AR_ICO.pkg, '<span class="au-op-name">ДОКУПКА</span>', '', 'нет недобора', false);
-  return `<div class="au-operations" aria-label="Закупки">${buy}${
-    tile(false, '', AR_ICO.file, 'СВОБОДНАЯ<span class="au-op-break"> </span>ЗАКУПКА', '', 'Барракуда', false)}</div>`;
+  return `<div class="au-operations au-one" aria-label="Закупки">
+    <button type="button" class="au-panel au-operation" disabled>
+      <span class="au-op-top">${AR_ICO.file}${AR_ICO.right}</span>
+      <span class="au-op-title">СВОБОДНАЯ<span class="au-op-break"> </span>ЗАКУПКА</span>
+      <span class="au-op-caption">Барракуда</span>
+    </button></div>`;
 }
 
 // Нижняя кнопка — та же «Загрузить ответ магазина» (ordUp → ordFile → supImport).

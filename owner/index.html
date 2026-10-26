@@ -3788,10 +3788,16 @@ button.path:active{transform:scale(.995)}
 #ambar-history-refined .ah-status{max-width:100%;white-space:normal;overflow-wrap:anywhere}
 #ambar-history-refined button:enabled{cursor:pointer}
 #ambar-history-refined button:focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
-/* адаптер оболочки STAR */
+/* адаптер оболочки STAR: шапка раздела своя; сводка закупок — своей строкой
+   над прокруткой и стоит на месте, листается только история по дням
+   (владелец, 27 окт 2026). Пустая строка сводки (вкладка «Приёмки») не занимает
+   места. */
 #accMid:has(> #ambar-history-refined){padding:0;overflow:hidden}
-#ambar-history-refined .ah-app{grid-template-rows:auto minmax(0,1fr)}
-#ambar-history-refined .ah-scroll{padding-bottom:calc(16px + var(--safe-bottom))}
+#ambar-history-refined .ah-app{grid-template-rows:auto auto minmax(0,1fr)}
+#ambar-history-refined .ah-tabs{grid-row:1}
+#ambar-history-refined .ah-pin{grid-row:2;min-width:0;padding:4px 10px 0}
+#ambar-history-refined .ah-pin:empty{display:none}
+#ambar-history-refined .ah-scroll{grid-row:3;padding-bottom:calc(16px + var(--safe-bottom))}
 /* barracuda-integration.css: размер от настоящего контейнера, без оболочки предпросмотра. */
 #ambar-receiving-finished{width:100%;height:100%;min-width:0;min-height:0}
 #ambar-receiving-finished .au-stage{display:contents;padding:0}
@@ -32956,6 +32962,7 @@ async function accHistory(tab){
   const tabBtn = (v, t) => `<button type="button" class="ah-tab${HIST_TAB === v ? ' is-active' : ''}" aria-pressed="${HIST_TAB === v}" onclick="histTab('hist','${v}')">${t}</button>`;
   document.getElementById('accMid').innerHTML = `<div id="ambar-history-refined" lang="ru"><div class="ah-stage"><div class="ah-app" data-density="balanced" aria-label="AMBAR — история закупок">
     <div class="ah-tabs" aria-label="Разделы истории">${tabBtn('sup', 'Закупки')}${tabBtn('int', 'Приёмки')}</div>
+    <div class="ah-pin" id="histPin"></div>
     <main class="ah-scroll" id="histBody"><div class="exp-empty">Загрузка…</div></main></div></div></div>`;
   if(HIST_TAB === 'int') await intHistory(); else await supHistory();
 }
@@ -32975,6 +32982,7 @@ async function supHistory(){
     ACC_SUP = {list, open: _supMain(list)};
   }
   const mid = document.getElementById('histBody');
+  { const pin = document.getElementById('histPin'); if(pin) pin.innerHTML = ''; }
   if(!list.length){
     mid.innerHTML = `<div class="xs-empty"><div class="sh-empty xs-ecard">
         <span class="sh-empty-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -32998,7 +33006,9 @@ async function supHistory(){
     if(!g || g.dt !== dt){ g = {dt, rows: []}; days.push(g); }
     g.rows.push(x);
   });
-  mid.innerHTML = `<section class="ah-summary" aria-label="Сводка закупок">
+  // Сводка — над прокруткой, на месте; листается только история по дням.
+  const pin = document.getElementById('histPin');
+  if(pin) pin.innerHTML = `<section class="ah-summary" aria-label="Сводка закупок">
       <div class="ah-summary-top">
         <div class="ah-metric"><span class="ah-metric-label">ЗАКУПОК</span><strong>${fmt(list.length)}</strong></div>
         <div class="ah-metric ah-total"><span class="ah-metric-label">ПО ПРАЙСУ · AED</span><strong>${fmt(aed)}</strong></div>
@@ -33007,8 +33017,8 @@ async function supHistory(){
         <div class="ah-small-metric"><span>Приняли</span><div><strong>${fmt(took)}</strong><span class="ah-unit">бут.</span></div></div>
         <div class="ah-small-metric"><span>Не дала Барракуда</span><div><strong>${fmt(gap)}</strong><span class="ah-unit">бут.</span></div></div>
       </div>
-    </section>
-    <div class="ah-timeline">${days.map((g, i) => `<section class="ah-day" aria-labelledby="ah-day-${i}">
+    </section>`;
+  mid.innerHTML = `<div class="ah-timeline">${days.map((g, i) => `<section class="ah-day" aria-labelledby="ah-day-${i}">
       <h2 id="ah-day-${i}"><time datetime="${escS(g.dt)}">${escS(_dayName(g.dt)).toUpperCase()}</time></h2>
       <div class="ah-records">${g.rows.map(supHistRow).join('')}</div>
     </section>`).join('')}</div>`;

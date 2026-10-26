@@ -32252,15 +32252,23 @@ function xbFilterPaint(){
   const none = sec.querySelector('.bp-none'); if(none) none.hidden = n > 0;
 }
 
-// Черновик из недобора: вся строка — прежняя дверь в окно «назвать базу и
-// отправить / отменить» (xSend). Штрих слева и иконки — украшение.
+// Кто не довёз: заявка собрана из недобора магазина (Барракуда) или другой
+// базы — по родительской заявке из списка (владелец, 28 окт 2026: «не
+// черновик, а не довезла Барракуда»).
+function _xFromName(x){
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  const p = x.from_supply ? list.find(v => v.supply_id === x.from_supply) : null;
+  return (p && p.kind === 'extra' && p.base) ? p.base : 'Барракуда';
+}
+// Заявка из недобора: вся строка — дверь на страницу состава (xDraftView),
+// оттуда — база и отправка. Штрих слева и иконки — украшение.
 function xbRequest(x){
   const dt = x.day || String(x.at || '').slice(0, 10);
   const было = (x.tried_bases || []).filter(Boolean);
   const q = x.total_qty || 0, p = x.positions || 0;
   return `<button type="button" class="bp-request" onclick="xDraftView('${escS(x.supply_id)}')" data-record="${escS(x.supply_id)}" data-status="draft">
     <span class="bp-request-icon" aria-hidden="true">${OB_ICO.file}</span>
-    <span class="bp-request-identity"><strong>${escS(x.base || 'База не названа')}</strong><span class="bp-draft"><span aria-hidden="true"></span>${_xState(x)[0]}</span></span>
+    <span class="bp-request-identity"><strong>${escS(x.base || 'База не названа')}</strong><span class="bp-draft"><span aria-hidden="true"></span>не довезла ${escS(_xFromName(x))}</span></span>
     <span class="bp-quantity"><strong>${fmt(q)}</strong><span>${pluralize(q,'бутылка','бутылки','бутылок')}</span></span>
     <span class="bp-request-arrow" aria-hidden="true">${OB_ICO.right}</span>
     <span class="bp-request-meta"><span>${p} ${pluralize(p,'позиция','позиции','позиций')}</span><time datetime="${escS(dt)}">${escS(_xbDay(dt))}</time>${
@@ -32511,12 +32519,13 @@ function xSupRender(d){
   const busy = live_.filter(t => t.driver && !t.done_at).length;
   const need = live_.reduce((a, t) => a + (t.need || 0), 0);
   const got  = live_.reduce((a, t) => a + (t.got || 0), 0);
-  const st = draft ? ['черновик', 'wait']
+  const st = draft ? ['ждёт решения', 'wait']
            : d.status === 'cancelled' ? ['отменена', 'no']
            : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
            : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
   _setText('accTitle', draft ? 'Доп. заявка' : extra ? (d.base || 'Другая база') : 'Приёмка');
-  _setText('accSub', draft ? (d.source === 'shortfall' ? `из недобора · ${d.from_base || 'магазина'}` : 'вручную')
+  _setText('accSub', draft ? (d.source === 'shortfall'
+                     ? `не довезла ${d.from_base && d.from_base !== 'магазина' ? d.from_base : 'Барракуда'}` : 'вручную')
                    : extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
   const order = t => t.cancelled_at ? 3 : t.done_at ? 2 : (t.driver ? 1 : 0);
   const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {

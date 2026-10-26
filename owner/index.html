@@ -3233,12 +3233,6 @@ button.path:active{transform:scale(.995)}
 .pin-pop.crw-ask.xsend.kb{top:max(20px,7vh)!important;transform:translate(-50%,0)!important;animation:none!important}
 .xsend .xs-in{font-size:15.5px;padding:13px 14px}
 .xsend .xs-chips{margin:10px 0 4px}
-.xsend-l{margin:-4px 0 12px;font-size:12.5px}
-.xsend-l:empty{display:none}
-.xsend-l div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--border2)}
-.xsend-l div span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.xsend-l div b{font-family:'Space Grotesk',sans-serif;color:var(--gold2)}
-.xsend-l div.more{border:0;color:var(--muted);justify-content:flex-start}
 .xsend .crw-ask-b:disabled{opacity:.4}
 .xs-chip{padding:9px 14px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:13px;
   font-weight:600;color:var(--sub);background:var(--card);border:1px solid var(--border2)}
@@ -32264,7 +32258,7 @@ function xbRequest(x){
   const dt = x.day || String(x.at || '').slice(0, 10);
   const было = (x.tried_bases || []).filter(Boolean);
   const q = x.total_qty || 0, p = x.positions || 0;
-  return `<button type="button" class="bp-request" onclick="xSend('${escS(x.supply_id)}')" data-record="${escS(x.supply_id)}" data-status="draft">
+  return `<button type="button" class="bp-request" onclick="xDraftView('${escS(x.supply_id)}')" data-record="${escS(x.supply_id)}" data-status="draft">
     <span class="bp-request-icon" aria-hidden="true">${OB_ICO.file}</span>
     <span class="bp-request-identity"><strong>${escS(x.base || 'База не названа')}</strong><span class="bp-draft"><span aria-hidden="true"></span>${_xState(x)[0]}</span></span>
     <span class="bp-quantity"><strong>${fmt(q)}</strong><span>${pluralize(q,'бутылка','бутылки','бутылок')}</span></span>
@@ -32353,7 +32347,12 @@ async function accExtra(){
 // отменить. Окно по центру: состав менять здесь нечем, решений два.
 let XSEND = null;
 async function xSend(sid){
-  const x = _xList().find(v => v.supply_id === sid); if(!x) return;
+  // Итог — из открытой страницы черновика, если это она: после правок список
+  // баз ещё не перечитан, а числа в окне обязаны совпадать с составом.
+  const x = (SUP_D && SUP_D.supply_id === sid && SUP_D.status === 'draft')
+    ? {supply_id: sid, total_qty: SUP_D.total_qty, positions: SUP_D.positions, tried_bases: SUP_D.tried_bases}
+    : _xList().find(v => v.supply_id === sid);
+  if(!x) return;
   XSEND = {sid, base: ''};
   closePinPop();
   const back = document.createElement('div');
@@ -32368,7 +32367,6 @@ async function xSend(sid){
     <div class="crw-ask-s">${fmt(x.total_qty)} ${pluralize(x.total_qty,'единица','единицы','единиц')} · ${
       x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')}${
       было.length ? `<br>Нет в наличии на: ${escS(было.join(', '))}` : ''}</div>
-    <div class="xsend-l" id="xSendL"></div>
     <input class="xs-in" id="xSendIn" placeholder="Название базы" maxlength="60" autocomplete="off"
            oninput="xSendPaint()" onfocus="this.closest('.xsend').classList.add('kb')"
            onblur="this.closest('.xsend').classList.remove('kb')">
@@ -32378,16 +32376,6 @@ async function xSend(sid){
     <button class="crw-ask-b bad" onclick="xSendDrop()">Отменить заявку</button>`;
   document.body.append(back, box);
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-  // Состав — следом: список весит больше строки, а окно должно открыться сразу.
-  try{
-    const d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(sid));
-    const l = document.getElementById('xSendL');
-    if(l && XSEND && XSEND.sid === sid){
-      const its = (d.items || []).slice().sort((a, b) => (b.qty || 0) - (a.qty || 0));
-      l.innerHTML = its.slice(0, 6).map(i => `<div><span>${escS(i.name)}</span><b>${fmt(i.qty)}</b></div>`).join('')
-        + (its.length > 6 ? `<div class="more">и ещё ${its.length - 6}</div>` : '');
-    }
-  }catch(e){}
 }
 function xSendPaint(){
   const v = ((document.getElementById('xSendIn') || {}).value || '').trim();
@@ -32427,6 +32415,56 @@ async function xSendDrop(){
   accExtra();
 }
 
+// ── Черновик докупки: сперва состав, потом база (владелец, 28 окт 2026:
+// «автоматически составленные заявки сначала показывают состав, а после
+// редактирования или сохранения как есть — выбор базы»). Страница — тот же
+// экран приёмки: районы, строки со степперами и «Добавить позицию», правки
+// уходят на сервер кнопкой. Внизу «Выбрать базу» — окно с названием базы и
+// отправкой водителям; в шапке — отмена черновика. ──
+async function xDraftView(sid){
+  _setText('accTitle', 'Доп. заявка');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accFoot').innerHTML = '';
+  XS_DRAFT = {}; SUP_GOTO = '';
+  await supLoad(sid);
+  ACC_BACK = accExtra;
+}
+// Правки есть — сперва сохранить, потом спрашивать базу: окно отправки
+// показывает итог заявки, и он обязан совпадать с тем, что уйдёт водителям.
+async function xDraftNext(){
+  if(!SUP_ID || !SUP_D || SUP_D.status !== 'draft') return;
+  if(xsDirty()){ const ok = await xsSave(); if(!ok || xsDirty()) return; }
+  if(!(SUP_D.total_qty > 0)){ _toast('В заявке пусто — отметьте товар хотя бы на один район'); return; }
+  xSend(SUP_ID);
+}
+function xDraftDropAsk(){
+  if(!SUP_ID) return;
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask';
+  box.innerHTML = `
+    <div class="crw-ask-t">Отменить заявку?</div>
+    <button class="crw-ask-b bad" onclick="closePinPop(); xDraftDropGo()">Отменить заявку</button>
+    <button class="crw-ask-b" onclick="closePinPop()">Оставить</button>`;
+  document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+}
+async function xDraftDropGo(){
+  if(!SUP_ID) return;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(SUP_ID)}/cancel`,
+      {method: 'POST', body: {as: _rcvMe()}});
+  }catch(e){ return _toast('Не удалось отменить'); }
+  XS_DRAFT = {};
+  _toast('Заявка отменена');
+  ACC_SUP = null;
+  accExtra();
+}
+
 // Заявка на базу открывается в ту же приёмку, что и основная: тот же экран,
 // те же «Взять на себя» и «Отменить». Стрелка ведёт обратно в список баз.
 async function xOpen(sid){
@@ -32461,6 +32499,9 @@ async function xSupRcp(sid, district, code){
 
 function xSupRender(d){
   const extra = d.kind === 'extra';
+  // Черновик докупки: состав по районам со степперами, без приёмки и без
+  // шагов потока; статус один — «черновик». Откуда состав — подписью в шапке.
+  const draft = d.status === 'draft';
   const D = d.districts || {};
   const tasks = d.tasks || [];
   // Отменённые районы — не в счёт: ни в «N из M», ни в бутылках к приёму.
@@ -32470,18 +32511,21 @@ function xSupRender(d){
   const busy = live_.filter(t => t.driver && !t.done_at).length;
   const need = live_.reduce((a, t) => a + (t.need || 0), 0);
   const got  = live_.reduce((a, t) => a + (t.got || 0), 0);
-  const st = d.status === 'cancelled' ? ['отменена', 'no']
+  const st = draft ? ['черновик', 'wait']
+           : d.status === 'cancelled' ? ['отменена', 'no']
            : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
            : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
-  _setText('accTitle', extra ? (d.base || 'Другая база') : 'Приёмка');
-  _setText('accSub', extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
+  _setText('accTitle', draft ? 'Доп. заявка' : extra ? (d.base || 'Другая база') : 'Приёмка');
+  _setText('accSub', draft ? (d.source === 'shortfall' ? `из недобора · ${d.from_base || 'магазина'}` : 'вручную')
+                   : extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
   const order = t => t.cancelled_at ? 3 : t.done_at ? 2 : (t.driver ? 1 : 0);
   const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {
     const x = D[t.district] || {};
     // Принято без кодов — своё состояние между «везёт» и «принято»: товар на
     // полке, задача открыта, пока всё не отсканируют.
     const ns = !t.done_at && !!t.noscan_at;
-    const who = t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
+    const who = draft ? `${(t.lines || []).length} ${pluralize((t.lines || []).length,'позиция','позиции','позиций')}`
+              : t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
               : t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
               : ns ? `без сканирования · ${escS(t.noscan_by || t.driver)} · ${_hm(t.noscan_at)}`
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
@@ -32496,7 +32540,7 @@ function xSupRender(d){
     // Пока район не начали принимать, состав правится прямо тут: − n +.
     // Первый скан (или «принято без сканирования») запирает район — замок в
     // подписи, кнопки исчезают, а водитель у себя видит, что именно поменяли.
-    const edit = !extra && d.status === 'open' && !t.locked && !t.cancelled_at;
+    const edit = (draft || (!extra && d.status === 'open')) && !t.locked && !t.cancelled_at;
     // Район заперли, пока правили черновик: правки по нему пропадают, и об
     // этом говорим сразу, а не в момент сохранения.
     if(t.locked && XS_DRAFT[t.district] && Object.keys(XS_DRAFT[t.district]).length){
@@ -32529,7 +32573,7 @@ function xSupRender(d){
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
         <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i>${lock}</span>
-        <span class="xs-dcard-n">${fmt(t.got)}<i>/ ${fmt(t.need)}</i></span>
+        <span class="xs-dcard-n">${draft ? `${fmtQty(t.need)}<i>бут.</i>` : `${fmt(t.got)}<i>/ ${fmt(t.need)}</i>`}</span>
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
           <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
@@ -32544,12 +32588,18 @@ function xSupRender(d){
       ${rtActs(t, d)}
     </div>`;
   }).join('');
-  document.getElementById('accMid').innerHTML = `<div class="xs-top xs-card">
+  const было = (d.tried_bases || []).filter(Boolean);
+  document.getElementById('accMid').innerHTML = (draft ? `<div class="xs-top xs-card">
+      <span class="xs-top-b"><span class="pstat-c ${st[1]}">${st[0]}</span>
+        <span class="xs-top-s">${all} ${pluralize(all,'район','района','районов')} · ${d.positions || 0} ${pluralize(d.positions || 0,'позиция','позиции','позиций')}${
+          было.length ? ` · нет на: ${escS(было.join(', '))}` : ''}</span></span>
+      <span class="xs-top-n">${fmtQty(need)}<i>${pluralize(need,'бутылка','бутылки','бутылок')}</i></span>
+    </div>` : `<div class="xs-top xs-card">
       <span class="xs-top-b"><span class="pstat-c ${st[1]}">${st[0]}</span>
         <span class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span></span>
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
-    </div>${extra ? xFlowCard(d) : ''}<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
+    </div>${extra ? xFlowCard(d) : ''}`) + `<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
   supActShow(d);
   supFoot();
   const goto = SUP_GOTO === 'who' ? 'supWho'
@@ -33511,6 +33561,14 @@ const _hm = iso => {
 // содержимого, а не экрана, и на длинном списке висела посреди строк, накрыв
 // их полосой в цвет фона.
 function supFoot(){
+  // У черновика докупки внизу — следующий шаг: выбрать базу. Есть правки —
+  // кнопка сперва их сохранит, той же кнопкой, что и в приёмке.
+  if(SUP_D && SUP_D.status === 'draft'){
+    const n = xsDraftCount();
+    document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
+      <button class="qb" id="xsSaveBtn" onclick="xDraftNext()">${n ? `Сохранить и выбрать базу · ${n}` : 'Выбрать базу'}</button></div>`;
+    return;
+  }
   // У доп. заявки внизу — следующий шаг потока. У основной подвал появляется
   // только с черновиком: одна кнопка, сколько строк уйдёт.
   if(SUP_D && SUP_D.kind === 'extra'){ document.getElementById('accFoot').innerHTML = xFlowFoot(SUP_D); return; }
@@ -34550,6 +34608,10 @@ function supCancelBtn(sup){
   const живых = s => s && (s.can_cancel != null
     ? s.can_cancel > 0
     : (s.districts || 0) - (s.done || 0) > 0);
+  // Черновик докупки отменяется целиком: водителям он не виден, районов не
+  // выбирают — окно-вопрос, и заявка уходит в отработанные.
+  if(sup && sup.status === 'draft') return sup.supply_id
+    ? `<button class="acc-act dn" onclick="xDraftDropAsk()">Отменить заявку</button>` : '';
   if(sup) return (sup.status === 'open' && sup.supply_id && живых(sup))
     ? `<button class="acc-act dn" onclick="supCancelOpen('${sup.kind === 'extra' ? 'extra' : 'sup'}')"
         >Отменить заявку</button>` : '';

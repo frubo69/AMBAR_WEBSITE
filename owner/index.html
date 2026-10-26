@@ -2601,6 +2601,13 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   background:transparent;transition:background .3s var(--e1),box-shadow .3s var(--e1)}
 .chk-e-dot.ok{background:var(--up);box-shadow:0 0 0 3px rgba(76,175,125,.14)}
 .chk-e-dot.now{background:var(--gold2);box-shadow:0 0 0 3px rgba(201,169,110,.16)}
+/* Закупка ждёт решения — точка у названия плитки дышит золотом, подпись
+   золотая (владелец, 26 окт 2026: «мигать кнопка в закупке»). */
+.acc-attn{display:inline-block;width:8px;height:8px;margin-left:7px;border-radius:50%;vertical-align:1px;
+  background:var(--gold2);animation:accBreath 2.4s var(--e1) infinite}
+@keyframes accBreath{0%,100%{box-shadow:0 0 0 0 rgba(232,201,138,.5)}70%{box-shadow:0 0 0 9px rgba(232,201,138,0)}}
+.acc-s.attn{color:var(--gold2)}
+@media (prefers-reduced-motion:reduce){.acc-attn{animation:none;box-shadow:0 0 0 3px rgba(232,201,138,.25)}}
 /* Просроченное дышит — не мигает: мигание кричит, дыхание зовёт. */
 .chk-e-dot.late{background:var(--dn);animation:chkBreath 2.6s var(--e1) infinite}
 @keyframes chkBreath{
@@ -19044,6 +19051,7 @@ const ACC = [
   {id:'visas',    t:'Визы',              s:'сроки / продления',
    ico:'<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M8.5 17h7"/>'},
 ];
+let PR_N = 0;      // новые цены магазина, ждущие решения — из /api/owner/supply
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
     ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null, ACC_SUP = null,
     ACC_WAL = null;
@@ -19586,16 +19594,20 @@ function accRender(){
                  'проверка','проверки','проверок') + ' за месяц' : 'за месяц'],
   };
   // Плитка одна и та же, меняется только раздел, в котором она стоит.
+  // Закупка ждёт решения (новые цены магазина, черновик докупки) — точка
+  // дышит у названия, подпись говорит, что именно (владелец, 26 окт 2026).
+  const attn = {order: ordAttn()};
   const tile = a => {
     const [v, u] = num[a.id] || [null, ''];
+    const at = attn[a.id] || '';
     return `<button class="acc-cell" onclick="accOpen('${a.id}')">
       <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${a.ico}</svg></span>
-      <span class="acc-t">${a.t}</span>
+      <span class="acc-t">${a.t}${at ? '<span class="acc-attn" aria-hidden="true"></span>' : ''}</span>
       <span class="acc-n">${v === null
         ? '<span class="acc-v is-skel">0000</span>'
         : `<span class="acc-v">${v}</span>`}<i>${escS(u)}</i></span>
-      ${a.s ? `<span class="acc-s">${escS(a.s)}</span>` : ''}
+      ${at ? `<span class="acc-s attn">${escS(at)}</span>` : a.s ? `<span class="acc-s">${escS(a.s)}</span>` : ''}
     </button>`;
   };
   // Два раздела вместо ровного ряда из четырёх: слева от заголовка сразу
@@ -26615,7 +26627,7 @@ async function accLoadSummaries(){
   if(chk) ACC_CHK = chk;
   // «Открытая» — основная, не на другую базу: иначе при принятой Барракуде и
   // открытой доп. заявке хаб Барракуды показывал бы чужую поставку.
-  if(sup) ACC_SUP = {list: sup.supplies || [], open: _supMain(sup.supplies || [])};
+  if(sup){ ACC_SUP = {list: sup.supplies || [], open: _supMain(sup.supplies || [])}; PR_N = sup.proposals || 0; }
   accRender(); mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender();
 }
 
@@ -26839,7 +26851,7 @@ async function accOrder(){
   if(!ACC_SUP){
     try{
       const r = await ownerApi.ownerFetch('/api/owner/supply');
-      ACC_SUP = {list: r.supplies || [], open: _supMain(r.supplies || [])};
+      ACC_SUP = {list: r.supplies || [], open: _supMain(r.supplies || [])}; PR_N = r.proposals || 0;
     }catch(e){ ACC_SUP = {list: [], open: null}; }
   }
   // Первый шаг — выбор: Барракуда или другие базы (владелец, 24 окт 2026:
@@ -26905,7 +26917,11 @@ function ordPick(){
   const pct = sup && !cancelled ? (sup.total_qty ? Math.round(took / sup.total_qty * 100) : 0) : null;
   let who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
-  const bar = {key: 'bar', ico: 'list', name: 'Барракуда', phase, live: taking, complete, idle: false,
+  // Новые цены магазина ждут решения — слово цикла уступает им и мигает:
+  // это единственное, что здесь просит руки (владелец, 26 окт 2026).
+  const prN = prCount();
+  const bar = {key: 'bar', ico: 'list', name: 'Барракуда', phase: prN ? `новые цены · ${prN}` : phase,
+    live: prN ? true : taking, complete: prN ? false : complete, idle: false,
     asked: sup ? (sup.asked_qty || 0) : (d.total_qty || 0), gave: sup ? (sup.total_qty || 0) : null, pct, who,
     qty: d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0),
     unit: pluralize(d.buy && d.buy.qty != null ? d.buy.qty : (d.total_qty || 0), 'единица', 'единицы', 'единиц'),
@@ -26919,9 +26935,11 @@ function ordPick(){
   const xwho = open.flatMap(x => Object.entries(x.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${x.base ? x.base + ' · ' : ''}${t.driver}`)).join(', ');
   const xqty = [...open, ...wait].reduce((a, x) => a + (x.total_qty || 0), 0);
-  const other = {key: 'extra', ico: 'store', name: 'Другие базы', idle: !open.length,
-    phase: open.length ? (xwho ? 'идёт приёмка' : 'в работе') : wait.length ? `${wait.length} ${pluralize(wait.length, 'черновик', 'черновика', 'черновиков')}` : 'нет заявок',
-    live: !!xwho, complete: false,
+  const dr = arShortDraft();
+  const other = {key: 'extra', ico: 'store', name: 'Другие базы', idle: !open.length && !dr,
+    phase: dr ? `докупка ждёт · ${fmt(dr.total_qty || 0)} бут.`
+      : open.length ? (xwho ? 'идёт приёмка' : 'в работе') : wait.length ? `${wait.length} ${pluralize(wait.length, 'черновик', 'черновика', 'черновиков')}` : 'нет заявок',
+    live: !!dr || !!xwho, complete: false,
     asked: open.length ? xa : null, gave: open.length ? xg : null, pct: open.length ? (xg ? Math.round(xt / xg * 100) : 0) : null, who: xwho,
     qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'), aed: open.length ? xm : null};
   mid.innerHTML = `<div class="ap-app" aria-label="Закупка"><div class="ap-content"><div class="ap-options">${apCard(bar)}${apCard(other)}</div></div></div>`;
@@ -27178,6 +27196,23 @@ const AR_ICO = (() => {
   };
 })();
 
+// Что в закупке ждёт решения (владелец, 26 окт 2026): новые цены магазина —
+// мигает вход в закупку и алерт в бот; черновик докупки из недобора — мигает
+// кнопка «Докупить», там же его отправляют или отклоняют.
+function prCount(){ return PR_D ? ((PR_D.proposals || []).length) : (PR_N || 0); }
+function arShortDraft(){
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  const main = _supCur(list);
+  return list.find(x => x.kind === 'extra' && x.status === 'draft' && x.source === 'shortfall'
+                        && (!main || !x.from_supply || x.from_supply === main.supply_id)) || null;
+}
+function ordAttn(){
+  const n = prCount(), dr = arShortDraft();
+  if(n) return `новые цены · ${n}`;
+  if(dr) return `докупка ждёт · ${fmt(dr.total_qty || 0)} бут.`;
+  return '';
+}
+
 // Сводка: вход в список заявки (та же кнопка, тот же accOrderList) и шкала
 // трёх шагов. Числа и подписи — те же, что считал путь (pathInner): заявка →
 // магазин дал → приняли %, под ними закупка AED и «принято из».
@@ -27196,7 +27231,8 @@ function arSummary(){
   const subs = m ? [aed(m.asked), aed(m.confirmed), `${fmtQty(st.took)} из ${fmtQty(sup.total_qty || 0)}`]
                  : [aed(d.total_cost != null ? d.total_cost : d.total_aed), '', ''];
   const taking = live && Object.values(sup.tasks || {}).some(t => t.driver && !t.done_at && !t.cancelled_at);
-  const phase = !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
+  const prN = prCount();
+  const phase = prN ? `новые цены · ${prN}` : !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
     : cancelled ? 'отменена' : done ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
   const cls = i => done ? (i < 2 ? 'is-done' : 'is-complete')
     : (i + 1 < step ? 'is-done' : i + 1 === step ? 'is-current' : 'is-pending');
@@ -27205,7 +27241,7 @@ function arSummary(){
     <button type="button" class="ar-section-head ar-summary-link cursor-interaction" onclick="accOrderList()">
       <span class="ar-icon" aria-hidden="true">${AR_ICO.list}</span>
       <span class="ar-heading"><span class="ar-title">ЗАЯВКА БАРРАКУДА</span><span class="ar-phase${
-        done ? ' is-complete' : ''}${taking ? ' ar-live' : ''}" aria-live="polite">${phase}</span></span>
+        done && !prN ? ' is-complete' : ''}${taking || prN ? ' ar-live' : ''}" aria-live="polite">${phase}</span></span>
       ${AR_ICO.right}
     </button>
     <div class="ar-summary-body"><div class="ar-route" aria-label="Этапы общей заявки">
@@ -27252,23 +27288,29 @@ function arReceiving(){
   return {html, n: rows.length};
 }
 
-// Две равные плитки — существующие действия хаба, прежде стоявшие строками:
-// докупка на других базах (accShort, число — что ещё не заказано) и новые
-// цены магазина (ordPrices). Нечего делать — плитка погашена, не исчезает:
-// геометрия эталона на две кнопки.
+// Две равные плитки (владелец, 26 окт 2026): «Докупить на доп. базах» —
+// мигает, пока ждёт черновик докупки из недобора (он собирается сам при
+// загрузке ответа магазина); нажатие открывает его: отправить водителям или
+// отклонить. Без черновика — остаток недобора и экран докупки, как раньше.
+// «Свободная закупка · Барракуда» — закупка под клиента вне нормы; поток ещё
+// не построен, плитка погашена.
 function arOps(){
   const st = supStage(), sup = st.sup;
   const gap = sup && sup.status === 'open' ? (sup.short_qty != null ? sup.short_qty : (sup.gap_qty || 0)) : 0;
   const left = gap ? (sup.short_left != null ? sup.short_left : gap) : 0;
-  const n = ((PR_D && PR_D.proposals) || []).length;
-  const tile = (on, go, ico, title, qty, cap) => `<button type="button" class="ar-panel ar-operation cursor-interaction${on ? '' : ' is-off'}" ${
+  const dr = arShortDraft();
+  const tile = (on, go, ico, title, qty, cap, live) => `<button type="button" class="ar-panel ar-operation cursor-interaction${on ? '' : ' is-off'}" ${
       on ? `onclick="${go}"` : 'disabled'}>
-      <span class="ar-op-top">${ico}<span class="ar-op-title">${title}${qty ? `<br><span class="ar-op-quantity">${qty}</span>` : ''}</span>${AR_ICO.right}</span>
+      <span class="ar-op-top">${ico}<span class="ar-op-title${live ? ' ar-live' : ''}">${title}${qty ? `<br><span class="ar-op-quantity">${qty}</span>` : ''}</span>${AR_ICO.right}</span>
       <span class="ar-op-caption">${cap}</span>
     </button>`;
-  return `<div class="ar-operations" aria-label="Заявки на закупку">${
-    tile(!!gap, 'accShort()', AR_ICO.pkg, 'ДОКУПКА', gap ? (left ? `${fmt(left)} бут.` : 'в заявках') : '', gap ? 'Доп. базы' : 'нет недобора')}${
-    tile(!!n, 'ordPrices()', AR_ICO.file, 'НОВЫЕ ЦЕНЫ', n ? `${n} ${pluralize(n, 'позиция', 'позиции', 'позиций')}` : '', n ? 'магазин' : 'нет новых')}</div>`;
+  const buy = dr
+    ? tile(true, `xSend('${escS(dr.supply_id)}')`, AR_ICO.pkg, 'ДОКУПКА', `${fmt(dr.total_qty || 0)} бут.`, 'черновик · отправить или отклонить', true)
+    : gap
+    ? tile(true, 'accShort()', AR_ICO.pkg, 'ДОКУПКА', left ? `${fmt(left)} бут.` : 'в заявках', 'Доп. базы', false)
+    : tile(false, '', AR_ICO.pkg, 'ДОКУПКА', '', 'нет недобора', false);
+  return `<div class="ar-operations" aria-label="Заявки на закупку">${buy}${
+    tile(false, '', AR_ICO.file, 'СВОБОДНАЯ<br>ЗАКУПКА', '', 'Барракуда', false)}</div>`;
 }
 
 // Нижняя кнопка — та же «Загрузить ответ магазина» (ordUp → ordFile →

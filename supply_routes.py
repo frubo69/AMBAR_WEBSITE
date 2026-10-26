@@ -1079,7 +1079,16 @@ async def handle_list(request):
                               "cancelled_at": str(t.get("cancelled_at") or "")}
                           for o, t in (r.get("tasks") or {}).items()}
         out.append(brief)
-    return web.json_response({"supplies": out}, headers=CORS_HEADERS,
+    # Новые цены магазина ждут решения — панель учёта и вход в закупку мигают
+    # этим числом (владелец, 26 окт 2026: «новые цены — просто мигать кнопка в
+    # закупке и алерт в бот»); сам алерт уходит при загрузке ответа.
+    try:
+        import stock_value
+        proposals = len(await stock_value.price_proposals_pending())
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[supply] предложения цен не прочитаны: {e}")
+        proposals = 0
+    return web.json_response({"supplies": out, "proposals": proposals}, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 

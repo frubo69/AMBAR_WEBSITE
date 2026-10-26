@@ -3577,130 +3577,144 @@ button.path:active{transform:scale(.995)}
 #accMid .ap-app [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){#accMid .ap-choice{transition:none}#accMid .ap-phase.is-live{animation:none;opacity:1}}
 
-/* ── Хаб «Барракуда» по эталону владельца (AMBAR-RECEIVING-VISUAL-ONLY.txt,
-   26 окт 2026: «перенести только визуал»). CSS эталона перенесён буквально,
-   включая compatibility-блок svg.lucide 16px!important — он участвовал в
-   снимке и «чистить» его нельзя. Ниже — единственный адаптер оболочки. ── */
-#ambar-receiving-adaptive .ar-app{--ar-width:390px;--ar-height:844px;--ar-receiving-grow:1.2;--ar-bg:#07070c;--ar-card:#12111f;--ar-text:#ece9e3;--ar-muted:#a39baa;--ar-gold:#e2c386;--ar-green:#899b8a;--ar-line:#2c2938;box-sizing:border-box;width:var(--ar-width);max-width:100%;height:var(--ar-height);position:relative;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;border:1px solid #26232f;border-radius:24px;background:var(--ar-bg);color:var(--ar-text);color-scheme:dark;font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;container-type:size;container-name:ar-phone}
-#ambar-receiving-adaptive .ar-app *{box-sizing:border-box}
-#ambar-receiving-adaptive .ar-app button{font-family:inherit;appearance:none;-webkit-tap-highlight-color:transparent;color:inherit;white-space:normal}
-#ambar-receiving-adaptive .ar-app-head{display:grid;grid-template-columns:44px minmax(0,1fr) auto 44px;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid #25212d;background:#0b0a11}
-#ambar-receiving-adaptive .ar-app-head h1{margin:0;min-width:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.02em;overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-icon-button{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid #292534;border-radius:13px;background:#12111f;color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-icon-button svg{width:22px;height:22px;stroke-width:1.8}
-#ambar-receiving-adaptive .ar-cancel{min-height:44px;padding:4px;border:0;border-radius:10px;background:transparent;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500}
-#ambar-receiving-adaptive .ar-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:13px;background:transparent;color:var(--ar-muted)!important}
-#ambar-receiving-adaptive .ar-history svg{width:21px;height:21px;stroke-width:1.7}
-#ambar-receiving-adaptive .ar-content{--ar-gap:clamp(6px,calc(3cqh - 13.2px),12px);--ar-head-y:clamp(5px,calc(3cqh - 14.2px),11px);--ar-row-y:clamp(6px,calc(2cqh - 6.8px),10px);--ar-row-h:clamp(46px,calc(10cqh - 18px),66px);display:flex;flex-direction:column;gap:var(--ar-gap);min-height:0;min-width:0;padding:var(--ar-gap) 10px;overflow-y:auto;overscroll-behavior:contain}
-#ambar-receiving-adaptive .ar-panel{flex-shrink:0;min-width:0;border:1px solid #37313f;border-radius:20px;background:linear-gradient(135deg,#1b1825 0%,#12111f 76%);overflow:hidden}
-#ambar-receiving-adaptive .ar-summary{display:flex;flex-direction:column;flex:1 0 auto;min-height:min-content}
-#ambar-receiving-adaptive .ar-receiving{display:flex;flex-direction:column;flex:var(--ar-receiving-grow) 0 auto;min-height:min-content}
-#ambar-receiving-adaptive .ar-section-head{display:grid;grid-template-columns:28px minmax(0,1fr) 16px;align-items:center;gap:8px;width:100%;min-width:0;flex:0 0 auto;padding:var(--ar-head-y) 12px;border:0;border-bottom:1px solid var(--ar-line);background:transparent;text-align:left}
-#ambar-receiving-adaptive .ar-icon{display:grid;place-items:center;width:28px;height:28px;border:1px solid #5b4d37;border-radius:9px;background:#c4aa7612;color:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-icon svg{width:18px;height:18px;stroke-width:1.7}
-#ambar-receiving-adaptive .ar-heading{display:flex;flex-direction:column;gap:2px;min-width:0}
-#ambar-receiving-adaptive .ar-title{margin:0;min-width:0;font-family:inherit;font-size:clamp(12px,3.72cqw,14.5px);line-height:18px;font-weight:700;letter-spacing:.025em;overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-phase{font-size:11px;line-height:14px;color:var(--ar-gold);overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-phase.is-complete{color:var(--ar-green)}
-#ambar-receiving-adaptive .ar-live{animation:ar-adaptive-pulse 3.6s ease-in-out infinite}
-@keyframes ar-adaptive-pulse{0%,100%{opacity:1}50%{opacity:.72}}
-#ambar-receiving-adaptive .ar-chevron{width:16px;height:16px;color:#91879e;stroke-width:1.8;flex-shrink:0}
-#ambar-receiving-adaptive .ar-summary-link .ar-chevron{color:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-summary-body{display:flex;align-items:center;flex:1 0 auto;min-height:min-content;padding:var(--ar-row-y) 12px var(--ar-gap)}
-#ambar-receiving-adaptive .ar-route{position:relative;display:grid;width:100%;min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:10px minmax(28px,max-content) auto auto;row-gap:3px;align-items:stretch}
-#ambar-receiving-adaptive .ar-rail{position:absolute;top:4.5px;left:16.666667%;right:16.666667%;height:1px;background:#3a3344;pointer-events:none}
-#ambar-receiving-adaptive .ar-rail span{display:block;height:100%;width:100%;background:#ab915e;transition:width .25s ease}
-#ambar-receiving-adaptive .ar-step{display:grid;grid-template-rows:subgrid;grid-row:1 / 5;min-width:0;padding:0 3px;text-align:center;position:relative;align-items:center}
-#ambar-receiving-adaptive .ar-step:nth-of-type(2){grid-column:1}
-#ambar-receiving-adaptive .ar-step:nth-of-type(3){grid-column:2}
-#ambar-receiving-adaptive .ar-step:nth-of-type(4){grid-column:3}
-#ambar-receiving-adaptive .ar-node{display:block;justify-self:center;width:9px;height:9px;border-radius:50%;background:#494153}
-#ambar-receiving-adaptive .ar-step.is-done .ar-node,#ambar-receiving-adaptive .ar-step.is-current .ar-node{background:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-step.is-current .ar-node{box-shadow:0 0 0 4px #e2c38615}
-#ambar-receiving-adaptive .ar-step.is-complete .ar-node{background:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-label{font-size:11px;line-height:14px;font-weight:600;letter-spacing:.015em;color:var(--ar-muted);overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-step strong{min-width:0;font-family:"Space Grotesk","Manrope",sans-serif;font-variant-numeric:tabular-nums;font-size:clamp(24px,calc(1cqh + 17.6px),28px);line-height:1.1;font-weight:500;letter-spacing:-.035em;overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-subvalue{font-size:11px;line-height:14px;color:var(--ar-muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-step.is-current strong,#ambar-receiving-adaptive .ar-step.is-current .ar-label{color:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-step.is-complete strong{color:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-step.is-complete .ar-label{color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-step.is-pending strong{color:#8d829c}
-#ambar-receiving-adaptive .ar-list-head{grid-template-columns:28px minmax(0,1fr) auto}
-#ambar-receiving-adaptive .ar-counter{display:flex;flex-direction:column;align-items:flex-end;gap:0;min-width:0}
-#ambar-receiving-adaptive .ar-counter>span{font-size:11px;line-height:13px;color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-counter strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:15px;line-height:16px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ar-text)}
-#ambar-receiving-adaptive .ar-districts{display:flex;flex-direction:column;flex:1 0 auto;min-height:min-content;min-width:0}
-#ambar-receiving-adaptive .ar-district{display:grid;grid-template-columns:28px minmax(0,1fr) 16px;gap:8px;align-items:center;flex:1 0 auto;width:100%;min-height:var(--ar-row-h);padding:var(--ar-row-y) 12px;border:0;background:transparent;text-align:left}
-#ambar-receiving-adaptive .ar-district+.ar-district{border-top:1px solid var(--ar-line)}
-#ambar-receiving-adaptive .ar-code{display:grid;place-items:center;width:28px;height:28px;border:1px solid #302c42;border-radius:9px;background:#1d1b30;font-family:"Space Grotesk","Manrope",sans-serif;font-size:13px;line-height:18px;font-weight:600;color:#b1a6be}
-#ambar-receiving-adaptive .ar-district-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
-#ambar-receiving-adaptive .ar-district-copy>strong{font-size:13px;line-height:18px;font-weight:700;overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-district-state{font-size:11px;line-height:14px;color:var(--ar-gold);overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-person{color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-district.is-complete .ar-district-state{display:flex;align-items:center;gap:4px;color:var(--ar-green)}
-#ambar-receiving-adaptive .ar-district-state>svg{width:12px;height:12px;flex-shrink:0;stroke-width:1.7}
-#ambar-receiving-adaptive .ar-district.is-complete .ar-code{color:#cbc4d3}
-#ambar-receiving-adaptive .ar-district.is-pending .ar-district-state{color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-empty{flex:0 0 auto;padding:20px 12px;font-size:12px;line-height:18px;color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-operations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;flex:1.2 0 auto;min-height:min-content;min-width:0}
-#ambar-receiving-adaptive .ar-operation{display:flex;flex-direction:column;gap:2px;justify-content:center;align-items:stretch;padding:clamp(7px,calc(4cqh - 18.6px),15px) 10px;text-align:left;border-radius:16px}
-#ambar-receiving-adaptive .ar-op-top{display:grid;grid-template-columns:18px minmax(0,1fr) 12px;align-items:center;gap:6px;min-width:0}
-#ambar-receiving-adaptive .ar-op-top>svg{width:18px;height:18px;stroke-width:1.7;color:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-op-top>.ar-chevron{width:12px;height:12px;color:var(--ar-muted)}
-#ambar-receiving-adaptive .ar-op-title{font-size:11px;line-height:16px;font-weight:700;letter-spacing:.01em;overflow-wrap:anywhere;min-width:0}
-#ambar-receiving-adaptive .ar-op-quantity{font-weight:500;color:var(--ar-gold);font-variant-numeric:tabular-nums}
-#ambar-receiving-adaptive .ar-op-caption{padding-left:24px;font-size:11px;line-height:14px;color:var(--ar-muted);overflow-wrap:anywhere}
-#ambar-receiving-adaptive .ar-bottom{flex-shrink:0;min-width:0}
-#ambar-receiving-adaptive .ar-upload{display:flex;justify-content:center;align-items:center;gap:9px;width:100%;min-height:48px;padding:12px;border:1px solid #615039;border-radius:16px;background:#1f1b26;color:var(--ar-text);font-size:13px;line-height:20px;font-weight:600;text-align:center}
-#ambar-receiving-adaptive .ar-upload svg{width:20px;height:20px;stroke-width:1.7;flex-shrink:0;color:var(--ar-gold)}
-#ambar-receiving-adaptive .ar-app button:hover{background-color:#ffffff04}
-#ambar-receiving-adaptive .ar-app button:active{background-color:#c4aa7612}
-#ambar-receiving-adaptive [hidden]{display:none!important}
-@container ar-phone (min-height:760px){
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-summary-body{padding-top:16px;padding-bottom:18px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-step strong{font-size:32px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-title{font-size:clamp(13px,4cqw,16px);line-height:20px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-section-head{grid-template-columns:36px minmax(0,1fr) 16px;gap:10px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-list-head{grid-template-columns:36px minmax(0,1fr) auto}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-icon{width:36px;height:36px;border-radius:11px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-icon svg{width:22px;height:22px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district{grid-template-columns:36px minmax(0,1fr) 16px;gap:10px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-code{width:36px;height:36px;border-radius:11px;font-size:15px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district-copy{gap:4px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district-copy>strong{font-size:15px;line-height:20px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district-state{font-size:12px;line-height:16px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-operation{gap:7px;padding:15px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-top{grid-template-columns:minmax(0,1fr) 16px;gap:10px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-top>svg:first-child{width:28px;height:28px;grid-row:1;grid-column:1}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-top>.ar-chevron{width:16px;height:16px;grid-row:1;grid-column:2}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-title{grid-row:2;grid-column:1 / -1;font-size:clamp(11px,3.4cqw,13px);line-height:18px}
-  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-caption{padding-left:0;font-size:12px;line-height:16px}
+/* ── Хаб «Барракуда» по эталону владельца, версия 2 (AMBAR-BARRACUDA-CLAUDE-V2.txt,
+   26 окт 2026): одна карточка заявки с приёмкой внутри, компактные этапы, две
+   плитки рядом, кнопка загрузки 56px. barracuda-visual.css перенесён буквально,
+   затем barracuda-integration.css, затем единственный адаптер оболочки STAR. ── */
+#ambar-receiving-finished{font-size:16px;line-height:26px;font-weight:400;-webkit-font-smoothing:antialiased}
+#ambar-receiving-finished .au-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-receiving-finished .au-app{--au-width:390px;--au-height:844px;--au-receiving-grow:.35;--au-order-grow:.65;--au-bg:#07070c;--au-text:#ece9e3;--au-muted:#a8a0ad;--au-gold:#e2c386;--au-green:#899b8a;--au-line:#2e2938;box-sizing:border-box;width:var(--au-width);max-width:100%;height:var(--au-height);display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;border:1px solid #26232f;border-radius:24px;background:var(--au-bg);color:var(--au-text);color-scheme:dark;font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;container-type:size;container-name:au-finished-phone}
+#ambar-receiving-finished .au-app *{box-sizing:border-box}
+#ambar-receiving-finished .au-app button{appearance:none;-webkit-tap-highlight-color:transparent;font-family:inherit;color:inherit;white-space:normal}
+#ambar-receiving-finished svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important;stroke-width:1.7}
+#ambar-receiving-finished .au-app-head{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #25212d;background:#0b0a11}
+#ambar-receiving-finished .au-app-head h1{margin:0;min-width:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.02em;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-back,#ambar-receiving-finished .au-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid #292534;border-radius:13px;background:#12111f;color:var(--au-muted)}
+#ambar-receiving-finished .au-history{border-color:transparent;background:transparent}
+#ambar-receiving-finished .au-content{--au-gap:clamp(6px,calc(3cqh - 13.2px),12px);--au-head-y:clamp(5px,calc(3cqh - 14.2px),11px);--au-row-y:clamp(6px,calc(2cqh - 6.8px),10px);--au-row-h:clamp(46px,calc(10cqh - 18px),66px);display:flex;flex-direction:column;gap:var(--au-gap);min-height:0;min-width:0;padding:var(--au-gap) 10px;overflow-y:auto;overscroll-behavior:contain}
+#ambar-receiving-finished .au-panel{min-width:0;border:1px solid #37313f;border-radius:20px;background:linear-gradient(135deg,#1b1825 0%,#12111f 76%);overflow:hidden}
+#ambar-receiving-finished .au-order{display:flex;flex-direction:column;flex:var(--au-order-grow) 0 auto;min-height:min-content;border-color:#3a3442;background:linear-gradient(135deg,#191722,#12111f 76%);box-shadow:inset 0 1px 0 #ffffff04}
+#ambar-receiving-finished .au-order-head{display:grid;grid-template-columns:28px minmax(0,1fr) 28px;align-items:center;gap:10px;flex:0 0 auto;width:100%;min-width:0;min-height:54px;padding:var(--au-head-y) 14px;border:0;border-bottom:1px solid #39313e;background:linear-gradient(110deg,#24202b,#191622);text-align:left}
+#ambar-receiving-finished .au-icon{display:grid;place-items:center;width:28px;height:28px;border:1px solid #5b4d37;border-radius:9px;background:#c4aa7612;color:var(--au-gold)}
+#ambar-receiving-finished .au-heading{display:flex;flex-direction:column;gap:2px;min-width:0}
+#ambar-receiving-finished .au-title{font-size:clamp(12px,3.72cqw,14.5px);line-height:18px;font-weight:700;letter-spacing:.012em;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-phase{font-size:11px;line-height:14px;color:var(--au-gold);overflow-wrap:anywhere}
+#ambar-receiving-finished .au-phase.is-complete{color:var(--au-green)}
+#ambar-receiving-finished .au-chevron{color:#91879e}
+#ambar-receiving-finished .au-open,#ambar-receiving-finished .au-row-open{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#ffffff04}
+#ambar-receiving-finished .au-open{background:#d4b77b0b}
+#ambar-receiving-finished .au-open>.au-chevron{color:var(--au-gold)}
+#ambar-receiving-finished .au-summary{display:flex;align-items:center;flex:.3 0 auto;min-height:min-content;padding:var(--au-row-y) 14px var(--au-gap)}
+#ambar-receiving-finished .au-route{position:relative;display:grid;width:100%;min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:10px minmax(28px,max-content) auto auto;row-gap:3px;align-items:stretch}
+#ambar-receiving-finished .au-rail{position:absolute;top:4.5px;left:16.666667%;right:16.666667%;height:1px;background:#3a3344;pointer-events:none}
+#ambar-receiving-finished .au-rail>span{display:block;height:100%;width:100%;background:#ab915e;transition:width .25s ease}
+#ambar-receiving-finished .au-step{display:grid;grid-template-rows:subgrid;grid-row:1 / 5;min-width:0;padding:0 3px;text-align:center;position:relative;align-items:center}
+#ambar-receiving-finished .au-step:nth-of-type(2){grid-column:1}
+#ambar-receiving-finished .au-step:nth-of-type(3){grid-column:2}
+#ambar-receiving-finished .au-step:nth-of-type(4){grid-column:3}
+#ambar-receiving-finished .au-step+.au-step::before{content:"";position:absolute;left:0;top:24px;bottom:0;width:1px;background:#342e40;opacity:.6;pointer-events:none}
+#ambar-receiving-finished .au-node{display:block;justify-self:center;width:9px;height:9px;border-radius:50%;background:#494153}
+#ambar-receiving-finished .au-step.is-done .au-node,#ambar-receiving-finished .au-step.is-current .au-node,#ambar-receiving-finished .au-step.is-complete .au-node{background:var(--au-gold)}
+#ambar-receiving-finished .au-step.is-current .au-node{box-shadow:0 0 0 4px #e2c38615}
+#ambar-receiving-finished .au-label{font-size:11px;line-height:14px;font-weight:500;letter-spacing:.015em;color:#b2aab8;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-step strong{min-width:0;font-family:"Space Grotesk","Manrope",sans-serif;font-variant-numeric:tabular-nums;font-size:clamp(24px,calc(1cqh + 17.6px),28px);line-height:1.1;font-weight:500;letter-spacing:-.035em;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-subvalue{font-size:11px;line-height:14px;color:var(--au-muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-step.is-current strong,#ambar-receiving-finished .au-step.is-current .au-label,#ambar-receiving-finished .au-step.is-complete strong{color:var(--au-gold)}
+#ambar-receiving-finished .au-step.is-pending strong{color:#8d829c}
+#ambar-receiving-finished .au-receiving{display:flex;flex-direction:column;flex:var(--au-receiving-grow) 0 auto;min-height:min-content;min-width:0;margin:0;padding:0 14px 6px;border-top:1px solid #332d3b;background:linear-gradient(180deg,#161420,#12111e)}
+#ambar-receiving-finished .au-receiving-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;flex:0 0 auto;padding:10px 0 2px;min-width:0}
+#ambar-receiving-finished .au-receiving-head h2{display:flex;align-items:center;gap:7px;min-width:0;margin:0;font-family:inherit;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.025em;color:#b8b0be;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-receiving-head h2>svg{color:var(--au-gold)}
+#ambar-receiving-finished .au-receiving-head h2>span{min-width:0}
+#ambar-receiving-finished .au-counter{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:2px 7px;max-width:128px;font-variant-numeric:tabular-nums}
+#ambar-receiving-finished .au-counter>span{font-size:11px;line-height:16px;color:var(--au-muted)}
+#ambar-receiving-finished .au-counter strong{min-width:38px;padding:3px 7px;border:1px solid #38313f;border-radius:7px;background:#24202d;font-family:"Space Grotesk","Manrope",sans-serif;font-size:13px;line-height:16px;font-weight:500;white-space:nowrap;text-align:center;color:var(--au-text)}
+#ambar-receiving-finished .au-districts{display:flex;flex-direction:column;flex:1 0 auto;min-height:min-content;min-width:0}
+#ambar-receiving-finished .au-district{display:grid;grid-template-columns:28px minmax(0,1fr) 28px;gap:10px;align-items:center;flex:1 0 auto;width:100%;min-height:var(--au-row-h);padding:var(--au-row-y) 0;border:0;background:transparent;text-align:left}
+#ambar-receiving-finished .au-district+.au-district{border-top:1px solid var(--au-line)}
+#ambar-receiving-finished .au-code{display:grid;place-items:center;width:28px;height:28px;border:1px solid #393145;border-radius:9px;background:#232030;font-family:"Space Grotesk","Manrope",sans-serif;font-size:13px;line-height:18px;font-weight:600;color:#b1a6be}
+#ambar-receiving-finished .au-district-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
+#ambar-receiving-finished .au-district-copy>strong{font-size:13px;line-height:18px;font-weight:700;overflow-wrap:anywhere}
+#ambar-receiving-finished .au-district-state{display:flex;align-items:center;gap:4px;min-width:0;font-size:11px;line-height:14px;color:var(--au-gold);overflow-wrap:anywhere}
+#ambar-receiving-finished .au-district-state>span{min-width:0}
+#ambar-receiving-finished .au-person{color:var(--au-muted)}
+#ambar-receiving-finished .au-district.is-complete .au-district-state{color:var(--au-green)}
+#ambar-receiving-finished .au-district.is-complete .au-code{color:#cbc4d3}
+#ambar-receiving-finished .au-district.is-pending .au-district-state{color:var(--au-muted)}
+#ambar-receiving-finished .au-empty{flex:0 0 auto;padding:12px 0 16px;font-size:12px;line-height:18px;color:var(--au-muted)}
+#ambar-receiving-finished .au-operations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto minmax(min-content,1fr);column-gap:8px;row-gap:2px;flex:1.2 0 auto;min-height:min-content;min-width:0}
+#ambar-receiving-finished .au-operation{display:grid;grid-row:1 / 3;grid-template-columns:16px minmax(0,1fr) 16px;grid-template-rows:subgrid;column-gap:6px;row-gap:2px;align-items:start;padding:clamp(7px,calc(4cqh - 18.6px),15px) 10px;text-align:left;border-radius:16px}
+#ambar-receiving-finished .au-operation:nth-child(1){grid-column:1}
+#ambar-receiving-finished .au-operation:nth-child(2){grid-column:2}
+#ambar-receiving-finished .au-op-top{display:contents}
+#ambar-receiving-finished .au-op-top>svg{grid-row:1;grid-column:1;align-self:center;color:var(--au-gold)}
+#ambar-receiving-finished .au-op-top>.au-chevron{grid-column:3;justify-self:end;color:var(--au-muted)}
+#ambar-receiving-finished .au-op-title{grid-row:1;grid-column:2;align-self:center;font-size:var(--au-op-title-size,11px);line-height:var(--au-op-title-line,16px);font-weight:700;letter-spacing:.01em;overflow-wrap:anywhere;min-width:0}
+#ambar-receiving-finished .au-op-name,#ambar-receiving-finished .au-op-break{display:block}
+#ambar-receiving-finished .au-op-quantity{display:block;font-size:var(--au-op-quantity-size,1em);font-weight:500;color:var(--au-gold);font-variant-numeric:tabular-nums}
+#ambar-receiving-finished .au-op-caption{grid-row:2;grid-column:1 / -1;align-self:end;min-width:0;font-size:var(--au-op-caption-size,11px);line-height:var(--au-op-caption-line,14px);color:var(--au-muted);overflow-wrap:anywhere}
+#ambar-receiving-finished .au-operation:disabled{opacity:.42;cursor:default}
+#ambar-receiving-finished .au-bottom{flex:0 0 auto;min-width:0}
+#ambar-receiving-finished .au-upload{display:flex;justify-content:center;align-items:center;gap:10px;width:100%;min-height:56px;padding:14px 12px;border:1px solid #615039;border-radius:16px;background:#1f1b26;color:var(--au-text);font-size:14px;line-height:22px;font-weight:600;text-align:center}
+#ambar-receiving-finished .au-upload>svg.lucide{width:18px!important;height:18px!important;color:var(--au-gold)}
+#ambar-receiving-finished .au-app button:enabled:hover{background-color:#ffffff04}
+#ambar-receiving-finished .au-app button:enabled:active{background-color:#c4aa7612}
+#ambar-receiving-finished [hidden]{display:none!important}
+#ambar-receiving-finished .au-live{animation:au-finished-pulse 3.6s ease-in-out infinite}
+@keyframes au-finished-pulse{0%,100%{opacity:1}50%{opacity:.72}}
+@container au-finished-phone (min-height:760px){
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-summary{padding-top:14px;padding-bottom:16px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-step strong{font-size:32px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-title{font-size:clamp(13px,4cqw,16px);line-height:20px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-order-head{grid-template-columns:36px minmax(0,1fr) 28px;gap:10px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-icon{width:36px;height:36px;border-radius:11px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-receiving-head{padding-top:12px;padding-bottom:4px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-receiving-head h2{font-size:12px;line-height:18px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-district{grid-template-columns:36px minmax(0,1fr) 28px;gap:10px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-code{width:36px;height:36px;border-radius:11px;font-size:15px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-district-copy{gap:4px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-district-copy>strong{font-size:15px;line-height:20px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-district-state{font-size:12px;line-height:16px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-operations{grid-template-rows:auto minmax(min-content,1fr) auto;row-gap:8px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-operation{grid-row:1 / 4;grid-template-columns:minmax(0,1fr) 16px;row-gap:8px;column-gap:10px;padding:15px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-op-top>svg:first-child{grid-row:1;grid-column:1;align-self:start}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-op-top>.au-chevron{grid-row:1;grid-column:2;align-self:start}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-op-title{grid-row:2;grid-column:1 / -1;font-size:var(--au-op-title-size,13px);line-height:var(--au-op-title-line,18px)}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-op-caption{grid-row:3;font-size:var(--au-op-caption-size,12px);line-height:var(--au-op-caption-line,16px)}
 }
-@supports not (grid-template-rows:subgrid){#ambar-receiving-adaptive .ar-step{grid-template-rows:10px minmax(28px,max-content) auto auto;gap:3px;grid-row:1;align-self:start}#ambar-receiving-adaptive .ar-route{grid-template-rows:auto}}
-@media(prefers-reduced-motion:reduce){#ambar-receiving-adaptive .ar-live{animation:none}#ambar-receiving-adaptive .ar-rail span{transition:none}}
-/* Minimal inherited presentation rules of the screenshot environment. */
-#ambar-receiving-adaptive{font-size:16px;line-height:26px;font-weight:400;-webkit-font-smoothing:antialiased}
-#ambar-receiving-adaptive .cursor-interaction{cursor:var(--cursor-interaction,pointer)}
-#ambar-receiving-adaptive svg{display:block;max-width:100%;height:auto}
-/* Keep this override: the screenshot's host uses 16px !important. */
-#ambar-receiving-adaptive svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important}
-/* ── Адаптер оболочки STAR (единственный, по эталону): шапка приложения
-   остаётся своей и в ar-app не дублируется, поэтому контейнер cqh/cqw — весь
-   экран раздела вместе с шапкой (#accOv), как в эталоне; ar-app берёт
-   фактическую высоту середины; рамки телефона внутри приложения нет. ── */
-#accOv:has(#ambar-receiving-adaptive){container-type:size;container-name:ar-phone}
-#accMid:has(> #ambar-receiving-adaptive){padding:0;overflow:hidden}
-#ambar-receiving-adaptive{width:100%;height:100%;min-width:0;min-height:0}
-#ambar-receiving-adaptive .ar-app{--ar-width:100%;--ar-height:100%;grid-template-rows:minmax(0,1fr);border:0;border-radius:0;container-type:normal;container-name:none}
-#ambar-receiving-adaptive .ar-content{padding-bottom:calc(var(--ar-gap) + var(--safe-bottom))}
-#ambar-receiving-adaptive .ar-operation.is-off{opacity:.45}
-#ambar-receiving-adaptive .ar-operation:disabled{cursor:default}
-/* Действия шапки по эталону: «Отменить» и история — в существующем слоте. */
-#accOv:has(#ambar-receiving-adaptive) .stk-top-a{display:flex;align-items:center;gap:4px}
-#accOv:has(#ambar-receiving-adaptive) .stk-top-a .acc-act.ar-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
-#accOv:has(#ambar-receiving-adaptive) .stk-top-a .ar-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:13px;background:transparent;color:#a39baa!important;cursor:pointer}
-#accOv:has(#ambar-receiving-adaptive) .stk-top-a .ar-history svg{width:21px;height:21px;stroke-width:1.7}
-#accOv:has(#ambar-receiving-adaptive) .stk-top-a svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important}
+@container au-finished-phone (max-height:700px){
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-order-head{min-height:48px;padding-top:5px;padding-bottom:5px}
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-route{grid-template-rows:10px minmax(24px,max-content) auto auto}
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-receiving{padding-bottom:4px}
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-receiving-head{padding-top:6px;padding-bottom:0}
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-counter strong{padding:2px 6px}
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-district{min-height:46px;padding-top:5px;padding-bottom:5px}
+  #ambar-receiving-finished .au-app[data-sparse="false"] .au-district-copy{gap:0}
+}
+@supports not (grid-template-rows:subgrid){
+  #ambar-receiving-finished .au-step{grid-template-rows:10px minmax(28px,max-content) auto auto;gap:3px;grid-row:1;align-self:start}
+  #ambar-receiving-finished .au-route{grid-template-rows:auto}
+  #ambar-receiving-finished .au-operation{grid-template-rows:auto minmax(min-content,1fr)}
+  @container au-finished-phone (min-height:760px){#ambar-receiving-finished .au-app[data-sparse="true"] .au-operation{grid-template-rows:auto minmax(min-content,1fr) auto}}
+}
+@media(prefers-reduced-motion:reduce){#ambar-receiving-finished .au-live{animation:none}#ambar-receiving-finished .au-rail>span{transition:none}}
+/* barracuda-integration.css: размер от настоящего контейнера, без оболочки предпросмотра. */
+#ambar-receiving-finished{width:100%;height:100%;min-width:0;min-height:0}
+#ambar-receiving-finished .au-stage{display:contents;padding:0}
+#ambar-receiving-finished .au-app{--au-width:100%;--au-height:100%;border:0;border-radius:0}
+#ambar-receiving-finished .cursor-interaction:enabled{cursor:pointer}
+/* ── Адаптер оболочки STAR: шапка раздела своя и в au-app не дублируется
+   (у сетки au-app остаётся одна строка под main), середина раздела — без
+   полей и без своей прокрутки (прокручивается au-content), снизу safe-area.
+   Действия шапки — в существующем слоте: «Отменить заявку» и история. ── */
+#accMid:has(> #ambar-receiving-finished){padding:0;overflow:hidden}
+#ambar-receiving-finished .au-app{grid-template-rows:minmax(0,1fr)}
+#ambar-receiving-finished .au-content{padding-bottom:calc(var(--au-gap) + var(--safe-bottom))}
+#ambar-receiving-finished .au-receiving-head[onclick]{cursor:pointer}
+#accOv:has(#ambar-receiving-finished) .stk-top-a{display:flex;align-items:center;gap:4px}
+#accOv:has(#ambar-receiving-finished) .stk-top-a .acc-act.au-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
+#accOv:has(#ambar-receiving-finished) .stk-top-a .au-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid transparent;border-radius:13px;background:transparent;color:#a8a0ad!important;cursor:pointer}
+#accOv:has(#ambar-receiving-finished) .stk-top-a svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important;stroke-width:1.7}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
 .oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -26643,6 +26657,7 @@ function accOpen(id){
   _navSave();
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accMid').classList.remove('xs-fix', 'ap-host');
+  arVisOff();
   document.getElementById('accFoot').innerHTML = '';   // подвал у каждого свой
   document.getElementById('accAct').innerHTML = '';    // и действие в шапке тоже
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -26899,7 +26914,7 @@ function ordPick(){
   document.getElementById('accAct').innerHTML = '';
   document.getElementById('accFoot').innerHTML = '';
   const mid = document.getElementById('accMid');
-  mid.classList.remove('xs-fix'); mid.classList.add('ap-host');
+  mid.classList.remove('xs-fix'); mid.classList.add('ap-host'); arVisOff();
   const st = supStage(), d = ORD.d || {};
   const list = (ACC_SUP && ACC_SUP.list) || [];
   // Открытой поставки нет, но сегодняшнюю уже приняли (или отменили) — она
@@ -27177,20 +27192,19 @@ function supHistLine(){
   </button>`;
 }
 
-// ── Хаб «Барракуда» по эталону владельца (AMBAR-RECEIVING-VISUAL-ONLY.txt,
-// 26 окт 2026: «перенести только визуал»). Порядок эталона: сводка заявки →
-// приёмка → две равные кнопки операций → полноширинная нижняя кнопка.
-// Действия — только существующие: вход в список заявки (accOrderList),
-// приёмка (accSupply), докупка (accShort), новые цены (ordPrices), ответ
-// магазина (supImport), история (accHistory) — в шапке, строкой не дублируется.
-// Иконки Lucide инлайном с классом lucide: эталон задаёт им 16px через
-// !important, и это участвовало в снимке.
+// ── Хаб «Барракуда» по эталону владельца, версия 2 (AMBAR-BARRACUDA-CLAUDE-V2.txt,
+// 26 окт 2026: «перенос визуального слоя, не новая реализация закупок»). Одна
+// карточка: шапка основной заявки → три этапа → приёмка по районам; ниже две
+// плитки рядом и кнопка загрузки. Действия — только существующие: список
+// заявки (accOrderList), приёмка (accSupply), черновик докупки (xSend) или
+// экран докупки (accShort), ответ магазина (supImport), история (accHistory) в
+// шапке. Иконки Lucide инлайном с классом lucide: эталон держит их 16px.
 const AR_ICO = (() => {
   const w = (n, body, cls) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls ? cls + ' ' : ''}lucide lucide-${n}" aria-hidden="true">${body}</svg>`;
   return {
     list: w('list', '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>'),
     pin: w('map-pin', '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>'),
-    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>', 'ar-chevron'),
+    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>', 'au-chevron'),
     check: w('check', '<path d="M20 6 9 17l-5-5"/>'),
     file: w('file-plus-2', '<path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M3 15h6"/><path d="M6 12v6"/>'),
     pkg: w('package-plus', '<path d="M16 16h6"/><path d="M19 13v6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>'),
@@ -27216,10 +27230,105 @@ function ordAttn(){
   return '';
 }
 
-// Сводка: вход в список заявки (та же кнопка, тот же accOrderList) и шкала
-// трёх шагов. Числа и подписи — те же, что считал путь (pathInner): заявка →
-// магазин дал → приняли %, под ними закупка AED и «принято из».
-function arSummary(){
+// Помощник геометрии эталона (barracuda-layout.js, буквально): веса высоты и
+// data-sparse по числу строк районов, типографика плиток по их фактической
+// геометрии. Содержимое не трогает, действий не вешает.
+/* Presentation only: geometry and type. No business actions or data changes. */
+(function (scope) {
+  'use strict';
+  const sessions = new WeakMap();
+
+  function sync(app) {
+    if (!app || !app.matches('.au-app')) return 0;
+    const list = app.querySelector('.au-districts');
+    const count = list && !list.hidden
+      ? Array.from(list.children).filter(row => row.matches('.au-district') && !row.hidden).length
+      : 0;
+    app.dataset.sparse = String(count <= 2);
+    app.style.setProperty('--au-receiving-grow', String(count * .35));
+    app.style.setProperty('--au-order-grow', String(.3 + count * .35));
+    return count;
+  }
+
+  function fitTypography(app) {
+    const operations = app.querySelector('.au-operations');
+    if (!operations || !app.isConnected) return;
+    const buttons = Array.from(operations.querySelectorAll('.au-operation'));
+    if (!buttons.length) return;
+    function setType(title, caption, quantity) {
+      operations.style.setProperty('--au-op-title-size', title + 'px');
+      operations.style.setProperty('--au-op-title-line', Math.ceil(16 + (title - 11) * 1.4) + 'px');
+      operations.style.setProperty('--au-op-caption-size', caption + 'px');
+      operations.style.setProperty('--au-op-caption-line', Math.ceil(14 + (caption - 11) * 2) + 'px');
+      operations.style.setProperty('--au-op-quantity-size', quantity + 'px');
+    }
+    // Re-measure from a stable baseline; do not observe the auto-sized buttons.
+    setType(11, 11, 11);
+    const height = Math.min(...buttons.map(button => button.getBoundingClientRect().height));
+    const titleWidth = Math.min(...buttons.map(button => button.querySelector('.au-op-title')?.getBoundingClientRect().width || 0));
+    const captionWidth = Math.min(...buttons.map(button => button.querySelector('.au-op-caption')?.getBoundingClientRect().width || 0));
+    if (height <= 0 || titleWidth <= 0 || captionWidth <= 0) return;
+    const quarter = value => Math.floor(value * 4) / 4;
+    const title = quarter(Math.max(11, Math.min(18, 11 + (height - 96) * .03, titleWidth / 7.2)));
+    const caption = quarter(Math.max(11, Math.min(14, title - 1, 11 + (height - 110) * .014, captionWidth / 8)));
+    const quantity = quarter(Math.min(20, title + Math.max(0, title - 11) * .15));
+    setType(title, caption, quantity);
+  }
+
+  function mount(app) {
+    if (!app || !app.matches('.au-app')) throw new TypeError('Expected .au-app element');
+    if (sessions.has(app)) return sessions.get(app);
+    const view = app.ownerDocument.defaultView || scope;
+    let disposed = false;
+    let frame = 0;
+    function refresh() {
+      if (disposed) return;
+      sync(app);
+      if (!frame) frame = view.requestAnimationFrame(() => {
+        frame = 0;
+        if (!disposed) fitTypography(app);
+      });
+    }
+    // Only the definite-size application surface is a ResizeObserver target.
+    const resizeObserver = view.ResizeObserver ? new view.ResizeObserver(refresh) : null;
+    if (resizeObserver) resizeObserver.observe(app);
+    else view.addEventListener('resize', refresh);
+    // Reacts to text/participant changes, not the style attributes written above.
+    const mutationObserver = view.MutationObserver ? new view.MutationObserver(refresh) : null;
+    if (mutationObserver) mutationObserver.observe(app, {
+      subtree: true, childList: true, characterData: true,
+      attributes: true, attributeFilter: ['hidden']
+    });
+    const fonts = app.ownerDocument.fonts;
+    if (fonts?.ready) fonts.ready.then(refresh);
+    fonts?.addEventListener?.('loadingdone', refresh);
+    const controller = Object.freeze({
+      refresh,
+      destroy() {
+        if (disposed) return;
+        disposed = true;
+        if (frame) view.cancelAnimationFrame(frame);
+        resizeObserver?.disconnect();
+        mutationObserver?.disconnect();
+        if (!resizeObserver) view.removeEventListener('resize', refresh);
+        fonts?.removeEventListener?.('loadingdone', refresh);
+        sessions.delete(app);
+      }
+    });
+    sessions.set(app, controller);
+    refresh();
+    return controller;
+  }
+  scope.AmbarReceivingVisual = Object.freeze({sync, mount});
+})(globalThis);
+let AR_VIS = null;                // помощник, пока хаб на экране
+function arVisOff(){ if(AR_VIS){ try{ AR_VIS.destroy(); }catch(e){} AR_VIS = null; } }
+
+// Единая карточка: шапка основной заявки (та же кнопка в список — accOrderList),
+// три этапа (числа и подписи те же, что считал путь), приёмка по районам
+// (заголовок — приёмка целиком, строка — район; accSupply). Возвращает и
+// число строк: от него зависят веса высоты и крупный режим.
+function auOrderCard(){
   const d = ORD.d || {}, st = supStage(), sup = st.sup;
   const live = !!(sup && sup.status === 'open');
   const done = !!(sup && sup.status !== 'open' && sup.status !== 'cancelled');
@@ -27240,95 +27349,84 @@ function arSummary(){
   const cls = i => done ? (i < 2 ? 'is-done' : 'is-complete')
     : (i + 1 < step ? 'is-done' : i + 1 === step ? 'is-current' : 'is-pending');
   const fill = done ? 100 : live ? 50 : 0;
-  return `<section class="ar-panel ar-summary" aria-label="Общая заявка Барракуде">
-    <button type="button" class="ar-section-head ar-summary-link cursor-interaction" onclick="accOrderList()">
-      <span class="ar-icon" aria-hidden="true">${AR_ICO.list}</span>
-      <span class="ar-heading"><span class="ar-title">ЗАЯВКА БАРРАКУДА</span><span class="ar-phase${
-        done && !prN ? ' is-complete' : ''}${taking || prN ? ' ar-live' : ''}" aria-live="polite">${phase}</span></span>
-      ${AR_ICO.right}
-    </button>
-    <div class="ar-summary-body"><div class="ar-route" aria-label="Этапы общей заявки">
-      <div class="ar-rail" aria-hidden="true"><span style="width:${fill}%"></span></div>
-      ${['ЗАЯВКА', 'МАГАЗИН ДАЛ', 'ПРИНЯЛИ'].map((t, i) => `<div class="ar-step ${cls(i)}"><span class="ar-node" aria-hidden="true"></span><span class="ar-label">${t}</span><strong>${vals[i]}</strong><span class="ar-subvalue">${subs[i] || ''}</span></div>`).join('')}
-    </div></div></section>`;
-}
-
-// Приёмка: заголовок ведёт в приёмку целиком, строка района — в неё с
-// раскрытым районом (accSupply, как и раньше). Только районы поставки; все —
-// пока магазин не ответил. Код → название и состояние (галочка у принятого,
-// водитель серым рядом) → стрелка. Возвращает и число строк: от него зависит
-// крупный режим и вес карточки в эталоне.
-function arReceiving(){
-  const d = ORD.d || {}, st = supStage(), sup = st.sup;
+  const steps = [['request', 'ЗАЯВКА'], ['store', 'МАГАЗИН ДАЛ'], ['received', 'ПРИНЯЛИ']].map(([k, t], i) =>
+    `<div class="au-step ${cls(i)}" data-step="${k}"><span class="au-node" aria-hidden="true"></span><span class="au-label">${t}</span><strong>${vals[i]}</strong><span class="au-subvalue">${subs[i] || ''}</span></div>`).join('');
+  // Приёмка: только районы поставки; все — пока магазин не ответил.
   const tasks = (sup && sup.tasks) || {};
   const dist = Object.keys(tasks).length ? (d.districts || []).filter(x => tasks[x.id]) : (d.districts || []);
   const rows = dist.map(x => {
     const t = sup && tasks[x.id];
-    const cls = !t ? '' : t.cancelled_at ? 'is-pending' : t.done_at ? 'is-complete' : t.noscan_at ? 'is-confirm' : t.driver ? 'is-current' : '';
+    const rc = !t ? '' : t.cancelled_at ? 'is-pending' : t.done_at ? 'is-complete' : t.noscan_at ? 'is-confirm' : t.driver ? 'is-active' : '';
     const word = !t ? '' : t.cancelled_at ? 'отменён' : t.done_at ? 'принято'
       : t.noscan_at ? 'принимают без сканирования' : t.driver ? 'в работе' : '';
     const who = t && !t.cancelled_at ? (t.driver || t.noscan_by || '') : '';
-    const state = word || who ? `<span class="ar-district-state">${t && t.done_at ? AR_ICO.check : ''}${escS(word)}${
-      who ? `${word ? ' · ' : ''}<span class="ar-person">${escS(who)}</span>` : ''}</span>` : '';
-    return `<button type="button" class="ar-district cursor-interaction ${cls}" ${
-        st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`}>
-      <span class="ar-code">${escS(x.code || '')}</span>
-      <span class="ar-district-copy"><strong>${escS(x.name || x.id)}</strong>${state}</span>
-      ${st.k === 'none' ? '' : AR_ICO.right}
-    </button>`;
+    const state = word || who ? `<span class="au-district-state">${t && t.done_at ? AR_ICO.check : ''}<span>${escS(word)}${
+      who ? `<span class="au-person">${word ? ' · ' : ''}${escS(who)}</span>` : ''}</span></span>` : '';
+    return `<button type="button" class="au-district cursor-interaction ${rc}" ${
+        st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`}><span class="au-code">${escS(x.code || '')}</span><span class="au-district-copy"><strong>${
+        escS(x.name || x.id)}</strong>${state}</span><span class="au-row-open" aria-hidden="true">${AR_ICO.right}</span></button>`;
   });
-  const counter = sup ? `<span>${st.k === 'cancelled' ? 'отменена' : 'завершено'}</span><strong>${st.done} / ${st.all}</strong>`
+  const counter = sup ? `<span>${st.k === 'cancelled' ? 'отменена' : 'завершено'}</span><strong data-counter>${st.done} / ${st.all}</strong>`
     : '<span>ждём магазин</span>';
-  const html = `<section class="ar-panel ar-receiving" aria-labelledby="ar-receiving-title">
-    <button type="button" class="ar-section-head ar-list-head cursor-interaction" ${st.k === 'none' ? '' : `onclick="accSupply('who')"`}>
-      <span class="ar-icon" aria-hidden="true">${AR_ICO.pin}</span>
-      <span class="ar-title" id="ar-receiving-title">ПРИЁМ ТОВАРА</span>
-      <span class="ar-counter">${counter}</span>
+  const html = `<section class="au-panel au-order" aria-label="Общая заявка Барракуде и её приёмка по районам">
+    <button type="button" class="au-order-head cursor-interaction" onclick="accOrderList()">
+      <span class="au-icon" aria-hidden="true">${AR_ICO.list}</span>
+      <span class="au-heading"><span class="au-title">ОСНОВНАЯ ЗАЯВКА БАРРАКУДА</span><span class="au-phase${
+        done && !prN ? ' is-complete' : ''}${taking || prN ? ' au-live' : ''}" data-phase>${phase}</span></span>
+      <span class="au-open" aria-hidden="true">${AR_ICO.right}</span>
     </button>
-    <div class="ar-districts">${rows.join('')}</div>
-    <div class="ar-empty"${rows.length ? ' hidden' : ''}>Районы не выбраны</div>
+    <div class="au-summary"><div class="au-route" aria-label="Этапы общей заявки">
+      <div class="au-rail" aria-hidden="true"><span data-rail style="width:${fill}%"></span></div>${steps}
+    </div></div>
+    <section class="au-receiving" aria-labelledby="au-receiving-title">
+      <div class="au-receiving-head${st.k === 'none' ? '' : ' cursor-interaction'}"${st.k === 'none' ? '' : ` role="button" tabindex="0" onclick="accSupply('who')"`}>
+        <h2 id="au-receiving-title">${AR_ICO.pin}<span>ПРИЁМ ТОВАРА</span></h2>
+        <span class="au-counter">${counter}</span>
+      </div>
+      <div class="au-districts" data-districts>${rows.join('')}</div>
+      <div class="au-empty" data-empty${rows.length ? ' hidden' : ''}>Районы не выбраны</div>
+    </section>
   </section>`;
   return {html, n: rows.length};
 }
 
-// Две равные плитки (владелец, 26 окт 2026): «Докупить на доп. базах» —
-// мигает, пока ждёт черновик докупки из недобора (он собирается сам при
-// загрузке ответа магазина); нажатие открывает его: отправить водителям или
-// отклонить. Без черновика — остаток недобора и экран докупки, как раньше.
-// «Свободная закупка · Барракуда» — закупка под клиента вне нормы; поток ещё
-// не построен, плитка погашена.
-function arOps(){
+// Две плитки рядом (владелец, 26 окт 2026): «Докупка» — мигает, пока ждёт
+// черновик докупки из недобора (собирается сам при загрузке ответа); нажатие —
+// отправить водителям или отклонить (xSend). Без черновика — остаток недобора
+// и экран докупки (accShort). Нечего — плитка погашена, не исчезает.
+// «Свободная закупка · Барракуда» — поток под клиентов ещё не построен.
+function auOps(){
   const st = supStage(), sup = st.sup;
   const gap = sup && sup.status === 'open' ? (sup.short_qty != null ? sup.short_qty : (sup.gap_qty || 0)) : 0;
   const left = gap ? (sup.short_left != null ? sup.short_left : gap) : 0;
   const dr = arShortDraft();
-  const tile = (on, go, ico, title, qty, cap, live) => `<button type="button" class="ar-panel ar-operation cursor-interaction${on ? '' : ' is-off'}" ${
+  const tile = (on, go, ico, title, qty, cap, live) => `<button type="button" class="au-panel au-operation${on ? ' cursor-interaction' : ''}" ${
       on ? `onclick="${go}"` : 'disabled'}>
-      <span class="ar-op-top">${ico}<span class="ar-op-title${live ? ' ar-live' : ''}">${title}${qty ? `<br><span class="ar-op-quantity">${qty}</span>` : ''}</span>${AR_ICO.right}</span>
-      <span class="ar-op-caption">${cap}</span>
+      <span class="au-op-top">${ico}${AR_ICO.right}</span>
+      <span class="au-op-title${live ? ' au-live' : ''}">${title}${qty ? `<span class="au-op-quantity">${qty}</span>` : ''}</span>
+      <span class="au-op-caption">${cap}</span>
     </button>`;
   const buy = dr
-    ? tile(true, `xSend('${escS(dr.supply_id)}')`, AR_ICO.pkg, 'ДОКУПКА', `${fmt(dr.total_qty || 0)} бут.`, 'черновик · отправить или отклонить', true)
+    ? tile(true, `xSend('${escS(dr.supply_id)}')`, AR_ICO.pkg, '<span class="au-op-name">ДОКУПКА</span>', `${fmt(dr.total_qty || 0)} бут.`, 'черновик · отправить или отклонить', true)
     : gap
-    ? tile(true, 'accShort()', AR_ICO.pkg, 'ДОКУПКА', left ? `${fmt(left)} бут.` : 'в заявках', 'Доп. базы', false)
-    : tile(false, '', AR_ICO.pkg, 'ДОКУПКА', '', 'нет недобора', false);
-  return `<div class="ar-operations" aria-label="Заявки на закупку">${buy}${
-    tile(false, '', AR_ICO.file, 'СВОБОДНАЯ<br>ЗАКУПКА', '', 'Барракуда', false)}</div>`;
+    ? tile(true, 'accShort()', AR_ICO.pkg, '<span class="au-op-name">ДОКУПКА</span>', left ? `${fmt(left)} бут.` : 'в заявках', 'Доп. базы', false)
+    : tile(false, '', AR_ICO.pkg, '<span class="au-op-name">ДОКУПКА</span>', '', 'нет недобора', false);
+  return `<div class="au-operations" aria-label="Закупки">${buy}${
+    tile(false, '', AR_ICO.file, 'СВОБОДНАЯ<span class="au-op-break"> </span>ЗАКУПКА', '', 'Барракуда', false)}</div>`;
 }
 
-// Нижняя кнопка — та же «Загрузить ответ магазина» (ordUp → ordFile →
-// supImport), теперь внутри экрана, как в эталоне, а не в подвале раздела.
-function arBottom(){
-  return `<div class="ar-bottom">
-    <button type="button" class="ar-upload cursor-interaction" id="ordUp" onclick="document.getElementById('ordFile').click()">${AR_ICO.upload}<span>Загрузить ответ магазина</span></button>
-    <input type="file" id="ordFile" accept=".xlsx" style="display:none" onchange="supImport(this,'ordUp')">
-  </div>`;
+// Нижняя кнопка — та же «Загрузить ответ магазина» (ordUp → ordFile → supImport).
+function auBottom(){
+  return `<div class="au-bottom"><button type="button" class="au-upload cursor-interaction" id="ordUp" onclick="document.getElementById('ordFile').click()">${
+    AR_ICO.upload}<span>Загрузить ответ магазина</span></button>
+    <input type="file" id="ordFile" accept=".xlsx" style="display:none" onchange="supImport(this,'ordUp')"></div>`;
 }
 
-// Хаб закупки: сводка, приёмка, две операции, ответ магазина. Списка здесь
-// нет намеренно — он живёт на своей странице и не мешает увидеть, где мы сейчас.
+// Хаб закупки: одна карточка, две плитки, ответ магазина. Списка здесь нет
+// намеренно — он живёт на своей странице и не мешает увидеть, где мы сейчас.
 function ordHub(){
   const d = ORD.d; if(!d) return;
+  arVisOff();
   const mid = document.getElementById('accMid');
   mid.classList.remove('ap-host');
   ORD_BRANCH = 'bar';
@@ -27338,16 +27436,14 @@ function ordHub(){
   supActShow();                     // кнопка отмены знает про заявку только теперь
   // История — значком в шапке рядом с отменой (эталон), строкой не дублируется.
   const act = document.getElementById('accAct');
-  const cancel = act.querySelector('.acc-act'); if(cancel) cancel.classList.add('ar-cancel');
-  act.insertAdjacentHTML('beforeend', `<button type="button" class="ar-history cursor-interaction" onclick="accHistory()" aria-label="История закупок и приёмок">${AR_ICO.history}</button>`);
+  const cancel = act.querySelector('.acc-act'); if(cancel) cancel.classList.add('au-cancel');
+  act.insertAdjacentHTML('beforeend', `<button type="button" class="au-history cursor-interaction" onclick="accHistory()" aria-label="История закупок и приёмок">${AR_ICO.history}</button>`);
   document.getElementById('accFoot').innerHTML = '';
-  // Два присваивания эталона при известном числе районов: крупный режим при
-  // N ≤ 2 и вес карточки приёмки N × 0.6 (помощник-наблюдатель не нужен).
-  const rc = arReceiving();
-  mid.innerHTML = `<div id="ambar-receiving-adaptive" lang="ru"><div class="ar-app" data-sparse="${rc.n <= 2}" style="--ar-receiving-grow:${
-    +(rc.n * 0.6).toFixed(1)}" aria-label="Барракуда — адаптивная приёмка"><main class="ar-content">${
-    arSummary()}${rc.html}${arOps()}${arBottom()}</main></div></div>`;
+  const card = auOrderCard();
+  mid.innerHTML = `<div id="ambar-receiving-finished" lang="ru"><div class="au-stage"><div class="au-app" data-sparse="${card.n <= 2}" aria-label="Барракуда — заявка и приёмка в одной карточке"><main class="au-content">${
+    card.html}${auOps()}${auBottom()}</main></div></div></div>`;
   mid.scrollTop = 0;
+  try{ AR_VIS = AmbarReceivingVisual.mount(mid.querySelector('.au-app')); }catch(e){ AR_VIS = null; }
 }
 
 // Цены магазина из его файла против наших закупочных (владелец, 24 окт 2026:
@@ -27389,8 +27485,7 @@ try{ document.fonts && document.fonts.ready.then(() => ohubFit()); }catch(e){}
 // Перерисовать сводку — на хабе это путь, на странице заявки строка итогов.
 // Числа меняются от каждой правки, а список под ними — нет.
 function pathPaint(){
-  const ar = document.querySelector('#accMid .ar-summary');
-  if(ar){ ar.outerHTML = arSummary(); return; }
+  if(document.querySelector('#accMid .au-order')){ ordHub(); return; }
   const el = document.querySelector('.path');
   if(el){ el.innerHTML = pathInner(); return; }
   const sum = document.querySelector('.ord-sum');
@@ -31732,7 +31827,7 @@ function pathExtra(){
 }
 
 async function accExtra(){
-  document.getElementById('accMid').classList.remove('ap-host');
+  document.getElementById('accMid').classList.remove('ap-host'); arVisOff();
   ORD_BRANCH = 'extra';
   ACC_BACK = ordPickBack;           // назад — к выбору Барракуда / другие базы
   XS = null;

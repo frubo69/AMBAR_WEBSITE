@@ -3715,6 +3715,83 @@ button.path:active{transform:scale(.995)}
   #ambar-receiving-finished .au-completion-message{gap:5px}
   #ambar-receiving-finished .au-completion-footer{padding-bottom:12px}
 }
+/* ── «История», вкладка «Закупки» по эталону владельца (AMBAR-HISTORY-FOR-CLAUDE,
+   27 окт 2026): history-visual.css буквально, затем history-integration.css,
+   затем адаптер оболочки STAR (шапка раздела своя, одна строка сетки под
+   вкладки и одна под прокрутку, safe-area снизу). ── */
+#ambar-history-refined{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-history-refined .ah-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-history-refined .ah-app{--ah-width:390px;--ah-height:844px;--ah-bg:#07070c;--ah-text:#ece9e3;--ah-muted:#a8a0ad;--ah-gold:#e2c386;--ah-green:#899b8a;--ah-red:#cc8589;--ah-line:#302a3b;--ah-row-y:11px;--ah-row-min:62px;box-sizing:border-box;width:var(--ah-width);max-width:100%;height:var(--ah-height);display:grid;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;border:1px solid #26232f;border-radius:24px;background:var(--ah-bg);color:var(--ah-text);color-scheme:dark;font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;container-type:size;container-name:ah-phone}
+#ambar-history-refined .ah-app *{box-sizing:border-box}
+#ambar-history-refined .ah-app button{appearance:none;-webkit-tap-highlight-color:transparent;font-family:inherit;white-space:normal}
+#ambar-history-refined svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important;stroke-width:1.7}
+#ambar-history-refined .ah-header{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #25212d;background:#0b0a11}
+#ambar-history-refined .ah-header h1{margin:0;min-width:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.02em}
+#ambar-history-refined .ah-back{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #292534;border-radius:13px;background:#12111f;color:var(--ah-muted)}
+#ambar-history-refined .ah-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:12px 10px 8px;padding:4px;border:1px solid #2a2533;border-radius:14px;background:#0d0c14}
+#ambar-history-refined .ah-tab{min-width:0;min-height:40px;padding:8px 10px;border:1px solid transparent;border-radius:10px;background:transparent;font-size:13px;line-height:20px;font-weight:600;color:var(--ah-muted)}
+#ambar-history-refined .ah-tab.is-active{border-color:#65513266;background:linear-gradient(115deg,#302731,#25212b);color:var(--ah-gold)}
+#ambar-history-refined .ah-scroll{min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 10px 16px;scrollbar-width:thin;scrollbar-color:#3b3445 transparent}
+#ambar-history-refined .ah-summary{overflow:hidden;min-width:0;border:1px solid #37313f;border-radius:18px;background:linear-gradient(125deg,#1c1825,#12111f 85%)}
+#ambar-history-refined .ah-summary-top{display:grid;grid-template-columns:minmax(80px,.75fr) minmax(0,1.25fr);align-items:end;gap:14px;padding:12px 15px 10px}
+#ambar-history-refined .ah-metric{display:flex;flex-direction:column;gap:3px;min-width:0}
+#ambar-history-refined .ah-metric-label{font-size:11px;line-height:15px;font-weight:600;letter-spacing:.055em;color:var(--ah-muted)}
+#ambar-history-refined .ah-metric>strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(26px,7.2cqw,30px);line-height:1.1;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-history-refined .ah-total{text-align:right;align-items:flex-end}
+#ambar-history-refined .ah-total>strong{color:var(--ah-gold)}
+#ambar-history-refined .ah-summary-bottom{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid #302936;background:#07070c12}
+#ambar-history-refined .ah-small-metric{display:flex;flex-direction:column;gap:3px;min-width:0;padding:8px 15px 9px}
+#ambar-history-refined .ah-small-metric+.ah-small-metric{border-left:1px solid #302936}
+#ambar-history-refined .ah-small-metric>span{font-size:11px;line-height:14px;font-weight:400;color:var(--ah-muted)}
+#ambar-history-refined .ah-small-metric>div{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;min-width:0}
+#ambar-history-refined .ah-small-metric strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:18px;line-height:22px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#ambar-history-refined .ah-unit{font-size:11px;line-height:16px;color:var(--ah-muted)}
+#ambar-history-refined .ah-timeline{display:flex;flex-direction:column;gap:14px;padding-top:16px}
+#ambar-history-refined .ah-day{min-width:0}
+#ambar-history-refined .ah-day h2{display:flex;align-items:center;gap:12px;margin:0 2px 8px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.075em;color:#b3a8b9}
+#ambar-history-refined .ah-day h2::after{content:"";height:1px;flex:1;background:#28232f}
+#ambar-history-refined .ah-records{overflow:hidden;border:1px solid #332d3e;border-radius:17px;background:linear-gradient(120deg,#181522,#12111e 85%)}
+#ambar-history-refined .ah-record{display:grid;grid-template-columns:30px minmax(0,1fr) 14px;align-items:center;gap:10px;min-width:0;width:100%;min-height:var(--ah-row-min);padding:var(--ah-row-y) 12px;border:0;background:transparent;text-align:left;color:var(--ah-text)}
+#ambar-history-refined .ah-record+.ah-record{border-top:1px solid #2c2636}
+#ambar-history-refined .ah-source-icon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #5a4b3466;border-radius:9px;background:#e2c38608;color:#bda473}
+#ambar-history-refined .ah-record[data-source="additional"] .ah-source-icon{border-color:#373141;background:#211d2e;color:#b5abbe}
+#ambar-history-refined .ah-record-body{display:flex;flex-direction:column;gap:3px;min-width:0}
+#ambar-history-refined .ah-record-top{display:flex;align-items:baseline;justify-content:space-between;gap:3px 8px;flex-wrap:wrap;min-width:0}
+#ambar-history-refined .ah-record-top>strong{min-width:0;font-size:14px;line-height:20px;font-weight:600;letter-spacing:-.015em;overflow-wrap:anywhere}
+#ambar-history-refined .ah-status{display:inline-flex;align-items:center;gap:3px;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
+#ambar-history-refined .ah-status>svg.lucide{width:12px!important;height:12px!important;stroke-width:1.8}
+#ambar-history-refined .ah-status.is-waiting{color:var(--ah-gold)}
+#ambar-history-refined .ah-status.is-accepted{color:var(--ah-green)}
+#ambar-history-refined .ah-status.is-cancelled{color:var(--ah-red)}
+#ambar-history-refined .ah-record-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:1px 8px;min-width:0;font-size:11px;line-height:16px;font-variant-numeric:tabular-nums;color:var(--ah-muted)}
+#ambar-history-refined .ah-record-meta>span{min-width:0;overflow-wrap:anywhere}
+#ambar-history-refined .ah-not-given{display:inline-flex;align-items:baseline;gap:8px}
+#ambar-history-refined .ah-not-given::before{content:"·";color:#776e83}
+#ambar-history-refined .ah-chevron{color:#8e839b;justify-self:end}
+#ambar-history-refined .ah-record:hover{background:#ffffff03}
+#ambar-history-refined .ah-record:active{background:#e2c38608}
+#ambar-history-refined .ah-app[data-density="compact"]{--ah-row-y:8px;--ah-row-min:56px}
+@container ah-phone (max-width:340px){
+  #ambar-history-refined .ah-record{grid-template-columns:26px minmax(0,1fr) 12px;gap:8px;padding-left:10px;padding-right:10px}
+  #ambar-history-refined .ah-source-icon{width:26px;height:28px;border-radius:8px}
+  #ambar-history-refined .ah-record-top>strong{font-size:13px;line-height:19px}
+  #ambar-history-refined .ah-record-meta{gap:0 6px}
+  #ambar-history-refined .ah-not-given{gap:6px}
+  #ambar-history-refined .ah-summary-top{padding-left:13px;padding-right:13px}
+  #ambar-history-refined .ah-small-metric{padding-left:13px;padding-right:13px}
+}
+/* history-integration.css */
+#ambar-history-refined{width:100%;height:100%;min-width:0;min-height:0}
+#ambar-history-refined .ah-stage{display:contents;padding:0}
+#ambar-history-refined .ah-app{--ah-width:100%;--ah-height:100%;min-width:0;min-height:0;border:0;border-radius:0}
+#ambar-history-refined .ah-small-metric strong{min-width:0;max-width:100%;overflow-wrap:anywhere}
+#ambar-history-refined .ah-status{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#ambar-history-refined button:enabled{cursor:pointer}
+#ambar-history-refined button:focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
+/* адаптер оболочки STAR */
+#accMid:has(> #ambar-history-refined){padding:0;overflow:hidden}
+#ambar-history-refined .ah-app{grid-template-rows:auto minmax(0,1fr)}
+#ambar-history-refined .ah-scroll{padding-bottom:calc(16px + var(--safe-bottom))}
 /* barracuda-integration.css: размер от настоящего контейнера, без оболочки предпросмотра. */
 #ambar-receiving-finished{width:100%;height:100%;min-width:0;min-height:0}
 #ambar-receiving-finished .au-stage{display:contents;padding:0}
@@ -32853,6 +32930,22 @@ function supRender(){
 // Владелец, 4 окт 2026: одна кнопка на хабе, отдельная страница, внутри
 // переключатель. Вкладка держится между открытиями (HIST_TAB).
 let HIST_TAB = 'sup';
+// Иконки эталона истории (Lucide, класс lucide — эталон держит их 16px).
+const AH_ICO = (() => {
+  const w = (n, body, cls) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls ? cls + ' ' : ''}lucide lucide-${n}" aria-hidden="true">${body}</svg>`;
+  return {
+    store: w('store', '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/>'),
+    warehouse: w('warehouse', '<path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><rect width="12" height="12" x="6" y="10"/>'),
+    clock: w('clock-3', '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/>'),
+    check: w('check', '<path d="M20 6 9 17l-5-5"/>'),
+    x: w('x', '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>', 'ah-chevron'),
+  };
+})();
+
+// Страница «История» по эталону владельца (AMBAR-HISTORY-FOR-CLAUDE, 27 окт
+// 2026): шапка раздела своя, под ней две вкладки, ниже одна область
+// прокрутки. Вкладка «Приёмки» — прежняя, со своим содержимым.
 async function accHistory(tab){
   if(tab) HIST_TAB = tab;
   ACC_BACK = accOrder;
@@ -32860,9 +32953,10 @@ async function accHistory(tab){
   _setText('accSub', '');
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accAct').innerHTML = '';
-  document.getElementById('accMid').innerHTML = `<div class="hist-seg">${
-      fbSeg('hist', HIST_TAB, [['sup', 'Закупки'], ['int', 'Приёмки']], 'histTab')}</div>
-    <div id="histBody"><div class="exp-empty">Загрузка…</div></div>`;
+  const tabBtn = (v, t) => `<button type="button" class="ah-tab${HIST_TAB === v ? ' is-active' : ''}" aria-pressed="${HIST_TAB === v}" onclick="histTab('hist','${v}')">${t}</button>`;
+  document.getElementById('accMid').innerHTML = `<div id="ambar-history-refined" lang="ru"><div class="ah-stage"><div class="ah-app" data-density="balanced" aria-label="AMBAR — история закупок">
+    <div class="ah-tabs" aria-label="Разделы истории">${tabBtn('sup', 'Закупки')}${tabBtn('int', 'Приёмки')}</div>
+    <main class="ah-scroll" id="histBody"><div class="exp-empty">Загрузка…</div></main></div></div></div>`;
   if(HIST_TAB === 'int') await intHistory(); else await supHistory();
 }
 function histTab(_, v){
@@ -32887,42 +32981,53 @@ async function supHistory(){
           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l3 2"/></svg></span>
         <div class="sh-empty-t">Пока пусто</div>
-        <div class="sh-empty-s">Здесь будут все закупки — магазин и другие базы</div>
+        <div class="sh-empty-s">Здесь будут все закупки — Барракуда и другие базы</div>
       </div></div>`;
     return;
   }
+  // Сводка — те же числа, что и раньше: закупок, по прайсу, приняли, не дала.
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
   const took = list.reduce((a, x) => a + (x.took || 0), 0);
   const gap = list.reduce((a, x) => a + (x.gap_qty || 0), 0);
-  const open = list.filter(x => x.status === 'open'), past = list.filter(x => x.status !== 'open');
-  mid.innerHTML = `<div class="xs-top xs-card">
-      <span class="xs-top-b"><i>Закупок</i><b>${list.length}</b>
-        <span class="xs-top-s">приняли ${fmt(took)} ${pluralize(took,'бутылку','бутылки','бутылок')}${
-          gap ? ` · не дал магазин ${fmt(gap)}` : ''}</span></span>
-      <span class="xs-top-n">${fmt(aed)}<i>AED по прайсу</i></span>
-    </div>
-    ${open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(supHistRow).join('')}</div>` : ''}
-    ${past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.map(supHistRow).join('')}</div>` : ''}`;
+  // По дням (день поставки — рабочий день приложения), порядок записей как
+  // в списке; дата один раз над группой.
+  const days = [];
+  list.forEach(x => {
+    const dt = x.day || String(x.at || '').slice(0, 10);
+    let g = days[days.length - 1];
+    if(!g || g.dt !== dt){ g = {dt, rows: []}; days.push(g); }
+    g.rows.push(x);
+  });
+  mid.innerHTML = `<section class="ah-summary" aria-label="Сводка закупок">
+      <div class="ah-summary-top">
+        <div class="ah-metric"><span class="ah-metric-label">ЗАКУПОК</span><strong>${fmt(list.length)}</strong></div>
+        <div class="ah-metric ah-total"><span class="ah-metric-label">ПО ПРАЙСУ · AED</span><strong>${fmt(aed)}</strong></div>
+      </div>
+      <div class="ah-summary-bottom">
+        <div class="ah-small-metric"><span>Приняли</span><div><strong>${fmt(took)}</strong><span class="ah-unit">бут.</span></div></div>
+        <div class="ah-small-metric"><span>Не дала Барракуда</span><div><strong>${fmt(gap)}</strong><span class="ah-unit">бут.</span></div></div>
+      </div>
+    </section>
+    <div class="ah-timeline">${days.map((g, i) => `<section class="ah-day" aria-labelledby="ah-day-${i}">
+      <h2 id="ah-day-${i}"><time datetime="${escS(g.dt)}">${escS(_dayName(g.dt)).toUpperCase()}</time></h2>
+      <div class="ah-records">${g.rows.map(supHistRow).join('')}</div>
+    </section>`).join('')}</div>`;
 }
 
+// Строка закупки: источник (Барракуда / другая база), статус словом и
+// значком, «принято из · не дала»; по нажатию — та же поставка (supOpenOne).
 function supHistRow(x){
-  const dt = x.day || String(x.at || '').slice(0, 10);
-  const d = dt ? new Date(dt + 'T12:00:00Z') : null;
-  const day = d && !isNaN(d) ? String(d.getUTCDate()) : '—';
-  const mon = d && !isNaN(d)
-    ? d.toLocaleDateString('ru-RU', {month:'short', timeZone:'UTC'}).replace('.', '') : '';
-  const st = x.status === 'cancelled' ? ['отменена', 'no']
-           : x.status === 'done' ? [x.took < x.total_qty ? 'недобор' : 'принято', 'done']
-           : x.free === x.districts ? ['ждёт', 'wait'] : ['в работе', 'live'];
   const extra = x.kind === 'extra';
-  return `<button class="pnav-r" onclick="supOpenOne('${escS(x.supply_id)}')">
-    <span class="xs-dc xs-date"><b>${day}</b><i>${escS(mon)}</i></span>
-    <span class="pnav-b"><b>${extra ? escS(x.base || 'Другая база') : 'Магазин'}</b>
-      <i>${fmt(x.took)} из ${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылки','бутылок','бутылок')}${
-        x.gap_qty ? ` · не дал ${fmt(x.gap_qty)}` : ''}${
-        x.status === 'open' && x.free ? ` · ${x.free} без водителя` : ''}</i></span>
-    <span class="pstat-c ${st[1]}">${st[0]}</span>
-    <span class="pnav-go">${ICO_CHEV}</span>
+  const st = x.status === 'cancelled' ? ['отменена', 'is-cancelled', AH_ICO.x, 'cancelled']
+           : x.status === 'done' ? [x.took < x.total_qty ? 'недобор' : 'принято', 'is-accepted', AH_ICO.check, 'accepted']
+           : x.free === x.districts ? ['ждёт', 'is-waiting', AH_ICO.clock, 'waiting'] : ['в работе', 'is-waiting', AH_ICO.clock, 'working'];
+  return `<button type="button" class="ah-record" onclick="supOpenOne('${escS(x.supply_id)}')" data-source="${extra ? 'additional' : 'store'}" data-status="${st[3]}">
+    <span class="ah-source-icon" aria-hidden="true">${extra ? AH_ICO.warehouse : AH_ICO.store}</span>
+    <span class="ah-record-body"><span class="ah-record-top"><strong>${extra ? escS(x.base || 'Другая база') : 'Барракуда'}</strong><span class="ah-status ${st[1]}">${st[2]}${st[0]}</span></span><span class="ah-record-meta"><span>${
+      fmt(x.took)} из ${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылки','бутылок','бутылок')}</span>${
+      x.gap_qty ? `<span class="ah-not-given">не дала ${fmt(x.gap_qty)}</span>` : ''}${
+      x.status === 'open' && x.free ? `<span class="ah-not-given">${x.free} без водителя</span>` : ''}</span></span>
+    ${AH_ICO.right}
   </button>`;
 }
 

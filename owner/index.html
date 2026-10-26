@@ -3566,6 +3566,131 @@ button.path:active{transform:scale(.995)}
 #accMid .ap-choice:active{border-color:#c4aa76;background:#24202d}
 #accMid .ap-app [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){#accMid .ap-choice{transition:none}#accMid .ap-phase.is-live{animation:none;opacity:1}}
+
+/* ── Хаб «Барракуда» по эталону владельца (AMBAR-RECEIVING-VISUAL-ONLY.txt,
+   26 окт 2026: «перенести только визуал»). CSS эталона перенесён буквально,
+   включая compatibility-блок svg.lucide 16px!important — он участвовал в
+   снимке и «чистить» его нельзя. Ниже — единственный адаптер оболочки. ── */
+#ambar-receiving-adaptive .ar-app{--ar-width:390px;--ar-height:844px;--ar-receiving-grow:1.2;--ar-bg:#07070c;--ar-card:#12111f;--ar-text:#ece9e3;--ar-muted:#a39baa;--ar-gold:#e2c386;--ar-green:#899b8a;--ar-line:#2c2938;box-sizing:border-box;width:var(--ar-width);max-width:100%;height:var(--ar-height);position:relative;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;border:1px solid #26232f;border-radius:24px;background:var(--ar-bg);color:var(--ar-text);color-scheme:dark;font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;container-type:size;container-name:ar-phone}
+#ambar-receiving-adaptive .ar-app *{box-sizing:border-box}
+#ambar-receiving-adaptive .ar-app button{font-family:inherit;appearance:none;-webkit-tap-highlight-color:transparent;color:inherit;white-space:normal}
+#ambar-receiving-adaptive .ar-app-head{display:grid;grid-template-columns:44px minmax(0,1fr) auto 44px;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid #25212d;background:#0b0a11}
+#ambar-receiving-adaptive .ar-app-head h1{margin:0;min-width:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.02em;overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-icon-button{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid #292534;border-radius:13px;background:#12111f;color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-icon-button svg{width:22px;height:22px;stroke-width:1.8}
+#ambar-receiving-adaptive .ar-cancel{min-height:44px;padding:4px;border:0;border-radius:10px;background:transparent;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500}
+#ambar-receiving-adaptive .ar-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:13px;background:transparent;color:var(--ar-muted)!important}
+#ambar-receiving-adaptive .ar-history svg{width:21px;height:21px;stroke-width:1.7}
+#ambar-receiving-adaptive .ar-content{--ar-gap:clamp(6px,calc(3cqh - 13.2px),12px);--ar-head-y:clamp(5px,calc(3cqh - 14.2px),11px);--ar-row-y:clamp(6px,calc(2cqh - 6.8px),10px);--ar-row-h:clamp(46px,calc(10cqh - 18px),66px);display:flex;flex-direction:column;gap:var(--ar-gap);min-height:0;min-width:0;padding:var(--ar-gap) 10px;overflow-y:auto;overscroll-behavior:contain}
+#ambar-receiving-adaptive .ar-panel{flex-shrink:0;min-width:0;border:1px solid #37313f;border-radius:20px;background:linear-gradient(135deg,#1b1825 0%,#12111f 76%);overflow:hidden}
+#ambar-receiving-adaptive .ar-summary{display:flex;flex-direction:column;flex:1 0 auto;min-height:min-content}
+#ambar-receiving-adaptive .ar-receiving{display:flex;flex-direction:column;flex:var(--ar-receiving-grow) 0 auto;min-height:min-content}
+#ambar-receiving-adaptive .ar-section-head{display:grid;grid-template-columns:28px minmax(0,1fr) 16px;align-items:center;gap:8px;width:100%;min-width:0;flex:0 0 auto;padding:var(--ar-head-y) 12px;border:0;border-bottom:1px solid var(--ar-line);background:transparent;text-align:left}
+#ambar-receiving-adaptive .ar-icon{display:grid;place-items:center;width:28px;height:28px;border:1px solid #5b4d37;border-radius:9px;background:#c4aa7612;color:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-icon svg{width:18px;height:18px;stroke-width:1.7}
+#ambar-receiving-adaptive .ar-heading{display:flex;flex-direction:column;gap:2px;min-width:0}
+#ambar-receiving-adaptive .ar-title{margin:0;min-width:0;font-family:inherit;font-size:clamp(12px,3.72cqw,14.5px);line-height:18px;font-weight:700;letter-spacing:.025em;overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-phase{font-size:11px;line-height:14px;color:var(--ar-gold);overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-phase.is-complete{color:var(--ar-green)}
+#ambar-receiving-adaptive .ar-live{animation:ar-adaptive-pulse 3.6s ease-in-out infinite}
+@keyframes ar-adaptive-pulse{0%,100%{opacity:1}50%{opacity:.72}}
+#ambar-receiving-adaptive .ar-chevron{width:16px;height:16px;color:#91879e;stroke-width:1.8;flex-shrink:0}
+#ambar-receiving-adaptive .ar-summary-link .ar-chevron{color:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-summary-body{display:flex;align-items:center;flex:1 0 auto;min-height:min-content;padding:var(--ar-row-y) 12px var(--ar-gap)}
+#ambar-receiving-adaptive .ar-route{position:relative;display:grid;width:100%;min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:10px minmax(28px,max-content) auto auto;row-gap:3px;align-items:stretch}
+#ambar-receiving-adaptive .ar-rail{position:absolute;top:4.5px;left:16.666667%;right:16.666667%;height:1px;background:#3a3344;pointer-events:none}
+#ambar-receiving-adaptive .ar-rail span{display:block;height:100%;width:100%;background:#ab915e;transition:width .25s ease}
+#ambar-receiving-adaptive .ar-step{display:grid;grid-template-rows:subgrid;grid-row:1 / 5;min-width:0;padding:0 3px;text-align:center;position:relative;align-items:center}
+#ambar-receiving-adaptive .ar-step:nth-of-type(2){grid-column:1}
+#ambar-receiving-adaptive .ar-step:nth-of-type(3){grid-column:2}
+#ambar-receiving-adaptive .ar-step:nth-of-type(4){grid-column:3}
+#ambar-receiving-adaptive .ar-node{display:block;justify-self:center;width:9px;height:9px;border-radius:50%;background:#494153}
+#ambar-receiving-adaptive .ar-step.is-done .ar-node,#ambar-receiving-adaptive .ar-step.is-current .ar-node{background:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-step.is-current .ar-node{box-shadow:0 0 0 4px #e2c38615}
+#ambar-receiving-adaptive .ar-step.is-complete .ar-node{background:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-label{font-size:11px;line-height:14px;font-weight:600;letter-spacing:.015em;color:var(--ar-muted);overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-step strong{min-width:0;font-family:"Space Grotesk","Manrope",sans-serif;font-variant-numeric:tabular-nums;font-size:clamp(24px,calc(1cqh + 17.6px),28px);line-height:1.1;font-weight:500;letter-spacing:-.035em;overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-subvalue{font-size:11px;line-height:14px;color:var(--ar-muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-step.is-current strong,#ambar-receiving-adaptive .ar-step.is-current .ar-label{color:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-step.is-complete strong{color:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-step.is-complete .ar-label{color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-step.is-pending strong{color:#8d829c}
+#ambar-receiving-adaptive .ar-list-head{grid-template-columns:28px minmax(0,1fr) auto}
+#ambar-receiving-adaptive .ar-counter{display:flex;flex-direction:column;align-items:flex-end;gap:0;min-width:0}
+#ambar-receiving-adaptive .ar-counter>span{font-size:11px;line-height:13px;color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-counter strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:15px;line-height:16px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ar-text)}
+#ambar-receiving-adaptive .ar-districts{display:flex;flex-direction:column;flex:1 0 auto;min-height:min-content;min-width:0}
+#ambar-receiving-adaptive .ar-district{display:grid;grid-template-columns:28px minmax(0,1fr) 16px;gap:8px;align-items:center;flex:1 0 auto;width:100%;min-height:var(--ar-row-h);padding:var(--ar-row-y) 12px;border:0;background:transparent;text-align:left}
+#ambar-receiving-adaptive .ar-district+.ar-district{border-top:1px solid var(--ar-line)}
+#ambar-receiving-adaptive .ar-code{display:grid;place-items:center;width:28px;height:28px;border:1px solid #302c42;border-radius:9px;background:#1d1b30;font-family:"Space Grotesk","Manrope",sans-serif;font-size:13px;line-height:18px;font-weight:600;color:#b1a6be}
+#ambar-receiving-adaptive .ar-district-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
+#ambar-receiving-adaptive .ar-district-copy>strong{font-size:13px;line-height:18px;font-weight:700;overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-district-state{font-size:11px;line-height:14px;color:var(--ar-gold);overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-person{color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-district.is-complete .ar-district-state{display:flex;align-items:center;gap:4px;color:var(--ar-green)}
+#ambar-receiving-adaptive .ar-district-state>svg{width:12px;height:12px;flex-shrink:0;stroke-width:1.7}
+#ambar-receiving-adaptive .ar-district.is-complete .ar-code{color:#cbc4d3}
+#ambar-receiving-adaptive .ar-district.is-pending .ar-district-state{color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-empty{flex:0 0 auto;padding:20px 12px;font-size:12px;line-height:18px;color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-operations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;flex:1.2 0 auto;min-height:min-content;min-width:0}
+#ambar-receiving-adaptive .ar-operation{display:flex;flex-direction:column;gap:2px;justify-content:center;align-items:stretch;padding:clamp(7px,calc(4cqh - 18.6px),15px) 10px;text-align:left;border-radius:16px}
+#ambar-receiving-adaptive .ar-op-top{display:grid;grid-template-columns:18px minmax(0,1fr) 12px;align-items:center;gap:6px;min-width:0}
+#ambar-receiving-adaptive .ar-op-top>svg{width:18px;height:18px;stroke-width:1.7;color:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-op-top>.ar-chevron{width:12px;height:12px;color:var(--ar-muted)}
+#ambar-receiving-adaptive .ar-op-title{font-size:11px;line-height:16px;font-weight:700;letter-spacing:.01em;overflow-wrap:anywhere;min-width:0}
+#ambar-receiving-adaptive .ar-op-quantity{font-weight:500;color:var(--ar-gold);font-variant-numeric:tabular-nums}
+#ambar-receiving-adaptive .ar-op-caption{padding-left:24px;font-size:11px;line-height:14px;color:var(--ar-muted);overflow-wrap:anywhere}
+#ambar-receiving-adaptive .ar-bottom{flex-shrink:0;min-width:0}
+#ambar-receiving-adaptive .ar-upload{display:flex;justify-content:center;align-items:center;gap:9px;width:100%;min-height:48px;padding:12px;border:1px solid #615039;border-radius:16px;background:#1f1b26;color:var(--ar-text);font-size:13px;line-height:20px;font-weight:600;text-align:center}
+#ambar-receiving-adaptive .ar-upload svg{width:20px;height:20px;stroke-width:1.7;flex-shrink:0;color:var(--ar-gold)}
+#ambar-receiving-adaptive .ar-app button:hover{background-color:#ffffff04}
+#ambar-receiving-adaptive .ar-app button:active{background-color:#c4aa7612}
+#ambar-receiving-adaptive [hidden]{display:none!important}
+@container ar-phone (min-height:760px){
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-summary-body{padding-top:16px;padding-bottom:18px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-step strong{font-size:32px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-title{font-size:clamp(13px,4cqw,16px);line-height:20px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-section-head{grid-template-columns:36px minmax(0,1fr) 16px;gap:10px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-list-head{grid-template-columns:36px minmax(0,1fr) auto}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-icon{width:36px;height:36px;border-radius:11px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-icon svg{width:22px;height:22px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district{grid-template-columns:36px minmax(0,1fr) 16px;gap:10px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-code{width:36px;height:36px;border-radius:11px;font-size:15px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district-copy{gap:4px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district-copy>strong{font-size:15px;line-height:20px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-district-state{font-size:12px;line-height:16px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-operation{gap:7px;padding:15px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-top{grid-template-columns:minmax(0,1fr) 16px;gap:10px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-top>svg:first-child{width:28px;height:28px;grid-row:1;grid-column:1}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-top>.ar-chevron{width:16px;height:16px;grid-row:1;grid-column:2}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-title{grid-row:2;grid-column:1 / -1;font-size:clamp(11px,3.4cqw,13px);line-height:18px}
+  #ambar-receiving-adaptive .ar-app[data-sparse="true"] .ar-op-caption{padding-left:0;font-size:12px;line-height:16px}
+}
+@supports not (grid-template-rows:subgrid){#ambar-receiving-adaptive .ar-step{grid-template-rows:10px minmax(28px,max-content) auto auto;gap:3px;grid-row:1;align-self:start}#ambar-receiving-adaptive .ar-route{grid-template-rows:auto}}
+@media(prefers-reduced-motion:reduce){#ambar-receiving-adaptive .ar-live{animation:none}#ambar-receiving-adaptive .ar-rail span{transition:none}}
+/* Minimal inherited presentation rules of the screenshot environment. */
+#ambar-receiving-adaptive{font-size:16px;line-height:26px;font-weight:400;-webkit-font-smoothing:antialiased}
+#ambar-receiving-adaptive .cursor-interaction{cursor:var(--cursor-interaction,pointer)}
+#ambar-receiving-adaptive svg{display:block;max-width:100%;height:auto}
+/* Keep this override: the screenshot's host uses 16px !important. */
+#ambar-receiving-adaptive svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important}
+/* ── Адаптер оболочки STAR (единственный, по эталону): шапка приложения
+   остаётся своей и в ar-app не дублируется, поэтому контейнер cqh/cqw — весь
+   экран раздела вместе с шапкой (#accOv), как в эталоне; ar-app берёт
+   фактическую высоту середины; рамки телефона внутри приложения нет. ── */
+#accOv:has(#ambar-receiving-adaptive){container-type:size;container-name:ar-phone}
+#accMid:has(> #ambar-receiving-adaptive){padding:0;overflow:hidden}
+#ambar-receiving-adaptive{width:100%;height:100%;min-width:0;min-height:0}
+#ambar-receiving-adaptive .ar-app{--ar-width:100%;--ar-height:100%;grid-template-rows:minmax(0,1fr);border:0;border-radius:0;container-type:normal;container-name:none}
+#ambar-receiving-adaptive .ar-content{padding-bottom:calc(var(--ar-gap) + var(--safe-bottom))}
+#ambar-receiving-adaptive .ar-operation.is-off{opacity:.45}
+#ambar-receiving-adaptive .ar-operation:disabled{cursor:default}
+/* Действия шапки по эталону: «Отменить» и история — в существующем слоте. */
+#accOv:has(#ambar-receiving-adaptive) .stk-top-a{display:flex;align-items:center;gap:4px}
+#accOv:has(#ambar-receiving-adaptive) .stk-top-a .acc-act.ar-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
+#accOv:has(#ambar-receiving-adaptive) .stk-top-a .ar-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:13px;background:transparent;color:#a39baa!important;cursor:pointer}
+#accOv:has(#ambar-receiving-adaptive) .stk-top-a .ar-history svg{width:21px;height:21px;stroke-width:1.7}
+#accOv:has(#ambar-receiving-adaptive) .stk-top-a svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
 .oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -27031,51 +27156,153 @@ function supHistLine(){
   </button>`;
 }
 
-// Хаб закупки: путь, два входа, недобор, история. Списка здесь нет намеренно —
-// он живёт на своей странице и не мешает увидеть, где мы сейчас.
+// ── Хаб «Барракуда» по эталону владельца (AMBAR-RECEIVING-VISUAL-ONLY.txt,
+// 26 окт 2026: «перенести только визуал»). Порядок эталона: сводка заявки →
+// приёмка → две равные кнопки операций → полноширинная нижняя кнопка.
+// Действия — только существующие: вход в список заявки (accOrderList),
+// приёмка (accSupply), докупка (accShort), новые цены (ordPrices), ответ
+// магазина (supImport), история (accHistory) — в шапке, строкой не дублируется.
+// Иконки Lucide инлайном с классом lucide: эталон задаёт им 16px через
+// !important, и это участвовало в снимке.
+const AR_ICO = (() => {
+  const w = (n, body, cls) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls ? cls + ' ' : ''}lucide lucide-${n}" aria-hidden="true">${body}</svg>`;
+  return {
+    list: w('list', '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>'),
+    pin: w('map-pin', '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>'),
+    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>', 'ar-chevron'),
+    check: w('check', '<path d="M20 6 9 17l-5-5"/>'),
+    file: w('file-plus-2', '<path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M3 15h6"/><path d="M6 12v6"/>'),
+    pkg: w('package-plus', '<path d="M16 16h6"/><path d="M19 13v6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>'),
+    upload: w('upload', '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'),
+    history: w('history', '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'),
+  };
+})();
+
+// Сводка: вход в список заявки (та же кнопка, тот же accOrderList) и шкала
+// трёх шагов. Числа и подписи — те же, что считал путь (pathInner): заявка →
+// магазин дал → приняли %, под ними закупка AED и «принято из».
+function arSummary(){
+  const d = ORD.d || {}, st = supStage(), sup = st.sup;
+  const live = !!(sup && sup.status === 'open');
+  const done = !!(sup && sup.status !== 'open' && sup.status !== 'cancelled');
+  const cancelled = !!(sup && sup.status === 'cancelled');
+  const has = live || done;
+  const step = live ? 2 : (done ? 3 : 1);
+  const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
+  const vals = [fmt(has ? (sup.asked_qty || 0) : (d.total_qty || 0)),
+                has ? fmt(sup.total_qty || 0) : '—', has ? pct + '%' : '—'];
+  const m = (has && sup.money) || null;
+  const aed = v => v == null ? '' : `${fmt(v)} AED`;
+  const subs = m ? [aed(m.asked), aed(m.confirmed), `${fmtQty(st.took)} из ${fmtQty(sup.total_qty || 0)}`]
+                 : [aed(d.total_cost != null ? d.total_cost : d.total_aed), '', ''];
+  const taking = live && Object.values(sup.tasks || {}).some(t => t.driver && !t.done_at && !t.cancelled_at);
+  const phase = !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
+    : cancelled ? 'отменена' : done ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
+  const cls = i => done ? (i < 2 ? 'is-done' : 'is-complete')
+    : (i + 1 < step ? 'is-done' : i + 1 === step ? 'is-current' : 'is-pending');
+  const fill = done ? 100 : live ? 50 : 0;
+  return `<section class="ar-panel ar-summary" aria-label="Общая заявка Барракуде">
+    <button type="button" class="ar-section-head ar-summary-link cursor-interaction" onclick="accOrderList()">
+      <span class="ar-icon" aria-hidden="true">${AR_ICO.list}</span>
+      <span class="ar-heading"><span class="ar-title">ЗАЯВКА БАРРАКУДА</span><span class="ar-phase${
+        done ? ' is-complete' : ''}${taking ? ' ar-live' : ''}" aria-live="polite">${phase}</span></span>
+      ${AR_ICO.right}
+    </button>
+    <div class="ar-summary-body"><div class="ar-route" aria-label="Этапы общей заявки">
+      <div class="ar-rail" aria-hidden="true"><span style="width:${fill}%"></span></div>
+      ${['ЗАЯВКА', 'МАГАЗИН ДАЛ', 'ПРИНЯЛИ'].map((t, i) => `<div class="ar-step ${cls(i)}"><span class="ar-node" aria-hidden="true"></span><span class="ar-label">${t}</span><strong>${vals[i]}</strong><span class="ar-subvalue">${subs[i] || ''}</span></div>`).join('')}
+    </div></div></section>`;
+}
+
+// Приёмка: заголовок ведёт в приёмку целиком, строка района — в неё с
+// раскрытым районом (accSupply, как и раньше). Только районы поставки; все —
+// пока магазин не ответил. Код → название и состояние (галочка у принятого,
+// водитель серым рядом) → стрелка. Возвращает и число строк: от него зависит
+// крупный режим и вес карточки в эталоне.
+function arReceiving(){
+  const d = ORD.d || {}, st = supStage(), sup = st.sup;
+  const tasks = (sup && sup.tasks) || {};
+  const dist = Object.keys(tasks).length ? (d.districts || []).filter(x => tasks[x.id]) : (d.districts || []);
+  const rows = dist.map(x => {
+    const t = sup && tasks[x.id];
+    const cls = !t ? '' : t.cancelled_at ? 'is-pending' : t.done_at ? 'is-complete' : t.noscan_at ? 'is-confirm' : t.driver ? 'is-current' : '';
+    const word = !t ? '' : t.cancelled_at ? 'отменён' : t.done_at ? 'принято'
+      : t.noscan_at ? 'принимают без сканирования' : t.driver ? 'в работе' : '';
+    const who = t && !t.cancelled_at ? (t.driver || t.noscan_by || '') : '';
+    const state = word || who ? `<span class="ar-district-state">${t && t.done_at ? AR_ICO.check : ''}${escS(word)}${
+      who ? `${word ? ' · ' : ''}<span class="ar-person">${escS(who)}</span>` : ''}</span>` : '';
+    return `<button type="button" class="ar-district cursor-interaction ${cls}" ${
+        st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`}>
+      <span class="ar-code">${escS(x.code || '')}</span>
+      <span class="ar-district-copy"><strong>${escS(x.name || x.id)}</strong>${state}</span>
+      ${st.k === 'none' ? '' : AR_ICO.right}
+    </button>`;
+  });
+  const counter = sup ? `<span>${st.k === 'cancelled' ? 'отменена' : 'завершено'}</span><strong>${st.done} / ${st.all}</strong>`
+    : '<span>ждём магазин</span>';
+  const html = `<section class="ar-panel ar-receiving" aria-labelledby="ar-receiving-title">
+    <button type="button" class="ar-section-head ar-list-head cursor-interaction" ${st.k === 'none' ? '' : `onclick="accSupply('who')"`}>
+      <span class="ar-icon" aria-hidden="true">${AR_ICO.pin}</span>
+      <span class="ar-title" id="ar-receiving-title">ПРИЁМ ТОВАРА</span>
+      <span class="ar-counter">${counter}</span>
+    </button>
+    <div class="ar-districts">${rows.join('')}</div>
+    <div class="ar-empty"${rows.length ? ' hidden' : ''}>Районы не выбраны</div>
+  </section>`;
+  return {html, n: rows.length};
+}
+
+// Две равные плитки — существующие действия хаба, прежде стоявшие строками:
+// докупка на других базах (accShort, число — что ещё не заказано) и новые
+// цены магазина (ordPrices). Нечего делать — плитка погашена, не исчезает:
+// геометрия эталона на две кнопки.
+function arOps(){
+  const st = supStage(), sup = st.sup;
+  const gap = sup && sup.status === 'open' ? (sup.short_qty != null ? sup.short_qty : (sup.gap_qty || 0)) : 0;
+  const left = gap ? (sup.short_left != null ? sup.short_left : gap) : 0;
+  const n = ((PR_D && PR_D.proposals) || []).length;
+  const tile = (on, go, ico, title, qty, cap) => `<button type="button" class="ar-panel ar-operation cursor-interaction${on ? '' : ' is-off'}" ${
+      on ? `onclick="${go}"` : 'disabled'}>
+      <span class="ar-op-top">${ico}<span class="ar-op-title">${title}${qty ? `<br><span class="ar-op-quantity">${qty}</span>` : ''}</span>${AR_ICO.right}</span>
+      <span class="ar-op-caption">${cap}</span>
+    </button>`;
+  return `<div class="ar-operations" aria-label="Заявки на закупку">${
+    tile(!!gap, 'accShort()', AR_ICO.pkg, 'ДОКУПКА', gap ? (left ? `${fmt(left)} бут.` : 'в заявках') : '', gap ? 'Доп. базы' : 'нет недобора')}${
+    tile(!!n, 'ordPrices()', AR_ICO.file, 'НОВЫЕ ЦЕНЫ', n ? `${n} ${pluralize(n, 'позиция', 'позиции', 'позиций')}` : '', n ? 'магазин' : 'нет новых')}</div>`;
+}
+
+// Нижняя кнопка — та же «Загрузить ответ магазина» (ordUp → ordFile →
+// supImport), теперь внутри экрана, как в эталоне, а не в подвале раздела.
+function arBottom(){
+  return `<div class="ar-bottom">
+    <button type="button" class="ar-upload cursor-interaction" id="ordUp" onclick="document.getElementById('ordFile').click()">${AR_ICO.upload}<span>Загрузить ответ магазина</span></button>
+    <input type="file" id="ordFile" accept=".xlsx" style="display:none" onchange="supImport(this,'ordUp')">
+  </div>`;
+}
+
+// Хаб закупки: сводка, приёмка, две операции, ответ магазина. Списка здесь
+// нет намеренно — он живёт на своей странице и не мешает увидеть, где мы сейчас.
 function ordHub(){
   const d = ORD.d; if(!d) return;
-  document.getElementById('accMid').classList.remove('ap-host');
+  const mid = document.getElementById('accMid');
+  mid.classList.remove('ap-host');
   ORD_BRANCH = 'bar';
   ACC_BACK = ordPickBack;           // назад — к выбору Барракуда / другие базы
   _setText('accTitle', 'Барракуда');
   _setText('accSub', '');
   supActShow();                     // кнопка отмены знает про заявку только теперь
-  const st = supStage();
-  // Две зоны, а не четыре куска. Первая — сегодняшний закуп: вход в заявку,
-  // путь и состояние приёмки. Вторая — то, что рядом: недобор и прошлые
-  // закупки. Раньше они висели голыми строками, а история была прижата к
-  // низу экрана, и между ними стояло поле пустоты в пол-экрана — оно читалось
-  // как «здесь что-то не загрузилось», а не как воздух.
-  // Загрузка ответа магазина стоит внизу всегда. Раньше она пряталась во всех
-  // состояниях, кроме двух, — и исчезала ровно тогда, когда была нужнее всего:
-  // заявку отменили и собирают заново, или магазин прислал второй файл поверх
-  // первого. Кнопка, которой нет, — это не «шаг не ждут», это тупик.
-  //
-  // Главной она выглядит там, где это следующий шаг: ответа ещё нет. В
-  // остальных случаях остаётся тихой — доступна, но не зовёт.
-  //
-  // Подвал — ДО хаба. Хаб меряется против высоты середины, а середина без
-  // подвала выше на его рост: хаб «влезал», подвал появлялся, середина
-  // сжималась, и через треть секунды повторный замер ужимал карточки уже на
-  // глазах у человека. Сначала подвал, потом хаб, один честный замер.
-  const ждём = st.k === 'none';
-  document.getElementById('accFoot').innerHTML = `
-      <div class="qb-wrap">
-        <button class="qb ${ждём ? '' : 'qb-ghost qb-wide'}" id="ordUp"
-                onclick="document.getElementById('ordFile').click()">
-          ${ICO_UP}Загрузить ответ магазина
-        </button>
-        <input type="file" id="ordFile" accept=".xlsx" style="display:none"
-               onchange="supImport(this,'ordUp')">
-      </div>`;
-  // Три карточки одной анатомии: заявка с путём; другие базы; разбивка по
-  // районам, и к ней же снизу пришита история закупок — это те же районы в
-  // прошлые дни, а отдельной карточкой она отбирала у строк районов высоту.
-  document.getElementById('accMid').innerHTML = `<div class="ohub">
-    <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div></div>
-    <div class="pbox grow">${pathDistricts()}${pathPrices()}${pathShort()}${supHistLine()}</div></div>`;
-  ohubFit();
+  // История — значком в шапке рядом с отменой (эталон), строкой не дублируется.
+  const act = document.getElementById('accAct');
+  const cancel = act.querySelector('.acc-act'); if(cancel) cancel.classList.add('ar-cancel');
+  act.insertAdjacentHTML('beforeend', `<button type="button" class="ar-history cursor-interaction" onclick="accHistory()" aria-label="История закупок и приёмок">${AR_ICO.history}</button>`);
+  document.getElementById('accFoot').innerHTML = '';
+  // Два присваивания эталона при известном числе районов: крупный режим при
+  // N ≤ 2 и вес карточки приёмки N × 0.6 (помощник-наблюдатель не нужен).
+  const rc = arReceiving();
+  mid.innerHTML = `<div id="ambar-receiving-adaptive" lang="ru"><div class="ar-app" data-sparse="${rc.n <= 2}" style="--ar-receiving-grow:${
+    +(rc.n * 0.6).toFixed(1)}" aria-label="Барракуда — адаптивная приёмка"><main class="ar-content">${
+    arSummary()}${rc.html}${arOps()}${arBottom()}</main></div></div>`;
+  mid.scrollTop = 0;
 }
 
 // Цены магазина из его файла против наших закупочных (владелец, 24 окт 2026:
@@ -27117,6 +27344,8 @@ try{ document.fonts && document.fonts.ready.then(() => ohubFit()); }catch(e){}
 // Перерисовать сводку — на хабе это путь, на странице заявки строка итогов.
 // Числа меняются от каждой правки, а список под ними — нет.
 function pathPaint(){
+  const ar = document.querySelector('#accMid .ar-summary');
+  if(ar){ ar.outerHTML = arSummary(); return; }
   const el = document.querySelector('.path');
   if(el){ el.innerHTML = pathInner(); return; }
   const sum = document.querySelector('.ord-sum');

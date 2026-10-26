@@ -3576,6 +3576,22 @@ button.path:active{transform:scale(.995)}
 #accMid .ap-choice:active{border-color:#c4aa76;background:#24202d}
 #accMid .ap-app [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){#accMid .ap-choice{transition:none}#accMid .ap-phase.is-live{animation:none;opacity:1}}
+/* ── Карточка «Другие базы», два утверждённых состояния (AMBAR-OTHER-BASES-CLAUDE,
+   27 окт 2026): нет активных заявок / заявка ждёт решения. Шапка карточки своя,
+   середина — иллюстрация и одна надпись (+ количество). Правила эталона с
+   корнем, перенесённым на нашу карточку; cqw — от контейнера .ap-app. ── */
+#accMid .ap-choice.ap-ob{grid-template-rows:max-content minmax(min-content,1fr)}
+#accMid .ap-choice.ap-ob .ob-state{grid-row:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:16px 0;text-align:center;gap:8px}
+#accMid .ap-choice.ap-ob .ob-art{display:block;flex:none;aspect-ratio:1;width:140px;max-width:100%;height:auto;object-fit:contain}
+#accMid .ap-choice.ap-ob .ob-empty .ob-art{width:clamp(160px,54cqw,210px)}
+#accMid .ap-choice.ap-ob .ob-empty{gap:12px}
+#accMid .ap-choice.ap-ob .ob-message{max-width:100%;font-size:18px;line-height:25px;font-weight:600;letter-spacing:-.02em;overflow-wrap:anywhere;text-wrap:balance;color:var(--ap-text)}
+#accMid .ap-choice.ap-ob .ob-decision .ob-art{width:clamp(150px,48cqw,188px)}
+#accMid .ap-choice.ap-ob .ob-decision{gap:4px;padding:12px 0 16px}
+#accMid .ap-choice.ap-ob .ob-request-amount{display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:5px;max-width:100%;min-width:0;color:var(--ap-gold)}
+#accMid .ap-choice.ap-ob .ob-request-amount strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:26px;line-height:32px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.025em;overflow-wrap:anywhere}
+#accMid .ap-choice.ap-ob .ob-request-amount>span{font-size:14px;line-height:20px;font-weight:400}
+@container ap-phone (max-width:320px){#accMid .ap-choice.ap-ob .ob-message{font-size:17px;line-height:24px}}
 
 /* ── Хаб «Барракуда» по эталону владельца, версия 2 (AMBAR-BARRACUDA-CLAUDE-V2.txt,
    26 окт 2026): одна карточка заявки с приёмкой внутри, компактные этапы, две
@@ -27003,6 +27019,20 @@ const AP_ICO = {
 function apCard(o){
   const v = x => (x == null ? '—' : x);
   const pct = o.pct == null ? null : Math.max(0, Math.min(100, Math.round(o.pct)));
+  // Два утверждённых состояния «Других баз» (27 окт 2026): вместо чисел и
+  // шкалы — иллюстрация и одна надпись; ждёт решения — ещё количество из
+  // самой заявки. Шапка и действие карточки те же.
+  if(o.state){
+    const st = o.state, n = st.qty || 0;
+    return `<button type="button" class="ap-choice ap-ob" onclick="ordBranch('${o.key}')" aria-label="${escS(o.name)} — ${st.kind === 'decision' ? 'заявка ждёт решения' : 'нет активных заявок'}">
+    <span class="ap-choice-head"><span class="ap-section-icon" aria-hidden="true">${AP_ICO[o.ico]}</span><span class="ap-heading"><span class="ap-name">${escS(o.name)}</span></span><span class="ap-open-mark" aria-hidden="true">${AP_ICO.right}</span></span>
+    <span class="ob-state ${st.kind === 'decision' ? 'ob-decision' : 'ob-empty'}">
+      <img class="ob-art" src="/owner/other-bases-${st.kind === 'decision' ? 'decision' : 'empty'}.webp" width="1254" height="1254" alt="" aria-hidden="true">
+      <span class="ob-message">${st.kind === 'decision' ? 'Заявка ждёт решения' : 'Нет активных заявок'}</span>${
+      st.kind === 'decision' ? `<span class="ob-request-amount"><strong>${fmt(n)}</strong><span>${pluralize(n, 'бутылка', 'бутылки', 'бутылок')}</span></span>` : ''}
+    </span>
+  </button>`;
+  }
   return `<button type="button" class="ap-choice${o.idle ? ' ap-idle' : ''}" onclick="ordBranch('${o.key}')">
     <span class="ap-choice-head"><span class="ap-section-icon" aria-hidden="true">${AP_ICO[o.ico]}</span><span class="ap-heading"><span class="ap-name">${escS(o.name)}</span><span class="ap-phase${
       o.complete ? ' is-complete' : o.live ? ' is-live' : ''}">${escS(o.phase)}</span></span><span class="ap-open-mark" aria-hidden="true">${AP_ICO.right}</span></span>
@@ -27068,7 +27098,11 @@ function ordPick(){
       : open.length ? (xwho ? 'идёт приёмка' : 'в работе') : wait.length ? `${wait.length} ${pluralize(wait.length, 'черновик', 'черновика', 'черновиков')}` : 'нет заявок',
     live: !!dr || !!xwho, complete: false,
     asked: open.length ? xa : null, gave: open.length ? xg : null, pct: open.length ? (xg ? Math.round(xt / xg * 100) : 0) : null, who: xwho,
-    qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'), aed: open.length ? xm : null};
+    qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'), aed: open.length ? xm : null,
+    // Состояния эталона: черновик докупки ждёт решения — его количество (та
+    // же заявка, что открывает карточка); ни открытых, ни черновиков — пусто.
+    // Открытые заявки и прочие стадии — прежняя инфографика.
+    state: dr ? {kind: 'decision', qty: dr.total_qty || 0} : (!open.length && !wait.length ? {kind: 'empty'} : null)};
   mid.innerHTML = `<div class="ap-app" aria-label="Закупка"><div class="ap-content"><div class="ap-options">${apCard(bar)}${apCard(other)}</div></div></div>`;
 }
 function ordBranch(b){

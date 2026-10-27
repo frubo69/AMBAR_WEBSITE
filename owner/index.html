@@ -3746,23 +3746,73 @@ button.path:active{transform:scale(.995)}
   @container au-finished-phone (min-height:760px){#ambar-receiving-finished .au-app[data-sparse="true"] .au-operation{grid-template-rows:auto minmax(min-content,1fr) auto}}
 }
 @media(prefers-reduced-motion:reduce){#ambar-receiving-finished .au-live{animation:none}#ambar-receiving-finished .au-rail>span{transition:none}}
-/* Завершённое состояние основной заявки (AMBAR-BARRACUDA-COMPLETED, 26 окт 2026):
-   иллюстрация, две строки, «История» внутри карточки. completion.css буквально. */
-#ambar-receiving-finished .au-completion{display:flex;flex-direction:column;flex:1 0 auto;min-width:0;min-height:min-content}
-#ambar-receiving-finished .au-completion-main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex:1 0 auto;padding:14px 18px 20px;min-width:0}
-#ambar-receiving-finished .au-completion-art{display:block;width:clamp(170px,56cqw,224px);max-width:100%;height:auto;aspect-ratio:1;object-fit:contain;flex:none}
-#ambar-receiving-finished .au-completion-message{display:grid;gap:6px;margin:0;width:100%;max-width:280px;min-width:0;text-align:center;overflow-wrap:anywhere;text-wrap:balance;color:var(--au-text)}
-#ambar-receiving-finished .au-completion-context{display:block;font-size:clamp(12px,3.3cqw,13px);line-height:1.45;font-weight:400;letter-spacing:0;color:var(--au-muted)}
-#ambar-receiving-finished .au-completion-result{display:block;font-size:clamp(17px,4.7cqw,19px);line-height:1.3;font-weight:600;letter-spacing:-.025em;color:var(--au-text)}
-#ambar-receiving-finished .au-completion-footer{flex:0 0 auto;padding:0 14px 14px}
-#ambar-receiving-finished .au-completion-history{display:grid;grid-template-columns:18px minmax(0,1fr) 18px;align-items:center;gap:10px;width:100%;min-height:48px;padding:12px 16px;border:1px solid #514533;border-radius:12px;background:#e2c38609;color:var(--au-gold);font-size:14px;line-height:22px;font-weight:600;text-align:center}
-#ambar-receiving-finished .au-completion-history>.au-chevron{color:var(--au-gold);justify-self:end}
-@container au-finished-phone (max-height:700px){
-  #ambar-receiving-finished .au-completion-main{padding:8px 16px 12px}
-  #ambar-receiving-finished .au-completion-art{width:144px}
-  #ambar-receiving-finished .au-completion-message{gap:5px}
-  #ambar-receiving-finished .au-completion-footer{padding-bottom:12px}
+/* ── Завершённая основная заявка — финальный визуал (AMBAR-COMPLETION-FINAL,
+   28 окт 2026): карточка с шапкой «Основная заявка / Барракуда», иллюстрацией с
+   датой и строкой «История» по центру. completion-visual.css дословно, корень
+   #ambar-completion-integrated; затем completion-integration.css и адаптер хаба. ── */
+#ambar-completion-integrated{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-completion-integrated .ci-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-completion-integrated .ci-frame{--ci-width:390px;--ci-height:440px;--ci-text:#ece9e3;--ci-muted:#a8a0ad;--ci-gold:#e2c386;box-sizing:border-box;width:var(--ci-width);max-width:100%;height:var(--ci-height);min-width:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#41394b transparent;color-scheme:dark;container-type:size;container-name:ci-frame;font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif}
+#ambar-completion-integrated .ci-frame *{box-sizing:border-box}
+#ambar-completion-integrated .ci-card{display:flex;flex-direction:column;min-width:0;min-height:100%;border:1px solid #3a3442;border-radius:24px;background:linear-gradient(135deg,#1b1825,#12111f 76%);color:var(--ci-text);box-shadow:inset 0 1px 0 #ffffff04}
+#ambar-completion-integrated .ci-card button{appearance:none;font-family:inherit;white-space:normal;-webkit-tap-highlight-color:transparent;color:inherit}
+#ambar-completion-integrated svg.lucide{display:block;flex:none;width:20px!important;height:20px!important;margin:0!important;stroke-width:1.7}
+#ambar-completion-integrated .ci-head{display:grid;grid-template-columns:24px minmax(0,1fr) 20px;align-items:center;gap:12px;flex:0 0 auto;width:100%;min-width:0;min-height:88px;padding:18px;border:0;border-bottom:1px solid #342e3d;border-radius:23px 23px 0 0;background:#1c1825;text-align:left}
+#ambar-completion-integrated .ci-order-icon{display:grid;place-items:center;width:24px;height:24px;color:#c6ae7f}
+#ambar-completion-integrated .ci-order-icon>svg.lucide{width:22px!important;height:22px!important}
+#ambar-completion-integrated .ci-heading{display:flex;flex-direction:column;gap:3px;min-width:0}
+#ambar-completion-integrated .ci-title{font-size:clamp(20px,5.4cqw,22px);line-height:1.28;font-weight:600;letter-spacing:-.025em;overflow-wrap:anywhere}
+#ambar-completion-integrated .ci-supplier{font-size:13px;line-height:18px;font-weight:500;letter-spacing:0;color:#b8b0be;overflow-wrap:anywhere}
+#ambar-completion-integrated .ci-head-arrow{display:grid;place-items:center;width:20px;height:24px;color:var(--ci-gold)}
+#ambar-completion-integrated .ci-completion{display:flex;align-items:center;justify-content:center;flex:1 0 auto;min-width:0;min-height:min-content;padding:16px 18px 22px}
+#ambar-completion-integrated .ci-result-group{display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;min-width:0}
+#ambar-completion-integrated .ci-art{display:block;flex:none;width:clamp(144px,40cqh,196px);max-width:100%;height:auto;aspect-ratio:1;object-fit:contain}
+#ambar-completion-integrated .ci-copy{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;min-width:0;text-align:center}
+#ambar-completion-integrated .ci-date{display:block;font-size:12px;line-height:18px;font-weight:400;color:var(--ci-muted)}
+#ambar-completion-integrated .ci-copy h2{max-width:100%;margin:0;font-size:clamp(22px,6.15cqw,25px);line-height:1.25;font-weight:600;letter-spacing:-.035em;text-wrap:balance;overflow-wrap:anywhere;color:var(--ci-text)}
+#ambar-completion-integrated .ci-history{display:grid;grid-template-columns:18px minmax(0,max-content) 18px;justify-content:center;gap:10px;align-items:center;flex:0 0 auto;width:calc(100% - 36px);min-width:0;min-height:60px;margin:0 18px;padding:17px 0;border:0;border-top:1px solid #342e3d;border-radius:0;background:transparent;text-align:center}
+#ambar-completion-integrated svg.lucide.ci-history-small-icon{width:18px!important;height:18px!important;color:#c6ae7f;stroke-width:1.7}
+#ambar-completion-integrated .ci-history-label{min-width:0;font-size:15px;line-height:22px;font-weight:600;letter-spacing:-.015em;color:var(--ci-text);overflow-wrap:anywhere}
+#ambar-completion-integrated svg.lucide.ci-history-arrow{width:18px!important;height:18px!important;color:#c6ae7f;justify-self:end;stroke-width:1.7}
+#ambar-completion-integrated .ci-head:hover{background:#2a2331}
+#ambar-completion-integrated .ci-head:active{background:#302737}
+#ambar-completion-integrated .ci-history:hover .ci-history-label,#ambar-completion-integrated .ci-history:hover .ci-history-arrow,#ambar-completion-integrated .ci-history:hover .ci-history-small-icon{color:var(--ci-gold)}
+#ambar-completion-integrated .ci-history:active .ci-history-label,#ambar-completion-integrated .ci-history:active .ci-history-arrow,#ambar-completion-integrated .ci-history:active .ci-history-small-icon{color:var(--ci-text)}
+@container ci-frame (max-width:340px){
+  #ambar-completion-integrated .ci-head{grid-template-columns:24px minmax(0,1fr) 20px;gap:10px;padding-inline:14px}
+  #ambar-completion-integrated .ci-completion{padding-inline:14px}
+  #ambar-completion-integrated .ci-history{width:calc(100% - 28px);margin-inline:14px}
 }
+@container ci-frame (max-height:390px){
+  #ambar-completion-integrated .ci-head{min-height:76px;padding-block:12px}
+  #ambar-completion-integrated .ci-completion{padding-block:10px 14px}
+  #ambar-completion-integrated .ci-result-group{gap:5px}
+  #ambar-completion-integrated .ci-art{width:124px}
+  #ambar-completion-integrated .ci-history{min-height:54px;padding-block:13px}
+}
+/* completion-integration.css: карточка в потоке страницы, без рамки 390×440. */
+#ambar-completion-integrated{--ci-slot-height: 0px;width: 100%;min-width: 0}
+#ambar-completion-integrated .ci-stage{display: block;width: 100%;padding: 0}
+#ambar-completion-integrated .ci-frame{width: 100%;max-width: none;height: auto;overflow: visible;container-type: inline-size}
+#ambar-completion-integrated .ci-card{min-height: var(--ci-slot-height)}
+#ambar-completion-integrated .ci-art{width: clamp(144px, calc(var(--ci-slot-height) * .4), 196px)}
+#ambar-completion-integrated[data-compact="true"] .ci-head{min-height: 76px;padding-block: 12px}
+#ambar-completion-integrated[data-compact="true"] .ci-completion{padding-block: 10px 14px}
+#ambar-completion-integrated[data-compact="true"] .ci-result-group{gap: 5px}
+#ambar-completion-integrated[data-compact="true"] .ci-art{width: 124px}
+#ambar-completion-integrated[data-compact="true"] .ci-history{min-height: 54px;padding-block: 13px}
+/* Адаптер хаба STAR: карточка стоит на месте карточки заявки тем же весом
+   высоты (--au-order-grow); в «отработана» показана она, карточка заявки с
+   этапами и районами спрятана — переключает помощник setCompleted. Высота
+   слота (--ci-slot-height, data-compact) считается им же по соседям в
+   .au-content, а не по самой карточке. */
+#ambar-receiving-finished .au-content>#ambar-completion-integrated{display:flex;flex-direction:column;flex:var(--au-order-grow) 0 auto;min-height:min-content;min-width:0}
+#ambar-receiving-finished .au-content>#ambar-completion-integrated[hidden],#ambar-receiving-finished .au-order[hidden]{display:none!important}
+#ambar-completion-integrated .ci-stage{display:flex;flex-direction:column;flex:1 0 auto}
+#ambar-completion-integrated .ci-frame{display:flex;flex-direction:column;flex:1 0 auto}
+#ambar-completion-integrated .ci-card{flex:1 0 auto}
+#ambar-completion-integrated button:enabled{cursor:pointer}
+#ambar-completion-integrated button:focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
 /* ── «История», вкладка «Закупки» по эталону владельца (AMBAR-HISTORY-FOR-CLAUDE,
    27 окт 2026): history-visual.css буквально, затем history-integration.css,
    затем адаптер оболочки STAR (шапка раздела своя, одна строка сетки под
@@ -27580,6 +27630,21 @@ function ordAttn(){
     app.dataset.sparse = String(completed || count <= 2);
     app.style.setProperty('--au-receiving-grow', String(count * .35));
     app.style.setProperty('--au-order-grow', String(completed ? .65 : .3 + count * .35));
+    // Высота, отданная карточке «отработана», — из компоновки: середина хаба
+    // минус соседи (плитка, кнопка) и зазоры, не из самой карточки. Ниже 390 —
+    // компактный режим (completion-integration.css).
+    const card = app.querySelector('#ambar-completion-integrated');
+    const content = app.querySelector('.au-content');
+    if (card && content && !card.hidden) {
+      const cs = getComputedStyle(content);
+      const gap = parseFloat(cs.rowGap) || parseFloat(cs.gap) || 0;
+      const others = Array.from(content.children).filter(el => el !== card && !el.hidden);
+      const inner = content.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+      const used = others.reduce((a, el) => a + el.getBoundingClientRect().height, 0) + gap * others.length;
+      const slot = Math.max(0, Math.round(inner - used));
+      card.style.setProperty('--ci-slot-height', slot + 'px');
+      if (slot > 0 && slot <= 390) card.dataset.compact = 'true'; else delete card.dataset.compact;
+    }
     return count;
   }
 
@@ -27588,14 +27653,14 @@ function ordAttn(){
   function setCompleted(app, completed) {
     if (!app || !app.matches('.au-app')) throw new TypeError('Expected .au-app element');
     if (typeof completed !== 'boolean') throw new TypeError('Expected a completion boolean');
-    const completion = app.querySelector('[data-completion]');
-    const summary = app.querySelector('.au-summary');
-    const receiving = app.querySelector('.au-receiving');
-    if (!completion || !summary || !receiving) throw new TypeError('Completion and active views must exist');
+    // Отработана — показана отдельная карточка (AMBAR-COMPLETION-FINAL),
+    // карточка заявки с этапами и районами спрятана целиком; иначе наоборот.
+    const order = app.querySelector('.au-order');
+    const card = app.querySelector('#ambar-completion-integrated');
+    if (!order || !card) throw new TypeError('Order card and completion card must exist');
     app.dataset.orderCompleted = String(completed);
-    completion.hidden = !completed;
-    summary.hidden = completed;
-    receiving.hidden = completed;
+    order.hidden = completed;
+    card.hidden = !completed;
     const session = sessions.get(app);
     if (session) session.refresh();
     else sync(app);
@@ -27675,6 +27740,36 @@ function ordAttn(){
 let AR_VIS = null;                // помощник, пока хаб на экране
 function arVisOff(){ if(AR_VIS){ try{ AR_VIS.destroy(); }catch(e){} AR_VIS = null; } }
 
+// Завершённая основная заявка — финальный визуал (AMBAR-COMPLETION-FINAL,
+// 28 окт 2026): отдельная карточка на месте карточки заявки. Шапка — та же
+// дверь в список (accOrderList), нижняя строка — та же история (accHistory).
+// Дата — рабочий день показываемой поставки; нет дня — даты нет.
+const CI_ICO = (() => {
+  const w = (n, body, cls) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-${n}${cls ? ' ' + cls : ''}" aria-hidden="true">${body}</svg>`;
+  return {
+    list: w('list', '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>'),
+    right: w('chevron-right', '<path d="m9 18 6-6-6-6"/>'),
+    history: w('history', '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>', 'ci-history-small-icon'),
+    arrow: w('arrow-right', '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>', 'ci-history-arrow'),
+  };
+})();
+function ciCard(sup){
+  const day = sup && sup.day ? String(sup.day) : '';
+  return `<div id="ambar-completion-integrated" lang="ru" hidden><div class="ci-stage"><div class="ci-frame" aria-label="Барракуда — завершённая основная заявка">
+    <section class="ci-card" aria-labelledby="ci-order-title">
+      <button type="button" class="ci-head cursor-interaction" onclick="accOrderList()" aria-label="Основная заявка Барракуда. Полностью отработана.">
+        <span class="ci-order-icon" aria-hidden="true">${CI_ICO.list}</span>
+        <span class="ci-heading"><span id="ci-order-title" class="ci-title">Основная заявка</span><span class="ci-supplier">Барракуда</span></span>
+        <span class="ci-head-arrow" aria-hidden="true">${CI_ICO.right}</span>
+      </button>
+      <div class="ci-completion"><div class="ci-result-group">
+        <img class="ci-art" src="/owner/order-completed.webp" width="1254" height="1254" alt="" aria-hidden="true">
+        <div class="ci-copy">${day ? `<time class="ci-date" datetime="${escS(day)}">${escS(_dayName(day))}</time>` : ''}<h2>Полностью отработана</h2></div>
+      </div></div>
+      <button type="button" class="ci-history cursor-interaction" onclick="accHistory()" aria-label="История закупок и приёмок">${CI_ICO.history}<span class="ci-history-label">История</span>${CI_ICO.arrow}</button>
+    </section></div></div></div>`;
+}
+
 // Единая карточка: шапка основной заявки (та же кнопка в список — accOrderList),
 // три этапа (числа и подписи те же, что считал путь), приёмка по районам
 // (заголовок — приёмка целиком, строка — район; accSupply). Возвращает и
@@ -27726,16 +27821,6 @@ function auOrderCard(){
         done && !prN ? ' is-complete' : ''}${taking || prN ? ' au-live' : ''}" data-phase>${phase}</span></span>
       <span class="au-open" aria-hidden="true">${AR_ICO.right}</span>
     </button>
-    <div class="au-completion" data-completion hidden>
-      <div class="au-completion-main">
-        <img class="au-completion-art" src="/owner/order-completed.webp" width="1254" height="1254" alt="Закрытая поставка и список выполненных задач">
-        <p class="au-completion-message"><span class="au-completion-context">${
-          sup && sup.day === _dayIsoFor(0) ? 'Сегодняшняя основная заявка' : `Основная заявка${sup && sup.day ? ' · ' + escS(_dayName(sup.day)) : ''}`}</span><strong class="au-completion-result">Полностью отработана</strong></p>
-      </div>
-      <div class="au-completion-footer">
-        <button type="button" class="au-completion-history cursor-interaction" onclick="accHistory()">${AR_ICO.history}<span>История</span>${AR_ICO.right}</button>
-      </div>
-    </div>
     <div class="au-summary"><div class="au-route" aria-label="Этапы общей заявки">
       <div class="au-rail" aria-hidden="true"><span data-rail style="width:${fill}%"></span></div>${steps}
     </div></div>
@@ -27747,7 +27832,7 @@ function auOrderCard(){
       <div class="au-districts" data-districts>${rows.join('')}</div>
       <div class="au-empty" data-empty${rows.length ? ' hidden' : ''}>Районы не выбраны</div>
     </section>
-  </section>`;
+  </section>${ciCard(sup)}`;
   return {html, n: rows.length};
 }
 

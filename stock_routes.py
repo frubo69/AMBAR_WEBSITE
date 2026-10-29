@@ -1899,7 +1899,12 @@ async def freeze_order(day: str = "") -> dict:
 
 @require_owner
 async def handle_order(request):
-    data = await order_rows(request.query.get("day") or "")
+    # live=1 — расчёт от склада прямо сейчас, без снимка собранной заявки: так
+    # «Заявка по норме» на «Других базах» подставляет, чего не хватает до нормы
+    # (владелец, 30 окт 2026). Без live — последняя собранная заявка, как и было.
+    live = (request.query.get("live") or "") == "1"
+    day = (request.query.get("day") or "").strip()
+    data = await order_rows(day or (_biz_day() if live else ""), live=live)
     # Критические остатки — красным прямо в заявке (владелец, 30 сен 2026).
     # Только в ответе экрану: сам расчёт заявки и её файл от этого не зависят.
     try:

@@ -4887,15 +4887,39 @@ async def _chk_support():
 
 
 async def _chk_supply(day: str):
-    """Поставка этих суток: пришла ли, роздана ли по водителям, чем кончилась."""
+    """Поставка этих суток: пришла ли, роздана ли по водителям, чем кончилась.
+
+    Плюс открытые приёмки ЛЮБОГО дня — open_list (владелец, 30 окт 2026:
+    «приёмка же не закончена, почему нет алерта в чек-листе»). Строка
+    «Поставка принята» жила только в сутках поставки: ответ загрузили 29-го,
+    с полудня 30-го чек-лист смотрит на 30-е — и строка исчезла вместе с
+    незакрытым районом. Долг не гаснет с полуднем, как и «QR код не внесён»."""
     try:
         rows = await db.supply_list(limit=10)
     except Exception as e:
         log.warning(f"[chk] поставки: {e}")
         rows = []
+    try:
+        открытые = await db.supply_list(limit=30, status="open")
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] открытые поставки: {e}")
+        открытые = []
+    open_list = []
+    for r in открытые:
+        tasks = {o: t for o, t in (r.get("tasks") or {}).items() if not t.get("cancelled_at")}
+        left = [o for o, t in tasks.items() if not t.get("done_at")]
+        if not left:
+            continue
+        open_list.append({"supply_id": r.get("supply_id") or "", "day": r.get("day") or "",
+                          "kind": r.get("kind") or "main", "base": r.get("base") or "",
+                          "left": left,
+                          "free": sum(1 for o in left if not tasks[o].get("driver"))})
+    # Самая старая — первой: по её дню считается срок строки.
+    open_list.sort(key=lambda x: (x["day"], x["supply_id"]))
     sup = next((r for r in rows if (r.get("day") or "") == day), None)
     if not sup:
-        return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0, "planned": 0}
+        return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0, "planned": 0,
+                "open_list": open_list}
     tasks = {o: t for o, t in (sup.get("tasks") or {}).items() if not t.get("cancelled_at")}
     free = sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at"))
     # Сколько районов было в заявке (без «не везём сюда»): заявки «появились у
@@ -4903,8 +4927,7 @@ async def _chk_supply(day: str):
     dists = [d for d in (sup.get("districts") or []) if isinstance(d, dict) and not d.get("off")]
     return {"exists": True, "free": free, "gap": int(sup.get("gap_qty") or 0),
             "done": (sup.get("status") or "open") != "open", "total": len(tasks),
-            "planned": len(dists) if dists else len(tasks)}
-
+            "planned": len(dists) if dists else len(tasks), "open_list": open_list}
 
 async def _chk_noscan() -> list:
     """Что принято без кодов и ещё не отсканировано — по всем открытым
@@ -4949,6 +4972,7 @@ CHK_PLAN = [
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
     ("costs",       12.0, 12.0, False),   # позиции без закупочной цены — пока они есть
+    ("prices_new",  12.0, 12.0, False),   # новые цены магазина ждут решения — пока они есть
     ("fines",       12.0, 12.0, False),   # штрафы на решение (fines_auto) — пока они есть
 ]
 # Смена — одна задача с двумя половинами. Днём спрашивается «открыты ли», под
@@ -4988,14 +5012,43 @@ def _order_rows(sup: dict, marks: dict, now, day: str, plan) -> list:
     каждого района заявки. «Сегодня не заказываем» (order_skip) гасит обе
     строки зелёным с подписью «сегодня заявки нет». «Поставка принята»
     появляется только после ответа магазина с заявками у всех районов — до
-    того принимать нечего, и строка только пугала бы красным."""
+    того принимать нечего, и строка только пугала бы красным.
+
+    С 30 окт 2026 «Поставка принята» горит и по открытой приёмке любого дня
+    (sup["open_list"]): кто, какого дня и какие районы не закрыты. Срок — по
+    дню самой старой открытой, а не по дню чек-листа: вчерашняя приёмка
+    сегодня просрочена, а не «пора». Строка ведёт в ту самую поставку (sid)."""
     skip = bool((marks.get("order_skip") or {}).get("done"))
     sent = bool((marks.get("order_sent") or {}).get("done"))
     answered = bool(sup.get("exists"))
     total, planned = int(sup.get("total") or 0), int(sup.get("planned") or sup.get("total") or 0)
     all_in = answered and total > 0 and total >= planned
+    open_list = sup.get("open_list") or []
+
+    def _open_row():
+        parts = []
+        for x in open_list:
+            кто = x["base"] if x["kind"] == "extra" and x["base"] else "Барракуда"
+            когда = _day_human(x["day"]) if x["day"] else ""
+            коды = [OFFICE_CODES.get(o, o) for o in x["left"]]
+            parts.append(" ".join(filter(None, [кто, когда]))
+                         + f" · не закрыт{'ы' if len(коды) > 1 else ''} {', '.join(коды)}"
+                         + (f" · без водителя {x['free']}" if x["free"] else ""))
+        row = _chk_row("supply_in", "Поставка принята", " · ".join(parts), False, now, day, plan,
+                       go="supply", n=sum(len(x["left"]) for x in open_list))
+        oldest = open_list[0]["day"] or day
+        conf = next((p for p in plan if p[0] == "supply_in"), None)
+        if conf and oldest != day:
+            since, due = _chk_at(oldest, conf[1], conf[3]), _chk_at(oldest, conf[2], conf[3])
+            row.update({"state": _chk_state(False, now, since, due),
+                        "due": due.strftime("%H:%M"), "due_at": due.isoformat(),
+                        "late_min": max(0, int((now - due).total_seconds() // 60))})
+        row["sid"] = open_list[0]["supply_id"]
+        return row
+
     if skip:
         return [_chk_row("order_sent", "Заявка в магазин", "сегодня заявки нет", True, now, day, plan, go="order"),
+                _open_row() if open_list else
                 _chk_row("supply_in", "Поставка принята", "сегодня заявки нет", True, now, day, plan, go="supply")]
     if answered:
         hint = ("магазин ответил · заявки у всех районов" if all_in
@@ -5005,14 +5058,15 @@ def _order_rows(sup: dict, marks: dict, now, day: str, plan) -> list:
     else:
         hint = "не отправлена"
     rows = [_chk_row("order_sent", "Заявка в магазин", hint, all_in, now, day, plan, go="order")]
-    if all_in:
+    if open_list:
+        rows.append(_open_row())
+    elif all_in:
         rows.append(_chk_row("supply_in", "Поставка принята",
                              ("приём закрыт" if sup.get("done")
                               else (f"{sup['free']} районов без водителя" if sup.get("free")
                                     else "везут, ни один район не закрыт")),
                              bool(sup.get("done")), now, day, plan, go="supply", n=int(sup.get("free") or 0)))
     return rows
-
 
 def _cash_hot(cr: dict) -> bool:
     """Выручка за прошлые дни не получена — строка горит красным сразу, не
@@ -5028,6 +5082,17 @@ def _chk_state(done: bool, now: datetime, since: datetime, due: datetime) -> str
     if now >= due:  return "late"
     if now >= since: return "now"
     return "soon"
+
+
+def _chk_price(v) -> str:
+    """Цена в подписи строки: 43 или 43,5 — без хвоста нулей."""
+    if v is None:
+        return "—"
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    return str(int(v)) if v.is_integer() else f"{v:.2f}".rstrip("0").replace(".", ",")
 
 
 def _pl_positions(n: int) -> str:
@@ -5311,6 +5376,30 @@ async def handle_checklist(request):
                        f"{n} {_pl_positions(n)} без закупочной цены",
                        False, now, day, plan, go="prices", n=n)
         row.update({"state": "late", "due": "", "late_min": 0})
+        rows.append(row)
+
+    # Новые цены магазина (владелец, 30 окт 2026: «должно там гореть, пока
+    # решение по новым ценам не принято»). При загрузке ответа разница цен
+    # уходит в предложения прайса и одним сообщением в бот — сообщение
+    # прочли и забыли, а строка не гаснет: есть, пока хоть одна цена ждёт
+    # решения, горит красным с минуты загрузки и ведёт в прайс, где по каждой
+    # «Принять» или «Оставить».
+    try:
+        import stock_value
+        цены = await stock_value.price_proposals_pending()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] новые цены магазина не прочитаны: {e}")
+        цены = []
+    if цены:
+        n = len(цены)
+        hint = " · ".join(f"{p.get('name') or '—'} {_chk_price(p.get('ours'))} → {_chk_price(p.get('theirs'))}"
+                          for p in цены[:3]) + (f" · ещё {n - 3}" if n > 3 else "")
+        row = _chk_row("prices_new", "Новые цены магазина", hint, False, now, day, plan, go="prices", n=n)
+        first = min((_geo_dt(p.get("at")) for p in цены if _geo_dt(p.get("at"))), default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ)).total_seconds() // 60))
+                    if first else 0})
         rows.append(row)
 
     # Штрафы, требующие решения (владелец, 22 сен 2026: «в чек-листе

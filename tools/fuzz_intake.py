@@ -604,34 +604,12 @@ async def прогон(seed, шагов):
                         for t in x.tasks.values():
                             if t.driver and not (t.done or t.cancelled or t.noscan or t.codes):
                                 t.driver = ""
-                # Черновик докупки: недобор минус то, что уже везут с других баз.
-                везут = {}
-                for c in м.дети(z.sid):
-                    if c.status != "draft":
-                        for o, by_ in c.plan.items():
-                            for p, n in by_.items():
-                                везут[p] = везут.get(p, 0) + n
-                надо = {p: max(0, sum(g.values()) - везут.get(p, 0)) for p, g in гап.items()}
-                if any(надо.values()):
-                    ч = Заявка("?", "extra", "draft", МИР["day"], parent=z.sid)
-                    ч.авто = True
-                    if not await привяжи([ч]):
-                        break
-                    d = await db.supply_get(ч.sid)
-                    for it in d.get("items") or []:
-                        p = it["id"]; ч.items.append(p)
-                        for o, n in (it.get("by_district") or {}).items():
-                            if int(n or 0) > int((гап.get(p) or {}).get(o) or 0):
-                                беда(seed, шаг, f"черновик докупки: {p}/{o} больше недобора района", n,
-                                     (гап.get(p) or {}).get(o), след)
-                            ч.plan.setdefault(o, {})[p] = int(n)
-                    ч.tasks = {o: Район() for o in ч.plan}
-                    for p, n in надо.items():
-                        есть = sum(int((ч.plan.get(o) or {}).get(p) or 0) for o in ч.plan)
-                        if есть != n:
-                            беда(seed, шаг, f"черновик докупки: {p} всего", есть, n, след)
-                elif r.get("draft"):
-                    беда(seed, шаг, "черновик докупки собран, а недобора нет", r.get("draft"), None, след)
+                # С 30 окт 2026 черновик докупки из недобора не собирается сам
+                # (владелец: «не составляй прям автоматом»): после загрузки новых
+                # документов нет — сверка модели с базой ловит лишний.
+                if r.get("draft"):
+                    беда(seed, шаг, "черновик докупки собран сам, хотя с 30 окт 2026 не должен",
+                         r.get("draft"), None, след)
 
         elif a < 0.045 and м.дней < 2:                       # наступил новый день
             м.дней += 1

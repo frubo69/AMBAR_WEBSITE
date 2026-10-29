@@ -50,7 +50,7 @@ def book(rows) -> bytes:
 
 async def load(raw):
     async def _none(*a, **k): return None
-    sr._draft_from_gap = _none; sr._answer_to_order = _none
+    sr._answer_to_order = _none
     async def _stale(*a, **k): return []
     sr._stale_tell = _stale
     resp = await unwrap(sr.handle_import)(_Req(raw))

@@ -968,18 +968,18 @@ async def handle_import(request):
     log.info(f"[supply] поставка {sid}: {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, отказов {len(dropped)}, "
              f"урезано {len(short)}, сверх заказа {len(extra)}")
-    # Магазин дал не всё — на разницу сразу собирается заявка на другую базу.
-    # Черновиком: водителям она не видна (им видны только открытые), человеку
-    # остаётся назвать базу, поправить числа и подтвердить — или отменить
-    # (владелец, 25 сен 2026). Раньше разницу надо было заметить самому и
-    # набрать заявку руками, а незамеченная разница — это просто не купленный
-    # товар.
-    черновик = await _draft_from_gap(doc)
+    # Заявку на другую базу из недобора программа больше не собирает сама
+    # (владелец, 30 окт 2026: «не составляй прям автоматом заявку на других
+    # базах»). С 25 сен черновик докупки заводился на каждую загрузку ответа,
+    # и 29 окт повторная загрузка не того файла родила ложный черновик на 264
+    # бутылки. Недобор остаётся у поставки (_shortfall), а заявку на другую
+    # базу собирает старший на «Других базах»: по норме или по недобору любой
+    # заявки из истории.
     try:
         await _stale_tell(sid)
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[supply] о снятых прошлых задачах не сказали: {e}")
-    return web.json_response({"ok": True, "supply_id": sid, "draft": черновик,
+    return web.json_response({"ok": True, "supply_id": sid,
                               "replaced": bool(заменена),
                               "items": len(items), "total_qty": doc["total_qty"],
                               "asked_qty": doc["asked_qty"], "gap_qty": doc["gap_qty"],
@@ -1047,7 +1047,14 @@ async def handle_list(request):
 
     Задачи остаются: по ним считается, кто поехал и сколько уже принято, — а
     это и есть то, ради чего в список смотрят."""
-    rows = await db.supply_list(limit=30)
+    # Обычно список короткий, но «Заявка по недобору Барракуды» на «Других
+    # базах» выбирает из любой заявки за всю историю (владелец, 30 окт 2026)
+    # — ей отдаём до трёхсот.
+    try:
+        limit = max(1, min(300, int(request.query.get("limit") or 30)))
+    except (TypeError, ValueError):
+        limit = 30
+    rows = await db.supply_list(limit=limit)
     await _costs_refresh()               # деньги в списке — закупочные
     try:
         kids = await db.supplies_children([r.get("supply_id") for r in rows])
@@ -2372,66 +2379,6 @@ async def _save_new(doc: dict, prefix: str, now) -> str:
     return doc["_id"]
 
 
-async def _draft_from_gap(sup: dict) -> dict | None:
-    """Заявка на другую базу из того, что магазин не дал. Черновиком.
-
-    Черновик (status=draft) водителю не виден: ему показываются только
-    открытые поставки (db.supplies_with_open_tasks). Поэтому появление
-    черновика не трогает ни одну приёмку — он живёт в панели, пока человек
-    не назовёт базу и не подтвердит.
-
-    Состав берём из общего недобора той же заявки: и отказы (включая строки,
-    которых магазин вовсе не прислал), и урезанное. Строку без разбивки по
-    районам взять некуда — её пропускаем, но в недоборе она остаётся видна.
-    """
-    short = _shortfall(sup)
-    # Ответ магазина загрузили повторно, а докупку по прошлой версии уже
-    # отправили водителям: её не трогаем, но и второй раз то же самое не
-    # просим — в черновик идёт только то, чего она не покрывает. Раньше новый
-    # черновик собирался на весь недобор заново, и одни и те же бутылки
-    # просили две заявки разом (найдено фаззером приёмки, 1 окт 2026).
-    try:
-        дети = (await db.supplies_children([sup.get("_id")])).get(sup.get("_id")) or []
-    except Exception as e:                           # noqa: BLE001
-        log.warning(f"[supply] докупки по {sup.get('_id')} не прочитаны: {e}")
-        дети = []
-    _cover(short, дети)
-    cat = _catalog_by_id()
-    items, tasks = [], {}
-    for r in short.get("rows") or []:
-        by = {o: int(n) for o, n in (r.get("left_by") or {}).items()
-              if o in OFFICE_IDS and int(n or 0) > 0}
-        if not by:
-            continue
-        qty = sum(by.values())
-        items.append({"id": r["id"], "name": r.get("name") or (cat.get(r["id"]) or {}).get("name", ""),
-                      "asked": qty, "qty": qty, "scanned": 0,
-                      "by_district": by, "got": {o: 0 for o in by}})
-        for oid, n in by.items():
-            t = tasks.setdefault(oid, {"qty": 0, "positions": 0, "scanned": 0,
-                                       "driver": "", "driver_id": 0,
-                                       "claimed_at": None, "started_at": None,
-                                       "done_at": None, "last_at": None,
-                                       "undo": 0, "note": "", "gaps": [], "flags": []})
-            t["qty"] += n; t["positions"] += 1
-    if not items:
-        return None
-    now = datetime.now(timezone.utc)
-    doc = {"at": now, "status": "draft", "day": sup.get("day") or "",
-           "kind": "extra", "base": "", "source": "shortfall",
-           "from_supply": sup.get("_id") or "",
-           "by": sup.get("by") or 0, "by_name": "",
-           "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
-           "tasks": tasks,
-           "total_qty": sum(i["qty"] for i in items),
-           "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
-    xid = await _save_new(doc, "X", now)
-    log.info(f"[supply] черновик докупки {xid} из недобора {sup.get('_id')}: "
-             f"{len(items)} позиций, {doc['total_qty']} единиц, районов {len(tasks)}")
-    return {"supply_id": xid, "total_qty": doc["total_qty"],
-            "items": len(items), "districts": sorted(tasks)}
-
-
 async def _draft_from_extra(sup: dict, oid: str, gaps: list) -> dict | None:
     """Следующая доп. заявка из того, чего не оказалось на другой базе.
 
@@ -3675,10 +3622,12 @@ async def handle_extra_create(request):
         return web.json_response({"error": "nothing"}, status=400, headers=CORS_HEADERS)
     now = datetime.now(timezone.utc)
     who = _owner_name(request, body)
-    # Откуда взялся состав: «shortfall» — подставлен из недобора основной
-    # заявки (магазин дал не всё), «manual» — набран руками. На экране заявки
-    # это подпись «из недобора магазина» рядом со временем и автором.
-    source = "shortfall" if str(body.get("source") or "") == "shortfall" else "manual"
+    # Откуда взялся состав: «shortfall» — подставлен из недобора заявки
+    # магазину (магазин дал не всё), «norm» — из расчёта «чего не хватает до
+    # нормы» (кнопка «Заявка по норме», 30 окт 2026), «manual» — набран
+    # руками. На экране заявки это подпись рядом со временем и автором.
+    _src = str(body.get("source") or "")
+    source = _src if _src in ("shortfall", "norm") else "manual"
     from_supply = str(body.get("from_supply") or "").strip()[:40]
     # День смены, а не календарный: смена идёт с полудня, и заявка, собранная
     # ночью, относится к уходящей смене — как основная, у которой день берётся

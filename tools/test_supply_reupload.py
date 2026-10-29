@@ -59,7 +59,8 @@ async def main():
     sr._cancel_tell = _tell
     async def _stale(*a, **k): return []
     sr._stale_tell = _stale
-    # Просили больше, чем дали — чтобы собирался черновик докупки.
+    # Просили больше, чем дали — недобор есть; черновик докупки из него с
+    # 30 окт 2026 не собирается (владелец: «не составляй прям автоматом»).
     async def _snap(): return {"asked": {"p1": 20, "p2": 9}, "by": {"p1": {"jvc": 20}, "p2": {"jvc": 9}}}
     db.zayavka_last_full = _snap
 
@@ -67,8 +68,8 @@ async def main():
     st, a = await load([(1, nm("p1"), 10, 5, 3, 0, 0, 0), (2, nm("p2"), 10, 4, 0, 0, 0, 0)])
     eq("поставка заведена", (st, a["ok"], a["replaced"]), (200, True, False))
     sid = a["supply_id"]
-    eq("черновик докупки собран", bool(a["draft"]), True)
-    x1 = a["draft"]["supply_id"]
+    eq("черновика докупки нет — с 30 окт 2026 его не собирают", a.get("draft"), None)
+    eq("в базе только сама поставка", await db._db.supplies.count_documents({}), 1)
     ok, _ = await db.supply_task_claim(sid, "jvc", "Худоба", 7, datetime.now(timezone.utc))
     ok2, _ = await db.supply_task_claim(sid, "bbay", "Авазбек", 8, datetime.now(timezone.utc))
     eq("водители взяли районы", (ok, ok2), (True, True))
@@ -86,10 +87,7 @@ async def main():
     eq("района, которого больше нет, в задачах нет", sorted(sup["tasks"]), ["jvc"])
     eq("его водителю сказано", СКАЗАНО, [("Авазбек", "bbay")])
     eq("отмечено, что это замена", (sup["replaced_n"], bool(sup["first_at"])), (1, True))
-    старый = await db.supply_get(x1)
-    eq("прошлый черновик докупки снят", старый["status"], "cancelled")
-    черн = await db._db.supplies.find({"status": "draft"}).to_list(None)
-    eq("новый черновик один и от новой разницы", [(d["from_supply"], d["total_qty"]) for d in черн], [(sid, 12)])
+    eq("черновиков после замены тоже нет", await db._db.supplies.count_documents({"status": "draft"}), 0)
     eq("«ждёт на базе» — не удвоилось", (await sr.pending_qty()).get(("jvc", "p1")), 8.0)
 
     print("\nТретья загрузка — а водитель уже начал принимать")

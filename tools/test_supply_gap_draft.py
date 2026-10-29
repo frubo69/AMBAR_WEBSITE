@@ -11,14 +11,17 @@
     прислал строку), и она попадает в gap_qty и в недобор;
   • честный ноль в файле остаётся обычным отказом, без пометки;
   • урезанную строку считаем как считали;
-  • на разницу создаётся черновик докупки: kind=extra, source=shortfall,
-    status=draft — водителю он НЕ виден (ему видны только открытые);
+  • черновик докупки (kind=extra, source=shortfall, status=draft) водителю НЕ
+    виден (ему видны только открытые); с 30 окт 2026 программа его из недобора
+    магазина НЕ собирает (владелец: «не составляй прям автоматом») — в тесте
+    он заводится руками, как черновик из недобора другой базы;
   • подтверждение требует имени базы и переводит в open;
   • черновик можно отменить, и приёмки это не касается.
 
     python3 tools/test_supply_gap_draft.py
 """
 import asyncio, inspect, json, os, sys
+from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["MONGO_URI"] = ""; os.environ.setdefault("AMBAR_OWNER_IDS", "1")
 import logging; logging.disable(logging.WARNING)
@@ -48,6 +51,27 @@ async def post(h, sid, body):
     req["owner_id"] = 1
     r = await raw(h)(req)
     return r.status, json.loads(r.text)
+
+
+def _draft_doc(short, from_sid, day):
+    """Черновик докупки из недобора — как его собирала программа до 30 окт 2026."""
+    items, tasks = [], {}
+    for r in short["rows"]:
+        by = {o: int(n) for o, n in (r.get("by_district") or {}).items() if int(n or 0) > 0}
+        if not by:
+            continue
+        q = sum(by.values())
+        items.append({"id": r["id"], "name": r.get("name") or "", "asked": q, "qty": q, "scanned": 0,
+                      "by_district": by, "got": {o: 0 for o in by}})
+        for o, n in by.items():
+            t = tasks.setdefault(o, {"qty": 0, "positions": 0, "scanned": 0, "driver": "", "driver_id": 0,
+                                     "claimed_at": None, "started_at": None, "done_at": None, "last_at": None,
+                                     "undo": 0, "note": "", "gaps": [], "flags": []})
+            t["qty"] += n; t["positions"] += 1
+    return {"at": datetime.now(timezone.utc), "status": "draft", "day": day, "kind": "extra", "base": "",
+            "source": "shortfall", "from_supply": from_sid, "by": 1, "by_name": "",
+            "items": items, "dropped": [], "short": [], "extra": [], "unknown": [], "tasks": tasks,
+            "total_qty": sum(i["qty"] for i in items), "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
 
 
 async def main():
@@ -82,10 +106,12 @@ async def main():
     p7 = next(r for r in sh["rows"] if r["id"] == "p7")
     eq("пропавшая — с адресом района", p7["by_district"], {"bbay": 12})
 
-    print("── черновик докупки собрался сам ──────────────────────────────")
-    d = await sup._draft_from_gap(doc)
-    eq("черновик создан", (bool(d), d and d["total_qty"], d and d["items"]), (True, 16, 2))
-    x = await db.supply_get(d["supply_id"])
+    print("── черновик из недобора заводится руками (сам — больше нет) ───")
+    eq("функции авто-черновика нет (30 окт 2026)", hasattr(sup, "_draft_from_gap"), False)
+    async def черновик(from_sid):
+        return await sup._save_new(_draft_doc(sh, from_sid, ДЕНЬ), "X", datetime.now(timezone.utc))
+    x = await db.supply_get(await черновик("S1"))
+    eq("черновик на весь недобор", (x["total_qty"], len(x["items"])), (16, 2))
     eq("это заявка на другую базу", (x["kind"], x["source"], x["from_supply"]),
        ("extra", "shortfall", "S1"))
     eq("и она ЧЕРНОВИК", x["status"], "draft")
@@ -109,7 +135,8 @@ async def main():
     eq("второй раз — не черновик", (st, r.get("error")), (409, "not_draft"))
 
     print("── черновик можно просто отменить ─────────────────────────────")
-    d2 = await sup._draft_from_gap({**doc, "_id": "S2"})
+    await asyncio.sleep(1.05)                     # номер черновика — по секундам
+    d2 = {"supply_id": await черновик("S2")}
     st, r = await post(sup.handle_cancel, d2["supply_id"], {"as": "STAR"})
     eq("отменён", (st, r.get("ok"), r.get("cancelled")), (200, True, "draft"))
     eq("статус", (await db.supply_get(d2["supply_id"]))["status"], "cancelled")
@@ -128,10 +155,6 @@ async def main():
     for tasks, ждём, имя in случаи:
         br = sup._sup_brief({"_id": "S9", "status": "open", "tasks": tasks, "items": []})
         eq(имя, br["can_cancel"], ждём)
-
-    print("── когда магазин дал всё — черновика нет ──────────────────────")
-    eq("пусто", await sup._draft_from_gap(
-        {"_id": "S3", "day": ДЕНЬ, "items": [], "short": [], "dropped": [], "tasks": {}}), None)
 
     print(("\nПРОВАЛЫ: " + ", ".join(FAIL)) if FAIL else "\nвсё сошлось")
     return 1 if FAIL else 0

@@ -47,8 +47,6 @@ print("── фаззер обязан ловить вернувшуюся ош
     ("две заявки в одну секунду — вторая затирает первую", db, "supply_insert", None, None),
     ("отменённый черновик считается покрытием недобора", sr, "_cover",
      'if ch.get("status") == "cancelled" and not (ch.get("base") or "").strip():', 'if False:'),
-    ("повторная загрузка: черновик на весь недобор, хотя докупку уже везут", sr, "_draft_from_gap",
-     '(r.get("left_by") or {})', '(r.get("by_district") or {})'),
     ("район с полкоробкой пива отменяется без вопроса", sr, "handle_cancel",
      "sum(float(v or 0) for o, v", "sum(int(v or 0) for o, v"),
     ("подтверждённый недовоз остаётся на складе до истечения кэша", sr, "short_decide",

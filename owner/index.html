@@ -3965,6 +3965,8 @@ button.path:active{transform:scale(.995)}
 #ambar-other-bases-priority .bp-footer{padding:10px 12px 14px;border-top:1px solid #25212d;background:#0b0a11}
 #ambar-other-bases-priority .bp-new{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-width:0;min-height:50px;padding:12px 14px;border:1px solid #514533;border-radius:14px;background:#e2c38609;color:var(--bp-gold);font-size:15px;line-height:22px;font-weight:600}
 #ambar-other-bases-priority .bp-new>svg.lucide{width:18px!important;height:18px!important}
+#ambar-other-bases-priority .bp-footer.bp-two{display:grid;gap:8px}
+#ambar-other-bases-priority .bp-record.bp-nogap{opacity:.45;cursor:default}
 #ambar-other-bases-priority .bp-request:hover{background:#ffffff03}
 #ambar-other-bases-priority .bp-request:active{background:#e2c38609}
 #ambar-other-bases-priority .bp-record:hover{background:#ffffff03}
@@ -20280,7 +20282,9 @@ let CKL_RETURN = false;
 const CK_GO = {
   shifts:    () => accOpen('shifts'),
   order:     () => accOpen('order'),
-  supply:    () => accOpen('supply'),
+  // Открытая приёмка любого дня: строка ведёт в ту поставку, что не закрыта
+  // (sid в строке), а не в поставку дня чек-листа.
+  supply:    () => chkSupply(),
   short:     () => { ACC_VIEW = 'short'; accShort(); },
   qr:        () => accOpen('qr'),
   expenses:  () => { SH_TAB = 'exp'; accOpen('expenses'); },
@@ -20366,6 +20370,14 @@ function chkNoscan(){
   accOpen('supply-at');             // только раздел: поставку выбираем сами
   ACC_VIEW = 'supply';
   accSupply('who', t.district, t.supply_id);
+}
+
+function chkSupply(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'supply_in')) || {};
+  if(!r.sid){ accOpen('supply'); return; }
+  accOpen('supply-at');             // только раздел: поставку выбираем сами
+  ACC_VIEW = 'supply';
+  accSupply('', '', r.sid);
 }
 
 async function chkGeoUnlock(){
@@ -27848,12 +27860,13 @@ function auOrderCard(){
 // Барракуда, уберём докупку — она формируется сама и живёт в закупках на
 // других базах»). Черновик докупки из недобора мигает на карточке «Другие
 // базы» и на входе в закупку, отправляют или отклоняют его там же.
-// «Свободная закупка · Барракуда» — поток под клиентов ещё не построен.
+// «Свободная заявка · Барракуда» (владелец, 30 окт 2026: «не свободная закупка,
+// а свободная заявка») — поток под клиентов ещё не построен.
 function auOps(){
   return `<div class="au-operations au-one" aria-label="Закупки">
     <button type="button" class="au-panel au-operation" disabled data-barracuda-free-purchase>
       <span class="au-op-top">${AR_ICO.file}${AR_ICO.right}</span>
-      <span class="au-op-title ambar-free-purchase-title"><span>СВОБОДНАЯ</span><span>ЗАКУПКА</span></span>
+      <span class="au-op-title ambar-free-purchase-title"><span>СВОБОДНАЯ</span><span>ЗАЯВКА</span></span>
       <span class="au-op-caption ambar-free-purchase-caption">Барракуда</span>
     </button></div>`;
 }
@@ -32301,8 +32314,12 @@ function pathExtra(){
 
 // ── «Другие базы» — список заявок по эталону владельца (AMBAR-OTHER-BASES-
 // LIST-FOR-CLAUDE, 27 окт 2026). Одна прокрутка, сверху «Требуют решения»:
-// черновики, собранные программой из недобора, и незаконченные заявки мастера
-// (память телефона); ниже «Отработанные» с фильтром. Открытые заявки, которые
+// черновики (с 30 окт 2026 — только из недобора других баз: из недобора
+// магазина программа заявок больше не собирает) и незаконченные заявки
+// мастера (память телефона); ниже «Отработанные» с фильтром. В подвале две
+// кнопки (владелец, 30 окт 2026): «Заявка по норме» — состав из того, чего не
+// хватает до нормы; «Заявка по недобору Барракуды» — любая заявка магазину за
+// всю историю, состав из того, чего он по ней не дал. Открытые заявки, которые
 // везут водители, — своей группой «В работе» между ними: они не ждут решения,
 // но и не отработаны. Иконки Lucide с class="lucide" — по нему стили эталона.
 const OB_ICO = (() => {
@@ -32444,9 +32461,51 @@ async function accExtra(){
       </div></div>`;
   mid.innerHTML = `<div id="ambar-other-bases-priority" lang="ru"><div class="bp-stage"><div class="bp-app" aria-label="Другие базы — заявки">
     <main class="bp-scroll">${tob ? `${head('bp-tob-title', 'ЗАКУПАЕМ ОТДЕЛЬНО')}<div class="xs-tob" id="xTob">${tob}</div>` : ''}${pending}${active}${done}${empty}</main>
-    <footer class="bp-footer"><button type="button" class="bp-new" onclick="xNew()">${OB_ICO.plus}<span>Новая заявка</span></button></footer>
+    <footer class="bp-footer bp-two">
+      <button type="button" class="bp-new" onclick="xNorm()">${OB_ICO.plus}<span>Заявка по норме</span></button>
+      <button type="button" class="bp-new" onclick="xPick()">${OB_ICO.file}<span>Заявка по недобору Барракуды</span></button></footer>
   </div></div></div>`;
   xbFilterPaint();
+}
+
+// «Заявка по недобору Барракуды» (владелец, 30 окт 2026): любая заявка
+// магазину за всю историю; заявка на другую базу собирается из того, чего
+// магазин по ней не дал. Строка — дата и состояние, сколько просили и сколько
+// дал, справа — сколько не дал; дал всё — строка не нажимается.
+async function xPick(){
+  XS = null;
+  ACC_BACK = accExtra;
+  _setText('accTitle', 'Недобор Барракуды');
+  _setText('accSub', '');
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.classList.remove('xs-fix');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  let list;
+  try{ list = ((await ownerApi.ownerFetch('/api/owner/supply', {params:{limit: 300}})).supplies) || []; }
+  catch(e){ mid.innerHTML = loadFail('xPick()'); return; }
+  const main = list.filter(x => x.kind !== 'extra' && x.status !== 'draft');
+  const rows = main.map(x => {
+    const dt = x.day || String(x.at || '').slice(0, 10);
+    const gap = x.gap_qty || 0;
+    const bases = [...new Set((x.children || []).map(c => c.base).filter(Boolean))];
+    const st = x.status === 'cancelled' ? ['отменена', 'is-cancelled', OB_ICO.x]
+             : x.status === 'open' ? ['в работе', 'is-waiting', OB_ICO.clock]
+             : ['принята', 'is-accepted', OB_ICO.check];
+    return `<button type="button" class="bp-record${gap ? '' : ' bp-nogap'}" ${gap ? `onclick="xNew('${escS(x.supply_id)}','gap')"` : 'disabled'} data-record="${escS(x.supply_id)}">
+      <span class="bp-record-icon" aria-hidden="true">${OB_ICO.store}</span>
+      <span class="bp-record-identity"><strong>Барракуда</strong><span>просили ${fmt(x.asked_qty || 0)} · дал ${fmt(x.total_qty || 0)}${
+        bases.length ? ` · ${escS(bases.join(', '))}` : ''}</span></span>
+      <span class="bp-record-quantity"><strong>${fmt(gap)}</strong><span>${gap ? 'не дал' : 'дал всё'}</span></span>
+      ${gap ? OB_ICO.chev : ''}
+      <span class="bp-record-head"><time class="bp-record-date" datetime="${escS(dt)}">${OB_ICO.cal}<span>${escS(_xbDay(dt))}</span></time><span class="bp-status ${st[1]}">${st[2]}${st[0]}</span></span>
+    </button>`;
+  });
+  mid.innerHTML = `<div id="ambar-other-bases-priority" lang="ru"><div class="bp-stage"><div class="bp-app" aria-label="Недобор Барракуды">
+    <main class="bp-scroll"><section class="bp-reviewed" aria-labelledby="bp-pick-title"><div class="bp-section-head"><h2 id="bp-pick-title">ЗАЯВКИ МАГАЗИНУ</h2><span class="bp-count" aria-label="${main.length} ${pluralize(main.length,'заявка','заявки','заявок')}">${main.length}</span></div>
+    <div class="bp-records">${rows.join('') || '<div class="bp-none">Пока пусто</div>'}</div></section></main>
+  </div></div></div>`;
 }
 
 // Черновик, собранный программой: назвать базу и отправить водителям — или
@@ -32914,58 +32973,82 @@ let XS = null;
 // from — заявка, чей остаток недобора подставить (основная или доп. база,
 // где купили не всё). Без from — с чистого листа, руками; недобор основной
 // подставится сам, как раньше, но только его незаказанный остаток.
-async function xNew(from){
+// Новая заявка на другую базу. Откуда состав (владелец, 30 окт 2026: «две
+// кнопки» на «Других базах»):
+//   norm — чего не хватает до нормы по всем районам, живым расчётом склада
+//          (тем же, что собирает заявку Барракуде, но без снимка);
+//   gap  — всё, чего магазин не дал по заявке `from` — любой из истории;
+//   left — то же, но только ещё не заказанный на других базах остаток
+//          (кнопка «Заявка на другую базу» на экране самой поставки);
+//   ''   — пусто (черновик мастера из памяти телефона).
+// Раньше состав подставлялся молча из недобора текущей основной заявки.
+async function xNew(from, mode){
+  mode = mode || (from ? 'left' : '');
   XS = {step: 1, di: 0, base: '', q: '', cat: '', rows: {}, dist: null, all: null, order: {},
-        src: from ? 'shortfall' : 'manual', from: from || ''};
+        src: mode === 'norm' ? 'norm' : (from ? 'shortfall' : 'manual'), from: from || '', mode, label: ''};
   document.getElementById('accAct').innerHTML = '';
   xRender();
   xLoad();
 }
+function xNorm(){ xNew('', 'norm'); }
 
-// Каталог для поиска и недобор основной заявки грузятся в фоне: первый шаг
-// про базу, и ждать список ради него незачем.
+// Каталог для поиска и состав грузятся в фоне: первый шаг про базу, и ждать
+// список ради него незачем.
 async function xLoad(){
+  const mode = XS && XS.mode;
   let d = ACC_ORDER;
-  if(!d){
+  // По норме — живой расчёт от склада на сейчас, а не снимок собранной заявки.
+  if(mode === 'norm'){
+    try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{live: '1'}}); }catch(e){ d = null; }
+  }else if(!d){
     try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}}); ACC_ORDER = d; }
     catch(e){ d = null; }
   }
-  if(!XS) return;
+  if(!XS || XS.mode !== mode) return;
   XS.dist = (d && d.districts) || [];
   XS.all = (d && (d.all_rows || d.rows)) || [];
   // Порядок — как в каталоге у операторов: водка, виски и дальше по полкам.
   // Строки заявки приходят отсортированными по потребности, а тут нужен
   // каталог, который листают глазами.
   try{ await loadCatalog(); }catch(e){}
-  if(!XS) return;
+  if(!XS || XS.mode !== mode) return;
   XS.order = {}; (PRODUCTS || []).forEach((p, i) => { XS.order[p.id] = i; });
   const ord = r => XS.order[r.id] != null ? XS.order[r.id] : 9999;
   XS.all = [...XS.all].sort((a, b) => ord(a) - ord(b) || a.name.localeCompare(b.name));
-  // Недобор — готовый список того, за чем едут: указанной заявки (кнопка
-  // «на другую базу») или основной, если заявку собирают с нуля и у магазина
-  // был недобор. Подставляется только незаказанный остаток и только в пустую
-  // заявку: чужие числа поверх своих не кладём.
-  const main = ACC_SUP && ACC_SUP.open;
-  const fromSid = XS.from || (main && (main.short_left || main.gap_qty) ? main.supply_id : '');
-  if(fromSid && !Object.keys(XS.rows).length){
+  // Состав подставляется только в пустую заявку: чужие числа поверх своих не кладём.
+  if(mode === 'norm' && d && !Object.keys(XS.rows).length){
+    (d.rows || []).forEach(r => {
+      const by = {};
+      Object.entries(r.cells || {}).forEach(([o, c]) => { if(c && !c.off && c.need > 0) by[o] = c.need; });
+      if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
+    });
+    XS.label = 'по норме';
+  }
+  if((mode === 'gap' || mode === 'left') && XS.from && !Object.keys(XS.rows).length){
     try{
-      const sd = (SUP_D && SUP_D.supply_id === fromSid) ? SUP_D
-               : await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(fromSid));
-      if(XS && !Object.keys(XS.rows).length)
+      const sd = (SUP_D && SUP_D.supply_id === XS.from) ? SUP_D
+               : await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(XS.from));
+      if(XS && XS.mode === mode && !Object.keys(XS.rows).length){
         (((sd || {}).shortfall || {}).rows || []).forEach(r => {
           const by = {};
-          // Остаток: по районам, если он есть; без разбивки — как в недоборе;
-          // нулевой остаток (всё уже в заявках) не подставляется вовсе.
-          if(r.left != null && !r.left) return;
-          const src = (r.left_by && Object.keys(r.left_by).length) ? r.left_by : (r.by_district || {});
+          let src;
+          if(mode === 'gap') src = r.by_district || {};
+          else {
+            // Остаток: по районам, если он есть; без разбивки — как в недоборе;
+            // нулевой остаток (всё уже в заявках) не подставляется вовсе.
+            if(r.left != null && !r.left) return;
+            src = (r.left_by && Object.keys(r.left_by).length) ? r.left_by : (r.by_district || {});
+          }
           Object.entries(src).forEach(([o, n]) => { if(n > 0) by[o] = n; });
           if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
         });
-      // Состав пришёл из недобора — так и подпишем заявку, с той заявкой, чей он.
-      if(XS && Object.keys(XS.rows).length){ XS.src = 'shortfall'; XS.from = fromSid; }
+        const кто = (sd && sd.kind === 'extra' && sd.base) ? sd.base : 'Барракуды';
+        XS.label = `недобор ${кто}` + (sd && sd.day ? ` · ${_dayName(sd.day)}` : '');
+      }
     }catch(e){}
   }
   if(XS && XS.step === 2) xRender();
+  else if(XS) xSub();
 }
 
 // Назад идёт по тем же шагам, что и вперёд: с итога — на последний район,
@@ -33005,7 +33088,7 @@ function xDraftSave(){
   if(!String(XS.base || '').trim() && !xTotal()) return;
   XS.did = XS.did || String(Date.now());
   const d = {id: XS.did, base: XS.base, step: XS.step, di: XS.di, rows: XS.rows,
-             src: XS.src, from: XS.from, at: new Date().toISOString()};
+             src: XS.src, from: XS.from, label: XS.label || '', at: new Date().toISOString()};
   xDraftsWrite([d, ...xDrafts().filter(x => x.id !== XS.did)]);
 }
 function xDraftDrop(id){ xDraftsWrite(xDrafts().filter(x => x.id !== id)); }
@@ -33014,7 +33097,7 @@ async function xDraftOpen(id){
   await xNew();
   if(!XS) return;
   Object.assign(XS, {did: d.id, base: d.base || '', rows: d.rows || {}, src: d.src || 'manual',
-                     from: d.from || '', step: d.step || 1, di: d.di || 0});
+                     from: d.from || '', label: d.label || '', step: d.step || 1, di: d.di || 0});
   xRender();
 }
 function xDraftRows(){
@@ -33060,7 +33143,7 @@ function xRender(){
   const nSteps = 2 + Math.max(1, dist.length);
   const cur = s === 1 ? 1 : s === 2 ? 2 + XS.di : nSteps;
   _setText('accTitle', 'Новая заявка');
-  _setText('accSub', s === 2 && dist.length ? `район ${XS.di + 1} из ${dist.length}` : `шаг ${cur} из ${nSteps}`);
+  xSub();
   // Справа в шапке — выход к списку баз одним нажатием: стрелка идёт по
   // районам назад, а сюда попадают с любого шага.
   const act = document.getElementById('accAct');
@@ -33141,6 +33224,18 @@ function xRender(){
       ${skipped.length ? `<div class="xs-skip">${skipped.join(' · ')} — ничего не надо</div>` : ''}`;
   }
   xFoot();
+}
+
+// Подпись под «Новая заявка»: откуда состав (по норме / недобор Барракуды ·
+// день) и где мы в шагах. Состав подгружается после первого рисунка, поэтому
+// подпись перерисовывается отдельно от экрана.
+function xSub(){
+  if(!XS) return;
+  const s = XS.step, dist = XS.dist || [];
+  const nSteps = 2 + Math.max(1, dist.length);
+  const cur = s === 1 ? 1 : s === 2 ? 2 + XS.di : nSteps;
+  _setText('accSub', (XS.label ? XS.label + ' · ' : '')
+    + (s === 2 && dist.length ? `район ${XS.di + 1} из ${dist.length}` : `шаг ${cur} из ${nSteps}`));
 }
 
 // Категории — полосой, как у операторов: «Все», потом по полкам в порядке
@@ -33713,7 +33808,7 @@ function xFlow(d){
 function xFlowCard(d){
   const f = xFlow(d);
   const when = `${_dayName(d.day || String(d.at || '').slice(0, 10))}${d.at ? ' ' + _hm(d.at) : ''}`;
-  const src = d.source === 'shortfall' ? `из недобора · ${d.from_base || 'магазина'}` : 'вручную';
+  const src = d.source === 'shortfall' ? `из недобора · ${d.from_base || 'магазина'}` : d.source === 'norm' ? 'по норме' : 'вручную';
   const meta = [when, d.by_name, src].filter(Boolean).join(' · ');
   // Не купили всё (не выдали на базе или отменили район) — остаток едет на
   // следующую базу тем же экраном, что недобор магазина.

@@ -27221,6 +27221,14 @@ const PT_MODES = {
 // Все районы заявки приняли — то же правило, что у завершённого вида хаба
 // (ordCompleted): поставка закрыта, районы в ней есть, и у каждого живого
 // стоит done_at. Одного «100%» или закрытой поставки мало.
+// Процент приёмки для пути «Заявка → Магазин дал → Приняли». 100 — только у
+// принятой поставки: пока хоть один район не закрыт, не выше 99, и округление
+// вниз — 220 из 221 это не «100%» (владелец, 29 окт 2026: «если не все
+// принял, то пиши 99%»).
+function _takenPct(took, total, done){
+  const p = total ? Math.floor((took || 0) / total * 100) : 0;
+  return done ? Math.max(0, Math.min(100, p)) : Math.max(0, Math.min(99, p));
+}
 function _supAllDone(sup){
   if(!sup || sup.status === 'open' || sup.status === 'cancelled') return false;
   const live = Object.values(sup.tasks || {}).filter(t => !t.cancelled_at);
@@ -27295,7 +27303,7 @@ function ordPick(){
   const mode = _supAllDone(sup) ? 'completed'
     : (!sup && d.phase === 'asked' && !d.skip) ? (d.sent ? 'sent' : 'ready') : null;
   const took = !sup ? 0 : st.sup ? st.took : (closed.took || closed.total_qty || 0);
-  const pct = sup && !cancelled ? (sup.total_qty ? Math.round(took / sup.total_qty * 100) : 0) : null;
+  const pct = sup && !cancelled ? _takenPct(took, sup.total_qty || 0, complete) : null;
   const who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
   const phase = !sup ? (d.skip ? 'сегодня не заказываем' : d.phase === 'asked' ? 'ждём ответ' : 'заявка')
@@ -27337,7 +27345,7 @@ function ordPick(){
     body: kind === 'decision' ? {kind: 'decision', img: '/owner/order-waiting.webp', message: 'Заявка ждёт решения', qty: drQty}
         : kind === 'empty' ? {kind: 'decision', img: '/owner/other-bases-empty.webp', message: 'Нет активных заявок'}
         : {kind: 'cycle', asked: open.length ? xa : null, gave: open.length ? xg : null,
-           pct: open.length ? (xg ? Math.round(xt / xg * 100) : 0) : null, who: xwho},
+           pct: open.length ? _takenPct(xt, xg, false) : null, who: xwho},
     summary: kind === 'cycle' ? {qty: xqty, unit: pluralize(xqty, 'бутылка', 'бутылки', 'бутылок'),
                                  cost: open.length ? xm : null, costLabel: 'Стоимость закупки · AED'} : null,
     label: `Другие базы. ${kind === 'decision' ? `Заявка ждёт решения, ${fmtQty(drQty)} ${pluralize(drQty, 'бутылка', 'бутылки', 'бутылок')}`
@@ -27415,7 +27423,7 @@ function pathInner(){
   const done = !!(sup && sup.status !== 'open' && sup.status !== 'cancelled');
   const has = live || done;
   const step = live ? 2 : (done ? 3 : 1);
-  const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
+  const pct = sup ? _takenPct(st.took, sup.total_qty || 0, done) : 0;
   // Третий шаг меряется в процентах, а не в бутылках: «179» рядом с «469» надо
   // делить в уме, а «38%» отвечает сразу. Сами бутылки — на экране приёмки.
   const vals = [
@@ -27781,7 +27789,7 @@ function auOrderCard(){
   const cancelled = !!(sup && sup.status === 'cancelled');
   const has = live || done;
   const step = live ? 2 : (done ? 3 : 1);
-  const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
+  const pct = sup ? _takenPct(st.took, sup.total_qty || 0, done) : 0;
   const vals = [fmt(has ? (sup.asked_qty || 0) : (d.total_qty || 0)),
                 has ? fmt(sup.total_qty || 0) : '—', has ? pct + '%' : '—'];
   const m = (has && sup.money) || null;

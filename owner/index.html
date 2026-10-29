@@ -3965,7 +3965,6 @@ button.path:active{transform:scale(.995)}
 #ambar-other-bases-priority .bp-footer{padding:10px 12px 14px;border-top:1px solid #25212d;background:#0b0a11}
 #ambar-other-bases-priority .bp-new{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-width:0;min-height:50px;padding:12px 14px;border:1px solid #514533;border-radius:14px;background:#e2c38609;color:var(--bp-gold);font-size:15px;line-height:22px;font-weight:600}
 #ambar-other-bases-priority .bp-new>svg.lucide{width:18px!important;height:18px!important}
-#ambar-other-bases-priority .bp-footer.bp-two{display:grid;gap:8px}
 #ambar-other-bases-priority .bp-record.bp-nogap{opacity:.45;cursor:default}
 #ambar-other-bases-priority .bp-request:hover{background:#ffffff03}
 #ambar-other-bases-priority .bp-request:active{background:#e2c38609}
@@ -32316,10 +32315,11 @@ function pathExtra(){
 // LIST-FOR-CLAUDE, 27 окт 2026). Одна прокрутка, сверху «Требуют решения»:
 // черновики (с 30 окт 2026 — только из недобора других баз: из недобора
 // магазина программа заявок больше не собирает) и незаконченные заявки
-// мастера (память телефона); ниже «Отработанные» с фильтром. В подвале две
-// кнопки (владелец, 30 окт 2026): «Заявка по норме» — состав из того, чего не
-// хватает до нормы; «Заявка по недобору Барракуды» — любая заявка магазину за
-// всю историю, состав из того, чего он по ней не дал. Открытые заявки, которые
+// мастера (память телефона); ниже «Отработанные» с фильтром. В подвале одна
+// кнопка «Новая заявка» — окно с тремя вариантами (xNewAsk, владелец, 30 окт
+// 2026): свободная; по норме — состав из того, чего не хватает до нормы; по
+// недобору Барракуды — любая заявка магазину за всю историю, состав из того,
+// чего он по ней не дал. Открытые заявки, которые
 // везут водители, — своей группой «В работе» между ними: они не ждут решения,
 // но и не отработаны. Иконки Lucide с class="lucide" — по нему стили эталона.
 const OB_ICO = (() => {
@@ -32461,14 +32461,38 @@ async function accExtra(){
       </div></div>`;
   mid.innerHTML = `<div id="ambar-other-bases-priority" lang="ru"><div class="bp-stage"><div class="bp-app" aria-label="Другие базы — заявки">
     <main class="bp-scroll">${tob ? `${head('bp-tob-title', 'ЗАКУПАЕМ ОТДЕЛЬНО')}<div class="xs-tob" id="xTob">${tob}</div>` : ''}${pending}${active}${done}${empty}</main>
-    <footer class="bp-footer bp-two">
-      <button type="button" class="bp-new" onclick="xNorm()">${OB_ICO.plus}<span>Заявка по норме</span></button>
-      <button type="button" class="bp-new" onclick="xPick()">${OB_ICO.file}<span>Заявка по недобору Барракуды</span></button></footer>
+    <footer class="bp-footer"><button type="button" class="bp-new" onclick="xNewAsk()">${OB_ICO.plus}<span>Новая заявка</span></button></footer>
   </div></div></div>`;
   xbFilterPaint();
 }
 
-// «Заявка по недобору Барракуды» (владелец, 30 окт 2026): любая заявка
+// «Новая заявка» в «Других базах» — не три кнопки в подвале, а одна и окно с
+// тремя вариантами (владелец, 30 окт 2026: «когда нажимаешь новая заявка
+// просто вылезает несколько вариантов»): свободная — мастер с пустыми
+// числами, по норме — от склада сейчас, по недобору Барракуды — из любой
+// заявки магазину за всю историю. Окно — как «Какую заявку отменить?».
+function xNewAsk(){
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask crw-pick';
+  const row = (ico, t, go) => `<button class="crw-ask-r" onclick="closePinPop(); ${go}">
+      <span class="crw-ask-i">${ico}</span>
+      <span class="crw-ask-n"><b>${escS(t)}</b></span>
+    </button>`;
+  box.innerHTML = `<div class="crw-ask-t">Новая заявка</div>
+    <div class="crw-ask-box">${
+      row(OB_ICO.pen, 'Свободная заявка', 'xNew()')}${
+      row(ICO_LIST, 'Заявка по норме', 'xNorm()')}${
+      row(OB_ICO.store, 'По недобору Барракуды', 'xPick()')}</div>
+    <button class="crw-ask-b no" onclick="closePinPop()">Отмена</button>`;
+  document.body.append(back, box);
+  _audHap('light');
+}
+
+// «По недобору Барракуды» (владелец, 30 окт 2026): любая заявка
 // магазину за всю историю; заявка на другую базу собирается из того, чего
 // магазин по ней не дал. Строка — дата и состояние, сколько просили и сколько
 // дал, справа — сколько не дал; дал всё — строка не нажимается.

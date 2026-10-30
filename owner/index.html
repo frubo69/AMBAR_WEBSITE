@@ -4028,9 +4028,34 @@ button.path:active{transform:scale(.995)}
 [data-barracuda-free-purchase] .ambar-free-purchase-title{font-size:22px!important;font-size:clamp(20px,5.8cqw,23px)!important;line-height:1.3!important;font-weight:700!important;letter-spacing:-0.015em!important;white-space:normal;overflow-wrap:anywhere}
 [data-barracuda-free-purchase] .ambar-free-purchase-title>span{display:block}
 [data-barracuda-free-purchase] .ambar-free-purchase-caption{font-size:14px!important;line-height:20px!important;font-weight:400!important}
+/* «История» — последней строкой карточки заявки и плитки свободной заявки, тем
+   же рядом, что на карточке «отработана» (.ci-history): черта сверху, значок,
+   слово, стрелка по центру (владелец, 30 окт 2026: «перенеси кнопку история
+   вниз под Бизнес Бей в конце карточки; то же самое по свободным заявкам»).
+   Значка в шапке больше нет. Высота — как у строки района, чтобы на коротком
+   экране ряд ужимался вместе с ними. */
+#ambar-receiving-finished .au-history-row{display:grid;grid-template-columns:18px minmax(0,max-content) 18px;justify-content:center;align-items:center;gap:10px;flex:0 0 auto;width:calc(100% - 28px);min-width:0;min-height:clamp(46px,calc(10cqh - 18px),60px);margin:0 14px;padding:var(--au-row-y) 0;border:0;border-top:1px solid #342e3d;border-radius:0;background:transparent;text-align:center;cursor:pointer}
+#ambar-receiving-finished .au-history-row>svg.lucide{width:18px!important;height:18px!important;color:#c6ae7f}
+#ambar-receiving-finished .au-history-row>svg.au-history-arrow{justify-self:end}
+#ambar-receiving-finished .au-history-label{min-width:0;font-size:15px;line-height:22px;font-weight:600;letter-spacing:-.015em;color:var(--au-text);overflow-wrap:anywhere}
+#ambar-receiving-finished .au-history-row:active .au-history-label{color:var(--au-gold)}
+/* Плитка свободной заявки — карточка из двух кнопок: верхняя (выключена, пока
+   потока нет) держит прежнюю сетку плитки, «История» под ней. */
+#ambar-receiving-finished .au-operations .au-operation.au-free{display:flex;flex-direction:column;gap:0;padding:0}
+/* У карточки с одним районом веса роста (.3 + .35) в сумме меньше единицы, и
+   треть свободной высоты оставалась пустой полосой в конце карточки — раньше
+   под строкой района, теперь легла бы под «Историей». Приёмка забирает не
+   меньше .7: сумма не меньше единицы, «История» — у самого края. */
+#ambar-receiving-finished .au-order>.au-receiving{flex-grow:max(.7,var(--au-receiving-grow))}
+#ambar-receiving-finished .au-free-main{display:grid;flex:1 0 auto;grid-template-columns:16px minmax(0,1fr) 16px;grid-template-rows:auto minmax(min-content,1fr);column-gap:6px;row-gap:2px;align-items:start;width:100%;min-width:0;padding:clamp(7px,calc(4cqh - 18.6px),15px) 10px;border:0;border-radius:16px 16px 0 0;background:transparent;text-align:left}
+#ambar-receiving-finished .au-free-main:disabled{opacity:.42;cursor:default}
+#ambar-receiving-finished .au-free>.au-history-row{width:calc(100% - 20px);margin:0 10px}
+@container au-finished-phone (min-height:760px){
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-free-main{grid-template-columns:minmax(0,1fr) 16px;grid-template-rows:auto auto minmax(min-content,1fr);row-gap:8px;column-gap:10px;padding:15px}
+  #ambar-receiving-finished .au-app[data-sparse="true"] .au-free>.au-history-row{width:calc(100% - 30px);margin:0 15px}
+}
 #accOv:has(#ambar-receiving-finished) .stk-top-a{display:flex;align-items:center;gap:4px}
 #accOv:has(#ambar-receiving-finished) .stk-top-a .acc-act.au-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
-#accOv:has(#ambar-receiving-finished) .stk-top-a .au-history{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:1px solid transparent;border-radius:13px;background:transparent;color:#a8a0ad!important;cursor:pointer}
 #accOv:has(#ambar-receiving-finished) .stk-top-a svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important;stroke-width:1.7}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
@@ -27598,8 +27623,9 @@ function supHistLine(){
 // карточка: шапка основной заявки → три этапа → приёмка по районам; ниже две
 // плитки рядом и кнопка загрузки. Действия — только существующие: список
 // заявки (accOrderList), приёмка (accSupply), черновик докупки (xSend) или
-// экран докупки (accShort), ответ магазина (supImport), история (accHistory) в
-// шапке. Иконки Lucide инлайном с классом lucide: эталон держит их 16px.
+// экран докупки (accShort), ответ магазина (supImport), история (accHistory)
+// последней строкой карточки. Иконки Lucide инлайном с классом lucide: эталон
+// держит их 16px.
 const AR_ICO = (() => {
   const w = (n, body, cls) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls ? cls + ' ' : ''}lucide lucide-${n}" aria-hidden="true">${body}</svg>`;
   return {
@@ -27611,6 +27637,7 @@ const AR_ICO = (() => {
     pkg: w('package-plus', '<path d="M16 16h6"/><path d="M19 13v6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>'),
     upload: w('upload', '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'),
     history: w('history', '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'),
+    arrow: w('arrow-right', '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>', 'au-history-arrow'),
   };
 })();
 
@@ -27851,8 +27878,19 @@ function auOrderCard(){
       <div class="au-districts" data-districts>${rows.join('')}</div>
       <div class="au-empty" data-empty${rows.length ? ' hidden' : ''}>Районы не выбраны</div>
     </section>
+    ${auHistRow()}
   </section>${ciCard(sup)}`;
   return {html, n: rows.length};
+}
+
+// «История» — последней строкой карточки заявки и плитки свободной заявки,
+// как на карточке «отработана» (владелец, 30 окт 2026: «перенеси кнопку
+// история, как у нас когда заявка отработана, вниз под Бизнес Бей в конце
+// карточки; то же самое по свободным заявкам»). Значка в шапке больше нет;
+// страница та же — accHistory (закупки / приёмки).
+function auHistRow(){
+  return `<button type="button" class="au-history-row cursor-interaction" onclick="accHistory()" aria-label="История закупок и приёмок">${
+    AR_ICO.history}<span class="au-history-label">История</span>${AR_ICO.arrow}</button>`;
 }
 
 // Одна плитка (владелец, 26 окт 2026: «оставим только свободная закупка
@@ -27861,13 +27899,18 @@ function auOrderCard(){
 // базы» и на входе в закупку, отправляют или отклоняют его там же.
 // «Свободная заявка · Барракуда» (владелец, 30 окт 2026: «не свободная закупка,
 // а свободная заявка») — поток под клиентов ещё не построен.
+// Плитка — карточка из двух кнопок: сама заявка (пока выключена) и «История»
+// последней строкой, как у карточки заявки (владелец, 30 окт 2026).
 function auOps(){
   return `<div class="au-operations au-one" aria-label="Закупки">
-    <button type="button" class="au-panel au-operation" disabled data-barracuda-free-purchase>
-      <span class="au-op-top">${AR_ICO.file}${AR_ICO.right}</span>
-      <span class="au-op-title ambar-free-purchase-title"><span>СВОБОДНАЯ</span><span>ЗАЯВКА</span></span>
-      <span class="au-op-caption ambar-free-purchase-caption">Барракуда</span>
-    </button></div>`;
+    <div class="au-panel au-operation au-free" data-barracuda-free-purchase>
+      <button type="button" class="au-free-main" disabled>
+        <span class="au-op-top">${AR_ICO.file}${AR_ICO.right}</span>
+        <span class="au-op-title ambar-free-purchase-title"><span>СВОБОДНАЯ</span><span>ЗАЯВКА</span></span>
+        <span class="au-op-caption ambar-free-purchase-caption">Барракуда</span>
+      </button>
+      ${auHistRow()}
+    </div></div>`;
 }
 
 // Нижняя кнопка — та же «Загрузить ответ магазина» (ordUp → ordFile → supImport).
@@ -27900,10 +27943,10 @@ function ordHub(){
   _setText('accTitle', 'Барракуда');
   _setText('accSub', '');
   supActShow();                     // кнопка отмены знает про заявку только теперь
-  // История — значком в шапке рядом с отменой (эталон), строкой не дублируется.
+  // История — последней строкой карточки заявки и плитки (auHistRow); в шапке
+  // только отмена (владелец, 30 окт 2026).
   const act = document.getElementById('accAct');
   const cancel = act.querySelector('.acc-act'); if(cancel) cancel.classList.add('au-cancel');
-  act.insertAdjacentHTML('beforeend', `<button type="button" class="au-history cursor-interaction" onclick="accHistory()" aria-label="История закупок и приёмок">${AR_ICO.history}</button>`);
   document.getElementById('accFoot').innerHTML = '';
   const card = auOrderCard();
   mid.innerHTML = `<div id="ambar-receiving-finished" lang="ru"><div class="au-stage"><div class="au-app" data-sparse="${card.n <= 2}" aria-label="Барракуда — заявка и приёмка в одной карточке"><main class="au-content">${

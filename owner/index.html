@@ -2444,15 +2444,64 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-carry .cr-fact b{font-size:14px;min-width:0}
 .cr-carry .cr-fact b.ok{font-size:12px}
 .cr-carry-note b{color:var(--text)}
-.cr-rcs{margin-top:8px}
-.cr-rc{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2);font-size:12.5px}
-.cr-rc .nm{flex:0 0 auto;font-weight:600;color:var(--text)}
-.cr-rc .st{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cr-rc .st.warn{color:var(--warn,#F3B44A)}
-.cr-rc b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
-.cr-rc b.dn{color:var(--dn)}
-.cr-rc b.ok{color:var(--up);display:inline-flex;align-items:center}
-.cr-rc b.ok svg{width:13px;height:13px}
+/* Водители района — складка под «Сдали» (30 окт 2026): строка — имя и
+   подстрока, справа что насчитал к сдаче и разница; стрелка — на страницу. */
+.cr-fold span i{font-style:normal;margin-left:8px;color:var(--warn)}
+.cr-drvs{margin-top:2px}
+.cr-drv{display:flex;align-items:center;gap:10px;width:100%;padding:9px 0;border:0;border-top:1px solid var(--border2);
+  background:none;color:inherit;font-family:inherit;text-align:left;cursor:pointer}
+.cr-drv:first-child{border-top:0}
+.cr-drv:active{background:rgba(201,169,110,.06)}
+.cr-drv-b{flex:1;min-width:0}
+.cr-drv-b b{display:block;font-size:13.5px;font-weight:600;color:var(--text)}
+.cr-drv-b i{display:block;font-style:normal;font-size:11px;line-height:1.3;color:var(--muted);margin-top:2px}
+.cr-drv-b i.warn{color:var(--warn)}
+.cr-drv-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.cr-drv-r b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.cr-drv-r b.app{color:var(--muted)}
+.cr-drv-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:3px}
+.cr-drv-r i{font-style:normal;font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.cr-drv-r i.ok{color:var(--up)} .cr-drv-r i.dn{color:var(--dn)} .cr-drv-r i.gold{color:var(--gold2)}
+.cr-drv-r i svg{width:12px;height:12px}
+.cr-drv-ch{flex:0 0 auto;width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+/* Страница водителя за день: карточки той же анатомии, что карточка района;
+   заголовок карточки — подпись и число справа; строки «что · сколько». */
+.cdr-cap{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:11px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.cdr-cap i{font-style:normal;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;letter-spacing:0;
+  text-transform:none;color:var(--sub);font-variant-numeric:tabular-nums;text-align:right}
+.cdr-cap i.gold{color:var(--gold2)} .cdr-cap i.warn{color:var(--warn)} .cdr-cap i.good{color:var(--up)}
+.cdr-r{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--border2);font-size:13.5px}
+.cdr-cap+.cdr-r{margin-top:6px}
+.cdr-r span{min-width:0;color:var(--sub)}
+.cdr-r b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.cdr-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:3px}
+.cdr-r b.gold{color:var(--gold2)} .cdr-r b.dn{color:var(--dn)} .cdr-r b.none{color:var(--muted)}
+.cdr-r b.ok{color:var(--up);display:inline-flex;align-items:center;gap:5px;font-size:13px} .cdr-r b.ok svg{width:14px;height:14px}
+.cdr-r b.txt{font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--sub);text-align:right}
+.cdr-r b.txt.good{color:var(--up)} .cdr-r b.txt.warn{color:var(--warn)} .cdr-r b.txt.none{color:var(--muted)}
+.cdr-fx{margin-top:10px;font-size:12px;color:var(--gold2)} .cdr-fx b{color:var(--text)}
+.cdr .cr-items{margin-top:6px}
+.cdr .cr-it:first-child{border-top:0}
+/* На странице водителя ждущий расход уже вычтен (как у него в итогах) —
+   не зачёркиваем, а красим в цвет ожидания. */
+.cdr .cr-it.pend .cr-it-a{color:var(--warn);text-decoration:none}
+.cdr .cr-it.pend.card .cr-it-a{color:var(--muted)}
+.cdr .cr-it-b i{white-space:normal;line-height:1.3}
+.cr-sub .warn b{color:inherit}
+.cdr-act{display:flex;align-items:center;justify-content:center;width:100%;margin-top:12px;padding:11px;border-radius:14px;
+  border:1px solid rgba(243,180,74,.4);background:rgba(243,180,74,.14);color:var(--warn);cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:700}
+.cdr-act:active{transform:scale(.98)}
+.cdr-o{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border2)}
+.cdr-cap+.cdr-o{margin-top:6px}
+.cdr-o-t{flex:0 0 40px;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.cdr-o-b{flex:1;min-width:0}
+.cdr-o-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdr-o-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.cdr-o-b em{font-style:normal;color:var(--gold2)}
+.cdr-o-a{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.cdr-o-a.other{color:var(--muted)}
 
 .cr-acts{display:flex;gap:8px;margin-top:12px}
 .cr-acts .cr-ok{margin-top:0;flex:1 1 auto;min-width:0}
@@ -20661,7 +20710,7 @@ function crCard(x){
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}${
       долг ? ` · ${долг}` : ''}</div>
-    ${разбивка ? '' : crFactRow(x)}${crReconRows(x)}
+    ${разбивка ? '' : crFactRow(x)}${crDrvFold(x)}
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
@@ -20703,21 +20752,193 @@ function crFactLine(x, day, net, fact, opt){
       value="${fact == null ? '' : fmt(fact)}" placeholder="${fmt(net + (opt.op || 0))}"
       onchange="crFact('${escS(x.id)}', this.value, '${day}')"><u>AED</u></span>${right}</div>`;
 }
-// Сверка водителей района: что насчитал, что ответил оператор, правки товара.
-function crReconRows(x){
+// ── Водители района и страница водителя за день ────────────────────────────
+// Владелец, 30 окт 2026: «сделай так, чтобы можно было раскрыть и посмотреть,
+// какой водитель сколько сдал по факту; на него можно нажать и посмотреть на
+// отдельной странице, сколько за смену он заработал, сколько у него расходов,
+// какими они были, есть ли те, что не согласовали или ещё не согласованные,
+// сколько он чая наработал — чтобы расхождения было просто искать».
+// Складка «Водители · N» под «Сдали», в одном ряду с «Расходы за смену»:
+// строка — имя, заказы и сверка подстрокой; справа — что насчитал к сдаче
+// («по факту», если оператор подтвердил) и разница с приложением; не считал —
+// число по приложению серым. Нажатие — страница водителя (crDriver).
+let CR_DRV_OPEN = new Set();
+function crDrvFold(x){
   const rows = x.recon || [];
   if(!rows.length) return '';
-  return `<div class="cr-rcs">${rows.map(r => {
-    const d = r.op_fact != null ? r.op_gap : (r.diff != null && r.ok >= 1 ? r.diff : null);
-    const st = r.op_fact != null ? `оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`
-      : r.mismatch ? 'ждёт оператора' : r.confirmed ? 'сверил' : r.ok ? `сверил ${r.ok} из 3` : 'считает';
-    const fixes = (r.fixes || []).length ? ' · ' + r.fixes.map(f => (f.delta > 0 ? '+' : '−') + Math.abs(f.delta) + ' ' + escS(f.name)
-      + (f.ok === true ? ' — принято' : f.ok === false ? ' — отклонено' : ' — ждёт')).join(', ') : '';
-    const num = d == null ? '' : d === 0 ? `<b class="ok">${IC('check', 13)}</b>`
-      : `<b class="${d < 0 ? 'dn' : ''}">${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}</b>`;
-    return `<div class="cr-rc"><span class="nm">${escS(r.name)}</span><span class="st${r.mismatch || r.fix_open ? ' warn' : ''}">${
-      r.cash != null ? `насчитал ${fmt(r.cash)} · ` : ''}${st}${fixes}</span>${num}</div>`;
-  }).join('')}</div>`;
+  const open = CR_DRV_OPEN.has(x.id);
+  const bad = rows.filter(r => r.mismatch || r.fix_open).length;
+  const gap = rows.filter(r => r.op_fact != null && r.op_gap).length;
+  const hint = bad ? `<i>${bad} ${pluralize(bad, 'расхождение', 'расхождения', 'расхождений')}</i>`
+    : gap ? `<i>${gap} по факту</i>` : '';
+  return `<button class="cr-fold${open ? ' on' : ''}" onclick="crDrvToggle('${escS(x.id)}')">
+      <span>Водители · ${rows.length}${hint}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>${open ? `<div class="cr-drvs">${rows.map(crDrvRow).join('')}</div>` : ''}`;
+}
+function crDrvRow(r){
+  const факт = r.op_fact != null;
+  const d = факт ? r.op_gap : (r.cash != null ? r.diff : null);
+  const сверка = факт ? `оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`
+    : r.mismatch ? 'ждёт оператора' : r.confirmed ? 'сверил' : r.ok ? `сверил ${r.ok} из 3`
+    : r.started ? 'считает' : 'не сверял';
+  const части = [`${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}`, сверка];
+  if(r.fix_open) части.push(`${r.fix_open} ${pluralize(r.fix_open, 'правка', 'правки', 'правок')} без ответа`);
+  if(r.exp_pending) части.push(`${r.exp_pending} ${pluralize(r.exp_pending, 'расход ждёт', 'расхода ждут', 'расходов ждут')}`);
+  const warn = r.mismatch || r.fix_open || r.exp_pending;
+  const num = r.cash != null ? `<b>${fmt(r.cash)}<u>AED</u></b>` : `<b class="app">${fmt(r.cash_app)}<u>AED</u></b>`;
+  const под = r.cash == null ? '<i>по приложению</i>'
+    : `<i${d === 0 ? ' class="ok"' : d > 0 ? ' class="gold"' : d < 0 ? ' class="dn"' : ''}>${факт ? 'по факту' : 'насчитал'}${
+        d == null ? '' : d === 0 ? ` · ${IC('check', 12)}сошлось` : ` · ${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}`}</i>`;
+  return `<button class="cr-drv" onclick="crDriver('${escS(r.name)}')">
+    <span class="cr-drv-b"><b>${escS(r.name)}</b><i${warn ? ' class="warn"' : ''}>${части.join(' · ')}</i></span>
+    <span class="cr-drv-r">${num}${под}</span>
+    <svg class="cr-drv-ch" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  </button>`;
+}
+function crDrvToggle(id){
+  if(CR_DRV_OPEN.has(id)) CR_DRV_OPEN.delete(id); else CR_DRV_OPEN.add(id);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  crRender();
+}
+
+// Страница водителя за день — в том же разделе, назад ведёт в сбор того же
+// дня (как «Распределение»). Числа — те же, что видел водитель в своих
+// «Итогах смены» (cash_math.piles на сервере): две пачки, сверка, расходы с
+// решениями, чай по людям, своё, заказы строками.
+let CRV = {open: false, name: '', day: '', data: null, back: null};
+async function crDriver(name, back){
+  const day = CRV.open ? CRV.day : (CR ? CR.day : accDay());
+  CRV = {open: true, name, day, data: null, back: CRV.open ? CRV.back : (back !== undefined ? back : ACC_BACK)};
+  ACC_BACK = crDriverBack;
+  _setText('accTitle', name);
+  _setText('accSub', crDrvDay(day));
+  document.getElementById('accFoot').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/driver', {params: {day, name}}); }
+  catch(e){
+    if(CRV.open && CRV.name === name) mid.innerHTML = loadFail(`crDriver('${escS(name)}')`);
+    return;
+  }
+  if(!CRV.open || CRV.name !== name) return;
+  CRV.data = r;
+  _setText('accSub', [r.code, crDrvDay(day)].filter(Boolean).join(' · '));
+  crDriverRender();
+}
+function crDrvDay(day){ return CR && day === CR.today ? 'сегодня' : _dayName(day); }
+function crDriverBack(){
+  ACC_BACK = CRV.back || null;
+  const day = CRV.day;
+  CRV = {open: false, name: '', day: '', data: null, back: null};
+  CR_DAY = day;
+  const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  accCashRound();
+}
+// Расходы ждут решения — в «Расходы смены», и обратно на эту же страницу.
+function crDrvToExp(){
+  const name = CRV.name, back = CRV.back;
+  CRV = {open: false, name: '', day: '', data: null, back: null};
+  accOpen('expenses');
+  ACC_BACK = () => crDriver(name, back);
+}
+function crDriverRender(){
+  const mid = document.getElementById('accMid'), r = CRV.data;
+  if(!mid || !CRV.open || !r) return;
+  const h = r.hand || {}, rc = r.recon || {}, ex = r.exp || {};
+  const money = v => `${v < 0 ? '−' : ''}${fmt(Math.abs(v || 0))}`;
+  const row = (т, зн, cls) => `<div class="cdr-r"><span>${т}</span><b${cls ? ` class="${cls}"` : ''}>${зн}</b></div>`;
+  const cap = (т, зн, cls) => `<div class="cdr-cap">${т}${зн != null ? `<i${cls ? ` class="${cls}"` : ''}>${зн}</i>` : ''}</div>`;
+  if(r.empty){
+    mid.innerHTML = `<div class="cr-card empty cdr"><div class="cr-h">
+      <span class="cr-hb"><b>${escS(r.name)}</b><i>${escS(crDrvDay(r.day))}</i></span>
+      <span class="cr-none">ничего нет</span></div></div>`;
+    return;
+  }
+  // Шапка: район, оператор, смена; справа — закрыл или ещё на смене.
+  const смена = r.opened_at ? `смена ${_hm(r.opened_at)}${r.closed_at ? ' → ' + _hm(r.closed_at) : ''}`
+    : r.working === false ? 'дома' : r.working === true ? 'на смене' : '';
+  const st = r.closed_at ? `<span class="cr-st">${IC('check', 12)}закрыл</span>`
+    : r.opened_at ? '<span class="cr-st later">смена открыта</span>' : '';
+  const fx = (h.fx || []).map(f => `<b>${escS(f.sym)}${fmt(f.amount)}</b>`).join(', ');
+  const top = `<div class="cr-card cdr">
+    <div class="cr-h">
+      ${r.code ? `<span class="shl-code">${escS(r.code)}</span>` : ''}
+      <span class="cr-hb"><b>${escS(r.district_name || '')}</b><i>${escS([r.operator, смена].filter(Boolean).join(' · '))}</i></span>
+      ${st}
+    </div>
+    <div class="cr-main">
+      <span class="cr-big"><i>Выручка</i><b${h.revenue_aed < 0 ? ' class="dn"' : ''}>${money(h.revenue_aed)}<u>AED</u></b></span>
+      <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(h.tea || 0)}<u>AED</u></b></span>
+    </div>
+    ${fx ? `<div class="cdr-fx">${fx} валютой · отдельно</div>` : ''}
+    <div class="cr-sub">наличные <b>${fmt(h.taken || 0)}</b> · ${h.orders_cash || 0} ${pluralize(h.orders_cash || 0, 'заказ', 'заказа', 'заказов')} · расход <b>${fmt(h.spent_sum || 0)}</b>${
+      ex.pending_n ? ` · <span class="warn">из них ${fmt(ex.pending)} ждёт решения</span>` : ''}${
+      h.card_spent ? ` · безналом <b>${fmt(h.card_spent)}</b> — не из наличных` : ''}${
+      h.got ? ` · приход <b>${fmt(h.got)}</b>` : ''}${
+      h.debt ? ` · в долг <b>${fmt(h.debt)}</b> — деньги у клиента` : ''}</div>
+  </div>`;
+  // Сверка: по приложению, насчитал (по факту — если оператор подтвердил),
+  // разница, ответ оператора, правки товара.
+  const diff = rc.cash == null ? null : (rc.op_fact != null ? rc.op_gap : rc.diff);
+  const шаги = (rc.ok || []).length;
+  const состояние = rc.op_fact != null ? 'оператор подтвердил' : rc.mismatch ? 'ждёт оператора'
+    : rc.confirmed ? `подтвердил · ${_hm(rc.confirmed_at)}` : шаги ? `сверил ${шаги} из 3` : rc.started ? 'считает' : 'не сверял';
+  const diffCell = diff == null ? '—' : diff === 0 ? `${IC('check', 14)}сошлось` : `${diff > 0 ? '+' : '−'}${fmt(Math.abs(diff))}`;
+  const оператор = rc.op_fact != null ? `так и есть${rc.op_fact_by ? ' · ' + escS(rc.op_fact_by) : ''}${rc.op_fact_at ? ' · ' + _hm(rc.op_fact_at) : ''}`
+    : rc.mismatch ? 'ждёт ответа' : '—';
+  const fixes = (rc.fixes || []).map(f => row(`${f.delta > 0 ? '+' : '−'}${Math.abs(f.delta)} ${escS(f.name)}${f.pcs ? ` · ${f.pcs} шт` : ''}`,
+      f.ok === true ? `принято${f.order_id ? ' · #' + escS(f.order_id) : ''}` : f.ok === false ? 'отклонено' : 'ждёт оператора',
+      'txt' + (f.ok === true ? ' good' : f.ok === false ? ' none' : ' warn'))).join('');
+  const сверка = `<div class="cr-card cdr">
+    ${cap('Сверка', состояние, rc.mismatch || rc.fix_open ? 'warn' : rc.confirmed || rc.op_fact != null ? 'good' : '')}
+    ${row('По приложению', `${fmt(r.cash_app || 0)}<u>AED</u>`)}
+    ${row(rc.op_fact != null ? 'По факту' : 'Насчитал', rc.cash == null ? '—' : `${fmt(rc.cash)}<u>AED</u>`, rc.cash == null ? 'none' : '')}
+    ${row('Разница', diffCell, diff == null ? 'none' : diff === 0 ? 'ok' : diff < 0 ? 'dn' : 'gold')}
+    ${row('Оператор', оператор, 'txt' + (rc.op_fact != null ? ' good' : rc.mismatch ? ' warn' : ' none'))}
+    ${fixes}
+  </div>`;
+  // Расходы — все, с решениями: принят / ждёт / отклонён; безналом и мимо
+  // наличных — подписью. Ждущие — кнопкой в «Расходы смены».
+  const items = r.items || [];
+  const расходы = `<div class="cr-card cdr">
+    ${cap('Расходы', ex.n || 0)}
+    ${items.length ? `<div class="cr-items">${items.map(crItem).join('')}</div>
+      <div class="cr-sub">из наличных <b>${fmt(ex.cash || 0)}</b>${
+        ex.pending_n ? ` · <span class="warn">из них ${fmt(ex.pending)} ждёт решения</span>` : ''}${
+        ex.card ? ` · безналом <b>${fmt(ex.card)}</b>` : ''}${ex.got ? ` · приход <b>${fmt(ex.got)}</b>` : ''}${
+        ex.rejected_n ? ` · отклонено <b>${fmt(ex.rejected)}</b>` : ''}</div>` : '<div class="cr-noexp">Расходов за смену не было</div>'}
+    ${ex.pending_n ? `<button class="cdr-act" onclick="crDrvToExp()">Решить · ${ex.pending_n} ${pluralize(ex.pending_n, 'расход', 'расхода', 'расходов')}</button>` : ''}
+  </div>`;
+  const чайПо = r.tea_by || [];
+  const чай = `<div class="cr-card cdr">
+    ${cap('Чаевые операторам', `${fmt(r.tea || 0)} AED`, 'gold')}
+    ${чайПо.map(t => row(escS(t.who), fmt(t.aed), 'gold')).join('')}
+    ${r.tea_other ? row('с безналичных заказов', fmt(r.tea_other), 'gold') : ''}
+    ${!чайПо.length && !r.tea_other ? '<div class="cr-noexp">Чая за смену нет</div>' : ''}
+  </div>`;
+  const keep = r.keep || {};
+  const своё = (keep.meal || keep.bonus) ? `<div class="cr-card cdr">
+    ${cap('Остаётся у него', `${fmt((keep.meal || 0) + (keep.bonus || 0))} AED`)}
+    ${keep.meal ? row(`Питание${r.working === true ? ' · на смене' : r.working === false ? ' · дома' : ''}`, fmt(keep.meal)) : ''}
+    ${keep.bonus ? row('Бонус за допродажу', fmt(keep.bonus)) : ''}
+  </div>` : '';
+  const ords = r.orders || [];
+  const всего = ords.reduce((a, o) => a + (o.aed || 0), 0), нал = ords.reduce((a, o) => a + (o.cash || 0), 0);
+  const заказы = `<div class="cr-card cdr">
+    ${cap('Заказы', ords.length)}
+    ${ords.length ? ords.map(o => `<div class="cdr-o">
+      <span class="cdr-o-t">${escS(o.t || '—')}</span>
+      <span class="cdr-o-b"><b>${escS(o.a)}</b><i>${escS([o.pay || 'наличными', o.cash != null && o.cash !== o.aed ? `взял ${fmt(o.cash)}` : '',
+        o.fx ? `${o.fx} валютой` : '', o.recon ? 'по сверке' : ''].filter(Boolean).join(' · '))}${o.tea ? ` · <em>чай ${fmt(o.tea)}</em>` : ''}</i></span>
+      <b class="cdr-o-a${o.cash == null ? ' other' : ''}">${fmt(o.aed)}</b>
+    </div>`).join('') + `<div class="cr-sub">всего <b>${fmt(всего)}</b> · наличными <b>${fmt(нал)}</b></div>` : '<div class="cr-noexp">Заказов за смену не было</div>'}
+  </div>`;
+  mid.innerHTML = top + сверка + расходы + чай + своё + заказы;
 }
 async function crFact(id, v, day){
   if(!CR || CR_BUSY) return;
@@ -20738,11 +20959,13 @@ async function crFact(id, v, day){
 function crItem(e){
   const pend = e.status === 'pending', rej = e.status === 'rejected';
   const plus = e.amount < 0;
-  const кто = [e.who, e.note, e.photo ? 'чек' : '', e.pay === 'card' ? 'безналом — не из наличных' : ''].filter(Boolean).join(' · ');
-  return `<div class="cr-it${pend ? ' pend' : ''}${rej ? ' rej' : ''}${e.pay === 'card' ? ' card' : ''}">
+  // Мимо наличных — заказ в долг, бутылка охране: строка есть, денег не двигала.
+  const кто = [e.who, e.note, e.photo ? 'чек' : '', e.no_receipt ? 'без чека' : '',
+    e.pay === 'card' ? 'безналом — не из наличных' : e.bottle ? 'бутылкой' : e.nocash ? 'мимо наличных' : ''].filter(Boolean).join(' · ');
+  return `<div class="cr-it${pend ? ' pend' : ''}${rej ? ' rej' : ''}${e.pay === 'card' || e.nocash ? ' card' : ''}">
     <span class="cr-it-t">${e.at ? _hm(e.at) : '—'}</span>
     <span class="cr-it-b"><b>${escS(e.kind_t || 'Расход')}</b><i>${escS(кто)}${
-      pend ? ' · ждёт решения' : rej ? ' · отклонён' : ''}</i></span>
+      pend ? ' · ждёт решения' : rej ? ' · отклонён' + (e.decided_note ? ' · ' + escS(e.decided_note) : '') : ''}</i></span>
     <b class="cr-it-a${plus ? ' up' : ''}">${plus ? '+' : '−'}${fmt(Math.abs(e.amount))}</b>
   </div>`;
 }
@@ -20764,7 +20987,7 @@ function crFold(id, снизу){
 function crFoot(){
   const f = document.getElementById('accFoot'); if(!f) return;
   const d = CR;
-  if(!d || CRD.open){ f.innerHTML = ''; return; }
+  if(!d || CRD.open || CRV.open){ f.innerHTML = ''; return; }
   // Шаг 2 — по готовым дням: сдали за день со всех районов — он
   // распределяется, даже если сегодняшний ещё собирают.
   const st = crDistState();

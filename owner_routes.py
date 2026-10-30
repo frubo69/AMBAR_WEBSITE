@@ -4692,6 +4692,16 @@ async def cash_round(day: str) -> dict:
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[cash] сверка за {day}: {e}")
         rc = {}
+    # Строки водителей района — складка «Водители» в карточке (владелец,
+    # 30 окт 2026: «раскрыть и посмотреть, какой водитель сколько сдал по
+    # факту»): все, кто работал, со сверкой или без неё (cash_driver.rows).
+    # До начала учёта строк нет — там и сумм нет.
+    try:
+        import cash_driver
+        drows = {} if before else await cash_driver.rows(day, orders)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] водители за {day}: {e}")
+        drows = {}
     for x in out:
         r = rc.get(x["id"]) or {}
         fact = r.get("fact")
@@ -4710,7 +4720,7 @@ async def cash_round(day: str) -> dict:
         else:
             gap, src = 0, ""
         x.update({"fact": fact, "fact_at": r.get("fact_at") or "", "gap": gap, "gap_src": src,
-                  "recon": r.get("rows") or []})
+                  "recon": drows.get(x["id"]) or r.get("rows") or []})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
             "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
             # Решено по всем: получил или «Соберу завтра» — строка чек-листа
@@ -4816,6 +4826,29 @@ async def handle_cash_round(request):
     await _staff_fresh()
     day = (request.query.get("day") or "").strip() or _biz_date(_now_dubai()).isoformat()
     return web.json_response(await cash_round(day), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_cash_driver(request):
+    """GET /api/owner/cash-round/driver?day=&name= — водитель за смену для
+    «Сбора выручки» (владелец, 30 окт 2026: «на него можно нажать и
+    посмотреть на отдельной странице, сколько за смену он заработал, сколько
+    у него расходов, какими они были, есть ли те, что не согласовали или ещё
+    не согласованные, сколько он чая наработал»): две пачки той же
+    арифметикой, что в его итогах смены, сверка, расходы с решениями, чай по
+    людям, своё, заказы — cash_driver.driver_day."""
+    await _staff_fresh()
+    day = (request.query.get("day") or "").strip() or _biz_date(_now_dubai()).isoformat()
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    name = str(request.query.get("name") or "").strip()[:60]
+    if not name:
+        return web.json_response({"error": "bad_name"}, status=400, headers=CORS_HEADERS)
+    import cash_driver
+    return web.json_response(await cash_driver.driver_day(day, name), headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
@@ -5866,6 +5899,8 @@ def setup(app):
     app.router.add_post(            "/api/owner/cash-round/later", handle_cash_later)
     app.router.add_route("OPTIONS", "/api/owner/cash-round/fact", handle_cash_fact)
     app.router.add_post(            "/api/owner/cash-round/fact", handle_cash_fact)
+    app.router.add_route("OPTIONS", "/api/owner/cash-round/driver", handle_cash_driver)
+    app.router.add_get(             "/api/owner/cash-round/driver", handle_cash_driver)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)

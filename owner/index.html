@@ -2456,13 +2456,19 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .cr-drv-b b{display:block;font-size:13.5px;font-weight:600;color:var(--text)}
 .cr-drv-b i{display:block;font-style:normal;font-size:11px;line-height:1.3;color:var(--muted);margin-top:2px}
 .cr-drv-b i.warn{color:var(--warn)}
-.cr-drv-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.cr-drv-r b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
-.cr-drv-r b.app{color:var(--muted)}
-.cr-drv-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted);margin-left:3px}
-.cr-drv-r i{font-style:normal;font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
-.cr-drv-r i.ok{color:var(--up)} .cr-drv-r i.dn{color:var(--dn)} .cr-drv-r i.gold{color:var(--gold2)}
-.cr-drv-r i svg{width:12px;height:12px}
+/* Справа две строки «подпись · число»: «к сдаче» (по приложению) и под ней
+   «насчитал» / «по факту» с разницей; числа в своей колонке, чтобы сравнивать
+   глазами. Не считал — одна подпись «не сверял». */
+.cr-drv-r{flex:0 0 auto;display:grid;grid-template-columns:auto auto;column-gap:6px;row-gap:1px;align-items:baseline;justify-items:end}
+.cr-drv-r i{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;justify-self:start}
+.cr-drv-r i.w{grid-column:1 / -1;justify-self:end}
+.cr-drv-r b{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums;
+  white-space:nowrap;display:inline-flex;align-items:baseline;gap:4px}
+.cr-drv-r b.due{font-size:15px;color:var(--text)}
+.cr-drv-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted)}
+.cr-drv-r b.ok{color:var(--up)} .cr-drv-r b.dn{color:var(--dn)} .cr-drv-r b.gold{color:var(--gold2)}
+.cr-drv-r b em{font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:2px}
+.cr-drv-r b em svg{width:11px;height:11px}
 .cr-drv-ch{flex:0 0 auto;width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 /* Страница водителя за день: карточки той же анатомии, что карточка района;
    заголовок карточки — подпись и число справа; строки «что · сколько». */
@@ -20759,9 +20765,11 @@ function crFactLine(x, day, net, fact, opt){
 // какими они были, есть ли те, что не согласовали или ещё не согласованные,
 // сколько он чая наработал — чтобы расхождения было просто искать».
 // Складка «Водители · N» под «Сдали», в одном ряду с «Расходы за смену»:
-// строка — имя, заказы и сверка подстрокой; справа — что насчитал к сдаче
-// («по факту», если оператор подтвердил) и разница с приложением; не считал —
-// число по приложению серым. Нажатие — страница водителя (crDriver).
+// строка — имя, заказы и сверка подстрокой; справа первым числом — сколько
+// к сдаче по приложению (владелец, 30 окт 2026: «я должен видеть, сколько
+// кто должен был сдать, на самой странице сбора выручки, просто разворачивая
+// эту инфу»), под ним — что насчитал («по факту», если оператор подтвердил)
+// и разница; не считал — «не сверял». Нажатие — страница водителя (crDriver).
 let CR_DRV_OPEN = new Set();
 function crDrvFold(x){
   const rows = x.recon || [];
@@ -20778,21 +20786,22 @@ function crDrvFold(x){
 }
 function crDrvRow(r){
   const факт = r.op_fact != null;
+  const сдал = факт ? r.op_fact : r.cash;                 // насчитал сам / подтвердил оператор
   const d = факт ? r.op_gap : (r.cash != null ? r.diff : null);
-  const сверка = факт ? `оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`
-    : r.mismatch ? 'ждёт оператора' : r.confirmed ? 'сверил' : r.ok ? `сверил ${r.ok} из 3`
-    : r.started ? 'считает' : 'не сверял';
-  const части = [`${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}`, сверка];
+  const части = [`${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}`];
+  if(факт) части.push(`оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`);
+  else if(r.mismatch) части.push('ждёт оператора');
+  else if(r.cash != null && !r.confirmed && r.ok) части.push(`сверил ${r.ok} из 3`);
   if(r.fix_open) части.push(`${r.fix_open} ${pluralize(r.fix_open, 'правка', 'правки', 'правок')} без ответа`);
   if(r.exp_pending) части.push(`${r.exp_pending} ${pluralize(r.exp_pending, 'расход ждёт', 'расхода ждут', 'расходов ждут')}`);
   const warn = r.mismatch || r.fix_open || r.exp_pending;
-  const num = r.cash != null ? `<b>${fmt(r.cash)}<u>AED</u></b>` : `<b class="app">${fmt(r.cash_app)}<u>AED</u></b>`;
-  const под = r.cash == null ? '<i>по приложению</i>'
-    : `<i${d === 0 ? ' class="ok"' : d > 0 ? ' class="gold"' : d < 0 ? ' class="dn"' : ''}>${факт ? 'по факту' : 'насчитал'}${
-        d == null ? '' : d === 0 ? ` · ${IC('check', 12)}сошлось` : ` · ${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}`}</i>`;
+  const cls = d == null ? '' : d === 0 ? ' class="ok"' : d > 0 ? ' class="gold"' : ' class="dn"';
+  const разн = d == null ? '' : d === 0 ? `<em>${IC('check', 11)}сошлось</em>` : `<em>${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}</em>`;
+  const низ = сдал != null ? `<i>${факт ? 'по факту' : 'насчитал'}</i><b${cls}>${fmt(сдал)}${разн}</b>`
+    : `<i class="w">${r.started ? 'считает' : 'не сверял'}</i>`;
   return `<button class="cr-drv" onclick="crDriver('${escS(r.name)}')">
     <span class="cr-drv-b"><b>${escS(r.name)}</b><i${warn ? ' class="warn"' : ''}>${части.join(' · ')}</i></span>
-    <span class="cr-drv-r">${num}${под}</span>
+    <span class="cr-drv-r"><i>к сдаче</i><b class="due">${fmt(r.cash_app)}<u>AED</u></b>${низ}</span>
     <svg class="cr-drv-ch" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
   </button>`;
 }

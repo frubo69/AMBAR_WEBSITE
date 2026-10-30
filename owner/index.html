@@ -2563,6 +2563,262 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .crd-acts{display:flex;gap:8px;padding:12px 14px 14px}
 .crd-acts .aud-b{padding:14px 10px;font-size:14.5px}
 .crd-acts .aud-b.soft{flex:0 0 auto;padding-left:20px;padding-right:20px}
+/* ── Сбор выручки: утверждённый визуал (макет ChatGPT «STAR-DAILY-COLLECTION», владелец,
+   30 окт 2026). Сначала точные значения макета как есть (collection-visual.css), затем
+   его же адаптация к мини-аппу (collection-integration.css), затем крючки оболочки
+   раздела и состояния, которых в макете не было. Корень #star-daily-collection — один
+   на странице, стили изолированы им. ── */
+#star-daily-collection{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#star-daily-collection .sc-stage{display:flex;justify-content:center;padding:12px 8px}
+#star-daily-collection .sc-app{--sc-width:414px;--sc-height:920px;--sc-bg:#09080e;--sc-surface:#15121e;--sc-text:#eeeae3;--sc-muted:#a69dae;--sc-gold:#dfc087;--sc-line:#332c3e;position:relative;display:flex;flex-direction:column;width:var(--sc-width);max-width:100%;height:var(--sc-height);min-width:0;border:1px solid #342c3e;border-radius:24px;overflow:hidden;background:var(--sc-bg);color:var(--sc-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:sc-phone / inline-size}
+#star-daily-collection .sc-app *{box-sizing:border-box}
+#star-daily-collection :where(.sc-app button){appearance:none;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left;-webkit-tap-highlight-color:transparent}
+#star-daily-collection :where(.sc-app h1,.sc-app h2,.sc-app p,.sc-app dl,.sc-app dd){margin:0}
+#star-daily-collection .sc-app [hidden]{display:none!important}
+#star-daily-collection .sc-app svg.lucide{display:block;width:17px!important;height:17px!important;flex:none;stroke-width:1.7}
+#star-daily-collection .sc-app summary{list-style:none}
+#star-daily-collection .sc-app summary::-webkit-details-marker{display:none}
+#star-daily-collection .sc-app summary::marker{content:""}
+#star-daily-collection .sc-header{display:flex;align-items:center;gap:10px;flex:none;padding:13px 12px 12px;background:#0e0b13}
+#star-daily-collection .sc-back{display:grid;place-items:center;width:42px;height:44px;flex:none;border:1px solid #31283d;border-radius:13px;background:#17121f;color:#c0b4ce}
+#star-daily-collection .sc-heading{flex:1;min-width:0}
+#star-daily-collection .sc-heading h1{font-size:23px;line-height:29px;font-weight:700;letter-spacing:-.04em}
+#star-daily-collection .sc-heading>span{display:block;margin-top:2px;font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-date{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none;font-size:11px;line-height:17px}
+#star-daily-collection .sc-date strong{color:var(--sc-gold);font-weight:500}
+#star-daily-collection .sc-date>span{color:var(--sc-muted)}
+#star-daily-collection .sc-steps{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:none;background:#100d18;border-top:1px solid #251f30;border-bottom:1px solid #352c40}
+#star-daily-collection .sc-steps>button{position:relative;display:flex;align-items:center;gap:9px;min-width:0;min-height:68px;padding:12px 13px;color:#b4a9c0}
+#star-daily-collection .sc-steps>button+button{border-left:1px solid #2b2335}
+#star-daily-collection .sc-steps>button[aria-selected="true"]{background:#201a27;color:var(--sc-text)}
+#star-daily-collection .sc-steps>button[aria-selected="true"]::after{content:"";position:absolute;left:13px;right:13px;bottom:-1px;height:2px;background:var(--sc-gold);border-radius:2px}
+#star-daily-collection .sc-step-number{display:grid;place-items:center;width:23px;height:23px;flex:none;border-radius:50%;background:#252031;color:#9c90ae;font-size:12px;line-height:17px;font-family:"Space Grotesk",sans-serif}
+#star-daily-collection [aria-selected="true"]>.sc-step-number{background:var(--sc-gold);color:#201927}
+#star-daily-collection .sc-steps>button>span:last-child{display:flex;flex-direction:column;gap:3px;min-width:0}
+#star-daily-collection .sc-steps strong{font-size:13px;line-height:19px;font-weight:600;overflow-wrap:break-word}
+#star-daily-collection .sc-steps small{display:flex;align-items:center;gap:4px;font-size:11px;line-height:16px;color:var(--sc-muted)}
+#star-daily-collection .sc-steps small>svg.lucide{width:11px!important;height:11px!important}
+#star-daily-collection .sc-scroll{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4a3d57 transparent}
+#star-daily-collection .sc-overview{padding:16px 14px 14px}
+#star-daily-collection .sc-overview-line{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12px;color:#d0c7d8}
+#star-daily-collection .sc-overview-line>strong{color:var(--sc-text);font-family:"Space Grotesk",sans-serif;font-size:19px;line-height:23px;font-weight:500}
+#star-daily-collection .sc-overview-line>strong>span{color:#8e829d;font-size:13px}
+#star-daily-collection .sc-progress{height:4px;margin:10px 0 4px;background:#2e2638;border-radius:4px;overflow:hidden}
+#star-daily-collection .sc-progress>span{display:block;height:100%;background:var(--sc-gold)}
+#star-daily-collection .sc-overview-bottom{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#star-daily-collection .sc-overview-bottom>span{font-size:11px;line-height:16px;color:var(--sc-muted)}
+#star-daily-collection .sc-text-action{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-height:44px;flex:none;color:#b8a689;font-size:11px;font-weight:500}
+#star-daily-collection .sc-text-action>svg.lucide{width:13px!important;height:13px!important}
+#star-daily-collection .sc-districts{display:flex;flex-direction:column;gap:10px;padding:0 12px}
+#star-daily-collection .sc-district{min-width:0;border:1px solid #342b3e;border-radius:17px;background:var(--sc-surface)}
+#star-daily-collection .sc-district[open]{border-color:#534336;background:linear-gradient(145deg,#1b1623,#12101b 70%)}
+#star-daily-collection .sc-district-heading{display:grid;grid-template-columns:34px minmax(0,1fr) auto 14px;align-items:center;gap:9px;min-width:0;min-height:76px;padding:13px 12px}
+#star-daily-collection .sc-code{display:grid;place-items:center;width:34px;height:36px;border:1px solid #443647;border-radius:11px;background:#241d2c;color:#d4bf94;font-family:"Space Grotesk",sans-serif;font-size:14px;font-weight:500}
+#star-daily-collection .sc-district-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+#star-daily-collection .sc-district-name>strong,#star-daily-collection .sc-district-name h2{font-size:16px;line-height:22px;font-weight:700;letter-spacing:-.025em;overflow-wrap:break-word}
+#star-daily-collection .sc-district-name>span{font-size:11px;line-height:16px;color:var(--sc-muted)}
+#star-daily-collection .sc-summary-status{display:flex;align-items:center;justify-content:flex-end;gap:4px;font-size:11px;line-height:16px;white-space:nowrap}
+#star-daily-collection .sc-summary-status>svg.lucide{width:12px!important;height:12px!important}
+#star-daily-collection .sc-summary-stack{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}
+#star-daily-collection .sc-closed-money{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:23px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+#star-daily-collection .sc-closed-money small{font-family:Manrope,sans-serif;font-size:11px;color:var(--sc-muted);font-weight:400}
+#star-daily-collection .sc-district[open] .sc-closed-only{display:none}
+#star-daily-collection .sc-summary-money{display:flex;flex-direction:column;align-items:flex-end;gap:1px;min-width:0}
+#star-daily-collection .sc-summary-money strong{font-family:"Space Grotesk",sans-serif;font-size:19px;line-height:23px;font-weight:500;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-summary-money>span{font-size:11px;line-height:15px;color:var(--sc-muted)}
+#star-daily-collection .sc-compact .sc-district-heading{grid-template-columns:34px minmax(0,1fr) auto;min-height:65px;padding-block:10px}
+#star-daily-collection .sc-compact{background:#100d17;border-color:#2b2434}
+#star-daily-collection .sc-compact .sc-summary-money{color:#8f829e}
+#star-daily-collection svg.lucide.sc-disclosure{width:14px!important;height:14px!important;color:#9e90ae;transition:transform .16s ease}
+#star-daily-collection details[open]>summary>.sc-disclosure{transform:rotate(180deg)}
+#star-daily-collection .sc-district-totals{display:grid;grid-template-columns:1.45fr 1fr;gap:14px;padding:0 13px 12px}
+#star-daily-collection .sc-district-totals>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+#star-daily-collection .sc-district-totals>div+div{padding-left:14px;border-left:1px solid #352c40}
+#star-daily-collection .sc-district-totals>div>span{font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-district-totals strong{font-family:"Space Grotesk",sans-serif;font-size:28px;line-height:34px;font-weight:500;letter-spacing:-.045em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#star-daily-collection .sc-district-totals small{font-family:Manrope,sans-serif;font-size:11px;line-height:16px;font-weight:500;letter-spacing:0;color:var(--sc-muted)}
+#star-daily-collection .sc-carryover{display:flex;align-items:center;gap:6px;padding:0 13px 13px;color:var(--sc-muted);font-size:11px;line-height:16px}
+#star-daily-collection .sc-carryover>svg.lucide{width:13px!important;height:13px!important;color:#b39a72}
+#star-daily-collection .sc-carryover b{font-weight:500;color:#c8bdcf}
+#star-daily-collection .sc-settlement{margin-top:2px;border-top:1px solid #3b303b;border-radius:0 0 16px 16px;background:#1d1720}
+#star-daily-collection .sc-attention{display:grid;grid-template-columns:16px minmax(0,1fr) 14px;align-items:center;gap:8px;width:100%;min-height:56px;padding:11px 13px 10px;color:#dfbd81}
+#star-daily-collection .sc-attention>span{display:flex;flex-direction:column;gap:2px}
+#star-daily-collection .sc-attention strong{font-size:12px;line-height:18px;font-weight:600}
+#star-daily-collection .sc-attention small{font-size:11px;line-height:16px;color:#b9a48b}
+#star-daily-collection .sc-attention>svg.lucide{width:15px!important;height:15px!important}
+#star-daily-collection .sc-days{display:grid;gap:10px;padding:2px 12px 12px}
+#star-daily-collection .sc-day{min-width:0;border:1px solid #3d3346;border-radius:12px;background:#1c1725}
+#star-daily-collection .sc-day[open]{background:#14101d}
+#star-daily-collection .sc-day-heading{display:grid;grid-template-columns:minmax(0,1fr) auto 14px;align-items:center;gap:9px;min-height:76px;padding:13px 12px;border-radius:11px;background:#1c1725}
+#star-daily-collection .sc-day[open]>.sc-day-heading{border-bottom:1px solid #3d3346;border-radius:11px 11px 0 0}
+#star-daily-collection .sc-day-heading>span:first-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+#star-daily-collection .sc-day-heading>span:first-child>strong{font-size:14px;line-height:20px;font-weight:700;letter-spacing:-.015em}
+#star-daily-collection .sc-day-heading>span:first-child>small{font-size:11px;line-height:16px;color:var(--sc-muted)}
+#star-daily-collection .sc-day-money{display:flex;align-items:baseline;gap:4px;text-align:right;white-space:nowrap}
+#star-daily-collection .sc-day-money strong{font-family:"Space Grotesk",sans-serif;font-size:20px;line-height:25px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-day-money small{font-size:11px;line-height:15px;color:var(--sc-muted)}
+#star-daily-collection .sc-day-body{padding:13px 12px 12px}
+#star-daily-collection .sc-received-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,1.05fr);align-items:center;gap:12px}
+#star-daily-collection .sc-received-row label{font-size:12px;line-height:18px;color:#c1b6ca}
+#star-daily-collection .sc-field{display:flex;align-items:center;min-width:0;border:1px solid #54445d;border-radius:10px;background:#0f0c16}
+#star-daily-collection .sc-field input{appearance:none;display:block;width:100%;min-width:0;height:44px;padding:10px;border:0;border-radius:10px;background:transparent;color:var(--sc-text);font-family:"Space Grotesk",sans-serif;font-size:17px;line-height:24px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-field input::placeholder{color:#8f829d;opacity:1}
+#star-daily-collection .sc-field>span{padding-right:10px;color:var(--sc-muted);font-size:11px;line-height:16px}
+#star-daily-collection .sc-difference{margin-top:7px;text-align:right;font-size:11px;line-height:17px;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-drivers{margin-top:9px}
+#star-daily-collection .sc-drivers>summary,#star-daily-collection .sc-expenses>summary{display:grid;grid-template-columns:minmax(0,1fr) auto 14px;align-items:center;gap:8px;min-height:47px;font-size:12px;line-height:18px;font-weight:500}
+#star-daily-collection .sc-drivers>summary>span:nth-child(2),#star-daily-collection .sc-expenses>summary>span:nth-child(2){font-size:11px;font-weight:400;color:var(--sc-muted)}
+#star-daily-collection .sc-drivers b,#star-daily-collection .sc-expenses b{padding-left:5px;color:#95869f;font-family:"Space Grotesk",sans-serif;font-weight:500}
+#star-daily-collection .sc-driver{position:relative;min-width:0;padding:10px 11px 12px;border-radius:10px;background:#211b29}
+#star-daily-collection .sc-driver+.sc-driver{margin-top:8px}
+#star-daily-collection .sc-drivers[open]{padding-bottom:10px}
+#star-daily-collection .sc-driver-link{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:32px;font-size:13px;line-height:19px;font-weight:600}
+#star-daily-collection .sc-driver-link::after{content:"";position:absolute;inset:0;border-radius:10px}
+#star-daily-collection .sc-driver-link>span{min-width:0;overflow-wrap:anywhere}
+#star-daily-collection .sc-driver-link>svg.lucide{color:#9e90ae;width:14px!important;height:14px!important}
+#star-daily-collection .sc-driver-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-driver-money{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:9px;font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-driver-money strong{color:var(--sc-text);font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:23px;font-weight:500;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-driver-money small,#star-daily-collection .sc-comparison small{font-family:Manrope,sans-serif;font-size:11px;font-weight:400;color:var(--sc-muted)}
+#star-daily-collection .sc-comparison{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+#star-daily-collection .sc-comparison>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+#star-daily-collection .sc-comparison>div+div{border-left:1px solid var(--sc-line);padding-left:14px}
+#star-daily-collection .sc-comparison>div>span{font-size:11px;line-height:16px;color:var(--sc-muted)}
+#star-daily-collection .sc-comparison strong{font-family:"Space Grotesk",sans-serif;font-size:21px;line-height:26px;letter-spacing:-.03em;font-weight:500;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-discrepancy{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 12px;margin-top:9px;padding:7px 0;border-top:1px solid #44382b;border-bottom:1px solid #44382b;color:#d8b27c;font-size:11px;line-height:17px}
+#star-daily-collection .sc-discrepancy strong{font-family:"Space Grotesk",sans-serif;font-size:14px;line-height:19px;font-weight:500;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-driver-notes{display:flex;flex-wrap:wrap;gap:3px 13px;padding-top:7px;font-size:11px;line-height:17px;color:#c9aa77}
+#star-daily-collection .sc-confirmation{margin-top:7px;font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-confirmed{display:inline-flex;gap:4px;align-items:center;color:#a5b39d!important}
+#star-daily-collection .sc-confirmed>svg.lucide{width:12px!important;height:12px!important}
+#star-daily-collection .sc-difference.sc-confirmed{display:block}
+#star-daily-collection .sc-calculation{border-top:1px solid var(--sc-line)}
+#star-daily-collection .sc-calculation>summary{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;font-size:11px;color:var(--sc-muted)}
+#star-daily-collection .sc-calculation dl{padding:0 0 9px}
+#star-daily-collection .sc-calculation dl>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:6px 0;font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-calculation dd{flex:none;font-family:"Space Grotesk",sans-serif;color:#d6cddd;font-size:13px}
+#star-daily-collection .sc-calculation-total{border-top:1px solid var(--sc-line);color:var(--sc-text)!important}
+#star-daily-collection .sc-day-receive{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:42px;margin-top:8px;border:1px solid #3c3245;border-radius:10px;background:#211a29;color:#a698af;font-size:12px;font-weight:500}
+#star-daily-collection .sc-day-receive>svg.lucide{width:13px!important;height:13px!important}
+#star-daily-collection .sc-expenses{margin:0 13px}
+#star-daily-collection .sc-expense-body{padding:0 0 12px}
+#star-daily-collection .sc-expense-body h3{margin:10px 0 3px;font-size:11px;line-height:17px;font-weight:600;color:#d4c6df}
+#star-daily-collection .sc-expense-body>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:7px 0;font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-expense-body>div>strong{font-family:"Space Grotesk",sans-serif;font-size:13px;font-weight:500;color:#d3c9dc}
+#star-daily-collection .sc-expense-pending{color:#d5b37d!important}
+#star-daily-collection .sc-expense-pending>strong{color:inherit!important}
+#star-daily-collection .sc-expense-action{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:42px;margin-top:5px;color:var(--sc-gold);font-size:12px;font-weight:600}
+#star-daily-collection .sc-district-actions{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;padding:2px 12px 13px}
+#star-daily-collection .sc-primary{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #cfb17a;border-radius:12px;background:#dfc087;color:#251e27;font-size:12px;line-height:18px;font-weight:700;text-align:center}
+#star-daily-collection .sc-primary.sc-unavailable{border-color:#655137;background:#33291f;color:#c6ae86}
+#star-daily-collection .sc-primary>svg.lucide{width:14px!important;height:14px!important}
+#star-daily-collection .sc-secondary{min-height:46px;min-width:0;padding:10px 8px;border:1px solid #3c3147;border-radius:12px;background:#1c1526;color:#b7a8c3;font-size:11px;line-height:17px;font-weight:500;text-align:center}
+#star-daily-collection .sc-waiting{margin:14px 14px 18px;padding:0 0 8px;color:var(--sc-muted)}
+#star-daily-collection .sc-waiting>summary{display:grid;grid-template-columns:16px minmax(0,1fr) 14px;align-items:center;gap:8px;min-height:44px;font-size:11px}
+#star-daily-collection .sc-waiting>summary>svg:first-child{width:14px!important;height:14px!important}
+#star-daily-collection .sc-waiting>div{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;padding:6px 0;font-size:11px;line-height:17px}
+#star-daily-collection .sc-waiting strong{font-weight:500;color:#c3b8d0}
+#star-daily-collection .sc-footer{flex:none;padding:11px 13px 13px;border-top:1px solid #3a3044;background:#15101c}
+#star-daily-collection .sc-footer>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:9px}
+#star-daily-collection .sc-footer>div>span{font-size:11px;line-height:17px;color:var(--sc-muted)}
+#star-daily-collection .sc-footer>div>strong{font-family:"Space Grotesk",sans-serif;font-size:21px;line-height:26px;font-weight:500;letter-spacing:-.03em;color:#d6c39c;font-variant-numeric:tabular-nums}
+#star-daily-collection .sc-footer small{font-family:Manrope,sans-serif;font-size:11px;color:var(--sc-muted);font-weight:400}
+#star-daily-collection .sc-distribute{width:100%;min-height:48px;background:#2c2331;border-color:#514258;color:#b9a8c5;font-size:13px;font-weight:600}
+#star-daily-collection .sc-toast{position:absolute;left:13px;right:13px;bottom:118px;z-index:4;padding:12px 14px;border:1px solid #786045;border-radius:12px;background:#30241c;color:#edd6b3;box-shadow:0 8px 25px #00000070;font-size:12px;line-height:18px}
+#star-daily-collection .sc-distribution-intro{display:flex;flex-direction:column;gap:5px;padding:24px 16px 20px}
+#star-daily-collection .sc-distribution-intro>span{font-size:12px;color:var(--sc-muted)}
+#star-daily-collection .sc-distribution-intro>strong{font-family:"Space Grotesk",sans-serif;font-size:32px;line-height:38px;font-weight:500;letter-spacing:-.04em}
+#star-daily-collection .sc-distribution-intro small{font-family:Manrope,sans-serif;font-size:12px;color:var(--sc-muted);font-weight:400}
+#star-daily-collection .sc-pending-day{margin:0 12px 12px;padding:16px;border:1px solid var(--sc-line);border-radius:16px;background:var(--sc-surface)}
+#star-daily-collection .sc-pending-day>div{display:grid;grid-template-columns:17px minmax(0,1fr) 17px;gap:10px;align-items:center;color:#b6a3c7}
+#star-daily-collection .sc-pending-day h2{font-size:16px;line-height:22px;font-weight:600;color:var(--sc-text)}
+#star-daily-collection .sc-pending-day>p{margin-top:18px;font-size:13px;line-height:20px;color:#c3b5cf}
+#star-daily-collection .sc-pending-day>span{display:block;margin-top:5px;font-size:12px;line-height:18px;color:var(--sc-muted)}
+#star-daily-collection .sc-gold{color:var(--sc-gold)!important}
+#star-daily-collection .sc-warning{color:#d7b17a!important}
+#star-daily-collection .sc-negative{color:#cc9298!important}
+@container sc-phone (max-width:360px){
+  #star-daily-collection .sc-header{gap:8px;padding-inline:10px}
+  #star-daily-collection .sc-heading h1{font-size:21px;line-height:27px}
+  #star-daily-collection .sc-heading>span{max-width:128px;line-height:15px}
+  #star-daily-collection .sc-steps>button{gap:7px;padding-inline:10px}
+  #star-daily-collection .sc-steps strong{font-size:12px;line-height:18px}
+  #star-daily-collection .sc-steps small{font-size:11px;line-height:15px}
+  #star-daily-collection .sc-districts{padding-inline:10px}
+  #star-daily-collection .sc-district-heading{gap:7px;padding-inline:10px;grid-template-columns:32px minmax(0,1fr) auto 12px}
+  #star-daily-collection .sc-district-name>strong,#star-daily-collection .sc-district-name h2{font-size:15px;line-height:21px}
+  #star-daily-collection .sc-summary-status{white-space:normal;max-width:48px;flex-wrap:wrap;justify-content:flex-start;gap:2px}
+  #star-daily-collection .sc-summary-status>svg.lucide{display:none}
+  #star-daily-collection .sc-district-totals strong{font-size:25px;line-height:31px}
+  #star-daily-collection .sc-day-money{flex-direction:column;gap:0;align-items:flex-end}
+  #star-daily-collection .sc-days{padding-inline:10px}
+  #star-daily-collection .sc-day-heading{gap:7px;padding-inline:10px}
+  #star-daily-collection .sc-day-body{padding-inline:10px}
+  #star-daily-collection .sc-driver{padding-inline:10px}
+  #star-daily-collection .sc-comparison{gap:10px}
+  #star-daily-collection .sc-comparison>div+div{padding-left:10px}
+  #star-daily-collection .sc-day-heading>span:first-child>small{max-width:170px}
+  #star-daily-collection .sc-district-actions{grid-template-columns:1.3fr 1fr;padding-inline:10px}
+  #star-daily-collection .sc-primary{padding-inline:8px;font-size:11px}
+  #star-daily-collection .sc-distribute{font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){#star-daily-collection .sc-disclosure{transition:none}}
+/* Load AFTER collection-visual.css. Host must provide its available content height. */
+#star-daily-collection {
+  width: 100%;
+  height: var(--sc-available-height, 100%);
+  min-height: 0;
+}
+#star-daily-collection .sc-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+#star-daily-collection .sc-app {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+#star-daily-collection .sc-footer {
+  padding-bottom: calc(13px + var(--sc-safe-bottom, 0px));
+}
+/* Оболочка раздела: шапка, рейка и подвал спрятаны — у страницы свои;
+   середина без отступов и без своей прокрутки — прокручивается .sc-scroll. */
+#accOv.sdc .stk-top,#accOv.sdc #accRail,#accOv.sdc .stk-foot{display:none}
+#accOv.sdc .stk-mid{display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+#accOv.sdc #star-daily-collection{--sc-safe-bottom:var(--safe-bottom);flex:1 1 auto;min-height:0}
+#accOv.sdc .sc-header{padding-top:calc(13px + var(--safe-top))}
+/* Клавиатура (vendor/ambar-kb.js): подвал прячется, снизу воздух — поле
+   докручивается в центр экрана. */
+html.kb #accOv.sdc .sc-footer{display:none}
+html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
+/* Состояния, которых в макете нет, — теми же красками макета: район получен
+   (снять отметку), «соберу завтра» нажата, день забран (вернуть), кнопка
+   распределения открыта, одна кнопка в нижней зоне, отклонённый расход. */
+#star-daily-collection .sc-primary.sc-done{border-color:#3c3147;background:#1c1526;color:#b7a8c3}
+#star-daily-collection .sc-secondary[aria-pressed="true"]{border-color:#655137;color:#d7b17a}
+#star-daily-collection .sc-secondary>svg.lucide{display:inline-block;width:12px!important;height:12px!important;vertical-align:-2px;margin-right:4px}
+#star-daily-collection .sc-district-actions.sc-one{grid-template-columns:minmax(0,1fr)}
+#star-daily-collection .sc-day-receive.sc-taken{color:#a5b39d}
+#star-daily-collection .sc-distribute.sc-ready{border-color:#cfb17a;background:#dfc087;color:#251e27}
+#star-daily-collection .sc-step-number>svg.lucide{width:12px!important;height:12px!important}
+#star-daily-collection .sc-expense-body>div.sc-rejected>strong{text-decoration:line-through;color:var(--sc-muted)}
+#star-daily-collection .sc-expense-body>div.sc-aside>strong{color:var(--sc-muted)}
+#star-daily-collection .sc-expense-body>div>strong{flex:none;white-space:nowrap}
+#star-daily-collection .exp-empty{padding:16px}
+/* Карточки книги на этапе «Распределение» (crDistCard, те же, что в «Кассе
+   дня»): внутри корня макета сброс кнопок перебивает .aud-b — возвращаем. */
+#star-daily-collection .crd{margin:0 12px 12px}
+#star-daily-collection .crd-acts .aud-b{flex:1;padding:14px 10px;border-radius:13px;font-size:14.5px;font-weight:700;text-align:center;cursor:pointer}
+#star-daily-collection .crd-acts .aud-b.go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+#star-daily-collection .crd-acts .aud-b.soft{flex:0 0 auto;padding-left:20px;padding-right:20px;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -20523,6 +20779,34 @@ let CRD = {open: false, edit: null, busy: false, back: null};
 // Открыть сразу второй этап (карточка на «Финансах»): 2 — после загрузки сбора
 // перейти к распределению, если сбор закончен.
 let CR_GO = 0;
+// Утверждённый визуал страницы (владелец, 30 окт 2026: макет ChatGPT
+// «STAR-DAILY-COLLECTION», перенос точь-в-точь, логика прежняя). Страница
+// живёт в своей оболочке #star-daily-collection: шапка, два этапа, один
+// скролл, подвал; шапка и подвал раздела (#accOv.sdc) на это время спрятаны.
+// Что раскрыто — живёт между перерисовками и возвратами с других страниц:
+// районы, дни, расчёт — здесь; складка расходов — CR_OPEN, водители —
+// CR_DRV_OPEN. Корень создаётся один раз на заход, перерисовываются только
+// его части — чтобы прокрутка не прыгала к началу после каждого нажатия.
+let SDC = {open: new Set(), days: new Set(), calc: new Set(), wait: false, stage: 0};
+let CR_DRV_OPEN = new Set();                 // раскрытые «Водители» — ключ «район:день»
+// Иконки макета — Lucide, встроенными SVG (в приложении только встроенные
+// значки; сторонних библиотек ради макета не ставим).
+const LUC = {
+  'chevron-left':    '<path d="m15 18-6-6 6-6"/>',
+  'chevron-down':    '<path d="m6 9 6 6 6-6"/>',
+  'chevron-right':   '<path d="m9 18 6-6-6-6"/>',
+  'lock-keyhole':    '<circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/>',
+  'corner-up-right': '<path d="m15 14 5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/>',
+  'circle-alert':    '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+  'history':         '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  'check':           '<path d="M20 6 9 17l-5-5"/>',
+  'arrow-up-right':  '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  'clock-3':         '<circle cx="12" cy="12" r="10"/><path d="M12 6v6h4.5"/>',
+  'calendar-days':   '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
+};
+function luc(name, cls){
+  return `<svg class="lucide lucide-${name}${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUC[name] || ''}</svg>`;
+}
 
 async function accCashRound(){
   CRD.open = false;
@@ -20535,6 +20819,7 @@ async function accCashRound(){
   const go = CR_GO; CR_GO = 0;
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
   catch(e){
+    document.getElementById('accOv').classList.remove('sdc');
     document.getElementById('accMid').innerHTML =
       loadFail();
     return;
@@ -20543,33 +20828,82 @@ async function accCashRound(){
   if(go === 2 && !crDistState().locked) crDist();
 }
 
+// ── Оболочка страницы: создаётся один раз на заход ─────────────────────────
+function sdcShell(){
+  return `<div id="star-daily-collection" lang="ru"><div class="sc-stage"><div class="sc-app" aria-label="STAR — сбор и распределение выручки">
+    <header class="sc-header">
+      <button type="button" class="sc-back" aria-label="Назад" onclick="accBack()">${luc('chevron-left')}</button>
+      <div class="sc-heading"><h1>Выручка</h1><span>Сбор и распределение</span></div>
+      <div class="sc-date" id="sdcDate"></div>
+    </header>
+    <div class="sc-steps" id="sdcSteps" role="tablist" aria-label="Этапы работы с выручкой"></div>
+    <main class="sc-scroll" id="sdcScroll">
+      <section id="sc-collection" role="tabpanel" aria-labelledby="sc-tab-collection"></section>
+      <section id="sc-distribution" role="tabpanel" aria-labelledby="sc-tab-distribution" hidden></section>
+    </main>
+    <footer class="sc-footer" id="sdcFoot" hidden></footer>
+  </div></div></div>`;
+}
+function sdcMount(){
+  const mid = document.getElementById('accMid');
+  let root = document.getElementById('star-daily-collection');
+  if(!root || root.parentNode !== mid){
+    mid.innerHTML = sdcShell();
+    root = document.getElementById('star-daily-collection');
+    SDC.stage = 0;
+    // Раскрытие — родные <details>: браузер показывает сам, мы только
+    // запоминаем, что раскрыто (toggle не всплывает — ловим на захвате).
+    root.addEventListener('toggle', sdcToggled, true);
+    root.addEventListener('click', e => {
+      if(e.target && e.target.closest && e.target.closest('summary'))
+        try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(x){}
+    });
+  }
+  document.getElementById('accOv').classList.add('sdc');
+  return root;
+}
+function sdcToggled(e){
+  const el = e.target, tag = el && el.dataset ? el.dataset.sdc : '';
+  if(!tag) return;
+  const i = tag.indexOf(':'), kind = i < 0 ? tag : tag.slice(0, i), key = i < 0 ? '' : tag.slice(i + 1);
+  if(kind === 'wait'){ SDC.wait = !!el.open; return; }
+  const set = {d: SDC.open, day: SDC.days, drv: CR_DRV_OPEN, calc: SDC.calc, exp: CR_OPEN}[kind];
+  if(!set) return;
+  if(el.open) set.add(key); else set.delete(key);
+}
+// Этап: один из двух разделов виден, второй скрыт; подвал — только у сбора.
+function sdcStage(n){
+  const c = document.getElementById('sc-collection'), p = document.getElementById('sc-distribution'),
+        s = document.getElementById('sdcScroll');
+  if(c) c.hidden = n === 2;
+  if(p) p.hidden = n !== 2;
+  if(s && SDC.stage && SDC.stage !== n) s.scrollTop = 0;
+  SDC.stage = n;
+}
+function sdcHead(){
+  const el = document.getElementById('sdcDate'), d = CR; if(!el || !d) return;
+  const name = escS(_dayName(d.day));
+  el.innerHTML = d.day === d.today ? `<strong>Сегодня</strong><span>${name}</span>`
+    : d.day === _dayIsoFor(1) ? `<strong>Вчера</strong><span>${name}</span>`
+    : `<strong>${name}</strong><span>учётный день</span>`;
+}
+function sdcMoney(v){ return `${v < 0 ? '−' : ''}${fmt(Math.abs(v || 0))}`; }
+function sdcAed(v, cls){ return `<strong${cls ? ` class="${cls}"` : ''}>${sdcMoney(v)} <small>AED</small></strong>`; }
+
 function crRender(){
   const d = CR; if(!d) return;
   _setText('accSub', d.day === d.today ? 'сегодня' : _dayName(d.day));
-  const all = d.need > 0 && d.done >= d.need;
+  sdcMount();
+  sdcHead();
+  crStepsPaint();
   // Порядок районов от отметок не зависит (владелец, 20 сен 2026: «сделай так,
   // чтобы когда нажал получил, в сборе выручки район не уходил вниз, пусть всё
-  // остаётся на своих местах»). Раньше полученные уезжали в конец, и карточка
-  // выпрыгивала из-под пальца. Внизу остаются только те, где получать нечего:
-  // это приходит с сервера и от нажатий не меняется.
+  // остаётся на своих местах»). Внизу остаются только те, где получать
+  // нечего: это приходит с сервера и от нажатий не меняется.
   const list = [...d.districts].sort((a, b) => a.empty - b.empty);
-  const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
-  const head = `<div class="ck-head cr-head${all ? ' all' : ''}">
-    <div class="ck-h-l">Сбор выручки</div>
-    <div class="ck-h-n">
-      <span class="ck-h-v">${d.done}<u>/${d.need}</u></span>
-      <span class="ck-h-w">${d.before ? 'до учёта' : d.need ? 'районов получил' + (d.later ? ` · ${d.later} соберу завтра` : '') : 'получать нечего'}</span>
-    </div>
-    <div class="ck-track"><i style="width:${доля}%"></i></div>
-    <div class="cr-tot">
-      <span><i>выручка</i><b${d.net_total < 0 ? ' class="dn"' : ''}>${d.net_total < 0 ? '−' : ''}${fmt(Math.abs(d.net_total))}</b></span>
-      <span><i>чаевые</i><b class="gold">${fmt(d.tips_total)}</b></span>
-      ${crLaterAllBtn()}
-    </div>
-    ${d.carry_total ? `<div class="cr-carry-note">из них за прошлые дни — ${d.carry_total < 0 ? '−' : ''}${
-      fmt(Math.abs(d.carry_total))} AED: не получили вовремя</div>` : ''}
-  </div>`;
-  document.getElementById('accMid').innerHTML = crSteps(1) + head + list.map(crCard).join('');
+  const col = document.getElementById('sc-collection');
+  if(col) col.innerHTML = sdcOverview(d) + `<div class="sc-districts">${list.map(sdcDistrict).join('')}</div>` + sdcWaiting();
+  sdcStage(CRD.open ? 2 : 1);
   crFoot();
   crDistPrefetch();
   // Строка «Сбор выручки» на «Финансах» — те же числа сразу, а не при
@@ -20581,9 +20915,26 @@ function crRender(){
   }
 }
 
-// «Заберу всё завтра» — одной кнопкой на все районы, которые сегодня не
-// получили (владелец, 20 сен 2026: «вместо наличных и расхода сделай общую
-// кнопку заберу всё завтра, чтобы можно было одной кнопкой все районы завтра
+// Шапка этапа: сколько районов получено, полоса, перенос; справа — общий
+// перенос на завтра.
+function sdcOverview(d){
+  const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
+  const дниПереноса = [...new Set((d.districts || []).flatMap(x => (x.carry || []).map(c => c.day)))].sort();
+  const слева = d.before ? 'До начала учёта'
+    : дниПереноса.length ? `Есть перенос за ${дниПереноса.map(_dayName).join(', ')}`
+    : d.later ? `${d.later} ${pluralize(d.later, 'район', 'района', 'районов')} — соберу завтра`
+    : !d.need ? 'Получать нечего' : '';
+  const кнопка = crLaterAllBtn();
+  return `<div class="sc-overview">
+    <div class="sc-overview-line"><span>Получено от районов</span><strong>${d.done} <span>/ ${d.need}</span></strong></div>
+    <div class="sc-progress" role="progressbar" aria-label="Районы, от которых получена выручка" aria-valuemin="0" aria-valuemax="${d.need}" aria-valuenow="${d.done}"><span style="width:${доля}%"></span></div>
+    ${слева || кнопка ? `<div class="sc-overview-bottom"><span>${escS(слева)}</span>${кнопка}</div>` : ''}
+  </div>`;
+}
+
+// «Всё завтра» — одной кнопкой на все районы, которые сегодня не получили
+// (владелец, 20 сен 2026: «вместо наличных и расхода сделай общую кнопку
+// заберу всё завтра, чтобы можно было одной кнопкой все районы завтра
 // собрать»). Нечего откладывать — кнопки нет; у района расходы ещё не
 // согласованы — сначала они, то же правило, что у кнопок района.
 function crLaterAllBtn(){
@@ -20591,9 +20942,8 @@ function crLaterAllBtn(){
   const можно = (d.districts || []).filter(x => !x.empty && !x.done && !x.later);
   if(!можно.length) return '';
   const ждут = можно.filter(x => +x.spend_pending > 0);
-  return `<button class="cr-allater${ждут.length ? ' off' : ''}" onclick="${
-    ждут.length ? `crNeedExp('${escS(ждут.map(x => x.code).join(', '))}')` : 'crLaterAll()'}">
-    ${IC('clock', 14)}Заберу всё завтра</button>`;
+  return `<button type="button" class="sc-text-action"${ждут.length ? ' aria-disabled="true" data-blocked' : ''} onclick="${
+    ждут.length ? `crNeedExp('${escS(ждут.map(x => x.code).join(', '))}')` : 'crLaterAll()'}">Всё завтра${luc('corner-up-right')}</button>`;
 }
 async function crLaterAll(){
   if(!CR || CR_BUSY) return;
@@ -20624,199 +20974,255 @@ function crToExp(){
   ACC_BACK = () => { CR_DAY = day; accCashRound(); };
 }
 
-function crCard(x){
-  const team = [x.operator, (x.drivers || []).join(', ')].filter(Boolean).join(' · ');
+// ── Карточка района ────────────────────────────────────────────────────────
+// Свёрнутая — код, название, команда, выручка и статус; раскрытая — две
+// суммы, перенос, дни блоками, расходы, нижняя зона с предупреждением и
+// кнопками. Получать нечего — компактная строка внизу списка.
+function sdcDistrict(x){
+  const id = escS(x.id), code = escS(x.code), name = escS(x.name);
+  // Под названием — оператор и сколько водителей (имена — в строках
+  // водителей внутри дня): полный список имён растягивал свёрнутую карточку
+  // на три строки.
+  const nd = (x.drivers || []).length;
+  const team = [x.operator, nd ? `${nd} ${pluralize(nd, 'водитель', 'водителя', 'водителей')}` : ''].filter(Boolean).join(' · ');
   // Заказ в долг объясняет, почему денег меньше: товар уехал, а платить за
   // него будут потом. У водителя эта же строка стоит в его расходах
   // (владелец, 21 сен 2026).
-  const долг = x.debt ? `в долг <b>${fmt(x.debt)}</b>${x.debt_n > 1 ? ` за ${x.debt_n} ${
+  const долг = x.debt ? `в долг ${fmt(x.debt)}${x.debt_n > 1 ? ` за ${x.debt_n} ${
     pluralize(x.debt_n, 'заказ', 'заказа', 'заказов')}` : ''} — деньги у клиента` : '';
-  if(x.empty) return `<div class="cr-card empty" id="cr-${escS(x.id)}">
-    <div class="cr-h">
-      <span class="shl-code">${escS(x.code)}</span>
-      <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
-      <span class="cr-none">нечего получать</span>
-    </div>
-    ${долг ? `<div class="cr-sub">${долг}</div>` : ''}
-  </div>`;
-  const open = CR_OPEN.has(x.id);
-  const n = (x.items || []).length;
-  // Два числа, которые старший забирает: выручка (наличные минус расход
-  // водителя) и чай — порознь, потому что и берутся порознь. Доплат
-  // водителю нет: ушёл в минус — так и пишем, с минусом.
-  // Вместе с тем, что не получили в прошлые дни, — столько старший и
-  // забирает; из чего сложилось — разбивкой по дням ниже.
-  const carry = x.carry || [];
+  if(x.empty) return `<article class="sc-district sc-compact" id="sdc-${id}" aria-label="${code}, ${name}, нечего получать">
+    <div class="sc-district-heading"><span class="sc-code">${code}</span>
+      <div class="sc-district-name"><h2>${name}</h2><span>${escS([team, 'нечего получать', долг].filter(Boolean).join(' · '))}</span></div>
+      <div class="sc-summary-money"><strong>0</strong><span>AED</span></div></div></article>`;
+  const open = SDC.open.has(x.id);
+  const carry = x.carry || [], взятые = x.taken || [];
+  // Две суммы, которые старший забирает: выручка (наличные минус чай и
+  // расход водителя) и чай — порознь, потому что и берутся порознь. Доплат
+  // водителю нет: ушёл в минус — так и пишем, с минусом. Вместе с тем, что
+  // не получили в прошлые дни, — столько старший и забирает.
   const net = x.net_all != null ? x.net_all : x.net;
   const tips = x.tips_all != null ? x.tips_all : x.tips;
-  const дней = carry.length + ((x.cash || x.spend || x.tips) ? 1 : 0);
+  const сегодня = !!(x.cash || x.spend || x.tips);
+  const дней = carry.length + (сегодня ? 1 : 0);
   // «за 2 дня»; один день, и тот прошлый, — по имени: «за 19 сентября».
   const заСколько = дней >= 2 ? `за ${дней} ${pluralize(дней, 'день', 'дня', 'дней')}`
     : carry.length ? `за ${_dayName(carry[0].day)}` : '';
-  // На кнопке рядом с «Соберу завтра» «за 18 сентября» не влезает в строку —
-  // там дата короче: «за 18.09».
+  // На кнопке рядом с «Соберу завтра» «за 18 сентября» не влезает — там дата
+  // короче: «за 18.09».
   const заКнопка = дней < 2 && carry.length
     ? `за ${String(carry[0].day).slice(8, 10)}.${String(carry[0].day).slice(5, 7)}` : заСколько;
-  // Расходы района ещё ждут решения — об этом таблеткой, и собирать нельзя.
+  // Расходы района ещё ждут решения — предупреждение внизу карточки, и
+  // собирать нельзя: ни район, ни день, ни «соберу завтра».
   const ждут = +x.spend_pending > 0 && !x.done;
-  const st = x.done ? `<span class="cr-st">${IC('check', 12)}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>`
-    : ждут ? '<button class="cr-st pend" onclick="crToExp()">расходы не согласованы</button>'
-    : x.later ? '<span class="cr-st later">соберу завтра</span>'
-    : заСколько ? `<span class="cr-days">${заСколько}</span>` : '';
-  const money = v => `${v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
-  const сегодня = CR && CR.day === CR.today ? 'сегодня' : _dayName(CR && CR.day);
-  // Каждый день — своя кнопка: старший забирает либо всё сразу (большая
-  // «Получил» внизу), либо ровно за один день (владелец, 28 сен 2026).
-  // Забранный поимённо остаётся строкой, но серой и с галочкой — иначе
-  // отметку не снять.
-  const взятые = x.taken || [];
-  // «Получил» целиком уже нажали — всё, что ниже, в кассе: строки без кнопок,
+  const pendN = (x.items || []).filter(e => e.status === 'pending' && e.pay !== 'card' && !e.nocash).length;
+  // «Получил» целиком уже нажали — всё, что ниже, в кассе: дни без кнопок,
   // чтобы поверх общей отметки не легла отметка на один день.
   const всёЗабрал = !!x.done && !x.solo_today;
-  const деньРяд = (подпись, нетто, чай, день, взят) => {
-    взят = взят || всёЗабрал;
-    const тело = `<span>${взят ? IC('check', 13) : ''}${escS(подпись)}</span>` +
-      `<b${нетто < 0 ? ' class="dn"' : ''}>${money(нетто)}</b><i>чаевые ${fmt(чай)}</i>`;
-    if(всёЗабрал) return `<div class="cr-carry-r got">${тело}</div>`;
-    // Расходы района ещё ждут решения — по одному дню тоже не забрать.
-    const жми = ждут ? `crNeedExp('${escS(x.code)}')`
-      : `crTakeDay('${escS(x.id)}','${день}',${взят ? 'false' : 'true'})`;
-    return `<button class="cr-carry-r${взят ? ' got' : ''}${ждут ? ' off' : ''}" onclick="${жми}">${
-      тело}<em class="cr-take">${взят ? 'вернуть' : 'забрать'}</em></button>`;
-  };
-  const есть_сегодня = x.cash || x.spend || x.tips;
-  // Подпись — одна дата: «не получили» рядом с «ЗАБРАТЬ» переносило строку
-  // и говорило то же самое, а у полученных то же делает галочка.
-  // Под каждым днём — сколько за него сдали на самом деле и остаток
-  // (владелец, 24 окт 2026: «по каждому району за каждый день указать,
-  // сколько денег реально сдали, и видеть остаток; сейф и приложение должны
-  // совпасть в момент сбора, разницу — потом на разбирательство»). Раньше
-  // поле было одно на район и сравнивалось с одним днём, а старший считал
-  // всю пачку за несколько дней.
-  const дниФакта = [есть_сегодня ? {net: x.net, fact: x.fact} : null, ...carry, ...взятые].filter(c => c && c.fact != null);
-  const сдали = дниФакта.reduce((a, c) => a + c.fact, 0), остаток = дниФакта.reduce((a, c) => a + (c.net - c.fact), 0);
-  const итог = дниФакта.length && (carry.length + взятые.length + (есть_сегодня ? 1 : 0)) >= 2
-    ? `<div class="cr-carry-note">сдали <b>${fmt(сдали)}</b> за ${дниФакта.length} ${pluralize(дниФакта.length, 'день', 'дня', 'дней')} · ${
-        остаток > 0 ? `остаток <b>${fmt(остаток)}</b>` : остаток < 0 ? `сверх <b>+${fmt(-остаток)}</b>` : 'сошлось'}</div>` : '';
-  const разбивка = (carry.length || взятые.length) ? `<div class="cr-carry">${
-      есть_сегодня ? деньРяд(сегодня, x.net, x.tips, CR.day, !!x.solo_today)
-        + crFactLine(x, CR.day, x.net, x.fact, {cls: 'd', op: x.gap_src === 'op' ? x.gap : null}) + crDrvFold(x, CR.day, x.recon) : ''}${
-      carry.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, false) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'}) + crDrvFold(x, c.day, c.recon)).join('')}${
-      взятые.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, true) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'}) + crDrvFold(x, c.day, c.recon)).join('')}${
-      итог}</div>` : '';
-  return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
-    <div class="cr-h">
-      <span class="shl-code">${escS(x.code)}</span>
-      <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
-      ${st}
-    </div>
-    <div class="cr-main">
-      <span class="cr-big"><i>Выручка</i><b${net < 0 ? ' class="dn"' : ''}>${money(net)}<u>AED</u></b></span>
-      <span class="cr-big"><i>Чаевые</i><b class="gold">${fmt(tips)}<u>AED</u></b></span>
-    </div>
-    ${разбивка}
-    <div class="cr-sub">наличные <b>${fmt(x.cash)}</b>${(x.fx || []).length ? ` (из них ${
-      x.fx.map(f => `<b>${escS(f.sym)}${fmt(f.amount)}</b>`).join(', ')} валютой)` : ''} · ${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')} · чаевые <b>${fmt(x.tips)}</b> · расход <b>${fmt(x.spend)}</b> за смену${
-      x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
-      x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}${
-      долг ? ` · ${долг}` : ''}</div>
-    ${разбивка ? '' : crFactRow(x) + crDrvFold(x, CR.day, x.recon)}
-    ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
-        <span>Расходы за смену · ${n}</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>${open ? `<div class="cr-items">${x.items.map(crItem).join('')}${
-        foldEnd(n, `crFold('${escS(x.id)}', 1)`)}</div>` : ''}`
-      : '<div class="cr-noexp">Расходов за смену не было</div>'}
-    <div class="cr-acts">
-      <button class="cr-ok${x.done ? ' on' : ''}${ждут ? ' off' : ''}" onclick="${
-        ждут ? `crNeedExp('${escS(x.code)}')` : `crToggle('${escS(x.id)}')`}">
-        ${x.done ? `${IC('check', 16)}Получил · снять отметку` : заКнопка ? `Получил ${заКнопка}` : 'Получил'}
-      </button>
-      ${!x.done && CR && CR.day === CR.today ? `<button class="cr-later${x.later ? ' on' : ''}${ждут ? ' off' : ''}"
-        onclick="${ждут ? `crNeedExp('${escS(x.code)}')` : `crLater('${escS(x.id)}', ${!x.later})`}"${
-        x.later ? ' aria-label="Снять «Соберу завтра»"' : ''}>${
-        x.later ? IC('check', 14) : ''}Соберу завтра</button>` : ''}
-    </div>
+  const days = [];
+  if(сегодня) days.push({day: CR.day, net: x.net, tips: x.tips, cash: x.cash, spend: x.spend, spend_card: x.spend_card,
+    spend_pending: x.spend_pending, debt: x.debt, debt_n: x.debt_n, fx: x.fx || [], orders: x.orders, fact: x.fact,
+    op: x.gap_src === 'op' ? x.gap : null, rows: x.recon || [], taken: !!x.solo_today, at: x.solo_today ? x.done_at : ''});
+  carry.forEach(c => days.push({day: c.day, net: c.net, tips: c.tips, cash: c.cash, spend: c.spend, orders: c.orders,
+    fact: c.fact, rows: c.recon || [], taken: false, at: ''}));
+  // Забранные поимённо — своим блоком, с галочкой: иначе отметку не снять.
+  взятые.forEach(c => days.push({day: c.day, net: c.net, tips: c.tips, fact: c.fact, rows: c.recon || [], taken: true, at: c.at}));
+  let st = '';
+  if(x.done) st = `<span class="sc-summary-status sc-confirmed">${luc('check')}получил${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>`;
+  else if(ждут) st = `<span class="sc-summary-status sc-warning">${luc('circle-alert')}${
+    pendN ? `${pendN} ${pluralize(pendN, 'расход', 'расхода', 'расходов')}` : 'расходы ждут'}</span>`;
+  else if(x.later) st = '<span class="sc-summary-status sc-warning">соберу завтра</span>';
+  const справа = st
+    ? `<span class="sc-summary-stack"><span class="sc-closed-money sc-closed-only${net < 0 ? ' sc-negative' : ''}">${sdcMoney(net)} <small>AED</small></span>${st}</span>`
+    : `<span class="sc-summary-money sc-closed-only"><strong${net < 0 ? ' class="sc-negative"' : ''}>${sdcMoney(net)}</strong><span>AED</span></span>`;
+  const sub = [team, заСколько].filter(Boolean).join(' · ');
+  const head = `<summary class="sc-district-heading"><span class="sc-code">${code}</span>
+    <span class="sc-district-name"><strong>${name}</strong>${sub ? `<span>${escS(sub)}</span>` : ''}<span class="sc-closed-only">Чаевые ${fmt(tips)} AED</span></span>
+    ${справа}${luc('chevron-down', 'sc-disclosure')}</summary>`;
+  const перенос = carry.length ? `<div class="sc-carryover">${luc('history')}<span>Из них <b>${
+    sdcMoney(x.carry_net != null ? x.carry_net : carry.reduce((a, c) => a + c.net, 0))} AED</b> за ${
+    carry.map(c => _dayName(c.day)).join(', ')}</span></div>` : '';
+  const дни = days.length ? `<div class="sc-days">${days.map(dd => sdcDay(x, dd, ждут, всёЗабрал, days.length)).join('')}</div>` : '';
+  const блок = ждут ? `<button type="button" class="sc-attention" data-existing-action="shift-expenses" onclick="crToExp()">${
+    luc('circle-alert')}<span id="sdc-blk-${id}"><strong>Расход не согласован</strong><small>Получение пока недоступно</small></span>${luc('chevron-right')}</button>` : '';
+  const стоп = ` aria-disabled="true" aria-describedby="sdc-blk-${id}" data-blocked`;
+  // Галочка ставится и снимается одним нажатием, без вопросов: действие
+  // обратимо, а спрашивать «точно?» по пять раз за ночь — приучать не читать.
+  const главная = x.done
+    ? `<button type="button" class="sc-primary sc-done" onclick="crToggle('${id}')">${luc('check')}Получил · снять отметку</button>`
+    : ждут
+    ? `<button type="button" class="sc-primary sc-unavailable"${стоп} onclick="crNeedExp('${code}')">${luc('lock-keyhole')}Получил${заКнопка ? ' ' + заКнопка : ''}</button>`
+    : `<button type="button" class="sc-primary" onclick="crToggle('${id}')">Получил${заКнопка ? ' ' + заКнопка : ''}</button>`;
+  // «Соберу завтра» — своя у каждого района (владелец, 19 сен 2026). Только
+  // в сегодняшнем сборе; нажать ещё раз — снять.
+  const завтра = !x.done && CR.day === CR.today
+    ? (ждут ? `<button type="button" class="sc-secondary"${стоп} onclick="crNeedExp('${code}')">Соберу завтра</button>`
+            : `<button type="button" class="sc-secondary" aria-pressed="${x.later ? 'true' : 'false'}" onclick="crLater('${id}', ${!x.later})"${
+                x.later ? ' aria-label="Снять «Соберу завтра»"' : ''}>${x.later ? luc('check') : ''}Соберу завтра</button>`)
+    : '';
+  return `<details class="sc-district" id="sdc-${id}" data-sdc="d:${id}"${open ? ' open' : ''}>${head}
+    <div class="sc-district-body">
+      <div class="sc-district-totals"><div><span>Выручка</span>${sdcAed(net, net < 0 ? 'sc-negative' : '')}</div><div><span>Чаевые</span>${sdcAed(tips, 'sc-gold')}</div></div>
+      ${перенос}${дни}${sdcExpenses(x, carry, pendN)}
+      <div class="sc-settlement">${блок}<div class="sc-district-actions${завтра ? '' : ' sc-one'}">${главная}${завтра}</div></div>
+    </div></details>`;
+}
+
+// День — свой блок: дата и сумма в заголовке; внутри «Сдали по факту» с
+// разницей, водители, расчёт и «Забрать» ровно за этот день (владелец,
+// 28 сен 2026: «либо забрать всё, либо именно за определённый день»; 24 окт
+// 2026: «по каждому району за каждый день — сколько реально сдали, и
+// остаток»). Один день у района — кнопки дня нет, его забирает «Получил».
+function sdcDay(x, dd, ждут, всёЗабрал, n){
+  const id = escS(x.id), code = escS(x.code), day = escS(dd.day);
+  const key = `${x.id}:${dd.day}`, open = SDC.days.has(key);
+  const rows = dd.rows || [];
+  const bad = rows.filter(r => r.mismatch || r.fix_open).length;
+  const got = dd.taken || всёЗабрал;
+  const title = CR && dd.day === CR.today ? 'Сегодня' : _dayName(dd.day);
+  const за = CR && dd.day === CR.today ? 'сегодня' : _dayName(dd.day);
+  const diff = dd.fact != null ? dd.fact - dd.net : null;
+  const small = [
+    got ? `<span class="sc-confirmed">${luc('check')}получено${dd.at ? ' · ' + _hm(dd.at) : ''}</span>` : '',
+    bad ? `<span class="sc-warning">${bad} ${pluralize(bad, 'расхождение', 'расхождения', 'расхождений')}</span>` : '',
+    `чаевые ${fmt(dd.tips)} AED`,
+    diff == null ? '' : diff === 0 ? 'сошлось' : diff < 0 ? `<span class="sc-warning">остаток ${fmt(-diff)}</span>` : `сверх +${fmt(diff)}`,
+  ].filter(Boolean).join(' · ');
+  const dif = `data-difference="${id}:${day}" aria-live="polite"`;
+  // Пусто — по приложению; подтверждённые оператором наличные водителей дают
+  // подсказку и разницу сами. Последнее слово за тем, кто считал деньги руками.
+  const разница = diff != null
+    ? (diff === 0 ? `<div class="sc-difference sc-confirmed" ${dif}>${luc('check')}Сошлось</div>`
+       : diff < 0 ? `<div class="sc-difference sc-warning" ${dif}>Остаток ${fmt(-diff)} AED</div>`
+       : `<div class="sc-difference" ${dif}>Сверх +${fmt(diff)} AED</div>`)
+    : dd.op != null
+    ? `<div class="sc-difference${dd.op < 0 ? ' sc-warning' : ''}" ${dif}>Оператор подтвердил · ${
+        dd.op === 0 ? 'сошлось' : dd.op < 0 ? `остаток ${fmt(-dd.op)} AED` : `+${fmt(dd.op)} AED`}</div>`
+    : `<div class="sc-difference" ${dif} hidden></div>`;
+  let кнопка = '';
+  if(!всёЗабрал && (n >= 2 || dd.taken)){
+    if(ждут) кнопка = `<button type="button" class="sc-day-receive" aria-disabled="true" aria-describedby="sdc-blk-${id}" data-blocked onclick="crNeedExp('${code}')">${luc('lock-keyhole')}Забрать за ${за}</button>`;
+    else if(dd.taken) кнопка = `<button type="button" class="sc-day-receive sc-taken" onclick="crTakeDay('${id}', '${day}', false)">${luc('check')}Вернуть за ${за}</button>`;
+    else кнопка = `<button type="button" class="sc-day-receive" onclick="crTakeDay('${id}', '${day}', true)">Забрать за ${за}</button>`;
+  }
+  const inp = `sdc-in-${id}-${day}`;
+  return `<details class="sc-day" id="sdc-day-${id}-${day}" data-sdc="day:${id}:${day}"${open ? ' open' : ''}>
+    <summary class="sc-day-heading"><span><strong>${title}</strong><small>${small}</small></span><span class="sc-day-money"><strong${
+      dd.net < 0 ? ' class="sc-negative"' : ''}>${sdcMoney(dd.net)}</strong><small>AED</small></span>${luc('chevron-down', 'sc-disclosure')}</summary>
+    <div class="sc-day-body">
+      <div class="sc-received-row"><label for="${inp}">Сдали по факту</label><div class="sc-field"><input id="${inp}" type="text" inputmode="numeric" maxlength="8" placeholder="${
+        sdcMoney(dd.net + (dd.op || 0))}" autocomplete="off" value="${dd.fact == null ? '' : fmt(dd.fact)}" data-actual="${id}:${day}" data-expected="${dd.net}" onchange="crFact('${id}', this.value, '${day}')"><span>AED</span></div></div>
+      ${разница}${rows.length ? sdcDrivers(x, dd, rows, bad) : ''}${dd.cash != null ? sdcCalc(x, dd) : ''}${кнопка}
+    </div></details>`;
+}
+
+// ── Водители дня ───────────────────────────────────────────────────────────
+// Владелец, 30 окт 2026: «раскрыть и посмотреть, какой водитель сколько сдал
+// по факту; нажать — страница водителя за день». Водитель — своя подложка,
+// нажимается целиком (crDriver). Главная сумма — «Сдал»: после закрытия
+// смены он уже сдал по своему отчёту, сверял или нет; смена ещё открыта —
+// «К сдаче». «Насчитал» (его сверка) и «По факту» (подтвердил оператор) —
+// отдельные числа, с расхождением строкой.
+function sdcDrivers(x, dd, rows, bad){
+  const id = escS(x.id), day = escS(dd.day);
+  const key = `${x.id}:${dd.day}`, open = CR_DRV_OPEN.has(key);
+  const gap = rows.filter(r => r.op_fact != null && r.op_gap).length;
+  const none = rows.every(r => r.cash == null && r.op_fact == null);
+  const hint = bad ? `<span class="sc-warning">${bad} ${pluralize(bad, 'расхождение', 'расхождения', 'расхождений')}</span>`
+    : gap ? `<span>${gap} по факту</span>` : none ? '<span>Не сверяли</span>' : '<span></span>';
+  return `<details class="sc-drivers" id="sdc-drv-${id}-${day}" data-sdc="drv:${id}:${day}"${open ? ' open' : ''}>
+    <summary><span>Водители <b>${rows.length}</b></span>${hint}${luc('chevron-down', 'sc-disclosure')}</summary>
+    ${rows.map(r => sdcDriver(r, dd.day)).join('')}</details>`;
+}
+function sdcDriver(r, day){
+  const name = escS(r.name);
+  const подпись = r.shift === 'open' ? 'К сдаче' : 'Сдал';
+  const факт = r.op_fact != null, счёт = r.cash != null;
+  const d = факт ? (r.op_gap || 0) : счёт ? (r.diff || 0) : null;
+  let статус;
+  if(факт) статус = d === 0 ? `<span class="sc-confirmed">${luc('check')}Сошлось</span>` : '<span>Оператор подтвердил</span>';
+  else if(r.mismatch) статус = '<span class="sc-warning">Ждёт оператора</span>';
+  else if(счёт) статус = d === 0 ? `<span class="sc-confirmed">${luc('check')}Сошлось</span>`
+    : r.ok ? `<span>Сверил ${r.ok} из 3</span>` : '<span>Насчитал</span>';
+  else статус = `<span>${r.started ? 'Считает' : 'Не сверял'}</span>`;
+  const заказы = r.orders == null ? '' : `<span>${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}</span>`;
+  const neg = r.cash_app < 0 ? 'sc-negative' : '';
+  let деньги;
+  if(факт || счёт){
+    деньги = `<div class="sc-comparison"><div><span>${подпись}</span>${sdcAed(r.cash_app, neg)}</div><div><span>${
+      факт ? 'По факту' : 'Насчитал'}</span>${sdcAed(факт ? r.op_fact : r.cash)}</div></div>`;
+    if(d) деньги += `<div class="sc-discrepancy"><span>Расхождение</span><strong>${d > 0 ? '+' : '−'}${fmt(Math.abs(d))} AED</strong></div>`;
+  } else деньги = `<div class="sc-driver-money"><span>${подпись}</span>${sdcAed(r.cash_app, neg)}</div>`;
+  const notes = [r.fix_open ? `<span>${r.fix_open} ${pluralize(r.fix_open, 'правка', 'правки', 'правок')} без ответа</span>` : '',
+    r.exp_pending ? `<span>${r.exp_pending} ${pluralize(r.exp_pending, 'расход ждёт', 'расхода ждут', 'расходов ждут')}</span>` : ''].filter(Boolean).join('');
+  const подтв = факт ? `<div class="sc-confirmation">Подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}${
+    r.op_fact_at ? ' · ' + _hm(r.op_fact_at) : ''}</div>` : '';
+  const warn = r.mismatch || r.fix_open || r.exp_pending || (факт && d);
+  return `<div class="sc-driver${warn ? ' sc-driver-attention' : ''}">
+    <button type="button" class="sc-driver-link" onclick="crDriver('${name}', '${escS(day)}')"><span>${name}</span>${luc('chevron-right')}</button>
+    <div class="sc-driver-meta">${заказы}${статус}</div>
+    ${деньги}${notes ? `<div class="sc-driver-notes">${notes}</div>` : ''}${подтв}
   </div>`;
 }
 
-// «Сдали по факту» (владелец, 9 окт 2026): сколько старший получил по району
-// на самом деле. Пусто — по приложению; подтверждённые оператором наличные
-// водителей дают подсказку и разницу сами. Разница уходит в книгу дня строкой
-// «Собрал по факту». Последнее слово за тем, кто считал деньги руками.
-function crFactRow(x){
-  return crFactLine(x, CR.day, x.net, x.fact, {label: 'Сдали по факту', op: x.gap_src === 'op' ? x.gap : null});
+// Из чего сложилась выручка дня: наличные − чаевые − расход; безнал, долг и
+// ждущее решения — отдельными строками, в вычет не идут.
+function sdcCalc(x, dd){
+  const id = escS(x.id), day = escS(dd.day);
+  const key = `${x.id}:${dd.day}`, open = SDC.calc.has(key);
+  const row = (t, v, cls) => `<div${cls ? ` class="${cls}"` : ''}><dt>${t}</dt><dd>${v}</dd></div>`;
+  const fx = (dd.fx || []).length ? ` · ${dd.fx.map(f => `${escS(f.sym)}${fmt(f.amount)}`).join(', ')} валютой` : '';
+  return `<details class="sc-calculation" id="sdc-calc-${id}-${day}" data-sdc="calc:${id}:${day}"${open ? ' open' : ''}>
+    <summary><span>Расчёт выручки</span>${luc('chevron-down', 'sc-disclosure')}</summary>
+    <dl>${row(`Наличные${dd.orders != null ? ` · ${dd.orders} ${pluralize(dd.orders, 'заказ', 'заказа', 'заказов')}` : ''}`, `${fmt(dd.cash)} AED${fx}`)}
+    ${row('Чаевые', `${dd.tips ? '−' : ''}${fmt(dd.tips)} AED`)}
+    ${row('Расход за смену', `${dd.spend ? '−' : ''}${fmt(dd.spend)} AED`)}
+    ${row('Выручка', `${sdcMoney(dd.net)} AED`, 'sc-calculation-total')}
+    ${dd.spend_card ? row('Безналом · не из наличных', `${fmt(dd.spend_card)} AED`) : ''}
+    ${dd.spend_pending ? row('Ждёт решения', `${fmt(dd.spend_pending)} AED`, 'sc-expense-pending') : ''}
+    ${dd.debt ? row('В долг · деньги у клиента', `${fmt(dd.debt)} AED`) : ''}</dl></details>`;
 }
-// Строка факта за ОДИН день: поле и справа остаток — что по приложению за
-// этот день ещё не сдано (красным), «+N» — сдали больше, «сошлось». Пишется
-// в отметку того дня (cashfact), и книга того дня берёт её же. Пусто —
-// по приложению; подтверждённые оператором наличные дают подсказку (op).
-function crFactLine(x, day, net, fact, opt){
-  opt = opt || {};
-  const разн = fact != null ? fact - net : (opt.op != null ? opt.op : null);
-  const right = разн == null ? '<b></b>'
-    : разн === 0 ? `<b class="ok">${IC('check', 14)}сошлось</b>`
-    : разн < 0 ? `<b class="dn"><small>остаток</small>${fmt(-разн)}</b>`
-    : `<b>+${fmt(разн)}</b>`;
-  return `<div class="cr-fact${opt.cls ? ' ' + opt.cls : ''}"><i>${opt.label || 'Сдали'}</i><span class="in"><input inputmode="numeric" maxlength="8"
-      value="${fact == null ? '' : fmt(fact)}" placeholder="${fmt(net + (opt.op || 0))}"
-      onchange="crFact('${escS(x.id)}', this.value, '${day}')"><u>AED</u></span>${right}</div>`;
+
+// Расходы района: по дням — наличными, безналом, ждёт решения, и строки
+// расходов дня (когда · что · кто · чек · решение); ссылка — в «Расходы
+// смены», там решают.
+function sdcExpenses(x, carry, pendN){
+  const id = escS(x.id);
+  const items = x.items || [], n = items.length, open = CR_OPEN.has(x.id);
+  const row = (t, v, cls) => `<div${cls ? ` class="${cls}"` : ''}><span>${t}</span><strong>${v}</strong></div>`;
+  const дни = [];
+  const сегодня = CR && CR.day === CR.today ? 'Сегодня' : _dayName(CR.day);
+  if(n || x.spend || x.spend_card || x.spend_pending){
+    let b = `<h3>${escS(сегодня)}</h3>` + row('Расход наличными', `${fmt(x.spend)} AED`);
+    if(x.spend_card) b += row('Безналом · не из наличных', `${fmt(x.spend_card)} AED`);
+    if(x.spend_pending) b += row('Ждёт решения', `${pendN ? `${pendN} ${pluralize(pendN, 'расход', 'расхода', 'расходов')} · ` : ''}${fmt(x.spend_pending)} AED`, 'sc-expense-pending');
+    дни.push(b + items.map(sdcItem).join(''));
+  }
+  carry.forEach(c => { if(c.spend) дни.push(`<h3>${escS(_dayName(c.day))}</h3>` + row('Расход наличными', `${fmt(c.spend)} AED`)); });
+  return `<details class="sc-expenses" id="sdc-exp-${id}" data-sdc="exp:${id}"${open ? ' open' : ''}>
+    <summary><span>Расходы за смену <b>${n}</b></span>${pendN ? `<span class="sc-warning">${pendN} ${pluralize(pendN, 'ждёт', 'ждут', 'ждут')}</span>` : '<span></span>'}${luc('chevron-down', 'sc-disclosure')}</summary>
+    <div class="sc-expense-body">${дни.length ? дни.join('') : '<div><span>Расходов за смену не было</span></div>'}
+      <button type="button" class="sc-expense-action" data-existing-action="shift-expenses" onclick="crToExp()">Расходы смены${luc('arrow-up-right')}</button></div></details>`;
 }
-// ── Водители района и страница водителя за день ────────────────────────────
-// Владелец, 30 окт 2026: «сделай так, чтобы можно было раскрыть и посмотреть,
-// какой водитель сколько сдал по факту; на него можно нажать и посмотреть на
-// отдельной странице, сколько за смену он заработал, сколько у него расходов,
-// какими они были, есть ли те, что не согласовали или ещё не согласованные,
-// сколько он чая наработал — чтобы расхождения было просто искать».
-// Складка «Водители · N» под КАЖДЫМ днём на карточке — под «Сдали» этого
-// дня: деньги за вчерашнюю смену старший берёт утром на сегодняшней странице,
-// переносом, и водители ему нужны вчерашние (владелец, 30 окт 2026: «я должен
-// видеть, сколько кто должен был сдать, на самой странице сбора выручки,
-// просто разворачивая эту инфу» — на его снимке карточка с переносом за
-// 29 октября и без складки: она считалась только по сегодняшнему дню, где
-// заказов ещё нет). Строка — имя, заказы и сверка подстрокой; справа первым
-// числом — сколько к сдаче по приложению, под ним — что насчитал («по
-// факту», если оператор подтвердил) и разница; не считал — «не сверял».
-// Нажатие — страница водителя за ЭТОТ день (crDriver).
-let CR_DRV_OPEN = new Set();
-function crDrvFold(x, day, rows){
-  rows = rows || [];
-  if(!rows.length) return '';
-  const key = `${x.id}:${day}`, open = CR_DRV_OPEN.has(key);
-  const bad = rows.filter(r => r.mismatch || r.fix_open).length;
-  const gap = rows.filter(r => r.op_fact != null && r.op_gap).length;
-  const hint = bad ? `<i>${bad} ${pluralize(bad, 'расхождение', 'расхождения', 'расхождений')}</i>`
-    : gap ? `<i>${gap} по факту</i>` : '';
-  return `<button class="cr-fold drv${open ? ' on' : ''}" onclick="crDrvToggle('${escS(key)}')">
-      <span>Водители · ${rows.length}${hint}</span>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-    </button>${open ? `<div class="cr-drvs">${rows.map(r => crDrvRow(r, day)).join('')}</div>` : ''}`;
+// Строка расхода: когда · что · кто · заметка · чек · как платили · решение.
+// Ждущее — цветом ожидания, в вычет не идёт; отклонённое — зачёркнуто.
+function sdcItem(e){
+  const pend = e.status === 'pending', rej = e.status === 'rejected', plus = e.amount < 0;
+  const kind = e.kind_t || 'Расход';
+  const кто = [e.at ? _hm(e.at) : '', kind, e.who, e.note && String(e.note).trim().toLowerCase() !== kind.toLowerCase() ? e.note : '', e.photo ? 'чек' : '', e.no_receipt ? 'без чека' : '',
+    e.pay === 'card' ? 'безналом — не из наличных' : e.bottle ? 'бутылкой' : e.nocash ? 'мимо наличных' : '',
+    pend ? 'ждёт решения' : rej ? 'отклонён' + (e.decided_note ? ' · ' + e.decided_note : '') : ''].filter(Boolean).map(escS).join(' · ');
+  return `<div class="${pend ? 'sc-expense-pending' : rej ? 'sc-rejected' : ''}${e.pay === 'card' || e.nocash ? ' sc-aside' : ''}"><span>${кто}</span><strong>${
+    plus ? '+' : '−'}${fmt(Math.abs(e.amount))} AED</strong></div>`;
 }
-function crDrvRow(r, day){
-  const факт = r.op_fact != null;
-  const сдал = факт ? r.op_fact : r.cash;                 // насчитал сам / подтвердил оператор
-  const d = факт ? r.op_gap : (r.cash != null ? r.diff : null);
-  const части = r.orders == null ? [] : [`${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}`];
-  if(факт) части.push(`оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`);
-  else if(r.mismatch) части.push('ждёт оператора');
-  else if(r.cash != null && !r.confirmed && r.ok) части.push(`сверил ${r.ok} из 3`);
-  if(r.fix_open) части.push(`${r.fix_open} ${pluralize(r.fix_open, 'правка', 'правки', 'правок')} без ответа`);
-  if(r.exp_pending) части.push(`${r.exp_pending} ${pluralize(r.exp_pending, 'расход ждёт', 'расхода ждут', 'расходов ждут')}`);
-  const warn = r.mismatch || r.fix_open || r.exp_pending;
-  const cls = d == null ? '' : d === 0 ? ' class="ok"' : d > 0 ? ' class="gold"' : ' class="dn"';
-  const разн = d == null ? '' : d === 0 ? `<em>${IC('check', 11)}сошлось</em>` : `<em>${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}</em>`;
-  const низ = сдал != null ? `<i>${факт ? 'по факту' : 'насчитал'}</i><b${cls}>${fmt(сдал)}${разн}</b>`
-    : `<i class="w">${r.started ? 'считает' : 'не сверял'}</i>`;
-  return `<button class="cr-drv" onclick="crDriver('${escS(r.name)}', '${escS(day)}')">
-    <span class="cr-drv-b"><b>${escS(r.name)}</b><i${warn ? ' class="warn"' : ''}>${части.join(' · ')}</i></span>
-    <span class="cr-drv-r"><i>к сдаче</i><b class="due">${fmt(r.cash_app)}<u>AED</u></b>${низ}</span>
-    <svg class="cr-drv-ch" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-  </button>`;
-}
-function crDrvToggle(key){
-  if(CR_DRV_OPEN.has(key)) CR_DRV_OPEN.delete(key); else CR_DRV_OPEN.add(key);
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  crRender();
+
+// Кого ещё ждём — по дням, в конце списка районов.
+function sdcWaiting(){
+  const st = crDistState();
+  const days = st.waiting || [];
+  if(!days.length) return '';
+  return `<details class="sc-waiting" id="sdc-wait" data-sdc="wait"${SDC.wait ? ' open' : ''}>
+    <summary>${luc('clock-3')}<span>Ещё ждём · ${days.length} ${pluralize(days.length, 'день', 'дня', 'дней')}</span>${luc('chevron-down', 'sc-disclosure')}</summary>
+    ${days.map(d => `<div><span>${CR && d === CR.today ? 'Сегодня' : escS(_dayName(d))}</span><strong>${crDayWait(d).map(escS).join(' · ')}</strong></div>`).join('')}</details>`;
 }
 
 // Страница водителя за день — в том же разделе, назад ведёт в сбор того же
@@ -20831,6 +21237,7 @@ async function crDriver(name, day, back){
   day = day || (CRV.open ? CRV.day : page);
   CRV = {open: true, name, day, page, data: null, back: CRV.open ? CRV.back : (back !== undefined ? back : ACC_BACK)};
   ACC_BACK = crDriverBack;
+  document.getElementById('accOv').classList.remove('sdc');   // страница водителя — в шапке раздела
   _setText('accTitle', name);
   _setText('accSub', crDrvDay(day));
   document.getElementById('accFoot').innerHTML = '';
@@ -20993,40 +21400,37 @@ function crItem(e){
   </div>`;
 }
 
-function crFold(id, снизу){
-  if(CR_OPEN.has(id)) CR_OPEN.delete(id); else CR_OPEN.add(id);
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  crRender();
-  if(снизу) foldSeen('cr-' + id);
+// Подвал этапа «Сбор»: одна строка — что за сумма (предварительный расчёт,
+// пока сбор не закончен; к распределению — когда есть готовые дни;
+// распределено) — и кнопка. Под замком кнопка нажимается и объясняет, кого
+// ждём (crStage). Шаг 2 — по готовым дням: сдали за день со всех районов —
+// он распределяется, даже если сегодняшний ещё собирают.
+function sdcSum(){
+  const st = crDistState(), d = CR || {};
+  if(st.locked) return {label: 'Предварительный расчёт', sum: d.net_total || 0, state: 'locked'};
+  if(!st.known) return {label: 'Выручка дня', sum: null, state: 'loading'};
+  if(st.pend.length) return {label: 'К распределению', sum: st.sum, state: 'ready'};
+  if(st.any) return {label: 'Распределено', sum: st.ready.map(crDistBook).reduce((a, b) => a + (b && b.base > 0 ? b.base : 0), 0), state: 'done'};
+  return {label: 'Распределять нечего', sum: 0, state: 'none'};
 }
-
-// «Соберу завтра» — у каждого района своя, рядом с «Получил» (владелец,
-// 19 сен 2026: «соберу завтра должна быть отдельно по каждому району — вдруг
-// он с какого-то забрал, а где-то просто не успевает»). Раньше была одна
-// кнопка внизу на все неполученные районы — её больше нет, подвал пуст.
-// Выручка переедет на завтра и без отметки — отметка говорит, что это
-// решение, и строка чек-листа за день не горит. Только в сегодняшнем сборе;
-// нажать ещё раз — снять.
+function sdcSumLine(l){
+  return `<div><span>${l.label}</span><strong>${l.sum == null ? '—' : `${sdcMoney(l.sum)} <small>AED</small>`}</strong></div>`;
+}
 function crFoot(){
-  const f = document.getElementById('accFoot'); if(!f) return;
+  const f = document.getElementById('sdcFoot'); if(!f) return;
   const d = CR;
-  if(!d || CRD.open || CRV.open){ f.innerHTML = ''; return; }
-  // Шаг 2 — по готовым дням: сдали за день со всех районов — он
-  // распределяется, даже если сегодняшний ещё собирают.
-  const st = crDistState();
-  if(st.locked){
-    if(!(d.need > 0) && !st.waiting.length){ f.innerHTML = ''; return; }
-    f.innerHTML = `<div class="qb-wrap"><div class="cr-foot-cap">Сначала получите выручку: ${st.wait.length ? crWaitTxt(st.wait) : crWaitDaysTxt(st.waiting)}</div>
-      <button class="qb quiet" disabled>Распределить выручку</button></div>`;
-    return;
-  }
-  const cap = st.waiting.length ? `<div class="cr-foot-cap">Ещё ждём: ${crWaitDaysTxt(st.waiting)}</div>` : '';
-  const seen = st.known && st.any && !st.pend.length;
-  f.innerHTML = `<div class="qb-wrap">${cap}${seen
-    ? `<button class="qb quiet" onclick="crDist()">${IC('check', 17)}Распределено · посмотреть</button>`
-    : st.known && !st.any
-    ? '<button class="qb quiet" disabled>Распределять нечего — выручки нет</button>'
-    : `<button class="qb" onclick="crDist()">Распределить выручку${st.sum > 0 ? ` · ${fbFmt(st.sum)} AED` : ''}</button>`}</div>`;
+  if(!d || CRD.open || CRV.open){ f.hidden = true; return; }
+  const st = crDistState(), l = sdcSum();
+  if(st.locked && !(d.need > 0) && !st.waiting.length){ f.hidden = true; return; }
+  f.hidden = false;
+  const btn = l.state === 'locked'
+    ? `<button type="button" class="sc-primary sc-distribute" aria-disabled="true" data-distribution-blocked onclick="crStage(2)">${luc('lock-keyhole')}<span>Распределить выручку</span></button>`
+    : l.state === 'done'
+    ? `<button type="button" class="sc-primary sc-distribute" onclick="crDist()">${luc('check')}<span>Распределено · посмотреть</span></button>`
+    : l.state === 'none'
+    ? `<button type="button" class="sc-primary sc-distribute" aria-disabled="true" onclick="crStage(2)"><span>Распределять нечего — выручки нет</span></button>`
+    : `<button type="button" class="sc-primary sc-distribute sc-ready" onclick="crDist()"><span>Распределить выручку</span></button>`;
+  f.innerHTML = sdcSumLine(l) + btn;
 }
 // Состояние второго этапа — одно на подвал и переключатель этапов.
 function crDistState(){
@@ -21052,26 +21456,21 @@ function crWaitTxt(wait){ return wait.map(x => escS(x.code) + (x.later ? ' — �
 function crSteps(stage){
   const d = CR || {}, st = crDistState();
   const got = d.need > 0 && d.done >= d.need;
-  const s1 = !d.need ? 'получать нечего' : got ? `получено со всех · ${d.need}` : `${d.done} из ${d.need} районов`;
+  const s1 = !d.need ? 'Получать нечего' : got ? `Получено со всех · ${d.need}` : `${d.done} из ${d.need} районов`;
   const nw = st.waiting.length;
-  const s2 = st.locked ? (d.need > 0 || nw ? 'после сбора' : 'нечего распределять')
-    : !st.known ? 'выручка дня' : st.pend.length ? `${fbFmt(st.sum)} AED`
-    : nw ? `ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : st.done ? 'согласовано' : 'нечего распределять';
-  return `<div class="cr-steps">
-    <button class="cr-step${stage === 1 ? ' on' : ''}${got ? ' done' : ''}" onclick="crStage(1)">
-      <span class="cr-step-n">${got && stage !== 1 ? IC('check', 14) : '1'}</span>
-      <span class="cr-step-b"><b>Сбор</b><i>${s1}</i></span>
-    </button>
-    <button class="cr-step${stage === 2 ? ' on' : ''}${st.locked ? ' locked' : ''}${st.done ? ' done' : ''}" onclick="crStage(2)"
-      ${st.locked ? 'aria-disabled="true"' : ''}>
-      <span class="cr-step-n">${st.locked ? IC('lock', 13) : st.done && stage !== 2 ? IC('check', 14) : '2'}</span>
-      <span class="cr-step-b"><b>Распределение</b><i>${s2}</i></span>
-    </button>
-  </div>`;
+  const s2 = st.locked ? (d.need > 0 || nw ? 'После сбора' : 'Нечего распределять')
+    : !st.known ? 'Выручка дня' : st.pend.length ? `${fbFmt(st.sum)} AED`
+    : nw ? `Ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : st.done ? 'Согласовано' : 'Нечего распределять';
+  return `<button id="sc-tab-collection" type="button" role="tab" aria-selected="${stage === 1}" aria-controls="sc-collection" data-stage="collection" onclick="crStage(1)"><span class="sc-step-number">${
+      got && stage !== 1 ? luc('check') : '1'}</span><span><strong>Сбор</strong><small>${s1}</small></span></button>
+    <button id="sc-tab-distribution" type="button" role="tab" aria-selected="${stage === 2}" aria-controls="sc-distribution"${
+      st.locked ? ' aria-disabled="true"' : ''} data-stage="distribution" onclick="crStage(2)"><span class="sc-step-number">${
+      st.locked ? luc('lock-keyhole') : st.done && stage !== 2 ? luc('check') : '2'}</span><span><strong>Распределение</strong><small>${
+      st.locked ? luc('lock-keyhole') : ''}${s2}</small></span></button>`;
 }
 function crStepsPaint(){
-  const el = document.querySelector('#accMid .cr-steps');
-  if(el) el.outerHTML = crSteps(CRD.open ? 2 : 1);
+  const el = document.getElementById('sdcSteps');
+  if(el) el.innerHTML = crSteps(CRD.open ? 2 : 1);
 }
 function crStage(n){
   if(n === 1){ if(CRD.open) crDistBack(); return; }
@@ -21177,9 +21576,6 @@ function crWait(){ return ((CR && CR.districts) || []).filter(x => !x.empty && !
 function crDayInfo(day){ return ((CR && CR.days) || []).find(x => x.day === day) || null; }
 function crDayReady(day){ const x = crDayInfo(day); return x ? !!x.ready : !crWait().length; }
 function crDayWait(day){ const x = crDayInfo(day); return x ? (x.wait || []) : crWait().map(z => z.code); }
-function crWaitDaysTxt(days){
-  return days.map(d => `${CR && d === CR.today ? 'сегодня' : escS(fbDayT(d))} — ${escS(crDayWait(d).join(', '))}`).join('; ');
-}
 function crDistBook(day){ return fbDayOf(fbBook(day.slice(0, 7)), day); }
 function crDistNorm(day){ return (((fbBook(day.slice(0, 7)) || {}).budget) || {}).norm || 0; }
 // Книгу месяца (двух — перенос через первое число) подтягиваем, пока идёт
@@ -21197,14 +21593,16 @@ async function crDist(){
   ACC_BACK = crDistBack;
   _setText('accTitle', 'Ежедневный сбор и распределение выручки');
   _setText('accSub', CR.day === CR.today ? 'сегодня' : _dayName(CR.day));
-  document.getElementById('accFoot').innerHTML = '';
-  const mid = document.getElementById('accMid');
-  mid.innerHTML = crSteps(2) + '<div class="exp-empty">Загрузка…</div>';
-  mid.scrollTop = 0;
+  sdcMount();
+  crStepsPaint();
+  const p = document.getElementById('sc-distribution');
+  if(p) p.innerHTML = sdcDistIntro() + '<div class="exp-empty">Загрузка…</div>';
+  sdcStage(2);
+  crFoot();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   const months = [...new Set(crDistDays().map(d => d.slice(0, 7)))];
   try{ await Promise.all(months.map(m => (fbBook(m) && !fbStale(m)) ? null : fbLoad(m))); }
-  catch(e){ if(CRD.open) mid.innerHTML = crSteps(2) + loadFail('crDist()'); return; }
+  catch(e){ if(CRD.open && p) p.innerHTML = sdcDistIntro() + loadFail('crDist()'); return; }
   if(CRD.open) crDistRender();
 }
 // Назад — к сбору того же дня; дальше «назад» ведёт туда, откуда пришли в сбор.
@@ -21212,14 +21610,27 @@ function crDistBack(){
   ACC_BACK = CRD.back || null;
   CRD = {open: false, edit: null, busy: false, back: null};
   CR_DAY = CR ? CR.day : '';
-  const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
+  sdcStage(1); crStepsPaint(); crFoot();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accCashRound();
 }
 
+// Этап «Распределение»: сверху та же сумма, что в подвале сбора; день, за
+// который ещё не сдали, — карточкой ожидания; готовый — карточкой книги
+// (Барракуда, РП+, ЧП; согласовать / изменить), как в «Кассе дня».
 function crDistRender(){
-  const mid = document.getElementById('accMid'); if(!mid || !CRD.open) return;
-  mid.innerHTML = crSteps(2) + crDistDays().map(crDistCard).join('');
+  const p = document.getElementById('sc-distribution'); if(!p || !CRD.open) return;
+  p.innerHTML = sdcDistIntro() + crDistDays().map(d => crDayReady(d) ? crDistCard(d) : sdcPendingDay(d)).join('');
+  crStepsPaint();
+}
+function sdcDistIntro(){
+  const l = sdcSum();
+  return `<div class="sc-distribution-intro"><span>${l.label}</span><strong>${l.sum == null ? '—' : `${sdcMoney(l.sum)} <small>AED</small>`}</strong></div>`;
+}
+function sdcPendingDay(day){
+  const title = CR && day === CR.today ? 'Сегодня' : fbDayT(day);
+  return `<div class="sc-pending-day"><div>${luc('calendar-days')}<h2>${escS(title)}</h2>${luc('lock-keyhole')}</div><p>Ждём выручку</p><span>${
+    crDayWait(day).map(escS).join(' · ')}</span></div>`;
 }
 function crDistCard(day){
   const b = crDistBook(day), norm = crDistNorm(day);
@@ -27248,7 +27659,7 @@ async function accLoadSummaries(){
 
 function accOpen(id){
   if(id === 'stock'){ openStock(); return; }          // у склада уже свой экран
-  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui'); }   // шапка штрафного листа
+  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui', 'sdc'); }   // шапка штрафного листа, оболочка сбора выручки
   _setRail('accRail', '');
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
@@ -27321,7 +27732,7 @@ function accClose(){
 
 function _accClose(){
   ACC_BACK = null;
-  document.getElementById('accOv').classList.remove('pen-ui');
+  document.getElementById('accOv').classList.remove('pen-ui', 'sdc');
   CKL_RETURN = false;
   SCAN.stop();
   MVT = null;

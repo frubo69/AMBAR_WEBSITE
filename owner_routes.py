@@ -4605,6 +4605,28 @@ async def cash_round(day: str) -> dict:
             a.update(cash=0, tips=0, spend=0, debt=0, debt_n=0, spend_card=0, spend_pending=0,
                      fx=[], items=[], net=0, empty=True)
     past = {d: await _cash_amounts(d, orders) for d in need_days}
+    # Строки водителей — складка «Водители» под КАЖДЫМ днём на карточке
+    # (владелец, 30 окт 2026: «раскрыть и посмотреть, какой водитель сколько
+    # сдал по факту»; «я должен видеть, сколько кто должен был сдать, на самой
+    # странице сбора, просто разворачивая эту инфу» — его снимок: деньги на
+    # карточке вчерашние, перенос, а складка считалась только по сегодняшнему
+    # дню, где заказов ещё нет). Считаются за дни, что попадут на карточки:
+    # день страницы, перенос и забранные поимённо; все, кто работал, со
+    # сверкой или без неё (cash_driver.rows). До начала учёта строк нет — там
+    # и сумм нет.
+    fold_days = set() if before else ({day} | {d for ch in chains.values() for d in ch}
+                                       | {d for s in solo.values() for d in s})
+    drows: dict = {}
+    for d in sorted(fold_days):
+        try:
+            import cash_driver
+            drows[d] = await cash_driver.rows(d, orders)
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[cash] водители за {d}: {e}")
+            drows[d] = {}
+
+    def _drv(d: str, oid: str) -> list:
+        return (drows.get(d) or {}).get(oid) or []
     legacy = bool((marks.get("cash") or {}).get("done"))     # старая отметка на весь день
     out, done_n, need_n, later_n = [], 0, 0, 0
     net_total = tips_total = cash_total = spend_total = carry_total = 0
@@ -4616,7 +4638,7 @@ async def cash_round(day: str) -> dict:
             if p["empty"]:
                 continue
             carry.append({"day": d, "net": p["net"], "tips": p["tips"], "cash": p["cash"],
-                          "spend": p["spend"], "orders": p["orders"],
+                          "spend": p["spend"], "orders": p["orders"], "recon": _drv(d, oid),
                           **(await _cash_fact(d, oid, p["net"], marks_all))})
         # Забранные поимённо — своей строкой, серыми: деньги уже в кассе.
         taken = []
@@ -4626,7 +4648,7 @@ async def cash_round(day: str) -> dict:
                 continue
             m_ = (marks_all.get(d) or {}).get(f"cash:{oid}") or {}
             taken.append({"day": d, "net": p["net"], "tips": p["tips"],
-                          "at": str(m_.get("at") or ""),
+                          "at": str(m_.get("at") or ""), "recon": _drv(d, oid),
                           **(await _cash_fact(d, oid, p["net"], marks_all))})
         c_net = sum(c["net"] for c in carry)
         c_tips = sum(c["tips"] for c in carry)
@@ -4692,16 +4714,6 @@ async def cash_round(day: str) -> dict:
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[cash] сверка за {day}: {e}")
         rc = {}
-    # Строки водителей района — складка «Водители» в карточке (владелец,
-    # 30 окт 2026: «раскрыть и посмотреть, какой водитель сколько сдал по
-    # факту»): все, кто работал, со сверкой или без неё (cash_driver.rows).
-    # До начала учёта строк нет — там и сумм нет.
-    try:
-        import cash_driver
-        drows = {} if before else await cash_driver.rows(day, orders)
-    except Exception as e:                                   # noqa: BLE001
-        log.warning(f"[cash] водители за {day}: {e}")
-        drows = {}
     for x in out:
         r = rc.get(x["id"]) or {}
         fact = r.get("fact")
@@ -4720,7 +4732,7 @@ async def cash_round(day: str) -> dict:
         else:
             gap, src = 0, ""
         x.update({"fact": fact, "fact_at": r.get("fact_at") or "", "gap": gap, "gap_src": src,
-                  "recon": drows.get(x["id"]) or r.get("rows") or []})
+                  "recon": _drv(day, x["id"]) or r.get("rows") or []})
     return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
             "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
             # Решено по всем: получил или «Соберу завтра» — строка чек-листа

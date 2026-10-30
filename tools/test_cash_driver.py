@@ -9,7 +9,8 @@
   • страница: пачки той же арифметикой, что итоги смены (cash_math.piles) —
     ждущие расходы вычтены, отклонённые нет; расходы все, с решениями;
     мимо наличных в «ждёт» не идёт; чай по людям; заказы строками с «взял»;
-  • /api/owner/cash-round: у района recon — строки водителей;
+  • /api/owner/cash-round: у района recon — строки водителей; назавтра они
+    при строке переноса / забранного дня (carry[].recon, taken[].recon);
     /api/owner/cash-round/driver — страница, без имени 400.
 
     python3 tools/test_cash_driver.py
@@ -147,6 +148,24 @@ async def main():
         eq("cash-round: у района строки водителей", (st, [r["name"] for r in x["recon"]]), (200, ["Али", "Гость", "Фарух"]))
         eq("карточка района считает только согласованное: расход 255 (питание 80 + 40, заправка 120, бонус 15), ждёт 60",
            (x["spend"], x["spend_pending"]), (255, 60))
+        # Назавтра деньги за D едут переносом: строки водителей — у строки ТОГО
+        # дня, а не у пустого сегодняшнего (владелец, 30 окт 2026: «я должен
+        # видеть, сколько кто должен был сдать, просто разворачивая эту инфу»).
+        st, cr2 = await get("/api/owner/cash-round", day="2026-10-30")
+        x2 = next(d for d in cr2["districts"] if d["id"] == OID)
+        eq("назавтра: у переноса за D — те же строки водителей, за сегодня — пусто",
+           (st, [(c["day"], [r["name"] for r in c["recon"]]) for c in x2["carry"]], x2["recon"]),
+           (200, [(D, ["Али", "Гость", "Фарух"])], []))
+        eq("назавтра: в строке Али за D — к сдаче 225, насчитал 100", 
+           next((r["cash_app"], r["cash"]) for c in x2["carry"] for r in c["recon"] if r["name"] == "Али"), (225, 100))
+        # Забрали ровно за D с завтрашней страницы — день уходит в «забранные», строки при нём.
+        await cl.post("/api/owner/checklist/mark", json={"day": "2026-10-30", "item": f"cash:{OID}", "done": True, "only": D},
+                      headers={"Authorization": "tma 1"})
+        st, cr3 = await get("/api/owner/cash-round", day="2026-10-30")
+        x3 = next(d for d in cr3["districts"] if d["id"] == OID)
+        eq("забрали за D: строка в «забранных» со своими водителями",
+           (x3["carry"], [(t["day"], [r["name"] for r in t["recon"]]) for t in x3["taken"]]),
+           ([], [(D, ["Али", "Гость", "Фарух"])]))
         st, p = await get("/api/owner/cash-round/driver", day=D, name="Али")
         eq("страница по ручке", (st, p["name"], p["cash_app"]), (200, "Али", 225))
         st, e = await get("/api/owner/cash-round/driver", day=D)

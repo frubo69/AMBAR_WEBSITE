@@ -2438,6 +2438,10 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* Факт за день внутри разбивки (владелец, 24 окт 2026): под строкой дня,
    компактнее районного, без своей черты — черта у следующего дня. */
 .cr-carry .cr-fact{margin-top:0;padding:0 0 8px;border-top:0;gap:10px}
+/* складка «Водители» внутри разбивки по дням — под «Сдали» своего дня */
+.cr-carry .cr-fold{margin-top:0;padding:8px 2px 6px;border-top:1px solid rgba(201,169,110,.14)}
+.cr-carry .cr-drvs{margin:0 0 4px}
+.cr-carry .cr-drv{border-top-color:rgba(201,169,110,.14)}
 .cr-carry .cr-fact i{font-size:10px;letter-spacing:.8px}
 .cr-carry .cr-fact .in{height:36px;padding:0 11px;border-radius:10px}
 .cr-carry .cr-fact .in input{font-size:16px}
@@ -20696,9 +20700,9 @@ function crCard(x){
         остаток > 0 ? `остаток <b>${fmt(остаток)}</b>` : остаток < 0 ? `сверх <b>+${fmt(-остаток)}</b>` : 'сошлось'}</div>` : '';
   const разбивка = (carry.length || взятые.length) ? `<div class="cr-carry">${
       есть_сегодня ? деньРяд(сегодня, x.net, x.tips, CR.day, !!x.solo_today)
-        + crFactLine(x, CR.day, x.net, x.fact, {cls: 'd', op: x.gap_src === 'op' ? x.gap : null}) : ''}${
-      carry.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, false) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'})).join('')}${
-      взятые.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, true) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'})).join('')}${
+        + crFactLine(x, CR.day, x.net, x.fact, {cls: 'd', op: x.gap_src === 'op' ? x.gap : null}) + crDrvFold(x, CR.day, x.recon) : ''}${
+      carry.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, false) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'}) + crDrvFold(x, c.day, c.recon)).join('')}${
+      взятые.map(c => деньРяд(_dayName(c.day), c.net, c.tips, c.day, true) + crFactLine(x, c.day, c.net, c.fact, {cls: 'd'}) + crDrvFold(x, c.day, c.recon)).join('')}${
       итог}</div>` : '';
   return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
     <div class="cr-h">
@@ -20716,7 +20720,7 @@ function crCard(x){
       x.spend_card ? ` · безналом <b>${fmt(x.spend_card)}</b> — не из наличных` : ''}${
       x.spend_pending ? ` · <span class="warn">ещё ${fmt(x.spend_pending)} ждёт решения</span>` : ''}${
       долг ? ` · ${долг}` : ''}</div>
-    ${разбивка ? '' : crFactRow(x)}${crDrvFold(x)}
+    ${разбивка ? '' : crFactRow(x) + crDrvFold(x, CR.day, x.recon)}
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
@@ -20764,31 +20768,35 @@ function crFactLine(x, day, net, fact, opt){
 // отдельной странице, сколько за смену он заработал, сколько у него расходов,
 // какими они были, есть ли те, что не согласовали или ещё не согласованные,
 // сколько он чая наработал — чтобы расхождения было просто искать».
-// Складка «Водители · N» под «Сдали», в одном ряду с «Расходы за смену»:
-// строка — имя, заказы и сверка подстрокой; справа первым числом — сколько
-// к сдаче по приложению (владелец, 30 окт 2026: «я должен видеть, сколько
-// кто должен был сдать, на самой странице сбора выручки, просто разворачивая
-// эту инфу»), под ним — что насчитал («по факту», если оператор подтвердил)
-// и разница; не считал — «не сверял». Нажатие — страница водителя (crDriver).
+// Складка «Водители · N» под КАЖДЫМ днём на карточке — под «Сдали» этого
+// дня: деньги за вчерашнюю смену старший берёт утром на сегодняшней странице,
+// переносом, и водители ему нужны вчерашние (владелец, 30 окт 2026: «я должен
+// видеть, сколько кто должен был сдать, на самой странице сбора выручки,
+// просто разворачивая эту инфу» — на его снимке карточка с переносом за
+// 29 октября и без складки: она считалась только по сегодняшнему дню, где
+// заказов ещё нет). Строка — имя, заказы и сверка подстрокой; справа первым
+// числом — сколько к сдаче по приложению, под ним — что насчитал («по
+// факту», если оператор подтвердил) и разница; не считал — «не сверял».
+// Нажатие — страница водителя за ЭТОТ день (crDriver).
 let CR_DRV_OPEN = new Set();
-function crDrvFold(x){
-  const rows = x.recon || [];
+function crDrvFold(x, day, rows){
+  rows = rows || [];
   if(!rows.length) return '';
-  const open = CR_DRV_OPEN.has(x.id);
+  const key = `${x.id}:${day}`, open = CR_DRV_OPEN.has(key);
   const bad = rows.filter(r => r.mismatch || r.fix_open).length;
   const gap = rows.filter(r => r.op_fact != null && r.op_gap).length;
   const hint = bad ? `<i>${bad} ${pluralize(bad, 'расхождение', 'расхождения', 'расхождений')}</i>`
     : gap ? `<i>${gap} по факту</i>` : '';
-  return `<button class="cr-fold${open ? ' on' : ''}" onclick="crDrvToggle('${escS(x.id)}')">
+  return `<button class="cr-fold drv${open ? ' on' : ''}" onclick="crDrvToggle('${escS(key)}')">
       <span>Водители · ${rows.length}${hint}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-    </button>${open ? `<div class="cr-drvs">${rows.map(crDrvRow).join('')}</div>` : ''}`;
+    </button>${open ? `<div class="cr-drvs">${rows.map(r => crDrvRow(r, day)).join('')}</div>` : ''}`;
 }
-function crDrvRow(r){
+function crDrvRow(r, day){
   const факт = r.op_fact != null;
   const сдал = факт ? r.op_fact : r.cash;                 // насчитал сам / подтвердил оператор
   const d = факт ? r.op_gap : (r.cash != null ? r.diff : null);
-  const части = [`${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}`];
+  const части = r.orders == null ? [] : [`${r.orders} ${pluralize(r.orders, 'заказ', 'заказа', 'заказов')}`];
   if(факт) части.push(`оператор подтвердил${r.op_fact_by ? ' · ' + escS(r.op_fact_by) : ''}`);
   else if(r.mismatch) части.push('ждёт оператора');
   else if(r.cash != null && !r.confirmed && r.ok) части.push(`сверил ${r.ok} из 3`);
@@ -20799,14 +20807,14 @@ function crDrvRow(r){
   const разн = d == null ? '' : d === 0 ? `<em>${IC('check', 11)}сошлось</em>` : `<em>${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}</em>`;
   const низ = сдал != null ? `<i>${факт ? 'по факту' : 'насчитал'}</i><b${cls}>${fmt(сдал)}${разн}</b>`
     : `<i class="w">${r.started ? 'считает' : 'не сверял'}</i>`;
-  return `<button class="cr-drv" onclick="crDriver('${escS(r.name)}')">
+  return `<button class="cr-drv" onclick="crDriver('${escS(r.name)}', '${escS(day)}')">
     <span class="cr-drv-b"><b>${escS(r.name)}</b><i${warn ? ' class="warn"' : ''}>${части.join(' · ')}</i></span>
     <span class="cr-drv-r"><i>к сдаче</i><b class="due">${fmt(r.cash_app)}<u>AED</u></b>${низ}</span>
     <svg class="cr-drv-ch" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
   </button>`;
 }
-function crDrvToggle(id){
-  if(CR_DRV_OPEN.has(id)) CR_DRV_OPEN.delete(id); else CR_DRV_OPEN.add(id);
+function crDrvToggle(key){
+  if(CR_DRV_OPEN.has(key)) CR_DRV_OPEN.delete(key); else CR_DRV_OPEN.add(key);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   crRender();
 }
@@ -20815,10 +20823,13 @@ function crDrvToggle(id){
 // дня (как «Распределение»). Числа — те же, что видел водитель в своих
 // «Итогах смены» (cash_math.piles на сервере): две пачки, сверка, расходы с
 // решениями, чай по людям, своё, заказы строками.
-let CRV = {open: false, name: '', day: '', data: null, back: null};
-async function crDriver(name, back){
-  const day = CRV.open ? CRV.day : (CR ? CR.day : accDay());
-  CRV = {open: true, name, day, data: null, back: CRV.open ? CRV.back : (back !== undefined ? back : ACC_BACK)};
+// day — день водителя (день строки разбивки: вчерашний перенос на сегодняшней
+// странице); page — день открытой страницы сбора, назад ведёт на неё.
+let CRV = {open: false, name: '', day: '', page: '', data: null, back: null};
+async function crDriver(name, day, back){
+  const page = CRV.open ? CRV.page : (CR ? CR.day : accDay());
+  day = day || (CRV.open ? CRV.day : page);
+  CRV = {open: true, name, day, page, data: null, back: CRV.open ? CRV.back : (back !== undefined ? back : ACC_BACK)};
   ACC_BACK = crDriverBack;
   _setText('accTitle', name);
   _setText('accSub', crDrvDay(day));
@@ -20830,7 +20841,7 @@ async function crDriver(name, back){
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/driver', {params: {day, name}}); }
   catch(e){
-    if(CRV.open && CRV.name === name) mid.innerHTML = loadFail(`crDriver('${escS(name)}')`);
+    if(CRV.open && CRV.name === name) mid.innerHTML = loadFail(`crDriver('${escS(name)}', '${escS(day)}')`);
     return;
   }
   if(!CRV.open || CRV.name !== name) return;
@@ -20841,19 +20852,22 @@ async function crDriver(name, back){
 function crDrvDay(day){ return CR && day === CR.today ? 'сегодня' : _dayName(day); }
 function crDriverBack(){
   ACC_BACK = CRV.back || null;
-  const day = CRV.day;
-  CRV = {open: false, name: '', day: '', data: null, back: null};
-  CR_DAY = day;
+  const page = CRV.page || CRV.day;
+  CRV = {open: false, name: '', day: '', page: '', data: null, back: null};
+  CR_DAY = page;
   const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accCashRound();
 }
-// Расходы ждут решения — в «Расходы смены», и обратно на эту же страницу.
+// Расходы ждут решения — в «Расходы смены» за ДЕНЬ водителя (полоса дня
+// переставляется, назад — возвращается), и обратно на эту же страницу.
 function crDrvToExp(){
-  const name = CRV.name, back = CRV.back;
-  CRV = {open: false, name: '', day: '', data: null, back: null};
+  const name = CRV.name, day = CRV.day, back = CRV.back, prev = DAY_OFFSET;
+  CRV = {open: false, name: '', day: '', page: '', data: null, back: null};
+  const off = Math.max(0, Math.round((Date.parse(_dayIsoFor(0)) - Date.parse(day)) / 86400000) || 0);
+  if(off !== DAY_OFFSET) accDaySet(off);
   accOpen('expenses');
-  ACC_BACK = () => crDriver(name, back);
+  ACC_BACK = () => { if(DAY_OFFSET !== prev) accDaySet(prev); crDriver(name, day, back); };
 }
 function crDriverRender(){
   const mid = document.getElementById('accMid'), r = CRV.data;

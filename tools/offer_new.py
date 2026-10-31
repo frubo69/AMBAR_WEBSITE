@@ -8,8 +8,10 @@
 Файл состава (json) пишет генератор PDF (scratchpad/offer-2000/build.py --spec):
   {"items": [{"id": "p6", "qty": 1}, {"id": "p43", "qty": 1, "pcs": 12}, ...],
    "gift": {"id": "p97", "qty": 1}, "discount": 200, "total": 1750,
-   "title": "Personal offer", "note": "для кого", "days": 3}
+   "title": "Personal offer", "note": "для кого", "days": 3, "until": "2026-11-03"}
 Пиво — только с pcs (12/24): пачка другой фасовки предложению не считается.
+Срок: days — ровно столько суток с создания; until — до конца этого дня по
+Дубаю (так в PDF можно честно написать «Valid until 3 November»); until главнее.
 
 На сервере:
   /opt/ambar/venv/bin/python /opt/ambar/tools/offer_new.py spec.json   # создать: код, ссылка, срок
@@ -110,9 +112,15 @@ async def create(path: str) -> int:
     bad = check(spec, cat)
     if bad:
         print("состав не годится:\n  " + "\n  ".join(bad)); return 2
+    days = int(spec.get("days") or offers.DAYS)
+    if spec.get("until"):
+        end = datetime.fromisoformat(str(spec["until"])).replace(hour=23, minute=59, second=59, tzinfo=DUBAI)
+        days = (end - datetime.now(timezone.utc)).total_seconds() / 86400
+        if days <= 0:
+            print(f"until {spec['until']} уже прошёл"); return 2
     doc = offers.new_doc(spec.get("items") or [], spec.get("discount") or 0, spec.get("gift"),
                          title=spec.get("title") or "", total=spec.get("total"),
-                         note=spec.get("note") or "", days=int(spec.get("days") or offers.DAYS))
+                         note=spec.get("note") or "", days=days)
     await db.connect()
     if db._db_or_none() is None:
         print("нет базы"); return 1

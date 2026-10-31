@@ -3068,6 +3068,19 @@ async def supply_set(sid: str, fields: dict, only_open: bool = True) -> bool:
     return r.modified_count > 0
 
 
+async def supply_base_rename(sid: str, old: str, new: str) -> bool:
+    """Назвать базу доп. заявки по факту — в любом статусе. У черновиков,
+    собранных из её недобора, в «где уже искали» старое имя меняется на новое."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.supplies.update_one({"_id": sid}, {"$set": {"base": new}})
+    if old:
+        async for c in db.supplies.find({"from_supply": sid, "tried_bases": old}, {"tried_bases": 1}):
+            tried = list(dict.fromkeys(new if b == old else b for b in (c.get("tried_bases") or [])))
+            await db.supplies.update_one({"_id": c["_id"]}, {"$set": {"tried_bases": tried}})
+    return r.modified_count > 0
+
+
 async def supplies_children(sids: list) -> dict:
     """Заявки, собранные из недобора указанных: {родитель: [дети]}. Дети —
     без задач целиком: нужен состав по районам, статус и база."""
@@ -3345,6 +3358,21 @@ async def base_price_set(key: str, base: str, product_id: str, price: float, nam
         "base_key": key, "base": base, "item": product_id, "name": name,
         "price": float(price), "at": now, "by": str(who or "")[:60], "supply_id": sid}},
         upsert=True)
+
+
+async def base_price_rekey(old_key: str, new_key: str, base: str, sid: str) -> int:
+    """Базу назвали по факту — цены, записанные этой заявкой при старом имени,
+    переезжают под новое. Ключ сидит в _id, поэтому запись удаляется и
+    кладётся заново; чужие записи под старым именем не трогаем."""
+    db = _db_or_none()
+    if db is None or not old_key or not new_key or old_key == new_key: return 0
+    n = 0
+    async for p in db.base_prices.find({"base_key": old_key, "supply_id": sid}):
+        await db.base_prices.delete_one({"_id": p["_id"]})
+        p.update(_id=f"{new_key}:{p.get('item')}", base_key=new_key, base=base)
+        await db.base_prices.replace_one({"_id": p["_id"]}, p, upsert=True)
+        n += 1
+    return n
 
 
 async def base_prices(key: str = "") -> list:

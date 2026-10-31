@@ -3102,6 +3102,44 @@ async def handle_draft_confirm(request):
 
 
 @require_owner
+async def handle_base_set(request):
+    """POST /api/owner/supply/{sid}/base {base, as?} — назвать базу по факту.
+
+    Заявку на другую базу собирают, ещё не зная, где купят (владелец, 1 ноя
+    2026: пресеты «Не знаем» / «Где найдём» вместо названия), а где купили на
+    самом деле — вписывают потом, хоть после приёмки, и это не обязательно.
+    Только kind=extra, кроме отменённой. Цены, записанные при старом имени
+    базы (db.base_prices), переезжают под новое; у следующей доп. заявки из
+    её недобора «где уже искали» тоже переписывается.
+    """
+    sid = request.match_info.get("sid") or ""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if (sup.get("kind") or "main") != "extra":
+        return web.json_response({"error": "not_extra"}, status=403, headers=CORS_HEADERS)
+    if (sup.get("status") or "") == "cancelled":
+        return web.json_response({"error": "cancelled"}, status=409, headers=CORS_HEADERS)
+    base = re.sub(r"\s+", " ", str(body.get("base") or "")).strip()[:60]
+    if not base:
+        return web.json_response({"error": "no_base"}, status=400, headers=CORS_HEADERS)
+    old = sup.get("base") or ""
+    if base != old:
+        await db.supply_base_rename(sid, old, base)
+        if _base_key(old) != _base_key(base):
+            try:
+                await db.base_price_rekey(_base_key(old), _base_key(base), base, sid)
+            except Exception as e:                       # noqa: BLE001
+                log.warning(f"[supply] цены базы не переехали: {e}")
+        log.info(f"[supply] база заявки {sid}: «{old}» → «{base}» · {_owner_name(request, body)}")
+    return web.json_response({"ok": True, "supply_id": sid, "base": base}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_cancel(request):
     """Отменить заявку: магазин не привёз, поехали в другой, передумали.
 
@@ -3852,6 +3890,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/release",         handle_release,      "POST"),
         ("/api/owner/supply/{sid}/cancel",          handle_cancel,       "POST"),
         ("/api/owner/supply/{sid}/confirm",         handle_draft_confirm, "POST"),
+        ("/api/owner/supply/{sid}/base",            handle_base_set,     "POST"),
         ("/api/owner/supply/{sid}/shortfall",       handle_short_export, "GET"),
         ("/api/owner/supply/{sid}/shortfall/send",  handle_short_send,   "POST"),
         # Приёмка руками старшего. Под своим «/task/», а не рядом: «/release»

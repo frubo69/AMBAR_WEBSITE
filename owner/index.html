@@ -3547,6 +3547,7 @@ button.path:active{transform:scale(.995)}
 .pin-pop.crw-ask.xsend{width:min(360px,calc(100vw - 32px))}
 .pin-pop.crw-ask.xsend.kb{top:max(20px,7vh)!important;transform:translate(-50%,0)!important;animation:none!important}
 .xsend .xs-in{font-size:15.5px;padding:13px 14px}
+.xsend .crw-ask-t + .xs-in{margin-top:10px}
 .xsend .xs-chips{margin:10px 0 4px}
 .xsend .crw-ask-b:disabled{opacity:.4}
 .xs-chip{padding:9px 14px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:13px;
@@ -33259,8 +33260,7 @@ async function xSend(sid){
     <input class="xs-in" id="xSendIn" placeholder="Название базы" maxlength="60" autocomplete="off"
            oninput="xSendPaint()" onfocus="this.closest('.xsend').classList.add('kb')"
            onblur="this.closest('.xsend').classList.remove('kb')">
-    ${recent.length ? `<div class="xs-chips">${recent.map(b =>
-      `<button class="xs-chip" data-b="${escS(b)}" onclick="xSendPick(this.dataset.b)">${escS(b)}</button>`).join('')}</div>` : ''}
+    ${xBaseChips('', recent, 'xSendPick')}
     <button class="crw-ask-b go" id="xSendGo" disabled onclick="xSendGo()">Отправить водителям</button>
     <button class="crw-ask-b bad" onclick="xSendDrop()">Отменить заявку</button>`;
   document.body.append(back, box);
@@ -33302,6 +33302,65 @@ async function xSendDrop(){
   closePinPop(); XSEND = null;
   _toast('Заявка отменена');
   accExtra();
+}
+
+// Где купили на самом деле — вписывают после поездки, хоть после приёмки
+// (владелец, 1 ноя 2026: «в конце добавь возможность редактировать название
+// этой базы, по факту где купили, но это не обязательно»). Окно как у
+// отправки черновика: поле с нынешним именем, пресеты и недавние базы, одна
+// кнопка; пока имя не поменяли — она не нажимается.
+let XBASE = null;
+function xBaseEdit(sid){
+  const d = (SUP_D && SUP_D.supply_id === sid) ? SUP_D : null;
+  if(!d || d.kind !== 'extra') return;
+  const cur = String(d.base || '').replace(/\s+/g, ' ').trim();
+  XBASE = {sid, cur};
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask xsend';
+  const recent = [...new Set(_xList().map(v => v.base).filter(Boolean))].slice(0, 6);
+  box.innerHTML = `
+    <div class="crw-ask-t">База</div>
+    <input class="xs-in" id="xBaseIn" placeholder="Название базы" maxlength="60" autocomplete="off"
+           value="${escS(cur)}" oninput="xBasePaint()"
+           onfocus="this.closest('.xsend').classList.add('kb')"
+           onblur="this.closest('.xsend').classList.remove('kb')"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();xBaseSave()}">
+    ${xBaseChips(cur, recent, 'xBasePick')}
+    <button class="crw-ask-b go" id="xBaseGo" disabled onclick="xBaseSave()">Сохранить</button>`;
+  document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function xBasePaint(){
+  const v = ((document.getElementById('xBaseIn') || {}).value || '').replace(/\s+/g, ' ').trim();
+  const b = document.getElementById('xBaseGo'); if(b) b.disabled = !v || v === (XBASE || {}).cur;
+  document.querySelectorAll('.xsend .xs-chip').forEach(c => c.classList.toggle('on', c.dataset.b === v));
+}
+function xBasePick(b){
+  const i = document.getElementById('xBaseIn'); if(i) i.value = b;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  xBasePaint();
+}
+async function xBaseSave(){
+  if(!XBASE) return;
+  const base = ((document.getElementById('xBaseIn') || {}).value || '').replace(/\s+/g, ' ').trim();
+  if(!base || base === XBASE.cur) return;
+  const b = document.getElementById('xBaseGo'); b.disabled = true; b.textContent = 'Сохраняю…';
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(XBASE.sid)}/base`,
+      {method: 'POST', body: {base, as: _rcvMe()}});
+  }catch(e){
+    b.disabled = false; b.textContent = 'Сохранить';
+    return _toast('Не удалось сохранить');
+  }
+  const sid = XBASE.sid;
+  closePinPop(); XBASE = null;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast('База · ' + base);
+  await supLoad(sid);
 }
 
 // ── Черновик докупки: сперва состав, потом база (владелец, 28 окт 2026:
@@ -33882,10 +33941,9 @@ function xRender(){
     mid.innerHTML = steps + `<div class="xs-h">Куда едем?</div>
       <input class="xs-in" id="xsBase" placeholder="Название базы" value="${escS(XS.base)}"
              autocomplete="off" enterkeyhint="next"
-             oninput="XS.base=this.value;xFoot()"
+             oninput="XS.base=this.value;xFoot();xChipsOn(this.value)"
              onkeydown="if(event.key==='Enter'){event.preventDefault();xNext()}">
-      ${recent.length ? `<div class="xs-chips">${recent.map(b =>
-        `<button class="xs-chip ${b === XS.base.trim() ? 'on' : ''}" onclick="xBase('${escS(b)}')">${escS(b)}</button>`).join('')}</div>` : ''}`;
+      ${xBaseChips(XS.base.trim(), recent, 'xBase')}`;
     setTimeout(() => { const e = document.getElementById('xsBase'); if(e && !XS.base) e.focus(); }, 80);
   }else if(s === 2){
     // Один район за раз: старший видит, куда сейчас набирает, а не держит
@@ -34074,6 +34132,20 @@ function xSkip(){
   const o = xCur();
   Object.values(XS.rows).forEach(r => { delete r.by[o]; });
   xNext(true);
+}
+// Базу часто ещё не знают, когда собирают заявку (владелец, 1 ноя 2026:
+// «кнопки пресетом, где название базы — не знаем / где найдём»): пресеты
+// стоят первыми, за ними недавние базы. Где купили на самом деле — вписывают
+// потом на странице заявки (xBaseEdit), и это не обязательно.
+const XS_PRESETS = ['Не знаем', 'Где найдём'];
+function xBaseChips(cur, recent, fn){
+  const all = [...XS_PRESETS, ...(recent || []).filter(b => b && !XS_PRESETS.includes(b))];
+  return `<div class="xs-chips">${all.map(b =>
+    `<button class="xs-chip ${b === cur ? 'on' : ''}" data-b="${escS(b)}" onclick="${fn}(this.dataset.b)">${escS(b)}</button>`).join('')}</div>`;
+}
+function xChipsOn(v){
+  v = String(v || '').replace(/\s+/g, ' ').trim();
+  document.querySelectorAll('#accMid .xs-chips .xs-chip[data-b]').forEach(c => c.classList.toggle('on', c.dataset.b === v));
 }
 function xBase(b){ XS.base = b; xRender(); }
 function xNext(skip){
@@ -34561,6 +34633,11 @@ function xFlowCard(d){
       return `<span class="xf-s ${cls}"><b>${cls === 'done' ? IC('check', 12) : k}</b><i>${t}</i></span>`;
     }).join('<u></u>')}</div>
     <div class="xf-hint">${HINT[f.step] || ''}</div>
+    ${d.status === 'cancelled' ? '' : `<button class="xf-prices" onclick="xBaseEdit('${escS(d.supply_id)}')">
+      <span>База</span>
+      <b>${escS(d.base || 'не названа')}</b>
+      <em>${ICO_CHEV}</em>
+    </button>`}
     <button class="xf-prices${f.priced < f.n ? ' warn' : ''}" onclick="xPrices('${escS(d.supply_id)}')">
       <span>Цены закупки</span>
       <b>${f.priced} из ${f.n}${f.cost ? ` · ${fmt(Math.round(f.cost))} AED` : ''}</b>

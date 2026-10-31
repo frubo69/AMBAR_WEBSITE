@@ -199,7 +199,8 @@ def sale_item(it: dict, cat: dict) -> tuple:
     """
     pid = it.get("id")
     q = _qty(it)
-    if not pid or not q:
+    # Скидка спецпредложения (offers.py) — строка с минусом, не бутылка.
+    if it.get("offer") or pid == "offer" or not pid or not q:
         return "", 0.0
     if pid not in cat and "_" in str(pid):
         base, _, хвост = str(pid).rpartition("_")

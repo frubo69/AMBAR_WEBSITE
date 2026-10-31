@@ -4,6 +4,7 @@ AMBAR API + Static file server — MongoDB edition
 - Serves the mini app HTML/assets on /
 - GET  /api/orders  → order history for authenticated Telegram user
 - POST /api/order   → create order, notify customer + operators
+- GET  /api/offer/{code} → персональное предложение по коду из ссылки (offers.py)
 - POST /api/support/send        → support chat message
 - POST /api/support/send-image  → support chat photo
 - GET  /api/support/messages    → fetch conversation
@@ -19,6 +20,7 @@ import aiohttp as _aiohttp
 from aiohttp import web
 from dotenv import load_dotenv
 import db
+import offers as _offers
 from customer_card import render_customer_card
 from config import (
     CRYPTO_REAL_MODE, CRYPTO_USDT_PER_AED, CRYPTO_REQUIRED_CONF,
@@ -578,6 +580,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
     if _rate_limited("order", uid, 10, 60):
         log.warning(f"[rl] order flood from uid={uid}")
         return _too_many()
+    # Подарок и скидку кладёт сервер: присланные клиентом строки с такими
+    # флагами или с минусом в цене отбрасываются (offers.py).
+    data["items"] = _offers.clean_client_items(data.get("items") or [])
     # Ban check — reject order if user is banned
     try:
         if await db.is_banned(uid):
@@ -682,8 +687,35 @@ async def handle_create_order(request: web.Request) -> web.Response:
     test = bool(data.get("test")) and uid in _TEST_ORDER_IDS
     if test and (prepaid or data.get("payment_method") == "crypto"):
         return web.json_response({"error": "test_no_crypto"}, status=400, headers=CORS_HEADERS)
-    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt, free=free,
-                                            test=test)
+    # Персональное предложение (offers.py): код из ссылки оффера. Проверяем
+    # состав и занимаем код ДО записи заказа — второй заказ по тому же коду не
+    # пройдёт, даже если два POST пришли разом. Криптой оффер не оформляется:
+    # счёт считается без скидки.
+    offer = None
+    _code = _offers.norm_code(data.get("offer"))
+    if _code:
+        if prepaid or data.get("payment_method") == "crypto":
+            return web.json_response({"error": "offer_no_crypto"}, status=400, headers=CORS_HEADERS)
+        _doc = await db.offer_get(_code)
+        _st = _offers.state(_doc)
+        if _st != "active":
+            log.warning(f"[offer] uid={uid} код {_code}: {_st}")
+            return web.json_response({"error": f"offer_{_st}"}, status=409, headers=CORS_HEADERS)
+        if not _offers.covered(_doc, data.get("items") or []):
+            log.warning(f"[offer] uid={uid} код {_code}: в корзине не всё из предложения")
+            return web.json_response({"error": "offer_items_missing"}, status=400, headers=CORS_HEADERS)
+        offer = await db.offer_claim(_code, oid, uid, datetime.now(timezone.utc).isoformat())
+        if not offer:
+            log.warning(f"[offer] uid={uid} код {_code} занят между проверкой и записью")
+            return web.json_response({"error": "offer_used"}, status=409, headers=CORS_HEADERS)
+        log.info(f"[offer] #{oid} по коду {_code}: скидка {offer.get('discount')} AED")
+    try:
+        result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt, free=free,
+                                                test=test, offer=offer)
+    except Exception:
+        if offer:
+            await db.offer_release(_code, oid)
+        raise
     return web.json_response(
         {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"],
          "test": test},
@@ -712,7 +744,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                                    prepaid: dict | None = None,
                                    debt: bool = False,
                                    free: bool = False,
-                                   test: bool = False) -> dict:
+                                   test: bool = False,
+                                   offer: dict | None = None) -> dict:
     """Persist an accepted order and run the full notification fan-out: customer
     card, first-order verification gate, operator + owner notifications, and
     referral points. Shared by the live POST /api/order path and the crypto
@@ -739,6 +772,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         pass
 
     items     = src.get("items", [])
+    # Персональное предложение: подарок и строку скидки кладёт сервер (offers.py).
+    if offer:
+        items = _offers.apply(items, offer, await asyncio.to_thread(_load_catalog_by_id), lang)
     phone     = src.get("phone", "—")
     # Три номера живут отдельно и намеренно: подтверждённый нельзя потерять,
     # даже если клиент вписал в доставку другой. Оператор видит всё.
@@ -861,6 +897,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         "status": "pending",    "timestamp": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    if offer:
+        # Код, скидка и подарок — на заказе: по ним карточки, лента и статус оффера.
+        order_doc["offer"] = _offers.order_fields(offer)
     if prepaid:
         order_doc["payment_method"]     = "crypto"
         order_doc["paid"]               = True
@@ -1071,6 +1110,15 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         )
     else:
         paid_banner = ""
+    if offer:
+        # Заказ по персональному предложению: оператор должен видеть, что
+        # скидка от компании и уже вычтена, а бутылка в составе — подарок.
+        _g = next((i for i in items if i.get("offer_gift")), None)
+        paid_banner += (
+            "\n\n<blockquote>🏷 <b>СПЕЦПРЕДЛОЖЕНИЕ КОМПАНИИ</b>\n"
+            f"Скидка <b>{int(offer.get('discount') or 0)} AED</b> уже вычтена из итога"
+            + (f"\n🎁 Подарок: <b>{_html_mod.escape(str(_g.get('name') or ''))}</b> — бесплатно" if _g else "")
+            + f"\nКод {_html_mod.escape(str(offer.get('code') or ''))}</blockquote>")
     tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
     # Номера в карточку заказа НЕ попадают: она пересылается водителям и висит
     # в общем чате операторов. Телефон живёт только за кнопкой «Клиент»
@@ -1149,7 +1197,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
                                uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
                                items=items, prepaid=prepaid, held=_needs_verification,
-                               test=test, free=free)
+                               test=test, free=free, offer=order_doc.get("offer"))
     except Exception as e:
         log.error(f"[owner-notif] orders.new failed: {e}")
 
@@ -1298,8 +1346,9 @@ async def _goods_subtotal_aed(items: list) -> float:
     catalog = await asyncio.to_thread(_load_catalog_by_id)
     subtotal = 0.0
     for it in (items or []):
-        # Подарок бесплатен и в свой же порог не засчитывается.
-        if it.get("gift"):
+        # Подарок бесплатен и в свой же порог не засчитывается; скидка
+        # спецпредложения — не товар.
+        if it.get("gift") or it.get("offer"):
             continue
         try:
             qty = int(it.get("qty", 0) or 0)
@@ -1326,6 +1375,14 @@ async def _recompute_order_total_aed(items: list, tip: float) -> float:
     subtotal = 0.0
     for it in (items or []):
         if it.get("gift"):
+            continue
+        if it.get("offer"):
+            # Скидка спецпредложения — строка с минусом, которую положил сервер
+            # (offers.py); клиентские строки с минусом отброшены на входе.
+            try:
+                subtotal += float(it.get("line_total", 0) or 0)
+            except (TypeError, ValueError):
+                pass
             continue
         try:
             qty = int(it.get("qty", 0) or 0)
@@ -1363,6 +1420,9 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
     uid = user.get("id")
 
+    # Персональное предложение криптой не оформляется: счёт считался бы без скидки.
+    if _offers.norm_code(data.get("offer")):
+        return web.json_response({"error": "offer_no_crypto"}, status=400, headers=CORS_HEADERS)
     # Re-enforce the rollout gate server-side (the /api/me flag is display-only).
     if not _crypto_enabled_for(uid):
         return web.json_response({"error": "crypto_not_enabled"}, status=403, headers=CORS_HEADERS)
@@ -2163,6 +2223,23 @@ async def handle_verify_request(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+# ── GET /api/offer/{code} ─────────────────────────────────────────────────────
+async def handle_offer_get(request: web.Request) -> web.Response:
+    """Персональное предложение по коду из ссылки (offers.py). Без подписи:
+    код и есть секрет, приложение спрашивает его раньше всего остального.
+    Чужого в ответе нет — только состав, подарок, скидка и срок."""
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    if _rate_limited("offer", request.remote, 30, 60):
+        return _too_many()
+    code = _offers.norm_code(request.match_info.get("code", ""))
+    doc = await db.offer_get(code) if code else None
+    view = _offers.public_view(doc)
+    # Код из головы — «не найдено», как у любой ручки с ключом в адресе
+    # (tools/audit_auth.py); тело то же, приложение читает state.
+    return web.json_response(view, status=404 if view["state"] == "unknown" else 200, headers=CORS_HEADERS)
+
+
 # ── GET /api/orders ───────────────────────────────────────────────────────────
 async def handle_orders(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -2952,6 +3029,8 @@ def build_app() -> web.Application:
     app.router.add_post(           "/api/verify-request",     handle_verify_request)
     app.router.add_route("OPTIONS", "/api/orders",             handle_orders)
     app.router.add_get(            "/api/orders",              handle_orders)
+    app.router.add_route("OPTIONS", "/api/offer/{code}",       handle_offer_get)
+    app.router.add_get(            "/api/offer/{code}",        handle_offer_get)
     app.router.add_route("OPTIONS", "/api/order",              handle_create_order)
     app.router.add_post(           "/api/order",               handle_create_order)
     app.router.add_route("OPTIONS", "/api/crypto/invoice",       handle_crypto_invoice_create)

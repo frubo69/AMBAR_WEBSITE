@@ -460,6 +460,9 @@ def _build_items(raw_items: list, source: str = "manual") -> tuple[list, str]:
     items = []
     for line in raw_items or []:
         pid = str(line.get("id", ""))
+        if line.get("offer") or pid == "offer":
+            # Скидка спецпредложения — не товар; её вернёт offers.keep_lines.
+            continue
         p = by_id.get(pid)
         if not p:
             return [], f"unknown product: {pid}"
@@ -1680,6 +1683,8 @@ async def handle_patch(request):
         if err:
             return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
         items = _keep_gift(order.get("items"), items)
+        import offers as _of
+        items = _of.keep_lines(order.get("items"), items)
         # личный ценник клиента: снимок заказа главнее, текущий ценник — для
         # строк, которых в снимке не было (clients.py)
         import clients as _clients

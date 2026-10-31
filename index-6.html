@@ -407,6 +407,17 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .gift-track i{display:block;height:100%;border-radius:2px;background:var(--gold);
   transition:width .3s cubic-bezier(.4,0,.2,1)}
 .gift-bar.on .gift-track i{background:#4CAF7D}
+/* Персональное предложение по ссылке из оффера (offers.py): скидка и подарок
+   строкой над подарком за сумму; набор в корзине неполный — плашка гаснет. */
+.offer-bar{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:12px;margin-bottom:10px;
+  background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.25)}
+.offer-bar svg{flex-shrink:0;margin-top:1px;stroke:var(--gold)}
+.offer-b{flex:1;min-width:0}
+.offer-t{display:block;font-size:12.5px;font-weight:700;color:var(--gold);line-height:1.3}
+.offer-s{display:block;font-size:11.5px;color:var(--sub);line-height:1.4;margin-top:3px}
+.offer-bar.offer-miss{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12)}
+.offer-bar.offer-miss svg{stroke:var(--sub)}
+.offer-bar.offer-miss .offer-t{color:var(--sub)}
 /* Сигареты едут только с алкоголем. Плашка стоит над итогом и говорит это до
    того, как человек ткнёт в «Оформить»: отказ на кнопке — плохая новость,
    условие, известное заранее, — просто условие. Полосы прогресса здесь нет
@@ -1938,6 +1949,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
   </div>
   <div id="cart-foot" style="display:none">
     <div class="cart-foot">
+      <div class="offer-bar" id="offer-bar" style="display:none"></div>
       <div class="gift-bar" id="gift-bar" style="display:none">
         <div class="gift-top">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
@@ -3891,7 +3903,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(saved!==null) activeAddrIdx=parseInt(saved);
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
-  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();initPromo();
+  buildTips();syncOrders();applyLang();loadCatalog().then(offerLoad);updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();initPromo();
   // Deep-link: #profile (from premium card welcome button) → auto-navigate to profile
   if(window.location.hash==='#profile'){try{history.replaceState(null,'',window.location.pathname);}catch(e){}setTimeout(()=>goPage('profile'),400);}
   // Preload game assets (images + audio) early so game opens instantly
@@ -6635,7 +6647,7 @@ function saveCart(){try{localStorage.setItem('ambar_cart',JSON.stringify(cart));
 function updHdr(){
   saveCart();
   const cnt=Object.values(cart).reduce((a,b)=>a+b,0);
-  el('hdr-tot').textContent=cartSub()+' AED';
+  el('hdr-tot').textContent=(cartSub()-offerDiscount())+' AED';
   const dot=el('hdr-dot');dot.textContent=cnt;dot.style.display=cnt>0?'flex':'none';
 }
 
@@ -6669,8 +6681,8 @@ function renderCart(){
   }).join('');
   el('gift-slot').innerHTML=giftRow();
   initCartSwipe();
-  el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
-  renderGift();renderSmokeBar();
+  el('tot-n').textContent=cartTotal();foot.style.display='block';tipSec.style.display='block';
+  renderOfferBar();renderGift();renderSmokeBar();
   setTimeout(updateCartThumb,0);
 }
 function updateCartThumb(){
@@ -6803,7 +6815,7 @@ function pickTip(v,isCustom,btn){
   if(isCustom){inp.style.display='block';inp.focus();inp.oninput=()=>{tip=Math.max(0,parseFloat(inp.value)||0);updCartTot()};}
   else{inp.style.display='none';el('tip-done-btn').style.display='none';tip=v;updCartTot();}
 }
-function updCartTot(){el('tot-n').textContent=cartSub()+tip;renderGift();buildSummary();}
+function updCartTot(){el('tot-n').textContent=cartTotal();renderOfferBar();renderGift();buildSummary();}
 
 // ── Подарок за сумму заказа ──────────────────────────────────────────────────
 // Порог и позицию решает сервер, он же кладёт бутылку в заказ. Здесь только
@@ -6813,13 +6825,20 @@ function giftProduct(){
   const g=P.find(x=>x.id===GIFT_ID);
   return (g && g.stock!==false) ? g : null;                   // нет на полке — не обещаем
 }
-function giftOn(){ return !!giftProduct() && cartSub()>=GIFT_MIN; }
+// Подарок оффера заменяет подарок за сумму: две бутылки бесплатно не едут
+// (владелец, 31 окт 2026). Сервер делает то же: config_gift.apply видит в
+// заказе подарочную строку и вторую не кладёт.
+function giftOn(){ return !offerGiftProduct() && !!giftProduct() && cartSub()>=GIFT_MIN; }
 
 // Подарок живёт отдельно от cart и намеренно: попади он в корзину — у него
 // появились бы плюс, минус и свайп, и человек смог бы «купить» его дважды или
 // удалить то, что ему и так положено. Здесь это строка, а не товар.
 function giftRow(){
+  const og=offerGiftProduct(); if(og) return giftRowFor(og);
   const g=giftProduct(); if(!g||!giftOn()) return '';
+  return giftRowFor(g);
+}
+function giftRowFor(g){
   return `<div class="gift-wrap"><div class="ci gift-ci">
     <img class="ci-img" src="${g.img}" alt="${g.name}">
     <div class="ci-info">
@@ -6840,13 +6859,105 @@ function renderGift(){
   const g=giftProduct();
   // Дошли до порога — полосу убираем: подарок уже лежит в списке строкой, и
   // повторять то же самое второй раз значит шуметь.
-  if(!g||giftOn()){bar.style.display='none';return;}
+  if(!g||giftOn()||offerGiftProduct()){bar.style.display='none';return;}
   const sub=cartSub(), left=GIFT_MIN-sub;
   bar.style.display='block';
   el('gift-fill').style.width=Math.min(100,Math.round(sub*100/GIFT_MIN))+'%';
   el('gift-txt').textContent=lang==='ru'
     ? `Ещё ${left} AED — и ${g.name} в подарок`
     : `${left} AED more — and ${g.name} is on us`;
+}
+
+// ── Персональное предложение (offers.py) ─────────────────────────────────────
+// Ссылка из оффера: t.me/<бот>?startapp=offer_<код>. По коду сервер отдаёт
+// состав, подарок и скидку (GET /api/offer/<код>); корзина собирается сама,
+// код уходит с заказом, а скидку и подарок в заказ кладёт сервер — как и
+// подарок за сумму. Скидка держится, пока в корзине весь набор из
+// предложения (лишнее не мешает). Код живёт в памяти телефона, пока оффер
+// действует: закрыл приложение — корзина и скидка на месте. Заказ по коду —
+// один: сервер занимает код при приёме, второй заказ получает offer_used.
+let OFFER=null, OFFER_CODE=localStorage.getItem('ambar_offer')||'';
+function offerParam(){
+  const m=/^offer_([A-Za-z0-9]{6,16})$/.exec(tg?.initDataUnsafe?.start_param||'');
+  return m?m[1].toUpperCase():'';
+}
+function offerActive(){ return !!(OFFER && OFFER.state==='active'); }
+function offerCovered(){
+  if(!offerActive()) return false;
+  return (OFFER.items||[]).every(it=>{
+    const p=P.find(x=>x.id===it.id); if(!p) return false;
+    if((cart[it.id]||0)<it.qty) return false;
+    // Пачка пива — та же позиция только при той же фасовке (как offers.covered на сервере).
+    const have=isBeer(p)?(+beerPcs[it.id]||0):0;
+    return have===(+it.pcs||0);
+  });
+}
+function offerDiscount(){ return offerCovered()?Math.min(+OFFER.discount||0,cartSub()):0; }
+function offerGiftProduct(){
+  if(!offerCovered()||!OFFER.gift) return null;
+  return P.find(x=>x.id===OFFER.gift.id)||null;
+}
+function cartTotal(){ return cartSub()-offerDiscount()+tip; }
+function offerUntil(){
+  try{ return new Date(OFFER.expires_at).toLocaleDateString(lang==='ru'?'ru-RU':'en-GB',{day:'numeric',month:'long',timeZone:'Asia/Dubai'}); }
+  catch(e){ return ''; }
+}
+function offerStateText(st){
+  const ru=lang==='ru';
+  return st==='used' ? (ru?'Предложение уже использовано':'This offer has already been used')
+       : st==='expired' ? (ru?'Срок предложения истёк':'This offer has expired')
+       : st==='items_missing' ? (ru?'В корзине не весь набор предложения':'Not all offer items are in the cart')
+       : st==='no_crypto' ? (ru?'Предложение криптой не оформляется':'This offer cannot be paid in crypto')
+       : (ru?'Предложение не найдено':'Offer not found');
+}
+async function offerLoad(){
+  const fromLink=offerParam(), code=fromLink||OFFER_CODE;
+  if(!code) return;
+  let d=null;
+  try{ const r=await fetch(`${AMBAR_API}/api/offer/${encodeURIComponent(code)}`); d=await r.json(); }
+  catch(e){ console.warn('offer fetch failed',e); return; }
+  if(!d||d.state!=='active'){
+    offerClear();
+    if(fromLink){ haptic.error(); showToast(offerStateText(d&&d.state),'err'); }
+    return;
+  }
+  OFFER=d; OFFER_CODE=d.code;
+  try{localStorage.setItem('ambar_offer',OFFER_CODE);}catch(e){}
+  if(payMethod==='crypto'){ payMethod='cash'; localStorage.setItem('ambar_pay_method','cash'); }
+  // По ссылке корзина собирается заново из предложения; при обычном запуске
+  // корзина своя, скидка просто применится, если набор на месте.
+  if(fromLink){ offerFill(); haptic.success(); go('cart'); }
+  updHdr(); if(curPg==='cart') renderCart();
+}
+function offerFill(){
+  const ids=Object.keys(cart);
+  cart={}; beerPcs={}; tip=0;
+  (OFFER.items||[]).forEach(it=>{
+    const p=P.find(x=>x.id===it.id); if(!p||p.stock===false) return;   // нет на полке — не кладём
+    cart[it.id]=it.qty;
+    if(isBeer(p)) beerPcs[it.id]=+it.pcs||12;
+  });
+  saveCart(); ids.concat(Object.keys(cart)).forEach(id=>syncCtrl(id)); buildTips();
+}
+function offerClear(){
+  OFFER=null; OFFER_CODE='';
+  try{localStorage.removeItem('ambar_offer');}catch(e){}
+  renderOfferBar();
+}
+function renderOfferBar(){
+  const bar=el('offer-bar'); if(!bar) return;
+  if(!offerActive()){ bar.style.display='none'; return; }
+  const ru=lang==='ru', ok=offerCovered(), d=+OFFER.discount||0;
+  const g=OFFER.gift?P.find(x=>x.id===OFFER.gift.id):null;
+  bar.style.display='flex'; bar.classList.toggle('offer-miss',!ok);
+  const title=ok ? (ru?`Персональное предложение · −${d} AED`:`Personal offer · −${d} AED`)
+                 : (ru?'Предложение не применяется':'Offer not applied');
+  const sub=ok ? [g?(ru?`${g.name} в подарок`:`${g.name} on the house`):'', ru?`до ${offerUntil()}`:`until ${offerUntil()}`].filter(Boolean).join(' · ')
+               : (ru?'в корзине не весь набор':'not all offer items are in the cart');
+  bar.innerHTML=`<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5"/></svg>
+    <div class="offer-b"><span class="offer-t">${title}</span><span class="offer-s">${sub}</span></div>`;
 }
 
 // ── SUMMARY ───────────────────────────────────────────────────────────────────
@@ -6860,10 +6971,16 @@ function buildSummary(){
     return`<div class="sum-line"><span>${label} ×${qty}</span><span>${unitPrice*qty} AED</span></div>`;
   }).join('')+(giftOn()?`<div class="sum-line" style="color:var(--gold)">
       <span>${giftProduct().name} ×1</span>
-      <span>${lang==='ru'?'подарок':'gift'}</span></div>`:'');
+      <span>${lang==='ru'?'подарок':'gift'}</span></div>`:'')
+  +(offerGiftProduct()?`<div class="sum-line" style="color:var(--gold)">
+      <span>${offerGiftProduct().name} ×${OFFER.gift.qty||1}</span>
+      <span>${lang==='ru'?'подарок':'gift'}</span></div>`:'')
+  +(offerDiscount()>0?`<div class="sum-line" style="color:var(--gold)">
+      <span>${lang==='ru'?'Персональное предложение':'Personal offer'}</span>
+      <span>−${offerDiscount()} AED</span></div>`:'');
   const tr=el('sum-tip-row');
   if(tip>0){tr.style.display='flex';el('sum-tip-val').textContent=tip+' AED';}else tr.style.display='none';
-  el('sum-tot-val').textContent=(sub+tip)+' AED';
+  el('sum-tot-val').textContent=cartTotal()+' AED';
 }
 
 // ── ORDER FLOW ────────────────────────────────────────────────────────────────
@@ -6946,7 +7063,7 @@ function placeOrder(){
     const displayName=pcs?`${p.name} (${pcs} ${lang==='ru'?'шт':'pcs'})`:p.name;
     return{id,name:displayName,price:unitPrice,qty,line_total:unitPrice*qty,pcs:pcs||null};
   });
-  const sub=cartSub(),total=sub+tip,oid='AMB'+Date.now().toString().slice(-7);
+  const sub=cartSub(),total=cartTotal(),oid='AMB'+Date.now().toString().slice(-7);
   const payload={
     action:'order',order_id:oid,items,subtotal:sub,tip,total,currency:'AED',
     phone:'+'+digits,phone_extra:(el('phone-extra-in')?.value||'').replace(/\D/g,''),
@@ -6958,6 +7075,12 @@ function placeOrder(){
     office_name:addr.office_name||OFFICES[0].name,lang,
   };
 
+  // Персональное предложение: код уходит с заказом, скидку и подарок кладёт
+  // сервер. Криптой не оформляется: счёт считался бы без скидки.
+  if(offerCovered()){
+    if(payMethod==='crypto'){ showToast(offerStateText('no_crypto'),'err'); haptic.error(); return; }
+    payload.offer=OFFER_CODE;
+  }
   // Crypto prepay: branch off into the on-chain invoice flow. The order is
   // created locally in AWAITING_PAYMENT and is NOT sent to the operator until
   // payment confirms (see _cpOnConfirmed). Gated to enabled accounts only.
@@ -6994,6 +7117,7 @@ function placeOrder(){
   }
 
   // Send order via API (works from both menu button and reply keyboard)
+  let _oFail=false;   // заказ не принят — на каталог не уходим
   const body={...payload, initData: tg?.initData||''};
   fetch(`${AMBAR_API}/api/order`,{
     method:'POST',
@@ -7002,6 +7126,7 @@ function placeOrder(){
   }).then(r=>r.json()).then(res=>{
     if(res.ok){
       console.log('Order sent via API:', res.order_id);
+      if(payload.offer) offerClear();   // код занят этим заказом; ссылка в оффере дальше просто открывает приложение
       // Флажок теста снимаем после каждого заказа: следующий — настоящий,
       // пока его не поставят снова.
       if(res.test) showToast('Тест-заказ оформлен — операторы его не видят');
@@ -7036,6 +7161,17 @@ function placeOrder(){
       orders=orders.filter(o=>o.order_id!==oid);
       localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
       smokePush();go('cart');
+    } else if(/^offer_/.test(res.error||'')){
+      // Код занят другим заказом, истёк или состав разошёлся: заказа нет,
+      // корзину возвращаем как была.
+      _oFail=true;
+      cart={..._snap.cart};beerPcs={..._snap.beerPcs};tip=_snap.tip;saveCart();
+      Object.keys(cart).forEach(id=>syncCtrl(id));buildTips();
+      orders=orders.filter(o=>o.order_id!==oid);
+      localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+      const _st=res.error.replace(/^offer_/,'');
+      if(_st!=='items_missing'&&_st!=='no_crypto') offerClear();
+      updHdr();haptic.error();showToast(offerStateText(_st),'err');go('cart');
     } else {
       console.error('Order API error:', res.error);
     }
@@ -7057,6 +7193,7 @@ function placeOrder(){
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
   setTimeout(()=>{
+    if(_oFail) return;
     go('catalog');checkActiveOrder();
   },1400);
 }
@@ -7099,6 +7236,11 @@ function selectPayMethod(m){
   if(m==='crypto' && testOrder){
     haptic.light();
     showToast('Тестовый заказ криптой не оформляется','err');
+    return;
+  }
+  if(m==='crypto' && offerCovered()){
+    haptic.light();
+    showToast(offerStateText('no_crypto'),'err');
     return;
   }
   if(m==='debt' && !DEBT_ENABLED)return; // hidden unless whitelisted — safety net

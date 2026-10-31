@@ -244,7 +244,8 @@ def _order_view(o: dict) -> dict:
         # новую сумму только по добавленному.
         "items": [{"id": i.get("id", ""), "name": i.get("name", ""), "qty": i.get("qty", 0),
                    "pcs": i.get("pcs"), "price": i.get("price", 0),
-                   "line_total": i.get("line_total", 0), "gift": bool(i.get("gift"))}
+                   "line_total": i.get("line_total", 0), "gift": bool(i.get("gift")),
+                   "offer": bool(i.get("offer"))}
                   for i in (o.get("items") or [])],
         "total": int(o.get("total", 0) or 0),
         # Откуда заказ: из приложения — цены со скидкой, по телефону — полные.
@@ -2565,6 +2566,9 @@ async def handle_edit_request(request):
         # без этой строки правка «убирала» бы подарок у клиента.
         gifts = [i for i in (o.get("items") or []) if i.get("gift")]
         items = gifts + items
+        # Скидка спецпредложения тоже остаётся: её ставит и снимает только сервер.
+        import offers as _of
+        items = _of.keep_lines(o.get("items"), items)
         diff = _diff_lines(o.get("items"), items)
         if not diff and not text:
             return web.json_response({"error": "nothing_changed"}, status=400, headers=CORS_HEADERS)

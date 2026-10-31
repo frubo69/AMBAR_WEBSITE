@@ -448,6 +448,7 @@ body.test-drv .wo-fix{display:none}
 .oc-it b{flex:0 0 auto;margin-right:3px;font-size:14px;font-weight:600;color:#C9CBDA;font-variant-numeric:tabular-nums}
 .oc-it b u{text-decoration:none;font-size:12px;font-weight:500;color:#8A8DA5;margin-left:4px}
 .oc-it.solo b{position:relative;top:8px}
+.oc-it.oc-dsc span,.oc-it.oc-dsc b{color:#C9A96E}
 .oc-addr{margin-top:1px;font-size:16px;font-weight:700;line-height:20px;letter-spacing:-.3px;color:#F1F2F6}
 .oc-map{flex:0 0 auto;margin:.5px 0 0 8px;display:flex;align-items:center;gap:8px;height:40.4px;padding:0 11px 0 12px;
   border-radius:10px;background:#191816;border:1px solid #272829;color:#E6CF9C;font-family:inherit;font-size:14px;
@@ -5888,7 +5889,10 @@ function orderCard(o, i){
   const oid = esc(o.order_id);
   // Значки в квадратах тонкие, как на макете (svgThin, 1.4).
   const sq = (ic, w, cls) => `<span class="oc-ic ${cls || ''}">${svgThin(ic, w)}</span>`;
-  const items = lines.map(it => `<div class="oc-it${n === 1 ? ' solo' : ''}">
+  const items = lines.map(it => it.offer
+    // Скидка спецпредложения — строкой с суммой, не товаром: собирать нечего.
+    ? `<div class="oc-it${n === 1 ? ' solo' : ''} oc-dsc"><span>${esc(it.name)} <i>· скидка</i></span><b>−${fmt(Math.abs(it.line_total || 0))}<u>AED</u></b></div>`
+    : `<div class="oc-it${n === 1 ? ' solo' : ''}">
       <span>${esc(it.name)}${it.gift ? ' <i>· подарок</i>' : (it.pcs ? ` <i>· ${it.pcs} шт</i>` : '')}</span>
       <b>${it.qty}<u>шт</u></b></div>`).join('')
     // Допродажа: добавили позиции уже в пути — 5% от их цены ваш чай.
@@ -13606,7 +13610,7 @@ function openEdit(oid){
                                                   : 'Цены как в приложении — со скидкой';
   // Правим копию: пока оператор не согласился, у заказа прежний состав.
   // Подарок не правится: он приложится к заказу сам, как и был.
-  EDIT_LINES = (o ? o.items : []).filter(it => !it.gift).map(it => ({
+  EDIT_LINES = (o ? o.items : []).filter(it => !it.gift && !it.offer).map(it => ({
     id: it.id, name: it.name, qty: it.qty, was: it.qty, price: it.price || 0, pcs: it.pcs}));
   EDIT_WAS = o ? o.total : 0;
   document.getElementById('editFor').textContent = `Заказ #${oid} · решает оператор`;

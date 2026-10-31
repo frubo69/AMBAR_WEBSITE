@@ -49,6 +49,8 @@ async def connect():
         await _db.users.create_index("telegram_id", unique=True)
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
+        # Персональные предложения: код — ключ ссылки, второго такого быть не может.
+        await _db.offers.create_index("code", unique=True)
         await _db.shifts.create_index([("operator_id", 1), ("status", 1)])
         # Приход после пересчёта спрашивается на каждую заявку — по району,
         # источнику и времени.
@@ -233,6 +235,71 @@ async def update_order(oid: str, **kw):
     if db is None: return
     await db.orders.update_one({"order_id": oid}, {"$set": kw})
     _orders_dirty()
+    if "status" in kw:
+        await _offer_follow(db, oid, kw["status"])
+
+
+# ── Персональные предложения (offers.py) ─────────────────────────────────────
+# Документ: code, status (new → ordered → delivered), items, gift, discount,
+# expires_at, order_id, used_by. Код занимается атомарно при приёме заказа.
+async def offer_create(doc: dict) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    await db.offers.insert_one(dict(doc))
+    return doc
+
+
+async def offer_get(code: str) -> dict | None:
+    db = _db_or_none()
+    if db is None or not code: return None
+    return await db.offers.find_one({"code": code}, {"_id": 0})
+
+
+async def offer_claim(code: str, oid: str, uid, now_iso: str) -> dict | None:
+    """Занять код под заказ — атомарно: два заказа по одному коду разом не
+    пройдут. None — код занят, истёк или его нет."""
+    db = _db_or_none()
+    if db is None or not code: return None
+    from pymongo import ReturnDocument
+    r = await db.offers.find_one_and_update(
+        {"code": code, "status": "new", "expires_at": {"$gt": now_iso}},
+        {"$set": {"status": "ordered", "order_id": oid, "used_by": uid, "used_at": now_iso}},
+        return_document=ReturnDocument.AFTER)
+    if r:
+        r.pop("_id", None)
+    return r
+
+
+async def offer_release(code: str, oid: str) -> bool:
+    """Вернуть код в оборот — только если он занят именно этим заказом."""
+    db = _db_or_none()
+    if db is None or not code: return False
+    r = await db.offers.update_one({"code": code, "order_id": oid, "status": "ordered"},
+                                   {"$set": {"status": "new"}})
+    return bool(r.modified_count)
+
+
+async def offers_list(limit: int = 50) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.offers.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
+async def _offer_follow(db, oid: str, status: str) -> None:
+    """Статус оффера идёт за статусом заказа (offers.follow_status): отказ и
+    отмена возвращают код в оборот, доставка закрывает. Сбой здесь заказ не
+    трогает — код останется занятым, это безопаснее обратного."""
+    try:
+        o = await db.orders.find_one({"order_id": oid}, {"_id": 0, "offer": 1})
+        code = ((o or {}).get("offer") or {}).get("code")
+        if not code: return
+        import offers as _of
+        st = _of.follow_status(status)
+        if st is None: return
+        await db.offers.update_one({"code": code, "order_id": oid}, {"$set": {"status": st}})
+    except Exception as e:                                   # noqa: BLE001
+        logging.getLogger(__name__).warning(f"[offer] follow {oid} -> {status}: {e}")
 
 
 async def order_mark_arrived(oid: str, name: str, at: str) -> bool:

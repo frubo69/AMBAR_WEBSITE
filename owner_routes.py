@@ -3102,7 +3102,7 @@ async def _send_md(token, chat_id, text, parse_mode="Markdown", reply_markup=Non
 async def notify_new_order(oid, total, user_name, phone, address, office,
                            uid, founder_id, premium_ids, worldwide_ids,
                            items=None, prepaid=None, held=False, manual=None, test=False,
-                           free=False):
+                           free=False, offer=None):
     """Send exactly one new-order message per user at their highest matching tier
     (orders.new1000 → orders.new500 → orders.new). VIP notification is independent.
     Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
@@ -3127,6 +3127,11 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         # замечен: тревога всем владельцам, мимо настроек и тихих часов.
         base += (f"\n\n🆓 *БЕЗ ОПЛАТЫ* — денег по заказу не будет, в выручку не идёт"
                  + (" · клиент: Фаундер" if uid and uid == founder_id else ""))
+    if offer:
+        # Заказ по персональному предложению (offers.py): скидка уже в сумме.
+        base += (f"\n\n🏷 *СПЕЦПРЕДЛОЖЕНИЕ* · скидка {int(offer.get('discount') or 0)} AED уже в сумме"
+                 + (" · подарок в составе" if offer.get("gift") else "")
+                 + f" · код {_md(str(offer.get('code') or ''))}")
     if held:
         base = ("⏳ *ОЖИДАЕТ ВЕРИФИКАЦИИ* — клиент ещё не подтверждён.\n"
                 "Оператор получит заказ после заполнения формы.\n\n") + base

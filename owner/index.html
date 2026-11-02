@@ -3031,6 +3031,16 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
    поле докручивается в центр экрана. */
 html.kb #pg-finance.active{bottom:0}
 html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
+/* Карточка аналитики идёт за пальцем и улетает при смене месяца — как карточка
+   выручки на «Обзоре» (daySwipe / _heroFlip); остальные секции — display:contents,
+   чтобы остаться элементами той же колонки с тем же зазором. */
+#pg-finance .fv-an-card{min-width:0;touch-action:pan-y}
+#pg-finance .fv-an-card.day-drag{transition:none}
+#pg-finance .fv-an-card.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
+#pg-finance .fv-an-card.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+@media (prefers-reduced-motion:reduce){#pg-finance .fv-an-card.day-move,#pg-finance .fv-an-card.day-back{transition-duration:.01s}}
+#pg-finance .fv-book-rest{display:contents}
+#pg-finance .fv-scroll{overflow-x:hidden}
 /* Состояния, которых в макете нет, — теми же красками: минус красным, прочерк
    тусклым, «Загрузка…» / «Не удалось загрузить» строкой под формулой, замок на
    «Распределении» (класс, а не disabled: тап объясняет, чего ждём), подпись
@@ -9881,7 +9891,7 @@ button.exp-wait:active{transform:scale(.99)}
      валют. Шапка и панель вкладок — общие у приложения, своих у корня нет.
      Прокрутка — внутри .fv-scroll; компактная сводка месяца над ним, в потоке,
      показывается, когда аналитика ушла вверх (fvCondensed). Первые четыре
-     секции рисует fbHubHtml в #finBook, курс — статичная разметка ниже
+     секции рисует fbHubPaint в #finBook (#finAn + #finRest), курс — статичная разметка ниже
      (fxRender пишет в те же id, что и раньше). -->
 <div class="page" id="pg-finance">
   <div id="ambar-finance-polished" lang="ru"><div class="fv-stage"><div class="fv-app" aria-label="AMBAR — Финансы">
@@ -21175,7 +21185,7 @@ function crRender(){
   if(d.day === _dayIsoFor(0)){
     FB_CR = d; FB_CR_AT = Date.now();
     try{ const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-         if(box && mb) box.innerHTML = fbHubHtml(mb); }catch(e){}
+         if(box && mb) fbHubPaint(mb); }catch(e){}
   }
 }
 
@@ -22094,7 +22104,7 @@ function giftBlockRender(){
 function walBlockRender(){
   // Кошелёк — строкой в «Сейфе» (19 сен 2026): пришёл свежий — дорисовать.
   try{ const fb = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-       if(fb && mb) fb.innerHTML = fbHubHtml(mb); }catch(e){}
+       if(fb && mb) fbHubPaint(mb); }catch(e){}
   // Отдельного блока «Кошелёк» на «Финансах» больше нет (владелец, 19 сен
   // 2026: «убери вот эти конкретно окна»), остальное — только если он есть.
   const block = document.getElementById('walBlock'); if(!block) return;
@@ -22611,7 +22621,7 @@ function fbCrcBooks(){
 }
 function fbHubRepaint(){
   const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-  if(box && mb){ box.innerHTML = fbHubHtml(mb); fvCondensed(); }
+  if(box && mb){ fbHubPaint(mb); fvCondensed(); }
 }
 // «Аналитика месяца» над прокруткой сжимается до компактной сводки (владелец,
 // 20 сен 2026: «сворачивается до компактного вида и не листается вместе со
@@ -22797,19 +22807,41 @@ async function fbHub(force){
   FB.month = FB.month || fbMonthNow();
   const m = FB.month;
   if(!fbBook(m) || force){
-    box.innerHTML = fbHubHtml(null);
+    fbHubPaint(null);
     try{ await fbLoad(m, force); }
-    catch(e){ box.innerHTML = fbHubHtml(null, true); return; }
+    catch(e){ fbHubPaint(null, true); return; }
   } else if(fbStale(m)){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
-  box.innerHTML = fbHubHtml(fbBook(FB.month));
+  fbHubPaint(fbBook(FB.month));
   fvCondensed();
   fbCrcBooks();
 }
-function fbHubHtml(b, err){
-  const month = FB.month || fbMonthNow();
-  return fvAnalytics(month, b, err) + fbCrcHtml() + fvSafe(b) + fvPayroll(b);
+// Книга рисуется в два гнезда: карточка аналитики #finAn переживает перерисовки
+// — на ней жест листания месяцев (daySwipe, тот же, что у карточки выручки на
+// «Обзоре»: карточка идёт за пальцем, слева направо — месяц назад, обратно —
+// вперёд до текущего, дальше упор), и она же улетает и прилетает при смене
+// месяца (_heroFlip). Остальные секции — в #finRest (владелец, 2 ноя 2026:
+// «точно так же, как тогда, дай возможность листать окошко аналитики месяца»).
+function fbHubPaint(b, err){
+  const box = document.getElementById('finBook'); if(!box) return;
+  let an = document.getElementById('finAn');
+  if(!an){
+    box.innerHTML = '<div class="fv-an-card" id="finAn"></div><div class="fv-book-rest" id="finRest"></div>';
+    an = document.getElementById('finAn');
+    daySwipe(an, {день: () => (FB.month || fbMonthNow()) >= fbMonthNow() ? 0 : 1, шаг: d => fvMonthSwipe(d)});
+  }
+  an.innerHTML = fvAnalytics(FB.month || fbMonthNow(), b, err);
+  document.getElementById('finRest').innerHTML = fbCrcHtml() + fvSafe(b) + fvPayroll(b);
+  fvCondensed();
+}
+// Шаг месяца от жеста: сперва улетает карточка, месяц догоняет — как день на
+// «Обзоре». Вперёд текущего месяца хода нет: false, и жест сам вернёт карточку.
+function fvMonthSwipe(delta){
+  if(fbMonthAdd(FB.month || fbMonthNow(), -delta) > fbMonthNow()) return false;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  _heroFlip(delta, document.getElementById('finAn')).then(() => fbMonthStep(-delta, true));
+  return true;
 }
 // Число секции: книги нет — серая полоска (загрузка) или прочерк (отказ);
 // минус — красным там, где он возможен (neg).
@@ -22970,13 +23002,13 @@ function fbOpenWal(back){
   accOpen('wallet');
   if(back) ACC_BACK = back;
 }
-async function fbMonthStep(d){
+async function fbMonthStep(d, quiet){
   const m = fbMonthAdd(FB.month || fbMonthNow(), d);
   if(m > fbMonthNow()) return;
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  if(!quiet) try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   FB.month = m;
   if(fbBook(m)){ fbRepaint(); return; }      // экран сам обновит устаревшее фоном
-  const box = document.getElementById('finBook'); if(box) box.innerHTML = fbHubHtml(null);
+  const box = document.getElementById('finBook'); if(box) fbHubPaint(null);
   try{ await fbLoad(m); }catch(e){ _toast('Не удалось загрузить'); return; }
   if(FB.month === m) fbRepaint();
 }
@@ -22990,7 +23022,7 @@ function fbRepaint(){
   // Лист премий считается отдельной ручкой — дотягиваем его один раз, чтобы
   // на карточке стояло число, а не прочерк.
   if(!TEN && !_tenBusy && window.ownerApi) tenLoad(true);
-  if(box) box.innerHTML = fbHubHtml(fbBook(FB.month));
+  if(box) fbHubPaint(fbBook(FB.month));
   if(!document.getElementById('accOv').classList.contains('show')) return;
   // открыта страница расхода (статья, аренда, зарплаты, история) — месяц
   // листается прямо на ней, экран под ней трогать незачем
@@ -23136,7 +23168,7 @@ function fbPaint(){
     const p = FB.person ? (fbCur(mb).people || []).find(x => x.name === FB.person) : null;
     if(p){ put('fbList-items', fbItems(p, mb.month)); put('fbList-pays', fbPays(p)); }
   }
-  const box = document.getElementById('finBook'); if(box && mb) box.innerHTML = fbHubHtml(mb);
+  const box = document.getElementById('finBook'); if(box && mb) fbHubPaint(mb);
 }
 
 // ── Записи: расходы из фонда, приход в фонд, выплаты из прибыли ───────────

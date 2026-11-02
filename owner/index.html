@@ -3041,10 +3041,7 @@ html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
 #ambar-finance-polished .fv-state{padding:0 14px 14px;font-size:12px;line-height:17px;color:var(--fv-muted)}
 #ambar-finance-polished .fv-state.dn{color:var(--dn)}
 #ambar-finance-polished .fv-revenue-steps .fv-distribution.is-locked:enabled:hover{background-color:#13111f}
-#ambar-finance-polished .fv-distribution-message.ok{color:#92b09a}
-#ambar-finance-polished .fv-distribution-message.warn{color:#d9bd84}
 #ambar-finance-polished .fv-distribution-targets b{font-family:"Space Grotesk",sans-serif;font-weight:500;color:#d0c8d8;font-variant-numeric:tabular-nums}
-#ambar-finance-polished .fv-distribution-short{display:block;margin-top:2px;color:#d9bd84;font-size:11px;line-height:17px}
 #ambar-finance-polished .fv-revenue-actions{display:flex;gap:8px;padding:0 10px 10px}
 #ambar-finance-polished .fv-act{display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 0;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #cfb17a;border-radius:12px;background:#dfc087;color:#251e27;font-size:13px;line-height:18px;font-weight:600;text-align:center}
 #ambar-finance-polished .fv-revenue-actions .fv-act:enabled:hover{background-color:#e6cd98}
@@ -22698,8 +22695,7 @@ function fbCrcHtml(){
          <span class="fv-collection-progress"><span class="fv-meter fv-collection-meter"><span style="width:0%"></span></span><span class="is-skel" style="min-width:90px">0000</span></span>`,
         ' onclick="fbOpenCash()"')}
       ${step('fv-distribution is-locked', '2', 'Распределение', luc('lock-keyhole'),
-        `<span class="fv-distribution-message"><span class="is-skel" style="min-width:110px">0000</span></span>
-         <span class="fv-distribution-targets">${targetsIdle}</span>`,
+        `<span class="fv-distribution-targets">${targetsIdle}</span>`,
         ' aria-disabled="true" onclick="fbCrcLocked()"')}
     </div>`);
   const {c, ds, wait, known, pend, real} = st;
@@ -22718,14 +22714,14 @@ function fbCrcHtml(){
      <span class="fv-collection-progress"><span class="fv-meter fv-collection-meter" role="progressbar" aria-label="Сбор выручки" aria-valuenow="${st.got ? 100 : pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${st.got ? 100 : pct}%"></span></span><span>${s1}</span></span>`,
     ` onclick="fbOpenCash()" aria-label="Сбор выручки: ${escS(s1)}"`);
   // ② Распределение: пока ждём районы — под замком (тап объясняет, чего ждём);
-  // есть что согласовать — его цифры; всё согласовано — согласованные.
+  // есть что согласовать — его цифры; всё согласовано — согласованные. Состояние
+  // словами — только в aria-label и в кнопках ниже (владелец, 2 ноя 2026: «убери
+  // надписи ждёт согласования и до нормы РП не хватает»).
   const shown = pend.length ? pend : real;
   const sum = f => shown.reduce((a, b) => a + (f(b) || 0), 0);
   // РП+ — наличными и криптой вместе.
   const tB = sum(b => b.aside), tR = sum(b => (b.collected || 0) + (b.collected_cr || 0)),
         tN = sum(b => Math.max(0, b.base) - (b.aside || 0) - (b.collected || 0));
-  const norm = ((fbBook(c.day.slice(0, 7)) || {}).budget || {}).norm || 0;
-  const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0) - (b.collected_cr || 0)), 0) : 0;
   const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';
   const nw = st.waiting.length;
   const s2 = st.locked ? (c.need || nw ? 'После сбора выручки' : 'Нечего распределять')
@@ -22738,9 +22734,7 @@ function fbCrcHtml(){
     : `${g('Барракуда', tB)} <span>·</span> ${g('РП+', tR)} <span>·</span> ${g('ЧП', tN, tN < 0)}`;
   const stage2 = step(`fv-distribution${st.locked ? ' is-locked' : ''}`, !st.locked && st.done ? luc('check') : '2', 'Распределение',
     st.locked ? luc('lock-keyhole') : luc('chevron-right', 'fv-row-arrow'),
-    `<span class="fv-distribution-message${!st.locked && st.done ? ' ok' : !st.locked && pend.length ? ' warn' : ''}">${s2}</span>
-     <span class="fv-distribution-targets">${targets}</span>${
-       has && short > 0 && !st.locked ? `<span class="fv-distribution-short">До нормы РП+ не хватает ${fbFmt(short)} AED</span>` : ''}`,
+    `<span class="fv-distribution-targets">${targets}</span>`,
     st.locked ? ` aria-disabled="true" onclick="fbCrcLocked()" aria-label="Распределение выручки: ${escS(s2)}"`
               : ` onclick="fbOpenDist()" aria-label="Распределение выручки: ${escS(s2)}"`);
   // Следующее действие — одно, и оно же главное (те же кнопки, что были на карточке).

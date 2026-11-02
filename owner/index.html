@@ -2799,6 +2799,174 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    докручивается в центр экрана. */
 html.kb #accOv.sdc .sc-footer{display:none}
 html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
+/* ── Отчёт ДДС за день (визуал 2 ноя 2026, бриф AMBAR-CASHFLOW-DAY): cashflow-visual.css и cashflow-integration.css из пакета дословно, ниже — адаптация под оболочку ── */
+#ambar-cashflow-day{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-cashflow-day .cf-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-cashflow-day .cf-app{--cf-width:390px;--cf-height:900px;--cf-bg:#07070c;--cf-panel:#12111f;--cf-text:#ece9e3;--cf-muted:#aaa2b4;--cf-gold:#e2c386;--cf-line:#2d2839;position:relative;display:flex;flex-direction:column;width:var(--cf-width);max-width:100%;height:var(--cf-height);min-width:0;box-sizing:border-box;overflow:hidden;border:1px solid #292532;border-radius:24px;background:var(--cf-bg);color:var(--cf-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:cf-phone / inline-size}
+#ambar-cashflow-day .cf-app *{box-sizing:border-box}
+#ambar-cashflow-day :where(.cf-app button){appearance:none;padding:0;margin:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left;-webkit-tap-highlight-color:transparent}
+#ambar-cashflow-day :where(.cf-app h1,.cf-app h2,.cf-app p,.cf-app dl,.cf-app dd){margin:0}
+#ambar-cashflow-day .cf-app [hidden]{display:none!important}
+#ambar-cashflow-day .cf-app svg.lucide{display:block;width:18px!important;height:18px!important;flex:none;stroke-width:1.7}
+#ambar-cashflow-day .cf-header{display:flex;align-items:center;gap:12px;flex:none;min-height:74px;padding:13px 12px;background:#0a090f;border-bottom:1px solid #24202e}
+#ambar-cashflow-day .cf-back{display:grid;place-items:center;width:42px;min-height:44px;flex:none;border:1px solid #312a3d;border-radius:12px;background:#15121f;color:#b5a9c3}
+#ambar-cashflow-day .cf-back>svg.lucide{width:22px!important;height:22px!important}
+#ambar-cashflow-day .cf-header>div{min-width:0}
+#ambar-cashflow-day .cf-header h1{font-size:22px;line-height:28px;font-weight:700;letter-spacing:-.035em}
+#ambar-cashflow-day .cf-header>div>span{display:block;margin-top:2px;color:var(--cf-muted);font-size:11px;line-height:17px}
+#ambar-cashflow-day .cf-datebar{display:grid;grid-template-columns:44px minmax(0,1fr) 44px 44px;align-items:center;gap:2px;flex:none;min-height:66px;padding:8px 12px;background:#100d18;border-bottom:1px solid #2e2738}
+#ambar-cashflow-day .cf-date-arrow,#ambar-cashflow-day .cf-calendar{display:grid;place-items:center;min-height:44px;border-radius:10px;color:#bba881}
+#ambar-cashflow-day .cf-date-arrow:disabled{color:#61586c}
+#ambar-cashflow-day .cf-selected-date{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;text-align:center}
+#ambar-cashflow-day .cf-selected-date>strong{font-size:14px;line-height:20px;font-weight:600}
+#ambar-cashflow-day .cf-selected-date>time{font-size:11px;line-height:16px;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-calendar{border:1px solid #3b3245;background:#1c1726;color:#c4b090}
+#ambar-cashflow-day .cf-calendar>svg.lucide{width:19px!important;height:19px!important}
+#ambar-cashflow-day .cf-scroll{flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#494052 transparent}
+#ambar-cashflow-day .cf-content{display:flex;flex-direction:column;gap:12px;padding:12px 12px 16px}
+#ambar-cashflow-day .cf-panel{min-width:0;border:1px solid #39323f;border-radius:18px;background:linear-gradient(135deg,#191622,var(--cf-panel) 72%)}
+#ambar-cashflow-day .cf-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;min-height:52px;padding:12px 14px;border-bottom:1px solid #493d49;border-radius:17px 17px 0 0;background:#221d29}
+#ambar-cashflow-day .cf-section-head h2{font-size:19px;line-height:26px;font-weight:700;letter-spacing:-.025em;color:#e7ca92}
+#ambar-cashflow-day .cf-unit{font-size:11px;line-height:16px;color:var(--cf-muted);flex:none}
+#ambar-cashflow-day .cf-balance-flow{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);align-items:center;gap:12px;padding:16px 14px 17px}
+#ambar-cashflow-day .cf-balance-flow>div{display:flex;flex-direction:column;gap:6px;min-width:0}
+#ambar-cashflow-day .cf-balance-flow>div>span{font-size:11px;line-height:17px;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-balance-flow strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:clamp(22px,6.7cqw,28px);line-height:32px;font-weight:500;letter-spacing:-.045em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-cashflow-day .cf-opening strong{color:#d5cddc}
+#ambar-cashflow-day .cf-closing strong{color:var(--cf-gold)}
+#ambar-cashflow-day .cf-balance-flow>.cf-flow-arrow{color:#81748f;align-self:end;margin-bottom:7px}
+#ambar-cashflow-day .cf-day-change{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px 12px;padding:11px 14px 12px;border-top:1px solid #352c3e;background:#1b1522;border-radius:0 0 17px 17px}
+#ambar-cashflow-day .cf-day-change>span{font-size:11px;line-height:17px;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-day-change>strong{font-family:"Space Grotesk",sans-serif;font-size:17px;line-height:22px;font-weight:500;letter-spacing:-.025em;font-variant-numeric:tabular-nums;color:#c59a9f}
+#ambar-cashflow-day .cf-day-change small,#ambar-cashflow-day .cf-section-total small,#ambar-cashflow-day .cf-account-total small,#ambar-cashflow-day .cf-empty-account small{font-family:Manrope,sans-serif;font-size:11px;line-height:16px;font-weight:400;letter-spacing:0;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-section-total{font-family:"Space Grotesk",sans-serif;font-size:22px;line-height:27px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-cashflow-day .cf-section-total.cf-outflow{color:#d0a0a3}
+#ambar-cashflow-day .cf-income-items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:12px 0 13px}
+#ambar-cashflow-day .cf-income-items>div{display:flex;flex-direction:column;gap:4px;align-items:center;min-width:0;padding:0 8px}
+#ambar-cashflow-day .cf-income-items>div+div{border-left:1px solid #322a3d}
+#ambar-cashflow-day .cf-income-items dt{font-size:11px;line-height:17px;color:var(--cf-muted);text-align:center}
+#ambar-cashflow-day .cf-income-items dd{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:23px;font-weight:500;color:#b2a7c0}
+#ambar-cashflow-day .cf-expense-group>summary{display:grid;grid-template-columns:minmax(0,1fr) auto 14px;align-items:center;gap:9px;min-height:54px;padding:12px 14px;list-style:none}
+#ambar-cashflow-day .cf-expense-group>summary::-webkit-details-marker{display:none}
+#ambar-cashflow-day .cf-expense-group>summary::marker{content:""}
+#ambar-cashflow-day .cf-account-name{font-size:14px;line-height:20px;font-weight:600}
+#ambar-cashflow-day .cf-account-total{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:24px;font-weight:500;letter-spacing:-.025em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-cashflow-day .cf-expense-group svg.cf-chevron{width:14px!important;height:14px!important;color:#9d90ae;transition:transform .16s ease}
+#ambar-cashflow-day .cf-expense-group[open] svg.cf-chevron{transform:rotate(180deg)}
+#ambar-cashflow-day .cf-payroll{margin:0 13px 13px;padding:0 12px 4px;border:1px solid #3b3143;border-radius:12px;background:#1c1725}
+#ambar-cashflow-day .cf-payroll-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 12px;min-height:35px;padding:8px 0;color:#bcae9a;font-size:11px;line-height:17px}
+#ambar-cashflow-day .cf-payroll-heading>span:last-child{color:#a49aaf}
+#ambar-cashflow-day .cf-payroll-list>div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:12px;min-height:39px;padding:9px 0;border-top:1px solid #302837}
+#ambar-cashflow-day .cf-payroll-list dt{font-size:13px;line-height:20px;font-weight:500;overflow-wrap:anywhere}
+#ambar-cashflow-day .cf-payroll-list dd{font-family:"Space Grotesk",sans-serif;font-size:16px;line-height:20px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#d3cbdc;white-space:nowrap}
+#ambar-cashflow-day .cf-empty-account{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:48px;padding:12px 14px;border-top:1px solid #302939;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-empty-account>span{font-size:13px;line-height:20px;font-weight:500}
+#ambar-cashflow-day .cf-empty-account>strong{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:24px;font-weight:500}
+#ambar-cashflow-day .cf-footer{flex:none;padding:12px 12px 16px;border-top:1px solid #302736;background:#0e0b13}
+#ambar-cashflow-day .cf-month-report{display:grid;grid-template-columns:19px minmax(0,1fr) 14px;align-items:center;gap:10px;width:100%;min-height:53px;padding:13px 15px;border:1px solid #6a573b;border-radius:13px;background:#29212d}
+#ambar-cashflow-day .cf-month-report>span{font-size:14px;line-height:22px;font-weight:600;text-align:center}
+#ambar-cashflow-day .cf-month-report>svg.lucide{color:var(--cf-gold)}
+#ambar-cashflow-day .cf-month-report>svg.lucide:last-child{width:14px!important;height:16px!important}
+#ambar-cashflow-day .cf-expense-group>summary:hover{background:#e2c38605}
+#ambar-cashflow-day .cf-month-report:hover{background:#332a37}
+#ambar-cashflow-day .cf-back:hover,#ambar-cashflow-day .cf-calendar:hover{background:#241d2c}
+@container cf-phone (max-width:350px){
+  #ambar-cashflow-day .cf-header{padding-inline:10px;gap:10px}
+  #ambar-cashflow-day .cf-header h1{font-size:21px}
+  #ambar-cashflow-day .cf-datebar{padding-inline:8px}
+  #ambar-cashflow-day .cf-content{padding-inline:10px;gap:10px}
+  #ambar-cashflow-day .cf-section-head{padding-inline:12px}
+  #ambar-cashflow-day .cf-section-head h2{font-size:18px}
+  #ambar-cashflow-day .cf-section-total{font-size:20px}
+  #ambar-cashflow-day .cf-balance-flow{padding-inline:12px;gap:8px;grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr)}
+  #ambar-cashflow-day .cf-balance-flow strong{font-size:22px}
+  #ambar-cashflow-day .cf-payroll{margin-inline:11px;padding-inline:10px}
+  #ambar-cashflow-day .cf-month-report{padding-inline:12px}
+}
+@media(prefers-reduced-motion:reduce){#ambar-cashflow-day .cf-chevron{transition:none}}
+/* Load after cashflow-visual.css. The existing app shell owns viewport and safe area. */
+#ambar-cashflow-day {
+  width: 100%;
+  height: var(--cf-available-height, 100%);
+  min-height: 0;
+}
+#ambar-cashflow-day .cf-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+#ambar-cashflow-day .cf-app {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  container-type: inline-size;
+}
+#ambar-cashflow-day .cf-back {
+  width: 44px;
+}
+#ambar-cashflow-day .cf-footer {
+  padding-bottom: calc(16px + var(--cf-safe-bottom, 0px));
+}
+#ambar-cashflow-day :is(button, summary):focus-visible {
+  outline: 2px solid #e2c386;
+  outline-offset: -3px;
+}
+/* Оболочка раздела для отчёта ДДС (#accOv.cfd, как у сбора выручки): шапка,
+   рейка и подвал спрятаны — у страницы свои; середина без отступов и без своей
+   прокрутки — прокручивается .cf-scroll. Высота — от оболочки (flex), safe
+   area снизу — только у подвала страницы, родитель её не добавляет. */
+#accOv.cfd .stk-top,#accOv.cfd #accRail,#accOv.cfd .stk-foot{display:none}
+#accOv.cfd .stk-mid{display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+#accOv.cfd #ambar-cashflow-day{--cf-safe-bottom:var(--safe-bottom);flex:1 1 auto;min-height:0}
+#accOv.cfd .cf-header{padding-top:calc(13px + var(--safe-top))}
+/* Полоса дня — та же, что пилюля дня в разделах: жест daySwipe и полёт
+   _heroFlip (классы day-*), окошко с датой — кнопка «к сегодня». */
+#ambar-cashflow-day .cf-datebar{touch-action:pan-y}
+#ambar-cashflow-day .cf-datebar.day-drag{transition:none}
+#ambar-cashflow-day .cf-datebar.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
+#ambar-cashflow-day .cf-datebar.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+@media (prefers-reduced-motion:reduce){#ambar-cashflow-day .cf-datebar.day-move,#ambar-cashflow-day .cf-datebar.day-back{transition-duration:.01s}}
+#ambar-cashflow-day .cf-selected-date{justify-content:center;width:100%;min-height:44px;border-radius:10px}
+/* Состояния, которых в макете нет, — теми же красками макета: минус в сейфе,
+   плюс и ноль в изменении за день, расхождение с сейфом, четвёртая стопка
+   (Барракуда+), записи прихода под сеткой, неподтверждённая выручка, выплаты
+   одной рамкой и одной строкой, пустой день, загрузка. */
+#ambar-cashflow-day .cf-balance-flow strong.cf-neg,#ambar-cashflow-day .cf-day-change.cf-mismatch>span{color:#c59a9f}
+#ambar-cashflow-day .cf-day-change.cf-up>strong{color:#d5cddc}
+#ambar-cashflow-day .cf-day-change.cf-zero>strong{color:var(--cf-muted)}
+#ambar-cashflow-day .cf-day-change:not(:last-child){border-radius:0}
+#ambar-cashflow-day .cf-income-items.cf-four{grid-template-columns:repeat(4,minmax(0,1fr))}
+#ambar-cashflow-day .cf-income-items dd{text-align:center;overflow-wrap:anywhere}
+#ambar-cashflow-day .cf-income-lines{padding:0 14px 4px;border-top:1px solid #322a3d}
+#ambar-cashflow-day .cf-income-lines>div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:12px;min-height:39px;padding:9px 0}
+#ambar-cashflow-day .cf-income-lines>div+div{border-top:1px solid #302837}
+#ambar-cashflow-day .cf-income-lines dt{font-size:13px;line-height:20px;font-weight:500;overflow-wrap:anywhere}
+#ambar-cashflow-day .cf-income-lines dt>span{color:var(--cf-muted)}
+#ambar-cashflow-day .cf-income-lines dd,#ambar-cashflow-day .cf-expense-row>strong{font-family:"Space Grotesk",sans-serif;font-size:16px;line-height:20px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#d3cbdc;white-space:nowrap}
+#ambar-cashflow-day .cf-wait{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:48px;padding:12px 14px;border-top:1px solid #302939;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-wait>span{min-width:0;font-size:13px;line-height:20px;font-weight:500}
+#ambar-cashflow-day .cf-wait>span>small{display:block;font-size:11px;line-height:16px;font-weight:400}
+#ambar-cashflow-day .cf-wait>strong{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:24px;font-weight:500;white-space:nowrap}
+#ambar-cashflow-day .cf-wait>strong>small{font-family:Manrope,sans-serif;font-size:11px;line-height:16px;font-weight:400;letter-spacing:0;color:var(--cf-muted)}
+#ambar-cashflow-day .cf-expense-body{display:flex;flex-direction:column;gap:8px;padding:0 13px 13px}
+#ambar-cashflow-day .cf-expense-body .cf-payroll{margin:0}
+#ambar-cashflow-day .cf-expense-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:12px;min-height:39px;padding:9px 12px;border:1px solid #3b3143;border-radius:12px;background:#1c1725}
+#ambar-cashflow-day .cf-expense-row>span{font-size:13px;line-height:20px;font-weight:500;overflow-wrap:anywhere}
+#ambar-cashflow-day .cf-expense-group+.cf-expense-group>summary,#ambar-cashflow-day .cf-empty-account+.cf-expense-group>summary{border-top:1px solid #302939}
+#ambar-cashflow-day .cf-state{padding:28px 14px;text-align:center;font-size:13px;line-height:20px;color:var(--cf-muted)}
+#ambar-cashflow-day .is-skel{min-width:0;border-radius:5px}
+@container cf-phone (max-width:350px){
+  #ambar-cashflow-day .cf-income-items.cf-four dt{font-size:10.5px}
+  #ambar-cashflow-day .cf-income-items.cf-four dd{font-size:15px}
+  #ambar-cashflow-day .cf-expense-body{padding-inline:11px}
+}
 /* Состояния, которых в макете нет, — теми же красками макета: район получен
    (снять отметку), «соберу завтра» нажата, день забран (вернуть), кнопка
    распределения открыта, одна кнопка в нижней зоне, отклонённый расход. */
@@ -21077,6 +21245,9 @@ const LUC = {
   'file-text':        '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
   'arrow-left-right': '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
   'calendar-days':   '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
+  // Отчёт ДДС за день (визуал 2 ноя 2026)
+  'arrow-right':      '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  'calendar-range':   '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M17 14h-6"/><path d="M13 18H7"/><path d="M7 14h.01"/><path d="M17 18h.01"/>',
 };
 function luc(name, cls){
   return `<svg class="lucide lucide-${name}${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUC[name] || ''}</svg>`;
@@ -23753,34 +23924,71 @@ async function fbDayOk(day){
   }catch(e){ _toast(fbCrErr(e) || 'Не удалось подтвердить'); }
 }
 // ── Отчёт ДДС ─────────────────────────────────────────────────────────────
-// Весь день сейфа одной лентой (владелец, 20 сен 2026: «отчёт за день, там
-// должны быть видны абсолютно все движения денег за день; сверху цифра
-// изначальная общая, а потом все минусы, плюс РП−, РП+, закупка на барракуда —
-// в общей сложности полная история и хронология движения средств»). Сверху
-// сколько было, дальше каждое движение со временем и остатком после него,
-// внизу сколько стало. Своей арифметики здесь нет: всё из той же книги, что и
-// «Касса дня», и сходится по построению — было + выручка + приход в фонд −
-// расходы − выплаты − оплата базе = стало (finance_calc.compute). Крипта лежит
-// на кошельке, а не в сейфе, поэтому оплаченное ею — в «Мимо сейфа».
+// Весь день сейфа (владелец, 20 сен 2026: «отчёт за день, там должны быть видны
+// абсолютно все движения денег за день; сверху цифра изначальная общая, а
+// потом все минусы, плюс РП−, РП+, закупка на барракуда — в общей сложности
+// полная история и хронология движения средств»; 30 сен 2026: «ногу сломишь…
+// нужно что-то максимально простое, минималистичное и с очевидной логикой» —
+// начало, поступления, выплаты, сальдо, конец). Своей арифметики здесь нет:
+// всё из той же книги, что и «Касса дня», и сходится по построению — было +
+// приход − расход = стало (finance_calc.compute). Крипта лежит на кошельке, а
+// не в сейфе, поэтому оплаченное ею в отчёт не входит.
+//
+// Вид 2 ноя 2026 (владелец, бриф AMBAR-CASHFLOW-DAY): страница
+// #ambar-cashflow-day целиком в середине раздела, шапка, рейка и подвал
+// оболочки на это время спрятаны (#accOv.cfd, как у сбора выручки),
+// единственная прокрутка — .cf-scroll. Своя шапка со стрелкой назад
+// (accBack), полоса дня с теми же стрелками, календарём (openDate('ddcDay')),
+// жестом (bindDayBars → daySwipe) и тапом по окошку «к сегодня» (dayBarHome),
+// внизу кнопка месячного отчёта. Смена дня — через accDayGo → fbDdcReload.
 async function accFinDdc(){
   _setText('accTitle', 'Отчёт ДДС');
-  _setText('accSub', accDayWord());
-  document.getElementById('accMid').innerHTML =
-    `<div class="exp-sum stk-bysum fb-daysum" id="finDdcCard" data-day="общий">${fbDdcCardInner(null)}</div>
-     <div id="finDdcBody"><div class="exp-empty">Загрузка…</div></div>`;
-  requestAnimationFrame(bindDayBars);
-  document.getElementById('accFoot').innerHTML =
-    `<div class="qb-wrap"><button class="qb" onclick="FB.month=accDay().slice(0,7);accOpen('finddcm')">Отчёт ДДС месяц</button></div>`;
+  _setText('accSub', 'Движение денежных средств');
+  document.getElementById('accMid').innerHTML = cfdShell();
+  document.getElementById('accOv').classList.add('cfd');
+  requestAnimationFrame(bindDayBars);        // жест по полосе дня — тот же daySwipe
   await fbDdcReload();
+}
+function cfdShell(){
+  return `<div id="ambar-cashflow-day" lang="ru"><div class="cf-stage"><div class="cf-app" aria-label="Отчёт ДДС">
+    <header class="cf-header">
+      <button type="button" class="cf-back" aria-label="Назад" onclick="accBack()">${luc('chevron-left')}</button>
+      <div><h1>Отчёт ДДС</h1><span>Движение денежных средств</span></div>
+    </header>
+    <div class="cf-datebar" id="finDdcCard" data-day="общий" aria-label="Дата отчёта">
+      <button type="button" class="cf-date-arrow" onclick="dayBarArrow(this,1)" aria-label="Предыдущий день">${luc('chevron-left')}</button>
+      <button type="button" class="cf-selected-date" onclick="dayBarHome(this)"><strong></strong><time></time></button>
+      <button type="button" class="cf-date-arrow" onclick="dayBarArrow(this,-1)" aria-label="Следующий день">${luc('chevron-right')}</button>
+      <button type="button" class="cf-calendar" onclick="openDate('ddcDay')" aria-label="Выбрать дату отчёта">${luc('calendar-days')}</button>
+    </div>
+    <main class="cf-scroll" aria-label="Движение денег за день"><div class="cf-content" id="finDdcBody">${cfdBodyHtml(null, null, 'loading')}</div></main>
+    <footer class="cf-footer"><button type="button" class="cf-month-report" onclick="FB.month=accDay().slice(0,7);accOpen('finddcm')">${luc('calendar-range')}<span>Отчёт ДДС за месяц</span>${luc('chevron-right')}</button></footer>
+  </div></div></div>`;
+}
+// Подпись дня в полосе — те же слова, что у пилюли дня в разделах
+// (dayBarLabels): «Сегодня / Вчера / Позавчера / 29 октября», ниже число с
+// днём недели (у далёких дней — день недели и год). Стрелка вперёд заперта на
+// сегодня, как везде.
+function cfdDatePaint(){
+  const bar = document.getElementById('finDdcCard'); if(!bar) return;
+  const off = DAY_OFFSET, {имя, дата} = dayBarLabels(off), day = accDay();
+  const s = bar.querySelector('.cf-selected-date > strong'), t = bar.querySelector('.cf-selected-date > time');
+  if(s) s.textContent = имя;
+  if(t){ t.textContent = дата.replace(', ', ' · '); t.setAttribute('datetime', day); }
+  const next = bar.querySelectorAll('.cf-date-arrow')[1];
+  if(next){ next.disabled = off <= 0; next.setAttribute('aria-label', off <= 0 ? 'Следующий день недоступен' : 'Следующий день'); }
+  const app = bar.closest('.cf-app');
+  if(app) app.setAttribute('aria-label', `Отчёт ДДС за ${fbDayT(day)} ${day.slice(0, 4)}`);
 }
 async function fbDdcReload(){
   const day = accDay(), month = day.slice(0, 7);
-  _setText('accSub', accDayWord());
+  cfdDatePaint();
+  const body = () => document.getElementById('finDdcBody');
   if(!fbBook(month)){
+    if(body()) body().innerHTML = cfdBodyHtml(null, null, 'loading');
     try{ await fbLoad(month); }
     catch(e){
-      const body = document.getElementById('finDdcBody');
-      if(body) body.innerHTML = loadFail();
+      if(accDay() === day && body()) body().innerHTML = loadFail();
       return;
     }
   }
@@ -23790,20 +23998,76 @@ async function fbDdcReload(){
   fbDdcPaint();
 }
 function fbDdcPaint(){
-  const card = document.getElementById('finDdcCard'), body = document.getElementById('finDdcBody');
-  if(!card || !body) return;
+  const body = document.getElementById('finDdcBody');
+  if(!body || !document.getElementById('finDdcCard')) return;
   const day = accDay(), b = fbBook(day.slice(0, 7));
   if(!b) return;
-  const d = fbDayOf(b, day), start = fbDdcStart(b, day);
-  card.innerHTML = fbDdcCardInner(d, start);
-  dayBarPaint(card);
-  body.innerHTML = fbDdcBodyHtml(d, start);
+  cfdDatePaint();
+  body.innerHTML = cfdBodyHtml(fbDayOf(b, day), fbDdcStart(b, day));
 }
-function fbDdcCardInner(d, start){
-  return `<div class="exp-day dds-head${DAY_OFFSET ? ' back' : ''}">
-      <span class="exp-day-l"><span class="exp-day-t">Отчёт<i>ДДС</i></span></span>
-      ${_dayNav('ddcDay')}
-    </div>`;
+// Разметка дня по макету: «Сейф» — начало → конец и изменение за день (бывший
+// «Баланс»), разошлось с сейфом — строкой ниже, молчать нельзя; «Приход» —
+// итог и стопки сеткой, под ней записи, когда в стопку входила не только
+// выручка дня, неподтверждённая выручка — строкой; «Расход» — итог, стопка с
+// движениями раскрытой группой (выплаты одной статьи или вида — рамкой со
+// счётчиком, остальное — строкой), пустая стопка — строкой. Арифметика —
+// fbDdcParts и fbDdcStart, те же, что у таблицы месяца.
+function cfdBodyHtml(d, start, state){
+  const AED = ' <small>AED</small>';
+  if(state === 'loading'){
+    const sk = w => `<span class="is-skel">${'0'.repeat(w)}</span>`;
+    return `<section class="cf-panel cf-balance" aria-labelledby="cf-balance-title" aria-busy="true">
+      <div class="cf-section-head"><h2 id="cf-balance-title">Сейф</h2><span class="cf-unit">AED</span></div>
+      <div class="cf-balance-flow"><div class="cf-opening"><span>На начало дня</span><strong>${sk(7)}</strong></div>${luc('arrow-right', 'cf-flow-arrow')}<div class="cf-closing"><span>На конец дня</span><strong>${sk(7)}</strong></div></div>
+      <div class="cf-day-change"><span>Изменение за день</span><strong>${sk(6)}</strong></div></section>
+    <section class="cf-panel cf-income" aria-labelledby="cf-income-title" aria-busy="true">
+      <div class="cf-section-head"><h2 id="cf-income-title">Приход</h2><span class="cf-section-total">${sk(5)}</span></div>
+      <dl class="cf-income-items"><div><dt>РП+</dt><dd>${sk(4)}</dd></div><div><dt>Доп РП+</dt><dd>${sk(4)}</dd></div><div><dt>ЧП+</dt><dd>${sk(4)}</dd></div></dl></section>
+    <section class="cf-panel cf-expenses" aria-labelledby="cf-expenses-title" aria-busy="true">
+      <div class="cf-section-head"><h2 id="cf-expenses-title">Расход</h2><span class="cf-section-total">${sk(5)}</span></div>
+      <div class="cf-empty-account"><span>РП−</span><strong>${sk(4)}</strong></div><div class="cf-empty-account"><span>ЧП−</span><strong>${sk(4)}</strong></div></section>`;
+  }
+  const msg = !d ? 'За этот день ничего нет' : d.future ? 'Этот день ещё не наступил' : d.before ? 'До учёта' : '';
+  if(msg) return `<section class="cf-panel cf-state" role="status">${msg}</section>`;
+  const p = fbDdcParts(d), from = start.all, saldo = p.inSum - p.outSum, end = from + saldo;
+  const diff = Math.round(end - (+d.stack_total || 0));   // считаем сами и сверяем с сейфом
+  const wait = d.pending && +d.base ? +d.base : 0;
+  const plus = x => (x > 0 ? '+' : '') + fbFmt(x);
+  const grid = p.ins.map(r => `<div><dt>${escS(r.name)}</dt><dd>${fbFmt(r.v)}</dd></div>`).join('');
+  const lines = p.ins.map(r => r.items.length === 1 && r.items[0].src ? '' :
+    r.items.map(x => `<div><dt><span>${escS(r.name)} · </span>${escS(x.name)}</dt><dd>${fbFmt(x.v)}</dd></div>`).join('')).join('');
+  const acc = r => {
+    if(!r.items.length) return `<div class="cf-empty-account"><span>${escS(r.name)}</span><strong>${fbFmt(-r.v)}${AED}</strong></div>`;
+    const groups = [];
+    r.items.forEach(x => { const g = x.lbl ? groups.find(y => y.grp === x.grp) : null;
+      if(g) g.rows.push(x); else groups.push({grp: x.grp, rows: [x]}); });
+    const body = groups.map(g => g.rows.length > 1
+      ? `<div class="cf-payroll"><div class="cf-payroll-heading"><span>${escS(g.grp === 'Выплата' ? 'Выплаты' : g.grp)}</span><span>${g.rows.length} ${pluralize(g.rows.length, 'выплата', 'выплаты', 'выплат')}</span></div>
+          <dl class="cf-payroll-list" aria-label="${escS(g.grp)} из ${escS(r.name.slice(0, -1))}, AED">${g.rows.map(x => `<div><dt>${escS(x.lbl)}</dt><dd>${fbFmt(-x.v)}</dd></div>`).join('')}</dl></div>`
+      : `<div class="cf-expense-row"><span>${escS(g.rows[0].name)}</span><strong>${fbFmt(-g.rows[0].v)}</strong></div>`).join('');
+    const id = 'cf-acc-' + ({'РП−': 'rp', 'ЧП−': 'np'}[r.name] || 'b');
+    return `<details class="cf-expense-group" id="${id}" open><summary><span class="cf-account-name">${escS(r.name)}</span><span class="cf-account-total">${fbFmt(-r.v)}${AED}</span>${luc('chevron-down', 'cf-chevron')}</summary><div class="cf-expense-body">${body}</div></details>`;
+  };
+  return `<section class="cf-panel cf-balance" aria-labelledby="cf-balance-title">
+    <div class="cf-section-head"><h2 id="cf-balance-title">Сейф</h2><span class="cf-unit">AED</span></div>
+    <div class="cf-balance-flow" role="group" aria-label="В начале дня ${fbFmt(from)} AED, на конец дня ${fbFmt(end)} AED">
+      <div class="cf-opening"><span>На начало дня</span><strong${from < 0 ? ' class="cf-neg"' : ''}>${fbFmt(from)}</strong></div>
+      ${luc('arrow-right', 'cf-flow-arrow')}
+      <div class="cf-closing"><span>На конец дня</span><strong${end < 0 ? ' class="cf-neg"' : ''}>${fbFmt(end)}</strong></div>
+    </div>
+    <div class="cf-day-change${saldo > 0 ? ' cf-up' : saldo ? '' : ' cf-zero'}"><span>Изменение за день</span><strong>${plus(saldo)}${AED}</strong></div>
+    ${diff ? `<div class="cf-day-change cf-mismatch"><span>Не сходится с сейфом</span><strong>${fbFmt(diff)}${AED}</strong></div>` : ''}
+  </section>
+  <section class="cf-panel cf-income" aria-labelledby="cf-income-title">
+    <div class="cf-section-head"><h2 id="cf-income-title">Приход</h2><span class="cf-section-total${p.inSum < 0 ? ' cf-outflow' : ''}">${plus(p.inSum)}${AED}</span></div>
+    <dl class="cf-income-items${p.ins.length > 3 ? ' cf-four' : ''}" aria-label="Приход по стопкам, AED">${grid}</dl>
+    ${lines ? `<dl class="cf-income-lines" aria-label="Из чего сложился приход, AED">${lines}</dl>` : ''}
+    ${wait ? `<div class="cf-wait"><span>Выручка дня<small>день не подтверждён — в сейф ещё не легла</small></span><strong>${fbFmt(wait)}${AED}</strong></div>` : ''}
+  </section>
+  <section class="cf-panel cf-expenses" aria-labelledby="cf-expenses-title">
+    <div class="cf-section-head"><h2 id="cf-expenses-title">Расход</h2><span class="cf-section-total${p.outSum > 0 ? ' cf-outflow' : ''}">${fbFmt(-p.outSum)}${AED}</span></div>
+    ${p.outs.map(acc).join('')}
+  </section>`;
 }
 // Сколько лежало в сейфе до этого дня: остаток прошлого дня, а у первого дня
 // месяца — переносы на начало месяца, те же три стопки.
@@ -23831,7 +24095,9 @@ function fbDdcParts(d, month){
   const rp = ok ? n(d.collected) : 0, b = ok ? n(d.aside) : 0, np = ok ? n(d.np_plus) : 0;
   // Под каждым движением — за что (владелец: «везде помимо самой суммы надо
   // писать за что: в РП — сим-карты −192, премия −283»). Запись — своей строкой.
-  const it = (name, v) => ({name, v: n(v)}), has = a => a.filter(x => x.v);
+  // it(name, v, src): src — деньги из выручки дня, подпись-умолчание; экран дня
+  // её не повторяет, когда в стопку больше ничего не входило.
+  const it = (name, v, src) => ({name, v: n(v), src: !!src}), has = a => a.filter(x => x.v);
   const extra = (d.ins || []).map(e => it(month && e.src === 'crypto' ? 'Из крипты' : month && e.src === 'deposit' ? 'Возврат депозита'
     : [e.comment || 'Приход в фонд', e.src === 'crypto' && e.comment !== 'Из крипты' ? 'из крипты'
        : e.src === 'deposit' && !/депозит/i.test(e.comment || '') ? 'возврат депозита' : '', month ? '' : e.who].filter(Boolean).join(' · '), e.amount));
@@ -23841,10 +24107,10 @@ function fbDdcParts(d, month){
   const mvs = d.moves || [];
   const mvIn = k => mvs.filter(m => m.to === k).map(m => it(`Перевод из ${FB_MV_T[m.from] || '?'}${!month && m.comment ? ' · ' + m.comment : ''}`, m.amount));
   const mvOut = k => mvs.filter(m => m.from === k).map(m => it(`Перевод в ${FB_MV_T[m.to] || '?'}${!month && m.comment ? ' · ' + m.comment : ''}`, m.amount));
-  const ins = [{name: 'РП+', v: rp + n(d.mv_rp_in), items: has([it(month ? 'Из выручки' : 'Из выручки дня', rp), ...mvIn('rp')])},
+  const ins = [{name: 'РП+', v: rp + n(d.mv_rp_in), items: has([it(month ? 'Из выручки' : 'Из выручки дня', rp, true), ...mvIn('rp')])},
                {name: 'Доп РП+', v: n(d.extra_rp), items: has(extra)},
-               {name: 'ЧП+', v: np + n(d.mv_np_in), items: has([it(month ? 'Остаток выручки' : 'Остаток выручки дня', np), ...mvIn('np')])}];
-  if(b || n(d.mv_b_in)) ins.push({name: 'Барракуда+', v: b + n(d.mv_b_in), items: has([it(month ? 'Из выручки' : 'Из выручки дня', b), ...mvIn('b')])});
+               {name: 'ЧП+', v: np + n(d.mv_np_in), items: has([it(month ? 'Остаток выручки' : 'Остаток выручки дня', np, true), ...mvIn('np')])}];
+  if(b || n(d.mv_b_in)) ins.push({name: 'Барракуда+', v: b + n(d.mv_b_in), items: has([it(month ? 'Из выручки' : 'Из выручки дня', b, true), ...mvIn('b')])});
   // В сейф ложится выручка дня — та же сумма, что в окошке «Выручка» на главной
   // (владелец, 30 сен 2026: «расходы водителей и чай туда не считаются, туда
   // идёт именно выручка из окошка»). Отдельными движениями чая и расходов
@@ -23857,12 +24123,19 @@ function fbDdcParts(d, month){
   // сейфа не выходила: её в ДДС нет, как и оплаченного криптой.
   // Покрытое депозитом из сейфа не выходило: в ДДС — только остаток наличными,
   // а то, что сгорело из депозита, подписано рядом.
-  const rpOut = (d.expenses || []).filter(e => e.pay !== 'crypto' && e.pay !== 'hands').map(e => it((e.deposit ? 'Депозит · ' : '') + (
-    month ? (e.kind_t || e.line_name || 'Вне плана')
-          : [e.kind_t || e.line_name || 'Вне плана', e.kind_t ? e.who : e.comment].filter(Boolean).join(' · '))
-    + (e.dep_use ? ` · из депозита ${fbFmt(e.dep_use)}` : ''), n(e.amount) - n(e.dep_use)));
-  const npOut = (d.payouts || []).map(e => it(
-    (month ? (e.who || e.comment) : [e.who, e.comment].filter(Boolean).join(' · ')) || 'Выплата', e.amount));
+  // Экран дня (2 ноя 2026) группирует выплаты: grp — статья или вид, lbl — кому
+  // или за что; «Зарплата · 7 выплат» одной рамкой вместо семи строк
+  // «Зарплата · имя». name — та же строка, что и раньше: по ней складывает
+  // месяц, её же гоняет tools/fuzz_finance.py.
+  const rpOut = (d.expenses || []).filter(e => e.pay !== 'crypto' && e.pay !== 'hands').map(e => {
+    const grp = (e.deposit ? 'Депозит · ' : '') + (e.kind_t || e.line_name || 'Вне плана');
+    const lbl = [month ? '' : (e.kind_t ? e.who : e.comment), e.dep_use ? `из депозита ${fbFmt(e.dep_use)}` : ''].filter(Boolean).join(' · ');
+    return {...it(lbl ? `${grp} · ${lbl}` : grp, n(e.amount) - n(e.dep_use)), grp, lbl};
+  });
+  const npOut = (d.payouts || []).map(e => {
+    const lbl = (month ? (e.who || e.comment) : [e.who, e.comment].filter(Boolean).join(' · ')) || '';
+    return {...it(lbl || 'Выплата', e.amount), grp: 'Выплата', lbl};
+  });
   npOut.push(it('Барракуде сверх её стопки', d.pay_b_extra));
   // Барракуде из РП (владелец, 3 окт 2026) — тоже уход из стопки РП.
   rpOut.push(it('Барракуде сверх её стопки', d.pay_rp));
@@ -23872,13 +24145,6 @@ function fbDdcParts(d, month){
   if(n(d.pay_b) || n(d.mv_b_out)) outs.push({name: 'Барракуда−', v: n(d.pay_b) + n(d.mv_b_out), items: has([it('Оплата Барракуде', d.pay_b), ...mvOut('b')])});
   const sum = a => a.reduce((t, r) => t + r.v, 0);
   return {ins, outs, inSum: sum(ins), outSum: sum(outs)};
-}
-function fbDdcBodyHtml(d, start){
-  if(!d) return '<div class="exp-empty">За этот день ничего нет</div>';
-  if(d.future) return '<div class="exp-empty">Этот день ещё не наступил</div>';
-  if(d.before) return '<div class="exp-empty">До учёта</div>';
-  return fbDdcTable(fbDdcParts(d), start.all, d.stack_total, {from: 'Сейф начало дня', to: 'Сейф конец дня'},
-    d.pending && +d.base ? {name: 'Выручка дня', sub: 'день не подтверждён — в сейф ещё не легла', v: +d.base} : null);
 }
 // Одна таблица на день и на месяц: откуда начали → приход → расход → баланс →
 // к чему пришли. fact — сколько в сейфе по книге: считаем сами и сверяем.
@@ -27872,7 +28138,7 @@ async function accLoadSummaries(){
 
 function accOpen(id){
   if(id === 'stock'){ openStock(); return; }          // у склада уже свой экран
-  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui', 'sdc'); }   // шапка штрафного листа, оболочка сбора выручки
+  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui', 'sdc', 'cfd'); }   // шапка штрафного листа, оболочка сбора выручки и отчёта ДДС
   _setRail('accRail', '');
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
@@ -27945,7 +28211,7 @@ function accClose(){
 
 function _accClose(){
   ACC_BACK = null;
-  document.getElementById('accOv').classList.remove('pen-ui', 'sdc');
+  document.getElementById('accOv').classList.remove('pen-ui', 'sdc', 'cfd');
   CKL_RETURN = false;
   SCAN.stop();
   MVT = null;

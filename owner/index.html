@@ -2819,6 +2819,247 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
 #star-daily-collection .crd-acts .aud-b{flex:1;padding:14px 10px;border-radius:13px;font-size:14.5px;font-weight:700;text-align:center;cursor:pointer}
 #star-daily-collection .crd-acts .aud-b.go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 #star-daily-collection .crd-acts .aud-b.soft{flex:0 0 auto;padding-left:20px;padding-right:20px;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
+/* ── «Финансы»: утверждённый визуал полной страницы (пакет AMBAR-FINANCE-FINAL,
+   владелец, 2 ноя 2026: «внедри приложенный визуал поверх существующей страницы,
+   логику не трогай»). Сначала точные значения макета как есть (finance-visual.css),
+   затем его же адаптация к мини-аппу (finance-integration.css), затем крючки
+   оболочки и состояния, которых в макете не было. Корень #ambar-finance-polished —
+   один на странице, стили изолированы им. ── */
+#ambar-finance-polished{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-finance-polished .fv-stage{display:flex;justify-content:center;padding:12px 8px}
+#ambar-finance-polished .fv-app{--fv-width:390px;--fv-height:844px;--fv-bg:#07070c;--fv-panel:#12111f;--fv-text:#ece9e3;--fv-muted:#aaa2b4;--fv-gold:#e2c386;--fv-line:#2d2839;display:flex;flex-direction:column;width:var(--fv-width);max-width:100%;height:var(--fv-height);min-width:0;overflow:hidden;box-sizing:border-box;border:1px solid #292532;border-radius:24px;background:var(--fv-bg);color:var(--fv-text);font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container-name:fv-phone;container-type:size}
+#ambar-finance-polished .fv-app *{box-sizing:border-box}
+#ambar-finance-polished :where(.fv-app button){appearance:none;font:inherit;color:inherit;border:0;background:transparent;text-align:left;white-space:normal;-webkit-tap-highlight-color:transparent}
+#ambar-finance-polished .fv-app [hidden]{display:none!important}
+#ambar-finance-polished svg.lucide{display:block;width:18px!important;height:18px!important;flex:none;margin:0!important;stroke-width:1.7}
+#ambar-finance-polished .fv-app-head{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-height:62px;padding:12px;border-bottom:1px solid #24202e;background:#0a090f}
+#ambar-finance-polished .fv-wordmark{margin-right:auto;font-family:Georgia,"Times New Roman",serif;font-size:26px;line-height:1;letter-spacing:.17em;color:#d8bc82;white-space:nowrap}
+#ambar-finance-polished .fv-online{display:flex;gap:5px;align-items:center;padding:4px 7px;border:1px solid #294034;border-radius:20px;background:#132019;color:#92b09a;font-size:10px;line-height:16px;font-weight:600;letter-spacing:.035em;white-space:nowrap}
+#ambar-finance-polished .fv-online>span{width:5px;height:5px;border-radius:50%;background:#92b09a}
+#ambar-finance-polished .fv-tools{display:flex;gap:5px}
+#ambar-finance-polished .fv-tools>button{display:grid;place-items:center;position:relative;width:32px;height:34px;padding:0;border:1px solid #2c2738;border-radius:10px;background:#13111e;color:#a79db3}
+#ambar-finance-polished .fv-tools>button.fv-bell{border-color:#665137;background:#292217;color:var(--fv-gold)}
+#ambar-finance-polished .fv-bell>span{position:absolute;right:-3px;top:-6px;min-width:17px;padding:0 3px;border:2px solid #0a090f;border-radius:8px;background:#e2c386;color:#1b1720;font-size:9px;line-height:13px;font-weight:700;text-align:center}
+#ambar-finance-polished .fv-scroll{position:relative;flex:1 1 0;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#494052 transparent}
+#ambar-finance-polished .fv-content{display:flex;flex-direction:column;gap:12px;min-width:0;padding:12px 12px 18px}
+#ambar-finance-polished .fv-panel{flex:none;min-width:0;border:1px solid #39323f;border-radius:19px;background:linear-gradient(135deg,#191622,var(--fv-panel) 72%)}
+#ambar-finance-polished .fv-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;min-height:58px;padding:15px 14px;border-bottom:1px solid #493d49;border-radius:18px 18px 0 0;background:#221d29}
+#ambar-finance-polished .fv-section-head>div{min-width:0}
+#ambar-finance-polished .fv-section-head h2{margin:0;min-width:0;color:#e7ca92;font-size:20px;line-height:26px;font-weight:700;letter-spacing:-.025em;overflow-wrap:break-word}
+#ambar-finance-polished .fv-unit{font-size:11px;line-height:16px;color:var(--fv-muted);font-weight:500;flex:none}
+#ambar-finance-polished .fv-section-caption{display:block;margin-top:4px;color:var(--fv-muted);font-size:12px;line-height:17px}
+#ambar-finance-polished .fv-month{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;min-height:44px;padding:0 5px;border-bottom:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-month>span{min-width:0;font-size:14px;line-height:20px;font-weight:600;text-align:center}
+#ambar-finance-polished .fv-month>button{display:grid;place-items:center;width:40px;min-height:44px;padding:0;color:#b6a48a}
+#ambar-finance-polished .fv-month>button:disabled{color:#655c74}
+#ambar-finance-polished .fv-metrics{display:grid;grid-template-columns:minmax(0,1fr) 13px minmax(0,1fr) 13px minmax(0,1fr);align-items:stretch;gap:4px;min-width:0;padding:16px 13px 18px;background:linear-gradient(100deg,#1c1824,#17131f)}
+#ambar-finance-polished .fv-metric{display:grid;grid-template-rows:34px auto;align-content:start;gap:10px;min-width:0;padding:0;border-radius:7px}
+#ambar-finance-polished .fv-metric-operator{position:relative;align-self:stretch;padding-top:44px;color:#a89aaf;font-family:"Space Grotesk",sans-serif;font-size:17px;line-height:26px;font-weight:400;text-align:center}
+#ambar-finance-polished .fv-metric-operator::before,#ambar-finance-polished .fv-metric-operator::after{content:"";position:absolute;left:50%;width:1px;background:#3d3447;transform:translateX(-50%);pointer-events:none}
+#ambar-finance-polished .fv-metric-operator::before{top:0;bottom:32px}
+#ambar-finance-polished .fv-metric-operator::after{height:5px;bottom:-7px}
+#ambar-finance-polished .fv-metric-name{display:grid;grid-template-columns:minmax(0,1fr) 10px;gap:3px;align-items:start;min-height:34px;min-width:0;color:var(--fv-muted);font-size:11px;line-height:16px;font-weight:500}
+#ambar-finance-polished .fv-metric-name>svg.lucide{width:11px!important;height:13px!important;color:#85768f}
+#ambar-finance-polished .fv-metric>strong{max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(18px,5.7cqw,24px);line-height:26px;font-weight:500;letter-spacing:-.055em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-profit>strong{color:var(--fv-gold)}
+#ambar-finance-polished .fv-analytics-bottom{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-analytics-bottom>button{display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-width:0;min-height:79px;padding:12px 14px 13px}
+#ambar-finance-polished .fv-analytics-bottom>button+button{border-left:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-cell-label{display:flex;align-items:center;justify-content:space-between;gap:5px;width:100%;min-width:0;color:var(--fv-muted);font-size:11px;line-height:16px;font-weight:500}
+#ambar-finance-polished .fv-cell-label>svg.lucide{width:12px!important;height:14px!important;color:#85768f}
+#ambar-finance-polished .fv-profitability-line{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
+#ambar-finance-polished .fv-profitability-line>strong,#ambar-finance-polished .fv-budget-value>strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:23px;line-height:26px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:var(--fv-gold)}
+#ambar-finance-polished .fv-profitability-line>strong>span{font-size:15px;margin-left:2px}
+#ambar-finance-polished .fv-meter{display:block;min-width:0;height:4px;background:#30293d;border-radius:8px;overflow:hidden}
+#ambar-finance-polished .fv-meter>span{display:block;height:100%;border-radius:inherit;background:#c8ac72}
+#ambar-finance-polished .fv-profitability-line>.fv-meter{flex:1}
+#ambar-finance-polished .fv-budget-value{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;min-width:0}
+#ambar-finance-polished .fv-budget-value>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-revenue-head{gap:12px;min-height:0;padding-block:12px}
+#ambar-finance-polished .fv-revenue-head h2{flex:1}
+#ambar-finance-polished .fv-revenue-date{flex:none;color:var(--fv-muted);font-size:11px;line-height:16px}
+#ambar-finance-polished .fv-revenue-steps{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:1fr;gap:10px;min-width:0;padding:10px}
+#ambar-finance-polished .fv-collection,#ambar-finance-polished .fv-distribution{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;align-content:start;align-items:start;gap:8px;width:100%;min-width:0;padding:10px 12px;border:1px solid #3b3345;border-radius:12px}
+#ambar-finance-polished .fv-collection{background:#211c29;border-color:#66543c}
+#ambar-finance-polished .fv-revenue-steps .fv-collection:enabled:hover{background-color:#272130;border-color:#8c754b}
+#ambar-finance-polished .fv-revenue-steps .fv-collection:enabled:active{background-color:#2d2635}
+#ambar-finance-polished .fv-step-number{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;background:#e2c38612;color:#d9bd84;font-family:"Space Grotesk",sans-serif;font-size:12px;line-height:16px;font-weight:500}
+#ambar-finance-polished .fv-revenue-step-head{display:grid;grid-template-columns:22px minmax(0,1fr) 16px;align-items:center;gap:10px;min-width:0}
+#ambar-finance-polished .fv-revenue-step-head>strong{font-size:15px;line-height:22px;font-weight:600;overflow-wrap:break-word}
+#ambar-finance-polished .fv-collection .fv-step-number{background:#e2c3861c}
+#ambar-finance-polished .fv-revenue-step-content{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(28px,auto) auto;align-content:start;align-items:start;gap:6px;min-width:0}
+#ambar-finance-polished .fv-collection-money{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 8px;min-width:0;font-variant-numeric:tabular-nums}
+#ambar-finance-polished .fv-collection-money>strong{max-width:100%;color:var(--fv-gold);font-family:"Space Grotesk",sans-serif;font-size:26px;line-height:28px;font-weight:500;letter-spacing:-.035em;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-collection-money>span{color:var(--fv-muted);font-size:12px;line-height:18px;white-space:nowrap}
+#ambar-finance-polished .fv-collection-money b{font-weight:500;color:#d0c8d8}
+#ambar-finance-polished .fv-collection-progress{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;min-width:0;min-height:17px}
+#ambar-finance-polished .fv-collection-progress>span:last-child{color:var(--fv-muted);font-size:11px;line-height:17px;white-space:nowrap}
+#ambar-finance-polished .fv-collection-meter{height:4px}
+#ambar-finance-polished .fv-distribution{background:#13111f}
+#ambar-finance-polished .fv-distribution .fv-step-number{background:#ffffff04;color:#a198ae}
+#ambar-finance-polished .fv-distribution .fv-revenue-step-head>strong{color:#b5acbf}
+#ambar-finance-polished .fv-distribution-message{display:block;color:#9c93a8;font-size:12px;line-height:18px;font-weight:400;overflow-wrap:break-word}
+#ambar-finance-polished .fv-distribution-targets{display:block;color:#9c93a8;font-size:11px;line-height:17px;overflow-wrap:break-word}
+#ambar-finance-polished .fv-distribution-targets>span{padding:0 5px;color:#6e637d}
+#ambar-finance-polished .fv-distribution .fv-revenue-step-head>svg.lucide{width:15px!important;height:15px!important;color:#978caa}
+#ambar-finance-polished .fv-safe-body{display:grid;gap:12px;padding:12px}
+#ambar-finance-polished .fv-cash-total{display:grid;grid-template-columns:minmax(0,1fr) 14px;align-items:center;gap:7px 10px;width:100%;padding:14px;min-width:0;border:1px solid #655239;border-radius:13px;background:#251f2b}
+#ambar-finance-polished .fv-cash-total>span:first-child{font-size:12px;line-height:18px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-cash-total>.fv-row-arrow{grid-column:2;grid-row:1 / 3}
+#ambar-finance-polished .fv-cash-value{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;min-width:0;grid-column:1;grid-row:2}
+#ambar-finance-polished .fv-cash-value>strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:34px;line-height:38px;font-weight:500;letter-spacing:-.04em;color:var(--fv-gold);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-cash-value>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-accounts{min-width:0;border:1px solid #403648;border-radius:13px;background:#191521}
+#ambar-finance-polished .fv-wallet{display:grid;grid-template-columns:20px minmax(0,1fr) auto 14px;align-items:center;gap:9px;width:100%;min-width:0;min-height:66px;padding:12px;border-bottom:1px solid #3a3042;border-radius:12px 12px 0 0;background:#201a29}
+#ambar-finance-polished .fv-stacks>.fv-fin-row:last-child{border-radius:0 0 12px 12px}
+#ambar-finance-polished .fv-wallet>svg:first-child{color:#b8a177}
+#ambar-finance-polished .fv-wallet-title{min-width:0;font-size:12px;line-height:18px;font-weight:500;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-wallet-value{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;font-variant-numeric:tabular-nums}
+#ambar-finance-polished .fv-wallet-value>strong{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:22px;font-weight:500;white-space:nowrap}
+#ambar-finance-polished .fv-wallet-value small{font-family:"Manrope",sans-serif;font-size:11px;font-weight:500;color:var(--fv-muted)}
+#ambar-finance-polished .fv-wallet-value>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-fin-row{display:grid;grid-template-columns:20px minmax(0,1fr) minmax(0,max-content) 14px;align-items:center;gap:9px;width:100%;min-width:0;min-height:56px;padding:11px 12px}
+#ambar-finance-polished .fv-fin-row+.fv-fin-row{border-top:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-row-icon{color:#ad9875}
+#ambar-finance-polished .fv-row-title{min-width:0;font-size:13px;line-height:19px;font-weight:600;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-row-money{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;text-align:right}
+#ambar-finance-polished .fv-row-money>strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:20px;line-height:24px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:#dfc48d;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-row-money>span{font-size:11px;line-height:16px;color:var(--fv-muted);overflow-wrap:anywhere}
+#ambar-finance-polished svg.lucide.fv-row-arrow{width:14px!important;height:16px!important;color:#9f8c73}
+#ambar-finance-polished .fv-report{display:grid;grid-template-columns:20px minmax(0,1fr) 14px;align-items:center;gap:9px;width:100%;min-height:54px;padding:12px 14px;border:1px solid #403648;border-radius:12px;background:#211b28}
+#ambar-finance-polished .fv-report>svg:first-child{color:#ad9875}
+#ambar-finance-polished .fv-report>span{font-size:13px;line-height:20px;font-weight:500}
+#ambar-finance-polished .fv-payroll-head{min-height:78px}
+#ambar-finance-polished .fv-pay-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,max-content) 14px;align-items:center;gap:10px;width:100%;min-width:0;min-height:64px;padding:12px 14px}
+#ambar-finance-polished .fv-pay-row+.fv-pay-row{border-top:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-rates>summary{display:grid;grid-template-columns:22px minmax(0,1fr) 18px;align-items:center;gap:10px;min-height:76px;padding:15px 14px;border-radius:18px;background:#221d29;list-style:none}
+#ambar-finance-polished .fv-rates[open]>summary{border-radius:18px 18px 0 0}
+#ambar-finance-polished .fv-rates>summary::-webkit-details-marker{display:none}
+#ambar-finance-polished .fv-rates>summary::marker{content:""}
+#ambar-finance-polished .fv-rates>summary>span{display:flex;flex-direction:column;gap:3px;min-width:0}
+#ambar-finance-polished .fv-rates>summary strong{font-size:20px;line-height:26px;font-weight:700;letter-spacing:-.025em;color:#e7ca92}
+#ambar-finance-polished .fv-rates>summary>span>span{font-size:12px;line-height:17px;color:var(--fv-muted);overflow-wrap:break-word}
+#ambar-finance-polished .fv-exchange-icon{color:#baa27a}
+#ambar-finance-polished .fv-rates-chevron{color:#a496ad;transition:transform .15s ease}
+#ambar-finance-polished .fv-rates[open] .fv-rates-chevron{transform:rotate(180deg)}
+#ambar-finance-polished .fv-rates-body{border-top:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-market-rates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:14px 8px 8px}
+#ambar-finance-polished .fv-market-rates>div,#ambar-finance-polished .fv-customer-values>div{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:0 5px;text-align:center}
+#ambar-finance-polished .fv-market-rates>div+div,#ambar-finance-polished .fv-customer-values>div+div{border-left:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-market-rates strong,#ambar-finance-polished .fv-customer-values strong{font-family:"Space Grotesk",sans-serif;font-size:22px;line-height:27px;font-weight:500;letter-spacing:-.035em;color:var(--fv-gold);font-variant-numeric:tabular-nums}
+#ambar-finance-polished .fv-market-rates>div>span,#ambar-finance-polished .fv-customer-values>div>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-rate-caption{padding:0 10px 12px;text-align:center;font-size:11px;line-height:16px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-customer-rates{padding:12px 8px 16px;border-top:1px solid var(--fv-line)}
+#ambar-finance-polished .fv-customer-rates h3{margin:0 6px 12px;font-size:12px;line-height:18px;font-weight:600;color:#d0b785}
+#ambar-finance-polished .fv-customer-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+#ambar-finance-polished .fv-condensed{display:block;flex:0 0 auto;width:100%;padding:6px 14px 8px!important;border-bottom:1px solid #3a3241!important;background:#191621!important}
+#ambar-finance-polished .fv-condensed-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;line-height:15px;font-weight:500;color:#b7acbf}
+#ambar-finance-polished .fv-condensed-head>svg.lucide{width:13px!important;height:13px!important;color:#b9a37a}
+#ambar-finance-polished .fv-condensed-values{display:grid;grid-template-columns:1.15fr 1.15fr 1.15fr .65fr;gap:6px;margin-top:4px;min-width:0}
+#ambar-finance-polished .fv-condensed-values>span{display:flex;flex-direction:column;gap:1px;min-width:0}
+#ambar-finance-polished .fv-condensed-values>span>span{font-size:11px;line-height:14px;font-weight:400;color:var(--fv-muted)}
+#ambar-finance-polished .fv-condensed-values strong{font-family:"Space Grotesk",sans-serif;font-size:14px;line-height:17px;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-finance-polished .fv-condensed-values .fv-gold{color:var(--fv-gold)}
+#ambar-finance-polished .fv-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;flex:0 0 auto;min-height:63px;padding:9px 3px 11px;border-top:1px solid #26212e;background:#0a090f}
+#ambar-finance-polished .fv-nav>button{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;min-width:0;min-height:42px;padding:0;color:#968ba6;font-size:11px;line-height:14px;font-weight:500;text-align:center}
+#ambar-finance-polished .fv-nav>button>svg.lucide{width:20px!important;height:20px!important}
+#ambar-finance-polished .fv-nav>button.is-active{color:var(--fv-gold)}
+#ambar-finance-polished .fv-panel button:enabled:hover{background-color:#e2c38606}
+#ambar-finance-polished .fv-panel button:enabled:active{background-color:#e2c3860c}
+#ambar-finance-polished .fv-safe-body>.fv-cash-total:enabled:hover{background-color:#2e2633}
+#ambar-finance-polished .fv-accounts>.fv-wallet:enabled:hover{background-color:#282130}
+#ambar-finance-polished .fv-safe-body>.fv-report:enabled:hover{background-color:#2a2232}
+@container fv-phone (max-width:350px){
+  #ambar-finance-polished .fv-app-head{gap:7px;padding-inline:10px}
+  #ambar-finance-polished .fv-wordmark{font-size:22px;letter-spacing:.12em}
+  #ambar-finance-polished .fv-tools{gap:4px}
+  #ambar-finance-polished .fv-tools>button{width:29px;height:33px}
+  #ambar-finance-polished .fv-online{padding-inline:5px;font-size:9px}
+  #ambar-finance-polished .fv-content{padding-inline:10px;gap:10px}
+  #ambar-finance-polished .fv-section-head{padding-inline:12px}
+  #ambar-finance-polished .fv-section-head h2,#ambar-finance-polished .fv-rates>summary strong{font-size:18px;line-height:25px}
+  #ambar-finance-polished .fv-metrics{grid-template-columns:minmax(0,1fr) 10px minmax(0,1fr) 10px minmax(0,1fr);gap:3px;padding-inline:10px}
+  #ambar-finance-polished .fv-metric{padding:0}
+  #ambar-finance-polished .fv-analytics-bottom>button{padding-inline:11px}
+  #ambar-finance-polished .fv-cell-label{font-size:11px}
+  #ambar-finance-polished .fv-profitability-line{gap:6px}
+  #ambar-finance-polished .fv-safe-body{padding:10px;gap:10px}
+  #ambar-finance-polished .fv-cash-value>strong{font-size:31px}
+  #ambar-finance-polished .fv-wallet{grid-template-columns:18px minmax(0,1fr) auto 12px;gap:7px}
+  #ambar-finance-polished .fv-collection,#ambar-finance-polished .fv-distribution,#ambar-finance-polished .fv-wallet,#ambar-finance-polished .fv-fin-row,#ambar-finance-polished .fv-report,#ambar-finance-polished .fv-pay-row{padding-left:12px;padding-right:12px}
+  #ambar-finance-polished .fv-row-money>strong{font-size:19px}
+  #ambar-finance-polished .fv-row-title{font-size:12px;line-height:18px}
+}
+@media(prefers-reduced-motion:reduce){#ambar-finance-polished .fv-rates-chevron{transition:none}}
+/* Load after finance-visual.css. Height and safe area come from the existing app shell. */
+#ambar-finance-polished {
+  width: 100%;
+  height: var(--fv-available-height, 100%);
+  min-height: 0;
+}
+#ambar-finance-polished .fv-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+#ambar-finance-polished .fv-app {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  container-type: inline-size;
+}
+#ambar-finance-polished .fv-nav {
+  padding-bottom: calc(11px + var(--fv-safe-bottom, 0px));
+}
+/* Оболочка страницы: «Финансы» стоит fixed от низа шапки до верха панели вкладок,
+   без полей страницы; шапка и панель — общие у приложения, своих у корня нет.
+   Единственный скролл — .fv-scroll; компактная сводка — над ним, в потоке.
+   Safe-area снизу уже учтена панелью, поэтому --fv-safe-bottom = 0. */
+#pg-finance.active{position:fixed;top:calc(66px + var(--safe-top));bottom:calc(68px + var(--safe-bottom));left:0;right:0;padding:0;overflow:hidden}
+#pg-finance #ambar-finance-polished{--fv-safe-bottom:0px}
+/* Отрисованные секции лежат в #finBook внутри .fv-content — тот же столбец с теми же зазорами. */
+#pg-finance .fv-book{display:flex;flex-direction:column;gap:12px;min-width:0}
+@container fv-phone (max-width:350px){#pg-finance .fv-book{gap:10px}}
+/* Клавиатура (vendor/ambar-kb.js): панель вкладок прячется, снизу воздух —
+   поле докручивается в центр экрана. */
+html.kb #pg-finance.active{bottom:0}
+html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
+/* Состояния, которых в макете нет, — теми же красками: минус красным, прочерк
+   тусклым, «Загрузка…» / «Не удалось загрузить» строкой под формулой, замок на
+   «Распределении» (класс, а не disabled: тап объясняет, чего ждём), подпись
+   «до нормы РП+ не хватает», ряд действий под этапами (собрать / согласовать /
+   изменить / распределить — те же, что были на карточке). */
+#ambar-finance-polished .fv-app strong.dn,#ambar-finance-polished .fv-app b.dn,#ambar-finance-polished .fv-profitability.dn strong{color:var(--dn)}
+#ambar-finance-polished .fv-app strong.fv-none{color:#655c74}
+#ambar-finance-polished .fv-state{padding:0 14px 14px;font-size:12px;line-height:17px;color:var(--fv-muted)}
+#ambar-finance-polished .fv-state.dn{color:var(--dn)}
+#ambar-finance-polished .fv-revenue-steps .fv-distribution.is-locked:enabled:hover{background-color:#13111f}
+#ambar-finance-polished .fv-distribution-message.ok{color:#92b09a}
+#ambar-finance-polished .fv-distribution-message.warn{color:#d9bd84}
+#ambar-finance-polished .fv-distribution-targets b{font-family:"Space Grotesk",sans-serif;font-weight:500;color:#d0c8d8;font-variant-numeric:tabular-nums}
+#ambar-finance-polished .fv-distribution-short{display:block;margin-top:2px;color:#d9bd84;font-size:11px;line-height:17px}
+#ambar-finance-polished .fv-revenue-actions{display:flex;gap:8px;padding:0 10px 10px}
+#ambar-finance-polished .fv-act{display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 0;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #cfb17a;border-radius:12px;background:#dfc087;color:#251e27;font-size:13px;line-height:18px;font-weight:600;text-align:center}
+#ambar-finance-polished .fv-revenue-actions .fv-act:enabled:hover{background-color:#e6cd98}
+#ambar-finance-polished .fv-act.fv-act-soft,#ambar-finance-polished .fv-revenue-actions .fv-act.fv-act-soft:enabled:hover{border-color:#66543c;background-color:#211c29;color:#d9bd84}
+#ambar-finance-polished .fv-act.fv-act-fit{flex:0 0 auto;padding-inline:18px}
+#ambar-finance-polished .fv-act:disabled{border-color:#3b3345;background:#13111f;color:#9c93a8}
+#ambar-finance-polished .fv-act>svg.lucide{width:14px!important;height:14px!important}
+/* Числа «Нашего курса» нажимаются (открывают поле курса, как было). */
+#ambar-finance-polished .fv-customer-values>div{cursor:pointer}
+/* Хвост «Курса валют» из прежнего блока: редактор наших курсов, поиск, список
+   обменника и подпись — под плитками, в том же раскрытии. Заголовок редактора
+   повторял бы h3 макета — его нет. */
+#ambar-finance-polished .fv-rates-more{padding:4px 6px 0}
+#ambar-finance-polished .fv-rates-more .fx-take-h{display:none}
+#ambar-finance-polished .fv-rates-more .fx-q{font-family:inherit}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -9637,40 +9878,57 @@ button.exp-wait:active{transform:scale(.99)}
 </div>
 
 <!-- ============ MORE ============ -->
-<!-- Финансы: долги и удержания, курс, кошелёк. Всё карточками, без
-     подписей: каждая карточка называет себя сама. -->
+<!-- Финансы — одна страница по утверждённому визуалу (пакет AMBAR-FINANCE-FINAL,
+     владелец, 2 ноя 2026): корень #ambar-finance-polished, пять секций —
+     аналитика месяца, сбор и распределение, сейф и кошелёк, зарплаты, курс
+     валют. Шапка и панель вкладок — общие у приложения, своих у корня нет.
+     Прокрутка — внутри .fv-scroll; компактная сводка месяца над ним, в потоке,
+     показывается, когда аналитика ушла вверх (fvCondensed). Первые четыре
+     секции рисует fbHubHtml в #finBook, курс — статичная разметка ниже
+     (fxRender пишет в те же id, что и раньше). -->
 <div class="page" id="pg-finance">
-  <!-- Книга учёта денег — месячный отчёт старшего: месяц со стрелками, три
-       числа месяца и четыре книги строками. Ниже — разделы одной анатомии:
-       шапка, полоса чисел, тело. -->
-  <div id="finBook"></div>
-
-  <!-- Прайса здесь нет: он внизу карточки «Закупаем» на экране заявки
-       (владелец, 19 сен 2026). -->
-  <div class="fin-sec" id="fxBlock">
-    <button class="fin-sec-h" id="fxBlockHdr">
-      <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17"
-        fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span>
-      <span class="fin-sec-b"><b>Курс валют</b><i class="is-skel" id="fxSub" style="min-width:150px">0000</i></span>
-      <svg class="fin-sec-go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  <div id="ambar-finance-polished" lang="ru"><div class="fv-stage"><div class="fv-app" aria-label="AMBAR — Финансы">
+    <button type="button" class="fv-condensed" id="fvCondensed" data-back-to-month hidden aria-label="Вернуться к аналитике" onclick="fbAnTop()">
+      <span class="fv-condensed-head"><span id="fvCondMonth">— · AED</span><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span>
+      <span class="fv-condensed-values">
+        <span><span>Вал</span><strong id="fvCondGross">—</strong></span>
+        <span><span>Расходы</span><strong id="fvCondOut">—</strong></span>
+        <span><span>ЧП</span><strong class="fv-gold" id="fvCondProfit">—</strong></span>
+        <span><span>Рент.</span><strong id="fvCondMargin">—</strong></span>
+      </span>
     </button>
-    <div class="fin-strip fx-strip">
-      <div><b class="is-skel" id="fxUsd">0000</b><i>Доллар покупка</i></div>
-      <div><b class="is-skel" id="fxEur">0000</b><i>Евро покупка</i></div>
-      <div><b class="is-skel" id="fxRub">0000</b><i>Рубль покупка</i></div>
-    </div>
-    <div class="fx-take-cap">Наш курс для клиентов</div>
-    <div class="fin-strip fx-strip four" id="fxTake"></div>
-    <div class="fin-x">
-      <div id="fxTakeEd"></div>
-      <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off"
-             oninput="fxRender()">
-      <div id="fxList"></div>
-      <div class="fx-note" id="fxNote"></div>
-    </div>
-  </div>
-
+    <main class="fv-scroll" id="fvScroll" aria-label="Разделы финансов">
+      <div class="fv-content">
+        <div class="fv-book" id="finBook"></div>
+        <!-- Курс валют: обменник Al Ansari (rates.py) и наш курс для клиентов
+             (fx_take.py). Прайса здесь нет — он внизу карточки «Закупаем» на
+             экране заявки (владелец, 19 сен 2026). Раскрывается целиком одной
+             шапкой; под плитками — редактор наших курсов, поиск и список
+             обменника, как были. -->
+        <details class="fv-panel fv-rates" id="fxBlock" data-section="rates">
+          <summary id="fxBlockHdr"><svg class="lucide lucide-arrow-left-right fv-exchange-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg><span><strong>Курс валют</strong><span class="is-skel" id="fxSub" style="min-width:150px">0000</span></span><svg class="lucide lucide-chevron-down fv-rates-chevron" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="fv-rates-body">
+            <div class="fv-market-rates" aria-label="Покупка валюты">
+              <div><strong class="is-skel" id="fxUsd">0000</strong><span>Доллар</span></div>
+              <div><strong class="is-skel" id="fxEur">0000</strong><span>Евро</span></div>
+              <div><strong class="is-skel" id="fxRub">0000</strong><span>Рубль</span></div>
+            </div>
+            <div class="fv-rate-caption">Покупка · AED за единицу валюты</div>
+            <div class="fv-customer-rates">
+              <h3>Наш курс для клиентов</h3>
+              <div class="fv-customer-values" id="fxTake"></div>
+              <div class="fv-rates-more">
+                <div id="fxTakeEd"></div>
+                <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off" oninput="fxRender()">
+                <div id="fxList"></div>
+                <div class="fx-note" id="fxNote"></div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+    </main>
+  </div></div></div>
 </div>
 
 <div class="page" id="pg-more">
@@ -20803,6 +21061,14 @@ const LUC = {
   'check':           '<path d="M20 6 9 17l-5-5"/>',
   'arrow-up-right':  '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
   'clock-3':         '<circle cx="12" cy="12" r="10"/><path d="M12 6v6h4.5"/>',
+  // Страница «Финансы» (визуал 2 ноя 2026)
+  'arrow-up':         '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  'wallet':           '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  'fish':             '<path d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.47-3.44 6-7 6s-7.56-2.53-8.5-6Z"/><path d="M18 12v.5"/><path d="M16 17.93a9.77 9.77 0 0 1 0-11.86"/><path d="M7 10.67C7 8 5.58 5.97 2.73 5.5c-1 1.5-1 5 .23 6.5-1.24 1.5-1.24 5-.23 6.5C5.58 18.03 7 16 7 13.33"/><path d="M10.46 7.26C10.2 5.88 9.17 4.24 8 3h5.8a2 2 0 0 1 1.98 1.67l.23 1.4"/><path d="m16.01 17.93-.23 1.4A2 2 0 0 1 13.8 21H9.5a5.96 5.96 0 0 0 1.49-3.98"/>',
+  'banknote':         '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  'coins':            '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
+  'file-text':        '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  'arrow-left-right': '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
   'calendar-days':   '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
 };
 function luc(name, cls){
@@ -21960,8 +22226,8 @@ function _fxT(v){ return (+(+v).toFixed(4)).toString(); }
 function fxTakeRender(){
   const take = (FX && FX.take) || [];
   const strip = document.getElementById('fxTake');
-  if(strip) strip.innerHTML = take.map(t => `<div onclick="fxTakeGo('${escS(t.code)}')">
-      <b>${_fxT(t.rate)}</b><i>${escS(FX_TAKE_NAME[t.code] || t.code)}</i></div>`).join('');
+  if(strip) strip.innerHTML = take.map(t => `<div role="button" tabindex="0" onclick="fxTakeGo('${escS(t.code)}')">
+      <strong>${_fxT(t.rate)}</strong><span>${escS(FX_TAKE_NAME[t.code] || t.code)}</span></div>`).join('');
   const ed = document.getElementById('fxTakeEd'); if(!ed) return;
   const rows = (FX && FX.rates) || [];
   ed.innerHTML = take.length ? `<div class="fx-take-h">Наш курс для клиентов
@@ -21982,7 +22248,7 @@ function fxTakeRender(){
 }
 function fxTakeGo(code){
   const b = document.getElementById('fxBlock');
-  if(b && !b.classList.contains('open')) b.classList.add('open');
+  if(b && !b.open) b.open = true;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   setTimeout(() => { const i = document.getElementById('fxTakeIn-' + code); if(i) i.focus(); }, 260);
 }
@@ -22008,14 +22274,10 @@ async function fxTakeSave(code, input){
 }
 
 (function initFxBlock(){
+  // Раскрытие — родное у <details> (визуал 2 ноя 2026); отсюда только отклик.
   const block = document.getElementById('fxBlock');
-  const hdr = document.getElementById('fxBlockHdr');
-  if(!block || !hdr) return;
-  hdr.addEventListener('click', e => {
-    if(e.target && e.target.id === 'fxQ') return;
-    block.classList.toggle('open');
-    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
-  });
+  if(!block) return;
+  block.addEventListener('toggle', () => { try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){} });
 })();
 
 // ── Финансы: долги и удержания ──────────────────────────────────────────
@@ -22282,22 +22544,6 @@ function fbAn(b){
     ? +b.econ : gross - ((+t.ordered || 0) + (+t.expenses || 0) + (+t.spend || 0) + (+t.tips || 0));
   return {gross, out: gross - profit, profit, margin: gross ? Math.round(profit / gross * 100) : 0};
 }
-// Рентабельность — не четвёртое число в ряду, а своя строка под ними
-// (владелец, 20 сен 2026: «пусть там будут эти три числа, а рентабельность
-// красиво въедет и будет отличаться: заметно, но не нагромождено»): подпись,
-// крупный процент золотом и полоса — какая доля вала осталась прибылью.
-function fbAnRent(an){
-  if(!an) return `<div class="fb-an-rent"><span class="fb-an-rent-l">Рентабельность</span>
-    <b class="fb-an-rent-v is-skel" style="min-width:56px">0000</b>
-    <span class="fb-an-bar"><i style="width:0"></i></span></div>`;
-  const w = Math.max(0, Math.min(100, an.margin));
-  return `<div class="fb-an-rent${an.margin < 0 ? ' dn' : ''}">
-    <span class="fb-an-rent-l">Рентабельность</span>
-    <b class="fb-an-rent-v" data-f="t.margin" data-fc="neg">${fbFmt(an.margin)}<u>%</u></b>
-    <span class="fb-an-bar"><i style="width:${w}%"></i></span>
-    <span class="fb-an-rent-s">${an.margin < 0 ? 'месяц в минусе' : `${fbFmt(an.margin)}% вала — чистая прибыль`}</span>
-  </div>`;
-}
 function fbCap(month, arrows){
   const fut = month >= fbMonthNow();
   if(!arrows) return `<div class="sc-cap"><span>${escS(fbMonthT(month))}</span></div>`;
@@ -22354,174 +22600,70 @@ function fbCrcDays(c){
 // памяти (листали другой месяц), подтягиваем и перерисовываем.
 function fbCrcBooks(){
   const c = FB_CR; if(!c) return;
-  [...new Set(fbCrcDays(c).map(d => d.slice(0, 7)))].filter(m => !fbBook(m))
-    .forEach(m => fbLoad(m).then(() => fbHubRepaint()).catch(() => {}));
+  const need = [...new Set(fbCrcDays(c).map(d => d.slice(0, 7)))].filter(m => !fbBook(m));
+  if(!need.length) return;
+  // Книга старого месяца, приходя, выбрасывает из памяти книги месяцев после
+  // него (fbApply: запись назад меняет переносы вперёд) — в том числе книгу
+  // самой страницы (первые дни месяца: перенос за вчера — из прошлого месяца).
+  // Поэтому: дотянуть перенос, потом, если страницу выбросило, — её, и только
+  // тогда перерисовать; иначе fbHubRepaint молчал без книги, и «Распределение»
+  // стояло в «загрузка…» до следующего захода на вкладку.
+  Promise.all(need.map(m => fbLoad(m).catch(() => {})))
+    .then(() => fbBook(FB.month) ? null : fbLoad(FB.month).catch(() => {}))
+    .then(() => fbHubRepaint());
 }
 function fbHubRepaint(){
   const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-  if(box && mb){ box.innerHTML = fbHubHtml(mb); fbAnFit(); fbAnStick(); }
+  if(box && mb){ box.innerHTML = fbHubHtml(mb); fvCondensed(); }
 }
-// «Аналитика месяца» закреплена сверху экрана и в прокрутке сжимается до
-// полосы с четырьмя числами (владелец, 20 сен 2026: «сворачивается до
-// компактного вида и не листается вместе со страницей, а закреплена сверху»),
-// как карточка выручки на «Обзоре».
-// Кегль числа подбираем по факту: в плитку из трёх должен влезть и
-// шестизначный вал, и семизначный — на узком телефоне они разной ширины.
-function fbAnFit(){
-  document.querySelectorAll('#fbAnCard .fb-an-g .aud-tv').forEach(el => {
-    el.style.fontSize = '';
-    const box = el.clientWidth;
-    if(!box) return;
-    let f = parseFloat(getComputedStyle(el).fontSize) || 24;
-    let n = 0;
-    while(el.scrollWidth > box && f > 12 && n++ < 30){ f -= 0.5; el.style.fontSize = f + 'px'; }
-  });
+// «Аналитика месяца» над прокруткой сжимается до компактной сводки (владелец,
+// 20 сен 2026: «сворачивается до компактного вида и не листается вместе со
+// страницей, а закреплена сверху»; с 2 ноя 2026 — по утверждённому визуалу:
+// полоса .fv-condensed стоит МЕЖДУ шапкой и областью прокрутки .fv-scroll, в
+// потоке, и показывается, когда секция аналитики целиком ушла вверх). Месяц и
+// числа в ней — те же, что в секции: fbAn той же книги, отдельного состояния
+// нет. Граница меряется относительно самой области прокрутки, а не окна.
+let _fvRaf = null;
+function fvCondensed(){
+  const bar = document.getElementById('fvCondensed'), sc = document.getElementById('fvScroll');
+  if(!bar || !sc) return;
+  const month = FB.month || fbMonthNow(), b = fbBook(month), an = b ? fbAn(b) : null;
+  _setText('fvCondMonth', `${fbMonthT(month)} · AED`);
+  bar.setAttribute('aria-label', `Вернуться к аналитике: ${fbMonthT(month)}`);
+  const put = (id, v, dn) => { const el = document.getElementById(id); if(!el) return;
+    el.textContent = v; el.classList.toggle('dn', !!dn); };
+  put('fvCondGross', an ? fbFmt(an.gross) : '—');
+  put('fvCondOut', an ? fbFmt(an.out) : '—');
+  put('fvCondProfit', an ? fbFmt(an.profit) : '—', an && an.profit < 0);
+  put('fvCondMargin', an ? fbFmt(an.margin) + '%' : '—', an && an.margin < 0);
+  // Раздел скрыт (другая вкладка) — высоты нет, мерить нечего: полосу не трогаем.
+  if(!sc.clientHeight) return;
+  const sec = sc.querySelector('.fv-analytics');
+  const gone = !!sec && sec.getBoundingClientRect().bottom <= sc.getBoundingClientRect().top + .5;
+  if(bar.hidden !== !gone) bar.hidden = !gone;
 }
-// Карточка сжимается непрерывно, кадр в кадр (владелец, 20 сен 2026: «она
-// должна плавно сворачиваться по мере того, как я листаю»), и ровно на столько,
-// на сколько ушла страница: сосед снизу идёт за пальцем, держа постоянный
-// отступ, и только у края экрана уходит под закреплённую полосу.
-//
-// Карточка — три слоя над неподвижной полосой месяца:
-//   .fb-an-t     заголовок  — уходит первым, за первые ~50 px прокрутки;
-//   .fb-an-body  плитки, рентабельность, бюджет — следом;
-//   .fb-an-mini  четыре числа — вырастает снизу, когда тело почти ушло.
-// Высоты настоящие (не обрезка общей высоты), поэтому в свёрнутом виде полоса
-// занимает ровно свою высоту с полями и цифры не срезаются (владелец, 20 сен
-// 2026: «в свёрнутом состоянии цифры обрезаются сверху»).
-// Порядок пикселей: убрать надо (прокрутка + сколько заняла выросшая полоса),
-// берём сначала из заголовка, потом из тела — тогда сумма слоёв всегда равна
-// «полная высота минус прокрутка», без рывков на стыках.
-let _fbAnRaf = null;
-const _fbClamp = v => v < 0 ? 0 : v > 1 ? 1 : v;
-function _fbH(el, h){
-  if(!el) return;
-  const v = Math.max(0, h) + 'px';
-  if(el.style.height !== v){ el.style.height = v; el.style.minHeight = v; }
+function fvCondensedSoon(){
+  if(_fvRaf) return;
+  _fvRaf = requestAnimationFrame(() => { _fvRaf = null; fvCondensed(); });
 }
-function _fbO(el, o){
-  if(!el) return;
-  const v = String(Math.round(_fbClamp(o) * 100) / 100);
-  if(el.style.opacity !== v) el.style.opacity = v;
-}
-// Тап по свёрнутой полосе возвращает карточку целиком: пролистывать вверх
-// пальцем ради этого не надо.
+// Тап по сводке возвращает к аналитике: пролистывать вверх пальцем ради этого не надо.
 function fbAnTop(){
-  try{ window.scrollTo({top: 0, behavior: 'smooth'}); }
-  catch(e){ window.scrollTo(0, 0); }
+  const sc = document.getElementById('fvScroll'); if(!sc) return;
+  try{ sc.scrollTo({top: 0, behavior: 'smooth'}); }catch(e){ sc.scrollTop = 0; }
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
-function fbAnParts(card){
-  return {t: card.querySelector('.fb-an-th'), stage: card.querySelector('.fb-an-stage'),
-          clip: card.querySelector('.fb-an-bodyclip'), body: card.querySelector('.fb-an-bodyin'),
-          mini: card.querySelector('.fb-an-minin'), wrap: card.parentElement};
-}
-// Меряем карточку в её естественном виде — вернув в поток и сняв наши высоты.
-// Обёртка в этот момент сама берёт её высоту, и мы запоминаем ширину места.
-function fbAnMeasure(card){
-  const {t, stage, clip, body, mini, wrap} = fbAnParts(card);
-  card.style.position = ''; card.style.top = ''; card.style.left = ''; card.style.width = '';
-  card.classList.remove('pin');
-  if(wrap) wrap.style.height = '';
-  if(t){ t.style.height = ''; t.style.minHeight = ''; t.style.opacity = ''; }
-  if(stage){ stage.style.height = ''; stage.style.minHeight = ''; }
-  if(clip){ clip.style.opacity = ''; clip.classList.add('full'); }
-  if(mini) mini.style.opacity = '';
-  // Высоты — дробные (getBoundingClientRect), а не округлённые offsetHeight:
-  // на округлении обёртка выходила на пару пикселей короче карточки, и отступ
-  // до соседней карточки съедался.
-  const H = el => el ? el.getBoundingClientRect().height : 0;
-  card._tH = H(t ? (t.firstElementChild || t) : null);
-  // Слои сцены лежат абсолютом друг над другом, поэтому своей высоты у неё нет:
-  // меряем содержимое и ставим сцене высоту тела — это и есть развёрнутый вид.
-  card._bH = H(body);
-  card._miniH = H(mini);
-  if(stage) stage.style.height = card._bH + 'px';
-  card._full = H(card);                                  // сцена во всю высоту тела
-  card._min = card._full - card._tH - card._bH + card._miniH;
-  card._run = Math.max(0, card._full - card._min);       // весь ход сжатия
-  if(wrap){
-    wrap.style.height = card._full + 'px';
-    card._w = Math.round(wrap.getBoundingClientRect().width);
-  }
-  card._top = card._left = card._wpx = null;             // положение зададим заново
-}
-function fbAnStick(){
-  const card = document.getElementById('fbAnCard'); if(!card) return;
-  const {t, stage, clip, mini, wrap} = fbAnParts(card); if(!wrap) return;
-  if(!wrap.offsetWidth) return;                          // раздел скрыт — мерить нечего
-  if(!card._full || card._w !== Math.round(wrap.getBoundingClientRect().width)) fbAnMeasure(card);
-  const hdr = document.querySelector('.hdr');
-  const hb = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 66;
-  const box = wrap.getBoundingClientRect();
-  // Пока место карточки не дошло до шапки, она просто лежит в нём — своим
-  // потоком, без наших координат: так её не сдвинет поздняя перевёрстка
-  // (шрифты, картинки), от которой карточка once съезжала на пару пикселей и
-  // отступ до соседней съедался. Закрепляем ровно в тот миг, когда место
-  // дошло до шапки, — и тогда координаты совпадают, стыка не видно.
-  const px = v => (Math.round(v * 100) / 100) + 'px';
-  if(box.top > hb + .5){
-    if(card.style.position){ card.style.position = ''; card.style.top = ''; card.style.left = ''; card.style.width = '';
-                             card._top = card._left = card._wpx = null; }
-  }else{
-    if(card.style.position !== 'fixed') card.style.position = 'fixed';
-    if(card._top !== hb){ card._top = hb; card.style.top = px(hb); }
-    if(card._left !== box.left){ card._left = box.left; card.style.left = px(box.left); }
-    if(card._wpx !== box.width){ card._wpx = box.width; card.style.width = px(box.width); }
-  }
-  // Сжали ровно на то, насколько место карточки ушло под шапку: высота карточки
-  // всегда «полная минус прокрутка», поэтому соседняя карточка идёт за пальцем,
-  // держа свой отступ, и только у края экрана уходит под полосу.
-  const сжали = Math.max(0, Math.min(card._run, hb - box.top));
-  // 1. Заголовок — первые ~50 px пути.
-  const убрT = Math.min(card._tH, сжали);
-  _fbH(t, card._tH - убрT);
-  _fbO(t, card._tH ? 1 - убрT / card._tH : 1);
-  // 2. Сцена: сжимается от высоты тела до высоты полосы чисел.
-  const ходС = card._bH - card._miniH;
-  const u = ходС > 0 ? _fbClamp((сжали - card._tH) / ходС) : (сжали >= card._tH ? 1 : 0);
-  _fbH(stage, card._bH + (card._miniH - card._bH) * u);
-  // 3. Тело держится во всю силу почти до конца — его нижний край растворяет
-  //    маска, поэтому не видно, как строка режется краем карточки. Смена
-  //    тройки чисел на четвёрку — на последних пикселях пути и почти без
-  //    наложения: иначе на середине видно оба набора разом и они наезжают.
-  const оТело = _fbClamp(1 - (u - .80) / .12);
-  const оМини = _fbClamp((u - .88) / .12);
-  if(clip){
-    _fbO(clip, оТело);
-    clip.classList.toggle('full', u < .01);              // в покое края не трогаем
-    clip.style.pointerEvents = оТело > .5 ? '' : 'none';
-  }
-  _fbO(mini, оМини);
-  // По свёрнутой полосе можно тапнуть — карточка разворачивается обратно.
-  if(mini) mini.style.pointerEvents = оМини > .6 ? 'auto' : 'none';
-  // Числа подъезжают снизу — так их приход читается как смена вида, а не как
-  // проявившаяся из ниоткуда надпись.
-  if(mini){
-    const сдвиг = ((1 - оМини) * 8).toFixed(1) + 'px';
-    if(mini._ty !== сдвиг){ mini._ty = сдвиг; mini.style.transform = 'translateY(' + сдвиг + ')'; }
-  }
-  card.classList.toggle('pin', card._run > 0 && сжали >= card._run - .5);
-}
-window.addEventListener('scroll', () => {
-  if(_fbAnRaf) return;
-  _fbAnRaf = requestAnimationFrame(() => { _fbAnRaf = null; fbAnStick(); });
-}, {passive: true});
-window.addEventListener('resize', () => {
-  const card = document.getElementById('fbAnCard');
-  if(card){ card._full = 0; fbAnFit(); fbAnStick(); }
-});
-// Карточку «Финансов» перерисовывают из пяти мест (сводка сбора, книга, месяц,
-// правки). После перерисовки карточка новая — без подобранного кегля и без
-// сжатия, и на прокрученной странице она разворачивалась обратно. Следим за
-// самим узлом, а не за всеми, кто его трогает.
-(function fbAnWatch(){
-  const box = document.getElementById('finBook'); if(!box) return;
-  let raf = null;
-  new MutationObserver(() => {
-    if(raf) return;
-    raf = requestAnimationFrame(() => { raf = null; fbAnFit(); fbAnStick(); });
-  }).observe(box, {childList: true, subtree: true});
+// Прокрутка — своя у .fv-scroll (единственный скролл страницы). Хаб
+// перерисовывают из пяти мест (сводка сбора, книга, месяц, правки, кошелёк) —
+// следим за узлом, а не за всеми, кто его трогает. Наблюдатель срабатывает
+// микрозадачей, до кадра: состояние сводки согласовано раньше, чем страница
+// нарисуется с новой высотой, и прокрутка не дёргается. Элементы живут всю
+// сессию, отписываться не от чего.
+(function fvWatch(){
+  const sc = document.getElementById('fvScroll'), box = document.getElementById('finBook');
+  if(!sc || !box) return;
+  sc.addEventListener('scroll', fvCondensedSoon, {passive: true});
+  window.addEventListener('resize', fvCondensedSoon);
+  new MutationObserver(() => fvCondensed()).observe(box, {childList: true, subtree: true});
 })();
 function fbCrcState(){
   const c = FB_CR; if(!c) return null;
@@ -22543,78 +22685,76 @@ function fbCrcState(){
 }
 function fbCrcHtml(){
   const st = fbCrcState(), today = _dayIsoFor(0);
-  // Шапка — настоящий заголовок карточки, как «Сентябрь 2026» и «Зарплаты»:
-  // своя полоса с волоском под ней (владелец: «сделай это как настоящий
-  // заголовок, отдели»); нажатие — страница сбора.
-  const head = `<button class="sc-cap fb-crc-h" onclick="fbOpenCash()">
-      <span>Ежедневный сбор и распределение выручки</span>
-      <i>${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'сегодня'}</i>
-      <em class="fb-chev r">${_SC_CHEV}</em></button>`;
-  if(!st) return `<div class="sc fb-hub fb-crc">${head}
-      <div class="fb-crc-s"><div class="fb-crc-sh"><span class="fb-crc-n">1</span><b>Сбор</b>
-        <i><span class="is-skel" style="min-width:90px">0000</span></i></div></div>
-      <div class="fb-crc-s locked"><div class="fb-crc-sh"><span class="fb-crc-n lock">${IC('lock', 12)}</span><b>Распределение</b>
-        <i><span class="is-skel" style="min-width:70px">0000</span></i></div></div>
-    </div>`;
-  const {c, ds, net, wait, known, pend, real} = st;
-  // ① Сбор: районы плитками — код и сколько; получил — зелёная, «завтра» —
-  // янтарная, где брать нечего — тусклая с прочерком.
+  const head = `<div class="fv-section-head fv-revenue-head"><h2 id="fv-revenue-title">Сбор и распределение</h2>
+      <span class="fv-revenue-date">${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'Сегодня'}</span></div>`;
+  const sec = inner => `<section class="fv-panel fv-revenue" data-section="revenue" aria-labelledby="fv-revenue-title">${head}${inner}</section>`;
+  const step = (cls, n, title, ico, body, attrs) => `<button type="button" class="${cls}"${attrs || ''}>
+      <span class="fv-revenue-step-head"><span class="fv-step-number">${n}</span><strong>${title}</strong>${ico}</span>
+      <span class="fv-revenue-step-content">${body}</span></button>`;
+  const targetsIdle = 'Барракуда <span>·</span> РП+ <span>·</span> ЧП';
+  if(!st) return sec(`<div class="fv-revenue-steps">
+      ${step('fv-collection', '1', 'Сбор', luc('chevron-right', 'fv-row-arrow'),
+        `<span class="fv-collection-money"><strong class="is-skel" style="min-width:70px">0000</strong></span>
+         <span class="fv-collection-progress"><span class="fv-meter fv-collection-meter"><span style="width:0%"></span></span><span class="is-skel" style="min-width:90px">0000</span></span>`,
+        ' onclick="fbOpenCash()"')}
+      ${step('fv-distribution is-locked', '2', 'Распределение', luc('lock-keyhole'),
+        `<span class="fv-distribution-message"><span class="is-skel" style="min-width:110px">0000</span></span>
+         <span class="fv-distribution-targets">${targetsIdle}</span>`,
+        ' aria-disabled="true" onclick="fbCrcLocked()"')}
+    </div>`);
+  const {c, ds, wait, known, pend, real} = st;
+  // ① Сбор: сколько на руках из выручки дня и сколько районов получено; «соберу
+  // завтра» — числом в той же подписи. Выручка дня в минусе (одни расходы) —
+  // просто итог красным, «0 из −550» не читается.
   const pct = c.need ? Math.round(c.done / c.need * 100) : 0;
-  const tiles = ds.map(x => {
-    const v = net(x);
-    const cls = x.empty ? 'empty' : x.done ? 'got' : x.later ? 'later' : '';
-    const txt = x.empty ? '—' : x.later && !x.done ? 'завтра' : fbFmt(v);
-    return `<span class="fb-crc-d ${cls}${!x.empty && !(x.later && !x.done) && v < 0 ? ' neg' : ''}"><b>${
-      x.done ? IC('check', 10) : ''}${escS(x.code)}</b><s>${escS(x.name || '')}</s><i>${txt}</i></span>`;
-  }).join('');
-  const s1 = c.before ? 'до учёта' : !c.need ? 'получать нечего' : st.got ? 'получено со всех' : `${c.done} из ${c.need} районов`;
-  // «получено из всего» — пока есть что получать; выручка дня в минусе (одни
-  // расходы) — просто итог красным, «0 из −550» не читается.
-  const v1 = !c.need ? '' : st.got || st.total <= 0 ? `${fbFmt(st.total)}<u>AED</u>`
-    : `${fbFmt(st.inHand)}<u>из ${fbFmt(st.total)}</u>`;
-  const stage1 = `<div class="fb-crc-s" role="button" onclick="fbOpenCash()">
-      <div class="fb-crc-sh"><span class="fb-crc-n${st.got ? ' ok' : ''}">${st.got ? IC('check', 12) : '1'}</span>
-        <b>Сбор</b><i class="${st.got ? 'ok' : ''}">${s1}</i>
-        ${v1 ? `<span class="fb-crc-v${st.total < 0 ? ' dn' : ''}">${v1}</span>` : ''}</div>
-      <div class="fb-crc-bar${st.got ? ' all' : ''}"><i style="width:${pct}%"></i></div>
-      <div class="fb-crc-ds">${tiles}</div>
-    </div>`;
-  // ② Распределение: пока ждём районы — предложение тускло и под замком; есть
-  // что согласовать — его цифры; всё согласовано — согласованные.
+  const later = ds.filter(x => !x.empty && x.later && !x.done).length;
+  const s1 = c.before ? 'до учёта' : !c.need ? 'получать нечего' : st.got ? 'получено со всех'
+    : `${c.done} из ${c.need} районов${later ? ` · ${later} завтра` : ''}`;
+  const money = !c.need ? '<strong class="fv-none">—</strong>'
+    : st.got || st.total <= 0 ? `<strong${st.total < 0 ? ' class="dn"' : ''}>${fbFmt(st.total)}</strong><span>AED</span>`
+    : `<strong>${fbFmt(st.inHand)}</strong><span>из <b>${fbFmt(st.total)}</b> AED</span>`;
+  const stage1 = step('fv-collection', st.got ? luc('check') : '1', 'Сбор', luc('chevron-right', 'fv-row-arrow'),
+    `<span class="fv-collection-money">${money}</span>
+     <span class="fv-collection-progress"><span class="fv-meter fv-collection-meter" role="progressbar" aria-label="Сбор выручки" aria-valuenow="${st.got ? 100 : pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${st.got ? 100 : pct}%"></span></span><span>${s1}</span></span>`,
+    ` onclick="fbOpenCash()" aria-label="Сбор выручки: ${escS(s1)}"`);
+  // ② Распределение: пока ждём районы — под замком (тап объясняет, чего ждём);
+  // есть что согласовать — его цифры; всё согласовано — согласованные.
   const shown = pend.length ? pend : real;
   const sum = f => shown.reduce((a, b) => a + (f(b) || 0), 0);
-  // РП+ — наличными и криптой вместе; сколько из него крипты — подписью.
-  const tB = sum(b => b.aside), tR = sum(b => (b.collected || 0) + (b.collected_cr || 0)), tCr = sum(b => b.collected_cr),
+  // РП+ — наличными и криптой вместе.
+  const tB = sum(b => b.aside), tR = sum(b => (b.collected || 0) + (b.collected_cr || 0)),
         tN = sum(b => Math.max(0, b.base) - (b.aside || 0) - (b.collected || 0));
   const norm = ((fbBook(c.day.slice(0, 7)) || {}).budget || {}).norm || 0;
   const short = norm ? shown.reduce((a, b) => a + Math.max(0, norm - (b.collected || 0) - (b.collected_cr || 0)), 0) : 0;
   const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';
   const nw = st.waiting.length;
-  const s2 = st.locked ? (c.need || nw ? 'после сбора' : 'нечего распределять')
-    : !known ? 'загрузка…' : !real.length ? (nw ? 'ждём сбора' : 'нечего распределять')
-    : pend.length > 1 ? `ждут согласования · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}` : pend.length ? 'ждёт согласования'
-    : nw ? `ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : 'согласовано' + okBy;
+  const s2 = st.locked ? (c.need || nw ? 'После сбора выручки' : 'Нечего распределять')
+    : !known ? 'Загрузка…' : !real.length ? (nw ? 'Ждём сбора' : 'Нечего распределять')
+    : pend.length > 1 ? `Ждут согласования · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}` : pend.length ? 'Ждёт согласования'
+    : nw ? `Ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : 'Согласовано' + okBy;
   const has = known && real.length > 0;
-  const g = (t, v, dn) => `<span><i>${t}</i><b${dn ? ' class="dn"' : ''}>${has ? fbFmt(v) : '—'}</b></span>`;
-  const stage2 = `<div class="fb-crc-s${st.locked ? ' locked' : ''}" role="button" onclick="${st.locked ? 'fbCrcLocked()' : 'fbOpenDist()'}">
-      <div class="fb-crc-sh"><span class="fb-crc-n${st.locked ? ' lock' : st.done ? ' ok' : ''}">${
-        st.locked ? IC('lock', 12) : st.done ? IC('check', 12) : '2'}</span>
-        <b>Распределение</b><i class="${st.done ? 'ok' : !st.locked && pend.length ? 'warn' : ''}">${s2}</i></div>
-      <div class="fb-crc-g">${g('Барракуда', tB)}${g('РП+', tR)}${g('ЧП', tN, tN < 0)}</div>
-      ${has && short > 0 && !st.locked ? `<div class="fb-crc-short">до нормы РП+ не хватает ${fbFmt(short)} AED</div>` : ''}
-    </div>`;
-  // Следующее действие — одно, и оно же главное.
+  const g = (t, v, dn) => `${t} <b${dn ? ' class="dn"' : ''}>${has ? fbFmt(v) : '—'}</b>`;
+  const targets = st.locked ? targetsIdle
+    : `${g('Барракуда', tB)} <span>·</span> ${g('РП+', tR)} <span>·</span> ${g('ЧП', tN, tN < 0)}`;
+  const stage2 = step(`fv-distribution${st.locked ? ' is-locked' : ''}`, !st.locked && st.done ? luc('check') : '2', 'Распределение',
+    st.locked ? luc('lock-keyhole') : luc('chevron-right', 'fv-row-arrow'),
+    `<span class="fv-distribution-message${!st.locked && st.done ? ' ok' : !st.locked && pend.length ? ' warn' : ''}">${s2}</span>
+     <span class="fv-distribution-targets">${targets}</span>${
+       has && short > 0 && !st.locked ? `<span class="fv-distribution-short">До нормы РП+ не хватает ${fbFmt(short)} AED</span>` : ''}`,
+    st.locked ? ` aria-disabled="true" onclick="fbCrcLocked()" aria-label="Распределение выручки: ${escS(s2)}"`
+              : ` onclick="fbOpenDist()" aria-label="Распределение выручки: ${escS(s2)}"`);
+  // Следующее действие — одно, и оно же главное (те же кнопки, что были на карточке).
   let act = '';
   if(c.need){
-    if(wait.length) act = `<button class="aud-b go" onclick="fbOpenCash()">Собрать выручку</button>`;
-    else if(!known) act = `<button class="aud-b go" onclick="fbOpenDist()">Распределить выручку</button>`;
-    else if(!real.length) act = '<button class="aud-b soft" disabled>Распределять нечего</button>';
-    else if(st.done) act = `<button class="aud-b soft" onclick="fbOpenDist()">${IC('check', 15)}Распределено · посмотреть</button>`;
-    else if(pend.length === 1) act = `<button class="aud-b go" onclick="fbCrcOk('${pend[0].day}')">Согласовать</button>
-        <button class="aud-b soft fb-crc-ed" onclick="fbOpenDist()">Изменить</button>`;
-    else act = `<button class="aud-b go" onclick="fbOpenDist()">Распределить · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}</button>`;
+    if(wait.length) act = `<button type="button" class="fv-act" onclick="fbOpenCash()">Собрать выручку</button>`;
+    else if(!known) act = `<button type="button" class="fv-act" onclick="fbOpenDist()">Распределить выручку</button>`;
+    else if(!real.length) act = '<button type="button" class="fv-act fv-act-soft" disabled>Распределять нечего</button>';
+    else if(st.done) act = `<button type="button" class="fv-act fv-act-soft" onclick="fbOpenDist()">${luc('check')}Распределено · посмотреть</button>`;
+    else if(pend.length === 1) act = `<button type="button" class="fv-act" onclick="fbCrcOk('${pend[0].day}')">Согласовать</button>
+        <button type="button" class="fv-act fv-act-soft fv-act-fit" onclick="fbOpenDist()">Изменить</button>`;
+    else act = `<button type="button" class="fv-act" onclick="fbOpenDist()">Распределить · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}</button>`;
   }
-  return `<div class="sc fb-hub fb-crc">${head}${stage1}${stage2}${act ? `<div class="fb-crc-a">${act}</div>` : ''}</div>`;
+  return sec(`<div class="fv-revenue-steps">${stage1}${stage2}</div>${act ? `<div class="fv-revenue-actions">${act}</div>` : ''}`);
 }
 function fbCrcLocked(){
   const st = fbCrcState(); if(!st) return;
@@ -22657,6 +22797,9 @@ function fbOpenCash(){
 async function fbHub(force){
   const box = document.getElementById('finBook'); if(!box) return;
   fbCashLoad();
+  // Лист премий считается отдельной ручкой — дотягиваем его при первом заходе,
+  // чтобы в строке стояло число, а не прочерк (tenLoad сам перерисует хаб).
+  if(!TEN && !_tenBusy && window.ownerApi) tenLoad(true);
   FB.month = FB.month || fbMonthNow();
   const m = FB.month;
   if(!fbBook(m) || force){
@@ -22667,64 +22810,108 @@ async function fbHub(force){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
   box.innerHTML = fbHubHtml(fbBook(FB.month));
-  fbAnFit(); fbAnStick();
+  fvCondensed();
   fbCrcBooks();
 }
 function fbHubHtml(b, err){
   const month = FB.month || fbMonthNow();
-  if(!b) return `<div class="fb-an-wrap" id="fbAnWrap"><div class="sc fb-hub fb-anm" id="fbAnCard">
-    <div class="fb-an-th"><div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div></div>
-    ${fbCap(month, true)}
-    <div class="fb-an-stage"><div class="fb-an-bodyclip full"><div class="fb-an-bodyin">
-      <div class="aud-g fb-an-g">${fbTile('Вал', 't.gross', null)}${fbTile('Расходы', 't.out_all', null)}${
-        fbTile('Чистая прибыль', 'econ', null)}</div>
-      ${fbAnRent(null)}
-      <div class="exp-empty"${err ? ' style="color:var(--dn)"' : ''}>${err ? 'Не удалось загрузить' : 'Загрузка…'}</div>
-    </div></div></div></div></div>
-    ${fbCrcHtml()}`;
-  const t = b.totals, bu = b.budget || {}, pay = fbCur(b);
-  const wal = fbWal(b), all = fbSafeAll(b);
-  const an = fbAn(b);
-  return `<div class="fb-an-wrap" id="fbAnWrap"><div class="sc fb-hub fb-anm" id="fbAnCard">
-    <div class="fb-an-th"><div class="sc-cap fb-an-t"><span>Аналитика месяца</span></div></div>
-    ${fbCap(month, true)}
-    <div class="fb-an-stage"><div class="fb-an-bodyclip full"><div class="fb-an-bodyin">
-      <div class="aud-g fb-an-g">
-        ${fbTile('Вал', 't.gross', t.gross, {go: 'fbAnOpen()'})}
-        ${fbTile('Расходы', 't.out_all', an.out, {go: 'fbAnOpen()'})}
-        ${fbTile('Чистая прибыль', 'econ', an.profit, {mode: 'neg', go: 'fbAnOpen()'})}
-      </div>
-      ${fbAnRent(an)}
-      ${fbGo('Бюджет', 'bu.norm', bu.empty ? null : bu.norm, "accOpen('finbud')", {unit: bu.empty ? 'не заполнен' : 'в день'})}
-    </div></div>
-    <div class="fb-an-minin" onclick="fbAnTop()">
-      <span><i>вал</i><b data-f="t.gross">${fbFmt(an.gross)}</b></span>
-      <span><i>расходы</i><b data-f="t.out_all">${fbFmt(an.out)}</b></span>
-      <span><i>ЧП</i><b data-f="econ" data-fc="neg"${an.profit < 0 ? ' class="dn"' : ''}>${fbFmt(an.profit)}</b></span>
-      <span><i>рент.</i><b data-f="t.margin"${an.margin < 0 ? ' class="dn"' : ''}>${fbFmt(an.margin)}<u>%</u></b></span>
-    </div></div>
-  </div></div>
-  ${fbCrcHtml()}
-  <div class="sc fb-hub fb-safe">
-    <button class="fb-safe-h" onclick="accOpen('finsafe')"><span class="fb-safe-t">Сейф</span><b class="fb-safe-v${all < 0 ? ' dn' : ''}${fbFmt(all).length > 6 ? ' sm' : ''}" data-f="safe.all" data-fc="neg">${fbFmt(all)}<u>AED</u></b><i class="fb-safe-plus">+</i><span class="fb-safe-usdt tap${wal && walAed(wal.ours).length > 7 ? ' sm' : ''}" role="button" tabindex="0" aria-label="Кошелёк USDT" onclick="event.stopPropagation();fbOpenWal()"><i>Крипто-кошелёк</i><span>${wal ? walAed(wal.ours) : '—'}<u>AED</u></span>${wal ? `<small class="fb-safe-our">${fmtUsdt(wal.usdt)}<u>USDT</u></small>` : ''}</span><em class="fb-chev r">${_SC_CHEV}</em></button>
-    <!-- Порядок стопок: Барракуда, РП, Крипта, ЧП — и здесь, и на экране «Сейф»
-         (владелец, 20 сен 2026: «крипта в сейфе должна быть перед чп»). -->
-    <div class="fb-safe-k">
-      ${fbGo('Барракуда', 'safe.b', b.safe.b, "fbOpenB()", {unit: 'в сейфе', ico: FB_ICO.b})}
-      ${fbGo('РП', 'safe.rp', b.safe.rp, "accOpen('finrp')", {unit: b.safe.rp_cr ? `в сейфе · криптой ${fbFmt(b.safe.rp_cr)}` : 'в сейфе', mode: 'neg', ico: FB_ICO.rp})}
-      ${fbGo('ЧП', 'safe.np', b.safe.np, "accOpen('finnp')", {unit: 'в сейфе', mode: 'neg', ico: FB_ICO.np})}
+  return fvAnalytics(month, b, err) + fbCrcHtml() + fvSafe(b) + fvPayroll(b);
+}
+// Число секции: книги нет — серая полоска (загрузка) или прочерк (отказ);
+// минус — красным там, где он возможен (neg).
+function fvNum(v, o){
+  o = o || {};
+  if(o.skel) return `<strong class="is-skel"${o.w ? ` style="min-width:${o.w}px"` : ''}>0000</strong>`;
+  if(v === null || v === undefined) return '<strong class="fv-none">—</strong>';
+  return `<strong${o.neg && v < 0 ? ' class="dn"' : ''}>${fbFmt(v)}</strong>`;
+}
+// «Аналитика месяца»: вал − расходы = чистая прибыль одной связкой, под ней
+// рентабельность и бюджет. Числа — fbAn той же книги, что и везде.
+function fvAnalytics(month, b, err){
+  const an = b ? fbAn(b) : null, skel = !b && !err, bu = (b && b.budget) || {};
+  const fut = month >= fbMonthNow(), mt = escS(fbMonthT(month));
+  const N = (v, neg, w) => fvNum(v, {skel, neg, w});
+  const m = an ? Math.max(0, Math.min(100, an.margin)) : 0;
+  const metric = (cls, name, v, neg, lbl) => `<button type="button" class="fv-metric${cls ? ' ' + cls : ''}" onclick="fbAnOpen()" aria-label="${lbl}">
+        <span class="fv-metric-name"><span>${name}</span>${luc('chevron-right')}</span>${N(v, neg, 64)}
+      </button>`;
+  const aed = v => an ? `, ${fbFmt(v)} AED` : '';
+  return `<section class="fv-panel fv-analytics" data-section="analytics" aria-labelledby="fv-analytics-title">
+    <div class="fv-section-head"><h2 id="fv-analytics-title">Аналитика месяца</h2><span class="fv-unit">AED</span></div>
+    <div class="fv-month">
+      <button type="button" aria-label="Месяц назад" onclick="fbMonthStep(-1)">${luc('chevron-left')}</button>
+      <span>${mt}</span>
+      <button type="button" aria-label="${fut ? 'Следующий месяц недоступен' : 'Месяц вперёд'}" onclick="fbMonthStep(1)"${fut ? ' disabled' : ''}>${luc('chevron-right')}</button>
     </div>
-    <!-- Отчёт ДДС — низом карточки сейфа (владелец, 20 сен 2026: «добавь сюда
-         вниз кнопку — отчёт ДДС»): весь день движений деньгами одной лентой. -->
-    <button class="sc-r fb-ddcgo" onclick="accOpen('finddc')"><span class="fb-ic">${FB_ICO.ddc}</span><span>Отчёт ДДС</span><em>${_SC_CHEV}</em></button>
-  </div>
-  <div class="sc fb-hub">
-    ${fbCapT('Зарплаты / премии / удержания')}
-    ${fbGo('Зарплатная ведомость', 'pay.left', pay.totals.left, "accOpen('finpay')", {unit: 'к выплате', mode: 'neg'})}
-    ${fbGo('Лист премий', 'bonus.due', (TEN && TEN.due) || 0, "accOpen('finbonus')",
-           {unit: TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек ждёт', 'человека ждут', 'человек ждут')}` : 'за стаж'})}
-    ${fbGo('Штрафы/авансы/долги', 'pay.minus', pay.totals.minus, "accOpen('finitems')", {unit: 'удержано'})}
-  </div>`;
+    <div class="fv-metrics" role="group" aria-label="${an ? `Вал ${fbFmt(an.gross)} минус расходы ${fbFmt(an.out)} равняется чистой прибыли ${fbFmt(an.profit)} AED` : 'Вал минус расходы равняется чистой прибыли'}">
+      ${metric('', 'Вал', an && an.gross, false, 'Вал' + aed(an && an.gross))}
+      <span class="fv-metric-operator" aria-hidden="true">−</span>
+      ${metric('', 'Расходы', an && an.out, false, 'Расходы' + aed(an && an.out))}
+      <span class="fv-metric-operator" aria-hidden="true">=</span>
+      ${metric('fv-profit', 'Чистая прибыль', an && an.profit, true, 'Чистая прибыль' + aed(an && an.profit))}
+    </div>
+    <div class="fv-analytics-bottom">
+      <button type="button" class="fv-profitability${an && an.margin < 0 ? ' dn' : ''}" onclick="fbAnOpen()" aria-label="Рентабельность${an ? `, ${fbFmt(an.margin)} процентов` : ''}">
+        <span class="fv-cell-label">Рентабельность${luc('chevron-right')}</span>
+        <span class="fv-profitability-line">${skel ? '<strong class="is-skel" style="min-width:40px">00</strong>'
+          : an ? `<strong>${fbFmt(an.margin)}<span>%</span></strong>` : '<strong class="fv-none">—</strong>'}<span class="fv-meter" role="progressbar" aria-label="Доля чистой прибыли в валу" aria-valuenow="${m}" aria-valuemin="0" aria-valuemax="100"><span style="width:${m}%"></span></span></span>
+      </button>
+      <button type="button" class="fv-budget" onclick="accOpen('finbud')" aria-label="Бюджет${b && !bu.empty ? `, ${fbFmt(bu.norm)} AED в день` : b ? ' не заполнен' : ''}">
+        <span class="fv-cell-label">Бюджет${luc('chevron-right')}</span>
+        <span class="fv-budget-value">${skel ? N(null, false, 56) : b && !bu.empty ? `<strong>${fbFmt(bu.norm)}</strong><span>в день</span>`
+          : `<strong class="fv-none">—</strong>${b ? '<span>не заполнен</span>' : ''}`}</span>
+      </button>
+    </div>
+    ${!b ? `<div class="fv-state${err ? ' dn' : ''}">${err ? 'Не удалось загрузить' : 'Загрузка…'}</div>` : ''}
+  </section>`;
+}
+// «Сейф и кошелёк» — ровно три зоны: итог наличных, группа «кошелёк + три
+// стопки» (четыре отдельные кнопки), «Отчёт ДДС». Порядок стопок: Барракуда,
+// РП, ЧП — как на экране «Сейф»; крипта — первой строкой группы, к наличным
+// не прибавляется (владелец, 30 сен 2026: «жёлтыми цифрами пиши только деньги
+// в наличных, не надо пересчитывать их из этих USDT»).
+function fvSafe(b){
+  const wal = fbWal(b), sf = (b && b.safe) || {}, skel = !b;
+  const N = (v, neg, w) => fvNum(v, {skel, neg, w});
+  const all = b ? fbSafeAll(b) : null;
+  const row = (cls, ico, title, money, go, lbl) => `<button type="button" class="fv-fin-row${cls ? ' ' + cls : ''}" onclick="${go}" aria-label="${lbl}">${
+    luc(ico, 'fv-row-icon')}<span class="fv-row-title">${title}</span><span class="fv-row-money">${money}</span>${luc('chevron-right', 'fv-row-arrow')}</button>`;
+  const aed = v => b ? `, в сейфе ${fbFmt(v)} AED` : '';
+  return `<section class="fv-panel" data-section="safe" aria-labelledby="fv-safe-title">
+    <div class="fv-section-head"><h2 id="fv-safe-title">Сейф и кошелёк</h2><span class="fv-unit">Остатки</span></div>
+    <div class="fv-safe-body">
+    <button type="button" class="fv-cash-total" onclick="accOpen('finsafe')" aria-label="Сейф${b ? `, всего ${fbFmt(all)} AED` : ''}"><span>Всего в сейфе</span><span class="fv-cash-value">${N(all, true, 110)}<span>AED</span></span>${luc('chevron-right', 'fv-row-arrow')}</button>
+    <div class="fv-accounts" role="group" aria-label="Криптокошелёк и направления сейфа">
+    <button type="button" class="fv-wallet" onclick="fbOpenWal()" aria-label="Криптокошелёк${wal ? `, ${fmtUsdt(wal.usdt)} USDT, ${walAed(wal.ours)} AED` : ''}">
+      ${luc('wallet')}<span class="fv-wallet-title">Криптокошелёк</span>
+      <span class="fv-wallet-value">${wal ? `<strong>${fmtUsdt(wal.usdt)} <small>USDT</small></strong><span>${walAed(wal.ours)} AED</span>` : '<strong class="fv-none">—</strong>'}</span>
+      ${luc('chevron-right', 'fv-row-arrow')}
+    </button>
+    <div class="fv-stacks" aria-label="Деньги в сейфе по направлениям, AED">
+      ${row('', 'fish', 'Барракуда', N(sf.b), 'fbOpenB()', 'Барракуда' + aed(sf.b))}
+      ${row('fv-rp', 'banknote', 'РП', N(sf.rp, true) + (b && sf.rp_cr ? `<span>криптой ${fbFmt(sf.rp_cr)}</span>` : ''), "accOpen('finrp')",
+            'РП' + aed(sf.rp) + (b && sf.rp_cr ? `; криптой ${fbFmt(sf.rp_cr)}` : ''))}
+      ${row('', 'coins', 'ЧП', N(sf.np, true), "accOpen('finnp')", 'ЧП' + aed(sf.np))}
+    </div>
+    </div>
+    <button type="button" class="fv-report" onclick="accOpen('finddc')">${luc('file-text')}<span>Отчёт ДДС</span>${luc('chevron-right', 'fv-row-arrow')}</button>
+    </div>
+  </section>`;
+}
+// «Зарплаты, премии и удержания» — три строки-входа с главным числом каждой.
+// Лист премий считается отдельной ручкой: пока не пришёл — прочерк, не ноль.
+function fvPayroll(b){
+  const t = fbCur(b).totals || {}, skel = !b;
+  const N = (v, neg) => fvNum(v, {skel, neg});
+  const row = (title, money, unit, go, lbl) => `<button type="button" class="fv-pay-row" onclick="${go}" aria-label="${lbl}"><span class="fv-row-title">${title}</span><span class="fv-row-money">${money}<span>${unit}</span></span>${luc('chevron-right', 'fv-row-arrow')}</button>`;
+  const ten = TEN ? (TEN.due || 0) : null;
+  const wait = TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек ждёт', 'человека ждут', 'человек ждут')}` : 'за стаж';
+  return `<section class="fv-panel" data-section="payroll" aria-labelledby="fv-payroll-title">
+    <div class="fv-section-head fv-payroll-head"><h2 id="fv-payroll-title">Зарплаты, премии<br>и удержания</h2><span class="fv-unit">AED</span></div>
+    ${row('Зарплатная ведомость', N(t.left, true), 'к выплате', "accOpen('finpay')", `Зарплатная ведомость${b && t.left != null ? `, ${fbFmt(t.left)} AED к выплате` : ''}`)}
+    ${row('Лист премий', skel ? N(null) : fvNum(ten), wait, "accOpen('finbonus')", `Лист премий${ten != null ? `, ${fbFmt(ten)} AED` : ''} ${wait}`)}
+    ${row('Штрафы / авансы / долги', N(t.minus), 'удержано', "accOpen('finitems')", `Штрафы, авансы, долги${b && t.minus != null ? `; удержано ${fbFmt(t.minus)} AED` : ''}`)}
+  </section>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
 // внутри, а с главной идут закрывать текущую смену.
@@ -22919,7 +23106,6 @@ function fbValues(){
 }
 function fbPaint(){
   const V = fbValues();
-  requestAnimationFrame(fbAnFit);
   document.querySelectorAll('#accMid [data-f]').forEach(el => {
     const v = V[el.dataset.f]; if(v === undefined) return;
     const u = el.querySelector('u');

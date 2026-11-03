@@ -2614,6 +2614,17 @@ async def audit_sheet(district: str, day: str) -> dict:
         counted = True
         totals = a.get("result") or _audit_totals(rows)
     else:
+        # Наклейка, отсканированная раньше, чем её код внесли в реестр, лежит
+        # «чужой» без позиции и до сих пор дочитывалась только при «Завершить»;
+        # страница всё это время показывала бутылку недостачей (ревизия JVC
+        # 31 окт 2026: Absolut 2, Red Label, Bacardi Black, Corona — на полке
+        # есть, камера «не видела»; владелец, 3 ноя 2026: «верни то, чего
+        # хватало в той ревизии»). Дочитываем здесь же, тем же путём, что и
+        # при завершении: внесли код — бутылка в счёте сразу.
+        try:
+            await _audit_refresh_alien(district, day)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[audit] наклейки не дочитаны ({district} {day}): {e}")
         rows, counted = await _audit_lines(district, day)
         totals = _audit_totals(rows)
     stats = await db.audit_scan_stats(district, day)
@@ -3047,6 +3058,10 @@ async def _audit_refresh_alien(district: str, day: str) -> int:
         p = cat.get(pid) or {}
         if await db.audit_scan_update(district, day, c.get("code") or "", {
                 "verdict": v, "product_id": pid,
+                # Скан лёг с qty 1 — кода тогда не знали; реестр знает, что
+                # это полкоробки (владелец, 3 ноя 2026: Corona и Carlsberg
+                # на ревизии JVC — наклейки по 12 банок).
+                "qty": float((doc or {}).get("qty") or 1),
                 "product_name": (doc or {}).get("product_name") or p.get("name", ""),
                 "label": (doc or {}).get("label") or "",
                 "home": (doc or {}).get("district") or ""}):

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Курс Al Ansari с мака владельца на сервер (tools/fx_relay.py): сайт
+     обменника закрыл серверу конвертер, из Дубая он открыт. Раз в сутки в
+     10:30 (время мака, Дубай); мак в это время спит — launchd запустит при
+     пробуждении; RunAtLoad — и при входе в систему.
+
+       cp tools/fx_relay.plist ~/Library/LaunchAgents/com.ambar.fx-relay.plist
+       (заменить /Users/xxx на настоящий путь)
+       launchctl load ~/Library/LaunchAgents/com.ambar.fx-relay.plist
+
+     Настройки — ~/.ambar_fx_relay.json (url сервера и ключ), права 600. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.ambar.fx-relay</string>
+  <key>ProgramArguments</key>
+  <array><string>/Library/Frameworks/Python.framework/Versions/3.12/bin/python3</string><string>/Users/xxx/Desktop/xxx/TG/AMBAR/MINIAPP/tools/fx_relay.py</string></array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>30</integer></dict>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/xxx/Library/Logs/ambar_fx.out</string>
+  <key>StandardErrorPath</key><string>/Users/xxx/Library/Logs/ambar_fx.err</string>
+</dict></plist>

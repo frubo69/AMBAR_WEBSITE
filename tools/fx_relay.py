@@ -16,7 +16,9 @@ WordPress от чужих стран или дата-центров, не отв
 Как поставить (любая машина в ОАЭ с python3 и aiohttp)
 ------------------------------------------------------
   ~/.ambar_fx_relay.json  — {"url": "https://<сервер>", "token": "<FX_RELAY_TOKEN из .env сервера>"}, права 600
-  crontab: 30 10 * * * cd <репозиторий> && python3 tools/fx_relay.py >> ~/ambar_fx.log 2>&1
+  мак: tools/fx_relay.plist → ~/Library/LaunchAgents/com.ambar.fx-relay.plist, launchctl load
+       (раз в сутки в 10:30, журнал ~/Library/Logs/ambar_fx.out)
+  linux: crontab  30 10 * * * cd <репозиторий> && python3 tools/fx_relay.py >> ~/ambar_fx.log 2>&1
 
 Обменник не ответил — ничего не шлём, сервер держит прошлый курс со своим
 временем.

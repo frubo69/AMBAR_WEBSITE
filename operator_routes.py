@@ -2032,6 +2032,77 @@ async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
             test=bool(order.get("test")))
     except Exception as e:
         log.error(f"[pos] cancel notify failed: {e}")
+    try:
+        await _cancel_after_arrival(oid, order, who)
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[pos] отмена #{oid} после «На месте»: списания не заведены: {e}")
+
+
+async def _cancel_after_arrival(oid: str, order: dict, who: str) -> list:
+    """Заказ отменили после «На месте»: водитель стоял у клиента с товаром, и
+    куда делись бутылки, отмена не знает. 8 окт 2026 заказ AMB8348160A
+    (Baileys + Jose Cuervo Silver) отменили утром и тут же завели новый на один
+    Jose Cuervo; Baileys ни продан, ни на полке — ревизия JVC 31 окт нашла его
+    недостачей, и объяснить её было нечем (владелец, 3 ноя 2026).
+
+    Поэтому по каждой строке такого заказа заводится списание вида «отмена»,
+    ждущее решения владельца: «вернулась на полку» — запись в остаток не идёт;
+    «не вернулась» — списание, с кого удержать — там же. До решения бутылка
+    числится на полке, как и любое несогласованное списание.
+    Возвращает id заведённых записей."""
+    if not order.get("driver_arrived_at") or order.get("test"):
+        return []
+    driver = str(order.get("driver") or "").strip()
+    if not driver:
+        return []
+    import stock_routes as _sr
+    cat = _sr._catalog()
+    district = _staff_mod.stock_office(driver, order.get("office_id") or "")
+    now = datetime.now(timezone.utc)
+    day = _bizday.biz_day()
+    out = []
+    for it in (order.get("items") or []):
+        pid, q = _sr.sale_item(it, cat)
+        q = _sr._num(q)
+        if not pid or q <= 0:
+            continue
+        cid = f"cancel-{oid}-{pid}"
+        if await db.writeoff_by_cid(cid):
+            continue                                  # отмену уже заводили
+        doc = {
+            "at": now, "day": day, "item": pid, "thumb": "", "cid": cid,
+            "name": cat.get(pid, {}).get("name", "") or str(it.get("name") or ""),
+            "qty": q, "kind": "отмена",
+            "note": f"заказ {oid} · отменил {who}",
+            "district": district, "district_code": OFFICE_CODES.get(district, ""),
+            "by": driver, "by_id": int(_staff_mod.DRIVER_IDS.get(driver) or 0),
+            "src": "cancel", "order_id": oid,
+            "arrived_at": order.get("driver_arrived_at") or "",
+        }
+        wid = await db.writeoff_add(doc)
+        if not wid:
+            continue
+        out.append(wid)
+        doc["_id"] = wid
+        try:
+            import writeoff_msg as wm
+            from owner_routes import notify_owners
+            sent = await notify_owners("stock.writeoff", wm.cancel_text(doc),
+                                       parse_mode="HTML",
+                                       reply_markup=wm.keyboard(wid, "отмена"))
+            if sent:
+                await db.writeoff_note_msg(wid, sent)
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[pos] отмена #{oid}: вопрос владельцу не ушёл: {e}")
+    if out:
+        try:
+            import stock_routes as _sr2
+            _sr2.base_drop()
+        except Exception:                                    # noqa: BLE001
+            pass
+        log.info(f"[pos] отмена #{oid} после «На месте» ({driver}, {district}): "
+                 f"{len(out)} записей ждут решения")
+    return out
 
 
 @require_operator
@@ -2086,6 +2157,15 @@ async def handle_undeliver(request):
         await db.update_order(oid, status="approved", cancelled_by="", cancelled_at="",
                               updated_at=now)
         order.update(status="approved")
+        # Вопрос «вернулись ли бутылки» снимается вместе с отменой: заказ снова
+        # едет. Уже решённые записи остаются — это решение владельца.
+        try:
+            dropped, left = await db.writeoff_cancel_drop(oid)
+            if dropped or left:
+                log.info(f"[pos] #{oid} вернули в доставку: списаний по отмене снято {dropped}"
+                         + (f", решённых осталось {left}" if left else ""))
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[pos] #{oid}: списания по отмене не сняты: {e}")
         await notify_driver(order, "new")
         await _refresh_cards(order)
         await _customer_card(oid)

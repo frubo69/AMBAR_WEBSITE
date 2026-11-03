@@ -2415,15 +2415,23 @@ def _roll_back(now_qty: float, events: list, t) -> float:
     return max(0.0, v)
 
 
-def _gone_after(events: list, t) -> float:
-    """Сколько единиц УШЛО с полки после подсчёта: продажи, переезды в другой
-    район, бой.
+def _gone_after(events: list, t, until=None) -> float:
+    """Сколько единиц УШЛО с полки, пока позицию ещё считали: продажи,
+    переезды в другой район, бой между первым и последним её сканом.
 
     Ушедшее — доказательство, что бутылка на полке была. Владелец, 23 сен 2026:
     «он не успел просто досканировать, спать ушёл… я не сказал, что он
     отсканировал всё, что было на полке». Продали — значит она там стояла,
-    даже если камера до неё не дошла, и пропавшей её звать нельзя."""
-    return sum(-dq for at, dq in (events or ()) if at > t and dq < 0)
+    даже если камера до неё не дошла, и пропавшей её звать нельзя.
+
+    Но только пока позицию считали. Ревизия JVC 31 окт 2026 простояла
+    открытой двое суток, и продажи следующих смен «простили» 7,5 единиц
+    недостачи, которую листок владельца подтвердил: камера досканировала
+    всё, а бутылки ушли уже с посчитанной полки. Владелец, 3 ноя 2026:
+    зачёт — до последнего скана. Продано после того, как камера с этой
+    позиции ушла, — продано из посчитанного, и недостачу это не объясняет."""
+    return sum(-dq for at, dq in (events or ())
+               if at > t and (until is None or at <= until) and dq < 0)
 
 
 async def _audit_lines(district: str, day: str) -> tuple:
@@ -2446,7 +2454,8 @@ async def _audit_lines(district: str, day: str) -> tuple:
     # заказанных «с Tecom» вина ушли с полки JVC.
     zero = ((await _district_base(day)).get(district) or {}).get("zero") or {}
     counts = await db.audit_scan_counts(district, day)
-    when = await db.audit_scan_times(district, day)
+    spans = await db.audit_scan_spans(district, day)
+    when = {pid: span[0] for pid, span in spans.items()}
     after = await _audit_after(district, min(when.values())) if when else {}
     cat = _catalog()
     await _loss_load()
@@ -2457,7 +2466,9 @@ async def _audit_lines(district: str, day: str) -> tuple:
         ушло = 0.0
         if t:                                          # считали её в этот момент
             e = _num(_roll_back(e, after.get(pid), t))
-            ушло = _num(_gone_after(after.get(pid), t))
+            # Зачёт — только за то, что ушло, пока позицию ещё считали: от
+            # первого её скана до последнего (владелец, 3 ноя 2026).
+            ушло = _num(_gone_after(after.get(pid), t, spans[pid][1]))
         q = _num(noqr.get(pid) or 0)                   # из них без кодов
         q = _num(min(q, e))                            # без кодов не больше, чем всего
         c = _num(max(0, e - q))                        # видимых камере
@@ -2465,9 +2476,11 @@ async def _audit_lines(district: str, day: str) -> tuple:
         # Разница — только по кодовым бутылкам: те, что без кодов, камера
         # увидеть не может, и в недостачу они не идут — их вносят кодами.
         #
-        # Из разницы вычитаем ушедшее ПОСЛЕ подсчёта: продали, увезли в другой
-        # район, разбили. Такая бутылка на полке была — её просто не успели
-        # отсканировать, — и пропавшей она не считается. Зачёт не больше самой
+        # Из разницы вычитаем ушедшее, ПОКА ПОЗИЦИЮ СЧИТАЛИ: продали, увезли в
+        # другой район, разбили между первым и последним её сканом. Такая
+        # бутылка на полке была — её просто не успели отсканировать, — и
+        # пропавшей она не считается. Ушедшее после последнего скана позиции
+        # ушло из посчитанного и ничего не объясняет. Зачёт не больше самой
         # разницы: то, что и так посчитали камерой, второй раз не засчитываем,
         # иначе продажа превращалась бы в излишек.
         зачёт = _num(min(ушло, max(0.0, c - a)))
@@ -2479,8 +2492,8 @@ async def _audit_lines(district: str, day: str) -> tuple:
             "expected": e, "coded": c, "actual": a, "diff": d,   # diff>0 — не хватает кодовых
             "noqr": q,
             "zero": _num(zero.get(pid) or 0),            # списано сверх остатка после пересчёта
-            # Ушло заказами (или переездом, боем) после того, как позицию
-            # посчитали, и потому в недостачу не пошло.
+            # Ушло заказами (или переездом, боем), пока позицию считали, и
+            # потому в недостачу не пошло.
             "gone": _num(зачёт),
             "loss": _loss_of(pid, d) if d > 0 else 0,  # закупка за пропавшие
             # Недостача удерживается по прайсу (правило владельца): это и
@@ -3905,7 +3918,7 @@ def _sale_of(pid: str, qty: int) -> int:
 # закупочную цену — убыток, а не наценку: бутылку разбили, а не украли. За
 # утерю и недостачу — полную цену по прайсу: бутылки нет, и продать её уже
 # нельзя, а куда она делась, никто не сказал.
-_COMP_FULL = ("потеря", "недостача")
+_COMP_FULL = ("потеря", "недостача", "отмена")
 
 
 def _comp_basis(kind: str) -> str:
@@ -3933,7 +3946,7 @@ async def _loss_load():
 
 def _wo_row(r: dict, cat: dict) -> dict:
     """Одна строка списания для владельца — и в очереди, и в истории."""
-    qty = int(r.get("qty") or 0)
+    qty = _num(r.get("qty") or 0)          # у пива бывает полкоробки
     pid = r.get("item") or ""
     # Считаем и деньги: «пять бутылок» и «пять бутылок Хеннесси» — разные
     # новости, а понять это по названию можно, только зная прайс наизусть.
@@ -4530,17 +4543,26 @@ async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):
                           doc.get("by", ""), doc.get("district_code", ""),
                           doc.get("note", ""),
                           round(_price(p) / max(1, _unit(p)) * int(doc.get("qty") or 0)))
-        cap = wm.decided_caption(base, ok, by_name)
+        kind = doc.get("kind", "")
+        if kind == "отмена":
+            base = wm.cancel_text(doc)
+        cap = wm.decided_caption(base, ok, by_name, kind)
         for m in (doc.get("msgs") or []):
-            await tg_edit_caption(OWNER_BOT_TOKEN, m.get("chat_id"),
-                                  m.get("message_id"), cap)
+            if kind == "отмена":
+                # Вопрос по отмене уходил текстом, без снимка — правится текст.
+                from api_server import tg_edit
+                await tg_edit(OWNER_BOT_TOKEN, m.get("chat_id"), m.get("message_id"), cap,
+                              reply_markup={"inline_keyboard": []})
+            else:
+                await tg_edit_caption(OWNER_BOT_TOKEN, m.get("chat_id"),
+                                      m.get("message_id"), cap)
     except Exception as e:
         log.warning(f"[writeoff] кнопки не сняты: {e}")
     try:
         import pay_notify as _pn
         await _pn.tell_safe(doc.get("by"),
-                            wm.driver_text(doc.get("name", ""), int(doc.get("qty") or 0),
-                                           ok, doc.get("decided_note", "")),
+                            wm.driver_text(doc.get("name", ""), _num(doc.get("qty") or 0),
+                                           ok, doc.get("decided_note", ""), doc.get("kind", "")),
                             parse_mode=None)
     except Exception as e:
         log.warning(f"[writeoff] водителю не ушло: {e}")

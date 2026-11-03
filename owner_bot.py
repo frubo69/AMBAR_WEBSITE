@@ -245,10 +245,16 @@ async def on_writeoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur = await db.writeoff_get(wid) or {}
         by = cur.get("decided_by_name") or "другой владелец"
         try:
-            await q.edit_message_caption(
-                caption=wm.decided_caption(q.message.caption_html or "",
-                                           (cur.get("state") == "ok"), by),
-                parse_mode="HTML")
+            if str(cur.get("kind") or "") == "отмена":
+                await q.edit_message_text(
+                    text=wm.decided_caption(wm.cancel_text(cur), (cur.get("state") == "ok"),
+                                            by, "отмена"),
+                    parse_mode="HTML", reply_markup=None)
+            else:
+                await q.edit_message_caption(
+                    caption=wm.decided_caption(q.message.caption_html or "",
+                                               (cur.get("state") == "ok"), by),
+                    parse_mode="HTML")
         except Exception:
             pass
         return
@@ -269,9 +275,18 @@ async def _writeoff_after(context, doc: dict, ok: bool, by_name: str, q=None):
     msgs = doc.get("msgs") or []
     if not msgs and q is not None and q.message:
         msgs = [{"chat_id": q.message.chat_id, "message_id": q.message.message_id}]
+    kind = str(doc.get("kind") or "")
     cap = None
     for m in msgs:
         try:
+            if kind == "отмена":
+                # Вопрос по отмене после «На месте» уходил текстом, без снимка:
+                # правится сам текст, кнопки снимаются тем же вызовом.
+                await context.bot.edit_message_text(
+                    chat_id=m["chat_id"], message_id=m["message_id"],
+                    text=wm.decided_caption(wm.cancel_text(doc), ok, by_name, kind),
+                    parse_mode="HTML", reply_markup=None)
+                continue
             if cap is None:
                 cur = await context.bot.edit_message_reply_markup(
                     chat_id=m["chat_id"], message_id=m["message_id"], reply_markup=None)
@@ -296,9 +311,11 @@ async def _writeoff_after(context, doc: dict, ok: bool, by_name: str, q=None):
         try:
             from telegram import Bot
             from datetime import datetime, timezone
+            q = doc.get("qty") or 0
+            q = int(q) if float(q) == int(q) else q
             sent = await Bot(token).send_message(
-                tid, wm.driver_text(doc.get("name", ""), int(doc.get("qty") or 0),
-                                    ok, doc.get("decided_note", "")))
+                tid, wm.driver_text(doc.get("name", ""), q,
+                                    ok, doc.get("decided_note", ""), kind))
             # В реестр чата водителя: это сообщение шлёт STAR-бот, но приходит
             # оно в водительский чат — и скрытый режим водителя должен его
             # стирать. Без записи решение по списанию оставалось бы в чате.

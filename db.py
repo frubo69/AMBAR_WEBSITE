@@ -3652,6 +3652,17 @@ async def writeoff_del(wid: str) -> bool:
     return r.deleted_count > 0
 
 
+async def writeoff_cancel_drop(order_id: str) -> tuple:
+    """Заказ, отменённый после «На месте», вернули в доставку: вопрос «вернулись
+    ли бутылки» снимается — нерешённые записи стираем. (стёрто, осталось решённых)."""
+    db = _db_or_none()
+    if db is None or not order_id: return (0, 0)
+    q = {"src": "cancel", "order_id": order_id}
+    r = await db.writeoffs.delete_many({**q, "state": "pending"})
+    left = await db.writeoffs.count_documents({**q, "state": {"$ne": "pending"}})
+    return (int(r.deleted_count), int(left))
+
+
 async def writeoff_get(wid: str) -> dict | None:
     db = _db_or_none()
     if db is None or not wid: return None
@@ -5064,24 +5075,33 @@ async def audit_scan_counts(district: str, day: str) -> dict:
     return {d["_id"]: _qn(d["n"]) for d in await cur.to_list(length=800) if d["_id"]}
 
 
-async def audit_scan_times(district: str, day: str) -> dict:
-    """{позиция: когда её начали считать} — первый скан каждой позиции.
+async def audit_scan_spans(district: str, day: str) -> dict:
+    """{позиция: (первый скан, последний скан)} — когда её считали.
 
     Ревизия — не мгновение, а часы: к одной полке человек подошёл в шесть
     вечера, к другой в девять. Сравнивать обе с остатком «сейчас» нельзя —
     ночная продажа превратится в излишек, а утренняя поставка в недостачу.
-    Берём первый скан позиции: это и есть момент, когда её посчитали."""
+    Первый скан — момент, когда позицию посчитали; последний — до какого
+    момента её ещё считали (см. stock_routes._gone_after)."""
     db = _db_or_none()
     if db is None: return {}
     cur = db.audit_scans.aggregate([
         {"$match": {"district": district, "day": day, "product_id": {"$ne": ""}}},
-        {"$group": {"_id": "$product_id", "at": {"$min": "$at"}}}])
+        {"$group": {"_id": "$product_id", "at": {"$min": "$at"}, "last": {"$max": "$at"}}}])
     out = {}
     for d in await cur.to_list(length=800):
-        at = d.get("at")
+        at, last = d.get("at"), d.get("last")
         if d["_id"] and isinstance(at, datetime):
-            out[d["_id"]] = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+            if not isinstance(last, datetime):
+                last = at
+            out[d["_id"]] = (at if at.tzinfo else at.replace(tzinfo=timezone.utc),
+                             last if last.tzinfo else last.replace(tzinfo=timezone.utc))
     return out
+
+
+async def audit_scan_times(district: str, day: str) -> dict:
+    """{позиция: когда её начали считать} — первый скан каждой позиции."""
+    return {pid: span[0] for pid, span in (await audit_scan_spans(district, day)).items()}
 
 
 async def intake_events(district: str, since) -> dict:

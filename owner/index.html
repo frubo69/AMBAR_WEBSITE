@@ -41201,7 +41201,13 @@ async function nmReset(pid){
    открывает его во весь экран, и решение принимают там же, глядя на кадр. */
 let ACC_WO = null;
 const WO_TINT = {'бой': 'var(--dn)', 'брак': 'var(--warn)',
-                 'просрочка': 'var(--warn)', 'потеря': 'var(--dn)', 'недостача': 'var(--dn)'};
+                 'просрочка': 'var(--warn)', 'потеря': 'var(--dn)', 'недостача': 'var(--dn)',
+                 'отмена': 'var(--warn)'};
+// Отмена после «На месте» (3 ноя 2026): водитель стоял у клиента с товаром,
+// заказ отменили — вернулась ли бутылка на полку? Снимка нет, решение два:
+// «Вернулась» — запись в остаток не идёт; «Не вернулась» — списание, с кого
+// удержать — тем же окном, что у утери.
+const _woNoPhoto = k => k === 'потеря' || k === 'отмена';
 
 // Раздел «Списания» из «Учёта» — та же вкладка в «Расходах смены»: один экран
 // на одну вещь, а не два экрана, спорящие числами.
@@ -41270,13 +41276,16 @@ function woPendRow(r){
   return `<div class="wo-i" id="wo-${escS(r.id)}">
     <button class="wo-i-h" onclick="phvOpenWo('${escS(r.id)}')">
       <span class="wo-ph">${_woThumb(r)}</span>
-      <span class="wo-i-b"><b>${escS(r.name)} <u>× ${fmt(r.qty)}</u></b>
+      <span class="wo-i-b"><b>${escS(r.name)} <u>× ${fmtQty(r.qty)}</u></b>
         <i>${escS(_woSub(r))}${r.note ? ' · ' + escS(r.note) : ''}</i></span>
       <span class="wo-i-v"><b class="warn">${fmt(r.aed)}<u>AED</u></b></span>
     </button>
     <div class="aud-act">${r.kind === 'потеря'
       ? `<button class="aud-b soft" onclick="woDecide(event,'${escS(r.id)}',true,true)">Списать без виновного</button>
          <button class="aud-b go" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Удержать с виновного</button>`
+      : r.kind === 'отмена'
+      ? `<button class="aud-b soft" onclick="woDecide(event,'${escS(r.id)}',false)">Вернулась на полку</button>
+         <button class="aud-b go dn" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Не вернулась</button>`
       : `<button class="aud-b soft dn" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
          <button class="aud-b go" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Согласовать</button>`}
     </div>
@@ -41289,11 +41298,11 @@ function woPendRow(r){
 // Решённая запись — той же строкой, тише: справа сумма и слово решения.
 function woRow(r){
   const no = r.state === 'no';
-  const st = no ? ['отклонено', 'dn']
+  const st = no ? [r.kind === 'отмена' ? 'вернулась' : 'отклонено', 'dn']
            : r.comp ? [`удержано ${fmt(r.comp.amount)}`, 'warn'] : ['списано', 'ok'];
   return `<button class="wo-i-h${no ? ' off' : ''}" id="wo-${escS(r.id)}" onclick="phvOpenWo('${escS(r.id)}')">
     <span class="wo-ph sm">${_woThumb(r)}</span>
-    <span class="wo-i-b"><b>${escS(r.name)} <u>× ${fmt(r.qty)}</u></b><i>${escS(_woSub(r))}</i></span>
+    <span class="wo-i-b"><b>${escS(r.name)} <u>× ${fmtQty(r.qty)}</u></b><i>${escS(_woSub(r))}</i></span>
     <span class="wo-i-v"><b>${fmt(r.aed)}<u>AED</u></b><i class="${st[1]}">${st[0]}</i></span>
   </button>`;
 }
@@ -41747,7 +41756,7 @@ async function woCompOpen(ev, id, режим){
         <div class="wo-c-t">${WO_COMP_MODE === 'approve'
           ? 'Согласовать: кто платит'
           : 'Удержать за списание'}</div>
-        <div class="wo-c-s">${escS(r.name)} × ${fmt(r.qty)} · ${escS(r.kind)}${
+        <div class="wo-c-s">${escS(r.name)} × ${fmtQty(r.qty)} · ${escS(r.kind)}${
           r.due ? ` · ${r.due_by === 'прайс' ? 'прайс' : 'закупка'} ${fmt(r.due)} AED`
                 : ' · цены нет'}</div>
       </div>
@@ -41801,7 +41810,7 @@ function woSplitOpen(names, total, note){
   document.getElementById('woCompBody').innerHTML = `
       <div class="wo-c-h">
         <div class="wo-c-t">Кто сколько платит</div>
-        <div class="wo-c-s">${fmt(total)} AED · ${escS(r.name)} × ${fmt(r.qty)} · ${escS(names.join(', '))}</div>
+        <div class="wo-c-s">${fmt(total)} AED · ${escS(r.name)} × ${fmtQty(r.qty)} · ${escS(names.join(', '))}</div>
       </div>
       <div class="wo-c-l">Доли</div>
       ${names.map(nm => `<div class="wo-sp-r">
@@ -41945,15 +41954,20 @@ async function woCompSave(on){
 async function woDecide(ev, id, ok, noBlame){
   if(ev && ev.stopPropagation) ev.stopPropagation();
   const r = _woFind(id);
-  if(!ok){
+  const отмена = !!r && r.kind === 'отмена';
+  if(!ok && отмена){
+    const yes = await askDialog('Вернулась на полку?',
+      `${r.name} × ${fmtQty(r.qty)} · остаток не меняется`, 'Вернулась', 'Вернуться назад');
+    if(!yes) return false;
+  } else if(!ok){
     const yes = await askDialog('Отклонить списание?',
-      r ? `${r.name} × ${fmt(r.qty)} · останется недостачей${r.by ? ' у ' + r.by : ''}`
+      r ? `${r.name} × ${fmtQty(r.qty)} · останется недостачей${r.by ? ' у ' + r.by : ''}`
         : 'Бутылки останутся недостачей на водителе', 'Отклонить', 'Вернуться назад', 'bad');
     if(!yes) return false;
   }
   if(ok && noBlame){
     const yes = await askDialog('Списать без виновного?',
-      r ? `${r.name} × ${fmt(r.qty)} · за счёт компании` : 'За счёт компании', 'Списать без виновного', 'Вернуться назад');
+      r ? `${r.name} × ${fmtQty(r.qty)} · за счёт компании` : 'За счёт компании', 'Списать без виновного', 'Вернуться назад');
     if(!yes) return false;
   }
   const box = document.getElementById('wo-' + id);
@@ -41963,7 +41977,8 @@ async function woDecide(ev, id, ok, noBlame){
     await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/decide',
       {method:'POST', body:{ok: !!ok, as: _meName(), ...(ok && noBlame ? {blame: false} : {})}});
     _audHap(ok ? 'ok' : 'warn');
-    _toast(ok ? (noBlame ? 'Списано без виновного' : 'Согласовано — списано со склада') : 'Отклонено — осталось недостачей');
+    _toast(ok ? (noBlame ? 'Списано без виновного' : 'Согласовано — списано со склада')
+              : отмена ? 'Вернулась на полку' : 'Отклонено — осталось недостачей');
     done = true;
   }catch(e){
     const p = (e || {}).payload || {};
@@ -41983,14 +41998,14 @@ async function woDecide(ev, id, ok, noBlame){
 // той же карточкой с пустой рамкой: строка одна на всех, и путь у неё один.
 function phvOpenWo(id){
   const r = _woFind(id); if(!r) return;
-  const есть = !!r.thumb || r.kind !== 'потеря';
+  const есть = !!r.thumb || !_woNoPhoto(r.kind);
   phvOpen([{key: 'wo:' + id, which: 'wo', thumb: r.thumb || '', label: 'Снимок',
             path: есть ? '/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/photo' : ''}],
           0, {kind: 'wo', id});
 }
 function _phvPaintWo(){
   const r = _phvE(); if(!r) return;
-  _setText('phvT', `${r.name} × ${fmt(r.qty)}`);
+  _setText('phvT', `${r.name} × ${fmtQty(r.qty)}`);
   _setText('phvS', _woSub(r) + (r.note ? ' · ' + r.note : ''));
   document.getElementById('phvCap').innerHTML = '';
   document.getElementById('phvRej').hidden = true;
@@ -41999,6 +42014,9 @@ function _phvPaintWo(){
     ? (r.kind === 'потеря'
       ? `<button class="phv-no" onclick="phvWoWrite()">Списать без виновного</button>
          <button class="phv-ok" onclick="phvWoApprove()">Удержать с виновного</button>`
+      : r.kind === 'отмена'
+      ? `<button class="phv-no" onclick="phvWoReject()">Вернулась на полку</button>
+         <button class="phv-ok" onclick="phvWoApprove()">Не вернулась</button>`
       : `<button class="phv-no" onclick="phvWoReject()">Отклонить</button>
          <button class="phv-ok" onclick="phvWoApprove()">Согласовать</button>`)
     : (!no && !r.comp)
@@ -42006,7 +42024,7 @@ function _phvPaintWo(){
   const st = document.getElementById('phvSt');
   st.className = 'phv-st ' + (pend ? 'warn' : no ? 'no' : 'ok');
   st.textContent = pend ? `Ждёт решения · ${fmt(r.aed)} AED по прайсу`
-    : no ? `Отклонено${r.decided_by_name ? ' · ' + r.decided_by_name : ''}`
+    : no ? `${r.kind === 'отмена' ? 'Вернулась на полку' : 'Отклонено'}${r.decided_by_name ? ' · ' + r.decided_by_name : ''}`
     : r.comp ? `Удержано ${fmt(r.comp.amount)} AED · ${r.comp.who}`
     : `Списано · ${fmt(r.aed)} AED по прайсу`;
 }

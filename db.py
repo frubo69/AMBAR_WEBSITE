@@ -6770,6 +6770,22 @@ async def fx_day_set(day: str, rates: dict) -> None:
                                upsert=True)
 
 
+async def fx_last_set(doc: dict) -> None:
+    """Последний курс обменника целиком (строки ответа, откуда, когда) — чтобы
+    перезапуск службы не оставлял экран пустым: с 23 окт 2026 сайт обменника
+    закрыт для сервера, курс приходит извне (rates.handle_push)."""
+    d = _db_or_none()
+    if d is None: return
+    await d.fx_last.update_one({"_id": "ansari"}, {"$set": {**doc, "at": datetime.now(timezone.utc)}},
+                               upsert=True)
+
+
+async def fx_last_get() -> dict | None:
+    d = _db_or_none()
+    if d is None: return None
+    return await d.fx_last.find_one({"_id": "ansari"})
+
+
 async def fx_take_all() -> dict:
     """Наш курс приёма валюты у клиентов, вписанный в STAR: {код: {rate,
     by_name, at}}. Невписанные — по умолчанию из fx_take.DEFAULT."""

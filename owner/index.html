@@ -22385,7 +22385,7 @@ function fxRender(){
   // это свежо. Молчащий источник тоже говорится словом.
   const sub = document.getElementById('fxSub');
   if(sub) sub.classList.remove('is-skel');
-  _setText('fxSub', !FX ? 'не удалось загрузить'
+  _setText('fxSub', (!FX || !FX.fetched_at) ? 'не удалось загрузить'
     : (FX.silent ? `${FX.source || 'обменник'} молчит · последнее ${_fxWhen(FX.fetched_at)}`
                  : `${FX.source || 'обменник'} · ${_fxWhen(FX.fetched_at)}`));
   const q = (document.getElementById('fxQ')?.value || '').trim().toLowerCase();

@@ -12,8 +12,14 @@
     0.0003) — не курс, валюты нет; нет у обменника в списке — нет и у нас;
   • ключа нет — обменник молчит: None (держим его последний курс, рынок не
     подставляем); рынок молчит — строки из обменника;
-  • зарплата в долларах (курс месяца не вписан) — по «продаст», до сотых."""
-import asyncio, base64, json, os, sys
+  • зарплата в долларах (курс месяца не вписан) — по «продаст», до сотых;
+  • с 3 ноя 2026 (сайт закрыл серверу /wp-admin/): конвертер не отвечает —
+    один пробный запрос, остальные не шлём, и не чаще раза в сутки (владелец:
+    «давай раз в день… с сервера»); курс извне (POST /api/fx/push) принимается
+    только с ключом, сверяется с рынком, как свой, ложится в кэш и в базу, и
+    пока он не старше суток, сервер к обменнику не ходит; после перезапуска
+    курс берётся из базы с его временем и пометкой «молчит», пока сайт закрыт."""
+import asyncio, base64, json, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("MONGO_URI", "")
 import logging
@@ -57,6 +63,8 @@ async def page(request):
 async def ajax(request):
     f = await request.post()
     STATE["seen"].append((f.get("currfrom"), f.get("cntcode"), f.get("trtype")))
+    if STATE.get("deny"):                 # как Cloudflare серверу с 23 окт 2026
+        return web.Response(text="<html>Sorry, you have been blocked</html>", status=403)
     if f.get("security") != "abc123" or f.get("action") != "foreign_action" or f.get("currto") != "91":
         return web.Response(text="-1")
     v = RATES.get((int(f.get("currfrom")), f.get("trtype")))
@@ -137,6 +145,62 @@ async def main():
        (got["usd"], got["usd_auto"], got["usd_set"]), (3.67, 3.67, False))
     got = await fr._usd({"usd": 3.7})
     eq("вписан руками — он", (got["usd"], got["usd_set"]), (3.7, True))
+
+    print("── конвертер закрыт серверу, курс извне ─────────────────────")
+    from aiohttp.test_utils import make_mocked_request
+    STATE["page"] = "plain"; STATE["seen"].clear(); STATE["deny"] = True
+    eq("конвертер не отвечает — один пробный запрос, остальные не шлём",
+       (await R._fetch_cash(None), len(STATE["seen"])), ({}, 1))
+    STATE["deny"] = False
+
+    def push(body, token=None):
+        req = make_mocked_request("POST", "/api/fx/push", headers={"X-Ambar-Relay": token} if token else {})
+        req._read_bytes = json.dumps(body).encode()
+        return req
+    CASH = {"USD": {"sell": 3.655, "buy": 3.677}, "EUR": {"sell": 4.1485, "buy": 4.2684},
+            "TJS": {"sell": 0.0003, "buy": 0.0003}, "XXX": {"sell": 0}, "bad": {"sell": 1}}
+    os.environ.pop("FX_RELAY_TOKEN", None)
+    eq("ключ на сервере не задан — 401 даже с ключом", (await R.handle_push(push({"cash": CASH}, "k1"))).status, 401)
+    os.environ["FX_RELAY_TOKEN"] = "k1"
+    eq("без ключа — 401", (await R.handle_push(push({"cash": CASH}))).status, 401)
+    eq("чужой ключ — 401", (await R.handle_push(push({"cash": CASH}, "k2"))).status, 401)
+    eq("мусор вместо курса — 400", (await R.handle_push(push({"cash": "nope"}, "k1"))).status, 400)
+    eq("только нули — 400", (await R.handle_push(push({"cash": {"USD": {"sell": 0}}}, "k1"))).status, 400)
+    saved = {}
+    async def _last_set(doc): saved["doc"] = dict(doc)
+    async def _last_get(): return saved.get("doc")
+    db.fx_last_set, db.fx_last_get = _last_set, _last_get
+    STATE["page"] = "none"                 # серверу сайт закрыт
+    R._CACHE.update(at=0.0, data=None, fail_at=0.0, restored=True)
+    r = await R.handle_push(push({"cash": CASH}, "k1")); d = json.loads(r.text)
+    eq("курс извне принят: доллар и евро, сомони отсеян рынком, мусор отброшен",
+       (r.status, d["n"], d["usd"]["cash_aed"], d["usd"]["cash_buy_aed"]), (200, 2, 3.655, 3.677))
+    p = await R.get_rates()
+    eq("отдаём его как свежий, не «молчит», строки как у своего", (p["ok"], p["silent"], [(x["code"], x["cash_buy_aed"], x["aed"]) for x in p["rates"]]),
+       (True, False, [("USD", 3.677, 3.6725), ("EUR", 4.2684, 4.2157)]))
+    eq("…и он записан в базу с пометкой «извне»", (saved["doc"]["src"], len(saved["doc"]["rows"])), ("relay", 2))
+    STATE["page"] = "plain"; STATE["seen"].clear()
+    await R.get_rates()
+    eq("курс извне не старше суток — сервер к обменнику не ходит", len(STATE["seen"]), 0)
+    R._CACHE.update(at=0.0, data=None, fail_at=0.0, restored=False)
+    saved["doc"]["at_epoch"] = time.time() - 30 * 3600
+    STATE["page"] = "none"
+    p = await R.get_rates()
+    eq("после перезапуска — курс из базы, его время, «молчит», пока сайт закрыт",
+       (p["ok"], p["silent"], p["rates"][0]["code"], abs(p["fetched_at"] / 1000 - saved["doc"]["at_epoch"]) < 2),
+       (False, True, "USD", True))
+    STATE["page"] = "plain"; STATE["seen"].clear()
+    p = await R.get_rates()
+    eq("неудача — до завтра сервер к обменнику не ходит, курс старый с пометкой «молчит»",
+       (len(STATE["seen"]), p["silent"], p["rates"][0]["code"]), (0, True, "USD"))
+    r = await R.handle_push(push({"cash": CASH}, "k1"))
+    eq("курс привезли снова — свежий", (r.status, (await R.get_rates())["silent"]), (200, False))
+    R._CACHE.update(at=0.0, data=None, fail_at=0.0, restored=True); STATE["seen"].clear(); STATE["deny"] = True
+    for _ in range(3):
+        await R.get_rates()
+    eq("без курса на руках и при закрытой двери — один заход в сутки, не на каждый запрос", len(STATE["seen"]), 1)
+    STATE["deny"] = False
+    os.environ.pop("FX_RELAY_TOKEN", None)
 
     await srv.close()
     print("\nвсё прошло" if not FAIL else f"\nНЕ ПРОШЛИ: {FAIL}")

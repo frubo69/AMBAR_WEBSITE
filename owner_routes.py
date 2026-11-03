@@ -4548,6 +4548,45 @@ async def _cash_fact(day: str, oid: str, net: int, marks_all: dict) -> dict:
     return {"fact": int(fact), "fact_at": str(m.get("at") or "")}
 
 
+async def _cash_live(day: str) -> dict:
+    """{район: [кто ещё на смене]} — районы, чья смена за эти сутки ещё идёт
+    (владелец, 4 ноя 2026: «в сборе выручки её можно забрать не только с
+    закрытых смен, но и с текущей, это неправильно»; «в начале дня, пока мы в
+    минусе на 920 дирхам, оно вычитает из выручки те деньги из закрытых
+    смен»). Деньги такой смены не окончательны — водители ещё возят и
+    тратят, — поэтому в сбор они не входят и получить их нельзя: придут сюда,
+    когда смену закроют.
+
+    Смена района идёт, пока оператор открыл район и не закрыл (shift_opens без
+    shift_days) или хоть один водитель района открыл свою смену и не закрыл
+    (shift_open_at без shift_close_at — оператор закрывает район первым,
+    водитель свою после). Имена даём только во втором случае: район закрыт,
+    держит смену один человек — его и назвать; пока район открыт, на смене
+    все, и перечислять их незачем.
+
+    Только для сегодняшних суток: прошлые отработаны по определению — после
+    десяти утра в старом дне работать нельзя (needs_shift смотрит на
+    сегодняшний), а забытое закрытие не должно запереть деньги навсегда."""
+    import config_staff as _staff
+    try:
+        opens = await db.shift_opens_for_day(day)
+        closed = await db.shifts_for_day(day)
+        days = await db.get_driver_days(day)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] смены за {day}: {e}")
+        return {}
+    district = {str(d.get("name") or ""): d.get("district") or "" for d in _staff.all_drivers()}
+    out = {}
+    for oid in OFFICE_IDS:
+        on = sorted(str(r.get("driver") or "") for r in days
+                    if r.get("shift_open_at") and not r.get("shift_close_at")
+                    and district.get(str(r.get("driver") or "")) == oid)
+        op_open = oid in opens and oid not in closed
+        if op_open or on:
+            out[oid] = [] if op_open else on
+    return out
+
+
 async def cash_round(day: str) -> dict:
     """Сбор денег по районам за учётный день.
 
@@ -4561,7 +4600,15 @@ async def cash_round(day: str) -> dict:
 
     Несобранное за прошлые дни (с CASH_CARRY_FROM) едет сюда же — carry по
     району, и «выручка» / «чаевые» района — вместе с ним (net_all, tips_all):
-    столько старший и забирает. later — «Соберу завтра»."""
+    столько старший и забирает. later — «Соберу завтра».
+
+    Смена района ещё идёт (shift = open, _cash_live) — сегодняшних денег в
+    сборе нет: ни в выручке района, ни в итогах, ни в «нужно получить»; район
+    везёт только перенос, и «получил» здесь — перенос забран (каждый день
+    помечен solo, сегодняшней отметки нет — got). Сегодняшние суммы (net,
+    cash, spend, items) у такого района отдаются как есть, но нигде не
+    складываются (владелец, 4 ноя 2026)."""
+    today = _biz_date(_now_dubai()).isoformat()
     back = _cash_back_days(day, await _cash_from())
     # День раньше начала учёта (fin_start, владелец 16 окт 2026: «сбор выручки
     # как будто начинается с сегодняшнего дня, всё остальное уже собрано»):
@@ -4610,6 +4657,8 @@ async def cash_round(day: str) -> dict:
             a.update(cash=0, tips=0, spend=0, debt=0, debt_n=0, spend_card=0, spend_pending=0,
                      fx=[], items=[], net=0, empty=True)
     past = {d: await _cash_amounts(d, orders) for d in need_days}
+    # Чья смена ещё идёт — только у сегодняшних суток (прошлые отработаны).
+    live = await _cash_live(day) if day == today and not before else {}
     # Строки водителей — складка «Водители» под КАЖДЫМ днём на карточке
     # (владелец, 30 окт 2026: «раскрыть и посмотреть, какой водитель сколько
     # сдал по факту»; «я должен видеть, сколько кто должен был сдать, на самой
@@ -4661,22 +4710,34 @@ async def cash_round(day: str) -> dict:
         done = bool(m.get("done")) or legacy
         # Забрали только за сегодня — район закрыт не целиком: перенос остался.
         solo_today = bool(m.get("solo"))
-        later = bool(m.get("later")) and not done
-        empty = a["empty"] and not carry
+        # Смена идёт: сегодняшнее не берут, получить можно только перенос.
+        # Перенос весь забран (поимённо, solo) — район получен, got; своя
+        # отметка дня при этом не ставится — деньги смены придут, когда её
+        # закроют, и получать их будут отдельно. Отметка дня, поставленная до
+        # этого правила, остаётся видна (done) и снимается общей кнопкой.
+        on = live.get(oid)
+        идёт = on is not None
+        got = идёт and not done and not carry and bool(taken)
+        later = bool(m.get("later")) and not (done or got)
+        empty = (not carry and not taken) if идёт else (a["empty"] and not carry)
         if not empty:
             need_n += 1
-            if done:
+            if done or got:
                 done_n += 1
             elif later:
                 later_n += 1
-        net_all, tips_all = a["net"] + c_net, a["tips"] + c_tips
+        if идёт:
+            net_all, tips_all = c_net, c_tips
+        else:
+            net_all, tips_all = a["net"] + c_net, a["tips"] + c_tips
         net_total += net_all
         tips_total += tips_all
-        cash_total += a["cash"] + sum(c["cash"] for c in carry)
-        spend_total += a["spend"] + sum(c["spend"] for c in carry)
+        cash_total += (0 if идёт else a["cash"]) + sum(c["cash"] for c in carry)
+        spend_total += (0 if идёт else a["spend"]) + sum(c["spend"] for c in carry)
         carry_total += c_net
         out.append({"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
                     "operator": a["operator"], "drivers": a["drivers"],
+                    "shift": "open" if идёт else "closed", "on": on or [], "got": got,
                     "orders": a["orders"], "cash": a["cash"], "tips": a["tips"], "spend": a["spend"],
                     "debt": a["debt"], "debt_n": a["debt_n"],
                     "spend_card": a["spend_card"], "fx": a["fx"],
@@ -4684,8 +4745,9 @@ async def cash_round(day: str) -> dict:
                     "carry": carry, "carry_net": c_net, "carry_tips": c_tips,
                     "taken": taken,
                     "net_all": net_all, "tips_all": tips_all,
-                    "empty": empty, "done": done, "solo_today": solo_today,
-                    "done_at": str(m.get("at") or ""),
+                    "empty": empty, "done": done or got, "solo_today": solo_today,
+                    "done_at": str(m.get("at") or "") if done else
+                               (max((t["at"] for t in taken), default="") if got else ""),
                     "later": later, "later_at": str(m.get("at") or "") if later else ""})
     # Готовность по дням (владелец, 20 окт 2026: «сделай так, чтобы можно было
     # распределить любые собранные суммы»): день готов к распределению, когда
@@ -4709,7 +4771,9 @@ async def cash_round(day: str) -> dict:
         if not wait and not got:
             continue
         days_out.append({"day": d, "ready": not wait, "wait": wait, "got": got,
-                         "net": sum(amounts[o]["net"] for o in OFFICE_IDS if not amounts[o]["empty"])})
+                         # Идущая смена в сумму дня не входит — её деньги ещё не те.
+                         "net": sum(amounts[o]["net"] for o in OFFICE_IDS
+                                    if not amounts[o]["empty"] and not (d == day and o in live))})
     # Сверка смены (shift_recon, владелец, 9 окт 2026): у района — факт
     # («Сдали по факту», вписанный старшим, или подтверждённые оператором
     # наличные водителей), разница с приложением и строки водителей.
@@ -4738,7 +4802,7 @@ async def cash_round(day: str) -> dict:
             gap, src = 0, ""
         x.update({"fact": fact, "fact_at": r.get("fact_at") or "", "gap": gap, "gap_src": src,
                   "recon": _drv(day, x["id"]) or r.get("rows") or []})
-    return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
+    return {"day": day, "today": today, "districts": out, "done": done_n,
             "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
             # Решено по всем: получил или «Соберу завтра» — строка чек-листа
             # за этот день тогда не горит.
@@ -4748,15 +4812,22 @@ async def cash_round(day: str) -> dict:
             "carry_total": carry_total, "before": before, "days": days_out}
 
 
-async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "") -> None:
+async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "") -> str:
     """«Получил» по району — и за все дни, что в него переехали (via = этот
     день); «снять отметку» — возвращает их обратно в перенос.
 
     only — забрать ИМЕННО за этот день, остальное оставить в переносе
     (владелец, 28 сен 2026). Такая отметка помечается solo: она закрывает свой
     день, но цепочку переноса не рвёт, и всё, что старше, остаётся на экране.
-    """
+
+    Смена района ещё идёт (_cash_live, владелец, 4 ноя 2026): сегодняшнее не
+    берут — «забрать за сегодня» отказ shift_open, а «Получил» забирает
+    только перенос: каждый его день помечается solo, сегодняшняя отметка не
+    ставится. Возвращает код отказа, пустая строка — сделано."""
+    идёт = day == _biz_date(_now_dubai()).isoformat() and oid in await _cash_live(day)
     if only:
+        if only == day and идёт:
+            return "shift_open"
         if done:
             # В solo — день, С КОТОРОГО забрали: по нему строка «получено»
             # и найдётся, чтобы отметку можно было снять. Копить их за все
@@ -4767,10 +4838,16 @@ async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "")
                                     "at": datetime.now(timezone.utc).isoformat()})
         else:
             await db.checklist_put(only, f"cash:{oid}", None)
-        return
+        return ""
     back = _cash_back_days(day, await _cash_from())
     marks_all = await db.checklist_many(back) if back else {}
-    if done:
+    if done and идёт:
+        now = datetime.now(timezone.utc).isoformat()
+        for d in _cash_chain(day, oid, back, marks_all):
+            m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
+            if not m.get("done"):
+                await db.checklist_put(d, f"cash:{oid}", {"done": True, "solo": day, "by": who, "at": now})
+    elif done:
         for d in _cash_chain(day, oid, back, marks_all):
             m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
             if not m.get("done"):
@@ -4782,6 +4859,7 @@ async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "")
             if m.get("via") == day:
                 await db.checklist_put(d, f"cash:{oid}", None)
         await db.checklist_set(day, f"cash:{oid}", False, who)
+    return ""
 
 
 @require_owner
@@ -4814,6 +4892,10 @@ async def handle_cash_fact(request):
         page = day
     fact = body.get("fact")
     who = str(request.get("owner_id") or "")
+    # Смена района ещё идёт — сдавать нечего, числа дня не окончательны
+    # (владелец, 4 ноя 2026).
+    if day == _biz_date(_now_dubai()).isoformat() and oid in await _cash_live(day):
+        return web.json_response({"error": "shift_open"}, status=409, headers=CORS_HEADERS)
     if fact is None or str(fact).strip() == "":
         await db.checklist_put(day, f"cashfact:{oid}", None)
         log.info(f"[cash] {day} {OFFICE_CODES.get(oid, oid)}: «сдали по факту» снято")
@@ -5592,7 +5674,9 @@ async def handle_checklist_mark(request):
             return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
         if only and only > day:
             return web.json_response({"error": "future"}, status=400, headers=CORS_HEADERS)
-        await cash_receive(day, item[5:], bool(body.get("done")), who, only)
+        err = await cash_receive(day, item[5:], bool(body.get("done")), who, only)
+        if err:
+            return web.json_response({"error": err}, status=409, headers=CORS_HEADERS)
     else:
         await db.checklist_set(day, item, bool(body.get("done")), who)
     return web.json_response({"ok": True}, headers=CORS_HEADERS)

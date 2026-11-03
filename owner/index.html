@@ -2690,6 +2690,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 #star-daily-collection .sc-driver-notes{display:flex;flex-wrap:wrap;gap:3px 13px;padding-top:7px;font-size:11px;line-height:17px;color:#c9aa77}
 #star-daily-collection .sc-confirmation{margin-top:7px;font-size:11px;line-height:17px;color:var(--sc-muted)}
 #star-daily-collection .sc-confirmed{display:inline-flex;gap:4px;align-items:center;color:#a5b39d!important}
+#star-daily-collection .sc-live{color:var(--sc-muted)!important}
 #star-daily-collection .sc-confirmed>svg.lucide{width:12px!important;height:12px!important}
 #star-daily-collection .sc-difference.sc-confirmed{display:block}
 #star-daily-collection .sc-calculation{border-top:1px solid var(--sc-line)}
@@ -21383,10 +21384,15 @@ function crRender(){
 function sdcOverview(d){
   const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
   const дниПереноса = [...new Set((d.districts || []).flatMap(x => (x.carry || []).map(c => c.day)))].sort();
-  const слева = d.before ? 'До начала учёта'
+  // Смена района идёт — его сегодняшних денег в сборе нет (владелец, 4 ноя
+  // 2026); о таких районах — первой строкой, чтобы «получать нечего» не
+  // читалось как «смена отработана впустую».
+  const идут = (d.districts || []).filter(x => x.shift === 'open').map(x => x.code);
+  let слева = d.before ? 'До начала учёта'
     : дниПереноса.length ? `Есть перенос за ${дниПереноса.map(_dayName).join(', ')}`
-    : d.later ? `${d.later} ${pluralize(d.later, 'район', 'района', 'районов')} — соберу завтра`
-    : !d.need ? 'Получать нечего' : '';
+    : d.later ? `${d.later} ${pluralize(d.later, 'район', 'района', 'районов')} — соберу завтра` : '';
+  if(!d.before && идут.length) слева = [`Смена идёт · ${идут.join(', ')}`, слева].filter(Boolean).join(' · ');
+  else if(!слева && !d.need) слева = 'Получать нечего';
   const кнопка = crLaterAllBtn();
   return `<div class="sc-overview">
     <div class="sc-overview-line"><span>Получено от районов</span><strong>${d.done} <span>/ ${d.need}</span></strong></div>
@@ -21453,19 +21459,31 @@ function sdcDistrict(x){
   // (владелец, 21 сен 2026).
   const долг = x.debt ? `в долг ${fmt(x.debt)}${x.debt_n > 1 ? ` за ${x.debt_n} ${
     pluralize(x.debt_n, 'заказ', 'заказа', 'заказов')}` : ''} — деньги у клиента` : '';
-  if(x.empty) return `<article class="sc-district sc-compact" id="sdc-${id}" aria-label="${code}, ${name}, нечего получать">
+  // Смена района ещё идёт (владелец, 4 ноя 2026: «можно забрать не только с
+  // закрытых смен, но и с текущей, это неправильно»; «пока мы в минусе на
+  // 920 дирхам, оно вычитает из выручки те деньги из закрытых смен»):
+  // сегодняшних денег на карточке нет — ни суммой, ни днём, ни расходами, —
+  // район везёт только перенос. Имена сервер даёт, когда район закрыт и
+  // смену держит кто-то один.
+  const идёт = x.shift === 'open';
+  const наСмене = идёт && (x.on || []).length ? `на смене ${(x.on || []).join(', ')}` : '';
+  const смена = идёт ? ['смена идёт', наСмене].filter(Boolean).join(' · ') : '';
+  if(x.empty) return `<article class="sc-district sc-compact" id="sdc-${id}" aria-label="${code}, ${name}, ${идёт ? 'смена идёт' : 'нечего получать'}">
     <div class="sc-district-heading"><span class="sc-code">${code}</span>
-      <div class="sc-district-name"><h2>${name}</h2><span>${escS([team, 'нечего получать', долг].filter(Boolean).join(' · '))}</span></div>
-      <div class="sc-summary-money"><strong>0</strong><span>AED</span></div></div></article>`;
+      <div class="sc-district-name"><h2>${name}</h2><span>${escS([team, идёт ? смена : 'нечего получать', идёт ? '' : долг].filter(Boolean).join(' · '))}</span></div>
+      <div class="sc-summary-money">${идёт ? '<strong>—</strong>' : '<strong>0</strong><span>AED</span>'}</div></div></article>`;
   const open = SDC.open.has(x.id);
   const carry = x.carry || [], взятые = x.taken || [];
   // Две суммы, которые старший забирает: выручка (наличные минус чай и
   // расход водителя) и чай — порознь, потому что и берутся порознь. Доплат
   // водителю нет: ушёл в минус — так и пишем, с минусом. Вместе с тем, что
   // не получили в прошлые дни, — столько старший и забирает.
-  const net = x.net_all != null ? x.net_all : x.net;
-  const tips = x.tips_all != null ? x.tips_all : x.tips;
-  const сегодня = !!(x.cash || x.spend || x.tips);
+  // Получен при идущей смене (got) — в заголовке то, что забрали: перенос по
+  // дням; «к сбору» у такого района ноль, но карточка «получил» показывает
+  // сумму, как и обычная.
+  const net = x.got ? взятые.reduce((a, c) => a + (c.net || 0), 0) : x.net_all != null ? x.net_all : x.net;
+  const tips = x.got ? взятые.reduce((a, c) => a + (c.tips || 0), 0) : x.tips_all != null ? x.tips_all : x.tips;
+  const сегодня = !идёт && !!(x.cash || x.spend || x.tips);
   const дней = carry.length + (сегодня ? 1 : 0);
   // «за 2 дня»; один день, и тот прошлый, — по имени: «за 19 сентября».
   const заСколько = дней >= 2 ? `за ${дней} ${pluralize(дней, 'день', 'дня', 'дней')}`
@@ -21476,11 +21494,14 @@ function sdcDistrict(x){
     ? `за ${String(carry[0].day).slice(8, 10)}.${String(carry[0].day).slice(5, 7)}` : заСколько;
   // Расходы района ещё ждут решения — предупреждение внизу карточки, и
   // собирать нельзя: ни район, ни день, ни «соберу завтра».
-  const ждут = +x.spend_pending > 0 && !x.done;
-  const pendN = (x.items || []).filter(e => e.status === 'pending' && e.pay !== 'card' && !e.nocash).length;
+  // Идущая смена: её расходы ещё не её итог — перенос они не держат.
+  const ждут = +x.spend_pending > 0 && !x.done && !идёт;
+  const pendN = идёт ? 0 : (x.items || []).filter(e => e.status === 'pending' && e.pay !== 'card' && !e.nocash).length;
   // «Получил» целиком уже нажали — всё, что ниже, в кассе: дни без кнопок,
-  // чтобы поверх общей отметки не легла отметка на один день.
-  const всёЗабрал = !!x.done && !x.solo_today;
+  // чтобы поверх общей отметки не легла отметка на один день. При идущей
+  // смене «получил» — это перенос, забранный по дням (got): у каждого дня
+  // своя кнопка «Вернуть», общей отметки нет.
+  const всёЗабрал = !!x.done && !x.solo_today && !x.got;
   const days = [];
   if(сегодня) days.push({day: CR.day, net: x.net, tips: x.tips, cash: x.cash, spend: x.spend, spend_card: x.spend_card,
     spend_pending: x.spend_pending, debt: x.debt, debt_n: x.debt_n, fx: x.fx || [], orders: x.orders, fact: x.fact,
@@ -21494,14 +21515,15 @@ function sdcDistrict(x){
   else if(ждут) st = `<span class="sc-summary-status sc-warning">${luc('circle-alert')}${
     pendN ? `${pendN} ${pluralize(pendN, 'расход', 'расхода', 'расходов')}` : 'расходы ждут'}</span>`;
   else if(x.later) st = '<span class="sc-summary-status sc-warning">соберу завтра</span>';
+  else if(идёт) st = '<span class="sc-summary-status sc-live">смена идёт</span>';
   const справа = st
     ? `<span class="sc-summary-stack"><span class="sc-closed-money sc-closed-only${net < 0 ? ' sc-negative' : ''}">${sdcMoney(net)} <small>AED</small></span>${st}</span>`
     : `<span class="sc-summary-money sc-closed-only"><strong${net < 0 ? ' class="sc-negative"' : ''}>${sdcMoney(net)}</strong><span>AED</span></span>`;
-  const sub = [team, заСколько].filter(Boolean).join(' · ');
+  const sub = [team, заСколько, x.done && идёт ? 'смена идёт' : '', наСмене].filter(Boolean).join(' · ');
   const head = `<summary class="sc-district-heading"><span class="sc-code">${code}</span>
     <span class="sc-district-name"><strong>${name}</strong>${sub ? `<span>${escS(sub)}</span>` : ''}<span class="sc-closed-only">Чаевые ${fmt(tips)} AED</span></span>
     ${справа}${luc('chevron-down', 'sc-disclosure')}</summary>`;
-  const перенос = carry.length ? `<div class="sc-carryover">${luc('history')}<span>Из них <b>${
+  const перенос = carry.length && !идёт ? `<div class="sc-carryover">${luc('history')}<span>Из них <b>${
     sdcMoney(x.carry_net != null ? x.carry_net : carry.reduce((a, c) => a + c.net, 0))} AED</b> за ${
     carry.map(c => _dayName(c.day)).join(', ')}</span></div>` : '';
   const дни = days.length ? `<div class="sc-days">${days.map(dd => sdcDay(x, dd, ждут, всёЗабрал, days.length)).join('')}</div>` : '';
@@ -21511,7 +21533,7 @@ function sdcDistrict(x){
   // Галочка ставится и снимается одним нажатием, без вопросов: действие
   // обратимо, а спрашивать «точно?» по пять раз за ночь — приучать не читать.
   const главная = x.done
-    ? `<button type="button" class="sc-primary sc-done" onclick="crToggle('${id}')">${luc('check')}Получил · снять отметку</button>`
+    ? (x.got ? '' : `<button type="button" class="sc-primary sc-done" onclick="crToggle('${id}')">${luc('check')}Получил · снять отметку</button>`)
     : ждут
     ? `<button type="button" class="sc-primary sc-unavailable"${стоп} onclick="crNeedExp('${code}')">${luc('lock-keyhole')}Получил${заКнопка ? ' ' + заКнопка : ''}</button>`
     : `<button type="button" class="sc-primary" onclick="crToggle('${id}')">Получил${заКнопка ? ' ' + заКнопка : ''}</button>`;
@@ -21522,11 +21544,13 @@ function sdcDistrict(x){
             : `<button type="button" class="sc-secondary" aria-pressed="${x.later ? 'true' : 'false'}" onclick="crLater('${id}', ${!x.later})"${
                 x.later ? ' aria-label="Снять «Соберу завтра»"' : ''}>${x.later ? luc('check') : ''}Соберу завтра</button>`)
     : '';
+  const низ = главная || завтра
+    ? `<div class="sc-settlement">${блок}<div class="sc-district-actions${завтра ? '' : ' sc-one'}">${главная}${завтра}</div></div>` : '';
   return `<details class="sc-district" id="sdc-${id}" data-sdc="d:${id}"${open ? ' open' : ''}>${head}
     <div class="sc-district-body">
       <div class="sc-district-totals"><div><span>Выручка</span>${sdcAed(net, net < 0 ? 'sc-negative' : '')}</div><div><span>Чаевые</span>${sdcAed(tips, 'sc-gold')}</div></div>
-      ${перенос}${дни}${sdcExpenses(x, carry, pendN)}
-      <div class="sc-settlement">${блок}<div class="sc-district-actions${завтра ? '' : ' sc-one'}">${главная}${завтра}</div></div>
+      ${перенос}${дни}${sdcExpenses(идёт ? {...x, items: [], spend: 0, spend_card: 0, spend_pending: 0} : x, carry, pendN)}
+      ${низ}
     </div></details>`;
 }
 

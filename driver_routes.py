@@ -3130,6 +3130,9 @@ async def handle_supply_release(request):
     if t.get("driver") == me["name"] and (t.get("noscan_at") or int(t.get("scanned") or 0) > 0):
         return web.json_response({"ok": False, "verdict": "started"}, headers=CORS_HEADERS)
     ok = await db.supply_task_release(sid, oid, me["name"], untouched=True)
+    if ok:
+        import supply_log
+        await supply_log.add("released", sid, who=me["name"], district=oid)
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 

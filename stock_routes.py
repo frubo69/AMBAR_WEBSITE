@@ -3762,6 +3762,12 @@ async def handle_order_edit(request):
         except (TypeError, ValueError):
             return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
         await db.zayavka_edit_set(day, pid, district, qty)
+    # Хронология заявки (supply_log): кто, что и на сколько поправил.
+    import supply_log
+    await supply_log.add("order_edit", day=day, district=district,
+                         who=str(body.get("as") or "").strip()[:60] or "старший",
+                         note=f"{_catalog().get(pid, {}).get('name') or pid} · "
+                              + ("расчёт" if qty is None or qty == "" else str(qty)))
 
     data = await order_rows(day)
     row = next((r for r in data["all_rows"] if r["id"] == pid), None)
@@ -3796,6 +3802,9 @@ async def handle_order_district(request):
         return web.json_response({"error": "last_district"}, status=409, headers=CORS_HEADERS)
     await db.zayavka_off_set(day, district, off)
     log.info(f"[stock] заявка {day}: район {district} " + ("выключен" if off else "возвращён"))
+    import supply_log
+    await supply_log.add("order_off" if off else "order_on", day=day, district=district,
+                         who=str(body.get("as") or "").strip()[:60] or "старший")
     data = await order_rows(day)
     return web.json_response({"ok": True, "off": data["off"], "districts": data["districts"],
                               "total_qty": data["total_qty"], "total_aed": data["total_aed"],
@@ -3813,6 +3822,11 @@ async def handle_order_reset(request):
         body = {}
     day = (body.get("day") or "").strip() or _biz_day()
     await db.zayavka_edit_clear(day, (body.get("id") or "").strip() or None)
+    import supply_log
+    pid = (body.get("id") or "").strip()
+    await supply_log.add("order_reset", day=day,
+                         who=str(body.get("as") or "").strip()[:60] or "старший",
+                         note=(_catalog().get(pid, {}).get("name") or pid) if pid else "вся заявка")
     data = await order_rows(day)
     return web.json_response({"ok": True, "total_qty": data["total_qty"],
                               "total_aed": data["total_aed"],

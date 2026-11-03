@@ -27,6 +27,7 @@ from datetime import datetime, timezone, timedelta
 from aiohttp import web
 
 import db
+import supply_log
 from owner_auth import require_owner, CORS_HEADERS
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
 from config_stock_order import order_key, STOCK_ORDER   # порядок обхода полок, как в их таблице
@@ -181,6 +182,10 @@ async def handle_send(request):
     from owner_routes import OWNER_BOT_TOKEN
     if not OWNER_BOT_TOKEN:
         return web.json_response({"error": "no_bot"}, status=500, headers=CORS_HEADERS)
+    try:
+        body = await request.json()              # {day, as}: «as» — подпись в хронологии
+    except Exception:                            # noqa: BLE001
+        body = {}
     raw, name = await _build_book((request.query.get("day") or "").strip())
     form = _aiohttp.FormData()
     form.add_field("chat_id", str(request.get("owner_id") or 0))
@@ -210,6 +215,14 @@ async def handle_send(request):
         await _remember_owner_msg(OWNER_BOT_TOKEN, request.get("owner_id") or 0, res)
     except Exception as e:
         log.debug(f"[supply] реестр заявки: {e}")
+    # Хронология заявки: файл выслан — кем и когда. Под днём заявки, снимок
+    # которой только что записал _build_book (zayavka_save → at = сейчас).
+    try:
+        snap = await db.zayavka_last_full()
+        await supply_log.add("sent", day=str(snap.get("_id") or ""),
+                             who=_owner_name(request, body), note=name)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[supply] хронология: отправка файла не записана: {e}")
     return web.json_response({"ok": True, "file": name}, headers=CORS_HEADERS)
 
 
@@ -957,6 +970,13 @@ async def handle_import(request):
         await _answer_to_order(order_day, items, asked_full)
     except Exception as e:                           # noqa: BLE001
         log.error(f"[supply] ответ в заявку не записан: {e}")
+    # Хронология заявки: ответ загружен (или загружен заново), кем, и на
+    # какую заявку он лёг — по этому дню страница находит её шаги.
+    await supply_log.add("answer_replaced" if заменена else "answer", sid, day=day,
+                         who=str((getattr(request, "query", None) or {}).get("as") or "").strip()[:60] or "старший",
+                         note=supply_log.answer_note(doc)
+                         + (f" · раз {doc['replaced_n']}" if заменена and int(doc.get("replaced_n") or 0) > 1 else ""),
+                         data={"order_day": order_day}, at=now)
     # Цены магазина: что он написал в «Price, AED» против нашей закупочной.
     try:
         await _prices_tell(price_changes, sid)
@@ -1309,6 +1329,8 @@ async def na_set(sid: str, oid: str, pid: str, on: bool, me: str) -> dict:
         pass
     log.info(f"[supply] {sid}/{oid}: {it.get('name', pid)} — "
              f"{'нет в наличии' if on else 'снова в наличии'} · {me}")
+    await supply_log.add("na" if on else "na_off", sid, who=me, district=oid,
+                         note=it.get("name") or pid)
     sup = await db.supply_get(sid)
     return {"ok": True, "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, me)}
 
@@ -1343,6 +1365,9 @@ async def buy_set(sup: dict, pid: str, price: float, qty: int, who: str, by_id: 
     if not await db.supply_buy_set(sid, pid, doc):
         return {"ok": False, "error": "not_saved"}
     log.info(f"[supply] закупка {pid}: {price} × {qty} ({sid}) · {who or '—'}")
+    await supply_log.add("buy", sid, who=who, at=now,
+                         note=f"{row.get('name') or pid} · "
+                              + (f"{price:g} AED × {qty}" if price > 0 else "цена снята"))
     # Цена другой базы живёт при этой базе (владелец, 30 сен 2026: «цены, по
     # которым покупаем, сохраняй только по определённым доп. базам… не вписывай
     # их в учёт»). В закупочную цену позиции она не идёт — см. cost_map.
@@ -1527,7 +1552,10 @@ async def task_claim(sid: str, oid: str, me: str, tg_id: int, now) -> tuple:
     if task.get("noscan_at") and not task.get("done_at") and held_by_staff(task):
         await db.supply_task_release(sid, oid)
         log.info(f"[supply] {sid}/{oid}: принятое без сканирования отпущено от {task.get('driver')} — берёт {me}")
-    return await db.supply_task_claim(sid, oid, me, tg_id, now)
+    ok, task = await db.supply_task_claim(sid, oid, me, tg_id, now)
+    if ok:
+        await supply_log.add("claimed", sid, who=me, district=oid, at=now)
+    return ok, task
 
 
 def _can_touch(task: dict, me: str, owner: bool) -> bool:
@@ -1741,11 +1769,13 @@ async def task_undo(sid: str, oid: str, code: str, me: str,
     if not await db.supply_untake(sid, oid, pid, qty):
         return {"ok": False, "verdict": "not_ours"}
     await db.qr_remove(code)
+    now = datetime.now(timezone.utc)
     await db.supply_task_flag(sid, oid, {"kind": "undo", "code": code[:40],
                                          "product": doc.get("product_name", ""),
-                                         "product_id": pid, "by": me,
-                                         "at": datetime.now(timezone.utc)})
+                                         "product_id": pid, "by": me, "at": now})
     log.info(f"[supply] {sid}/{oid}: {me} убрал из приёмки {code[:30]} ({doc.get('product_name', '')})")
+    await supply_log.add("undo", sid, who=me, district=oid, at=now,
+                         note=f"{doc.get('product_name', '')} · {doc.get('label') or code[:30]}")
     # Строка, из которой убрали, — ровно в том виде, в каком её теперь видит
     # сервер: у пива код — полкоробки, и «минус одна» на экране врала бы.
     sup = await db.supply_get(sid) or {}
@@ -1812,6 +1842,10 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
     log.info(f"[supply] {sid}/{oid}: приёмка закрыта · {me} · "
              f"{(doc.get('tasks') or {}).get(oid, {}).get('scanned', 0)} шт · "
              f"недобор {sum(g['gap'] for g in gaps)}")
+    kind, note = supply_log.done_event(doc, oid, gaps)
+    await supply_log.add(kind, sid, who=me, district=oid, note=note, at=now)
+    if doc.get("status") == "done":
+        await supply_log.add("supply_done", sid, who=me, at=now)
     # На этой базе чего-то не оказалось — собираем следующую доп. заявку, на
     # другую базу (владелец, 30 сен 2026). Черновиком: базу называет человек.
     дальше = None
@@ -1897,6 +1931,9 @@ async def short_report(sid: str, oid: str, me: str, kind: str, lines: list,
         return {"ok": False, "verdict": "pending"}
     что = ", ".join("%s %s" % (x["name"], x["qty"]) for x in итог)
     log.info(f"[supply] {sid}/{oid}: недовоз от {me} ({kind}) — {что}")
+    await supply_log.add("short", sid, who=me, district=oid, at=rec["at"],
+                         note=f"{supply_log.qstr(sum(float(x['qty']) for x in итог))} ед"
+                              + (f" · {rec['note']}" if rec["note"] else ""))
     try:
         await _short_tell(sup, oid, rec)
     except Exception as e:                                   # noqa: BLE001
@@ -1943,6 +1980,8 @@ async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
     if not await db.supply_short_decide(sid, oid, "ok" if ok else "no", who, now, miss):
         return {"ok": False, "verdict": "not_pending"}
     log.info(f"[supply] {sid}/{oid}: недовоз {'подтверждён' if ok else 'отклонён'} · {who}")
+    await supply_log.add("short_ok" if ok else "short_no", sid, who=who, district=oid, at=now,
+                         note=f"{supply_log.qstr(sum(float((x or {}).get('qty') or 0) for x in sh.get('lines') or []))} ед")
     # Подтверждённый недовоз на полке не лежит: район «без сканирования» держал
     # его на складе, пока не истечёт кэш основы (найдено фаззером, 1 окт 2026).
     try:
@@ -2045,6 +2084,8 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
     v = _task_view(sid, doc, oid, (doc.get("tasks") or {}).get(oid) or {}, me)
     log.info(f"[supply] {sid}/{oid}: принято без сканирования · {me} · "
              f"{v['left']} шт не отсканировано")
+    await supply_log.add("noscan", sid, who=me, district=oid, at=now,
+                         note=f"не отсканировано {supply_log.qstr(v['left'])}")
     try:
         from owner_routes import notify_owners_force
         where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
@@ -2104,6 +2145,7 @@ async def task_hold(sid: str, oid: str, me: str, tg_id: int, on: bool,
             await db.supply_task_start(sid, oid, now)
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[supply] {sid} {oid}: начало приёмки не записано: {e}")
+        await supply_log.add("started", sid, who=me, district=oid, at=now)
     return {"ok": True, "sec": HOLD_SEC,
             "hold": {"who": me, "kind": kind, "at": str(now), "live": False, "mine": True}}
 
@@ -2426,6 +2468,8 @@ async def _draft_from_extra(sup: dict, oid: str, gaps: list) -> dict | None:
                asked_qty=sum(i["qty"] for i in items.values()), gap_qty=0)
     if новый:
         await _save_new(doc, "X", now)
+        await supply_log.add("draft", doc["_id"], at=now,
+                             note=f"{supply_log.what_note(doc)} · из недобора {sid}")
     else:
         await db.supply_save(doc)
     log.info(f"[supply] следующая доп. заявка {doc['_id']} из недобора {sid}/{oid}: "
@@ -2820,6 +2864,10 @@ async def handle_own_lines(request):
             break
         done += 1
         log.info(f"[supply] {sid} {oid}: {who} поставил {cat[pid].get('name','')} = {qty}")
+    if done:
+        await supply_log.add("line_edit", sid, who=who, district=oid, at=now,
+                             note=", ".join(f"{cat[p].get('name', '')} {q}" for p, q in lines[:done][:3])
+                                  + (" …" if done > 3 else ""))
     if done < len(lines):
         cur = await db.supply_get(sid) or sup
         t = (cur.get("tasks") or {}).get(oid) or task
@@ -2880,6 +2928,8 @@ async def handle_own_line(request):
                                  dumps=lambda o: __import__("json").dumps(o, default=str))
     who = str(body.get("as") or "").strip()[:60] or "старший"
     log.info(f"[supply] {sid} {oid}: {who} поставил {cat[pid].get('name','')} = {qty}")
+    await supply_log.add("line_edit", sid, who=who, district=oid, at=now,
+                         note=f"{cat[pid].get('name', '')} {qty}")
     # Водитель уже взял район, но ещё не начал — скажем ему сразу, не дожидаясь
     # опроса: задача у него на экране, и лучше пусть узнает от бота, чем от
     # отказа на первом скане.
@@ -3039,6 +3089,8 @@ async def handle_release(request):
     ok = await db.supply_task_release(sid, oid)
     if ok:
         log.info(f"[supply] {sid}/{oid}: задача снята владельцем")
+        await supply_log.add("released", sid, who=был.get("driver") or "", district=oid,
+                             note=f"снял {_owner_name(request, body)}")
         # Задача, пропавшая из приложения без слова, выглядит как сбой. Тому,
         # с кого сняли, говорим — и что принятое им осталось на месте.
         if был.get("driver"):
@@ -3087,6 +3139,7 @@ async def handle_draft_confirm(request):
                               "confirmed_at": datetime.now(timezone.utc)},
                         only_open=False)
     log.info(f"[supply] черновик докупки {sid} подтверждён: база «{base}», {who}")
+    await supply_log.add("confirmed", sid, who=who, note=base)
     try:
         from owner_routes import notify_owners
         where = " · ".join(f"{OFFICE_CODES.get(o, o)} {t['qty']}"
@@ -3136,6 +3189,7 @@ async def handle_base_set(request):
             except Exception as e:                       # noqa: BLE001
                 log.warning(f"[supply] цены базы не переехали: {e}")
         log.info(f"[supply] база заявки {sid}: «{old}» → «{base}» · {_owner_name(request, body)}")
+        await supply_log.add("base", sid, who=_owner_name(request, body), note=f"{old or '—'} → {base}")
     return web.json_response({"ok": True, "supply_id": sid, "base": base}, headers=CORS_HEADERS)
 
 
@@ -3171,6 +3225,7 @@ async def handle_cancel(request):
                                   "cancelled_by": _owner_name(request, body)},
                             only_open=False)
         log.info(f"[supply] черновик докупки {sid} отменён")
+        await supply_log.add("supply_cancelled", sid, who=_owner_name(request, body), note="черновик")
         return web.json_response({"ok": True, "cancelled": "draft"}, headers=CORS_HEADERS)
     if st != "open":
         # Уже закрыта или уже отменена — второе нажатие ничего не меняет.
@@ -3214,6 +3269,7 @@ async def handle_cancel(request):
         done_now.append(o)
         if tasks[o].get("driver"):
             told.append((tasks[o]["driver"], o))
+        await supply_log.add("cancelled", sid, who=who or "старший", district=o)
     targets = done_now
     if not targets:
         return web.json_response({"error": "nothing_to_cancel"}, status=409,
@@ -3232,10 +3288,12 @@ async def handle_cancel(request):
         if any(t.get("done_at") for t in tasks.values()):
             sup["status"] = "done"
             await db.supply_set(sid, {"status": "done", "done_at": now})
+            await supply_log.add("supply_done", sid, who=who or "старший", note="остальные районы отменены")
         else:
             sup["status"] = "cancelled"
             await db.supply_set(sid, {"status": "cancelled", "cancelled_at": now,
                                       "cancelled_by": who})
+            await supply_log.add("supply_cancelled", sid, who=who or "старший")
     # Задача, исчезнувшая из приложения без слова, — это повод приехать в
     # магазин и не понять, что происходит. Кто держал её взятой, узнаёт первым.
     await _cancel_tell(told, whole=not partial)
@@ -3396,6 +3454,7 @@ async def handle_own_claim(request):
                                   "driver": (task or {}).get("driver") or ""},
                                  status=409, headers=CORS_HEADERS)
     log.info(f"[supply] {я} взял приёмку {sid}/{oid} на себя")
+    await supply_log.add("claimed", sid, who=я, district=oid, note="сам")
     sup = await db.supply_get(sid)
     return web.json_response(
         _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, я),
@@ -3430,6 +3489,7 @@ async def handle_own_assign(request):
                                  status=409, headers=CORS_HEADERS)
     кто = _owner_name(request, body)
     log.info(f"[supply] {кто} назначил {name} на приёмку {sid}/{oid}")
+    await supply_log.add("assigned", sid, who=name, district=oid, note=f"назначил {кто}")
     sup = await db.supply_get(sid) or {}
     try:
         # Тем же путём, что штрафы: скрытый режим, реестр сообщений, тест-водитель.
@@ -3452,9 +3512,11 @@ async def handle_own_release(request):
         body = await request.json()
     except Exception:
         body = {}
-    ok = await db.supply_task_release(request.match_info.get("sid") or "",
-                                      str(body.get("district") or "").strip(),
-                                      _owner_name(request, body))
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    ok = await db.supply_task_release(sid, oid, _owner_name(request, body))
+    if ok:
+        await supply_log.add("released", sid, who=_owner_name(request, body), district=oid)
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 
@@ -3682,6 +3744,7 @@ async def handle_extra_create(request):
     sid = await _save_new(doc, "X", now)
     log.info(f"[supply] заявка на базу «{base}» {sid}: {who} · {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, районов {len(tasks)}")
+    await supply_log.add("created", sid, who=who, at=now, note=f"{base} · {supply_log.what_note(doc)}")
     # Это деньги мимо магазина — владелец узнаёт сразу, а не по итогу приёмки.
     try:
         from owner_routes import notify_owners
@@ -3886,6 +3949,7 @@ def setup(app):
         ("/api/owner/supply/intake", handle_own_intake, "GET"),
         ("/api/owner/supply",        handle_list,   "GET"),
         ("/api/owner/supply/{sid}",                 handle_one,          "GET"),
+        ("/api/owner/supply/{sid}/log",             supply_log.handle_log, "GET"),
         ("/api/owner/supply/{sid}/buy",             handle_buy,          "POST"),
         ("/api/owner/supply/{sid}/release",         handle_release,      "POST"),
         ("/api/owner/supply/{sid}/cancel",          handle_cancel,       "POST"),

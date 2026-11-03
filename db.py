@@ -81,6 +81,10 @@ async def connect():
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         await _db.owner_notifications.create_index([("created_at", -1)])
         await _db.owner_notifications.create_index("event_key")
+        # Хронология заявки (supply_log.py): записи читают по поставке и по
+        # дню заявки, всегда по времени.
+        await _db.supply_events.create_index([("sid", 1), ("at", 1)])
+        await _db.supply_events.create_index([("day", 1), ("at", 1)])
         # Реестр переписки owner-бота: свипер ходит по дате, тревога — по чату.
         await _db.owner_msgs.create_index("at")
         await _db.owner_msgs.create_index("chat_id")
@@ -2921,6 +2925,41 @@ async def zayavka_off(day: str) -> list:
     if db is None: return []
     doc = await db.zayavka_edits.find_one({"_id": day}, {"off": 1})
     return list((doc or {}).get("off") or [])
+
+
+async def zayavka_doc(day: str) -> dict:
+    """Документ заявки дня целиком — хронологии нужны frozen_at и at."""
+    db = _db_or_none()
+    if db is None or not day: return {}
+    return await db.zayavki.find_one({"_id": day}) or {}
+
+
+async def zayavka_edits_doc(day: str) -> dict:
+    db = _db_or_none()
+    if db is None or not day: return {}
+    return await db.zayavka_edits.find_one({"_id": day}) or {}
+
+
+# ── Журнал заявки (supply_log.py) ───────────────────────────────────────────
+# Запись — один шаг: {sid, day, kind, who, district, note, data, at}. sid пуст у
+# шагов заявки дня (файл выслан, правки) — они лежат под day (zayavki._id).
+async def supply_event_add(doc: dict) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.supply_events.insert_one(doc)
+
+
+async def supply_events(sid: str) -> list:
+    db = _db_or_none()
+    if db is None or not sid: return []
+    return await db.supply_events.find({"sid": sid}).sort("at", 1).to_list(length=2000)
+
+
+async def supply_events_day(day: str) -> list:
+    """Шаги заявки дня без поставки: файл выслан, заявку поправили."""
+    db = _db_or_none()
+    if db is None or not day: return []
+    return await db.supply_events.find({"sid": "", "day": day}).sort("at", 1).to_list(length=2000)
 
 
 async def zayavka_edits(day: str) -> dict:

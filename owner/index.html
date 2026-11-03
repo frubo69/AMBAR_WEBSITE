@@ -6002,6 +6002,23 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .xf-prices b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--gold2)}
 .xf-prices.warn b{color:var(--warn)}
 .xf-prices em{display:flex;color:var(--muted)}
+/* Хронология заявки (3 ноя 2026): строка под сводкой поставки и страница
+   шагов — время слева, рейка с точками, шаг и подпись (район · кто · что). */
+.sl-btn{margin:-2px 0 12px}
+.sl-list{padding:6px 16px 10px}
+.sl-r{display:flex;align-items:flex-start;gap:12px;position:relative;padding:8px 0}
+.sl-r::before{content:'';position:absolute;left:60px;top:0;bottom:0;width:1px;background:rgba(255,255,255,.09)}
+.sl-r:first-child::before{top:17px} .sl-r:last-child::before{bottom:auto;height:17px}
+.sl-r:first-child:last-child::before{display:none}
+.sl-r b{flex:0 0 44px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums;line-height:18px}
+.sl-r i.dot{flex:0 0 auto;width:9px;height:9px;margin-top:4.5px;border-radius:50%;background:var(--gold2);position:relative}
+.sl-r i.dot.ok{background:var(--up)} .sl-r i.dot.warn{background:var(--warn)} .sl-r i.dot.dn{background:var(--dn)}
+.sl-r i.dot.wait{background:#12122a;border:1.5px solid var(--dim)}
+.sl-r span{flex:1;min-width:0}
+.sl-r span em{display:block;font-style:normal;font-size:13px;font-weight:600;line-height:18px;color:var(--text)}
+.sl-r span u{display:block;text-decoration:none;font-size:11.5px;line-height:1.35;color:var(--muted);margin-top:2px;
+  overflow-wrap:anywhere}
 /* Цены закупки: строка на позицию, поле справа. */
 .xp-head{padding:4px 2px 12px}
 .xp-head b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
@@ -29489,7 +29506,7 @@ async function ordDistOff(id, off){
   ORD.busy = true;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/order/district',
-      {method:'POST', body:{day: (ORD.d || {}).day || '', district: id, off}});
+      {method:'POST', body:{day: (ORD.d || {}).day || '', district: id, off, as: _meName()}});
     // Клетки считает сервер — перечитываем заявку целиком, иначе строки
     // останутся с прежними числами.
     ORD.d = await ownerApi.ownerFetch('/api/owner/stock/order',
@@ -30125,7 +30142,7 @@ async function ordFlush(){
       const i = k.indexOf('|');
       const res = await ownerApi.ownerFetch('/api/owner/stock/order/edit',
         {method:'POST', body:{day: ORD.d.day, id: k.slice(0, i),
-                              district: k.slice(i + 1), qty: String(qty)}});
+                              district: k.slice(i + 1), qty: String(qty), as: _meName()}});
       // Удаляем только если за время запроса это число не успели изменить.
       if(ORD.pend[k] === qty) delete ORD.pend[k];
       ordSync(res);
@@ -30165,7 +30182,7 @@ async function ordReset(id){
   ORD.busy = true;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/order/reset', {method:'POST',
-      body:{day: ORD.d.day, id}});
+      body:{day: ORD.d.day, id, as: _meName()}});
     const d = await ownerApi.ownerFetch('/api/owner/stock/order');
     ORD.d = d; ACC_ORDER = d; ordRender();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -30238,7 +30255,7 @@ async function ordShare(){
     }
     b.innerHTML = 'Не вышло — шлём в телеграм';
     try{ await ownerApi.ownerFetch('/api/owner/supply/send',
-      {method:'POST', body:{day: ORD.d.day}}); b.innerHTML = 'Готово — файл в чате с ботом'; _ordMarkSent(); }
+      {method:'POST', body:{day: ORD.d.day, as: _meName()}}); b.innerHTML = 'Готово — файл в чате с ботом'; _ordMarkSent(); }
     catch(e2){ b.innerHTML = 'Не отправилось — попробуйте ещё раз'; }
   }
   setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
@@ -30262,7 +30279,7 @@ async function ordSend(){
   const b = document.getElementById('ordSend'); if(!b || b.disabled) return;
   b.disabled = true; b.style.opacity = '.5';
   try{
-    await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{day: ORD.d.day}});
+    await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{day: ORD.d.day, as: _meName()}});
     _toast('Файл в чате с ботом'); _ordMarkSent();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   }catch(e){
@@ -34027,7 +34044,7 @@ function xSupRender(d){
         <span class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span></span>
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
-    </div>${extra ? xFlowCard(d) : ''}`) + `<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
+    </div>${supLogBtn(d)}${extra ? xFlowCard(d) : ''}`) + `<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
   supActShow(d);
   supFoot();
   const goto = SUP_GOTO === 'who' ? 'supWho'
@@ -35017,6 +35034,69 @@ async function supOpenOne(sid){
   ACC_BACK = supHistory;
 }
 
+// ── Хронология заявки ──────────────────────────────────────────────────────
+// Владелец, 3 ноя 2026: «отслеживать пошаговый статус заявки… зайти, нажать и
+// прям хронологически посмотреть, что во сколько происходило». Строка под
+// сводкой поставки ведёт на страницу шагов: время, точка, шаг, район · кто ·
+// что. Данные — /api/owner/supply/{sid}/log: журнал ручек плюс то, что
+// восстановлено из документов (supply_log.py).
+const _tsMs = x => {
+  if(!x) return 0;
+  const t = String(x).replace(' ', 'T');
+  const d = new Date(/Z$|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
+  return isNaN(d) ? 0 : +d;
+};
+function supLogBtn(d){
+  if(!d || d.status === 'draft') return '';
+  // Справа — время последнего шага по тому, что уже есть в поставке.
+  const ts = [d.at, d.cancelled_at, d.closed_at];
+  (d.tasks || []).forEach(t => ts.push(t.claimed_at, t.started_at, t.noscan_at, t.done_at,
+    t.cancelled_at, t.short && t.short.at, t.short && t.short.decided_at));
+  const last = Math.max(0, ...ts.map(_tsMs));
+  return `<button class="xf-prices sl-btn" onclick="supLogOpen('${escS(d.supply_id)}')">
+    <span>Хронология</span><b>${last ? _hm(new Date(last).toISOString()) : ''}</b><em>${ICO_CHEV}</em></button>`;
+}
+async function supLogOpen(sid){
+  const back = ACC_BACK;
+  supPollStop();
+  _setText('accTitle', 'Хронология');
+  _setText('accSub', SUP_D && SUP_D.supply_id === sid
+    ? (SUP_D.kind === 'extra' ? (SUP_D.base || 'Другая база') : _dayName(SUP_D.day || String(SUP_D.at || '').slice(0, 10)))
+    : '');
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  // Стрелка возвращает на ту же поставку, а её стрелка — туда, откуда пришли.
+  ACC_BACK = async () => { ACC_BACK = back; await supLoad(sid); };
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(sid) + '/log'); }
+  catch(e){ mid.innerHTML = loadFail(`supLogOpen('${escS(sid)}')`); return; }
+  if(d.kind === 'extra') _setText('accSub', d.base || 'Другая база');
+  else if(d.day) _setText('accSub', _dayName(d.day));
+  mid.innerHTML = supLogHtml(d);
+}
+const _slDay = iso => { const ms = _tsMs(iso); return ms ? new Date(ms).toLocaleDateString('en-CA', {timeZone: 'Asia/Dubai'}) : ''; };
+function supLogHtml(d){
+  const ev = d.events || [];
+  if(!ev.length) return '<div class="sc"><div class="fb-none">Шагов пока нет</div></div>';
+  const days = [];
+  ev.forEach(e => {
+    const day = _slDay(e.at);
+    let g = days.find(x => x.day === day);
+    if(!g){ g = {day, rows: []}; days.push(g); }
+    g.rows.push(e);
+  });
+  return days.map(g => `<div class="sc">
+    <div class="sc-cap"><span>${escS(_dayName(g.day))}</span><i>${g.rows.length} ${pluralize(g.rows.length, 'шаг', 'шага', 'шагов')}</i></div>
+    <div class="sl-list">${g.rows.map(supLogRow).join('')}</div></div>`).join('');
+}
+function supLogRow(e){
+  const meta = [e.code, e.who, e.note].filter(Boolean).map(escS).join(' · ');
+  return `<div class="sl-r"><b>${_hm(e.at)}</b><i class="dot ${escS(e.cls || '')}"></i>
+    <span><em>${escS(e.title)}</em>${meta ? `<u>${meta}</u>` : ''}</span></div>`;
+}
+
 const _dayName = d => { const x = d ? new Date(d + 'T12:00:00Z') : null;
   return x && !isNaN(x) ? x.toLocaleDateString('ru-RU', {day:'numeric', month:'long'}) : (d || ''); };
 const _hm = iso => {
@@ -35228,7 +35308,7 @@ async function supImport(inp, btnId){
   const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Читаю файл…';
   try{
     const fd = new FormData(); fd.append('file', f, f.name);
-    const res = await fetch((ownerApi.AMBAR_API || '') + '/api/owner/supply/import',
+    const res = await fetch((ownerApi.AMBAR_API || '') + '/api/owner/supply/import?as=' + encodeURIComponent(_meName()),
       {method:'POST', body:fd,
        headers:{'Authorization':'tma ' + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
     const j = await res.json();

@@ -514,7 +514,14 @@ async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 
+async def _warm(app):
+    """При старте службы — последний курс из базы сразу, не дожидаясь первого
+    запроса: после перезапуска экран не должен пустеть даже на минуту."""
+    await _restore()
+
+
 def setup(app):
+    app.on_startup.append(_warm)          # после db.connect: он добавлен раньше
     app.router.add_route("OPTIONS", "/api/owner/rates", _opt)
     app.router.add_get("/api/owner/rates", handle_rates)
     app.router.add_route("OPTIONS", "/api/owner/rates/take", _opt)

@@ -45,7 +45,8 @@ DEFAULT = [
         {"id": "geo_off", "t": "Отключение геолокации", "amount": 200},
         {"id": "exp_rejected", "t": "Отклонённый расход", "amount": 0},
         {"id": "noscan_debt", "t": "Приёмка без сканирования не досканирована", "amount": 0},
-        {"id": "shift_left", "t": "Смена не закрыта", "amount": 0}]},
+        # 200 и срок 07:00 — владелец, 3 ноя 2026 (fines_auto.SHIFT_CLOSE_BY).
+        {"id": "shift_left", "t": "Смена не закрыта", "amount": 200}]},
 ]
 CAT_IDS = [c["id"] for c in DEFAULT]
 MAX_ITEMS, MAX_TIERS, MAX_AMOUNT = 40, 8, 100_000

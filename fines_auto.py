@@ -39,6 +39,11 @@ log = logging.getLogger(__name__)
 
 MEAL_FROM, MEAL_TO = 80, 40
 GEO_OFF_FINE = 200
+# Смену надо закрыть до этого часа (Дубай). Владелец, 3 ноя 2026: «сделай на
+# незакрытие смены штраф 200 дирхам, время до 7 утра её закрыть». Сумма — в
+# правилах (fine_rules, «Смена не закрыта»), час — здесь.
+SHIFT_CLOSE_BY = 7
+SHIFT_LEFT_FINE = 200
 
 KINDS = {
     "late_shift": {"reason": "Поздно открыл смену", "action": "meal"},
@@ -48,7 +53,7 @@ KINDS = {
     # правилах значит «не предлагать»: выключатель — сама сумма.
     "exp_rejected": {"reason": "Отклонённый расход", "action": "fine"},
     "noscan_debt": {"reason": "Приёмка без сканирования не досканирована", "action": "fine"},
-    "shift_left": {"reason": "Смена не закрыта", "action": "fine"},
+    "shift_left": {"reason": "Смена не закрыта", "action": "fine", "amount": SHIFT_LEFT_FINE},
     # Сверка смены (владелец, 9 окт 2026): оператор подтвердил, что наличных
     # у водителя меньше, чем по приложению, — недостача на решение старшему.
     # Сумма — сама недостача, а не из правил: var — «сумма из события».
@@ -209,25 +214,89 @@ def _hm_dubai(v) -> str:
     return dt.astimezone(bizday.DUBAI_TZ).strftime("%H:%M") if dt else ""
 
 
-async def sweep(day: str) -> dict:
-    """Обход закончившихся суток: что осталось несделанным и за что положен
-    штраф на решение. Зовётся раз в сутки после смены дня (loop)."""
+async def shift_left_check(day: str) -> list:
+    """Смены учётных суток day, открытые и не закрытые к SHIFT_CLOSE_BY, — на
+    решение старшему (владелец, 3 ноя 2026). Возвращает новые записи:
+    [{name, district, hm}] — о них и стоит сказать; повтор второй записи не
+    даёт (одна на человека и день)."""
     import config_staff as _staff
-    from config_offices import OFFICE_CODES
-    out = {"shift_left": 0, "noscan_debt": 0}
     home = {}
     try:
         home = _staff.district_map()
     except Exception:                                        # noqa: BLE001
         pass
-    # 1. Смена открыта и не закрыта, а сутки кончились.
+    out = []
+    for d in await db.get_driver_days_range(day, day):
+        if not d.get("shift_open_at") or d.get("shift_close_at"):
+            continue
+        name = d.get("driver") or ""
+        hm = _hm_dubai(d.get("shift_open_at"))
+        if await propose("shift_left", name, home.get(name, ""), day,
+                         f"открыта в {hm}, к {SHIFT_CLOSE_BY:02d}:00 не закрыта"):
+            out.append({"name": name, "district": home.get(name, ""), "hm": hm})
+    return out
+
+
+def close_by_day(now=None) -> str | None:
+    """Учётные сутки, чьи смены уже должны быть закрыты: с SHIFT_CLOSE_BY утра
+    и до начала новых суток (bizday.SHIFT_START_HOUR). В другое время — None."""
+    import bizday
+    now = (now or datetime.now(timezone.utc)).astimezone(bizday.DUBAI_TZ)
+    if SHIFT_CLOSE_BY <= now.hour < bizday.SHIFT_START_HOUR:
+        return bizday.biz_day(now)
+    return None
+
+
+async def shift_left_tell(new: list) -> None:
+    """Старшему — кто не закрыл смену к сроку, с кнопкой в «Штрафы»."""
+    if not new:
+        return
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    from owner_routes import notify_owners
+    import fine_rules
+    amount = await fine_rules.amount("shift_left", SHIFT_LEFT_FINE) or SHIFT_LEFT_FINE
+    lines = [f"⏰ <b>Смена не закрыта к {SHIFT_CLOSE_BY:02d}:00</b>"]
+    for x in new:
+        where = f"{OFFICE_CODES.get(x['district'], '')} {OFFICE_NAMES.get(x['district'], x['district'])}".strip(" ")
+        lines.append(html.escape(x["name"]) + (f", {html.escape(where)}" if where else "")
+                     + (f" — открыта в {x['hm']}" if x.get("hm") else ""))
+    n = len(new)
+    lines.append(f"Штраф {amount} AED ждёт решения — в «Штрафах»." if n == 1
+                 else f"Штрафы по {amount} AED ждут решения — в «Штрафах».")
+    await notify_owners("driver.shift_left", "\n".join(lines), parse_mode="HTML",
+                        reply_markup=open_button("Решить по штрафу"))
+
+
+async def tick(now=None) -> int:
+    """Семь утра: смены учётных суток, которые так и не закрыли, — на решение,
+    один раз за сутки (отметка в базе переживает рестарт). Сколько новых."""
+    day = close_by_day(now)
+    if not day or not await db.once_mark("shift_left", day):
+        return 0
+    new = await shift_left_check(day)
+    if new:
+        log.info(f"[fines] к {SHIFT_CLOSE_BY:02d}:00 не закрыли смену {day}: "
+                 + ", ".join(x["name"] for x in new))
+        try:
+            await shift_left_tell(new)
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[fines] старшему о незакрытых сменах не ушло: {e}")
+    return len(new)
+
+
+async def sweep(day: str) -> dict:
+    """Обход закончившихся суток: что осталось несделанным и за что положен
+    штраф на решение. Зовётся раз в сутки после смены дня (loop)."""
+    from config_offices import OFFICE_CODES
+    out = {"shift_left": 0, "noscan_debt": 0}
+    # 1. Смена открыта и не закрыта, а сутки кончились. Обычно это уже
+    # записано в семь утра (tick); здесь — страховка на случай, если служба
+    # тогда не работала: та же запись, второй она не даст.
     try:
-        for d in await db.get_driver_days_range(day, day):
-            if d.get("shift_open_at") and not d.get("shift_close_at"):
-                name = d.get("driver") or ""
-                if await propose("shift_left", name, home.get(name, ""), day,
-                                 f"открыта в {_hm_dubai(d.get('shift_open_at'))}, до конца суток не закрыта"):
-                    out["shift_left"] += 1
+        new = await shift_left_check(day)
+        out["shift_left"] = len(new)
+        if new:
+            await shift_left_tell(new)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[fines] обход смен {day}: {e}")
     # 2. Приняли без сканирования и так и не досканировали.
@@ -267,6 +336,10 @@ async def loop():
                 await sweep(prev)
         except Exception as e:                               # noqa: BLE001
             log.warning(f"[fines] обход не прошёл: {e}")
+        try:
+            await tick()                                     # семь утра: незакрытые смены
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[fines] проверка смен к {SHIFT_CLOSE_BY:02d}:00 не прошла: {e}")
         await asyncio.sleep(600)
 
 

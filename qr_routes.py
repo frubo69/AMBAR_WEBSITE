@@ -407,12 +407,21 @@ async def handle_scan(request):
     # при этом остаётся приходом, какой бы кнопкой её ни вносили.
     res = await db.qr_register(code, product_id, p.get("name", ""), district, me, now, label,
                                extra={"src": src, "qty": qty, "origin": district})
+    found = None
     if res.get("ok") and src == "new":
         try:
             import stock_routes
             stock_routes.base_drop()             # склад должен увидеть бутылку сразу
         except Exception:                        # noqa: BLE001
             pass
+        # Камера ревизии уже видела этот код «не в реестре» — наклейка на
+        # ревизии: бутылка в её счёте, недостачу закрывает, приходом не
+        # считается (владелец, 4 ноя 2026; stock_routes.audit_found).
+        try:
+            import stock_routes as _sr
+            found = await _sr.audit_found(code, district)
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[qr] наклейка на ревизии не засчитана ({code[:40]}): {e}")
     if not res.get("ok"):
         old = res.get("doc") or await db.qr_get(code) or {}
         if res.get("why") == "elsewhere":
@@ -451,7 +460,9 @@ async def handle_scan(request):
                               "label": label, "seq": seq, "qty": qty,
                               "product_id": product_id,
                               "product_name": p.get("name", ""),
-                              "product_total": total},
+                              "product_total": total,
+                              # Засчитана в ревизии: {day, state} или None.
+                              "found": found},
                              headers=CORS_HEADERS)
 
 
@@ -470,10 +481,19 @@ async def handle_undo(request):
         return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
     # Новую запись отмена стирает; бутылку, которую скан вернул из убранных, —
     # возвращает в убранные, с прежним названием и приходом (db.qr_scan_undo).
+    prev = await db.qr_get(code) or {}
     res = await db.qr_scan_undo(code)
     if res.get("ok"):
         log.info(f"[qr] отменён скан {code}"
                  + (" — бутылка снова убрана, как до скана" if res.get("restored") else ""))
+        if prev.get("found"):
+            # Это была наклейка на ревизии — ревизия узнаёт, что бутылки в
+            # её счёте больше нет (stock_routes.audit_unfound).
+            try:
+                import stock_routes as _sr
+                await _sr.audit_unfound(code, prev)
+            except Exception as e:               # noqa: BLE001
+                log.warning(f"[qr] наклейка на ревизии не снята ({code[:40]}): {e}")
     elif res.get("why") not in (None, "unknown"):
         log.warning(f"[qr] скан {code[:40]} не отменён: {res.get('why')}")
     return web.json_response({"ok": bool(res.get("ok")), "code": code,

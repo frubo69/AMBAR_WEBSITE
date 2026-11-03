@@ -18145,7 +18145,7 @@ async function stkByDistrict(тихо){
 // день и позицию (STK.flow), раскрытые позиции помнятся при листании дней.
 const STK_FLOW_T = {sale: 'Продажа', intake: 'Приёмка', noscan: 'Принято без сканирования', manual: 'Внесено руками',
                     move_in: 'Приехало из', move_out: 'Уехало в', writeoff: 'Списание', count: 'Ревизия', rescan: 'Досканировано',
-                    drop: 'Убран код', relabel: 'Стикер переклеен'};
+                    drop: 'Убран код', relabel: 'Стикер переклеен', found: 'Наклейка на ревизии'};
 function stkFlowKey(pid, day){ return `${day}|${pid}|${STK.dsel || ''}`; }
 async function stkFlowToggle(pid){
   if(!STK.flowOpen) STK.flowOpen = new Set();
@@ -18179,7 +18179,7 @@ function stkFlowHtml(pid, day){
             : e.kind === 'writeoff' ? `Списание · ${escS(e.ref || '')}`
             : e.kind === 'count' ? (e.was != null ? `Ревизия · числилось ${fmtQty(e.was)}, насчитали ${fmtQty(e.ref || 0)}` : `Ревизия · насчитали ${fmtQty(e.ref || 0)}`)
             : e.kind === 'intake' || e.kind === 'rescan' ? `${STK_FLOW_T[e.kind]} · ${e.n} ${pluralize(e.n, 'код', 'кода', 'кодов')}`
-            : e.kind === 'drop' || e.kind === 'relabel' ? `${STK_FLOW_T[e.kind]} · ${escS(e.ref || '')}`
+            : e.kind === 'drop' || e.kind === 'relabel' || e.kind === 'found' ? `${STK_FLOW_T[e.kind]} · ${escS(e.ref || '')}`
             : STK_FLOW_T[e.kind] || e.kind;
     const когда = _hm(e.at) + (e.to && _hm(e.to) !== _hm(e.at) ? '–' + _hm(e.to) : '');
     // Заказ другого района — «заказ B5»; списано сверх остатка — «сверх остатка N».

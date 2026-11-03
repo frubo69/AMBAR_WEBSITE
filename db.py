@@ -4699,7 +4699,9 @@ async def qr_readd(code: str, product_id: str, product_name: str, district,
              "district": district, "label": label,
              "re_at": re_at, "re_by": by, "re_src": str(extra.get("src") or ""),
              "re_from": (old.get("product_name") or "") if renamed else ""}
-        unset = {"was": "", "del_at": "", "del_by": ""}
+        # Метка «наклейка на ревизии» прежней жизни кода не наследуется: возврат
+        # кнопкой «новый товар» — явный выбор, что это бутылка-приход.
+        unset = {"was": "", "del_at": "", "del_by": "", "found": ""}
         if intake:
             if qty is not None:
                 s["qty"] = qty
@@ -5428,12 +5430,14 @@ async def qr_manual_events(district: str, since) -> dict:
     новый товар (src=new) после момента since (None — за всё время). Моменты
     по порядку и всегда со знаком пояса: складу они нужны рядом с продажами,
     а продажа, случившаяся ДО внесения, внесённую бутылку списывать не
-    должна. Удалённые из реестра не в счёт: убрали бутылку — убрали и приход."""
+    должна. Удалённые из реестра не в счёт: убрали бутылку — убрали и приход.
+    Наклейки на ревизии (found, см. qr_mark_found) — тоже не в счёт: та
+    бутылка посчитана ревизией и лежит в её пересчёте."""
     db = _db_or_none()
     if db is None: return {}
     from datetime import datetime as _dt, timezone as _tz
     # По району внесения (origin): переехавшая сканом бутылка учтена переездом.
-    q = {"src": "new", "status": {"$ne": "deleted"},
+    q = {"src": "new", "status": {"$ne": "deleted"}, "found": {"$exists": False},
          "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]}
     if since is not None:
         q["at"] = {"$gt": since}
@@ -5463,6 +5467,53 @@ async def qr_manual_since(district: str, since) -> dict:
     """{позиция: бутылок}, внесённых руками как новый товар после since —
     тот же счёт, что qr_manual_events, без моментов."""
     return {pid: len(ats) for pid, ats in (await qr_manual_events(district, since)).items()}
+
+
+async def qr_mark_found(code: str, district: str, day: str, at) -> bool:
+    """Наклейка на ревизии: код внесли руками к бутылке, которую камера уже
+    видела в ревизии района (district, day). Бутылка — в счёте той ревизии и в
+    её пересчёте, поэтому приходом код не считается: qr_manual_events и
+    qr_new_since его не видят (владелец, 4 ноя 2026). True — пометили сейчас."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "found": {"$exists": False}},
+        {"$set": {"found": {"district": district, "day": day, "at": at}}})
+    return bool(r.modified_count)
+
+
+async def qr_unmark_found(code: str, district: str = "", day: str = "") -> bool:
+    """Снять метку «наклейка на ревизии» (district/day — только метку этой
+    ревизии; пусто — любую). True — метка была и снята."""
+    db = _db_or_none()
+    if db is None: return False
+    q = {"_id": code, "found": {"$exists": True}}
+    if district:
+        q["found.district"] = district
+    if day:
+        q["found.day"] = day
+    r = await db.qr_codes.update_one(q, {"$unset": {"found": ""}})
+    return bool(r.modified_count)
+
+
+async def qr_unfound_audit(district: str, day: str) -> int:
+    """Снять метки ревизии района за день со всех кодов — заход отменили или
+    проход начали заново: пересчёта от него не будет, и внесённые в его время
+    бутылки снова обычный приход. Сколько кодов освобождено."""
+    db = _db_or_none()
+    if db is None: return 0
+    r = await db.qr_codes.update_many({"found.district": district, "found.day": day},
+                                      {"$unset": {"found": ""}})
+    return int(r.modified_count)
+
+
+async def audit_scans_of_code(district: str, code: str) -> list:
+    """Сканы этого кода в ревизиях района — день и вердикт, свежие первыми."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.audit_scans.find({"district": district, "code": code},
+                              {"_id": 0, "day": 1, "verdict": 1, "at": 1}).sort("day", -1)
+    return await cur.to_list(length=50)
 
 
 async def qr_history(since) -> tuple:
@@ -6148,6 +6199,7 @@ async def qr_new_since(district: str, product_id: str, since, until=None) -> lis
     db = _db_or_none()
     if db is None: return []
     q = {"src": "new", "status": {"$ne": "deleted"}, "product_id": product_id,
+         "found": {"$exists": False},                  # наклейка на ревизии — не приход
          "$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}],
          "at": {"$gt": since, **({"$lt": until} if until else {})}}
     cur = db.qr_codes.find(q, {"_id": 1, "at": 1, "qty": 1, "driver": 1})
@@ -6173,7 +6225,8 @@ async def qr_codes_between(product_id: str, start, end) -> list:
     cur = db.qr_codes.find({"product_id": product_id, "at": {"$gte": start, "$lt": end},
                             "src": {"$in": ["intake", "cover", "new"]}},
                            {"_id": 1, "at": 1, "qty": 1, "driver": 1, "by": 1, "supply_id": 1,
-                            "origin": 1, "district": 1, "src": 1, "status": 1})
+                            "origin": 1, "district": 1, "src": 1, "status": 1,
+                            "found": 1, "label": 1})
     return await cur.to_list(length=5000)
 
 

@@ -2103,6 +2103,20 @@ def _scan_verdict(doc: dict, district: str) -> str:
     return "sold" if st == "sold" else "ok"
 
 
+def _in_audit(at, a: dict) -> bool:
+    """Момент at — внутри идущей ревизии a: после её начала, пока не завершена
+    и не отменена. Так узнают код, внесённый руками по ходу ревизии."""
+    if not a or not a.get("started_at") or a.get("finished_at") or a.get("dropped_at"):
+        return False
+    t = at if isinstance(at, datetime) else _dt_of(str(at or ""))
+    s = _dt_of(str(a.get("started_at") or ""))
+    if not t or not s:
+        return False
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    return t >= s
+
+
 def _scan_state(district: str, day: str, counts: dict, odd: list,
                 stats: dict, cat: dict) -> dict:
     """Состояние прохода — одинаковое и после скана, и при открытии экрана."""
@@ -2150,6 +2164,15 @@ async def audit_scan(district: str, day: str, code: str, by: int, by_name: str =
     ses = re.sub(r"[^A-Za-z0-9_-]", "", str(ses or ""))[:24]
     if ses:
         rec["ses"] = ses
+    # Код внесли руками уже по ходу этой ревизии, и вот он под камерой:
+    # наклейка на ревизии — бутылка в счёте прохода, приходом её не считать
+    # (владелец, 4 ноя 2026; см. audit_found).
+    if verdict == "ok" and (doc or {}).get("src") == "new" and not (doc or {}).get("found"):
+        a = await db.audit_get(district, day) or {}
+        if _in_audit((doc or {}).get("at"), a) and await db.qr_mark_found(code, district, day, rec["at"]):
+            base_drop()
+            log.info(f"[audit] {district} {day}: {(doc or {}).get('label') or code[:40]} внесён по ходу "
+                     f"ревизии и отсканирован — наклейка на ревизии, не приход")
     fresh = await db.audit_scan_add(district, day, code, rec)
     counts = await db.audit_scan_counts(district, day)
     unit = _unit(p) if p else 1
@@ -2214,6 +2237,10 @@ async def handle_audit_scan_state(request):
 
 async def audit_scan_undo(district: str, day: str, code: str) -> dict:
     ok = await db.audit_scan_del(district, day, code)
+    # Скан снят — наклейка на ревизии, если это была она, снова обычный приход:
+    # в счёте прохода бутылки больше нет, а на полке она есть.
+    if ok and await db.qr_unmark_found(code, district, day):
+        base_drop()
     counts = await db.audit_scan_counts(district, day)
     return {"ok": ok, "code": code, "total": sum(counts.values()), "positions": len(counts)}
 
@@ -2247,7 +2274,10 @@ async def handle_audit_scan_reset(request):
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
     day = str(body.get("day") or "").strip() or _biz_day()
     n = await db.audit_scan_clear(district, day)
-    log.info(f"[audit] {district} {day}: проход сброшен, снято {n}")
+    m = await db.qr_unfound_audit(district, day)       # наклейки на ревизии — снова приход
+    if m:
+        base_drop()
+    log.info(f"[audit] {district} {day}: проход сброшен, снято {n}, наклеек на ревизии {m}")
     return web.json_response({"ok": True, "removed": n}, headers=CORS_HEADERS)
 
 
@@ -2495,6 +2525,9 @@ async def _audit_lines(district: str, day: str) -> tuple:
             # Ушло заказами (или переездом, боем), пока позицию считали, и
             # потому в недостачу не пошло.
             "gone": _num(зачёт),
+            # Ушло всего, пока считали, — без потолка разницы: по нему поздняя
+            # наклейка (_audit_adjust) пересчитывает зачёт заново.
+            "went": _num(ушло),
             "loss": _loss_of(pid, d) if d > 0 else 0,  # закупка за пропавшие
             # Недостача удерживается по прайсу (правило владельца): это и
             # есть сумма в отчёте и в окне «Удержать за недостачу».
@@ -2622,7 +2655,7 @@ async def audit_sheet(district: str, day: str) -> dict:
         # хватало в той ревизии»). Дочитываем здесь же, тем же путём, что и
         # при завершении: внесли код — бутылка в счёте сразу.
         try:
-            await _audit_refresh_alien(district, day)
+            await _audit_refresh_alien(district, day, a)
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[audit] наклейки не дочитаны ({district} {day}): {e}")
         rows, counted = await _audit_lines(district, day)
@@ -2763,8 +2796,13 @@ async def audit_cancel(district: str, day: str, by: int, by_name: str) -> tuple:
     # Сканы — в архив сразу: лист района после отмены должен быть чистым, а не
     # показывать счёт брошенного захода. Не стираем — переносим.
     в_архив = await db.audit_scans_archive(district, day, stamp)
+    # Наклейки на ревизии (found) без пересчёта повисли бы ничьими: бутылка
+    # есть, а приходом не считалась. Отменили заход — они снова приход.
+    снято = await db.qr_unfound_audit(district, day)
+    if снято:
+        base_drop()
     log.info(f"[audit] ревизия {district} за {day} отменена · {by_name or '—'}; "
-             f"сканов в архив: {в_архив}")
+             f"сканов в архив: {в_архив}, наклеек на ревизии освобождено: {снято}")
     try:
         await _audit_cancel_tell(district, day, a, sh, by_name)
     except Exception as e:                           # noqa: BLE001
@@ -2898,18 +2936,11 @@ async def audit_finish(district: str, day: str, by: int, who: str, extra: dict =
         return await _audit_finish(district, day, by, who, extra)
 
 
-async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict = None) -> tuple:
-    a = await db.audit_get(district, day) or {}
-    if a.get("finished_at"):
-        return 409, {"error": "finished", "audit": _audit_view(a)}
-    if not a.get("started_at"):
-        return 409, {"error": "not_started"}
-
-    await _audit_refresh_alien(district, day)
-    lines, counted = await _audit_lines(district, day)
+def _audit_verdicts(lines: list, codes: list) -> tuple:
+    """(итоги, недостача, излишек, кодов не в реестре) по строкам ревизии и её
+    сканам — одно и то же при завершении и при поздней наклейке
+    (_audit_adjust). Строки — с name/unit/price/due/loss, как у _audit_lines."""
     tot = _audit_totals(lines)
-    stats = await db.audit_scan_stats(district, day)
-    codes = await db.audit_scan_codes(district, day)
     alien = sum(1 for c in codes if (c.get("verdict") or "") == "alien")
     by_pid: dict = {}
     for c in codes:
@@ -2935,6 +2966,21 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
     short = ({"qty": tot["short_qty"], "aed": tot["short_aed"], "lines": short_lines}
              if short_lines else None)
     over = ({"qty": tot["over_qty"], "lines": over_lines} if over_lines else None)
+    return tot, short, over, alien
+
+
+async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict = None) -> tuple:
+    a = await db.audit_get(district, day) or {}
+    if a.get("finished_at"):
+        return 409, {"error": "finished", "audit": _audit_view(a)}
+    if not a.get("started_at"):
+        return 409, {"error": "not_started"}
+
+    await _audit_refresh_alien(district, day, a)
+    lines, counted = await _audit_lines(district, day)
+    stats = await db.audit_scan_stats(district, day)
+    codes = await db.audit_scan_codes(district, day)
+    tot, short, over, alien = _audit_verdicts(lines, codes)
 
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
@@ -2970,7 +3016,8 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
         "finished_by_name": who, "short": short, "over": over, "alien": alien,
         "result": {**tot, "scan_qty": int(stats.get("total") or 0), "counted": counted},
         "lines": [{"id": l["id"], "expected": l["expected"], "coded": l["coded"], "actual": l["actual"],
-                   "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"]} for l in lines],
+                   "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"],
+                   "went": l.get("went", 0)} for l in lines],
         **(extra or {}),
     }
     # Сошлось и чужих кодов нет — закрыта сразу. Чужие коды — это бутылки без
@@ -3041,10 +3088,13 @@ async def _audit_alien(district: str, day: str) -> dict | None:
     return {"qty": len(out), "left": left, "done": len(out) - left, "codes": out}
 
 
-async def _audit_refresh_alien(district: str, day: str) -> int:
+async def _audit_refresh_alien(district: str, day: str, a: dict = None) -> int:
     """Перед подсчётом: коды, внесённые в реестр после скана, получают
     настоящий вердикт и позицию — иначе возобновлённая ревизия увидела бы
-    в них недостачу (в реестре есть, камерой «не видела»)."""
+    в них недостачу (в реестре есть, камерой «не видела»).
+
+    Внесённый руками по ходу идущей ревизии (src=new после её начала) — это
+    наклейка на ревизии: бутылка в счёте, приходом не считается (found)."""
     n = 0
     cat = _catalog()
     for c in await db.audit_scan_codes(district, day):
@@ -3056,6 +3106,12 @@ async def _audit_refresh_alien(district: str, day: str) -> int:
             continue
         pid = (doc or {}).get("product_id") or ""
         p = cat.get(pid) or {}
+        if doc.get("src") == "new" and not doc.get("found"):
+            if a is None:
+                a = await db.audit_get(district, day) or {}
+            if _in_audit(doc.get("at"), a) and await db.qr_mark_found(
+                    c.get("code") or "", district, day, datetime.now(timezone.utc)):
+                base_drop()
         if await db.audit_scan_update(district, day, c.get("code") or "", {
                 "verdict": v, "product_id": pid,
                 # Скан лёг с qty 1 — кода тогда не знали; реестр знает, что
@@ -3067,6 +3123,159 @@ async def _audit_refresh_alien(district: str, day: str) -> int:
                 "home": (doc or {}).get("district") or ""}):
             n += 1
     return n
+
+
+async def _audit_adjust(district: str, day: str, a: dict, pid: str, dq: float, why: str = "") -> dict:
+    """Завершённая, но не решённая ревизия: засчитать (dq > 0) или снять
+    (dq < 0) бутылку позиции pid, которую камера видела, а реестр узнал позже
+    (наклейка на ревизии, см. audit_found).
+
+    Пересчитывать строки заново нельзя: пересчёт уже записан, и «числится»
+    сравнялось бы с фактом (см. _audit_rows_saved). Поэтому правим
+    сохранённое: факт позиции ± dq, разница — по той же формуле, что при
+    завершении (зачёт ушедшего, пока позицию считали, не больше разницы), и от
+    строк заново — недостача, излишек, итоги и снимок склада."""
+    cat = _catalog()
+    await _loss_load()
+    lines = [dict(l) for l in (a.get("lines") or [])]
+    ln = next((l for l in lines if l.get("id") == pid), None)
+    if ln is None:
+        ln = {"id": pid, "expected": 0, "coded": 0, "actual": 0, "diff": 0, "noqr": 0, "loss": 0}
+        lines.append(ln)
+    c = _num(ln.get("coded", max(0.0, _num(ln.get("expected") or 0) - _num(ln.get("noqr") or 0))))
+    a0, d0 = _num(ln.get("actual") or 0), _num(ln.get("diff") or 0)
+    зачёт0 = _num(max(0.0, c - a0 - d0))
+    if "went" in ln:
+        ушло = _num(ln.get("went") or 0)
+    else:
+        # Старые ревизии ушедшего не хранили: оно известно точно, если зачёт
+        # был меньше разницы; иначе его хватало на всю разницу — хватит и на
+        # меньшую.
+        ушло = зачёт0 if зачёт0 + 1e-9 < c - a0 else float("inf")
+    a1 = _num(max(0.0, a0 + dq))
+    зачёт1 = _num(min(ушло, max(0.0, c - a1)))
+    d1 = _num(c - a1 - зачёт1)
+    ln["actual"], ln["diff"] = a1, d1
+    ln["loss"] = _loss_of(pid, d1) if d1 > 0 else 0
+    rows = _audit_rows_saved({"lines": lines})
+    for r in rows:
+        r["due"] = _sale_of(r["id"], r["diff"]) if r["diff"] > 0 else 0
+    codes = await db.audit_scan_codes(district, day)
+    tot, short, over, alien = _audit_verdicts(rows, codes)
+    res = {**(a.get("result") or {}), **tot}
+    # Снимок склада по итогам ревизии: факт позиции (+ бутылки без кодов) и итоги.
+    cnt = await db.get_stock_count(district, day) or {}
+    if cnt.get("lines") is not None:
+        sl = [dict(l) for l in cnt.get("lines") or []]
+        s = next((l for l in sl if l.get("id") == pid), None)
+        if s is None:
+            p = cat.get(pid) or {}
+            s = {"id": pid, "name": p.get("name", ""), "price": _price(p), "unit": _unit(p),
+                 "was": 0, "income": 0, "moved_qty": 0, "sold": 0, "expected": 0,
+                 "actual": 0, "diff": 0, "counted": True, "mark": "ok"}
+            sl.append(s)
+        s["actual"] = _num(a1 + _num(ln.get("noqr") or 0))
+        s["diff"] = _num(_num(s.get("expected") or 0) - s["actual"])
+        s["mark"] = "ok" if not d1 else "diff"
+        await db.save_stock_count(district, day, {
+            "lines": sl, "short_qty": tot["short_qty"], "short_aed": tot["short_aed"],
+            "over_qty": tot["over_qty"], "matched_qty": tot["matched"],
+            "mismatch_qty": tot["mismatched"]})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    fields = {"short": short, "over": over, "alien": alien, "result": res, "lines": lines}
+    left = await _audit_alien(district, day) if alien else None
+    _audit_close_if_done(a, fields, now_iso, left["left"] if left else 0)
+    a = await db.audit_set(district, day, fields)
+    if a.get("closed_at") and "closed_at" not in fields and (short or over or (left and left["left"])):
+        # Закрылась сама, когда решать было нечего; наклейка дала недостачу
+        # или излишек — ревизия снова ждёт решения.
+        a = await db.audit_unset(district, day, ["closed_at"]) or {**a, "closed_at": ""}
+    base_drop()
+    p = cat.get(pid) or {}
+    log.info(f"[audit] {district} {day}: {why or 'поправка'} — {p.get('name', pid)} "
+             f"{'+' if dq > 0 else ''}{_num(dq)}: факт {a1}, разница {d1}; недостача "
+             f"{tot['short_qty']} / {tot['short_aed']} AED, излишек {tot['over_qty']}, "
+             f"не в реестре {alien}")
+    return a
+
+
+async def audit_found(code: str, district: str) -> dict | None:
+    """«Внести новый товар» для кода, который камера ревизии района уже видела
+    «не в реестре», — наклейка на ревизии (владелец, 4 ноя 2026: «те бутылки,
+    на которые я доклеивал QR, — это те, которых, по программе, не хватало;
+    сделай так, чтобы они компенсировали эти недостачи»).
+
+    Бутылка стояла под камерой — она в счёте той ревизии, а не новый приход:
+    код помечается found (qr_manual_events его не видит), скан получает
+    настоящий вердикт и позицию. Ревизия идёт — лист покажет бутылку сам.
+    Завершена и ждёт решения — результат, недостача, излишек и снимок склада
+    поправляются (_audit_adjust); закрывшаяся сама, когда решать было нечего,
+    — тоже (камера видела код именно в ней), и с излишком откроется снова.
+    Решение по недостаче или излишку уже принято или заход отменён — код
+    остаётся обычным приходом, задним числом ничего не меняется.
+    {day, state} или None, если ревизии это не касается."""
+    doc = await db.qr_get(code) or {}
+    if (not doc or (doc.get("src") or "") != "new" or doc.get("status") == "deleted"
+            or (doc.get("district") or "") != district):
+        return None
+    for s in await db.audit_scans_of_code(district, code):
+        if (s.get("verdict") or "") != "alien":
+            continue
+        day = str(s.get("day") or "")
+        a = await db.audit_get(district, day) or {}
+        if not a.get("started_at") or a.get("dropped_at"):
+            continue
+        fin = bool(a.get("finished_at"))
+        if fin and ((a.get("short") or {}).get("resolved_at") or (a.get("over") or {}).get("resolved_at")):
+            continue
+        await db.qr_mark_found(code, district, day, datetime.now(timezone.utc))
+        pid = doc.get("product_id") or ""
+        p = _catalog().get(pid) or {}
+        qty = float(doc.get("qty") or 1)
+        await db.audit_scan_update(district, day, code, {
+            "verdict": _scan_verdict(doc, district), "product_id": pid, "qty": qty,
+            "product_name": doc.get("product_name") or p.get("name", ""),
+            "label": doc.get("label") or "", "home": doc.get("district") or ""})
+        base_drop()
+        метка = doc.get("label") or code[:40]
+        if fin:
+            await _audit_adjust(district, day, a, pid, qty, f"наклейка {метка} засчитана")
+        else:
+            log.info(f"[audit] {district} {day}: наклейка {метка} засчитана в идущей "
+                     f"ревизии — {p.get('name', pid)}")
+        return {"day": day, "state": "pending" if fin else "running"}
+    return None
+
+
+async def audit_unfound(code: str, prev: dict) -> None:
+    """Отменили «внести новый товар» у наклейки на ревизии (prev — запись кода
+    до отмены): скан снова без позиции, у завершённой нерешённой ревизии
+    бутылка снимается с факта."""
+    f = (prev or {}).get("found") or {}
+    district, day = str(f.get("district") or ""), str(f.get("day") or "")
+    if not district or not day:
+        return
+    doc = await db.qr_get(code)                  # после отмены: нет, убран или прежняя запись
+    v = _scan_verdict(doc, district)
+    known = v != "alien"
+    p = _catalog().get((doc or {}).get("product_id") or "") or {}
+    await db.audit_scan_update(district, day, code, {
+        "verdict": v, "product_id": ((doc or {}).get("product_id") or "") if known else "",
+        "qty": float((doc or {}).get("qty") or 1),
+        "product_name": ((doc or {}).get("product_name") or p.get("name", "")) if known else "",
+        "label": ((doc or {}).get("label") or "") if known else "",
+        "home": ((doc or {}).get("district") or "") if known else ""})
+    base_drop()
+    a = await db.audit_get(district, day) or {}
+    if (not a.get("finished_at") or a.get("dropped_at")
+            or (a.get("short") or {}).get("resolved_at") or (a.get("over") or {}).get("resolved_at")):
+        return
+    метка = prev.get("label") or code[:40]
+    a = await _audit_adjust(district, day, a, prev.get("product_id") or "",
+                            -float(prev.get("qty") or 1), f"наклейка {метка} снята")
+    if v == "ok":
+        await _audit_adjust(district, day, a, (doc or {}).get("product_id") or "",
+                            float((doc or {}).get("qty") or 1), f"код {метка} остался в реестре")
 
 
 async def _audit_sync(district: str, day: str, a: dict) -> tuple:
@@ -3490,7 +3699,7 @@ async def handle_result(request):
 # (stock_at / _district_base), поэтому лента и цифры в таблице из одного
 # источника. Досканирование принятого без кодов и коды cover остаток не
 # меняют — показываются нулём.
-FLOW_KINDS = ("sale", "intake", "noscan", "manual", "move_in", "move_out", "writeoff", "count", "rescan", "drop", "relabel")
+FLOW_KINDS = ("sale", "intake", "noscan", "manual", "move_in", "move_out", "writeoff", "count", "rescan", "drop", "relabel", "found")
 
 
 def _flow_iso(dt: datetime) -> str:
@@ -3571,6 +3780,12 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
         if src == "new":
             if c.get("status") == "deleted" or str(c.get("_id")) in relabeled:
                 continue                      # убран — или это переклеенный стикер (выше)
+            if c.get("found"):
+                # Наклейка на ревизии: бутылка посчитана ревизией, прихода нет.
+                if start <= at < end:
+                    put(oid, kind="found", at=at, qty=0.0, who=str(c.get("driver") or ""),
+                        ref=str(c.get("label") or c.get("_id") or ""))
+                continue
             key = (oid, "manual", str(c.get("driver") or c.get("by") or ""), at.strftime("%H:%M"))
             g = groups.setdefault(key, {"kind": "manual", "at": at, "to": at, "qty": 0.0, "n": 0,
                                         "who": str(c.get("driver") or ""), "ref": ""})

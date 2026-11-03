@@ -222,12 +222,21 @@ async def timeline(sid: str) -> dict | None:
             if z.get("at"):
                 der.append(_ev("book", z["at"], note=note))
         # Время правок хранится одно на день и переписывается загрузкой ответа
-        # (она пишет ответ правками): показываем его как правку, только если
-        # журнал правок не вёл и время не совпадает с загрузкой.
+        # (она пишет ответ правками) — любой поставки на эту заявку, не только
+        # этой: 3 ноя ответ, загруженный до десяти утра, лёг на заявку
+        # предыдущих суток, у которой уже была своя поставка. Показываем его
+        # как правку, только если журнал правок не вёл и время не совпадает
+        # ни с одной загрузкой на эту заявку.
         ze = await db.zayavka_edits_doc(order_day)
         t = _dt((ze or {}).get("at"))
         if t and not any(e["kind"].startswith("order_") for e in jl):
-            near = [x for x in (_dt(sup.get("at")), _dt(sup.get("first_at")), _dt(sup.get("replaced_at"))) if x]
+            near = []
+            try:
+                others = await db.supplies_of_day(day)
+            except Exception:                        # noqa: BLE001
+                others = []
+            for o in list(others) + [sup]:
+                near += [x for x in (_dt(o.get("at")), _dt(o.get("first_at")), _dt(o.get("replaced_at"))) if x]
             if not any(abs((t - x).total_seconds()) <= DEDUP_SEC for x in near):
                 der.append(_ev("order_edit", t))
 

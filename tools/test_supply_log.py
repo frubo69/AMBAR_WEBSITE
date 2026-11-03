@@ -297,6 +297,21 @@ async def main():
     eq("район принят: сколько", one(ev, "done")["note"], "2 ед")
     eq("у старой поставки нет дня заявки без заморозки", d["order_day"], "2026-09-30")
 
+    # ── правки без журнала: время правок, совпавшее с загрузкой другой поставки
+    #    на ту же заявку (ответ пишется правками), — не правка ──
+    print("Правки до журнала")
+    t1 = NOW - timedelta(days=3, hours=4)
+    await db._db.zayavki.insert_one({"_id": "2026-09-27", "asked": {"p1": 4}, "by": {"p1": {"jvc": 4}},
+                                     "at": t1, "frozen_at": t1, "buy_day": "2026-09-28", "base": {}, "dist": {}})
+    await add_supply("S7a", "2026-09-28", t1 + timedelta(hours=1), {"jvc": {"p1": 2}}, {}, status="done")
+    await add_supply("S7b", "2026-09-28", t1 + timedelta(hours=5), {"jvc": {"p1": 2}}, {}, status="done")
+    await db._db.zayavka_edits.insert_one({"_id": "2026-09-27", "by": {"p1": {"jvc": 2}}, "at": t1 + timedelta(hours=5, seconds=3)})
+    st, d = await log_of("S7a")
+    eq("правка временем чужой загрузки не показывается", "order_edit" in kinds(d["events"]), False)
+    await db._db.zayavka_edits.update_one({"_id": "2026-09-27"}, {"$set": {"at": t1 + timedelta(hours=3)}})
+    st, d = await log_of("S7a")
+    eq("правка в своё время — показывается", "order_edit" in kinds(d["events"]), True)
+
     # ── ручка и журнал в пустоте ──
     print("Края")
     st, _ = await log_of("nope")

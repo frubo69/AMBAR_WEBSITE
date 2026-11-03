@@ -2943,6 +2943,14 @@ async def zayavka_edits_doc(day: str) -> dict:
 # ── Журнал заявки (supply_log.py) ───────────────────────────────────────────
 # Запись — один шаг: {sid, day, kind, who, district, note, data, at}. sid пуст у
 # шагов заявки дня (файл выслан, правки) — они лежат под day (zayavki._id).
+async def supplies_of_day(day: str) -> list:
+    """Поставки магазина за день закупки — без состава, только времена."""
+    db = _db_or_none()
+    if db is None or not day: return []
+    return await db.supplies.find({"day": day, "kind": {"$in": [None, "main"]}},
+                                  {"at": 1, "first_at": 1, "replaced_at": 1}).to_list(length=50)
+
+
 async def supply_event_add(doc: dict) -> None:
     db = _db_or_none()
     if db is None: return

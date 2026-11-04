@@ -202,19 +202,20 @@ for n_, f in dict(fin_budget_get=fin_budget_get, fin_budget_line_get=fin_budget_
 _ago = lambda n: (datetime.strptime(TODAY, "%Y-%m-%d") - timedelta(days=n)).strftime("%Y-%m-%d")
 _at = lambda n: datetime.now(timezone.utc) - timedelta(days=n)
 PEND = [dict(_id=f"geo_off:{TODAY}:Худоба", kind="geo_off", name="Худоба", district="jvc", day=TODAY,
-             reason="Отключил геолокацию", times=["19:40", "21:05"], note="выключал 2 раза: 19:40, 21:05",
+             reason="Отключил геолокацию", times=["19:40", "21:05"], on_times=["19:52", "21:30"],
+             note="выключал 2 раза: 19:40, 21:05, включал в 19:52, 21:30",
              amount=200, status="pending", at=_at(0)),
         dict(_id=f"late_shift:{TODAY}:Али", kind="late_shift", name="Али", district="jbr", day=TODAY,
              reason="Поздно открыл смену", note="открыл в 19:20, правило — до 18:00",
              status="pending", at=_at(0)),
         dict(_id=f"geo_off:{_ago(1)}:Баха", kind="geo_off", name="Баха", district="bbay", day=_ago(1),
-             reason="Отключил геолокацию", times=["23:10"], note="выключил в 23:10", amount=200,
+             reason="Отключил геолокацию", times=["23:10"], on_times=["23:25"], note="выключил в 23:10, включил в 23:25", amount=200,
              status="declined", decided_by="Макар", decided_at=_at(1), at=_at(1)),
         dict(_id=f"late_shift:{_ago(2)}:Авазбек", kind="late_shift", name="Авазбек", district="bbay", day=_ago(2),
              reason="Поздно открыл смену", note="открыл в 19:05, правило — до 18:00",
              status="assigned", decided_by="Макар", decided_at=_at(2), at=_at(2))]
 ITEMS.append(dict(_id="i5", name="Файзуло", kind="fine", amount=200, per_month=0, **{"from": MONTH}, day=_ago(3),
-                  reason="Отключение геолокации — в 20:15", note="", entry="",
+                  reason="Отключение геолокации — в 20:15, включил в 20:31", note="", entry="",
                   auto="geo_off", by="Макар", at=_at(3)))
 async def fine_pending_add(doc):
     if any(x["_id"] == doc["_id"] for x in PEND): return False

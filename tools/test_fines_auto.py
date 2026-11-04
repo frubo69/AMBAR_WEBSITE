@@ -79,11 +79,17 @@ async def main():
         GEO[0][1]["inline_keyboard"][0][0]["text"], GEO[0][1]["inline_keyboard"][0][0]["web_app"]["url"]),
        (True, True, "Решить по штрафу", "https://star.example/?go=fines"))
     await geo_watch.on_stream("Худоба", True, now=at(19, 50).astimezone(timezone.utc))
+    p = await d.fine_pending.find_one({"kind": "geo_off"})
+    eq("включил обратно — время дописано к штрафу (владелец, 4 ноя 2026)",
+       (p.get("on_times"), p["note"], fines_auto.view(p)["text"]),
+       (["19:50"], "выключил в 19:40, включил в 19:50", "Отключение геолокации — в 19:40, включил в 19:50"))
+    await geo_watch.on_stream("Худоба", True, now=at(19, 50).astimezone(timezone.utc))
+    eq("тот же сигнал дважды — время одно", (await d.fine_pending.find_one({"kind": "geo_off"}))["on_times"], ["19:50"])
     GEO.clear()
     await geo_watch.on_stream("Худоба", False, now=at(21, 5).astimezone(timezone.utc))
     p = await d.fine_pending.find_one({"kind": "geo_off"})
     eq("второй раз за день — та же запись, время дописано", (await d.fine_pending.count_documents({}), p["note"]),
-       (1, "выключал 2 раза: 19:40, 21:05"))
+       (1, "выключал 2 раза: 19:40, 21:05, включил в 19:50"))
     eq("и в сообщении про повтор — без строки о штрафе и без кнопки", ("Штраф" in GEO[0][0], GEO[0][1]), (False, None))
     print("── вне смены — тоже нельзя («в принципе запрещено отключать») ──")
     GEO.clear()
@@ -94,7 +100,8 @@ async def main():
        ("Не на смене." in GEO[0][0], "Штраф 200 AED ждёт решения" in GEO[0][0], bool(GEO[0][1])), (True, True, True))
     GEO.clear()
     await geo_watch.on_stream("Сунат", True, now=at(11, 40).astimezone(timezone.utc))
-    eq("включил вне смены — не событие", GEO, [])
+    eq("включил вне смены — не событие, но к штрафу время дописано",
+       (GEO, (await d.fine_pending.find_one({"name": "Сунат"}))["on_times"]), ([], ["11:40"]))
     await geo_watch.on_stream("Сунат", False, now=at(11, 50).astimezone(timezone.utc))
     eq("второй раз за день — без нового сообщения, время дописано",
        (GEO, (await d.fine_pending.find_one({"name": "Сунат"}))["times"]), ([], ["11:30", "11:50"]))
@@ -129,9 +136,20 @@ async def main():
     it = await d.fin_pay_items.find_one({})
     eq("в зарплатах обычный штраф: 150, день нарушения, этот месяц, разом, за что",
        (it["kind"], it["amount"], it["day"], it["from"], it["per_month"], it["reason"], it["note"], it["auto"]),
-       ("fine", 150, DAY, "2026-09", 0, "Отключение геолокации — 2 раза: в 19:40 и 21:05", "", "geo_off"))
+       ("fine", 150, DAY, "2026-09", 0, "Отключение геолокации — 2 раза: в 19:40 и 21:05, включил в 19:50", "", "geo_off"))
     eq("водителю — сообщение о штрафе", (TOLD[0][0], "Штраф 150 AED" in TOLD[0][1]), ("Худоба", True))
     TOLD.clear()
+    await geo_watch.on_stream("Худоба", True, now=at(21, 30).astimezone(timezone.utc))
+    it = await d.fin_pay_items.find_one({"pending": "geo_off:2026-09-22:Худоба"})
+    eq("включил после решения — формулировка назначенного штрафа обновлена",
+       (it["reason"], (await d.fine_pending.find_one({"kind": "geo_off", "name": "Худоба"}))["on_times"]),
+       ("Отключение геолокации — 2 раза: в 19:40 и 21:05, включал в 19:50 и 21:30", ["19:50", "21:30"]))
+    await d.fin_pay_items.update_one({"pending": "geo_off:2026-09-22:Худоба"}, {"$set": {"reason": "Правлено рукой"}})
+    await geo_watch.on_stream("Худоба", True, now=at(22, 15).astimezone(timezone.utc))
+    eq("формулировку правили руками — не трогаем",
+       (await d.fin_pay_items.find_one({"pending": "geo_off:2026-09-22:Худоба"}))["reason"], "Правлено рукой")
+    await d.fin_pay_items.update_one({"pending": "geo_off:2026-09-22:Худоба"}, {"$set": {"reason": fines_auto.full_text(
+        await d.fine_pending.find_one({"kind": "geo_off", "name": "Худоба"}))}})
     st, b = await decide({"id": "late_shift:2026-09-22:Али", "decision": "assign", "month": "2026-09", "as": "Макар"})
     eq("урезал питание — без суммы можно", (st, b.get("ok")), (200, True))
     day = await db.get_driver_day(DAY, "Али")
@@ -173,6 +191,14 @@ async def main():
     eq("пропажу заметил сторож (телефон молчит) — называется иначе",
        fines_auto.full_text({"kind": "geo_off", "times": ["04:36"], "self": False}),
        "Геолокация не передаётся — с 04:36")
+    eq("включил обратно — в той же фразе", fines_auto.full_text({"kind": "geo_off", "times": ["22:00"], "on_times": ["22:14"]}),
+       "Отключение геолокации — в 22:00, включил в 22:14")
+    eq("несколько раз выключал и включал",
+       fines_auto.full_text({"kind": "geo_off", "times": ["19:40", "21:05", "23:10"], "on_times": ["19:52", "21:30"]}),
+       "Отключение геолокации — 3 раза: в 19:40, 21:05 и 23:10, включал в 19:52 и 21:30")
+    eq("не передавалась, потом снова передаётся",
+       fines_auto.full_text({"kind": "geo_off", "times": ["04:36"], "self": False, "on_times": ["05:10"]}),
+       "Геолокация не передаётся — с 04:36, снова с 05:10")
     await db.save_driver_day(DAY, "Азиз", {"working": True, "shift_open_at": at(12, 0).astimezone(timezone.utc)})
     await fines_auto.geo_off("Азиз", "silicon", DAY, "04:36", by_signal=False)
     p2 = await d.fine_pending.find_one({"name": "Азиз"})
@@ -210,7 +236,7 @@ async def main():
     c = await card("Худоба")
     eq("Худоба: назначенный штраф — обычной строкой, без двойника",
        [(x["kind"], x["amount"], bool(x.get("forgiven")), x.get("text")) for x in c["items"]],
-       [("fine", 150, False, "Отключение геолокации — 2 раза: в 19:40 и 21:05")])
+       [("fine", 150, False, "Отключение геолокации — 2 раза: в 19:40 и 21:05, включал в 19:50, 21:30 и 22:15")])
     eq("и в сумме штрафов месяца — только назначенный", c["fines"], 150)
 
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")

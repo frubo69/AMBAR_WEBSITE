@@ -414,6 +414,19 @@ async def _fine(name: str, utc: datetime, day: str, by_signal: bool = True) -> t
             fines_auto.open_button("Решить по штрафу"))
 
 
+async def _geo_on(name: str, utc: datetime, day: str) -> None:
+    """Включил обратно — время к штрафу за выключение того же дня, если он
+    есть (владелец, 4 ноя 2026). Ничего не шлёт: «включил геопозицию»
+    старшему уходит там же, где и раньше."""
+    if staff.is_test_driver(name):
+        return
+    import fines_auto
+    try:
+        await fines_auto.geo_on(name, day, _hhmm(utc))
+    except Exception as e:                   # noqa: BLE001
+        log.warning(f"[geo-watch] {name}: время включения к штрафу не дописано: {e}")
+
+
 # ── мгновенный путь: сигнал телеграма ────────────────────────────────────────
 async def on_stream(name: str, on: bool, now: datetime = None, why: str = "") -> bool:
     """Телеграм сказал: трансляцию включили (on) или она кончилась.
@@ -436,6 +449,8 @@ async def on_stream(name: str, on: bool, now: datetime = None, why: str = "") ->
         log.info(f"[geo-watch] {name} уехал — трансляцию не разбираем")
         return False
     day = _biz_day(utc.astimezone(DUBAI_TZ))
+    if on:
+        await _geo_on(name, utc, day)        # к штрафу за выключение — и вне смены, и под замком
     d = await db.get_driver_day(day, name) or {}
     if d.get("working") is not True:
         # не на работе: включил — не событие, выключил — штраф на решение
@@ -593,6 +608,7 @@ async def tick(now: datetime = None) -> dict:
                 await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
                 await _owners(text_stream_on(name, (utc - off_since).total_seconds()), EVENT_ON,
                               meta=geo_meta(name, True))
+                await _geo_on(name, utc, day)
                 log.info(f"[geo-watch] {name}: геопозиция вернулась")
                 out["back"].append(name)
             continue
@@ -607,6 +623,7 @@ async def tick(now: datetime = None) -> dict:
         if g["stream"] and why == "stream":
             await _owners(text_stream_on(name, (utc - off_since).total_seconds()), EVENT_ON,
                           meta=geo_meta(name, True))
+            await _geo_on(name, utc, day)
             out["back"].append(name)
 
     if out["off"] or out["back"] or out["locked"]:

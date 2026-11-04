@@ -6885,6 +6885,24 @@ async def fine_pending_update(pid: str, fields: dict) -> bool:
     return bool(r.matched_count)
 
 
+async def fine_pending_patch(pid: str, fields: dict) -> bool:
+    """Дописать подробности в любую запись, и в решённую тоже: время, когда
+    геолокацию включили обратно, приходит и после решения (4 ноя 2026)."""
+    d = _db_or_none()
+    if d is None: return False
+    r = await d.fine_pending.update_one({"_id": pid}, {"$set": fields})
+    return bool(r.matched_count)
+
+
+async def fin_pay_item_rephrase(pid: str, old: str, new: str) -> bool:
+    """У штрафа, назначенного по записи pid, — новая формулировка, если
+    старая ещё не правлена руками."""
+    d = _db_or_none()
+    if d is None or old == new: return False
+    r = await d.fin_pay_items.update_one({"pending": pid, "reason": old}, {"$set": {"reason": new}})
+    return bool(r.modified_count)
+
+
 async def fine_pending_list(status: str = "", kind: str = "", limit: int = 200, name: str = "") -> list:
     """Свежие сверху. status: pending | assigned | declined; пусто — все."""
     d = _db_or_none()

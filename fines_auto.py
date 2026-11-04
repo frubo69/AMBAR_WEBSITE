@@ -79,17 +79,24 @@ def full_text(d: dict) -> str:
     nb = "\u00a0"                 # неразрывный: «2 раза», «в 19:40» и тире не рвутся по строкам
     if kind == "geo_off":
         t = [x for x in (d.get("times") or []) if x]
+        o = [x for x in (d.get("on_times") or []) if x]
+        # Включил обратно — тоже в фразу (владелец, 4 ноя 2026: «когда он
+        # включает её обратно, добавляй помимо „выключил геолокацию в xx xx“
+        # ещё и „включил геолокацию в хх хх“»).
+        back = "" if not o else (f", включил в{nb}{o[0]}" if len(o) == 1
+                                 else f", включал в{nb}{', '.join(o[:-1])} и{nb}{o[-1]}")
         # Сам выключил (сигнал телеграма с телефона) или связь пропала и это
         # заметил сторож — разные вещи, и называются по-разному: у выключенного
         # или разряженного телефона сигнала нет вовсе (владелец, 22 сен 2026).
         if not d.get("self", True):
-            return "Геолокация не передаётся" + (f"{nb}— с {t[0]}" if t else "")
+            return ("Геолокация не передаётся" + (f"{nb}— с {t[0]}" if t else "")
+                    + (f", снова с{nb}{o[0]}" if o else ""))
         if len(t) > 1:
             at = ", ".join(f"в{nb}{x}" if i == 0 else x for i, x in enumerate(t[:-1]))
-            return f"Отключение геолокации{nb}— {len(t)}{nb}{_times_word(len(t))}: {at} и{nb}{t[-1]}"
+            return f"Отключение геолокации{nb}— {len(t)}{nb}{_times_word(len(t))}: {at} и{nb}{t[-1]}" + back
         # Не «во время смены»: у нас в принципе запрещено отключать
         # геолокацию (владелец, 22 сен 2026) — и на смене, и вне её.
-        return "Отключение геолокации" + (f"{nb}— в{nb}{t[0]}" if t else "")
+        return "Отключение геолокации" + (f"{nb}— в{nb}{t[0]}" if t else "") + back
     if kind == "late_shift":
         note = d.get("note") or ""
         m = re.search(r"\b(\d{1,2}:\d{2})\b", note)
@@ -103,12 +110,16 @@ def full_text(d: dict) -> str:
     return d.get("reason") or ""
 
 
-def _geo_note(times: list) -> str:
+def _geo_note(times: list, on_times: list = ()) -> str:
     t = [x for x in times if x]
     if not t:
         return ""
-    return f"выключил в {t[0]}" if len(t) == 1 else f"выключал {len(t)} раза: {', '.join(t)}" \
+    s = f"выключил в {t[0]}" if len(t) == 1 else f"выключал {len(t)} раза: {', '.join(t)}" \
         if len(t) < 5 else f"выключал {len(t)} раз: {', '.join(t)}"
+    o = [x for x in (on_times or []) if x]
+    if o:
+        s += f", включил в {o[0]}" if len(o) == 1 else f", включал в {', '.join(o)}"
+    return s
 
 
 async def late_shift(name: str, district: str, day: str, at_hm: str, rule_hour: int) -> bool:
@@ -158,13 +169,38 @@ async def geo_off(name: str, district: str, day: str, at_hm: str, by_signal: boo
             times = list(cur.get("times") or []) + [at_hm]
             # Сначала заметили пропажу, потом пришёл сигнал с телефона — это уже
             # выключение: запись называется по самому сильному из того, что было.
-            fields = {"times": times, "note": _geo_note(times)}
+            fields = {"times": times, "note": _geo_note(times, cur.get("on_times") or [])}
             if by_signal and not cur.get("self", True):
                 fields["self"] = True
             await db.fine_pending_update(pid, fields)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[fines] {name}: штраф за геолокацию не записан: {e}")
     return False
+
+
+async def geo_on(name: str, day: str, at_hm: str) -> bool:
+    """Включил геолокацию обратно — время дописывается к штрафу за выключение
+    того же дня, если он есть (владелец, 4 ноя 2026: «когда он включает её
+    обратно, добавляй помимо „выключил геолокацию в xx xx“ ещё и „включил
+    геолокацию в хх хх“»). По записи уже решили — дописывается всё равно, а у
+    назначенного по ней штрафа в зарплатах обновляется формулировка (если её
+    не правили руками). True — время дописано."""
+    pid = f"geo_off:{day}:{name}"
+    try:
+        cur = await db.fine_pending_get(pid)
+        if not cur or at_hm in (cur.get("on_times") or []):
+            return False
+        on_times = list(cur.get("on_times") or []) + [at_hm]
+        fields = {"on_times": on_times, "note": _geo_note(cur.get("times") or [], on_times)}
+        if not await db.fine_pending_patch(pid, fields):
+            return False
+        if cur.get("status") == "assigned":
+            await db.fin_pay_item_rephrase(pid, full_text(cur), full_text({**cur, **fields}))
+        log.info(f"[fines] {name}: включил геолокацию {day} в {at_hm} — дописано к штрафу")
+        return True
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[fines] {name}: время включения геолокации не дописано: {e}")
+        return False
 
 
 async def propose(kind: str, name: str, district: str, day: str, note: str = "",

@@ -9458,8 +9458,9 @@ button.exp-wait:active{transform:scale(.99)}
   .tb{font-size:8px;letter-spacing:.5px;padding:6px 2px}
 }
 @media (max-width:340px){ .tb{font-size:7.5px;letter-spacing:.3px} }
-/* Кнопка чек-листа по центру полосы (владелец, 4 ноя 2026): синяя, чуть
-   выпуклая плашка — светлая кромка сверху, тень снизу, — вровень с
+/* Кнопка чек-листа по центру полосы (владелец, 4–5 ноя 2026): тёмная плашка
+   в тон карточек панели (card3 → card → bg3; синюю владелец отверг — «в нашем
+   стиле»), чуть выпуклая — светлая кромка сверху, тень снизу, — вровень с
    соседями по высоте (ровно значок + подпись), без подписи под ней, внутри
    CHECK. Кайма и буквы красные, пока есть дела, которые опаздывают или
    пора делать (класс need), иначе зелёные. Открыт чек-лист — плашка
@@ -9467,14 +9468,14 @@ button.exp-wait:active{transform:scale(.99)}
 #tbCkl{padding:6px 2px;justify-content:center}
 .tb-check{flex:1 1 auto;display:flex;align-items:center;justify-content:center;width:100%;max-width:58px;min-height:30px;
   border-radius:10px;font-size:9.5px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;line-height:1;
-  color:var(--up);border:1px solid rgba(76,175,125,.62);
-  background:linear-gradient(180deg,#3a5bd6 0%,#2a44ae 48%,#1c3186 100%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.4);
+  color:var(--up);border:1px solid rgba(76,175,125,.55);
+  background:linear-gradient(180deg,var(--card3) 0%,var(--card) 52%,var(--bg3) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),inset 0 -1px 0 rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.45);
   transition-property:var(--tp);transition-duration:.2s;transition-timing-function:var(--e1)}
-#tbCkl.need .tb-check{color:var(--dn);border-color:rgba(224,85,85,.72)}
-#tbCkl.on .tb-check{background:linear-gradient(180deg,#4a6ce6 0%,#3350c4 48%,#233a99 100%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.45),0 0 0 3px rgba(76,175,125,.16)}
-#tbCkl.need.on .tb-check{box-shadow:inset 0 1px 0 rgba(255,255,255,.34),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.45),0 0 0 3px rgba(224,85,85,.18)}
+#tbCkl.need .tb-check{color:var(--dn);border-color:rgba(224,85,85,.62)}
+#tbCkl.on .tb-check{background:linear-gradient(180deg,#232342 0%,var(--card3) 52%,var(--card) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.5),0 0 0 3px rgba(76,175,125,.14)}
+#tbCkl.need.on .tb-check{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.5),0 0 0 3px rgba(224,85,85,.16)}
 @media (max-width:340px){ .tb-check{font-size:9px;letter-spacing:.9px} }   /* на 320 плашка 55 px — буквам нужен воздух */
 /* Чек-лист открыт — полоса вкладок остаётся снизу (владелец, 4 ноя 2026:
    «когда переходишь в эту вкладку нав бар не должен пропадать снизу»):
@@ -13269,8 +13270,10 @@ body.safe-open .cvo-hdr{opacity:0}
   </button>
   <!-- Чек-лист — вкладкой (владелец, 4 ноя 2026: «хочу чек-лист сделать кнопкой
        внизу в нав баре»), по центру панели («чек лист сделай по центру»).
-       Вид — кнопка, а не плоская вкладка: синяя, чуть выпуклая плашка вровень
-       с соседями по высоте, внутри надпись CHECK, подписи под ней нет
+       Вид — кнопка, а не плоская вкладка: тёмная, в тон карточек панели
+       (синюю владелец отверг: «кнопка должна быть в нашем стиле, что это за
+       синий странный такой»), чуть выпуклая плашка вровень с соседями по
+       высоте, внутри надпись CHECK, подписи под ней нет
        («убери под кнопкой надпись чек, сделай её чуть прямоугольной, а саму
        надпись на английском check внутри самой кнопки… чуть выпуклой
        синей… окантовку и буквы красными, если требуют внимания, или зелёным,

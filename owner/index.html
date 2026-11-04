@@ -8620,6 +8620,9 @@ button.shl-p:active{transform:scale(.96)}
   font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.2;
   color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border2)}
 .exp-pay.card{color:var(--info);background:rgba(91,141,239,.14);border-color:rgba(91,141,239,.5)}
+/* Охрана: бутылка по коду — зелёным, наличные без скана — янтарным (4 ноя 2026). */
+.exp-pay.scan{color:var(--up);background:rgba(76,175,125,.14);border-color:rgba(76,175,125,.5)}
+.exp-pay.noscan{color:var(--warn);background:rgba(243,180,74,.14);border-color:rgba(243,180,74,.5)}
 .exp-pend-a .exp-pay{display:block;width:max-content;margin-left:auto}
 .exp-pend-ph{display:flex;gap:8px;margin-top:11px}
 /* Аванс: выбор строками (часть зарплаты / наперёд / по частям), ниже — сколько
@@ -21779,7 +21782,8 @@ function sdcItem(e){
   const pend = e.status === 'pending', rej = e.status === 'rejected', plus = e.amount < 0;
   const kind = e.kind_t || 'Расход';
   const кто = [e.at ? _hm(e.at) : '', kind, e.who, e.note && String(e.note).trim().toLowerCase() !== kind.toLowerCase() ? e.note : '', e.photo ? 'чек' : '', e.no_receipt ? 'без чека' : '',
-    e.pay === 'card' ? 'безналом — не из наличных' : e.bottle ? 'бутылкой' : e.nocash ? 'мимо наличных' : '',
+    e.kind === 'guard' ? (e.bottle ? 'бутылка отсканирована' : 'без скана · наличными')
+      : e.pay === 'card' ? 'безналом — не из наличных' : e.nocash ? 'мимо наличных' : '',
     pend ? 'ждёт решения' : rej ? 'отклонён' + (e.decided_note ? ' · ' + e.decided_note : '') : ''].filter(Boolean).map(escS).join(' · ');
   return `<div class="${pend ? 'sc-expense-pending' : rej ? 'sc-rejected' : ''}${e.pay === 'card' || e.nocash ? ' sc-aside' : ''}"><span>${кто}</span><strong>${
     plus ? '+' : '−'}${fmt(Math.abs(e.amount))} AED</strong></div>`;
@@ -22068,7 +22072,8 @@ function crItem(e){
   const plus = e.amount < 0;
   // Мимо наличных — заказ в долг, бутылка охране: строка есть, денег не двигала.
   const кто = [e.who, e.note, e.photo ? 'чек' : '', e.no_receipt ? 'без чека' : '',
-    e.pay === 'card' ? 'безналом — не из наличных' : e.bottle ? 'бутылкой' : e.nocash ? 'мимо наличных' : ''].filter(Boolean).join(' · ');
+    e.kind === 'guard' ? (e.bottle ? 'бутылка отсканирована' : 'без скана · наличными')
+      : e.pay === 'card' ? 'безналом — не из наличных' : e.nocash ? 'мимо наличных' : ''].filter(Boolean).join(' · ');
   return `<div class="cr-it${pend ? ' pend' : ''}${rej ? ' rej' : ''}${e.pay === 'card' || e.nocash ? ' card' : ''}">
     <span class="cr-it-t">${e.at ? _hm(e.at) : '—'}</span>
     <span class="cr-it-b"><b>${escS(e.kind_t || 'Расход')}</b><i>${escS(кто)}${
@@ -27241,7 +27246,7 @@ function fbExpRow(e){
   const sub = [escS(e.driver),
                e.kind === 'meal' ? (e.working === true ? 'на смене' : e.working === false ? 'дома' : '') : '',
                e.comment && e.comment !== kindT ? escS(e.comment) : '',
-               e.bottle ? escS(e.bottle) : '', e.goods ? 'бутылкой' : '',
+               e.bottle ? escS(e.bottle) : '', e.kind === 'guard' && !e.goods ? 'наличными' : '',
                e.nocash ? 'заказ в долг' : '', e.salary ? 'зарплата из выручки' : '',
                e.by_driver ? 'от водителя' : '', e.no_receipt ? 'без чека' : '',
                expWhen(e), st === 'rejected' && e.decided_note ? escS(e.decided_note) : ''].filter(Boolean).join(' · ');
@@ -27251,7 +27256,7 @@ function fbExpRow(e){
     <span class="exp-done-b"><b>${escS(kindT)}</b>${sub ? `<i>${sub}</i>` : ''}</span>
     <span class="exp-done-r">
       <b>${fbFmt(e.signed)}<u>AED</u></b>
-      <i>${st === 'rejected' ? 'отклонён' : st === 'pending' ? 'ждёт' : 'принят'}</i>${e.kind === 'meal' ? '' : expPayTag(e)}
+      <i>${st === 'rejected' ? 'отклонён' : st === 'pending' ? 'ждёт' : 'принят'}</i>${e.kind === 'meal' ? '' : expPayTag(e) + expGuardTag(e)}
     </span>
   </div>`;
 }
@@ -37322,6 +37327,13 @@ function expPhotos(e){
 // заметно с первого взгляда (19 сен 2026).
 const EXP_PAY_W = {cash: 'наличными', card: 'безналом'};
 const expPayTag = e => EXP_PAY_W[e.pay] ? `<i class="exp-pay${e.pay === 'card' ? ' card' : ''}">${EXP_PAY_W[e.pay]}</i>` : '';
+// Охрана: бутылку сканируют с крышки, иначе отдают наличные. Что из двух было,
+// меткой у суммы (владелец, 4 ноя 2026: «не до конца понятно, они бутылку
+// отсканировали или нет»). Запись дня несёт код, лента месяца — goods, сбор
+// выручки — bottle как признак.
+const expGuardScan = e => !!(e.code || e.bottle_id || e.goods || e.bottle === true);
+const expGuardTag = e => e.kind !== 'guard' ? ''
+  : expGuardScan(e) ? '<i class="exp-pay scan">отсканирована</i>' : '<i class="exp-pay noscan">без скана</i>';
 // Ожидающий расход — карточкой: вид и сумма, снимки крупно, под ними решение.
 // Когда подано и когда решено — по Дубаю (владелец, 1 окт 2026: «указывай
 // время, когда водители указывали расход на согласование»). Правил после
@@ -37336,12 +37348,13 @@ function expWhen(e){
 function expPendCard(r, e){
   const ph = expPhotos(e);
   const кто = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', e.by_driver ? 'от водителя' : '', expWhen(e)].filter(Boolean).join(' · ');
+               e.bottle || '', e.kind === 'guard' && !expGuardScan(e) ? 'наличными' : '',
+               e.by_driver ? 'от водителя' : '', expWhen(e)].filter(Boolean).join(' · ');
   return `<div class="exp-pend" id="pend-${escS(e.id)}">
     <div class="exp-pend-h">
       <span class="exp-pend-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
         кто ? `<i>${escS(кто)}</i>` : ''}</span>
-      <span class="exp-pend-a">${fmt(e.amount)}<u>AED</u>${expPayTag(e)}</span>
+      <span class="exp-pend-a">${fmt(e.amount)}<u>AED</u>${expPayTag(e)}${expGuardTag(e)}</span>
     </div>
     ${ph.length ? `<div class="exp-pend-ph">${ph.map((p, i) => `
       <button class="exp-ph" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})">
@@ -37377,7 +37390,8 @@ function expDoneRow(r, e){
   const st = e.status || 'approved';
   const ph = expPhotos(e);
   const что = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', e.by_driver ? 'от водителя' : '',
+               e.bottle || '', e.kind === 'guard' && !expGuardScan(e) ? 'наличными' : '',
+               e.by_driver ? 'от водителя' : '',
                e.no_receipt ? 'без чека' : '', expWhen(e)].filter(Boolean).join(' · ');
   return `<div class="exp-done ${st}">
     ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `
@@ -37387,7 +37401,7 @@ function expDoneRow(r, e){
       что ? `<i>${escS(что)}</i>` : ''}</span>
     <span class="exp-done-r">
       <b>${fmt(e.amount)}<u>AED</u></b>
-      <i>${st === 'rejected' ? 'отклонён' : 'принят'}</i>${expPayTag(e)}
+      <i>${st === 'rejected' ? 'отклонён' : 'принят'}</i>${expPayTag(e)}${expGuardTag(e)}
     </span>
     ${st === 'approved' ? `<button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
         aria-label="Убрать">✕</button>` : ''}

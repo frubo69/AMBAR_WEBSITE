@@ -85,6 +85,9 @@ async def connect():
         # дню заявки, всегда по времени.
         await _db.supply_events.create_index([("sid", 1), ("at", 1)])
         await _db.supply_events.create_index([("day", 1), ("at", 1)])
+        # Журнал сбора выручки (owner_routes.cash_receive): история читается
+        # назад по времени.
+        await _db.cash_events.create_index([("at", -1)])
         # Реестр переписки owner-бота: свипер ходит по дате, тревога — по чату.
         await _db.owner_msgs.create_index("at")
         await _db.owner_msgs.create_index("chat_id")
@@ -2968,6 +2971,25 @@ async def supply_events_day(day: str) -> list:
     db = _db_or_none()
     if db is None or not day: return []
     return await db.supply_events.find({"sid": "", "day": day}).sort("at", 1).to_list(length=2000)
+
+
+# ── Журнал сбора выручки (owner_routes.cash_receive, cash_history) ───────────
+# Запись — одно нажатие: {kind: got|back, district, page, days: [...], mode,
+# by (имя, не id), at}. got — «Получил» (целиком, за день или перенос при
+# идущей смене), back — отметку сняли (кнопкой на странице или из истории).
+async def cash_event_add(doc: dict) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.cash_events.insert_one(doc)
+
+
+async def cash_events_since(at_iso: str) -> list:
+    """Записи журнала не старше at_iso, новые первыми."""
+    db = _db_or_none()
+    if db is None: return []
+    return await db.cash_events.find({"at": {"$gte": at_iso}}, {"_id": 1, "kind": 1, "district": 1, "page": 1,
+                                                                 "days": 1, "mode": 1, "by": 1, "at": 1}
+                                     ).sort("at", -1).to_list(length=2000)
 
 
 async def zayavka_edits(day: str) -> dict:

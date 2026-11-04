@@ -4505,9 +4505,18 @@ def _cash_back_days(day: str, since: str = "") -> list:
 
 
 def _cash_chain(day: str, oid: str, back: list, marks: dict) -> list:
-    """Дни района, чья выручка едет в этот день: назад от вчера, пока не
-    встретится день, где её получили (кроме полученных именно этим днём —
-    via: они в нём и числятся). Пустые дни отсеет подсчёт."""
+    """Дни района, чья выручка едет в этот день: назад от вчера до начала
+    переноса, кроме дней, где её уже получили (полученные именно этим днём —
+    via — в нём и числятся). Пустые дни отсеет подсчёт.
+
+    Полученный день цепочку не рвёт, а пропускается (владелец, 4 ноя 2026:
+    «сделай возможность возвращать выручку назад»). Раньше цепочка
+    обрывалась на первом полученном дне, и день старше него, у которого
+    отметку сняли, с текущих страниц был не виден: деньги пропадали с
+    экрана вместе с ним — так 1 ноя 29 октября пришлось забирать со
+    страницы 30-го. Забранный именно за день (solo, 28 сен 2026) не рвал
+    её и раньше. Старая отметка на весь день по-прежнему обрывает: до неё
+    отметок по районам не было вовсе."""
     out = []
     for d in back:
         mk = marks.get(d) or {}
@@ -4517,14 +4526,7 @@ def _cash_chain(day: str, oid: str, back: list, marks: dict) -> list:
         if m.get("done"):
             if m.get("via") == day:
                 out.append(d)
-                continue
-            # Забрали именно за этот день (владелец, 28 сен 2026: «либо забрать
-            # всё, что не забрал, либо забрать именно за определённый день»).
-            # День закрыт, но цепочку НЕ рвёт: иначе всё, что старше, пропало
-            # бы с экрана вместе с деньгами.
-            if m.get("solo"):
-                continue
-            break
+            continue
         out.append(d)
     return out
 
@@ -4812,9 +4814,29 @@ async def cash_round(day: str) -> dict:
             "carry_total": carry_total, "before": before, "days": days_out}
 
 
-async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "") -> str:
+async def _cash_log(kind: str, oid: str, page: str, days: list, mode: str, who: str, name: str = "") -> None:
+    """Запись в журнал сбора db.cash_events — по ней история (владелец,
+    4 ноя 2026). kind: got — «Получил», back — отметку сняли; page — страница
+    сбора, с которой нажали; days — какие дни закрыли или вернули; mode: all
+    (целиком), solo (за день), live (перенос при идущей смене), hist (из
+    истории). Кто — именем: id в журнал не пишется. Никогда не роняет
+    отметку: ошибка журнала — предупреждение в лог."""
+    if not days:
+        return
+    try:
+        await db.cash_event_add({"kind": kind, "district": oid, "page": page, "days": sorted(set(days)),
+                                 "mode": mode, "by": staff.display_name(who, name),
+                                 "at": datetime.now(timezone.utc).isoformat()})
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] журнал: {kind} {oid} {page} не записан: {e}")
+
+
+async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "", name: str = "") -> str:
     """«Получил» по району — и за все дни, что в него переехали (via = этот
     день); «снять отметку» — возвращает их обратно в перенос.
+
+    Каждое нажатие — запись в журнал (_cash_log): по нему история сбора и
+    «Вернуть» из неё; name — как звать нажавшего (владелец, 4 ноя 2026).
 
     only — забрать ИМЕННО за этот день, остальное оставить в переносе
     (владелец, 28 сен 2026). Такая отметка помечается solo: она закрывает свой
@@ -4836,29 +4858,44 @@ async def cash_receive(day: str, oid: str, done: bool, who: str, only: str = "")
             await db.checklist_put(only, f"cash:{oid}",
                                    {"done": True, "solo": day, "by": who,
                                     "at": datetime.now(timezone.utc).isoformat()})
+            await _cash_log("got", oid, day, [only], "solo", who, name)
         else:
+            m = ((await db.checklist_many([only])).get(only) or {}).get(f"cash:{oid}") or {}
             await db.checklist_put(only, f"cash:{oid}", None)
+            if m.get("done"):
+                await _cash_log("back", oid, day, [only], "solo", who, name)
         return ""
     back = _cash_back_days(day, await _cash_from())
-    marks_all = await db.checklist_many(back) if back else {}
+    marks_all = await db.checklist_many(back + [day])
     if done and идёт:
         now = datetime.now(timezone.utc).isoformat()
+        got = []
         for d in _cash_chain(day, oid, back, marks_all):
             m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
             if not m.get("done"):
                 await db.checklist_put(d, f"cash:{oid}", {"done": True, "solo": day, "by": who, "at": now})
+                got.append(d)
+        await _cash_log("got", oid, day, got, "live", who, name)
     elif done:
+        got = []
         for d in _cash_chain(day, oid, back, marks_all):
             m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
             if not m.get("done"):
                 await db.checklist_put(d, f"cash:{oid}", {"done": True, "by": who, "via": day})
+                got.append(d)
         await db.checklist_set(day, f"cash:{oid}", True, who)
+        await _cash_log("got", oid, day, got + [day], "all", who, name)
     else:
+        gone = []
         for d in back:
             m = ((marks_all.get(d) or {}).get(f"cash:{oid}") or {})
             if m.get("via") == day:
                 await db.checklist_put(d, f"cash:{oid}", None)
+                gone.append(d)
+        if ((marks_all.get(day) or {}).get(f"cash:{oid}") or {}).get("done"):
+            gone.append(day)
         await db.checklist_set(day, f"cash:{oid}", False, who)
+        await _cash_log("back", oid, day, gone, "all", who, name)
     return ""
 
 
@@ -4912,6 +4949,199 @@ async def handle_cash_fact(request):
         await db.checklist_put(day, f"cashfact:{oid}", {"fact": v, "gap": v - int(x["net"]), "by": who})
         log.info(f"[cash] {day} {OFFICE_CODES.get(oid, oid)}: сдали по факту {v} · по приложению {x['net']}")
     return web.json_response({"ok": True, **(await cash_round(page))}, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+def _cash_holder(m: dict, day: str) -> str:
+    """С какой страницы сбора поставлена отметка дня: via — «Получил» целиком
+    оттуда, solo — «забрать за день» оттуда, иначе — страница самого дня."""
+    return str(m.get("via") or m.get("solo") or day)
+
+
+def _cash_ts(iso) -> float:
+    try:
+        return datetime.fromisoformat(str(iso or "").replace(" ", "T").replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+async def cash_history(days_back: int = 30) -> dict:
+    """История сбора выручки (владелец, 4 ноя 2026: «в сборе выручки сделай
+    историю и сделай возможность возвращать выручку назад»): каждое «Получил»
+    и каждое снятие отметки за последние days_back дней, новые первыми.
+
+    Два источника, как у хронологии заявки (supply_log). Журнал
+    db.cash_events пишет cash_receive с 4 ноя 2026. До него — сами отметки
+    cash:{район} (done, at, by, via / solo), собранные в нажатия: отметка дня —
+    «Получил» на странице этого дня, via — тем же нажатием со страницы via,
+    solo — «забрать за день» со страницы solo; отметки одного района с одной
+    страницы не дальше двух минут друг от друга — одно нажатие. Отметка, у
+    которой в журнале есть «Получил» того же района с этим днём в пределах
+    двух минут, второй раз не показывается. Отметки, снятые до журнала,
+    восстановить не из чего — таких снятий в истории нет.
+
+    У «Получил» — left: дни, которые это нажатие держит до сих пор (отметка
+    на месте и поставлена им же: та же страница, то же время), active —
+    есть что вернуть. Суммы — по приложению на сейчас, как на странице
+    сбора; fact — «сдали по факту» того дня. Кто — именем (display_name), id
+    наружу не идёт."""
+    days_back = max(1, min(int(days_back or 30), 92))
+    now = datetime.now(timezone.utc)
+    since_at = (now - timedelta(days=days_back)).isoformat()
+    today = _biz_date(_now_dubai())
+    try:
+        events = [{**e, "_id": str(e.get("_id"))} for e in await db.cash_events_since(since_at)]
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] журнал: {e}")
+        events = []
+    # Отметки: нажатие в окне могло закрыть дни на месяц старше окна.
+    first = today - timedelta(days=days_back + CASH_CARRY_MAX)
+    day_list = [(first + timedelta(days=i)).isoformat() for i in range((today - first).days + 1)]
+    try:
+        marks_all = await db.checklist_many(day_list)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] отметки для истории: {e}")
+        marks_all = {}
+
+    def _held(oid: str, page: str, d: str, at) -> bool:
+        m = (marks_all.get(d) or {}).get(f"cash:{oid}") or {}
+        return bool(m.get("done")) and _cash_holder(m, d) == page and abs(_cash_ts(m.get("at")) - _cash_ts(at)) < 120
+
+    entries = []
+    for e in events:
+        oid = str(e.get("district") or "")
+        if oid not in OFFICE_IDS:
+            continue
+        entries.append({"id": e["_id"], "kind": str(e.get("kind") or "got"), "mode": str(e.get("mode") or "all"),
+                        "district": oid, "page": str(e.get("page") or ""), "at": str(e.get("at") or ""),
+                        "by": str(e.get("by") or "—"), "days": sorted(str(d) for d in (e.get("days") or []))})
+    # Отметки до журнала — в нажатия.
+    groups: dict = {}
+    for d in day_list:
+        mk = marks_all.get(d) or {}
+        for oid in OFFICE_IDS:
+            m = mk.get(f"cash:{oid}") or {}
+            at = str(m.get("at") or "")
+            if not m.get("done") or not at or at < since_at:
+                continue
+            if any(e["kind"] == "got" and e["district"] == oid and d in e["days"]
+                   and abs(_cash_ts(e["at"]) - _cash_ts(at)) < 120 for e in entries):
+                continue
+            page = _cash_holder(m, d)
+            groups.setdefault((oid, page, "solo" if m.get("solo") else "all"), []).append((at, d, str(m.get("by") or "")))
+    for (oid, page, mode), rows in groups.items():
+        rows.sort()
+        cur = None
+        for at, d, by in rows:
+            if cur is None or _cash_ts(at) - _cash_ts(cur["at"]) > 120:
+                cur = {"id": f"m:{oid}:{page}:{at[:19]}", "kind": "got", "mode": mode, "district": oid,
+                       "page": page, "at": at, "by": staff.display_name(by, ""), "days": []}
+                entries.append(cur)
+            cur["days"].append(d)
+    for e in entries:
+        e["days"] = sorted(set(e["days"]))
+        e["left"] = [d for d in e["days"] if _held(e["district"], e["page"], d, e["at"])] if e["kind"] == "got" else []
+        e["active"] = bool(e["left"])
+    entries.sort(key=lambda e: e["at"], reverse=True)
+    # Суммы по дням — те же, что на странице сбора.
+    need = sorted({d for e in entries for d in e["days"]})
+    amounts: dict = {}
+    if need:
+        await _staff_fresh()
+        try:
+            orders = list((await db.orders_from(_bizday.since_utc(min(need)))).values())
+        except Exception as e:                               # noqa: BLE001
+            log.warning(f"[cash] заказы для истории: {e}")
+            orders = []
+        for d in need:
+            amounts[d] = await _cash_amounts(d, orders)
+    out = []
+    for e in entries:
+        oid = e["district"]
+        rows = []
+        for d in e["days"]:
+            a = (amounts.get(d) or {}).get(oid) or {}
+            # Пустой день (ни наличных, ни расхода, ни чая) «Получил» тоже
+            # помечает — на странице сбора его нет, и здесь он не нужен.
+            if a.get("empty"):
+                continue
+            f = (marks_all.get(d) or {}).get(f"cashfact:{oid}") or {}
+            rows.append({"day": d, "net": int(a.get("net") or 0), "tips": int(a.get("tips") or 0),
+                         "fact": (int(f["fact"]) if f.get("fact") is not None else None)})
+        if not rows:
+            continue
+        shown = {r["day"] for r in rows}
+        e["days"] = rows
+        e["left"] = [d for d in e["left"] if d in shown]
+        e["active"] = bool(e["left"])
+        e["net"] = sum(r["net"] for r in rows)
+        e["tips"] = sum(r["tips"] for r in rows)
+        e["code"] = OFFICE_CODES.get(oid, "")
+        e["name"] = OFFICE_NAMES.get(oid, oid)
+        out.append(e)
+    return {"days": days_back, "since": since_at[:10], "today": today.isoformat(),
+            "events": out, "n": len(out)}
+
+
+@require_owner
+async def handle_cash_history(request):
+    """GET /api/owner/cash-round/history?days=30 — история сбора: нажатия
+    «Получил» и снятия отметок, новые первыми (cash_history)."""
+    try:
+        days = int(request.query.get("days") or 30)
+    except ValueError:
+        days = 30
+    return web.json_response(await cash_history(days), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_cash_back(request):
+    """POST /api/owner/cash-round/back {district, page, days: [...], window?} —
+    вернуть выручку (владелец, 4 ноя 2026: «сделай возможность возвращать
+    выручку назад»; «Получил» дважды за три дня нажимали случайно): снять
+    отметки «получил» ровно у названных дней, которые держит нажатие со
+    страницы page. Дни снова едут переносом на текущую страницу сбора —
+    _cash_chain их больше не прячет. Книга и «сдали по факту» не трогаются.
+    Отвечает историей (window — её глубина в днях)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    oid = str(body.get("district") or "").strip()
+    if oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    page = str(body.get("page") or "").strip()
+    days = [str(d or "").strip() for d in (body.get("days") or [])]
+    try:
+        datetime.strptime(page, "%Y-%m-%d")
+        for d in days:
+            datetime.strptime(d, "%Y-%m-%d")
+    except ValueError:
+        return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
+    if not days or len(days) > CASH_CARRY_MAX + 1:
+        return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
+    who = str(request.get("owner_id") or "")
+    u = request.get("owner_user") or {}
+    name = (u.get("full_name") or f'{u.get("first_name", "")} {u.get("last_name", "")}').strip()
+    marks_all = await db.checklist_many(sorted(set(days)))
+    removed = []
+    for d in sorted(set(days)):
+        m = (marks_all.get(d) or {}).get(f"cash:{oid}") or {}
+        if not m.get("done") or _cash_holder(m, d) != page:
+            continue
+        await db.checklist_put(d, f"cash:{oid}", None)
+        removed.append(d)
+    if removed:
+        await _cash_log("back", oid, page, removed, "hist", who, name)
+    log.info(f"[cash] {OFFICE_CODES.get(oid, oid)}: вернули из истории за {', '.join(removed) or 'ничего'}"
+             f" (страница {page}) — {staff.display_name(who, name)}")
+    try:
+        window = int(body.get("window") or 30)
+    except (TypeError, ValueError):
+        window = 30
+    return web.json_response({"ok": True, "removed": removed, **(await cash_history(window))},
+                             headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
@@ -5674,7 +5904,9 @@ async def handle_checklist_mark(request):
             return web.json_response({"error": "bad_day"}, status=400, headers=CORS_HEADERS)
         if only and only > day:
             return web.json_response({"error": "future"}, status=400, headers=CORS_HEADERS)
-        err = await cash_receive(day, item[5:], bool(body.get("done")), who, only)
+        u = request.get("owner_user") or {}
+        name = (u.get("full_name") or f'{u.get("first_name", "")} {u.get("last_name", "")}').strip()
+        err = await cash_receive(day, item[5:], bool(body.get("done")), who, only, name)
         if err:
             return web.json_response({"error": err}, status=409, headers=CORS_HEADERS)
     else:
@@ -6002,6 +6234,10 @@ def setup(app):
     app.router.add_post(            "/api/owner/cash-round/fact", handle_cash_fact)
     app.router.add_route("OPTIONS", "/api/owner/cash-round/driver", handle_cash_driver)
     app.router.add_get(             "/api/owner/cash-round/driver", handle_cash_driver)
+    app.router.add_route("OPTIONS", "/api/owner/cash-round/history", handle_cash_history)
+    app.router.add_get(             "/api/owner/cash-round/history", handle_cash_history)
+    app.router.add_route("OPTIONS", "/api/owner/cash-round/back", handle_cash_back)
+    app.router.add_post(            "/api/owner/cash-round/back", handle_cash_back)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)

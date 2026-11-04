@@ -2581,6 +2581,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 #star-daily-collection .sc-app summary::marker{content:""}
 #star-daily-collection .sc-header{display:flex;align-items:center;gap:10px;flex:none;padding:13px 12px 12px;background:#0e0b13}
 #star-daily-collection .sc-back{display:grid;place-items:center;width:42px;height:44px;flex:none;border:1px solid #31283d;border-radius:13px;background:#17121f;color:#c0b4ce}
+#star-daily-collection .sc-hist{display:grid;place-items:center;width:42px;height:44px;flex:none;border:1px solid #31283d;border-radius:13px;background:#17121f;color:#c0b4ce}
 #star-daily-collection .sc-heading{flex:1;min-width:0}
 #star-daily-collection .sc-heading h1{font-size:23px;line-height:29px;font-weight:700;letter-spacing:-.04em}
 #star-daily-collection .sc-heading>span{display:block;margin-top:2px;font-size:11px;line-height:17px;color:var(--sc-muted)}
@@ -6020,6 +6021,29 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .sl-r span em{display:block;font-style:normal;font-size:13px;font-weight:600;line-height:18px;color:var(--text)}
 .sl-r span u{display:block;text-decoration:none;font-size:11.5px;line-height:1.35;color:var(--muted);margin-top:2px;
   overflow-wrap:anywhere}
+/* История сбора выручки (4 ноя 2026): строки как у хронологии заявки, справа
+   сумма; у нажатия, которое ещё держит отметки, — «Вернуть». */
+.ch-list{padding:6px 16px 10px}
+.ch-r{display:flex;align-items:flex-start;gap:10px;position:relative;padding:9px 0}
+.ch-r::before{content:'';position:absolute;left:58px;top:0;bottom:0;width:1px;background:rgba(255,255,255,.09)}
+.ch-r:first-child::before{top:18px} .ch-r:last-child::before{bottom:auto;height:18px}
+.ch-r:first-child:last-child::before{display:none}
+.ch-r .ch-t{flex:0 0 44px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums;line-height:18px}
+.ch-r i.dot{flex:0 0 auto;width:9px;height:9px;margin-top:4.5px;border-radius:50%;background:var(--gold2);position:relative}
+.ch-r i.dot.ok{background:var(--up)} .ch-r i.dot.warn{background:var(--warn)}
+.ch-r i.dot.wait{background:#12122a;border:1.5px solid var(--dim)}
+.ch-b{flex:1;min-width:0}
+.ch-b em{display:block;font-style:normal;font-size:13px;font-weight:600;line-height:18px;color:var(--text)}
+.ch-b u{display:block;text-decoration:none;font-size:11.5px;line-height:1.35;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.ch-sum{display:flex;align-items:baseline;gap:3px;flex:0 0 auto;white-space:nowrap;line-height:18px}
+.ch-sum b{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.ch-sum b.neg{color:var(--dn)} .ch-sum small{font-size:10px;color:var(--muted)}
+.ch-r.dim .ch-b em,.ch-r.dim .ch-sum b{color:var(--muted)}
+.ch-r.back .ch-sum b{color:var(--warn)}
+.ch-back{display:inline-flex;align-items:center;min-height:30px;margin-top:7px;padding:0 12px;border:1px solid rgba(201,169,110,.35);
+  border-radius:9px;background:rgba(201,169,110,.08);color:var(--gold2);font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.ch-back:active{transform:scale(.98)}
 /* Цены закупки: строка на позицию, поле справа. */
 .xp-head{padding:4px 2px 12px}
 .xp-head b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
@@ -21331,6 +21355,7 @@ function luc(name, cls){
 
 async function accCashRound(){
   CRD.open = false;
+  CRH = {open: false, data: null, back: null, page: '', busy: false};
   _setText('accTitle', 'Ежедневный сбор и распределение выручки');
   _setText('accSub', 'загрузка…');
   // CR_DAY — день, названный входом (с «Финансов» — сегодня); иначе день
@@ -21356,6 +21381,7 @@ function sdcShell(){
       <button type="button" class="sc-back" aria-label="Назад" onclick="accBack()">${luc('chevron-left')}</button>
       <div class="sc-heading"><h1>Выручка</h1><span>Сбор и распределение</span></div>
       <div class="sc-date" id="sdcDate"></div>
+      <button type="button" class="sc-hist" aria-label="История сбора" onclick="crHist()">${luc('history')}</button>
     </header>
     <div class="sc-steps" id="sdcSteps" role="tablist" aria-label="Этапы работы с выручкой"></div>
     <main class="sc-scroll" id="sdcScroll">
@@ -21775,6 +21801,113 @@ function sdcWaiting(){
 // решениями, чай по людям, своё, заказы строками.
 // day — день водителя (день строки разбивки: вчерашний перенос на сегодняшней
 // странице); page — день открытой страницы сбора, назад ведёт на неё.
+// ── История сбора ──────────────────────────────────────────────────────────
+// Владелец, 4 ноя 2026: «в сборе выручки сделай историю и сделай возможность
+// возвращать выручку назад» — «Получил» дважды за три дня нажимали случайно,
+// а вернуть было негде. Страница в той же оболочке раздела, что и водитель
+// (CRH, ACC_BACK = crHistBack → сбор того же дня): каждое «Получил» и каждое
+// снятие отметки за 30 дней, новые сверху, по дням; у нажатия, которое ещё
+// держит отметки, — «Вернуть»: снимает их, и дни снова едут переносом на
+// текущую страницу сбора.
+let CRH = {open: false, data: null, back: null, page: '', busy: false};
+async function crHist(){
+  const page = CRH.open ? CRH.page : (CR ? CR.day : accDay());
+  CRH = {open: true, data: CRH.open ? CRH.data : null, back: CRH.open ? CRH.back : ACC_BACK, page, busy: false};
+  ACC_BACK = crHistBack;
+  document.getElementById('accOv').classList.remove('sdc');   // история — в шапке раздела
+  _setText('accTitle', 'История сбора');
+  _setText('accSub', 'за 30 дней');
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/history', {params: {days: 30}}); }
+  catch(e){ if(CRH.open) mid.innerHTML = loadFail('crHist()'); return; }
+  if(!CRH.open) return;
+  CRH.data = r;
+  crHistRender();
+}
+function crHistBack(){
+  ACC_BACK = CRH.back || null;
+  const page = CRH.page;
+  CRH = {open: false, data: null, back: null, page: '', busy: false};
+  CR_DAY = page;
+  const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  accCashRound();
+}
+// «за 29 октября», «за 27–29 октября», «за 29 октября, 1 ноября».
+function crHistDays(days){
+  const ds = [...new Set(days || [])].sort();
+  if(!ds.length) return '';
+  if(ds.length === 1) return `за ${_dayName(ds[0])}`;
+  const ms = ds.map(d => Date.parse(d + 'T12:00:00Z'));
+  const подряд = ms.every((m, i) => !i || m - ms[i - 1] === 86400000);
+  const first = ds[0], last = ds[ds.length - 1];
+  if(подряд) return first.slice(0, 7) === last.slice(0, 7)
+    ? `за ${+first.slice(8, 10)}–${_dayName(last)}` : `за ${_dayName(first)} – ${_dayName(last)}`;
+  return `за ${ds.map(_dayName).join(', ')}`;
+}
+function crHistRender(){
+  const mid = document.getElementById('accMid'), r = CRH.data;
+  if(!mid || !CRH.open || !r) return;
+  const ev = r.events || [];
+  if(!ev.length){ mid.innerHTML = '<div class="sc"><div class="fb-none">За 30 дней нажатий не было</div></div>'; return; }
+  const days = [], сегодня = _slDay(new Date().toISOString());   // календарный день, не учётный
+  ev.forEach(e => {
+    const day = _slDay(e.at);
+    let g = days.find(x => x.day === day);
+    if(!g){ g = {day, rows: []}; days.push(g); }
+    g.rows.push(e);
+  });
+  mid.innerHTML = days.map(g => `<div class="sc">
+    <div class="sc-cap"><span>${escS(g.day === сегодня ? 'Сегодня' : _dayName(g.day))}</span><i>${g.rows.length} ${pluralize(g.rows.length, 'нажатие', 'нажатия', 'нажатий')}</i></div>
+    <div class="ch-list">${g.rows.map(crHistRow).join('')}</div></div>`).join('');
+}
+function crHistRow(e){
+  const got = e.kind === 'got', left = e.left || [], all = (e.days || []).map(d => d.day);
+  const returned = got && !e.active;
+  const dot = got ? (returned ? 'wait' : 'ok') : 'warn';
+  const facts = (e.days || []).filter(d => d.fact != null);
+  const meta = [crHistDays(all),
+                got && e.active && left.length < all.length ? `ещё держит ${crHistDays(left)}` : '',
+                returned ? 'возвращено' : '',
+                e.tips ? `чаевые ${fmt(e.tips)}` : '',
+                facts.length ? `по факту ${fmt(facts.reduce((a, d) => a + d.fact, 0))}` : '',
+                e.by && e.by !== '—' ? e.by : ''].filter(Boolean).map(escS).join(' · ');
+  const btn = got && e.active
+    ? `<button type="button" class="ch-back" onclick="crHistUndo('${escS(e.id)}')">Вернуть</button>` : '';
+  return `<div class="ch-r${returned ? ' dim' : ''}${got ? '' : ' back'}"><b class="ch-t">${_hm(e.at)}</b><i class="dot ${dot}"></i>
+    <span class="ch-b"><em>${escS(e.code)} · ${got ? 'Получил' : 'Вернул'}</em><u>${meta}</u>${btn}</span>
+    <span class="ch-sum"><b${e.net < 0 ? ' class="neg"' : ''}>${sdcMoney(e.net)}</b><small>AED</small></span></div>`;
+}
+// Вернуть — снять отметки «получил», которые это нажатие ещё держит. Деньги
+// снова к получению: на странице сбора дни появятся переносом.
+async function crHistUndo(id){
+  const e = ((CRH.data || {}).events || []).find(x => x.id === id);
+  if(!e || !e.active || CRH.busy) return;
+  const left = e.left || [];
+  const sum = (e.days || []).filter(d => left.includes(d.day)).reduce((a, d) => a + (d.net || 0), 0);
+  const за = crHistDays(left);
+  if(!await askYes(`Вернуть выручку ${e.code} ${за} — ${sdcMoney(sum)} AED?`)) return;
+  CRH.busy = true;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/back',
+         {method: 'POST', body: {district: e.district, page: e.page, days: left, window: 30}}); }
+  catch(x){ _toast('Не удалось вернуть'); CRH.busy = false; return; }
+  CRH.busy = false;
+  if(!CRH.open) return;
+  CRH.data = r;
+  crHistRender();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(x){}
+  _toast((r.removed || []).length ? `${e.code} · вернули ${за} — снова к получению` : 'Возвращать уже нечего');
+  CKL = null;                       // строка чек-листа и карточка сбора перечитаются
+  FB_CR_AT = 0;
+}
+
 let CRV = {open: false, name: '', day: '', page: '', data: null, back: null};
 async function crDriver(name, day, back){
   const page = CRV.open ? CRV.page : (CR ? CR.day : accDay());
@@ -21963,7 +22096,7 @@ function sdcSumLine(l){
 function crFoot(){
   const f = document.getElementById('sdcFoot'); if(!f) return;
   const d = CR;
-  if(!d || CRD.open || CRV.open){ f.hidden = true; return; }
+  if(!d || CRD.open || CRV.open || CRH.open){ f.hidden = true; return; }
   const st = crDistState(), l = sdcSum();
   if(st.locked && !(d.need > 0) && !st.waiting.length){ f.hidden = true; return; }
   f.hidden = false;

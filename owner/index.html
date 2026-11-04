@@ -9458,26 +9458,24 @@ button.exp-wait:active{transform:scale(.99)}
   .tb{font-size:8px;letter-spacing:.5px;padding:6px 2px}
 }
 @media (max-width:340px){ .tb{font-size:7.5px;letter-spacing:.3px} }
-/* «Чек» — кнопка по центру полосы, а не плоская вкладка (владелец, 4 ноя
-   2026: «она должна отличаться от остальных, выделяться, как кнопка…
-   не делай её колхозно выпуклой, но… визуально забирала на себя акцент»):
-   значок в золотой плашке с тонкой каймой и мягким ореолом, подпись золотом.
-   Плашка стоит выше соседних значков, подписи — в одну линию. Открыт
-   чек-лист — плашка залита золотом, значок тёмный; есть дела, которые
-   опаздывают или пора делать, — плашка, значок и подпись красные. */
-.tabbar{align-items:flex-end}
-#tbCkl{color:var(--gold2);padding-top:0;margin-top:-6px;gap:4px}
-#tbCkl svg{width:20px;height:20px;padding:7px;box-sizing:content-box;border-radius:13px;stroke:var(--gold2);stroke-width:2;
-  background:linear-gradient(180deg,rgba(201,169,110,.26),rgba(201,169,110,.09));
-  border:1px solid rgba(201,169,110,.45);
-  box-shadow:0 0 0 4px rgba(201,169,110,.07),0 8px 22px -8px rgba(201,169,110,.55)}
-#tbCkl.on{color:var(--gold3)}
-#tbCkl.on svg{background:linear-gradient(180deg,var(--gold3),var(--gold));stroke:#15120a;border-color:rgba(245,224,176,.6);filter:none;
-  box-shadow:0 0 0 4px rgba(201,169,110,.16),0 10px 26px -8px rgba(232,201,138,.75)}
-#tbCkl.need{color:var(--dn)}
-#tbCkl.need svg{stroke:var(--dn);background:linear-gradient(180deg,rgba(224,85,85,.28),rgba(224,85,85,.10));border-color:rgba(224,85,85,.55);
-  box-shadow:0 0 0 4px rgba(224,85,85,.08),0 8px 22px -8px rgba(224,85,85,.65)}
-#tbCkl.need.on svg{background:linear-gradient(180deg,#ea6b6b,var(--dn));stroke:#fff;border-color:rgba(255,255,255,.25)}
+/* Кнопка чек-листа по центру полосы (владелец, 4 ноя 2026): синяя, чуть
+   выпуклая плашка — светлая кромка сверху, тень снизу, — вровень с
+   соседями по высоте (ровно значок + подпись), без подписи под ней, внутри
+   CHECK. Кайма и буквы красные, пока есть дела, которые опаздывают или
+   пора делать (класс need), иначе зелёные. Открыт чек-лист — плашка
+   светлее, с ореолом цвета каймы. */
+#tbCkl{padding:6px 2px;justify-content:center}
+.tb-check{flex:1 1 auto;display:flex;align-items:center;justify-content:center;width:100%;max-width:58px;min-height:30px;
+  border-radius:10px;font-size:9.5px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;line-height:1;
+  color:var(--up);border:1px solid rgba(76,175,125,.62);
+  background:linear-gradient(180deg,#3a5bd6 0%,#2a44ae 48%,#1c3186 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.4);
+  transition-property:var(--tp);transition-duration:.2s;transition-timing-function:var(--e1)}
+#tbCkl.need .tb-check{color:var(--dn);border-color:rgba(224,85,85,.72)}
+#tbCkl.on .tb-check{background:linear-gradient(180deg,#4a6ce6 0%,#3350c4 48%,#233a99 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.45),0 0 0 3px rgba(76,175,125,.16)}
+#tbCkl.need.on .tb-check{box-shadow:inset 0 1px 0 rgba(255,255,255,.34),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.45),0 0 0 3px rgba(224,85,85,.18)}
+@media (max-width:340px){ .tb-check{font-size:9px;letter-spacing:.9px} }   /* на 320 плашка 55 px — буквам нужен воздух */
 /* Чек-лист открыт — полоса вкладок остаётся снизу (владелец, 4 ноя 2026:
    «когда переходишь в эту вкладку нав бар не должен пропадать снизу»):
    поднимается над разделом, список получает место под неё. Глубже — в
@@ -13270,17 +13268,20 @@ body.safe-open .cvo-hdr{opacity:0}
     Районы
   </button>
   <!-- Чек-лист — вкладкой (владелец, 4 ноя 2026: «хочу чек-лист сделать кнопкой
-       внизу в нав баре»), по центру панели («чек лист сделай по центру»),
-       подпись «Чек» («назови просто чек») и вид кнопки, а не плоской вкладки
-       («должна отличаться от остальных… визуально забирала на себя акцент»).
-       Сам чек-лист живёт в разделе учёта поверх страницы, но полоса вкладок
-       остаётся под ним («нав бар не должен пропадать снизу», cklSkin). Есть
-       дела, которые опаздывают или пора делать сейчас, — плашка и значок
-       красные, не золотые; цифры в кружке нет (владелец: «не пиши там вот эту
-       цифру в кружочке»). -->
+       внизу в нав баре»), по центру панели («чек лист сделай по центру»).
+       Вид — кнопка, а не плоская вкладка: синяя, чуть выпуклая плашка вровень
+       с соседями по высоте, внутри надпись CHECK, подписи под ней нет
+       («убери под кнопкой надпись чек, сделай её чуть прямоугольной, а саму
+       надпись на английском check внутри самой кнопки… чуть выпуклой
+       синей… окантовку и буквы красными, если требуют внимания, или зелёным,
+       если всё окей… наравне с остальными по высоте»). Сам чек-лист живёт в
+       разделе учёта поверх страницы, но полоса вкладок остаётся под ним
+       («нав бар не должен пропадать снизу», cklSkin). Класс need от cklMark:
+       есть дела, которые опаздывают или пора делать сейчас, — кайма и буквы
+       красные, иначе зелёные; цифры в кружке нет (владелец: «не пиши там вот
+       эту цифру в кружочке»). -->
   <button class="tb" data-pg="checklist" id="tbCkl" aria-label="Чек-лист">
-    <svg viewBox="0 0 24 24"><path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/><path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg>
-    Чек
+    <span class="tb-check">Check</span>
   </button>
   <button class="tb" data-pg="money">
     <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>

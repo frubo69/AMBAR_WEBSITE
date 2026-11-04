@@ -29110,8 +29110,7 @@ function pathDistricts(){
   const rows = dist.map(x => {
     const t = sup && (sup.tasks || {})[x.id];
     const cls = !t ? '' : t.cancelled_at ? 'no' : t.done_at ? 'ok' : t.noscan_at ? 'warn' : t.driver ? 'live' : '';
-    const под = !t || t.cancelled_at ? '' : t.done_at ? 'принято'
-              : t.noscan_at ? 'принимают без сканирования' : t.driver ? 'в работе' : '';
+    const под = !t || t.cancelled_at ? '' : t.done_at ? 'принято' : t.noscan_at ? _noscanWord(t) : t.driver ? 'в работе' : '';
     const кто = t ? (t.driver || t.noscan_by || '') : '';
     const go = st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`;
     return `<button class="pd-r ${cls}" ${go}>
@@ -29398,6 +29397,17 @@ function ciCard(sup){
 // три этапа (числа и подписи те же, что считал путь), приёмка по районам
 // (заголовок — приёмка целиком, строка — район; accSupply). Возвращает и
 // число строк: от него зависят веса высоты и крупный режим.
+// Принятый без сканирования район: товар уже на полке, задача открыта только
+// долгом досканировать. Пока по нему ничего не отсканировано — «принято без
+// сканирования»; пошли коды — «сканируют · 70 из 71», а не «принимают без
+// сканирования» (владелец, 4 ноя 2026: «какого… написано, что принимают без
+// сканирования — разве он его не начал уже давно»).
+function _noscanWord(t){
+  const got = t.got_units != null ? t.got_units : (t.scanned || 0);
+  if(!(got > 0)) return 'принято без сканирования';
+  return t.need_units != null ? `сканируют · ${fmtQty(got)} из ${fmtQty(t.need_units)}` : 'сканируют';
+}
+
 function auOrderCard(){
   const d = ORD.d || {}, st = supStage(), sup = st.sup;
   const live = !!(sup && sup.status === 'open');
@@ -29428,7 +29438,7 @@ function auOrderCard(){
     const t = sup && tasks[x.id];
     const rc = !t ? '' : t.cancelled_at ? 'is-pending' : t.done_at ? 'is-complete' : t.noscan_at ? 'is-confirm' : t.driver ? 'is-active' : '';
     const word = !t ? '' : t.cancelled_at ? 'отменён' : t.done_at ? 'принято'
-      : t.noscan_at ? 'принимают без сканирования' : t.driver ? 'в работе' : '';
+      : t.noscan_at ? _noscanWord(t) : t.driver ? 'в работе' : '';
     const who = t && !t.cancelled_at ? (t.driver || t.noscan_by || '') : '';
     const state = word || who ? `<span class="au-district-state">${t && t.done_at ? AR_ICO.check : ''}<span>${escS(word)}${
       who ? `<span class="au-person">${word ? ' · ' : ''}${escS(who)}</span>` : ''}</span></span>` : '';

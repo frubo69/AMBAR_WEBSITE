@@ -1110,6 +1110,12 @@ def _task_units_got(sup: dict, oid: str):
     return _qn(sum(float((it.get("got") or {}).get(oid) or 0) for it in sup.get("items") or []))
 
 
+def _task_units_need(sup: dict, oid: str, task: dict):
+    """Сколько единиц надо принять по району — план минус подтверждённый
+    недовоз; хаб пишет «сканируют · 70 из 71» у принятого без сканирования."""
+    return _qn(sum(_need_eff(it, oid, task or {}) for it in sup.get("items") or []))
+
+
 @require_owner
 async def handle_list(request):
     """Поставки: что в работе и что уже забрали.
@@ -1152,6 +1158,7 @@ async def handle_list(request):
                               # Принято в единицах склада (пиво коробками) — для
                               # процента на пути «Заявка → Магазин дал → Приняли».
                               "got_units": _task_units_got(r, o),
+                              "need_units": _task_units_need(r, o, t),
                               "qty": int(t.get("qty") or 0),
                               "done_at": str(t.get("done_at") or ""),
                               "noscan_at": str(t.get("noscan_at") or ""),

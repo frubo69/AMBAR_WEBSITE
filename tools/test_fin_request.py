@@ -340,6 +340,24 @@ async def main():
        (await sr.fin_request(sid, "jvc", DRV["jvc"], "")).get("verdict"), "too_few")
     await scan_n(sid, "jvc", "p1", 27); await scan_n(sid, "jvc", "p2", 1)
     eq("31 из 34 — можно", (await sr.fin_request(sid, "jvc", DRV["jvc"], "")).get("ok"), True)
+    # Хаб «Закупка» у принятого без сканирования пишет «сканируют · 31 из 34»,
+    # а не «принимают без сканирования» (владелец, 4 ноя 2026).
+    from aiohttp.test_utils import make_mocked_request as _mk
+    rq = _mk("GET", "/api/owner/supply/list"); rq["owner_id"] = 1
+    lst = json.loads((await unwrap(sr.handle_list)(rq)).body)
+    def _find(o):
+        if isinstance(o, dict):
+            if o.get("supply_id") == sid and "tasks" in o: return o
+            for v in o.values():
+                r = _find(v)
+                if r: return r
+        if isinstance(o, list):
+            for v in o:
+                r = _find(v)
+                if r: return r
+    tk = _find(lst)["tasks"]["jvc"]
+    eq("список поставок для хаба: принято без сканирования, отсканировано 31 из 34",
+       (bool(tk["noscan_at"]), tk["got_units"], tk["need_units"]), (True, 31, 34))
     eq("склад до решения — по заявке", await stock("jvc"), base("jvc", **PLAN["jvc"]))
     r = await sr.fin_decide(sid, "jvc", True, "Старший")
     eq("разрешено", (r.get("ok"), r.get("finished")), (True, True))

@@ -12219,9 +12219,9 @@ function supRenderTask(){
          ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}${
          // Остаток не отсканировать (полка закрыта, товар не достать) — можно
          // попросить старшего закрыть район так. Пока просьба ждёт, второй
-         // раз не просят; ничего не принято и не «без сканирования» —
-         // просить нечего, это «Вернуть задачу» или «Принять без сканирования».
-         (t.got > 0 || ns) && !frPend
+         // раз не просят; пока отсканировано не больше 90% — кнопки нет
+         // (владелец, 4 ноя 2026), сервер проверяет то же (too_few).
+         finReqCan(t) && !frPend
            ? `<button class="btn btn-gh" onclick="finReqOpen()">Завершить без сканирования</button>` : ''}`}`;
 }
 
@@ -12232,6 +12232,12 @@ function supRenderTask(){
 // кодов и почему — причина уходит старшему вместе с просьбой. Решение
 // приходит сообщением в бот и сюда: разрешил — приёмка закрыта, остаток
 // числится на полке без кодов; отказал — досканировать.
+// Просить можно, когда отсканировано больше 90% нужного (владелец, 4 ноя
+// 2026: «если уже отсканировали больше 70% бутылок» → «даже 90%»); ровно
+// 90% — ещё нет.
+const FIN_REQ_MIN = 0.9;
+function finReqCan(t){ return !!t && t.need > 0 && t.got > t.need * FIN_REQ_MIN + 1e-9; }
+
 function finReqOpen(){
   const t = TASK; if(!t) return;
   const left = (t.lines || []).filter(l => l.left > 0);
@@ -12258,7 +12264,7 @@ async function finReqSend(){
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/finish-request`,
       {method:'POST', body:{district: t.district, note}});
-    if(!r.ok) throw new Error(r.verdict);
+    if(!r.ok){ const err = new Error(r.verdict); err.got = r.got; err.need = r.need; throw err; }
     if(r.task) TASK = supAdopt(r.task);
     finClose();
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -12269,6 +12275,7 @@ async function finReqSend(){
     toast(v === 'pending' ? 'Прошлый запрос ещё ждёт решения'
         : v === 'nothing_left' ? 'Всё отсканировано — завершите приёмку'
         : v === 'nothing_scanned' ? 'Сначала отсканируйте хотя бы одну бутылку'
+        : v === 'too_few' ? `Отсканировано ${fmt(e.got || 0)} из ${fmt(e.need || 0)} — просить можно после 90%`
         : v === 'closed' ? 'Приёмка уже закрыта'
         : 'Не удалось отправить', 'err');
   }

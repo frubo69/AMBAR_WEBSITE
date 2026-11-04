@@ -344,16 +344,17 @@ async function standBoot(){
   // окно просьбы; &fr=pending|no — экран задачи со строкой состояния просьбы
   // (4 ноя 2026). Опрос задачи и отправку просьбы отвечает стенд сам.
   if(ST_Q.get('open') === 'finreq' || ST_Q.get('fr')){
+    // Отсканировано 44 из 48 (92%) — больше 90%, кнопка просьбы есть.
     const L = [
-        {id: 'p1', name: 'Absolut 1 ltr',   need: 12, got: 9, left: 3},
-        {id: 'p7', name: 'Столичная 0,7',   need: 12, got: 5, left: 7},
-        {id: 'p31', name: 'Heineken 0,5',   need: 12, got: 6, left: 6},
-        {id: 'p54', name: 'Martini Bianco', need: 12, got: 0, left: 12}];
+        {id: 'p1', name: 'Absolut 1 ltr',   need: 12, got: 12, left: 0},
+        {id: 'p7', name: 'Столичная 0,7',   need: 12, got: 10, left: 2},
+        {id: 'p31', name: 'Heineken 0,5',   need: 12, got: 12, left: 0},
+        {id: 'p54', name: 'Martini Bianco', need: 12, got: 10, left: 2}];
     const left = L.filter(l => l.left > 0).map(l => ({id: l.id, name: l.name, qty: l.left}));
     const fr = ST_Q.get('fr') === 'pending' ? {status: 'pending', lines: left, note: 'Полка закрыта, ключа у охраны нет', by: 'Али', at: _agoIso(12)}
              : ST_Q.get('fr') === 'no' ? {status: 'no', lines: left, note: '', by: 'Али', at: _agoIso(30), decided_by: 'Тест-старший', decided_at: _agoIso(5)} : null;
     TASK = {supply_id: 's9', district: 'jvc', district_code: 'B1', district_name: 'JVC', at: _agoIso(190), day: '2026-11-04',
-      need: 48, got: 20, left: 28, positions: 4, erev: 1, rev: 1, mine: true, extra: false, base: '', hold: null,
+      need: 48, got: 44, left: 4, positions: 4, erev: 1, rev: 1, mine: true, extra: false, base: '', hold: null,
       short: null, noscan_at: '', done_at: '', cancelled_at: '', fin_req: fr, lines: L};
     const _f0 = drvApi.drvFetch;
     drvApi.drvFetch = async (path, opts = {}) => {

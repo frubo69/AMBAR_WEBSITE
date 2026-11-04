@@ -2143,9 +2143,13 @@ def _fin_view(fr):
             "decided_by": fr.get("decided_by") or ""}
 
 
+FIN_REQ_MIN = 0.9      # доля отсканированного, после которой можно просить (строго больше)
+
+
 async def fin_request(sid: str, oid: str, me: str, note: str = "",
                       owner: bool = False) -> dict:
-    """Водитель просит закрыть район, не отсканировав остаток. note — почему."""
+    """Водитель просит закрыть район, не отсканировав остаток. note — почему.
+    Просить можно, когда отсканировано больше FIN_REQ_MIN (90 %) от нужного."""
     sup = await db.supply_get(sid)
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
@@ -2168,6 +2172,11 @@ async def fin_request(sid: str, oid: str, me: str, note: str = "",
     # нечего: это «Принять без сканирования» (с чеком базы) или «Вернуть».
     if v["got"] <= 0 and not task.get("noscan_at"):
         return {"ok": False, "verdict": "nothing_scanned"}
+    # Просить можно, когда отсканировано больше 90 % (владелец, 4 ноя 2026:
+    # «запросить завершить без сканирования они могут, если уже
+    # отсканировали больше 70 % бутылок» → «даже 90%») — ровно 90 % ещё мало.
+    if v["got"] <= v["need"] * FIN_REQ_MIN + 1e-9:
+        return {"ok": False, "verdict": "too_few", "got": v["got"], "need": v["need"], "min": FIN_REQ_MIN}
     rec = {"status": "pending", "lines": lines, "note": str(note or "").strip()[:300],
            "by": str(me or "")[:60], "at": datetime.now(timezone.utc)}
     if not await db.supply_fin_set(sid, oid, rec):

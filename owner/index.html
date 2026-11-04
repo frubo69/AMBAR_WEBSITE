@@ -9416,6 +9416,14 @@ button.exp-wait:active{transform:scale(.99)}
 .tb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;transition-property:var(--tp);transition-duration:.2s;transition-timing-function:var(--e1)}
 .tb.on{color:var(--gold2)}
 .tb.on svg{stroke:var(--gold2);filter:drop-shadow(0 0 8px rgba(201,169,110,.35))}
+/* Шесть подписей в одну строку: «Чек-лист» и «Финансы» на узком экране
+   ломались по дефису и наезжали на соседей. */
+.tb{white-space:nowrap}
+@media (max-width:420px){
+  .tabbar{gap:2px;padding-left:8px;padding-right:8px}
+  .tb{font-size:8px;letter-spacing:.5px;padding:6px 2px}
+}
+@media (max-width:340px){ .tb{font-size:7.5px;letter-spacing:.3px} }
 
 /* Tiny legend / footnote */
 .foot{font-size:10px;color:var(--dim);text-align:center;padding:18px 0 4px;letter-spacing:.5px}
@@ -10378,6 +10386,13 @@ button.exp-wait:active{transform:scale(.99)}
       <div class="set-ttl">Настройки</div>
     </div>
     <div class="set-body">
+      <!-- «Ещё» с панели вкладок ушло сюда (4 ноя 2026): внизу его место
+           заняла вкладка «Чек-лист». -->
+      <button class="set-tile" onclick="openMore()">
+        <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span>
+        <span class="set-b"><b>Ещё</b><i>доступ · маркетинг · акции</i></span>
+        <span class="set-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
       <button class="set-tile" onclick="openNotif()">
         <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
         <span class="set-b"><b>Уведомления</b><i>пресеты / пороги / районы</i></span>
@@ -13186,6 +13201,14 @@ body.safe-open .cvo-hdr{opacity:0}
     <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 10h2M13 10h2M9 14h2M13 14h2"/></svg>
     Районы
   </button>
+  <!-- Чек-лист — вкладкой (владелец, 4 ноя 2026: «хочу чек-лист сделать кнопкой
+       внизу в нав баре»). Сам чек-лист живёт в разделе учёта поверх любой
+       страницы; цифра — сколько дел опаздывает или пора делать сейчас. -->
+  <button class="tb" data-pg="checklist" id="tbCkl">
+    <svg viewBox="0 0 24 24"><path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/><path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg>
+    Чек-лист
+    <span class="tab-badge" id="cklTabBadge" style="display:none">0</span>
+  </button>
   <button class="tb" data-pg="money">
     <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
     Учёт
@@ -13197,11 +13220,6 @@ body.safe-open .cvo-hdr{opacity:0}
   <button class="tb" data-pg="people">
     <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
     Клиенты
-  </button>
-  <button class="tb" data-pg="more">
-    <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-    Ещё
-    <span class="tab-badge" id="moreTabBadge" style="display:none">0</span>
   </button>
 </nav>
 
@@ -13396,6 +13414,8 @@ try{ if(window.Telegram && Telegram.WebApp){
   pollNotifs();
   setInterval(pollNotifs, 30000);
 })();
+// Цифра на вкладке «Чек-лист»: при старте и раз в пять минут.
+if(window.ownerApi){ setTimeout(cklRefresh, 1500); setInterval(cklRefresh, 300000); }
 
 // Приложение свернули — движение замирает. В телеграме мини-апп не
 // выгружается: он остаётся в памяти, и все бесконечные анимации продолжают
@@ -13414,7 +13434,7 @@ try{ if(window.Telegram && Telegram.WebApp){
 // хранилище пустое, и приложение честно начинает с «Обзора».
 function _navSave(){
   try{
-    const pg = (document.querySelector('.tb.on') || {}).dataset?.pg || 'overview';
+    const pg = ((document.querySelector('.page.active') || {}).id || 'pg-overview').slice(3);
     const stock = document.getElementById('stkOv')?.classList.contains('show') ? 1 : 0;
     sessionStorage.setItem('ambar_nav', JSON.stringify({pg, acc: ACC_VIEW || '', stock}));
   }catch(e){}
@@ -13450,6 +13470,7 @@ function _navRestore(){
   try{
     const btn = document.querySelector(`.tb[data-pg="${nav.pg}"]`);
     if(btn && !btn.classList.contains('on')) btn.click();
+    else if(!btn && nav.pg === 'more') openMore();
     // Раздел учёта или склад открываем на их корне: середина сканирования
     // или лист района после перезагрузки не восстановимы, а корень — да.
     if(nav.stock) setTimeout(openStock, 250);
@@ -13462,6 +13483,7 @@ window.addEventListener('load', () => setTimeout(_navRestore, 600));
 document.querySelectorAll('.tb').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const pg = btn.dataset.pg;
+    if(pg === 'checklist'){ cklTab(); return; }     // раздел поверх страницы, подсветка остаётся у неё
     document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
     btn.classList.add('on');
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -13484,10 +13506,6 @@ document.querySelectorAll('.tb').forEach(btn=>{
     if(pg === 'overview' && window.ownerApi && _ovOff !== DAY_OFFSET
        && typeof _paintDay === 'function'){
       _paintDay(document.querySelector('#periodPicker button.on')?.dataset?.p || 'today');
-    }
-    if(pg === 'more' && window.ownerApi){
-      mktRender(); promoBlockRender(); giftBlockRender(); bcastAudience();
-      if(!ACC_PERIOD) accLoadSummaries();
     }
     if(pg === 'finance' && window.ownerApi){
       walBlockRender();
@@ -20782,8 +20800,32 @@ function accRender(){
 // смены и по данным, которых у страницы нет. Если уже спрашивали в этот заход,
 // берём готовое — открывать «Учёт» и каждый раз ждать сеть незачем.
 let CKL_CNT = null;
+// Вкладка «Чек-лист» внизу (владелец, 4 ноя 2026: «хочу чек-лист сделать
+// кнопкой внизу в нав баре»). Чек-лист живёт в разделе учёта (#accOv) и
+// ложится поверх любой страницы вместе с панелью вкладок, поэтому у вкладки
+// нет состояния «горит»: это вход, а «назад» возвращает на страницу под ним.
+function cklTab(){
+  if(ACC_VIEW === 'checklist' && document.getElementById('accOv').classList.contains('show')) return;
+  accOpen('checklist');
+}
+// Цифра на вкладке — сколько дел опаздывает или пора делать сейчас.
+function cklBadge(c){
+  const b = document.getElementById('cklTabBadge'); if(!b) return;
+  const n = c ? (+c.late || 0) + (+c.now || 0) : 0;
+  b.textContent = n; b.style.display = n ? 'flex' : 'none';
+}
+// Счётчики — при старте и раз в пять минут; открытый чек-лист обновит их сам.
+async function cklRefresh(){
+  if(HIDE || !window.ownerApi) return;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/checklist');
+    CKL_CNT = (r && r.counts) || null; cklBadge(CKL_CNT);
+    if(!CKL) CKL = r;
+  }catch(e){}
+}
 async function chkDot(){
   const пиши = c => {
+    cklBadge(c);
     const d = document.getElementById('chkDot');
     if(!d || !c) return;
     d.className = 'chk-e-dot ' + (c.late ? 'late' : c.now ? 'now' : 'ok');
@@ -20960,6 +21002,7 @@ async function accChecklist(keepDay){
     return;
   }
   CKL_CNT = (CKL && CKL.counts) || null;
+  if(!CKL_OFF) cklBadge(CKL_CNT);        // цифра на вкладке — про сегодня
   chkRender();
 }
 
@@ -39683,17 +39726,6 @@ function _renderAlertBtn(){
       badge.style.display = 'none';
     }
   }
-  // Mirror the "important unseen" indicator on the bottom-tab «Ещё» badge
-  // for visibility while on other pages.
-  const tbBadge = document.getElementById('moreTabBadge');
-  if(tbBadge){
-    if(importantUnseen.length){
-      tbBadge.textContent = importantUnseen.length;
-      tbBadge.style.display = 'flex';
-    } else {
-      tbBadge.style.display = 'none';
-    }
-  }
 }
 
 function _renderAlerts(){
@@ -43956,6 +43988,15 @@ function openCmd(){ cmdOv.classList.add('show'); setTimeout(()=>cmdIn.focus(),12
 function closeCmd(){ cmdOv.classList.remove('show'); cmdIn.value=''; filterCmd(''); }
 function openSet(){ setOv.classList.add('show'); syncQuietLbl(); syncActiveCount(); const cl = document.getElementById('setCurLbl'); if(cl) cl.textContent = curCur; try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){} }
 function closeSet(){ setOv.classList.remove('show'); }
+// «Ещё» (доступ к боту, рассылка, подарки, промокоды, продажи) открывается из
+// настроек: вкладки внизу у него больше нет, её место заняла вкладка «Чек-лист».
+function openMore(){
+  closeSet();
+  navTo('more');
+  if(window.ownerApi){ mktRender(); promoBlockRender(); giftBlockRender(); bcastAudience(); if(!ACC_PERIOD) accLoadSummaries(); }
+  _navSave();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
 const notifOv = document.getElementById('notifOverlay');
 function openNotif(){ closeSet(); setTimeout(()=>{ notifOv.classList.add('show'); const first = notifOv.querySelector('.ncat'); if(first && !first.classList.contains('open')) first.classList.add('open'); syncMasterFold(); const body = notifOv.querySelector('.notif-body'); if(body) body.scrollTop = 0; try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){} },160); }
 
@@ -44341,7 +44382,7 @@ document.querySelectorAll('.cmd-item').forEach(it=>{
     if(!act) return;
     const [kind, val] = act.split(':');
     try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
-    if(kind==='nav'){ navTo(val); closeCmd(); }
+    if(kind==='nav'){ closeCmd(); if(val==='more') openMore(); else navTo(val); }
     else if(kind==='quick'){
       if(val.startsWith('office-')) navTo('offices');
       else if(val==='late'||val==='reviews') navTo('overview');
@@ -44351,7 +44392,7 @@ document.querySelectorAll('.cmd-item').forEach(it=>{
     else if(kind==='act'){
       if(val==='settings'){ closeCmd(); setTimeout(openSet,180); }
       else if(val==='notif'){ closeCmd(); setTimeout(openNotif,180); }
-      else{ navTo('more'); closeCmd(); }
+      else{ closeCmd(); openMore(); }
     }
   });
 });

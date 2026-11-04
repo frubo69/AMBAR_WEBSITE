@@ -8649,6 +8649,18 @@ button.shl-p:active{transform:scale(.96)}
 .exp-done-r i{display:block;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;margin-top:4px;color:var(--up)}
 .exp-done.rejected .exp-done-r i{color:var(--dn)}
+/* Лента расходов водителей в «Финансах» (4 ноя 2026): чип с суммой, значок
+   вместо миниатюры, «ждёт» жёлтым, не-деньги (бутылка, долг, зарплата) тише. */
+.fb-fchip small{display:block;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--muted);margin-top:2px;letter-spacing:-.2px}
+.fb-fchip.on small{color:var(--gold2)}
+.fb-fchip em.fb-ini{font-size:11px;font-weight:700;letter-spacing:.4px}
+.fb-xrows{display:flex;flex-direction:column;gap:6px;padding:0 10px 10px}
+.exp-done.pending .exp-done-r i{color:var(--warn)}
+.exp-done.quiet .exp-done-r b{color:var(--muted)}
+.exp-done-th.fb-xph{position:relative}
+.exp-done-th.fb-xph>i{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:9px;
+  background:var(--card);border:1px solid var(--border2);color:var(--muted);font-style:normal}
+.exp-done-th.fb-xph:active>i{transform:scale(.95)}
 .exp-done .exp-item-x{width:30px;height:30px}
 /* Сводка сверху — кнопка: нажал и уже у первого ожидающего. */
 button.exp-wait{display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;
@@ -23045,7 +23057,7 @@ function fbHubPaint(b, err){
     daySwipe(an, {день: () => (FB.month || fbMonthNow()) >= fbMonthNow() ? 0 : 1, шаг: d => fvMonthSwipe(d)});
   }
   an.innerHTML = fvAnalytics(FB.month || fbMonthNow(), b, err);
-  document.getElementById('finRest').innerHTML = fbCrcHtml() + fvSafe(b) + fvPayroll(b);
+  document.getElementById('finRest').innerHTML = fbCrcHtml() + fvSafe(b) + fvPayroll(b) + fvExpenses();
   fvCondensed();
 }
 // Шаг месяца от жеста: сперва улетает карточка, месяц догоняет — как день на
@@ -23152,6 +23164,42 @@ function fvPayroll(b){
     ${row('Штрафы / авансы / долги', N(t.minus), 'удержано', "accOpen('finitems')", `Штрафы, авансы, долги${b && t.minus != null ? `; удержано ${fbFmt(t.minus)} AED` : ''}`)}
   </section>`;
 }
+// «Расходы водителей» — своей секцией под зарплатами (владелец, 4 ноя 2026:
+// «хочу, чтобы в расходах были фильтры по водителям и/или категориям…
+// наверное, делать это надо в финансах»). Лента месяца — своей ручкой
+// (/api/owner/expenses/month), а не из книги: книга несёт по дням только
+// суммы, а здесь нужна каждая запись. Живёт минуту, как книга; число на
+// панели и экран смотрят в одну память.
+FB.expM = {};
+function fbExpC(month){ return FB.expM[month] || (FB.expM[month] = {data: null, err: false, at: 0, busy: null}); }
+function fbExpData(month){ return fbExpC(month).data; }
+function fbExpStale(month){ const c = fbExpC(month); return !c.busy && Date.now() - c.at > FB_TTL; }
+function fbExpLoad(month){
+  const c = fbExpC(month);
+  if(c.busy || !window.ownerApi) return c.busy;
+  c.busy = ownerApi.ownerFetch('/api/owner/expenses/month?month=' + encodeURIComponent(month))
+    .then(d => { c.data = d; c.err = false; })
+    .catch(() => { c.err = true; })
+    .finally(() => {
+      c.at = Date.now(); c.busy = null;
+      fbHubRepaint();
+      if(ACC_VIEW === 'finexp' && (FB.month || fbMonthNow()) === month) fbExpPaint();
+    });
+  return c.busy;
+}
+function fvExpenses(){
+  const month = FB.month || fbMonthNow(), c = fbExpC(month), d = c.data;
+  if(fbExpStale(month)) fbExpLoad(month);
+  const skel = !d && !c.err;
+  const N = v => fvNum(v, {skel});
+  const row = (title, money, unit, lbl) => `<button type="button" class="fv-pay-row" onclick="accOpen('finexp')" aria-label="${lbl}"><span class="fv-row-title">${title}</span><span class="fv-row-money">${money}<span>${unit}</span></span>${luc('chevron-right', 'fv-row-arrow')}</button>`;
+  const n = d ? (d.pending_n || 0) : 0, nt = `${n} ${pluralize(n, 'запись', 'записи', 'записей')}`;
+  return `<section class="fv-panel" data-section="drivers" aria-labelledby="fv-drv-title">
+    <div class="fv-section-head"><h2 id="fv-drv-title">Расходы водителей</h2><span class="fv-unit">AED</span></div>
+    ${row('Разовые расходы', N(d ? d.extra : null), 'за месяц', `Расходы водителей${d ? `, ${fbFmt(d.extra)} AED за месяц` : ''}`)}
+    ${n ? row('Ждут решения', N(d.pending), nt, `Ждут решения: ${nt}, ${fbFmt(d.pending)} AED`) : ''}
+  </section>`;
+}
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
 // внутри, а с главной идут закрывать текущую смену.
 function fbOpenToday(){
@@ -23229,7 +23277,7 @@ async function fbMonthStep(d, quiet){
 // месячный экран. Экран дня месяц не листает — у него свой день.
 const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => accFinNP(), finsafe: () => accFinSafe(),
                   finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson(), finitems: () => accFinItems(), finbonus: () => accFinBonus(),
-                  finddcm: () => accFinDdcM()};
+                  finddcm: () => accFinDdcM(), finexp: () => accFinExp(true)};
 function fbRepaint(){
   const box = document.getElementById('finBook');
   // Лист премий считается отдельной ручкой — дотягиваем его один раз, чтобы
@@ -26920,6 +26968,141 @@ async function tenPay(name){
   _toast('Премия выплачена — водителю ушло поздравление');
 }
 
+// ── Экран «Расходы водителей» (владелец, 4 ноя 2026) ───────────────────────
+// Лента месяца с двумя фильтрами, водитель и категория, которые складываются:
+// «если фильтр бензин — показывается только история расхода на бензин, если
+// водитель — водителя, а если и водитель, и бензин — конкретно расход этого
+// водителя на бензин». У каждой записи — когда подана, когда и как решена,
+// чем платили, чек; снимки открываются тем же просмотром, что в «Расходах
+// смены», только без кнопок решения: решают там.
+//
+// Питание — отдельной категорией: без неё в ленте только разовые траты
+// (питание — строка на человека в день, за месяц это сотни одинаковых
+// строк), а число в плитке всегда равно сумме строк под ним.
+// keep — перерисовка при листании месяца: фильтры остаются. С панели
+// «Финансов» заходят без keep — фильтры сняты, и «Всего» равно числу панели.
+async function accFinExp(keep){
+  const b = await fbMonthScreen('Расходы водителей'); if(!b) return;
+  FB.hist = null; FB.lpage = null; FB.rentGrp = null; FB.salPage = false; FB.sec = null; FB.who = null;
+  FB.itemWho = null; FB.pen = null;
+  if(!keep || !FB.exp) FB.exp = {drv: '', kind: '', open: ''};
+  const month = FB.month;
+  if(!fbExpData(month)){
+    document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+    await fbExpLoad(month);
+  } else if(fbExpStale(month)) fbExpLoad(month);
+  fbExpPaint();
+}
+function fbExpPaint(){
+  if(ACC_VIEW !== 'finexp') return;
+  const mid = document.getElementById('accMid'), body = document.getElementById('fbExpBody');
+  if(body) body.innerHTML = fbExpHtml();
+  else if(mid){ mid.innerHTML = `<div class="fb-page in" id="fbExpBody">${fbExpHtml()}</div>`; mid.scrollTop = 0; }
+}
+// Строки под фильтром: водитель И категория. Без категории питания нет.
+function fbExpUnder(items, drv, kind){
+  return (items || []).filter(e => (!drv || e.driver === drv) && (kind ? e.kind === kind : e.kind !== 'meal'));
+}
+// Сумма «в расходах» по строкам: утверждённое и считающееся деньгами —
+// бутылка охране, заказ в долг и зарплата из выручки нет, как в книге.
+const fbExpSum = rows => rows.reduce((a, e) => a + (e.money ? e.signed : 0), 0);
+const FB_EXP_I = {meal: 'coin', fuel: 'fuel', wash: 'car', parking: 'nopark', guard: 'bottle', kfc: 'coins',
+                  we_gave: 'export', owed_us: 'money', we_got: 'download', we_owe: 'money', upsell: 'trend',
+                  advance: 'ledger', advance_bonus: 'star', other: 'plus'};
+function fbExpHtml(){
+  const month = FB.month || fbMonthNow(), c = fbExpC(month), d = c.data, st = FB.exp || {drv: '', kind: '', open: ''};
+  if(!d) return c.err ? loadFail('accFinExp()') : '<div class="exp-empty">Загрузка…</div>';
+  const items = d.items || [], rows = fbExpUnder(items, st.drv, st.kind);
+  const sum = fbExpSum(rows);
+  const pend = rows.filter(e => e.status === 'pending' && !e.goods);
+  const pendSum = pend.reduce((a, e) => a + e.signed, 0);
+  // Чипы: у водителя — сумма при выбранной категории, у категории — при
+  // выбранном водителе; кого в этом месяце нет — не показываем, кроме выбранного.
+  const chip = (which, id, on, ico, t, sub) => `<button class="fb-fchip${on ? ' on' : ''}" data-f="${escS(id)}" onclick="fbExpPick('${which}', this.dataset.f)">
+      <em${ico.ini ? ' class="fb-ini"' : ''}>${ico.ini ? escS(ico.ini) : IC(ico.i, 16)}</em><span>${t}${sub === null ? '' : `<small>${sub}</small>`}</span></button>`;
+  const drvChips = [chip('drv', '', !st.drv, {i: 'users'}, 'Все водители', null)]
+    .concat((d.drivers || []).filter(p => p.name === st.drv || fbExpUnder(items, p.name, st.kind).length)
+      .map(p => chip('drv', p.name, st.drv === p.name, {ini: fbIni(p.name)}, escS(p.name), fbFmt(fbExpSum(fbExpUnder(items, p.name, st.kind)))))).join('');
+  const kindChips = [chip('kind', '', !st.kind, {i: 'inbox'}, 'Все категории', null)]
+    .concat((d.kinds || []).filter(k => k.id === st.kind || fbExpUnder(items, st.drv, k.id).length)
+      .map(k => chip('kind', k.id, st.kind === k.id, {i: FB_EXP_I[k.id] || 'dot'}, escS(k.t), fbFmt(fbExpSum(fbExpUnder(items, st.drv, k.id)))))).join('');
+  const drvT = st.drv ? escS(st.drv) : 'Все водители';
+  const kindT = st.kind ? escS(((d.kinds || []).find(k => k.id === st.kind) || {}).t || st.kind) : 'Все категории';
+  // по дням, новые сверху; в шапке дня — сумма его строк
+  const byDay = [];
+  rows.forEach(e => {
+    const last = byDay[byDay.length - 1];
+    if(last && last.day === e.day) last.rows.push(e); else byDay.push({day: e.day, rows: [e]});
+  });
+  const days = byDay.map(dd => `<div class="sc">${fbCapT(fbDayT(dd.day), fbFmt(fbExpSum(dd.rows)) + ' AED')}
+    <div class="fb-xrows">${dd.rows.map(fbExpRow).join('')}</div></div>`).join('');
+  const nt = n => `${n} ${pluralize(n, 'запись', 'записи', 'записей')}`;
+  return `<div class="sc fb-gut">
+    ${fbCap(month, true)}
+    <div class="aud-g">
+      ${fbTile('Всего', 'xp.sum', sum)}
+      ${fbTile('Записей', 'xp.n', rows.length, {unit: pluralize(rows.length, 'запись', 'записи', 'записей')})}
+      ${fbTile('Ждут решения', 'xp.pend', pendSum, {unit: pend.length ? nt(pend.length) : 'AED'})}
+    </div>
+  </div>
+  <div class="sc">
+    <button class="fb-e fb-bl" onclick="fbExpToggle('drv')"><span class="fb-e-b"><b>Водитель</b><i>${drvT}</i></span><em class="fb-chev${st.open === 'drv' ? ' open' : ''}">${_SC_CHEV}</em></button>
+    <div class="fb-fwrap${st.open === 'drv' ? ' open' : ''}" id="fbExpF-drv"><div class="fb-fgrid">${drvChips}</div></div>
+    <button class="fb-e fb-bl" onclick="fbExpToggle('kind')"><span class="fb-e-b"><b>Категория</b><i>${kindT}</i></span><em class="fb-chev${st.open === 'kind' ? ' open' : ''}">${_SC_CHEV}</em></button>
+    <div class="fb-fwrap${st.open === 'kind' ? ' open' : ''}" id="fbExpF-kind"><div class="fb-fgrid">${kindChips}</div></div>
+  </div>
+  ${days || '<div class="sc"><div class="fb-none">Таких расходов в этом месяце не было</div></div>'}`;
+}
+// Строка записи — как решённый расход в «Расходах смены», плюс имя: лента
+// общая на всех. Сумма со знаком: возврат уменьшает день, и шапка дня
+// сходится со строками. Снимки — значком: миниатюр в ленте месяца нет, сам
+// снимок подтянет просмотр.
+function fbExpRow(e){
+  const st = e.status || 'approved', kindT = e.kind_t || 'Расход';
+  const list = e.kind === 'meal' ? [] : expPhotos(e);
+  const sub = [escS(e.driver),
+               e.kind === 'meal' ? (e.working === true ? 'на смене' : e.working === false ? 'дома' : '') : '',
+               e.comment && e.comment !== kindT ? escS(e.comment) : '',
+               e.bottle ? escS(e.bottle) : '', e.goods ? 'бутылкой' : '',
+               e.nocash ? 'заказ в долг' : '', e.salary ? 'зарплата из выручки' : '',
+               e.by_driver ? 'от водителя' : '', e.no_receipt ? 'без чека' : '',
+               expWhen(e), st === 'rejected' && e.decided_note ? escS(e.decided_note) : ''].filter(Boolean).join(' · ');
+  return `<div class="exp-done ${st}${!e.money && st === 'approved' ? ' quiet' : ''}">
+    ${list.length ? `<span class="exp-done-ph">${list.map((p, i) => `
+      <button class="exp-done-th fb-xph" onclick="fbExpPhoto('${escS(e.id)}',${i})" aria-label="${escS(p.label)}"><i>${IC('cam', 16)}</i>${_phBadge(p.verdict)}</button>`).join('')}</span>` : ''}
+    <span class="exp-done-b"><b>${escS(kindT)}</b>${sub ? `<i>${sub}</i>` : ''}</span>
+    <span class="exp-done-r">
+      <b>${fbFmt(e.signed)}<u>AED</u></b>
+      <i>${st === 'rejected' ? 'отклонён' : st === 'pending' ? 'ждёт' : 'принят'}</i>${e.kind === 'meal' ? '' : expPayTag(e)}
+    </span>
+  </div>`;
+}
+// Раскрываем классом, а не перерисовкой, как фильтр истории; открыт один из двух.
+function fbExpToggle(which){
+  const st = FB.exp; st.open = st.open === which ? '' : which;
+  ['drv', 'kind'].forEach(w => {
+    const wrap = document.getElementById('fbExpF-' + w); if(!wrap) return;
+    wrap.classList.toggle('open', st.open === w);
+    const c = wrap.previousElementSibling && wrap.previousElementSibling.querySelector('.fb-chev');
+    if(c) c.classList.toggle('open', st.open === w);
+  });
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+// Выбранное второй раз — снимается; «Все» снимает выбор.
+function fbExpPick(which, id){
+  const st = FB.exp;
+  if(which === 'drv') st.drv = st.drv === id ? '' : id; else st.kind = st.kind === id ? '' : id;
+  fbExpPaint();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+// Снимки записи — тем же просмотром, только смотреть: ro.
+function fbExpPhoto(id, i){
+  const d = fbExpData(FB.month || fbMonthNow()); if(!d) return;
+  const e = (d.items || []).find(x => x.id === id); if(!e) return;
+  const list = expPhotos(e); if(!list.length) return;
+  phvOpen(list, Math.min(i || 0, list.length - 1), {kind: 'fx', id, driver: e.driver, e, ro: true});
+}
+
 // ── Экран «Штрафы/авансы/долги» ──────────────────────────────────────────
 // Три числа сверху — сколько снимается в этом месяце штрафами, авансами и
 // долгами. Ниже одна карточка «Штрафы и удержания»: в штраф попадают только
@@ -28221,6 +28404,7 @@ function accOpen(id){
   if(id === 'finperson') accFinPerson();
   if(id === 'finitems') accFinItems();
   if(id === 'finbonus') accFinBonus();
+  if(id === 'finexp')   accFinExp();
   if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
 
@@ -37170,6 +37354,7 @@ function phvClose(){
 function _phvE(){
   const c = PHV.ctx; if(!c) return null;
   if(c.kind === 'wo') return _woFind(c.id);
+  if(c.kind === 'fx') return c.e || null;   // лента месяца: запись пришла с собой, только смотреть
   const f = _expFind(c.driver, c.id);
   return f ? f.e : null;
 }
@@ -37214,13 +37399,14 @@ function phvPaint(){
     + (v === 'ok' ? '<span class="phv-capv ok">принят</span>'
      : v === 'no' ? `<span class="phv-capv no">отклонён${note ? ' · ' + escS(note) : ''}</span>` : '');
   // На снимке — отказ по этому снимку; внизу — решение по записи целиком.
+  const ro = !!(PHV.ctx && PHV.ctx.ro);
   const rej = document.getElementById('phvRej');
-  rej.hidden = !e;
+  rej.hidden = !e || ro;
   rej.className = 'phv-rej' + (v === 'no' ? ' on' : '');
   rej.innerHTML = (v === 'no'
     ? `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Отклонено`
     : `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Отклонить фото`);
-  document.getElementById('phvActs').innerHTML = e ? `
+  document.getElementById('phvActs').innerHTML = e && !ro ? `
     <button class="phv-no" onclick="phvAskOpen('expense')">Отклонить</button>
     <button class="phv-ok" onclick="phvApprove()">Принять</button>` : '';
   const st = e ? (e.status || 'approved') : '';

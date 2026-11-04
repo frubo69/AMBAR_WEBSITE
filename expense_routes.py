@@ -22,7 +22,9 @@ AMBAR — расходы по водителям.
 
 Весь модуль под require_owner: доступ только владельцу и менеджерам.
 """
+import calendar
 import logging
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -806,6 +808,118 @@ async def handle_period(request):
     }, headers=CORS_HEADERS)
 
 
+# ── лента месяца (владелец, 4 ноя 2026) ────────────────────────────────────
+# «Хочу, чтобы в расходах были фильтры по водителям и/или категориям, по типу
+# охрана, парковка, чтобы можно было конкретно смотреть, кто сколько потратил
+# за месяц… если фильтр бензин — показывается только история расхода на
+# бензин, если водитель — водителя, а если и водитель, и бензин — конкретно
+# расход этого водителя на бензин… и посмотреть так же подробно, когда расход
+# был совершён, согласован он или отклонён».
+#
+# Сервер отдаёт месяц целиком одной лентой, фильтрует приложение: записей за
+# месяц сотни, а не тысячи, и каждое касание фильтра не должно ходить в сеть.
+MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def _month_item(e: dict, day: str, driver: str, district: str) -> dict:
+    """Разовая трата строкой ленты месяца. Без снимков: их миниатюры весят
+    больше всего остального вместе взятого, а сам снимок просмотр подтянет по
+    id. Зато со всем, по чему трату судят: когда подана и правлена, когда и
+    как решена, чем платили, есть ли чек и что по нему сказали.
+
+    money — идёт ли запись в расходы месяца тем же правилом, что в книге
+    (finance_routes._spend): утверждена, не бутылка охране (это товар), не
+    заказ в долг (деньги у клиента) и не зарплата из выручки на руках (она в
+    фонде «зарплата», а не в расходах водителя)."""
+    st = _status(e)
+    k = _kind(e)
+    goods, nocash, salary = is_bottle(e), bool(e.get("nocash")), bool(e.get("salary_of"))
+    return {
+        "id": str(e.get("id") or ""), "day": day, "driver": driver,
+        "district": str(e.get("district") or district or ""),
+        "kind": str(e.get("kind") or "other"), "kind_t": str(e.get("kind_t") or k["t"]),
+        "amount": _amount(e.get("amount")), "signed": _signed(e), "plus": bool(k.get("plus")),
+        "status": st,
+        "at": str(e.get("at") or ""), "edited_at": str(e.get("edited_at") or ""),
+        "decided_at": str(e.get("decided_at") or ""), "decided_note": str(e.get("decided_note") or ""),
+        "by_driver": bool(e.get("by_driver")), "auto": bool(e.get("auto")),
+        "pay": str(e.get("pay") or ""), "card": is_card(e),
+        "no_receipt": bool(e.get("no_receipt")),
+        "photo": bool(e.get("photo") or e.get("thumb")),
+        "car_photo": bool(e.get("car_photo") or e.get("car_thumb")),
+        "photo_ok": e.get("photo_ok") or None, "car_ok": e.get("car_ok") or None,
+        "photo_note": str(e.get("photo_note") or ""), "car_note": str(e.get("car_note") or ""),
+        "bottle": str(e.get("bottle") or ""), "goods": goods, "nocash": nocash, "salary": salary,
+        "comment": str(e.get("comment") or ""),
+        "money": st == "approved" and not (goods or nocash or salary),
+    }
+
+
+def month_items(rows: list, home: dict) -> list:
+    """Лента месяца: питание каждого отмеченного дня и каждая разовая трата,
+    новые сверху. Питание — отдельным видом meal: строка на человека в день,
+    чтобы «кто сколько потратил» сходилось с книгой и по нему."""
+    out = []
+    for r in rows:
+        day, drv = str(r.get("day") or ""), str(r.get("driver") or "")
+        dist = home.get(drv) or ""
+        meal = staff.meal_of(r)
+        if meal:
+            out.append({"id": f"meal:{day}:{drv}", "day": day, "driver": drv, "district": dist,
+                        "kind": "meal", "kind_t": "Питание", "amount": meal, "signed": meal,
+                        "status": "approved", "money": True, "at": "",
+                        "working": r.get("working")})
+        for e in (r.get("extras") or []):
+            out.append(_month_item(e, day, drv, dist))
+    out.sort(key=lambda i: (i["day"], i["at"]), reverse=True)
+    return out
+
+
+@require_owner
+async def handle_month(request):
+    """GET /api/owner/expenses/month?month=YYYY-MM — расходы водителей за
+    месяц одной лентой, с людьми и видами для фильтров.
+
+    Суммы — тем же правилом, что расходы водителей в книге месяца: total
+    сходится с суммой _spend по дням, extra — то же без питания, card —
+    утверждённое безналом, pending — ждущее решения (кроме бутылки охране),
+    как в расходах дня."""
+    month = (request.query.get("month") or "").strip()
+    if not MONTH_RE.match(month):
+        month = _biz_day()[:7]
+    y, m = int(month[:4]), int(month[5:7])
+    start, end = f"{month}-01", f"{month}-{calendar.monthrange(y, m)[1]:02d}"
+    rows = await db.get_driver_days_range(start, end)
+    roster = staff.all_drivers()
+    home = {d["name"]: d.get("district") or "" for d in roster}
+    items = month_items(rows, home)
+    # Люди — по реестру, в порядке районов, уехавшие тоже: за отработанные
+    # смены расходы были. Кого в реестре нет вовсе — следом, по записям.
+    drivers = [{"name": d["name"], "district": d.get("district") or "",
+                "district_code": d.get("district_code") or "",
+                "district_name": d.get("district_name") or "",
+                "away": bool(d.get("away"))} for d in roster]
+    seen = {d["name"] for d in drivers}
+    for name in sorted({i["driver"] for i in items} - seen):
+        drivers.append({"name": name,
+                        "district": next((i["district"] for i in items if i["driver"] == name), ""),
+                        "district_code": "", "district_name": "", "away": True})
+    money = [i for i in items if i["money"]]
+    meal = sum(i["signed"] for i in money if i["kind"] == "meal")
+    total = sum(i["signed"] for i in money)
+    pend = [i for i in items if i["status"] == "pending" and not i.get("goods")]
+    return web.json_response({
+        "month": month, "from": start, "to": end, "today": _biz_day(),
+        "drivers": drivers,
+        "kinds": [{"id": "meal", "t": "Питание", "plus": False}]
+                 + [{"id": k, "t": v["t"], "plus": bool(v.get("plus"))} for k, v in EXTRA_KINDS.items()],
+        "items": items, "n": len(items),
+        "total": total, "meal": meal, "extra": total - meal,
+        "card": sum(i["signed"] for i in money if i.get("card")),
+        "pending": sum(i["signed"] for i in pend), "pending_n": len(pend),
+    }, headers=CORS_HEADERS)
+
+
 async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) -> None:
     """Списать бутылку, отданную охране. Молча ничего не делаем для всего
     остального: код есть только у этого вида расхода."""
@@ -858,6 +972,7 @@ def setup(app):
     routes = (
         ("/api/owner/expenses",            handle_day,       "GET"),
         ("/api/owner/expenses/period",     handle_period,    "GET"),
+        ("/api/owner/expenses/month",      handle_month,     "GET"),
         ("/api/owner/expenses/working",    handle_working,   "POST"),
         ("/api/owner/expenses/extra",      handle_extra_add, "POST"),
         ("/api/owner/bottle",              handle_bottle_look, "GET"),

@@ -63,6 +63,14 @@ KINDS = {
     "short":            ("Недовоз заявлен", "wait"),
     "short_ok":         ("Недовоз подтверждён", "ok"),
     "short_no":         ("Недовоз отклонён", "dn"),
+    # Завершить без сканирования остатка (владелец, 4 ноя 2026): просьба
+    # водителя, решение старшего, закрытие с остатком без кодов и момент,
+    # когда остаток досканировали с полки.
+    "fin_req":          ("Просьба завершить без сканирования", "wait"),
+    "fin_ok":           ("Разрешено завершить без сканирования", "warn"),
+    "fin_no":           ("Завершить без сканирования не разрешено", "dn"),
+    "done_unscanned":   ("Район закрыт без сканирования остатка", "warn"),
+    "unscanned_done":   ("Остаток без кодов внесён", "ok"),
     "done":             ("Район принят", "ok"),
     "done_short":       ("Район закрыт с недобором", "warn"),
     "supply_done":      ("Поставка принята", "ok"),
@@ -165,11 +173,18 @@ def _task_counts(sup: dict, oid: str) -> tuple:
 
 
 def done_event(sup: dict, oid: str, gaps: list | None = None) -> tuple:
-    """(вид, подпись) для закрытия района: «Район принят · 24 ед» или «Район
-    закрыт с недобором · принято 20 из 24»."""
+    """(вид, подпись) для закрытия района: «Район принят · 24 ед», «Район
+    закрыт с недобором · принято 20 из 24» или — закрыт с разрешения старшего
+    без сканирования остатка — «не отсканировано 6 · принято 18 из 24»."""
     got, plan = _task_counts(sup, oid)
+    task = ((sup.get("tasks") or {}).get(oid) or {})
     gap = sum(float((g or {}).get("gap") or 0) for g in (gaps if gaps is not None
-                                                           else ((sup.get("tasks") or {}).get(oid) or {}).get("gaps") or []))
+                                                           else task.get("gaps") or []))
+    uns = sum(float(v or 0) for v in (task.get("unscanned") or {}).values())
+    if uns > 0:
+        # Остаток — на момент закрытия: сколько тогда лежало без кодов.
+        return "done_unscanned", (f"не отсканировано {qstr(uns)} · принято {qstr(got)} из {qstr(plan)}"
+                                  if got + 1e-9 < plan else f"не отсканировано {qstr(uns)}")
     if gap > 0 or got + 1e-9 < plan:
         return "done_short", f"принято {qstr(got)} из {qstr(plan)}"
     return "done", f"{qstr(got)} ед"
@@ -302,6 +317,17 @@ async def timeline(sid: str) -> dict | None:
             if sh.get("decided_at") and sh.get("status") in ("ok", "no"):
                 der.append(_ev("short_ok" if sh["status"] == "ok" else "short_no", sh["decided_at"],
                                who=sh.get("decided_by") or "", district=oid, note=f"{qstr(q)} ед"))
+        fr = t.get("fin_req") or {}
+        if isinstance(fr, dict) and fr.get("at"):
+            q = sum(float((x or {}).get("qty") or 0) for x in fr.get("lines") or [])
+            der.append(_ev("fin_req", fr["at"], who=fr.get("by") or "", district=oid,
+                           note=f"не отсканировано {qstr(q)}" + (f" · {fr['note']}" if fr.get("note") else "")))
+            if fr.get("decided_at") and fr.get("status") in ("ok", "no"):
+                der.append(_ev("fin_ok" if fr["status"] == "ok" else "fin_no", fr["decided_at"],
+                               who=fr.get("decided_by") or "", district=oid, note=f"{qstr(q)} ед"))
+        if t.get("unscanned_done_at"):
+            der.append(_ev("unscanned_done", t["unscanned_done_at"], district=oid,
+                           note=f"{qstr(sum(float(v or 0) for v in (t.get('unscanned') or {}).values()))} ед"))
         if t.get("done_at"):
             kind, note = done_event(sup, oid)
             der.append(_ev(kind, t["done_at"], who=drv or t.get("noscan_by") or "", district=oid, note=note))

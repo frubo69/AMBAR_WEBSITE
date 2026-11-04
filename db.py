@@ -1028,6 +1028,10 @@ _DEFAULT_PREFS = {
     "shift.closed": True,
     # Приёмка: итог по району и отдельно — то, на что стоит посмотреть глазами.
     "supply.done": True, "supply.flag": True,
+    # Водитель просит завершить приёмку, не отсканировав остаток, — решение
+    # за старшим (владелец, 4 ноя 2026). Уходит всем, мимо настроек; ключ
+    # здесь — ради архива и списка событий.
+    "supply.finreq": True,
     # Ревизию провёл водитель района — итог старшему (владелец, 19 сен 2026:
     # «по итогам ревизии отчёт старшему должен приходить и операторам»).
     "stock.audit": True,
@@ -3260,8 +3264,11 @@ async def supply_take(sid: str, district: str, product_id: str, room, now, qty=1
     db = _db_or_none()
     if db is None: return None
     from pymongo import ReturnDocument
+    # Поставка со статусом done тоже принимает код: район, закрытый с
+    # разрешения старшего без сканирования остатка (unscanned_at), досканируют
+    # с полки уже после закрытия — ту ли задачу трогают, проверяет task_scan.
     return await db.supplies.find_one_and_update(
-        {"_id": sid, "status": "open",
+        {"_id": sid, "status": {"$in": ["open", "done"]},
          "items": {"$elemMatch": {"id": product_id, f"got.{district}": {"$lte": room}}}},
         {"$inc": {f"items.$.got.{district}": qty, "items.$.scanned": 1,
                   f"tasks.{district}.scanned": 1,
@@ -3482,6 +3489,70 @@ async def supply_short_decide(sid: str, district: str, status: str, who: str,
     return r.modified_count > 0
 
 
+# ── завершить приёмку без сканирования остатка (владелец, 4 ноя 2026) ────────
+# Водитель просит закрыть район, не отсканировав часть позиций; разрешает или
+# запрещает старший. Просьба — tasks.<район>.fin_req {status pending|ok|no|void,
+# lines, note, by, at, decided_by, decided_at}; разрешение закрывает район и
+# записывает остаток: unscanned {позиция: единиц}, unscanned_at, unscanned_by
+# (кто просил), unscanned_ok_by (кто разрешил). Пока остаток не досканирован,
+# район числится в unscanned_open поставки — по нему склад держит товар на
+# полке и «Внести / удалить товар» показывает его как неотсканированный.
+async def supply_fin_set(sid: str, district: str, rec: dict) -> bool:
+    """Просьба завершить без сканирования. Одна живая на район: пока прошлая
+    ждёт решения, вторая не ложится — условие в самом фильтре."""
+    db = _db_or_none()
+    if db is None: return False
+    k = f"tasks.{district}"
+    r = await db.supplies.update_one(
+        {"_id": sid, "status": "open", f"{k}.done_at": None, f"{k}.cancelled_at": None,
+         f"{k}.fin_req.status": {"$ne": "pending"}},
+        {"$set": {f"{k}.fin_req": rec}})
+    return r.modified_count > 0
+
+
+async def supply_fin_decide(sid: str, district: str, status: str, who: str, now,
+                            unscanned: dict | None = None, asked_by: str = "") -> bool:
+    """Решение по просьбе: ok, no или void (район закрыли обычным путём, пока
+    просьба ждала). ok записывает остаток без кодов и ставит район в
+    unscanned_open; переход — только из pending, атомарно."""
+    db = _db_or_none()
+    if db is None: return False
+    k = f"tasks.{district}"
+    upd = {f"{k}.fin_req.status": status, f"{k}.fin_req.decided_at": now,
+           f"{k}.fin_req.decided_by": str(who or "")[:60]}
+    extra = {}
+    if status == "ok":
+        upd.update({f"{k}.unscanned": dict(unscanned or {}), f"{k}.unscanned_at": now,
+                    f"{k}.unscanned_by": str(asked_by or "")[:60],
+                    f"{k}.unscanned_ok_by": str(who or "")[:60]})
+        if unscanned:
+            extra["$addToSet"] = {"unscanned_open": district}
+    r = await db.supplies.update_one(
+        {"_id": sid, f"{k}.fin_req.status": "pending"}, {"$set": upd, **extra})
+    return r.modified_count > 0
+
+
+async def supply_unscanned_clear(sid: str, district: str, now) -> bool:
+    """Остаток района досканирован до последней бутылки — район больше не
+    держит поставку в списке незавершённого приёма."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.supplies.update_one(
+        {"_id": sid, "unscanned_open": district},
+        {"$pull": {"unscanned_open": district},
+         "$set": {f"tasks.{district}.unscanned_done_at": now}})
+    return r.modified_count > 0
+
+
+async def supplies_unscanned(limit: int = 20) -> list:
+    """Поставки, где у какого-то района остаток закрыт без сканирования и ещё
+    не досканирован, — любого статуса: сама поставка обычно уже done."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.supplies.find({"unscanned_open.0": {"$exists": True}}).sort("at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
 async def supply_task_finish(sid: str, district: str, gaps: list,
                              note: str, now) -> dict | None:
     """Закрыть задачу района. Возвращает поставку целиком."""
@@ -3525,11 +3596,15 @@ async def supply_task_hold(sid: str, district: str, who: str, kind: str,
     if live and hold.get("who") != who:
         return False, hold
     at = hold.get("at") if (live and hold.get("who") == who) else now
+    # Закрытый район занять нельзя — кроме закрытого без сканирования остатка
+    # (unscanned_at): его досканируют с полки после закрытия.
     r = await db.supplies.update_one(
-        {"_id": sid, "status": "open", f"tasks.{district}.done_at": None,
-         "$or": [{f"tasks.{district}.hold": None},
-                 {f"tasks.{district}.hold.until": {"$lt": now}},
-                 {f"tasks.{district}.hold.who": who}]},
+        {"_id": sid, "status": {"$in": ["open", "done"]},
+         "$and": [{"$or": [{f"tasks.{district}.done_at": None},
+                           {f"tasks.{district}.unscanned_at": {"$ne": None}}]},
+                  {"$or": [{f"tasks.{district}.hold": None},
+                           {f"tasks.{district}.hold.until": {"$lt": now}},
+                           {f"tasks.{district}.hold.who": who}]}]},
         {"$set": {f"tasks.{district}.hold": {"who": who, "kind": kind, "tg": int(tg or 0),
                                               "at": at, "until": until}}})
     if r.matched_count == 0:

@@ -25,7 +25,7 @@ GROUPS = [
         "system.botDown", "system.dbDown", "system.apiErrors", "system.maintenance",
     ]),
     ("Заявки и приёмка", [
-        "shift.closed", "supply.done", "supply.flag",
+        "shift.closed", "supply.done", "supply.flag", "supply.finreq",
     ]),
     ("Товар", [
         "stock.writeoff", "stock.out", "qr.alien", "qr.found", "stock.audit",
@@ -56,6 +56,7 @@ TITLES = {
     "shift.closed":          "Смена закрыта · заявка",
     "supply.done":           "Приёмка",
     "supply.flag":           "Приёмка — расхождение",
+    "supply.finreq":         "Просьба завершить приёмку без сканирования",
     "stock.writeoff":        "Списание",
     "stock.out":             "Позиция кончилась",
     "qr.alien":              "Чужая бутылка",

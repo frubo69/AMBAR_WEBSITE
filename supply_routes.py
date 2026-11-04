@@ -1518,6 +1518,16 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "gaps": task.get("gaps") or [],
         # Отчёт о недовозе: ждёт решения старшего, подтверждён или отклонён.
         "short": _short_view(task.get("short")),
+        # Просьба завершить без сканирования остатка и её судьба (владелец,
+        # 4 ноя 2026).
+        "fin_req": _fin_view(task.get("fin_req")),
+        # Район закрыт с разрешения старшего, остаток без кодов: когда, кто
+        # просил, кто разрешил и сколько тогда лежало без кодов. По этим полям
+        # «Внести / удалить товар» говорит, что за бутылка и откуда она.
+        "unscanned_at": str(task.get("unscanned_at") or ""),
+        "unscanned_by": task.get("unscanned_by") or "",
+        "unscanned_ok_by": task.get("unscanned_ok_by") or "",
+        "unscanned_qty": _qn(sum(float(q or 0) for q in (task.get("unscanned") or {}).values())),
         "need": need, "got": got, "left": _qn(sum(l["left"] for l in lines)),
         "positions": len(lines),
         "lines": lines,
@@ -1614,9 +1624,24 @@ async def task_claim(sid: str, oid: str, me: str, tg_id: int, now) -> tuple:
 
 def _can_touch(task: dict, me: str, owner: bool) -> bool:
     """Чья это задача. Своя — всегда. Чужая — только старшему и только если
-    товар уже принят без кодов: тогда сканировать осталось не в магазине, а на
-    полке, и делать это может любой, кто до неё дошёл."""
-    return task.get("driver") == me or bool(owner and task.get("noscan_at"))
+    товар уже принят без кодов (без сканирования или закрыт с разрешения
+    старшего без сканирования остатка): тогда сканировать осталось не в
+    магазине, а на полке, и делать это может любой, кто до неё дошёл."""
+    return task.get("driver") == me or bool(owner and (task.get("noscan_at") or task.get("unscanned_at")))
+
+
+def _unscanned_rem(sup: dict, oid: str, task: dict) -> float:
+    """Сколько единиц по району ещё без кодов: план за вычетом подтверждённого
+    недовоза минус принятое, по всем позициям."""
+    return sum(max(0.0, _need_eff(i, oid, task) - float((i.get("got") or {}).get(oid) or 0))
+               for i in (sup.get("items") or []))
+
+
+def _unscanned_open(sup: dict, task: dict, oid: str) -> bool:
+    """Район закрыт с разрешения старшего без сканирования остатка, и остаток
+    ещё не досканирован: такую задачу трогают и после закрытия."""
+    return bool(task.get("unscanned_at")) and bool(task.get("done_at")) \
+        and _unscanned_rem(sup, oid, task) > 1e-9
 
 
 async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
@@ -1628,14 +1653,19 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     реестр. Наоборот — и упавшая на полпути запись оставила бы бутылку в
     остатке, но не в поставке: строка никогда бы не закрылась."""
     sup = await db.supply_get(sid)
-    if not sup or sup.get("status") != "open":
+    if not sup:
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
+    # Район, закрытый с разрешения старшего без сканирования остатка, досканируют
+    # с полки уже после закрытия — и сама поставка к тому времени обычно done.
+    uns_open = _unscanned_open(sup, task, oid)
+    if sup.get("status") != "open" and not (uns_open and sup.get("status") == "done"):
+        return {"ok": False, "verdict": "no_supply"}
     if task.get("cancelled_at"):
         return {"ok": False, "verdict": "cancelled"}
     if not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
-    if task.get("done_at"):
+    if task.get("done_at") and not uns_open:
         return {"ok": False, "verdict": "closed"}
     # Заявка на другую базу: сперва цены (водитель их узнаёт на базе), потом
     # бутылки. Старший с полки вносит коды без этого — цены он видит у себя.
@@ -1700,10 +1730,11 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     label = f"{product_slug(pid, item.get('name',''))}#{seq:06d}"
     # Товар приняли без сканирования раньше, чем район пересчитали, — пересчёт
     # его уже видел, и код к нему заводится как cover (остаток не растёт).
-    # Иначе — обычный приход.
+    # Иначе — обычный приход. Остаток, закрытый без сканирования с разрешения
+    # старшего, лежит на полке с момента разрешения — та же мерка.
     src = "intake"
     try:
-        ns = task.get("noscan_at")
+        ns = task.get("noscan_at") or task.get("unscanned_at")
         if ns:
             import stock_routes as _sr
             cnt = await db.get_last_stock_count(oid, before_day=None)
@@ -1764,7 +1795,19 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     # сама, у всех сразу: ждать от человека ещё одного «Завершить» незачем,
     # недобора здесь быть не может.
     finished, supply_done = False, False
-    if task.get("noscan_at"):
+    if task.get("done_at"):
+        # Остаток закрытого района (без сканирования, с разрешения старшего)
+        # внесли до последней бутылки: район уходит из «незавершённого приёма»
+        # и из чек-листа; закрывать нечего — он закрыт в момент разрешения.
+        if _unscanned_rem(upd, oid, task) <= 1e-9:
+            if await db.supply_unscanned_clear(sid, oid, now):
+                всего = sum(float(q or 0) for q in (task.get("unscanned") or {}).values())
+                await supply_log.add("unscanned_done", sid, who=me, district=oid, at=now,
+                                     note=f"внесено {supply_log.qstr(всего)}")
+                log.info(f"[supply] {sid}/{oid}: остаток без кодов внесён · {me}")
+            finished = True
+            await db.supply_task_unhold(sid, oid, me)
+    elif task.get("noscan_at"):
         осталось = sum(max(0.0, _need_eff(i, oid, task)
                                 - float((i.get("got") or {}).get(oid) or 0))
                        for i in (upd.get("items") or []))
@@ -1844,12 +1887,17 @@ async def task_undo(sid: str, oid: str, code: str, me: str,
 
 
 async def task_finish(sid: str, oid: str, me: str, note: str = "",
-                      owner: bool = False, force: bool = False) -> dict:
+                      owner: bool = False, force: bool = False,
+                      unscanned: dict | None = None) -> dict:
     """Закрыть задачу района. Недобор считается сам — по строкам.
 
     Спрашивать «сколько не хватило» отдельно незачем: разницу между
     подтверждённым и принятым видно и без водителя. У него спрашиваем только
-    то, чего в базе нет, — почему."""
+    то, чего в базе нет, — почему.
+
+    unscanned — {позиция: единиц}, что старший разрешил оставить без кодов
+    (fin_decide): это не недобор, товар на полке, и в недобор для магазина он
+    не идёт."""
     sup = await db.supply_get(sid)
     if not sup:
         return {"ok": False, "verdict": "no_supply"}
@@ -1880,7 +1928,8 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
         if not need:
             continue
         got_u = _qn((it.get("got") or {}).get(oid) or 0)
-        left = _left_units(need, got_u)
+        # Разрешённый остаток без кодов лежит на полке — из недобора вычитаем.
+        left = _left_units(need, got_u + float((unscanned or {}).get(it["id"]) or 0))
         if left > 0:
             gaps.append({"id": it["id"], "name": it.get("name", ""),
                          "need": need, "got": got_u, "gap": left})
@@ -1888,6 +1937,14 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
     doc = await db.supply_task_finish(sid, oid, gaps, str(note or "")[:300], now)
     if not doc:
         return {"ok": False, "verdict": "closed"}
+    # Просьба завершить без сканирования ещё ждала, а район закрыли обычным
+    # путём (досканировали всё или старший закрыл сам) — просьба снимается:
+    # решать по ней больше нечего.
+    if ((task.get("fin_req") or {}).get("status")) == "pending" and not unscanned:
+        try:
+            await db.supply_fin_decide(sid, oid, "void", me, now)
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[supply] {sid}/{oid}: просьба завершить не снята: {e}")
     try:
         import stock_routes
         stock_routes.base_drop()            # задача закрыта — остаток без кодов пересчитать
@@ -2061,6 +2118,227 @@ async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
             "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, who)}
 
 
+# ── завершить без сканирования остатка: просьба водителя, решение старшего ──
+# Владелец, 4 ноя 2026: «надо давать водителям возможность запросить
+# разрешение закончить приёмку, даже если какое-то количество позиций они не
+# отсканировали; разрешать или запрещать будет старший; если такую приёмку
+# разрешили завершить, то в чек-лист должно сваливаться предупреждение о том,
+# что на складе после приёмки остался неотсканированный товар; так же он
+# должен светиться во „внести товар“ как неотсканированная бутылка; должно
+# быть понятно, что это за бутылка и откуда она взялась».
+#
+# Просьба задачу не трогает: водитель может досканировать дальше, пока ждёт.
+# Разрешение закрывает район тем, что принято, а остаток записывает в
+# unscanned — он на полке, в недобор для магазина не идёт, склад держит его
+# как принятое без кодов (stock_routes._noscan_after), и «Внести / удалить
+# товар» показывает его с подписью, откуда он: день заявки, район, водитель,
+# кто разрешил. Досканировать остаток можно и после закрытия — тем же
+# task_scan, с полки.
+def _fin_view(fr):
+    if not fr:
+        return None
+    return {"status": fr.get("status") or "pending", "lines": fr.get("lines") or [],
+            "note": fr.get("note") or "", "by": fr.get("by") or "", "at": str(fr.get("at") or ""),
+            "decided_at": str(fr.get("decided_at") or ""),
+            "decided_by": fr.get("decided_by") or ""}
+
+
+async def fin_request(sid: str, oid: str, me: str, note: str = "",
+                      owner: bool = False) -> dict:
+    """Водитель просит закрыть район, не отсканировав остаток. note — почему."""
+    sup = await db.supply_get(sid)
+    if not sup or sup.get("status") != "open":
+        return {"ok": False, "verdict": "no_supply"}
+    task = (sup.get("tasks") or {}).get(oid)
+    if not task:
+        return {"ok": False, "verdict": "no_task"}
+    if task.get("cancelled_at"):
+        return {"ok": False, "verdict": "cancelled"}
+    if task.get("driver") != me and not owner:
+        return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
+    if task.get("done_at"):
+        return {"ok": False, "verdict": "closed"}
+    if ((task.get("fin_req") or {}).get("status")) == "pending":
+        return {"ok": False, "verdict": "pending"}
+    v = _task_view(sid, sup, oid, task, me)
+    lines = [{"id": l["id"], "name": l["name"], "qty": l["left"]} for l in v["lines"] if l["left"] > 0]
+    if not lines:
+        return {"ok": False, "verdict": "nothing_left"}
+    # Ничего не отсканировано и товар не принят без сканирования — просить
+    # нечего: это «Принять без сканирования» (с чеком базы) или «Вернуть».
+    if v["got"] <= 0 and not task.get("noscan_at"):
+        return {"ok": False, "verdict": "nothing_scanned"}
+    rec = {"status": "pending", "lines": lines, "note": str(note or "").strip()[:300],
+           "by": str(me or "")[:60], "at": datetime.now(timezone.utc)}
+    if not await db.supply_fin_set(sid, oid, rec):
+        return {"ok": False, "verdict": "pending"}
+    всего = _qn(sum(float(x["qty"]) for x in lines))
+    log.info(f"[supply] {sid}/{oid}: {me} просит завершить без сканирования — {всего} ед · {rec['note']}")
+    await supply_log.add("fin_req", sid, who=me, district=oid, at=rec["at"],
+                         note=f"без кодов {supply_log.qstr(всего)}"
+                              + (f" · {rec['note']}" if rec["note"] else ""))
+    try:
+        await _fin_tell(sid, sup, oid, rec, v)
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[supply] о просьбе завершить не сказали: {e}")
+    sup = await db.supply_get(sid)
+    return {"ok": True, "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, me)}
+
+
+def _star_button(text: str, go: str) -> dict:
+    """Кнопка под сообщением: мини-апп сразу на нужном экране (?go=…), как у
+    напоминания о приёмке без кодов (supply_nag)."""
+    import os
+    from urllib.parse import quote
+    url = os.getenv("OWNER_WEBAPP_URL", "https://owner.ambar-delivery.com/")
+    url += ("&" if "?" in url else "?") + "go=" + quote(go, safe="")
+    return {"inline_keyboard": [[{"text": text, "web_app": {"url": url}}]]}
+
+
+async def _fin_tell(sid: str, sup: dict, oid: str, rec: dict, v: dict):
+    """Старшему — что просят, сколько без кодов и что решать в STAR."""
+    from owner_routes import notify_owners_force
+    where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
+    base = f" · {_md(sup.get('base'))}" if sup.get("kind") == "extra" and sup.get("base") else ""
+    всего = _qn(sum(float(x["qty"]) for x in rec["lines"]))
+    n = len(rec["lines"])
+    lst = "\n".join(f"• {_md(x['name'])} — {_qn(x['qty'])}" for x in rec["lines"][:10])
+    more = f"\n…и ещё {n - 10}" if n > 10 else ""
+    body = (f"📦 *Просьба завершить приёмку без сканирования — {_md(where)}{base}*\n"
+            f"{_md(rec['by'])} · отсканировано {v['got']} из {v['need']} · "
+            f"без кодов {всего} {_plural(всего, 'бутылка', 'бутылки', 'бутылок')} · "
+            f"{n} {_plural(n, 'позиция', 'позиции', 'позиций')}\n\n{lst}{more}")
+    if rec.get("note"):
+        body += f"\n\n_{_md(rec['note'])}_"
+    body += "\n\nРазрешить или отказать — в STAR, в приёмке района."
+    await notify_owners_force("supply.finreq", body,
+                              reply_markup=_star_button("Открыть приёмку", f"supply:{sid}:{oid}"))
+
+
+async def _fin_tell_driver(name: str, oid: str, ok: bool, lines: list):
+    """Водителю — решение: он стоит с товаром и ждёт, можно ли ехать."""
+    import pay_notify as _pn
+    where = f"{OFFICE_CODES.get(oid, oid)} {OFFICE_NAMES.get(oid, '')}".strip()
+    if ok:
+        всего = _qn(sum(float(x.get("qty") or 0) for x in lines))
+        что = ", ".join(f"{x.get('name')} {_qn(x.get('qty'))}" for x in lines[:6])
+        text = (f"✅ Старший разрешил завершить приёмку {where} без сканирования. "
+                f"Приёмка закрыта; без кодов осталось {всего} "
+                f"{_plural(всего, 'бутылка', 'бутылки', 'бутылок')}" + (f": {что}." if что else "."))
+    else:
+        text = (f"🚫 Старший не разрешил завершить приёмку {where} без сканирования — "
+                f"отсканируйте остальное.")
+    await _pn.tell_safe(name, text, parse_mode=None)
+
+
+async def fin_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
+    """Решение старшего по просьбе завершить без сканирования.
+
+    Разрешил — район закрывается тем, что принято; остаток (то, что ещё без
+    кодов НА МОМЕНТ РЕШЕНИЯ, — водитель мог досканировать часть, пока ждал)
+    записывается как лежащий на полке без кодов. Отказал — просьба закрыта,
+    водитель досканирует; попросить снова можно."""
+    sup = await db.supply_get(sid)
+    if not sup:
+        return {"ok": False, "verdict": "no_supply"}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    fr = task.get("fin_req") or {}
+    if fr.get("status") != "pending":
+        return {"ok": False, "verdict": "not_pending"}
+    now = datetime.now(timezone.utc)
+    if task.get("done_at") or task.get("cancelled_at"):
+        # Район закрыли или отменили, пока просьба ждала, — решать нечего.
+        await db.supply_fin_decide(sid, oid, "void", who, now)
+        return {"ok": False, "verdict": "closed"}
+    # Недовоз ещё ждёт решения: сперва он. Подтверждённый недовоз уменьшает
+    # то, что надо отсканировать, и остаток без кодов считался бы с тем,
+    # чего магазин не дал.
+    if ok and ((task.get("short") or {}).get("status")) == "pending":
+        return {"ok": False, "verdict": "short_pending"}
+    v = _task_view(sid, sup, oid, task, who)
+    left = [{"id": l["id"], "name": l["name"], "qty": l["left"]} for l in v["lines"] if l["left"] > 0]
+    finished = False
+    if ok:
+        uns = {l["id"]: l["qty"] for l in left}
+        if not await db.supply_fin_decide(sid, oid, "ok", who, now, uns,
+                                          asked_by=fr.get("by") or task.get("driver") or ""):
+            return {"ok": False, "verdict": "not_pending"}
+        всего = _qn(sum(uns.values()))
+        log.info(f"[supply] {sid}/{oid}: завершить без сканирования разрешил {who} · без кодов {всего}")
+        await supply_log.add("fin_ok", sid, who=who, district=oid, at=now,
+                             note=f"без кодов {supply_log.qstr(всего)}")
+        fin = await task_finish(sid, oid, who, fr.get("note") or "", owner=True, force=True,
+                                unscanned=uns)
+        finished = bool(fin.get("ok"))
+        if not finished:
+            log.error(f"[supply] {sid}/{oid}: разрешено, но район не закрылся: {fin.get('verdict')}")
+    else:
+        if not await db.supply_fin_decide(sid, oid, "no", who, now):
+            return {"ok": False, "verdict": "not_pending"}
+        log.info(f"[supply] {sid}/{oid}: завершить без сканирования не разрешил {who}")
+        await supply_log.add("fin_no", sid, who=who, district=oid, at=now,
+                             note=f"без кодов {supply_log.qstr(sum(float(x['qty']) for x in left))}")
+    try:
+        await _fin_tell_driver(fr.get("by") or task.get("driver") or "", oid, ok, left)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[supply] водителю о решении не ушло: {e}")
+    sup = await db.supply_get(sid)
+    return {"ok": True, "finished": finished,
+            "task": _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, who)}
+
+
+async def fin_requests() -> list:
+    """Просьбы завершить без сканирования, которые ждут решения, — по всем
+    открытым поставкам. Этим живёт строка чек-листа."""
+    out = []
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        sid = sup.get("_id")
+        for oid, t in (sup.get("tasks") or {}).items():
+            fr = t.get("fin_req") or {}
+            if oid not in OFFICE_IDS or fr.get("status") != "pending" \
+                    or t.get("done_at") or t.get("cancelled_at"):
+                continue
+            v = _task_view(sid, sup, oid, t)
+            out.append({"supply_id": sid, "district": oid,
+                        "code": v["district_code"], "name": v["district_name"],
+                        "by": fr.get("by") or v["driver"], "at": fr.get("at"),
+                        "note": fr.get("note") or "",
+                        "left": v["left"], "need": v["need"], "got": v["got"],
+                        "lines": [{"id": l["id"], "name": l["name"], "qty": l["left"]}
+                                  for l in v["lines"] if l["left"] > 0],
+                        "extra": v["extra"], "base": v["base"]})
+    out.sort(key=lambda x: str(x["at"] or ""))
+    return out
+
+
+async def unscanned_tasks() -> list:
+    """Районы, закрытые с разрешения старшего без сканирования остатка, где
+    остаток ещё не внесён кодами, — с тем, откуда он: день заявки, водитель,
+    кто просил и кто разрешил. Этим живут чек-лист и «Внести / удалить
+    товар»."""
+    out = []
+    for sup in await db.supplies_unscanned(limit=20):
+        sid = sup.get("_id")
+        for oid in sup.get("unscanned_open") or []:
+            t = (sup.get("tasks") or {}).get(oid) or {}
+            if oid not in OFFICE_IDS or not t.get("unscanned_at") or t.get("cancelled_at"):
+                continue
+            v = _task_view(sid, sup, oid, t)
+            if v["left"] <= 0:
+                continue
+            out.append({"supply_id": sid, "district": oid,
+                        "code": v["district_code"], "name": v["district_name"],
+                        "day": v["day"], "driver": v["driver"],
+                        "by": v["unscanned_by"] or v["driver"], "ok_by": v["unscanned_ok_by"],
+                        "at": t.get("unscanned_at"), "qty": v["unscanned_qty"],
+                        "left": v["left"], "need": v["need"], "got": v["got"],
+                        "lines": [{"id": l["id"], "name": l["name"], "left": l["left"]}
+                                  for l in v["lines"] if l["left"] > 0],
+                        "extra": v["extra"], "base": v["base"]})
+    out.sort(key=lambda x: str(x["at"] or ""))
+    return out
+
+
 async def open_tasks_all() -> list:
     """Открытые задачи всех районов — для отчёта о недовозе у операторов."""
     out = []
@@ -2171,16 +2449,20 @@ async def task_hold(sid: str, oid: str, me: str, tg_id: int, on: bool,
     отпускает. Ответ «busy» значит, что задачу уже сканирует другой: экран
     показывает, кто и сколько уже внёс, а камеру не открывает."""
     sup = await db.supply_get(sid)
-    if not sup or sup.get("status") != "open":
+    if not sup:
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
+    # Закрытый без сканирования остатка район досканируют и после закрытия.
+    uns_open = _unscanned_open(sup, task, oid)
+    if sup.get("status") != "open" and not (uns_open and sup.get("status") == "done"):
+        return {"ok": False, "verdict": "no_supply"}
     now = datetime.now(timezone.utc)
     if not on:
         await db.supply_task_unhold(sid, oid, me)
         return {"ok": True, "hold": _hold_view({}, me, now)}
     if not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
-    if task.get("done_at"):
+    if task.get("done_at") and not uns_open:
         return {"ok": False, "verdict": "closed"}
     kind = "senior" if owner else "driver"
     ok, h = await db.supply_task_hold(sid, oid, me, kind, tg_id, now,
@@ -2212,15 +2494,25 @@ async def intake_by_district(me: str = "") -> dict:
                  "name": OFFICE_NAMES.get(oid, oid), "left": 0, "need": 0, "got": 0,
                  "tasks": [], "hold": {"who": "", "kind": "", "live": False, "mine": False}}
            for oid in OFFICE_IDS}
-    for sup in await db.supplies_with_open_tasks(limit=12):
+    # Кроме открытых поставок — закрытые, где остаток района разрешили
+    # оставить без кодов (владелец, 4 ноя 2026): он тоже «QR код не внесён»,
+    # с подписью, откуда он (finished + unscanned_*).
+    sups = await db.supplies_with_open_tasks(limit=12)
+    seen = {s.get("_id") for s in sups}
+    sups += [s for s in await db.supplies_unscanned(limit=20) if s.get("_id") not in seen]
+    for sup in sups:
         sid = sup.get("_id")
         for oid, t in (sup.get("tasks") or {}).items():
-            if oid not in out or not t.get("noscan_at") or t.get("done_at"):
+            if oid not in out or t.get("cancelled_at"):
+                continue
+            uns = bool(t.get("unscanned_at")) and bool(t.get("done_at"))
+            if not ((t.get("noscan_at") and not t.get("done_at")) or uns):
                 continue
             v = _task_view(sid, sup, oid, t, me)
             if v["left"] <= 0:
                 continue
             v["lines"] = [l for l in v["lines"] if l["left"] > 0]
+            v["finished"] = uns
             d = out[oid]
             d["tasks"].append(v)
             d["left"] += v["left"]; d["need"] += v["need"]; d["got"] += v["got"]
@@ -2244,24 +2536,30 @@ async def intake_live() -> list:
     start = bizday.day_start(bizday.biz_day())
     sups = await db.supplies_with_open_tasks(limit=12)
     sups += await db.supplies_since((start - timedelta(days=3)).strftime("%Y-%m-%d"), limit=40)
+    sups += await db.supplies_unscanned(limit=20)
     iso = lambda v: v.isoformat() if v else ""
     seen, out = set(), []
     for sup in sups:
         sid = sup.get("_id")
         for oid, t in (sup.get("tasks") or {}).items():
             ns = db._dt_aware(t.get("noscan_at"))
-            if (sid, oid) in seen or oid not in OFFICE_IDS or not ns or t.get("cancelled_at"):
+            # Закрытый без сканирования остатка район досканируют после
+            # закрытия: пока остаток без кодов, это тоже идущая приёмка.
+            ua = db._dt_aware(t.get("unscanned_at"))
+            if (sid, oid) in seen or oid not in OFFICE_IDS or not (ns or ua) or t.get("cancelled_at"):
                 continue
+            v = _task_view(sid, sup, oid, t)
             done = db._dt_aware(t.get("done_at"))
+            if ua and v["left"] > 0:
+                done = None
             if done and done < start:
                 continue
             seen.add((sid, oid))
-            v = _task_view(sid, sup, oid, t)
             only = set(t.get("rescan") or [])
             lines = [l for l in v["lines"] if not only or l["id"] in only]
             lines.sort(key=lambda l: l["name"])
             last = db._dt_aware(t.get("last_at"))
-            if last and last < ns:
+            if last and last < (ns or ua):
                 last = None                      # скан из прежней приёмки — не этот
             got = sum(l["got"] for l in lines)
             status = ("done" if done else "live" if v["hold"]["live"]
@@ -2269,8 +2567,10 @@ async def intake_live() -> list:
             out.append({"supply_id": sid, "district": oid, "day": v["day"],
                         "district_code": v["district_code"], "district_name": v["district_name"],
                         "driver": v["driver"], "who": v["hold"]["who"], "status": status,
-                        "rescan": bool(only), "noscan_at": iso(ns), "last_at": iso(last),
-                        "done_at": iso(done), "lines": lines})
+                        "rescan": bool(only), "noscan_at": iso(ns or ua), "last_at": iso(last),
+                        "done_at": iso(done), "lines": lines,
+                        "unscanned": bool(ua), "unscanned_by": v["unscanned_by"],
+                        "unscanned_ok_by": v["unscanned_ok_by"]})
     out.sort(key=lambda x: (x["status"] == "done", x["noscan_at"]))
     return out
 
@@ -2362,7 +2662,8 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
     from owner_routes import notify_owners, notify_owners_force
     task = (doc.get("tasks") or {}).get(oid) or {}
     took = int(task.get("scanned") or 0)
-    need = took + sum(g["gap"] for g in gaps)
+    uns = _qn(sum(float(q or 0) for q in (task.get("unscanned") or {}).values()))
+    need = took + sum(g["gap"] for g in gaps) + uns
     where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
     mins = ""
     try:
@@ -2372,7 +2673,13 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
         pass
     base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
     head = f"📥 *Приёмка — {_md(where)}{base}*\n{_md(me)} · принято {took} из {need}{mins}"
-    if task.get("noscan_at"):
+    if uns:
+        # Закрыт с разрешения старшего без сканирования остатка: остаток на
+        # полке без кодов, внести его — из «Внести / удалить товар».
+        head += (f"\nЗавершена без сканирования: {uns} {_plural(uns, 'бутылка', 'бутылки', 'бутылок')} "
+                 f"на полке без кодов · просил {_md(task.get('unscanned_by') or '')} · "
+                 f"разрешил {_md(task.get('unscanned_ok_by') or me)}")
+    elif task.get("noscan_at"):
         head += "\nБыло принято без сканирования — теперь коды на месте"
     # Что убирали из приёмки — в самой сводке: это обычная правка (камера
     # поймала не ту бутылку), но старший должен видеть, что именно убрали.
@@ -3634,6 +3941,23 @@ async def handle_own_short(request):
 
 
 @require_owner
+async def handle_own_finreq(request):
+    """POST {district, ok, as} — решение по просьбе завершить приёмку без
+    сканирования остатка (владелец, 4 ноя 2026)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    oid = str(body.get("district") or "").strip()
+    if oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    res = await fin_decide(request.match_info.get("sid") or "", oid,
+                           bool(body.get("ok")), _owner_name(request, body))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
 async def handle_prices_file(request):
     """POST /api/owner/supply/prices (multipart file) — файл магазина только
     ради цен: что он написал в «Price, AED» против нашей закупочной. Поставку
@@ -3932,6 +4256,8 @@ def _intake_row(sid: str, sup: dict, oid: str, t: dict, who: list) -> dict | Non
     plan = sum(int(l.get("plan") or 0) for l in v["lines"])
     miss = _qn(sum(float(l.get("miss") or 0) for l in v["lines"]))
     status = ("cancelled" if cancelled
+              # Закрыт без сканирования остатка и остаток ещё без кодов.
+              else "unscanned" if t.get("done_at") and t.get("unscanned_at") and v["left"] > 0
               else "done" if t.get("done_at") and not v["left"] and not miss
               else "short" if t.get("done_at")
               else "noscan" if t.get("noscan_at")
@@ -3951,6 +4277,10 @@ def _intake_row(sid: str, sup: dict, oid: str, t: dict, who: list) -> dict | Non
         "codes": int(t.get("scanned") or 0), "undo": undo, "positions": len(v["lines"]),
         "note": t.get("note") or "",
         "short": v["short"],
+        "fin_req": v["fin_req"],
+        "unscanned_at": _iso(t.get("unscanned_at")), "unscanned_by": v["unscanned_by"],
+        "unscanned_ok_by": v["unscanned_ok_by"], "unscanned_qty": v["unscanned_qty"],
+        "unscanned_done_at": _iso(t.get("unscanned_done_at")),
         "lines": sorted(({"id": l["id"], "name": l["name"], "unit": l["unit"], "plan": l["plan"],
                           "need": l["need"], "got": l["got"], "miss": l["miss"]} for l in v["lines"]),
                         key=lambda l: l["name"]),
@@ -4024,6 +4354,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
         ("/api/owner/supply/{sid}/task/noscan",     handle_own_noscan,   "POST"),
         ("/api/owner/supply/{sid}/task/short",      handle_own_short,    "POST"),
+        ("/api/owner/supply/{sid}/task/finreq",     handle_own_finreq,   "POST"),
         ("/api/owner/supply/{sid}/task/hold",       handle_own_hold,     "POST"),
         ("/api/owner/supply/{sid}/task/line",       handle_own_line,     "POST"),
         ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),

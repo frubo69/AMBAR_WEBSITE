@@ -1095,12 +1095,23 @@ async def _noscan_after(since: dict, until: datetime | None = None) -> dict:
     if until is not None:
         return await _noscan_at(since, until)
     out: dict = {}
-    for sup in await db.supplies_with_open_tasks(limit=12):
+    # Район, закрытый с разрешения старшего без сканирования остатка
+    # (владелец, 4 ноя 2026), держит остаток на полке так же, как принятый
+    # без сканирования: задача уже done, поставка часто тоже, — такие поставки
+    # приходят из supplies_unscanned. Момент, с которого товар на полке, —
+    # noscan_at, если принимали без сканирования, иначе момент разрешения.
+    sups = await db.supplies_with_open_tasks(limit=12)
+    seen = {s.get("_id") for s in sups}
+    sups += [s for s in await db.supplies_unscanned(limit=20) if s.get("_id") not in seen]
+    for sup in sups:
         for oid, t in (sup.get("tasks") or {}).items():
             edge = since.get(oid)
-            ns = t.get("noscan_at")
-            if not ns or t.get("done_at") or t.get("cancelled_at") or oid not in OFFICE_IDS:
+            if t.get("cancelled_at") or oid not in OFFICE_IDS:
                 continue
+            uns = bool(t.get("unscanned_at")) and bool(t.get("done_at"))
+            if not ((t.get("noscan_at") and not t.get("done_at")) or uns):
+                continue
+            ns = t.get("noscan_at") or t.get("unscanned_at")
             ns_dt = ns if hasattr(ns, "tzinfo") else _dt_of(str(ns))
             if ns_dt is not None and ns_dt.tzinfo is None:
                 ns_dt = ns_dt.replace(tzinfo=timezone.utc)
@@ -1160,13 +1171,24 @@ async def _noscan_at(since: dict, until: datetime) -> dict:
             if oid not in OFFICE_IDS:
                 continue
             ns = _aware(t.get("noscan_at"))
-            if ns is None or ns > until:
-                continue                    # тогда ещё сканировали или не начинали
+            if ns is not None and ns > until:
+                ns = None                   # тогда ещё сканировали или не начинали
+            # Закрыт с разрешения старшего без сканирования остатка: с момента
+            # разрешения остаток на полке без кодов, и закрытие задачи его не
+            # снимает — снимают только коды (их считает supply_codes_until).
+            ua = _aware(t.get("unscanned_at"))
+            if ua is not None and ua > until:
+                ua = None
+            moment = ns or ua
+            if moment is None:
+                continue
             done, cancel = _aware(t.get("done_at")), _aware(t.get("cancelled_at"))
-            if (done and done <= until) or (cancel and cancel <= until):
+            if cancel and cancel <= until:
+                continue                    # к тому моменту уже отменена
+            if done and done <= until and ua is None:
                 continue                    # к тому моменту уже закрыта
             edge = since.get(oid)
-            if edge and ns <= edge:
+            if edge and moment <= edge:
                 continue                    # пересчёт после неё товар уже видел
             got = await db.supply_codes_until(sid, oid, until)
             for it in sup.get("items") or []:

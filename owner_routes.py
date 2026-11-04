@@ -3041,10 +3041,11 @@ async def car_intake_tell(me: dict, car: dict, km: int, iid: str, why: str = "",
 
 
 async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Markdown",
-                              test: bool = False) -> None:
+                              test: bool = False, reply_markup=None) -> None:
     """Send to EVERY owner/manager, bypassing prefs + quiet hours — for critical
     alerts (crypto-paid orders, order edits) that must always be seen.
-    test=True — событие по тест-заказу: только тестерам, мимо архива."""
+    test=True — событие по тест-заказу: только тестерам, мимо архива.
+    reply_markup — кнопка под сообщением (мини-апп на нужном экране)."""
     if test:
         await _notify_testers(event_key, text, parse_mode)
         return
@@ -3062,7 +3063,7 @@ async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Mark
     log.info(f"[owner-notif] FORCE {event_key} → {len(ids)} owners: {ids}")
     for oid in ids:
         try:
-            await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode, reply_markup=reply_markup)
         except Exception as e:
             log.error(f"[owner-notif] force {event_key} → {oid} failed: {e}")
 
@@ -5328,8 +5329,10 @@ CHK_PLAN = [
     ("writeoffs",   12.0, 23.0, False),
     ("order_sent",  12.0, 15.0, False),
     ("supply_in",   12.0, 21.0, False),
+    ("fin_req",     12.0, 12.0, False),   # просьба завершить без сканирования — горит с минуты просьбы
     ("noscan",      12.0, 12.0, False),   # горит с минуты приёмки; срок — сама приёмка
     ("audit",       12.0, 12.0, False),   # горит с минуты завершения ревизии
+    ("unscanned_left", 12.0, 12.0, False),  # остаток без кодов после приёмки — пока он на полке
     ("unscanned",   12.0, 21.0, False),
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
@@ -5672,6 +5675,77 @@ async def handle_checklist(request):
     # убери из чек листа»): о ней напоминает почасовое сообщение в STAR, а в
     # приёмке район и так помечен «без сканирования». _chk_noscan остаётся
     # для напоминания.
+
+    # Просьба водителя завершить приёмку, не отсканировав остаток (владелец,
+    # 4 ноя 2026): ждёт решения старшего — строка горит красным с минуты
+    # просьбы, водитель стоит с товаром, — и ведёт в приёмку района, где
+    # «Разрешить» и «Отказать».
+    try:
+        import supply_routes as _sup
+        просьбы = await _sup.fin_requests()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] просьбы завершить без сканирования не прочитаны: {e}")
+        просьбы = []
+    if просьбы:
+        _q = lambda v: f"{float(v or 0):g}"
+        if len(просьбы) == 1:
+            x = просьбы[0]
+            hint = (f"{x['code']} {x['name']}".strip() + f" · {x['by']}"
+                    + f" · без кодов {_q(x['left'])} {_pl_bottles(x['left'])}"
+                    + (f" · {x['note']}" if x.get("note") else ""))
+        else:
+            hint = " · ".join(f"{x['code']} {x['by']} {_q(x['left'])} {_pl_bottles(x['left'])}"
+                              for x in просьбы)
+        row = _chk_row("fin_req", "Просьба завершить приёмку", hint, False, now, day, plan,
+                       go="finreq", n=len(просьбы))
+        first = min((_geo_dt(x.get("at")) for x in просьбы if _geo_dt(x.get("at"))), default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ)).total_seconds() // 60))
+                    if first else 0,
+                    "tasks": [{"supply_id": x["supply_id"], "district": x["district"],
+                               "code": x["code"], "name": x["name"]} for x in просьбы]})
+        rows.append(row)
+
+    # Товар, оставшийся на полке без кодов после приёмки, которую старший
+    # разрешил завершить без сканирования (владелец, 4 ноя 2026: «в чек-лист
+    # должно сваливаться предупреждение о том, что на складе после приёмки
+    # остался неотсканированный товар»): строка горит красным с минуты
+    # разрешения, пока остаток не внесён кодами, и ведёт в «Внести / удалить
+    # товар» района — там видно, что за бутылки и откуда они.
+    try:
+        import supply_routes as _sup
+        остаток = await _sup.unscanned_tasks()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] остаток без кодов после приёмки не прочитан: {e}")
+        остаток = []
+    if остаток:
+        _q = lambda v: f"{float(v or 0):g}"
+        всего = sum(float(x.get("left") or 0) for x in остаток)
+        if len(остаток) == 1:
+            x = остаток[0]
+            что = ", ".join(f"{l['name']} {_q(l['left'])}" for l in (x.get("lines") or [])[:3])
+            if len(x.get("lines") or []) > 3:
+                что += f" · ещё {len(x['lines']) - 3}"
+            hint = (f"{x['code']} {x['name']}".strip()
+                    + f" · {_q(x['left'])} {_pl_bottles(x['left'])}"
+                    + (f" · {что}" if что else "")
+                    + (f" · приёмка {_day_human(x['day'])}" if x.get("day") else "")
+                    + (f" · {x['driver']}" if x.get("driver") else "")
+                    + (f" · разрешил {x['ok_by']}" if x.get("ok_by") else ""))
+        else:
+            hint = " · ".join(f"{x['code']} {_q(x['left'])} {_pl_bottles(x['left'])}" for x in остаток)
+        row = _chk_row("unscanned_left", "Остаток без сканирования", hint, False, now, day, plan,
+                       go="unscanned_left", n=int(round(всего)))
+        first = min((_geo_dt(x.get("at")) for x in остаток if _geo_dt(x.get("at"))), default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ)).total_seconds() // 60))
+                    if first else 0,
+                    "tasks": [{"supply_id": x["supply_id"], "district": x["district"],
+                               "code": x["code"], "name": x["name"], "day": x.get("day") or ""}
+                              for x in остаток]})
+        rows.append(row)
 
     # Ревизия завершена, а недостача или излишек ждут решения: строка горит
     # красным с минуты завершения и ведёт прямо в отчёт той ревизии. Ревизий

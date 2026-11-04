@@ -18371,6 +18371,7 @@ let AUDQ = null;                             // своя очередь отпр
 let HOLD = null;                             // окно удержания: {parts, total}
 let QR_WANT = null;                          // район, на который открыть «Внести товар»
 let QR_WANT_NEW = false;                     // …и сразу как новый товар (приход), не код к остатку
+let QR_WANT_IN = null;                       // район, на который открыть «с незавершённого приёма» (чек-лист)
 function audQ(){
   if(!AUDQ) AUDQ = Object.assign({}, SCANQ, {items: [], busy: false, onDone: audDone});
   return AUDQ;
@@ -21185,6 +21186,11 @@ const CK_GO = {
   // Принято без кодов: строка ведёт прямо в район той поставки, где это
   // случилось, — и там уже кнопка «Сканировать».
   noscan:    () => chkNoscan(),
+  // Просьба завершить без сканирования: в район той поставки, где решают.
+  finreq:    () => chkFinReq(),
+  // Остаток без кодов после приёмки: в «Внести / удалить товар» → район,
+  // где видно, что за бутылки и откуда.
+  unscanned_left: () => chkUnscanned(),
   // Ревизия ждёт решения: строка ведёт прямо в её отчёт, где решение и
   // принимают. Решать нечего — просто на склад.
   audit:     () => chkAudit(),
@@ -21257,6 +21263,22 @@ function chkNoscan(){
   accOpen('supply-at');             // только раздел: поставку выбираем сами
   ACC_VIEW = 'supply';
   accSupply('who', t.district, t.supply_id);
+}
+
+function chkFinReq(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'fin_req')) || {};
+  const t = (r.tasks || [])[0];
+  if(!t){ accOpen('supply'); return; }
+  accOpen('supply-at');             // только раздел: поставку выбираем сами
+  ACC_VIEW = 'supply';
+  accSupply('who', t.district, t.supply_id);
+}
+
+function chkUnscanned(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'unscanned_left')) || {};
+  const t = (r.tasks || [])[0];
+  QR_WANT_IN = t ? t.district : null;
+  accOpen('qr');
 }
 
 function chkSupply(){
@@ -31064,6 +31086,9 @@ async function accQR(){
     const want = QR_WANT, fresh = QR_WANT_NEW;
     QR_WANT = null; QR_WANT_NEW = false; QR_NEED = !fresh; qrPick(want); return;
   }
+  // Из чек-листа по «Не отсканировано после приёмки» — сразу на страницу
+  // района с незавершённого приёма.
+  if(QR_WANT_IN){ const want = QR_WANT_IN; QR_WANT_IN = null; return qrIntake(want); }
   await qrHome();
 }
 
@@ -31321,8 +31346,11 @@ function qrInRows(){
     let sub = лист ? 'по пересчёту · внести кодами' : 'нет незавершённого приёма', cls = '';
     if(есть && h.live){ sub = `${h.who} вносит · ${fmtQty(x.got)} из ${fmtQty(x.need)}`; cls = 'warn'; }
     else if(есть){
-      const кто = [...new Set((x.tasks || []).map(t => t.noscan_by || t.driver).filter(Boolean))].join(', ');
-      sub = `без сканирования${кто ? ' · ' + кто : ''}`;
+      const кто = [...new Set((x.tasks || []).map(t => t.noscan_by || t.unscanned_by || t.driver).filter(Boolean))].join(', ');
+      // Все задачи района — закрытые с разрешения старшего без сканирования
+      // остатка: так и пишем; вперемешку с принятым без сканирования — общее.
+      const fin = (x.tasks || []).filter(t => t.finished).length;
+      sub = `${fin && fin === (x.tasks || []).length ? 'приёмка завершена без сканирования' : 'без сканирования'}${кто ? ' · ' + кто : ''}`;
     }
     const жив = есть || лист > 0;
     const go = есть ? `onclick="qrIntake('${d.id}')"` : лист ? `onclick="qrCover('${d.id}')"` : 'disabled';
@@ -31494,6 +31522,9 @@ async function qrIntake(district, тихо){
   const d = (ACC_IN.districts || []).find(x => x.id === district) || {tasks: [], hold: {}};
   QR_IN.tasks = d.tasks || [];
   if(!QR_IN.tasks.length){ _toast('Здесь всё внесено'); qrHome(); return; }
+  // Пришли сюда напрямую (строка чек-листа) — районы ещё не были загружены,
+  // и в шапке пусто: теперь они есть.
+  if(!тихо && d.code) _setText('accTitle', `${d.code || ''} ${d.name || ''}`.trim());
   const h = d.hold || {};
   const sig = JSON.stringify([d.left, d.got, !!h.live, h.who || '']);
   if(тихо && QR_IN.sig === sig) return;
@@ -31509,8 +31540,15 @@ async function qrIntake(district, тихо){
   const many = QR_IN.tasks.length > 1;
   const заявка = t => (t.day === _dayIsoFor(0) ? 'Сегодняшняя заявка' : t.day === _dayIsoFor(1)
     ? 'Вчерашняя заявка' : 'Заявка от ' + _dayName(t.day)) + (t.extra && t.base ? ' · ' + t.base : '');
-  const body = QR_IN.tasks.map((t, ti) => `${many
-      ? `<div class="stk-grp2"><span>${escS(заявка(t))}</span></div>` : ''}
+  // Откуда бутылки (владелец, 4 ноя 2026: «должно быть понятно, что это за
+  // бутылка и откуда она взялась»): заявка какого дня, кто принимал, и если
+  // район закрыли без сканирования остатка — кто просил и кто разрешил.
+  const откуда = t => t.finished
+    ? `${заявка(t)} · завершена без сканирования · ${t.unscanned_by || t.driver || ''}${
+        t.unscanned_ok_by ? ' · разрешил ' + t.unscanned_ok_by + (t.unscanned_at ? ' ' + _hm(t.unscanned_at) : '') : ''}`
+    : `${заявка(t)} · принята без сканирования · ${t.noscan_by || t.driver || ''}`;
+  const body = QR_IN.tasks.map((t, ti) => `${many || t.finished || t.noscan_at
+      ? `<div class="stk-grp2"><span>${escS(откуда(t))}</span></div>` : ''}
     <div class="sc">${(t.lines || []).map(l => `<button class="pk-row need${h.live ? ' off' : ''}"
         ${h.live ? 'disabled' : ''} onclick="qrInLine(${ti}, '${escS(l.id)}')">
         <span class="pk-row-b"><span class="pk-name">${escS(l.name)}</span>
@@ -31557,6 +31595,12 @@ function _ilSum(t){
   return {need, got, cn, cg, pct: need ? Math.min(100, Math.round(got / need * 100)) : 0,
           u: beer === L.length ? 'кор' : beer ? 'ед.' : 'бут'};
 }
+// Район закрыт с разрешения старшего без сканирования остатка: пока никто не
+// сканирует, состояние — не «ждёт начала», а это.
+function _ilSt(t){
+  if(t.unscanned && (t.status === 'wait' || t.status === 'pause')) return ['закрыта без сканирования', 'warn'];
+  return IL_ST[t.status] || IL_ST.wait;
+}
 function _ilWhen(t){
   if(t.status === 'done') return t.done_at ? `в ${_hmDubai(t.done_at)}` : '';
   if(t.last_at) return `скан ${_hmDubai(t.last_at)}`;
@@ -31574,7 +31618,7 @@ function ilHomePaint(){
   // Завершённую убираем с «Обзора» сразу (владелец, 18 сен 2026: «раз уж она уже
   // завершена — убирай»); на открытой странице статуса она остаётся до выхода.
   box.innerHTML = IL.tasks.filter(t => t.status !== 'done').map(t => {
-    const s = _ilSum(t), [st, cls] = IL_ST[t.status] || IL_ST.wait;
+    const s = _ilSum(t), [st, cls] = _ilSt(t);
     return `<button class="rcv il-home" onclick="ilOpen('${escS(_ilKey(t))}')">
       <div class="rcv-h"><span class="rcv-st ${cls}">${st}</span>
         <span class="il-t">${escS(`${t.district_code} ${t.district_name}`)}</span></div>
@@ -31605,7 +31649,7 @@ function ilPaint(){
     return;
   }
   IL.sel = _ilKey(t);
-  const s = _ilSum(t), [st, cls] = IL_ST[t.status] || IL_ST.wait;
+  const s = _ilSum(t), [st, cls] = _ilSt(t);
   _setText('accTitle', `${t.district_code} ${t.district_name}`);
   _setText('accSub', `приёмка · ${t.driver || '—'}`);
   const rows = (t.lines || []).map(l => {
@@ -34372,8 +34416,13 @@ function xSupRender(d){
     // Принято без кодов — своё состояние между «везёт» и «принято»: товар на
     // полке, задача открыта, пока всё не отсканируют.
     const ns = !t.done_at && !!t.noscan_at;
+    // Закрыт с разрешения старшего без сканирования остатка (владелец, 4 ноя
+    // 2026): остаток на полке без кодов, пока он есть — карточка жёлтая, как
+    // у принятого без сканирования, и в ней кнопка «Сканировать».
+    const uns = !!t.done_at && !!t.unscanned_at && !t.cancelled_at;
     const who = draft ? `${(t.lines || []).length} ${pluralize((t.lines || []).length,'позиция','позиции','позиций')}`
               : t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
+              : uns ? `завершена без сканирования · ${_hm(t.done_at)}${t.unscanned_ok_by ? ' · разрешил ' + escS(t.unscanned_ok_by) : ''}`
               : t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
               : ns ? `без сканирования · ${escS(t.noscan_by || t.driver)} · ${_hm(t.noscan_at)}`
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
@@ -34416,7 +34465,7 @@ function xSupRender(d){
     // 2026): замок в подписи с причиной, рамка карточки, степперов нет.
     const lock = t.locked && !t.done_at
       ? `<span class="xs-lock">${IC('lock', 12)}${t.lock_why === 'scan' ? 'сканируют' : t.lock_why === 'noscan' ? 'принято без сканирования' : 'заперт'} · правки закрыты${t.lock_at ? ' с ' + _hm(t.lock_at) : ''}</span>` : '';
-    return `<div class="xs-dcard ${t.cancelled_at || t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}${t.locked && !t.done_at && !t.cancelled_at ? ' lock' : ''}"
+    return `<div class="xs-dcard ${uns && t.left ? 'noscan' : t.cancelled_at || t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}${t.locked && !t.done_at && !t.cancelled_at ? ' lock' : ''}"
       id="xsd-${escS(t.district)}" data-fold="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
@@ -34425,11 +34474,12 @@ function xSupRender(d){
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
           <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
-            t.left && (t.driver || t.done_at || ns) ? ` · ${t.done_at ? 'не хватает' : ns ? 'не отсканировано' : 'осталось'} ${fmt(t.left)}` : ''}</span>
+            t.left && (t.driver || t.done_at || ns) ? ` · ${uns || (ns && !t.done_at) ? 'не отсканировано' : t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}` : ''}</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>${open ? `<div class="xs-fold-b">${list}${
           foldEnd(rows.length, `xSupToggle('${escS(t.district)}', 1)`)}</div>` : ''}`}
       ${xsShort(d, t)}
+      ${xsFin(d, t)}
       ${t.noscan_photo ? `<button class="rt-rcp" onclick="xSupRcp('${escS(d.supply_id || SUP_ID || '')}','${escS(t.district)}','${escS(x.code || '')}')">${IC('note', 14)}Чек базы · ${escS(t.noscan_by || t.driver || '')}</button>` : ''}
       ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
@@ -34487,6 +34537,57 @@ function xsShort(d, t){
   return `<div class="xsh ${ok ? 'ok' : 'no'}">
     <div class="xsh-h">${IC(ok ? 'check' : 'close', 13)}Недовоз ${ok ? 'подтверждён' : 'отклонён'}${
       sh.decided_by ? ' · ' + escS(sh.decided_by) : ''} · ${fmtQty(всего)}</div>${list}</div>`;
+}
+
+// Просьба завершить без сканирования остатка (владелец, 4 ноя 2026: «надо
+// давать водителям возможность запросить разрешение закончить приёмку, даже
+// если какое-то количество позиций они не отсканировали; разрешать или
+// запрещать будет старший»). Решение здесь, как по недовозу: «Разрешить»
+// закрывает район тем, что принято, остаток числится на полке без кодов
+// (строка чек-листа, «Внести / удалить товар» → район); «Отказать» —
+// водитель досканирует. Недовоз ждёт решения — сервер просит сперва его.
+function xsFin(d, t){
+  const fr = t.fin_req; if(!fr || fr.status === 'void') return '';
+  const list = (fr.lines || []).map(l =>
+    `<div class="xsh-l"><span>${escS(l.name)}</span><b>${fmtQty(l.qty)}</b></div>`).join('');
+  const всего = (fr.lines || []).reduce((a, l) => a + (+l.qty || 0), 0);
+  if(fr.status === 'pending'){
+    return `<div class="xsh wait">
+      <div class="xsh-h">Просьба завершить без сканирования · ${escS(fr.by || t.driver || '')} · ${fmtQty(всего)}</div>
+      ${list}
+      ${fr.note ? `<div class="xsh-note">${escS(fr.note)}</div>` : ''}
+      <div class="xsh-b">
+        <button class="btn btn-gh" onclick="xsFinGo('${escS(d.supply_id)}','${escS(t.district)}',0)">Отказать</button>
+        <button class="btn btn-pri" onclick="xsFinGo('${escS(d.supply_id)}','${escS(t.district)}',1)">Разрешить</button>
+      </div></div>`;
+  }
+  const ok = fr.status === 'ok';
+  return `<div class="xsh ${ok ? 'ok' : 'no'}">
+    <div class="xsh-h">${IC(ok ? 'check' : 'close', 13)}${ok ? 'Разрешено завершить без сканирования' : 'Завершить без сканирования не разрешено'}${
+      fr.decided_by ? ' · ' + escS(fr.decided_by) : ''} · ${fmtQty(ok ? (t.unscanned_qty || всего) : всего)}</div></div>`;
+}
+
+async function xsFinGo(sid, district, ok){
+  if(!sid || !district || SUP_BUSY) return;
+  SUP_BUSY = true;
+  let r = null;
+  try{
+    r = await ownerApi.ownerFetch(`/api/owner/supply/${sid}/task/finreq`,
+      {method: 'POST', body: {district, ok: !!ok, as: _rcvMe()}});
+  }catch(e){ SUP_BUSY = false; return _toast('Не удалось'); }
+  SUP_BUSY = false;
+  if(!r || r.ok === false){
+    const v = (r || {}).verdict;
+    _toast(v === 'short_pending' ? 'Сначала решите недовоз'
+         : v === 'closed' ? 'Район уже закрыт'
+         : v === 'not_pending' ? 'Просьба уже решена' : 'Не удалось');
+  }else{
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast(ok ? 'Разрешено — район закрыт, остаток без кодов на полке' : 'Не разрешено — водитель досканирует');
+  }
+  SUP_GOTO = 'd:' + district;
+  SUP_OPEN.add(district);
+  await supLoad(sid);
 }
 
 async function xsShortGo(sid, district, ok){
@@ -35328,6 +35429,7 @@ function supHistRow(x){
 // убранное из приёмки, недовоз и позиции. Данные — /api/owner/supply/intake/history.
 let IH = null;
 const IH_ST = {done: ['', ''], short: ['недобор', 'warn'], noscan: ['без сканирования', 'warn'],
+               unscanned: ['закрыта без скана', 'warn'],
                live: ['в работе', 'live'], taken: ['взял, не начал', ''], cancelled: ['отменён', 'dn']};
 async function intHistory(){
   // Приёмки — вкладка страницы «История» (см. accHistory).
@@ -35403,7 +35505,15 @@ function intHistDetail(r){
                 rejected: ['отклонён', 'dn']}[r.short.status] || ['', ''];
     t.push(row(st[1], `Недовоз · ${st[0]}${r.short.note ? ' · «' + escS(r.short.note) + '»' : ''}`, fmtQty(n)));
   }
-  if(r.done_at) t.push(row('ok', `Закрыл${r.started_at ? ' · ' + intHistMins(r.started_at, r.done_at) : ''}`, _hm(r.done_at)));
+  if(r.fin_req && r.fin_req.status !== 'void'){
+    const n = (r.fin_req.lines || []).reduce((a, l) => a + (+l.qty || 0), 0);
+    const st = {pending: ['ждёт решения', 'wait'], ok: ['разрешено', 'ok'], no: ['не разрешено', 'dn']}[r.fin_req.status] || ['', ''];
+    t.push(row(st[1], `Просьба завершить без сканирования · ${escS(r.fin_req.by || '—')} · ${st[0]}${
+      r.fin_req.decided_by ? ' · ' + escS(r.fin_req.decided_by) : ''}${r.fin_req.note ? ' · «' + escS(r.fin_req.note) + '»' : ''}`, fmtQty(n)));
+  }
+  if(r.unscanned_at) t.push(row('warn', `Закрыта без сканирования · ${escS(r.unscanned_by || '—')} · разрешил ${escS(r.unscanned_ok_by || '—')} · без кодов ${fmtQty(r.unscanned_qty || 0)}`, _hm(r.unscanned_at)));
+  if(r.done_at && !r.unscanned_at) t.push(row('ok', `Закрыл${r.started_at ? ' · ' + intHistMins(r.started_at, r.done_at) : ''}`, _hm(r.done_at)));
+  if(r.unscanned_done_at) t.push(row('ok', 'Остаток без кодов внесён', _hm(r.unscanned_done_at)));
   if(r.cancelled_at) t.push(row('dn', 'Район отменён', _hm(r.cancelled_at)));
   const closed = r.status === 'done' || r.status === 'short' || r.status === 'cancelled';
   const lines = (r.lines || []).map(l => {
@@ -35745,6 +35855,12 @@ async function supImport(inp, btnId){
 // себе — тогда водители увидят его занятым и не поедут за тем же ящиком.
 // Свой — продолжить. Чужой — только снять с водителя, как и раньше.
 function rtActs(t, d){
+  // Район закрыт с разрешения старшего без сканирования остатка: остаток
+  // досканируют с полки и после закрытия — пока он есть (и поставка не
+  // отменена; сама она к этому времени обычно уже done).
+  if(t.done_at && t.unscanned_at && t.left > 0 && !t.cancelled_at && d.status !== 'cancelled')
+    return `<div class="rt-acts">
+    <button class="rt-take" onclick="rcvOpen('${escS(t.district)}')">Сканировать</button></div>`;
   if(d.status !== 'open' || t.done_at || t.cancelled_at) return '';
   const мой = t.driver && t.driver === _rcvMe();
   // Принято без кодов — досканировать может любой, кто дошёл до полки: и тот
@@ -35845,7 +35961,9 @@ async function rcvPollTick(){
   if(!RCV || RCV_LINE || !t) return;
   const sig = x => JSON.stringify([x.got, x.left, x.done_at, x.erev, !!(x.hold && x.hold.live), (x.hold || {}).who]);
   if(sig(t) === sig(RCV)) return;
-  if(t.done_at){ _toast('Приёмка закрыта'); rcvBack(); return; }
+  // Закрыта с разрешения старшего без сканирования остатка — сканируем дальше,
+  // пока остаток есть.
+  if(t.done_at && !(t.unscanned_at && t.left > 0)){ _toast('Приёмка закрыта'); rcvBack(); return; }
   RCV = rcvAdopt(t); rcvRender();
 }
 
@@ -35958,6 +36076,10 @@ function rcvRender(){
   _setText('accSub', `Приёмка · ${t.positions} ${
     pluralize(t.positions,'позиция','позиции','позиций')}`);
   const ns = !!t.noscan_at;
+  // Район закрыт с разрешения старшего без сканирования остатка: здесь только
+  // досканировать его с полки — ни вернуть, ни закрыть, ни «не всё привезли».
+  // Откуда остаток — в шапке: кто просил, кто и когда разрешил.
+  const uns = !!t.done_at && !!t.unscanned_at;
   // Справа сверху — обходной путь, а не следующий шаг: пока ничего не принято,
   // район можно вернуть; когда принято не всё — закрыть с недобором. Главная
   // кнопка внизу всегда одна и говорит, что делать дальше.
@@ -35967,23 +36089,26 @@ function rcvRender(){
   // в углу его не находили. В углу остаётся только «Вернуть район».
   // Когда уже что-то принято — «Убрать бутылку»: лишнюю, которую поймала
   // камера, убирают и отсюда, если сканер закрыт или её строка уже полна.
-  if(act) act.innerHTML = занято0 ? '' : (t.got === 0 && !ns)
+  if(act) act.innerHTML = занято0 || uns ? '' : (t.got === 0 && !ns)
     ? `<button class="acc-act" onclick="rcvGiveBack()">Вернуть район</button>`
     : t.got > 0 ? `<button class="acc-act dn" onclick="rcvRemoveOpen()">Убрать бутылку</button>` : '';
 
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const занято = !!(t.hold && t.hold.live);
   const head = `<div class="rcv">
-    <div class="rcv-h"><span class="rcv-st ${занято ? 'warn' : ns ? 'warn' : 'live'}">${
-      занято ? `${escS(t.hold.who)} вносит сейчас` : ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
+    <div class="rcv-h"><span class="rcv-st ${занято ? 'warn' : (ns || uns) ? 'warn' : 'live'}">${
+      занято ? `${escS(t.hold.who)} вносит сейчас` : uns ? 'Завершена без сканирования' : ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
     <div class="rcv-n">
       <span class="rcv-v">${fmt(t.got)}</span>
       <span class="rcv-of">из ${fmt(t.need)}</span>
       <span class="rcv-pct">${pct}%</span>
     </div>
     <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
-    <div class="rcv-f"><span>${t.left ? (ns ? 'не отсканировано ' : 'осталось ') + fmt(t.left)
-                                      : 'всё отсканировано'}</span></div>
+    <div class="rcv-f"><span>${t.left ? ((ns || uns) ? 'не отсканировано ' : 'осталось ') + fmt(t.left)
+                                      : 'всё отсканировано'}</span></div>${uns
+      ? `<div class="rcv-f"><span>${escS([t.unscanned_by ? 'просил ' + t.unscanned_by : '',
+                                       t.unscanned_ok_by ? 'разрешил ' + t.unscanned_ok_by + (t.unscanned_at ? ' ' + _hm(t.unscanned_at) : '') : '']
+                                       .filter(Boolean).join(' · '))}</span></div>` : ''}
   </div>`;
 
   // Недобранное вверх: закрытые строки больше не нужны, а следующую бутылку
@@ -36001,13 +36126,15 @@ function rcvRender(){
     </button>`).join('');
 
   document.getElementById('accMid').innerHTML = head +
-    `<div class="exp-grp">${ns ? 'Что отсканировать' : 'Что забрать'}</div>` +
+    `<div class="exp-grp">${(ns || uns) ? 'Что отсканировать' : 'Что забрать'}</div>` +
     (rows || '<div class="exp-empty">Позиций нет</div>');
   // Одна главная кнопка — следующий шаг. Всё отсканировано — завершить;
   // нет — сканировать дальше, и под ней тихая «без сканирования», пока этот
   // путь ещё не выбран.
   rcvPollStart();
-  document.getElementById('accFoot').innerHTML = занято ? '' : !t.left
+  document.getElementById('accFoot').innerHTML = занято ? '' : uns
+    ? (t.left ? `<button class="qb" onclick="rcvNext()">Продолжить сканирование</button>` : '')
+    : !t.left
     ? `<button class="qb" onclick="rcvFinOpen()">Завершить приёмку</button>`
     : `<div class="rcv-acts">
         <button class="qb" onclick="rcvNext()">${t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>
@@ -36227,11 +36354,12 @@ function rcvDone(err, r, job){
     // туда, откуда пришли: со страницы района — на первый экран.
     if(r.finished){
       qrFlash('ok', 'всё внесено');
+      const uns = !!(RCV && RCV.unscanned_at);
       setTimeout(() => {
         SCAN.stop(); rcvHoldStop(); rcvPollStop();
         RCV_LINE = null; RCV_ROWS = [];
         try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-        _toast('Приёмка завершена');
+        _toast(uns ? 'Остаток без кодов внесён' : 'Приёмка завершена');
         const f = RCV_EXIT; RCV_HOME = null; RCV_EXIT = null;
         if(f) f(); else rcvBack();
       }, 700);
@@ -48378,8 +48506,17 @@ try{ setTimeout(callInit, 1500); }catch(e){}
 // Кнопка под напоминанием бота открывает приложение сразу на приёмке:
 // человек нажал «Открыть приёмку» — и он в ней, а не на главной.
 try{
-  if(new URLSearchParams(location.search).get('go') === 'supply')
+  const go = new URLSearchParams(location.search).get('go') || '';
+  if(go === 'supply')
     window.addEventListener('load', () => setTimeout(() => accOpen('supply'), 700));
+  // Кнопка под просьбой завершить без сканирования — прямо в район той
+  // поставки: go=supply:<поставка>:<район>.
+  else if(go.startsWith('supply:')){
+    const [, sid, oid] = go.split(':');
+    window.addEventListener('load', () => setTimeout(() => {
+      accOpen('supply-at'); ACC_VIEW = 'supply'; accSupply('who', oid || '', sid || '');
+    }, 700));
+  }
 }catch(e){}
 </script>
 </body>

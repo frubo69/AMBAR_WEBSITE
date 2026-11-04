@@ -340,6 +340,32 @@ async function standBoot(){
         {id: 'p54', name: 'Martini Bianco', need: 12, got: 0, left: 12}]};
     shortOpen(ST_Q.get('from') || 'ns');
   }
+  // ?open=finreq — экран задачи с кнопкой «Завершить без сканирования» и само
+  // окно просьбы; &fr=pending|no — экран задачи со строкой состояния просьбы
+  // (4 ноя 2026). Опрос задачи и отправку просьбы отвечает стенд сам.
+  if(ST_Q.get('open') === 'finreq' || ST_Q.get('fr')){
+    const L = [
+        {id: 'p1', name: 'Absolut 1 ltr',   need: 12, got: 9, left: 3},
+        {id: 'p7', name: 'Столичная 0,7',   need: 12, got: 5, left: 7},
+        {id: 'p31', name: 'Heineken 0,5',   need: 12, got: 6, left: 6},
+        {id: 'p54', name: 'Martini Bianco', need: 12, got: 0, left: 12}];
+    const left = L.filter(l => l.left > 0).map(l => ({id: l.id, name: l.name, qty: l.left}));
+    const fr = ST_Q.get('fr') === 'pending' ? {status: 'pending', lines: left, note: 'Полка закрыта, ключа у охраны нет', by: 'Али', at: _agoIso(12)}
+             : ST_Q.get('fr') === 'no' ? {status: 'no', lines: left, note: '', by: 'Али', at: _agoIso(30), decided_by: 'Тест-старший', decided_at: _agoIso(5)} : null;
+    TASK = {supply_id: 's9', district: 'jvc', district_code: 'B1', district_name: 'JVC', at: _agoIso(190), day: '2026-11-04',
+      need: 48, got: 20, left: 28, positions: 4, erev: 1, rev: 1, mine: true, extra: false, base: '', hold: null,
+      short: null, noscan_at: '', done_at: '', cancelled_at: '', fin_req: fr, lines: L};
+    const _f0 = drvApi.drvFetch;
+    drvApi.drvFetch = async (path, opts = {}) => {
+      if(path === '/api/driver/supply/s9' && !(opts.method)) return TASK;
+      if(path === '/api/driver/supply/s9/finish-request'){ stLog('API POST finish-request ' + JSON.stringify(opts.body));
+        return {ok: true, task: {...TASK, fin_req: {status: 'pending', lines: left, note: (opts.body || {}).note || '', by: 'Али', at: new Date().toISOString()}}}; }
+      return _f0(path, opts);
+    };
+    document.getElementById('supScr').classList.add('show');
+    supRenderTask();
+    if(ST_Q.get('open') === 'finreq'){ await new Promise(r => setTimeout(r, 200)); finReqOpen(); }
+  }
   // ?open=odo — экран пробега с уже снятым кадром: камеры на стенде нет,
   // поэтому подсовываем готовый снимок и зовём тот же odoAsk, что и камера.
   // &free=1 — машина выбрана из свободных, прошлого пробега нет.

@@ -10981,6 +10981,7 @@ function supCard(t){
   const lines = t.lines || [];
   const held = !!(t.hold && t.hold.live);
   const sub = held ? `<span class="sup-held">${esc(t.hold.who)} вносит сейчас</span>`
+    : t.fin_req && t.fin_req.status === 'pending' ? 'ждёт решения старшего'
     : ns ? 'принято без сканирования'
     : t.stale
     ? `незакончено <span class="sup-old">с ${esc(supWhen(t).split(' · ')[0])}</span>`
@@ -11931,10 +11932,15 @@ async function supPollTick(){
   try{
     const r = await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}`, {params:{district: TASK.district}});
     if(!TASK || !r) return;
-    // Приёмку закрыли без нас: старший внёс последнюю бутылку с полки.
-    if(r.done_at){ toast('Приёмка завершена'); try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){} supBack(); return; }
+    // Приёмку закрыли без нас: старший внёс последнюю бутылку с полки — или
+    // разрешил завершить без сканирования остатка.
+    if(r.done_at){
+      toast(r.unscanned_at ? 'Разрешено завершить без сканирования — приёмка закрыта' : 'Приёмка завершена');
+      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){} supBack(); return;
+    }
     if(r.cancelled_at){ toast('Приёмка по этому району отменена — за ним не едем'); supBack(); return; }
-    const sig = x => JSON.stringify([x.erev, x.got, x.left, !!(x.hold && x.hold.live), (x.hold || {}).who]);
+    const sig = x => JSON.stringify([x.erev, x.got, x.left, !!(x.hold && x.hold.live), (x.hold || {}).who,
+                                     (x.short || {}).status, (x.fin_req || {}).status]);
     if(sig(r) !== sig(TASK)) supTaskApply(r);
   }catch(e){}
   finally{ _supPollBusy = false; }
@@ -12067,7 +12073,9 @@ function supPricesOpen(){ PRICES_OPEN = true; supRenderTask(); window.scrollTo({
 // сколько и по чём, без кнопок и без опроса.
 function supRenderDone(){
   const t = TASK; if(!t) return;
-  const ns = !!t.noscan_at && t.got < t.need;
+  // Закрыт с разрешения старшего без сканирования остатка — своя метка.
+  const uns = !!t.unscanned_at && t.got < t.need;
+  const ns = uns || (!!t.noscan_at && t.got < t.need);
   _setText('supT', `${t.district_code} · ${t.district_name}`);
   _setText('supS', `Приёмка завершена · ${supHistWhen(t.done_at)}${t.extra ? ' · ' + (t.base || 'другая база') : ''}`);
   document.getElementById('supV').style.display = 'none';
@@ -12076,7 +12084,7 @@ function supRenderDone(){
   const pct = t.need ? Math.min(100, Math.round(t.got / t.need * 100)) : 100;
   const xprSum = t.extra && t.cost ? `<div class="dcard xpr-sum"><span>Закупка на базе</span><b>${fmt(t.cost)} AED</b></div>` : '';
   document.getElementById('supMid').innerHTML = `<div class="dtop">
-      <span class="dtop-b"><span class="dchip ${ns ? 'warn' : 'ok'}">${ns ? 'без сканирования' : 'принято'}</span>
+      <span class="dtop-b"><span class="dchip ${ns ? 'warn' : 'ok'}">${uns ? 'завершена без сканирования' : ns ? 'без сканирования' : 'принято'}</span>
         <span class="dtop-s">${lines.length} ${plural(lines.length,'позиция','позиции','позиций')}</span></span>
       <span class="dtop-n">${fmt(t.got)}<i>из ${fmt(t.need)} ${plural(t.need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
@@ -12183,7 +12191,15 @@ function supRenderTask(){
     : sh.status === 'ok'
       ? `<div class="sup-short ok">Недовоз подтвердил ${esc(sh.decided_by || 'старший')} — отсканируйте то, что привезли</div>`
       : `<div class="sup-short no">Недовоз отклонён${sh.decided_by ? ' · ' + esc(sh.decided_by) : ''}</div>`;
-  document.getElementById('supBot').innerHTML = shLine + `
+  // Просьба завершить без сканирования остатка (владелец, 4 ноя 2026) — той
+  // же строкой: ждёт решения или не разрешена. Разрешённая закрывает район,
+  // и экран уходит сам (supPollTick).
+  const fr = t.fin_req;
+  const frPend = !!(fr && fr.status === 'pending');
+  const frLine = !fr || fr.status !== 'pending' && fr.status !== 'no' ? '' : frPend
+      ? `<div class="sup-short wait">Просьба завершить без сканирования — ждёт решения старшего</div>`
+      : `<div class="sup-short no">Завершить без сканирования не разрешил ${esc(fr.decided_by || 'старший')} — отсканируйте остальное</div>`;
+  document.getElementById('supBot').innerHTML = shLine + frLine + `
     <div class="sup-tot">
       <span class="sup-tot-l">${all ? (ns ? 'Всё отсканировано' : 'Взято полностью')
                                     : (ns ? 'Не отсканировано' : 'Осталось забрать')}</span>
@@ -12200,7 +12216,63 @@ function supRenderTask(){
          // сканирования закрывать нечего: там остаётся досканировать.
          !ns && t.short && t.short.status === 'pending'
            ? `<button class="btn btn-gh" onclick="finPendOpen()">Закрыть район</button>` : ''}${
-         ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}`}`;
+         ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}${
+         // Остаток не отсканировать (полка закрыта, товар не достать) — можно
+         // попросить старшего закрыть район так. Пока просьба ждёт, второй
+         // раз не просят; ничего не принято и не «без сканирования» —
+         // просить нечего, это «Вернуть задачу» или «Принять без сканирования».
+         (t.got > 0 || ns) && !frPend
+           ? `<button class="btn btn-gh" onclick="finReqOpen()">Завершить без сканирования</button>` : ''}`}`;
+}
+
+// Просьба закрыть район, не отсканировав остаток (владелец, 4 ноя 2026:
+// «надо давать водителям возможность запросить разрешение закончить приёмку,
+// даже если какое-то количество позиций они не отсканировали; разрешать или
+// запрещать будет старший»). Окно общее с «Завершить»: что осталось без
+// кодов и почему — причина уходит старшему вместе с просьбой. Решение
+// приходит сообщением в бот и сюда: разрешил — приёмка закрыта, остаток
+// числится на полке без кодов; отказал — досканировать.
+function finReqOpen(){
+  const t = TASK; if(!t) return;
+  const left = (t.lines || []).filter(l => l.left > 0);
+  _setText('finT', 'Завершить без сканирования');
+  _setText('finS', `${t.district_code} ${t.district_name} · без кодов ${fmt(t.left)} ${plural(t.left,'бутылка','бутылки','бутылок')} · ${left.length} ${plural(left.length,'позиция','позиции','позиций')}`);
+  document.getElementById('finBody').innerHTML =
+    (left.length ? `<div class="card" style="margin-bottom:12px">${
+      left.slice(0, 8).map(l => `<div class="ord-item" style="margin-bottom:7px">
+        <span>${esc(l.name)}</span><b>${l.got} из ${l.need}</b></div>`).join('')
+      }${left.length > 8 ? `<div class="sup-row-s">…и ещё ${left.length - 8}</div>` : ''}</div>` : '') +
+    `<textarea id="finNote" placeholder="Почему не отсканировали"></textarea>`;
+  const b = document.getElementById('finGo');
+  b.textContent = 'Запросить у старшего'; b.disabled = false;
+  b.onclick = finReqSend;
+  document.getElementById('finSheet').classList.add('show');
+}
+
+async function finReqSend(){
+  const t = TASK; if(!t || SUP_BUSY) return;
+  const note = ((document.getElementById('finNote') || {}).value || '').trim();
+  if(!note) return toast('Впишите, почему не отсканировали', 'err');
+  SUP_BUSY = true;
+  const btn = document.getElementById('finGo'); btn.disabled = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/finish-request`,
+      {method:'POST', body:{district: t.district, note}});
+    if(!r.ok) throw new Error(r.verdict);
+    if(r.task) TASK = supAdopt(r.task);
+    finClose();
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Отправлено старшему — ждём решения');
+    supRenderTask();
+  }catch(e){
+    const v = e && e.message;
+    toast(v === 'pending' ? 'Прошлый запрос ещё ждёт решения'
+        : v === 'nothing_left' ? 'Всё отсканировано — завершите приёмку'
+        : v === 'nothing_scanned' ? 'Сначала отсканируйте хотя бы одну бутылку'
+        : v === 'closed' ? 'Приёмка уже закрыта'
+        : 'Не удалось отправить', 'err');
+  }
+  finally{ SUP_BUSY = false; btn.disabled = false; }
 }
 
 // Замок сканирования: держим, пока открыта камера, продлеваем раз в десять

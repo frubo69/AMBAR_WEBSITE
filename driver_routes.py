@@ -3317,6 +3317,28 @@ async def handle_supply_buy(request):
 
 @require_driver
 @_no_test
+async def handle_supply_finreq(request):
+    """POST {district, note} — просьба завершить приёмку, не отсканировав
+    остаток (владелец, 4 ноя 2026). Решает старший в STAR; note — почему.
+    Просит тот, у кого задача: это его приёмка и его остаток."""
+    import supply_routes
+    from config_offices import OFFICE_IDS
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    if not sid or oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_request"}, status=400, headers=CORS_HEADERS)
+    res = await supply_routes.fin_request(sid, oid, me["name"], str(body.get("note") or ""))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_driver
+@_no_test
 async def handle_supply_noscan(request):
     """Товар забрали, коды не читали. Задача остаётся открытой — досканировать."""
     import supply_routes
@@ -3539,6 +3561,7 @@ def setup(app):
         ("/api/driver/supply/{sid}/undo",       handle_supply_undo,   "POST"),
         ("/api/driver/supply/{sid}/finish",     handle_supply_finish, "POST"),
         ("/api/driver/supply/{sid}/short",      handle_supply_short,  "POST"),
+        ("/api/driver/supply/{sid}/finish-request", handle_supply_finreq, "POST"),
         ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
         ("/api/driver/supply/{sid}/hold",       handle_supply_hold,   "POST"),
         ("/api/driver/supply/{sid}/buy",        handle_supply_buy,    "POST"),

@@ -3281,10 +3281,16 @@ html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
   transition-property:var(--tp);transition-duration:.15s;transition-timing-function:var(--e1)}
 .ck-r:active{transform:scale(.995)}
 .ck-r > *{pointer-events:none}
-/* Действие внутри строки (владелец, 11 окт 2026: «Сегодня не заказываем» у
-   заявки в магазин) — своя плашка под подписью, нажимается отдельно от строки. */
-.ck-r .ck-act{pointer-events:auto;display:inline-flex;align-items:center;margin:7px 6px 0 0;padding:6px 11px;border-radius:9px;
-  font-size:11.5px;font-weight:700;letter-spacing:.02em;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.32);cursor:pointer}
+/* Действия внутри строки (владелец, 11 окт 2026: «Сегодня не заказываем» у
+   заявки в магазин) — полкой под строкой, как «История» под плитками склада:
+   строка остаётся 66 ростом с квадратом по центру, а плашки стоят на своей
+   полке от края до края и нажимаются отдельно от строки (4 ноя 2026). */
+.ck-r.acts{flex-wrap:wrap;align-content:flex-start;row-gap:0}   /* gap строки — только между колонками */
+.ck-r.acts > .ck-dot{margin:12px 0}
+.ck-acts{flex:0 0 calc(100% + 32px);margin:0 -16px;padding:9px 16px 10px;display:flex;flex-wrap:wrap;gap:8px;
+  border-top:1px solid rgba(201,169,110,.14);background:rgba(255,255,255,.025)}
+.ck-r .ck-act{pointer-events:auto;display:inline-flex;align-items:center;min-height:28px;padding:0 11px;border-radius:9px;
+  font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.32);cursor:pointer}
 .ck-r .ck-act:active{transform:scale(.97)}
 .ck-r.done .ck-act{color:var(--sub);background:var(--card2);border-color:var(--border2)}
 .ck-r.done{opacity:.72}
@@ -17805,9 +17811,7 @@ function stkValInner(reg){
     ${нет ? `<div class="stk-vnote">${stkNoStock(v)}</div>` : ''}
     ${без ? `<button class="sc-r dn" onclick="accOpen('qr')"><span>QR код не внесён</span>
       <b>${fmtQty(без)}<u>бут</u></b><em>${_SC_CHEV}</em></button>` : ''}
-    <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>
-    ${past ? '' : `<button class="sc-r" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
-      ${MVO.open ? `<b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b>` : ''}<em>${_SC_CHEV}</em></button>`}`;
+    <button class="sc-r" onclick="stkByDistrict()"><span>По районам</span><em>${_SC_CHEV}</em></button>`;
 }
 
 // Прежняя полоса остатка. Оставлена для экрана района, где стоимость не
@@ -19606,8 +19610,8 @@ function stkMoveChoose(){
       <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">Создать заявку на перемещение</span>
         <span class="stk-mv-pick-s">откуда, куда, что и сколько — сканируют обе стороны: и отдающий водитель, и принимающий</span></span>
       <em class="mvn-go">${_SC_CHEV}</em></button>
-    ${MVO.open ? `<button class="sc-r mvn-live" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
-      <b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
+    <button class="sc-r mvn-live" onclick="accOpen('moves')"><span>Незавершённые перемещения</span>
+      ${MVO.open ? `<b>${MVO.open}<u>${pluralize(MVO.open,'район','района','районов')}</u></b>` : ''}<em>${_SC_CHEV}</em></button>`;
 }
 
 // Ручная заявка — та же, что у операторов, но районы любые. Строка помнит
@@ -21104,7 +21108,12 @@ function chkRow(r){
   // Справа времени нет (владелец, 10 сен 2026: «убери отсюда время»): «к 21:00»
   // и «+9 мин» отнимали место у названия, а состояние и так говорит цвет
   // точки слева и подпись под названием.
-  return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
+  // Действия — полкой под строкой (владелец, 4 ноя 2026: «эту кнопку в
+  // чек-листе исправь»): плашка в столбике под подписью растягивала строку,
+  // квадрат слева повисал между подписью и плашкой, а «Не отправляли» под
+  // «отправлена» читалось как состояние, а не как действие.
+  const acts = chkRowAct(r);
+  return `<button class="ck-r ${st.c}${acts ? ' acts' : ''}" onclick="chkGo('${escS(r.go)}')">
     <span class="ck-dot">${r.state === 'done'
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
@@ -21112,9 +21121,9 @@ function chkRow(r){
            stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`}</span>
     <span class="ck-b">
       <span class="ck-t">${escS(r.t)}</span>
-      <span class="ck-s">${escS(r.s)}</span>${chkRowAct(r)}
+      <span class="ck-s">${escS(r.s)}</span>
     </span>
-    <span class="ck-go">${ICO_CHEV}</span>
+    <span class="ck-go">${ICO_CHEV}</span>${acts ? `<span class="ck-acts">${acts}</span>` : ''}
   </button>`;
 }
 
@@ -21122,12 +21131,14 @@ function chkRow(r){
 // Отправил ли файл магазину, знает только старший — «Отправил в магазин»;
 // «Сегодня не заказываем» гасит зелёным и заявку, и поставку («сегодня заявки
 // нет»), «Заказываем» возвращает. Магазин ответил — действий больше нет.
+// Отправленная снимается «Снять отметку»: «Не отправляли» рядом с
+// «отправлена» читалось как состояние (4 ноя 2026).
 function chkRowAct(r){
   if(r.id !== 'order_sent' || !CKL) return '';
   const act = (t, fn) => `<span class="ck-act" role="button" onclick="event.stopPropagation(); ${fn}">${t}</span>`;
   if(CKL.order_skip) return act('Заказываем', 'chkOrderSkip(false)');
   if(CKL.order_answered) return '';
-  if(CKL.order_sent) return act('Не отправляли', 'chkOrderSent(false)');
+  if(CKL.order_sent) return act('Снять отметку', 'chkOrderSent(false)');
   return act('Отправил в магазин', 'chkOrderSent(true)') + act('Сегодня не заказываем', 'chkOrderSkip(true)');
 }
 async function chkOrderSent(on){
@@ -31652,7 +31663,8 @@ async function mvoLoad(){
 
 // Карточки перемещений на «Обзоре» больше нет (владелец, 20 сен 2026: «убери
 // перемещения из обзора, это была временная мера»). Заявки — в «Учёте», склад →
-// «Незавершённые перемещения»; MVO.open по-прежнему считает районы для той строки.
+// «Перемещение» → «Незавершённые перемещения» (под остатками строки больше нет —
+// владелец, 4 ноя 2026); MVO.open по-прежнему считает районы для той строки.
 
 function mvoFold(key){
   MVO.fold.has(key) ? MVO.fold.delete(key) : MVO.fold.add(key);

@@ -17359,7 +17359,11 @@ function stkBack(){
     // из кнопки бота или «Алертов» — закрыть склад, туда, где были.
     if(STK.repFrom === 'checklist' || STK.repFrom === 'link'){ closeStock(); return; }
     if(STK.repFrom === 'audits') stkAudits(STK.audFocus, STK.audFrom); else stkAuditPick(); return; }
-  if(STK.view === 'sheet'){ stkAuditPick(); return; }
+  // Страница района открыта сразу (чек-лист или кнопка бота, когда отчёта ещё
+  // нет) — назад туда, откуда пришли; изнутри склада — к выбору района.
+  if(STK.view === 'sheet'){
+    if(STK.sheetFrom === 'checklist' || STK.sheetFrom === 'link'){ STK.sheetFrom = ''; closeStock(); return; }
+    stkAuditPick(); return; }
   // История открывается и с плитки склада, и с карточки района — назад туда же.
   if(STK.view === 'audits'){ if(STK.audFrom === 'pick') stkAuditPick(); else stkPicker(); return; }
   if(STK.view === 'moves' || STK.view === 'moves-hist' || STK.view === 'audit-pick'){ stkPicker(); return; }
@@ -18473,6 +18477,7 @@ async function stkAuditGo(id, day){
   // День передаём всегда. Без него audOpen оставлял день прошлого открытия:
   // открыли «Не завершена 26 сен», вернулись, нажали на район — и снова
   // попадали в старую ревизию вместо сегодняшней («новую начать не даёт»).
+  STK.sheetFrom = '';               // пришли изнутри склада — «назад» к выбору района
   await audOpen(id, false, day || '');
 }
 
@@ -18782,7 +18787,7 @@ async function audAlienDrop(code){
   }
   _audHap('medium');
   _toast(r.closed ? 'Код убран · ревизия закрыта' : 'Код убран из итога');
-  await audReportOpen(rep.district, rep.day);
+  await audReportOpen(rep.district, rep.day, STK.repFrom);   // откуда открывали отчёт — оттуда и «назад»
 }
 
 async function audStart(){
@@ -21365,6 +21370,7 @@ async function audReportOpen(district, day, from){
     // Отчёта нет — ревизию возобновили или ещё не завершили: показываем, что
     // с ней сейчас, на странице района.
     _toast('Отчёта нет — ревизия идёт');
+    STK.sheetFrom = from;           // с чек-листа или из кнопки бота — «назад» наружу, а не к выбору района
     await audOpen(district);
     return;
   }
@@ -24693,7 +24699,13 @@ function fbHistOpen(line, from){
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbHistHtml(b)}</div>`;
   mid.scrollTop = 0;
   const back = FB.hist.from;
-  ACC_BACK = back && back.kind === 'line' ? () => fbLinePay(back.id) : accFinRP;
+  // Назад на страницу статьи — с тем же «кому» и тем же «назад», что были у
+  // неё (группа / «кому» / РП−): иначе после истории стрелка со статьи вела в
+  // РП−, минуя страницу группы.
+  const lb = FB.lback, lw = FB.lwho;
+  ACC_BACK = back && back.kind === 'line'
+    ? () => { fbLinePay(back.id, lw || undefined); if(lb) ACC_BACK = FB.lback = lb; }
+    : accFinRP;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbHistPaint(){
@@ -26344,7 +26356,9 @@ function fbRentPay(grp){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbRentPayHtml(b)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = fbRpOutPage;
+  // Со страницы группы («Расходы на автомобили» → «Аренда») — стрелка на неё
+  // же, а не через голову в РП−.
+  { const sec = FB.sec; ACC_BACK = sec ? () => fbSecPage(sec) : fbRpOutPage; }
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbRentPayPaint(){
@@ -26476,6 +26490,7 @@ async function fbPayUndo(eid){
 function fbLinePay(id, who){
   const b = fbBook(FB.month); if(!b) return;
   const l = ((b.budget || {}).lines || []).find(x => x.id === id); if(!l) return;
+  const sec = FB.sec;               // пришли со страницы группы — стрелка туда же, не в РП−
   FB.shot = null; FB.line = id; FB.lineSet = true; FB.lpage = id; FB.rentGrp = null; FB.salPage = false;
   FB.who = null; FB.sec = null; FB.rpPage = false; FB.hist = null;
   // билеты и визы — на человека: имя пришло со страницы «кому», его и пишем
@@ -26485,7 +26500,8 @@ function fbLinePay(id, who){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbPayBody">${fbLinePayHtml(b, l)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = fbNeedsWho(l) ? () => fbWhoPage(id) : fbRpOutPage;
+  ACC_BACK = fbNeedsWho(l) ? () => fbWhoPage(id) : sec ? () => fbSecPage(sec) : fbRpOutPage;
+  FB.lback = ACC_BACK;              // «История» со страницы статьи вернёт его на место
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 // ── Билеты и визы: сначала — кому ────────────────────────────────────────
@@ -28187,7 +28203,7 @@ function fbItemPerson(name){
   const mid = document.getElementById('accMid');
   mid.innerHTML = `<div class="fb-page in" id="fbItemBody">${fbItemPersonHtml(b)}</div>`;
   mid.scrollTop = 0;
-  ACC_BACK = () => accOpen('finitems');
+  ACC_BACK = () => fbDiscOpen();    // сюда приходят только с «Дисциплины» — туда и назад, а не через голову в штрафы
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 function fbItemPersonList(b){
@@ -28772,10 +28788,12 @@ function accClose(){
   return true;                      // закрыт сразу; false — спросили, раздел пока на месте
 }
 
-function _accClose(){
+// keepCkl — раздел убирают, чтобы показать склад под ним (qrExit): возврат в
+// чек-лист (CKL_RETURN) остаётся за отчётом ревизии, который там лежит.
+function _accClose(keepCkl){
   ACC_BACK = null;
   document.getElementById('accOv').classList.remove('pen-ui', 'sdc', 'cfd');
-  CKL_RETURN = false;
+  if(!keepCkl) CKL_RETURN = false;
   SCAN.stop();
   MVT = null;
   supPollStop();
@@ -31214,14 +31232,26 @@ async function accQR(){
   // Пришли из ревизии по «QR не внесён» — сразу на ту точку, где стоим.
   // Из отчёта по кодам не из реестра — тоже на ту точку, но новым товаром:
   // в пересчёте этих бутылок нет, и на склад они попадут только приходом.
+  QR_DIRECT = false;
   if(QR_WANT){
     const want = QR_WANT, fresh = QR_WANT_NEW;
-    QR_WANT = null; QR_WANT_NEW = false; QR_NEED = !fresh; qrPick(want); return;
+    QR_WANT = null; QR_WANT_NEW = false; QR_NEED = !fresh; QR_DIRECT = true; qrPick(want); return;
   }
   // Из чек-листа по «Не отсканировано после приёмки» — сразу на страницу
   // района с незавершённого приёма.
-  if(QR_WANT_IN){ const want = QR_WANT_IN; QR_WANT_IN = null; return qrIntake(want); }
+  if(QR_WANT_IN){ const want = QR_WANT_IN; QR_WANT_IN = null; QR_DIRECT = true; return qrIntake(want); }
   await qrHome();
+}
+// Раздел открыли сразу на странице точки, минуя первый экран (отчёт ревизии
+// → «QR не внесён», строка чек-листа): стрелка с неё ведёт туда, откуда
+// пришли, а не на первый экран, где не были (владелец, 5 ноя 2026: «один шаг
+// вперёд — стрелка один шаг назад»). Склад под разделом (отчёт) — раздел
+// убираем, отчёт снова виден и перечитан, его очередь вернуть в чек-лист;
+// иначе — как обычный «назад» с корня: чек-лист или закрыть.
+let QR_DIRECT = false;
+function qrExit(){
+  if(document.getElementById('stkOv').classList.contains('show')){ _accClose(true); return; }
+  ACC_BACK = null; accBack();
 }
 
 // Уйти со списка позиций. Внесли хоть одну — сперва вопрос: сохранить или
@@ -31310,7 +31340,7 @@ function _lockOn(district, product_id){
 // строки районов: человек смотрит на список, и он не должен уезжать из-под
 // пальца.
 async function qrHome(тихо){
-  QR_IN = null; RCV_HOME = null; RCV_EXIT = null;
+  QR_IN = null; RCV_HOME = null; RCV_EXIT = null; QR_DIRECT = false;
   if(!тихо){
     _qrHead('Внести / удалить товар', 'загрузка…', null);
     document.getElementById('accMid').innerHTML = '<div class="scan-empty">Загрузка…</div>';
@@ -31644,7 +31674,7 @@ async function qrIntake(district, тихо){
   const d0 = ((ACC_IN && ACC_IN.districts) || []).find(x => x.id === district) || {};
   if(!тихо){
     QR_IN = {district, tasks: [], sig: ''};
-    _qrHead(`${d0.code || ''} ${d0.name || ''}`.trim(), 'загрузка…', () => qrHome());
+    _qrHead(`${d0.code || ''} ${d0.name || ''}`.trim(), 'загрузка…', QR_DIRECT ? qrExit : () => qrHome());
     document.getElementById('accMid').innerHTML = '<div class="scan-empty">Загрузка…</div>';
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   }
@@ -32477,7 +32507,7 @@ function qrPick(district){
   const head = _qrHead(`${d.code || ''} ${d.name || ''}`.trim() || 'Точка',
                        QR_FOUND ? `${QR_FOUND.code} · выберите позицию`
                        : QR_NEED ? 'позиции без QR кода' : 'выберите позицию',
-                       QR_FOUND ? () => { QR_FOUND = null; qrHome(); } : () => qrLeave());
+                       QR_FOUND ? () => { QR_FOUND = null; qrHome(); } : () => qrLeave(QR_DIRECT ? qrExit : undefined));
   const box = document.querySelector('#accOv .stk-ttl');
   if(box){
     document.getElementById('accTitle').innerHTML =
@@ -33910,7 +33940,13 @@ async function accSupply(goto, district, sid){
   SUP_GOTO = district ? 'd:' + district : (goto || '');
   XS_DRAFT = {};
   if(district) SUP_OPEN.add(district);
-  ACC_BACK = accOrder;              // поставка живёт внутри заявки
+  // Внутри закупки (раздел order: хаб → приёмка) поставка живёт внутри заявки
+  // — стрелка в хаб. Открыли поставку сразу, минуя хаб (строка чек-листа,
+  // кнопка бота ?go=supply, звонок: ACC_VIEW = 'supply') — стрелка ведёт туда,
+  // откуда пришли: в чек-лист (accBack по CKL_RETURN) или наружу, а не в хаб,
+  // на котором не были (владелец, 5 ноя 2026: «логичнее было — один шаг
+  // вперёд, стрелка один шаг назад»).
+  ACC_BACK = ACC_VIEW === 'supply' ? null : accOrder;
   _setText('accTitle', 'Поставка');
   supActShow();
   _setText('accSub', 'загрузка…');
@@ -33947,7 +33983,11 @@ async function accShort(sid){
   }
   const cur = sid ? (list.find(x => x.supply_id === sid) || {supply_id: sid, kind: 'extra'})
                   : (_supMain(list) || list.find(x => x.kind !== 'extra'));
-  ACC_BACK = cur && cur.kind === 'extra' ? (() => xOpen(cur.supply_id)) : accOrder;
+  SHORT_SID = sid;                  // сюда вернётся «назад» с открытой отсюда доп. заявки (xOpen)
+  // Со строки чек-листа (ACC_VIEW = 'short') — стрелка назад в чек-лист, а не
+  // в хаб, на котором не были; из хаба — в хаб, с доп. заявки — на неё.
+  ACC_BACK = ACC_VIEW === 'short' ? null
+           : cur && cur.kind === 'extra' ? (() => xOpen(cur.supply_id)) : accOrder;
   if(!cur){ shortBody(null); return; }
   // Всегда заново: остаток зависит от заявок, созданных секунду назад.
   SUP_ID = cur.supply_id;
@@ -33981,7 +34021,7 @@ function shortBody(d){
   // сказать, куда именно.
   const kidRows = kids.length ? `<div class="sc" style="margin-top:10px">
       <div class="sc-cap"><span>Уже в заявках</span></div>
-      ${kids.map(k => `<button class="sc-r" onclick="xOpen('${escS(k.supply_id)}')">
+      ${kids.map(k => `<button class="sc-r" onclick="xOpen('${escS(k.supply_id)}', 'short')">
         <span>${escS(k.base || 'База')}<i class="sh-kid"> · ${
           k.status === 'open' ? 'в работе' : k.status === 'cancelled' ? 'отменена' : 'принята'}</i></span>
         <b>${fmt(k.qty)}<u>${pluralize(k.qty,'бутылка','бутылки','бутылок')}</u></b><em>${_SC_CHEV}</em>
@@ -34490,12 +34530,17 @@ async function xDraftDropGo(){
 
 // Заявка на базу открывается в ту же приёмку, что и основная: тот же экран,
 // те же «Взять на себя» и «Отменить». Стрелка ведёт обратно в список баз.
-async function xOpen(sid){
+// from — откуда открыли: 'short' — со страницы недобора («Уже в заявках»),
+// стрелка ведёт обратно на неё; иначе — в список доп. заявок. Страница цен
+// (xPrices) передаёт X_FROM дальше, чтобы путь не терялся.
+let X_FROM = '', SHORT_SID;
+async function xOpen(sid, from){
+  X_FROM = from || '';
   _setText('accTitle', 'Приёмка');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   await supLoad(sid);
-  ACC_BACK = accExtra;
+  ACC_BACK = X_FROM === 'short' ? () => accShort(SHORT_SID) : accExtra;
 }
 
 // ── приёмка ──
@@ -35889,7 +35934,7 @@ function _xUnit(pid){
 async function xPrices(sid){
   if(!SUP_D || SUP_D.supply_id !== sid) await supLoad(sid);
   const d = SUP_D; if(!d) return;
-  ACC_BACK = () => xOpen(sid);
+  ACC_BACK = () => xOpen(sid, X_FROM);
   _setText('accTitle', 'Цены закупки');
   _setText('accSub', d.base || '');
   document.getElementById('accAct').innerHTML = '';
@@ -35919,7 +35964,7 @@ function xPricesPaint(){
       </div>`; }).join('')}
     <div class="xp-tot"><span>Итого закупка</span><b id="xpTot">${fmt(Math.round(f.cost))} AED</b></div>`;
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
-    <button class="qb" onclick="xOpen('${escS(d.supply_id)}')">${f.priced >= f.n ? 'Готово' : `Готово · ${f.priced} из ${f.n}`}</button></div>`;
+    <button class="qb" onclick="xOpen('${escS(d.supply_id)}', X_FROM)">${f.priced >= f.n ? 'Готово' : `Готово · ${f.priced} из ${f.n}`}</button></div>`;
 }
 async function xPriceSave(pid){
   const d = SUP_D; if(!d) return;
@@ -36186,16 +36231,22 @@ async function rcvOpen(oid){
   }catch(e){ RCV = null; }
   if(!RCV) return _toast('Не удалось открыть');
   RCV_LINE = null; RCV_ROWS = []; RCV_HOME = null; RCV_EXIT = null;
+  RCV_BACK = ACC_BACK;              // «назад» самой поставки — вернуть ей, когда уйдём с района
   rcvRender();
 }
 
 // Выход с экрана приёмки — обратно к списку районов той же поставки, а не в
-// начало раздела: за одну ходку закрывают несколько районов подряд.
+// начало раздела: за одну ходку закрывают несколько районов подряд. Поставке
+// возвращается её же «назад» (хаб или чек-лист): supLoad его не ставит, и
+// после района стрелка с поставки закрывала раздел, минуя хаб.
+let RCV_BACK = null;
 function rcvBack(){
   SCAN.stop();
   rcvHoldStop(); rcvPollStop();
   RCV = null; RCV_LINE = null; RCV_ROWS = []; RCV_HOME = null; RCV_EXIT = null;
+  const back = RCV_BACK; RCV_BACK = null;
   supLoad(SUP_ID);
+  ACC_BACK = back;
 }
 
 function rcvRender(){
@@ -36947,13 +36998,17 @@ function supActShow(sup){
 // экран: карточка на каждую открытую заявку (основная и другие базы), строка
 // на район с отметкой. Отменяют выбранные районы; отмечены все — отменяется
 // заявка. Принятый район отменить нельзя: товар уже на полке.
-let SUPC = {sups: [], sel: {}, from: ''};
+let SUPC = {sups: [], sel: {}, from: '', view: null};
 function supCancelOpen(from){
-  SUPC = {sups: [], sel: {}, from: from || ''};
+  // view — раздел, из которого пришли: accOpen('supcancel') его перепишет, а
+  // «назад» на поставку должно вернуть её с тем же «назад», что был (с
+  // чек-листа — в чек-лист, из хаба — в хаб), см. accSupply.
+  SUPC = {sups: [], sel: {}, from: from || '', view: ACC_VIEW};
   accOpen('supcancel');
 }
 async function accSupCancel(){
-  ACC_BACK = SUPC.from === 'sup' ? accSupply : SUPC.from === 'extra' ? accExtra : accOrder;
+  ACC_BACK = SUPC.from === 'sup' ? () => { ACC_VIEW = SUPC.view || 'order'; accSupply(); }
+           : SUPC.from === 'extra' ? accExtra : accOrder;
   _setText('accTitle', 'Отмена заявки');
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';

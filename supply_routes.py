@@ -20,6 +20,7 @@
 """
 import io
 import logging
+import os
 import re
 import zipfile
 from datetime import datetime, timezone, timedelta
@@ -2204,7 +2205,6 @@ async def fin_request(sid: str, oid: str, me: str, note: str = "",
 def _star_button(text: str, go: str) -> dict:
     """Кнопка под сообщением: мини-апп сразу на нужном экране (?go=…), как у
     напоминания о приёмке без кодов (supply_nag)."""
-    import os
     from urllib.parse import quote
     url = os.getenv("OWNER_WEBAPP_URL", "https://owner.ambar-delivery.com/")
     url += ("&" if "?" in url else "?") + "go=" + quote(go, safe="")
@@ -3687,10 +3687,9 @@ async def _cancel_tell(drivers: list, whole: bool = True):
     if not drivers:
         return
     try:
-        import os as _os
         import config_staff as _staff
         from api_server import tg_send
-        token = _os.getenv("DRIVER_BOT_TOKEN", "")
+        token = os.getenv("DRIVER_BOT_TOKEN", "")
         if not token:
             return
         by: dict = {}

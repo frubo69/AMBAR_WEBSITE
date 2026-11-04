@@ -7,9 +7,11 @@
 
     python3 tools/test_intake_fuzz.py
 """
-import asyncio, inspect, os, sys
+import asyncio, inspect, os, re, sys
+from datetime import datetime
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT); sys.path.insert(0, os.path.join(ROOT, "tools"))
+from mongomock_motor import AsyncMongoMockClient                   # noqa: E402
 import fuzz_intake as F                                            # noqa: E402
 import db, supply_routes as sr, stock_routes as SR                 # noqa: E402
 
@@ -76,6 +78,23 @@ for имя, mod, функция, a, b in ПОЛОМКИ:
     setattr(mod, функция, было)
 F.БЕДЫ.clear(); F.МИР["тихо"] = False
 eq("после возврата всё снова чисто", asyncio.run(F.прогон(1234, 110)), True)
+
+print("── _save_new: все номера заняты — запасной hex-хвост ──────────")
+async def _все_заняты():
+    """Основа и все 26 букв заняты (функция пробует основу и b–z) — номер
+    из шести hex-знаков, поставка вставлена, чужие записи целы. До 4 ноя
+    2026 здесь был NameError: os не был импортирован в шапке модуля."""
+    db._db = AsyncMongoMockClient()["ambar_save_new_full"]
+    now = datetime(2026, 11, 4, 9, 14, 52)
+    основа = "S" + now.strftime("%y%m%d-%H%M%S")
+    for хвост in [""] + list("abcdefghijklmnopqrstuvwxyz"):
+        await db._db.supplies.insert_one({"_id": основа + хвост, "kind": "занято"})
+    sid = await sr._save_new({"kind": "main", "day": "2026-11-04"}, "S", now)
+    doc = await db._db.supplies.find_one({"_id": sid})
+    return sid, основа, (doc or {}).get("kind"), await db._db.supplies.count_documents({})
+sid, основа, вид, всего = asyncio.run(_все_заняты())
+eq("номер = основа + «-» + шесть hex-знаков", bool(re.fullmatch(re.escape(основа) + r"-[0-9a-f]{6}", sid)), True)
+eq("поставка записана под ним, 27 занятых целы", (вид, всего), ("main", 28))
 
 print("\nИТОГ:", "все прошли" if not FAIL else f"провалено: {FAIL}")
 sys.exit(1 if FAIL else 0)

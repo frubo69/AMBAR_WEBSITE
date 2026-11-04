@@ -9477,12 +9477,18 @@ button.exp-wait:active{transform:scale(.99)}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.5),0 0 0 3px rgba(76,175,125,.14)}
 #tbCkl.need.on .tb-check{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.5),0 0 0 3px rgba(224,85,85,.16)}
 @media (max-width:340px){ .tb-check{font-size:9px;letter-spacing:.9px} }   /* на 320 плашка 55 px — буквам нужен воздух */
-/* Чек-лист открыт — полоса вкладок остаётся снизу (владелец, 4 ноя 2026:
-   «когда переходишь в эту вкладку нав бар не должен пропадать снизу»):
-   поднимается над разделом, список получает место под неё. Глубже — в
-   заявке, на складе — полоса снова уходит под раздел. */
-html:has(#accOv.show.ckl-bar):not(:has(#stkOv.show)) .tabbar{z-index:121}
-#accOv.ckl-bar #accMid{padding-bottom:calc(var(--tbh,80px) + 16px)}
+/* Полоса вкладок остаётся снизу и под разделами (владелец, 4 ноя 2026 —
+   чек-лист: «нав бар не должен пропадать снизу»; 5 ноя — везде, где нет
+   своей полосы внизу: «там где есть эти полоски типа „загрузить ответ
+   магазина" пока шторку не добавляй»). Класс ckl-bar (чек-лист, cklSkin)
+   или bar-on (barSync: подвал пуст, камеры нет, раздел не из BAR_SKIP) на
+   слое раздела поднимает полосу над ним, а списку даёт место под неё. Склад
+   и страницы-оверлеи — тем же классом; раздел под открытым складом полосу
+   не держит. Окна-вопросы (131) и модальные окна (200+) остаются выше. */
+html:has(#accOv.show:is(.ckl-bar,.bar-on)):not(:has(#stkOv.show)):not(:has(.pg-ov.show)) .tabbar{z-index:121}
+html:has(#stkOv.show.bar-on):not(:has(.pg-ov.show)) .tabbar{z-index:121}
+html:has(.pg-ov.show.bar-on) .tabbar{z-index:151}
+#accOv:is(.ckl-bar,.bar-on) #accMid,#stkOv.bar-on #stkMid,.pg-ov.bar-on .stk-mid{padding-bottom:calc(var(--tbh,80px) + 16px)}
 
 /* Tiny legend / footnote */
 .foot{font-size:10px;color:var(--dim);text-align:center;padding:18px 0 4px;letter-spacing:.5px}
@@ -13559,10 +13565,16 @@ window.addEventListener('load', () => setTimeout(_navRestore, 600));
 document.querySelectorAll('.tb').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const pg = btn.dataset.pg;
+    // Полоса видна над разделом (чек-лист, список учёта, склад, «Анализ») —
+    // тап по вкладке сперва закрывает его; спросили о несохранённом —
+    // остаёмся. Открытый чек-лист при тапе по CHECK не закрывается.
+    { const acc = document.getElementById('accOv'), stk = document.getElementById('stkOv'),
+            an = document.getElementById('finAnOv');
+      const over = el => el && el.classList.contains('show') && (el.classList.contains('bar-on') || el.classList.contains('ckl-bar'));
+      if(over(an)) fbAnClose();
+      if(over(stk)) closeStock();                   // из чек-листа (CKL_RETURN) — вернёт чек-лист
+      if(over(acc) && !(pg === 'checklist' && ACC_VIEW === 'checklist') && !accClose()) return; }
     if(pg === 'checklist'){ cklTab(); return; }     // раздел поверх страницы, полоса остаётся под ним
-    // Чек-лист открыт — тап по другой вкладке сперва закрывает его.
-    { const ov = document.getElementById('accOv');
-      if(ov.classList.contains('show') && ov.classList.contains('ckl-bar')) accClose(); }
     document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
     btn.classList.add('on');
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -20907,6 +20919,46 @@ function cklBar(){
   const bar = document.querySelector('.tabbar');
   if(bar) document.documentElement.style.setProperty('--tbh', Math.round(bar.getBoundingClientRect().height) + 'px');
 }
+// Полоса под остальными разделами (владелец, 5 ноя 2026: «насколько возможно
+// шторку сделать всегда видимой… там, где есть эти полоски типа „загрузить
+// ответ магазина", пока не добавляй; так же не делай там, где не
+// порекомендовал»). Класс bar-on на слое раздела (#accOv, склад #stkOv,
+// страница «Анализ») стоит, пока у экрана пустой подвал (#accFoot / #stkFoot)
+// и нет камеры; хаб закупки (раздел order: свои оболочки во всю высоту с
+// полосой внизу), сбор выручки (оболочка sdc) и отчёт ДДС за день (cfd) — со
+// своей полосой внизу содержимого — без него, чек-лист ведёт cklSkin. Подвал
+// и камера появляются после загрузки раздела и на глубине (страница поставки,
+// отчёт ревизии, сканер) — поэтому наблюдатель на слоях: подвал встал —
+// полоса ушла под раздел, вернулись к списку — снова снизу.
+const BAR_SKIP_STK = new Set(['scan', 'move-scan']);
+function _footEmpty(id){
+  const f = document.getElementById(id);
+  return !f || (!f.textContent.trim() && !f.querySelector('button,.qb,.stk-main'));
+}
+function _camIn(el){ return !!(el && el.querySelector('.scan-cam,.aud-cam,video')); }
+function barSync(){
+  const acc = document.getElementById('accOv'), stk = document.getElementById('stkOv'),
+        an = document.getElementById('finAnOv');
+  if(!acc || !stk) return;
+  acc.classList.toggle('bar-on', acc.classList.contains('show') && !!ACC_VIEW
+    && ACC_VIEW !== 'order' && ACC_VIEW !== 'checklist'
+    && !acc.classList.contains('sdc') && !acc.classList.contains('cfd')
+    && _footEmpty('accFoot') && !_camIn(acc));
+  stk.classList.toggle('bar-on', stk.classList.contains('show')
+    && !BAR_SKIP_STK.has(STK.view || '') && _footEmpty('stkFoot') && !_camIn(stk));
+  if(an) an.classList.toggle('bar-on', an.classList.contains('show'));
+  cklBar();
+}
+// Наблюдатель зовёт barSync прямо: все изменения одной задачи приходят одной
+// пачкой, а повторный вызов от своих же классов ничего не меняет и затихает.
+window.addEventListener('load', () => {
+  const obs = new MutationObserver(() => barSync());
+  ['accOv', 'stkOv', 'finAnOv'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) obs.observe(el, {attributes:true, attributeFilter:['class'], childList:true, subtree:true});
+  });
+  barSync();
+});
 // Значок вкладки красный, пока есть дела, которые опаздывают или пора делать сейчас.
 function cklMark(c){
   const b = document.getElementById('tbCkl'); if(!b) return;
@@ -28650,6 +28702,7 @@ function accOpen(id){
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
   cklSkin(id === 'checklist');
+  barSync();
   _navSave();
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accMid').classList.remove('xs-fix', 'ap-host');
@@ -28713,9 +28766,10 @@ function accBack(){
 function accClose(){
   // Уходить с несохранённой перестановкой молча нельзя: человек либо забудет,
   // что натыкал, либо решит, что оно уже применено.
-  if(ACC_VIEW === 'crew' && typeof crewDirty === 'function' && crewDirty()){ crewAsk(); return; }
-  if(typeof xsDirty === 'function' && xsDirty()){ xsAsk(_accClose); return; }
+  if(ACC_VIEW === 'crew' && typeof crewDirty === 'function' && crewDirty()){ crewAsk(); return false; }
+  if(typeof xsDirty === 'function' && xsDirty()){ xsAsk(_accClose); return false; }
   _accClose();
+  return true;                      // закрыт сразу; false — спросили, раздел пока на месте
 }
 
 function _accClose(){

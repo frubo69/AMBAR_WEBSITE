@@ -9416,6 +9416,7 @@ button.exp-wait:active{transform:scale(.99)}
 .tb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;transition-property:var(--tp);transition-duration:.2s;transition-timing-function:var(--e1)}
 .tb.on{color:var(--gold2)}
 .tb.on svg{stroke:var(--gold2);filter:drop-shadow(0 0 8px rgba(201,169,110,.35))}
+.tb.need svg{stroke:var(--dn)}   /* чек-лист требует внимания */
 /* Шесть подписей в одну строку: «Чек-лист» и «Финансы» на узком экране
    ломались по дефису и наезжали на соседей. */
 .tb{white-space:nowrap}
@@ -13207,11 +13208,12 @@ body.safe-open .cvo-hdr{opacity:0}
   </button>
   <!-- Чек-лист — вкладкой (владелец, 4 ноя 2026: «хочу чек-лист сделать кнопкой
        внизу в нав баре»). Сам чек-лист живёт в разделе учёта поверх любой
-       страницы; цифра — сколько дел опаздывает или пора делать сейчас. -->
+       страницы. Есть дела, которые опаздывают или пора делать сейчас, —
+       линии значка красные, не серые; цифры в кружке нет (владелец: «не пиши
+       там вот эту цифру в кружочке»). -->
   <button class="tb" data-pg="checklist" id="tbCkl">
     <svg viewBox="0 0 24 24"><path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/><path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg>
     Чек-лист
-    <span class="tab-badge" id="cklTabBadge" style="display:none">0</span>
   </button>
   <button class="tb" data-pg="finance">
     <svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M4 16l5-5 4 4 7-8"/><path d="M15 7h5v5"/></svg>
@@ -13414,7 +13416,7 @@ try{ if(window.Telegram && Telegram.WebApp){
   pollNotifs();
   setInterval(pollNotifs, 30000);
 })();
-// Цифра на вкладке «Чек-лист»: при старте и раз в пять минут.
+// Значок вкладки «Чек-лист»: при старте и раз в пять минут.
 if(window.ownerApi){ setTimeout(cklRefresh, 1500); setInterval(cklRefresh, 300000); }
 
 // Приложение свернули — движение замирает. В телеграме мини-апп не
@@ -20808,24 +20810,24 @@ function cklTab(){
   if(ACC_VIEW === 'checklist' && document.getElementById('accOv').classList.contains('show')) return;
   accOpen('checklist');
 }
-// Цифра на вкладке — сколько дел опаздывает или пора делать сейчас.
-function cklBadge(c){
-  const b = document.getElementById('cklTabBadge'); if(!b) return;
+// Значок вкладки красный, пока есть дела, которые опаздывают или пора делать сейчас.
+function cklMark(c){
+  const b = document.getElementById('tbCkl'); if(!b) return;
   const n = c ? (+c.late || 0) + (+c.now || 0) : 0;
-  b.textContent = n; b.style.display = n ? 'flex' : 'none';
+  b.classList.toggle('need', n > 0);
 }
 // Счётчики — при старте и раз в пять минут; открытый чек-лист обновит их сам.
 async function cklRefresh(){
   if(HIDE || !window.ownerApi) return;
   try{
     const r = await ownerApi.ownerFetch('/api/owner/checklist');
-    CKL_CNT = (r && r.counts) || null; cklBadge(CKL_CNT);
+    CKL_CNT = (r && r.counts) || null; cklMark(CKL_CNT);
     if(!CKL) CKL = r;
   }catch(e){}
 }
 async function chkDot(){
   const пиши = c => {
-    cklBadge(c);
+    cklMark(c);
     const d = document.getElementById('chkDot');
     if(!d || !c) return;
     d.className = 'chk-e-dot ' + (c.late ? 'late' : c.now ? 'now' : 'ok');
@@ -21002,7 +21004,7 @@ async function accChecklist(keepDay){
     return;
   }
   CKL_CNT = (CKL && CKL.counts) || null;
-  if(!CKL_OFF) cklBadge(CKL_CNT);        // цифра на вкладке — про сегодня
+  if(!CKL_OFF) cklMark(CKL_CNT);         // значок вкладки — про сегодня
   chkRender();
 }
 

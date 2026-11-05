@@ -30253,7 +30253,7 @@ async function ordPrices(only){
 }
 
 // Предложения магазина: цена из его файла против нашей закупочной. «Принять»
-// — закупочная становится ценой магазина (рукой владельца), «Оставить» —
+// — закупочная становится ценой магазина (рукой владельца), «Не менять» —
 // предложение закрывается. Денег не двигает: это прайс, а не книга.
 const fmtP = v => (v == null ? '—' : Number.isInteger(+v) ? fmt(+v) : (+v).toFixed(2).replace('.', ','));
 function oprProps(){
@@ -30263,11 +30263,11 @@ function oprProps(){
     <div class="sc-cap"><span>Новые цены магазина</span><b>${rows.length}</b></div>
     ${rows.map(r => `<div class="oprp-r" id="oprp-${escS(r.id)}">
       <span class="oprp-b"><b>${escS(r.name)}</b><i>${fmtP(r.ours)} → ${fmtP(r.theirs)} AED · ${r.unit > 1 ? 'за коробку' : 'за бутылку'}</i></span>
-      <button class="aud-b soft" onclick="oprPropDecide('${escS(r.id)}', false)">Оставить</button>
+      <button class="aud-b soft" onclick="oprPropDecide('${escS(r.id)}', false)">Не менять</button>
       <button class="aud-b go" onclick="oprPropDecide('${escS(r.id)}', true)">Принять</button>
     </div>`).join('')}
     ${rows.length > 1 ? `<div class="aud-act">
-      <button class="aud-b soft" onclick="oprPropAll(false)">Оставить все</button>
+      <button class="aud-b soft" onclick="oprPropAll(false)">Не менять все</button>
       <button class="aud-b go" onclick="oprPropAll(true)">Принять все</button></div>` : ''}
   </div>`;
 }
@@ -30298,7 +30298,7 @@ async function oprPropAll(accept){
   if(OPR.busy) return;
   const n = ((OPR.d && OPR.d.proposals) || []).length;
   if(!await askDialog(accept ? 'Принять все цены магазина?' : 'Оставить наши цены?',
-                      `${n} ${pluralize(n,'позиция','позиции','позиций')}`, accept ? 'Принять все' : 'Оставить все', 'Вернуться назад')) return;
+                      `${n} ${pluralize(n,'позиция','позиции','позиций')}`, accept ? 'Принять все' : 'Не менять все', 'Вернуться назад')) return;
   OPR.busy = true;
   try{
     const res = await ownerApi.ownerFetch('/api/owner/stock/prices/proposal', {method:'POST', body:{all: true, accept, as:_meName()}});

@@ -3240,7 +3240,7 @@ html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
-  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  background:linear-gradient(90deg,rgba(76,175,125,.7),var(--up));
   transition:width .5s var(--e1)}
 /* Невыполненное — красным и жирным целиком: это не примечание, а долг. */
 .ck-h-s{font-size:13px;font-weight:700;color:var(--dn)}
@@ -3294,16 +3294,16 @@ html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
 .ck-r .ck-act:active{transform:scale(.97)}
 .ck-r.done .ck-act{color:var(--sub);background:var(--card2);border-color:var(--border2)}
 .ck-r.done{opacity:.72}
-/* Светофор в квадрате: красный — просрочено, жёлтый — пора, зелёный —
-   сделано, серый — ещё впереди. Галочка у сделанного, крестик у остальных:
-   «выполнено» и «не выполнено» — разные вещи, а не оттенки. */
+/* Два цвета в квадрате (владелец, 5 ноя 2026: «либо требует внимания, либо
+   не требует», жёлтого не должно быть нигде): красный — опаздывает или пора,
+   зелёный — сделано или ещё не время. Галочка у сделанного, крестик у
+   остальных: «выполнено» и «не выполнено» — разные вещи, а не оттенки. */
 .ck-dot{flex:0 0 auto;width:42px;height:42px;border-radius:13px;display:grid;
   place-items:center;color:var(--dim);background:rgba(255,255,255,.04);
   border:1px solid var(--border3)}
 .ck-dot svg{width:15px;height:15px}
-.ck-r.late .ck-dot{color:var(--dn);background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.4)}
-.ck-r.now  .ck-dot{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.32)}
-.ck-r.done .ck-dot{color:var(--up);background:rgba(76,175,125,.12);border-color:rgba(76,175,125,.35)}
+.ck-r.late .ck-dot,.ck-r.now .ck-dot{color:var(--dn);background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.4)}
+.ck-r.done .ck-dot,.ck-r.soon .ck-dot{color:var(--up);background:rgba(76,175,125,.12);border-color:rgba(76,175,125,.35)}
 .ck-b{flex:1;min-width:0}
 .ck-t{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
   letter-spacing:.6px;text-transform:uppercase;line-height:1.2;
@@ -3339,7 +3339,7 @@ html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
 .chk-e-dot{flex:0 0 auto;width:8px;height:8px;margin-right:3px;border-radius:50%;
   background:transparent;transition:background .3s var(--e1),box-shadow .3s var(--e1)}
 .chk-e-dot.ok{background:var(--up);box-shadow:0 0 0 3px rgba(76,175,125,.14)}
-.chk-e-dot.now{background:var(--gold2);box-shadow:0 0 0 3px rgba(201,169,110,.16)}
+.chk-e-dot.now{background:var(--dn);box-shadow:0 0 0 3px rgba(224,85,85,.2)}
 /* Закупка ждёт решения — точка у названия плитки дышит золотом, подпись
    золотая (владелец, 26 окт 2026: «мигать кнопка в закупке»). */
 .acc-attn{display:inline-block;width:8px;height:8px;margin-left:7px;border-radius:50%;vertical-align:1px;
@@ -21164,8 +21164,8 @@ async function accChecklist(keepDay){
 }
 
 // Пульт смены. Не галочки, а расписание: у каждого дела свой час, и цвет
-// говорит, где мы относительно него. Красное опаздывает и мигает, жёлтое пора
-// делать сейчас, серое ещё впереди, зелёное сделано и уезжает вниз.
+// говорит одно — требует внимания или нет (владелец, 5 ноя 2026): красное
+// опаздывает или пора делать сейчас, зелёное сделано или ещё не время.
 //
 // Деления на «закрыть смену» и «открыть смену» больше нет: оно заставляло
 // держать в голове, в какой мы фазе, хотя вопрос всегда один — что просрочено
@@ -21460,7 +21460,7 @@ async function chkCash(){
 // ── Сбор выручки по районам (владелец: «сбор выручки, не сбор денег»; отметка — «получил») ──────────────────────────────────────────────────
 // С 19 сен 2026 называется «Ежедневный сбор и распределение выручки» — и
 // строка на «Финансах», и сам экран (владелец: «переназови в ежедневный сбор
-// и распределение выручки»). Отметка в чек-листе — по-прежнему «Выручка получена».
+// и распределение выручки»). Отметка в чек-листе — по-прежнему «Сбор выручки».
 // Задача «Деньги собраны» — не одна галочка на день, а по галочке на район:
 // деньги сдают по одному, и старший заходит сюда несколько раз за смену.
 // На карточке района одно главное число — «к сдаче» (наличные − расход), под
@@ -22375,7 +22375,7 @@ async function crToggle(id){
   const all = CR.need > 0 && CR.done >= CR.need;
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(all ? 'success' : 'warning'); }catch(e){}
   if(all && !wasAll) _toast('Выручка получена по всем районам');
-  // Чек-лист перечитается при возврате — строка «Выручка получена» считается
+  // Чек-лист перечитается при возврате — строка «Сбор выручки» считается
   // на сервере из этих же отметок.
   CKL = null;
 }

@@ -5281,14 +5281,14 @@ async def _chk_supply(day: str):
     open_list.sort(key=lambda x: (x["day"], x["supply_id"]))
     sup = next((r for r in rows if (r.get("day") or "") == day), None)
     if not sup:
-        return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0, "planned": 0,
+        return {"exists": False, "free": 0, "done": False, "total": 0, "planned": 0,
                 "open_list": open_list}
     tasks = {o: t for o, t in (sup.get("tasks") or {}).items() if not t.get("cancelled_at")}
     free = sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at"))
     # Сколько районов было в заявке (без «не везём сюда»): заявки «появились у
     # всех», когда задача есть у каждого из них (владелец, 11 окт 2026).
     dists = [d for d in (sup.get("districts") or []) if isinstance(d, dict) and not d.get("off")]
-    return {"exists": True, "free": free, "gap": int(sup.get("gap_qty") or 0),
+    return {"exists": True, "free": free,
             "done": (sup.get("status") or "open") != "open", "total": len(tasks),
             "planned": len(dists) if dists else len(tasks), "open_list": open_list}
 
@@ -5335,7 +5335,6 @@ CHK_PLAN = [
     ("unscanned_left", 12.0, 12.0, False),  # остаток без кодов после приёмки — пока он на полке
     ("unscanned",   12.0, 21.0, False),
     ("cash",         5.0,  6.0, True),
-    ("shortfall",   12.0, 21.0, False),
     ("costs",       12.0, 12.0, False),   # позиции без закупочной цены — пока они есть
     ("prices_new",  12.0, 12.0, False),   # новые цены магазина ждут решения — пока они есть
     ("fines",       12.0, 12.0, False),   # штрафы на решение (fines_auto) — пока они есть
@@ -5644,12 +5643,12 @@ async def handle_checklist(request):
         for r in rows:
             if r["id"] == "cash":
                 r.update({"state": "late", "due": "", "late_min": 0})
-    # Недобор появляется в списке только когда он есть: пункт, который штатно
-    # выполнен, каждый день занимал бы строку и приучал не читать список.
-    if sup["gap"]:
-        rows.append(_chk_row("shortfall", "Докупить на базах",
-                             f"магазин не дал {sup['gap']} бутылок",
-                             False, now, day, plan, go="short", n=sup["gap"]))
+    # Недобор ответа магазина строки в чек-листе больше не даёт (владелец,
+    # 5 ноя 2026: «не надо ничего автоматом туда пихать»). Строка «Докупить на
+    # базах» зажигалась сама по gap_qty поставки и не гасла до следующих суток,
+    # хотя заявку на другую базу с 30 окт никто автоматом не собирает. Заявка
+    # на базу, собранная старшим руками, видна здесь как открытая приёмка
+    # («Поставка принята» с именем базы), пока её районы не закрыты.
     # Водитель без входа: сторож геопозиции закрыл ему приложение, и открыть
     # может только старший. Строка есть, пока есть хоть один замок, — и горит
     # красным с той минуты, как он поставлен: человек не может работать.
@@ -5965,7 +5964,7 @@ async def handle_checklist_mark(request):
         body = {}
     day = (body.get("day") or "").strip()
     item = (body.get("item") or "").strip()
-    ok_item = item in CHK_MANUAL | {"shortfall", "recon", "order_skip"} or (
+    ok_item = item in CHK_MANUAL | {"recon", "order_skip"} or (
         item.startswith("cash:") and item[5:] in OFFICE_IDS)
     if not day or not ok_item:
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)

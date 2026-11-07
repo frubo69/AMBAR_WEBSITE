@@ -21254,13 +21254,14 @@ function chkRow(r){
 // Плашки-действия на строке «Заявка в магазин» (владелец, 11 окт 2026).
 // Отправил ли файл магазину, знает только старший — «Отправил в магазин»;
 // «Сегодня не заказываем» гасит зелёным и заявку, и поставку («сегодня заявки
-// нет»), «Заказываем» возвращает. Магазин ответил — действий больше нет.
+// нет»), «Вернуть заявку» возвращает (владелец, 7 ноя 2026: «Замени заказываем
+// на вернуть заявку»). Магазин ответил — действий больше нет.
 // Отправленная снимается «Снять отметку»: «Не отправляли» рядом с
 // «отправлена» читалось как состояние (4 ноя 2026).
 function chkRowAct(r){
   if(r.id !== 'order_sent' || !CKL) return '';
   const act = (t, fn) => `<span class="ck-act" role="button" onclick="event.stopPropagation(); ${fn}">${t}</span>`;
-  if(CKL.order_skip) return act('Заказываем', 'chkOrderSkip(false)');
+  if(CKL.order_skip) return act('Вернуть заявку', 'chkOrderSkip(false)');
   if(CKL.order_answered) return '';
   if(CKL.order_sent) return act('Снять отметку', 'chkOrderSent(false)');
   return act('Отправил в магазин', 'chkOrderSent(true)') + act('Сегодня не заказываем', 'chkOrderSkip(true)');

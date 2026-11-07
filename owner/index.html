@@ -2079,18 +2079,42 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .chk-t.bad .chk-t-s{color:var(--dn);font-weight:700}
 .chk-t.bad .chk-t-d{color:var(--dn);opacity:1}
 
-/* История: одна строка на проверку — имя, сколько, сколько чужих, когда. */
-.chk-hist{border-radius:13px;overflow:hidden;border:1px solid var(--border2)}
-.chk-h{display:flex;align-items:baseline;gap:9px;padding:10px 12px;background:var(--card);
-  border-top:1px solid var(--border2);font-size:13px}
-.chk-h:first-child{border-top:none}
-.chk-h.bad{background:var(--dn-soft)}
-.chk-h-n{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chk-h-v{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--gold2)}
-.chk-h-v i{font-style:normal;font-size:9px;color:var(--muted);margin-left:2px}
-.chk-h-b{padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;
-  background:rgba(224,85,85,.16);color:var(--dn)}
-.chk-h-t{font-size:10.5px;color:var(--muted);white-space:nowrap}
+/* История проверок (владелец, 7 ноя 2026: «история проверки бутылки не
+   понятная»). Было: имя, «14шт», красная цифра без подписи и время, нажать
+   нельзя, а контейнер .chk-hist перебивало старое правило с тем же именем
+   (отступы и полоса слева от первого экрана проверки, 13 авг). Теперь строка —
+   кого проверяли, где и когда, итог словом и цветом, по нажатию — сама
+   проверка с бутылками; «Все проверки» — страница по дням. */
+.bch{border-radius:14px;overflow:hidden;border:1px solid var(--border2);background:var(--card)}
+.bch-r{display:grid;grid-template-columns:30px minmax(0,1fr) auto 14px;align-items:center;gap:10px;
+  width:100%;padding:10px 12px;background:none;border:0;border-top:1px solid var(--border2);
+  color:inherit;font-family:inherit;text-align:left;-webkit-tap-highlight-color:transparent}
+.bch-r:first-child{border-top:0}
+.bch-r:active{background:rgba(255,255,255,.04)}
+.bch-i{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  border:1px solid rgba(226,195,134,.3);background:rgba(226,195,134,.06);color:var(--gold2)}
+.bch-r.free .bch-i{border-color:var(--border2);background:rgba(255,255,255,.04);color:var(--muted)}
+.bch-r.bad .bch-i{border-color:rgba(224,85,85,.4);background:rgba(224,85,85,.1);color:var(--dn)}
+.bch-b{min-width:0}
+.bch-n{display:block;font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bch-s{display:block;font-size:11px;line-height:1.3;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.bch-v{text-align:right;white-space:nowrap}
+.bch-v b{display:block;font-size:12px;font-weight:700;color:var(--up)}
+.bch-r.bad .bch-v b{color:var(--dn)}
+.bch-r.warn .bch-v b{color:var(--warn)}
+.bch-r.none .bch-v b{color:var(--muted);font-weight:600}
+.bch-v i{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px;
+  font-family:'DM Sans',sans-serif;font-variant-numeric:tabular-nums}
+.bch-go{color:var(--muted);display:flex}
+.bch-all{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;
+  padding:11px;border-radius:12px;border:1px solid var(--border2);background:var(--card);color:var(--gold2);
+  font-family:inherit;font-size:13px;font-weight:700;-webkit-tap-highlight-color:transparent}
+.bch-all:active{transform:scale(.99)}
+.bch-day{display:flex;align-items:center;gap:12px;margin:14px 2px 8px;font-size:11px;font-weight:600;
+  letter-spacing:.075em;color:var(--muted);text-transform:uppercase}
+.bch-day::after{content:"";height:1px;flex:1;background:var(--border2)}
+.bch-day:first-child{margin-top:4px}
+.bch-day i{font-style:normal;font-family:'DM Sans',sans-serif;letter-spacing:0;text-transform:none}
 .chk-item{padding:10px 12px;border-radius:11px;margin-bottom:6px;
   background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--up)}
 .chk-item.warn{border-left-color:var(--warn)}
@@ -2102,14 +2126,6 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .chk-item.warn .chk-item-t span{color:var(--warn)}
 .chk-item.bad .chk-item-t span{color:var(--dn)}
 .chk-item-s{font-size:11px;color:var(--muted);margin-top:3px}
-.chk-hist{padding:11px 13px;border-radius:12px;margin-bottom:7px;
-  background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--border2)}
-.chk-hist.warn{border-left-color:var(--warn)}
-.chk-hist.bad{border-left-color:var(--dn)}
-.chk-hist-t{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:600}
-.chk-hist-t span{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:600}
-.chk-hist-s{font-size:11px;color:var(--muted);margin-top:3px}
-.chk-hist-s b.bad{color:var(--dn)}
 .chk-sum{padding:22px 16px;border-radius:18px;text-align:center;
   background:var(--card);border:1px solid var(--border2)}
 .chk-sum.bad{border-color:rgba(224,85,85,.45);background:var(--dn-soft)}
@@ -42980,15 +42996,9 @@ function chkHome(){
     </div>`;
   }).join('');
 
-  // Последние проверки — три штуки: они отвечают на «что было вчера», а не
-  // заменяют журнал. Весь список открывается отдельно.
-  const hist = checks.slice(0, 3).map(c => `
-    <div class="chk-h ${c.bad ? 'bad' : ''}">
-      <span class="chk-h-n">${escS(c.driver || 'Свободная')}</span>
-      <span class="chk-h-v">${c.total}<i>шт</i></span>
-      ${c.bad ? `<span class="chk-h-b">${c.bad}</span>` : ''}
-      <span class="chk-h-t">${escS(_when(c.at))}</span>
-    </div>`).join('');
+  // Последние проверки — три строки: кого, где и когда, итог словом; по
+  // нажатию — сама проверка с бутылками. Весь список — «Все проверки».
+  const hist = checks.slice(0, 3).map(c => bchRow(c, 'home')).join('');
 
   document.getElementById('accMid').innerHTML = `
     <button class="chk-free" onclick="chkStart('')">
@@ -43002,8 +43012,141 @@ function chkHome(){
     <div>${tiles}</div>
 
     ${checks.length ? `<div class="scan-sect"><span>Последние проверки</span>${
-        checks.length > 3 ? `<i>${checks.length} всего</i>` : ''}</div>
-      <div class="chk-hist">${hist}</div>` : ''}`;
+        checks.length > 3 ? `<i>${checks.length} за 30 дней</i>` : ''}</div>
+      <div class="bch">${hist}</div>
+      ${checks.length > 3 ? `<button class="bch-all" onclick="bchHist()">Все проверки · ${checks.length}</button>` : ''}` : ''}`;
+}
+
+// ── История проверок ───────────────────────────────────────────────────────
+// Строка проверки одна на всех экранах: кого проверяли (или «Свободная
+// проверка»), где и когда, кто проверял, справа итог словом — «все наши»
+// зелёным, «не наших N» красным, «N с вопросом» (списана, другой район)
+// жёлтым — и сколько бутылок. По нажатию — сама проверка.
+function bchVerdict(c){
+  if(c.bad) return ['bad', `не наших ${c.bad}`];
+  if(c.warn) return ['warn', `${c.warn} ${pluralize(c.warn,'с вопросом','с вопросами','с вопросами')}`];
+  return c.total ? ['ok', 'все наши'] : ['none', 'ничего не проверили'];
+}
+// Район проверки и бутылки — кодом и названием, как везде; список районов
+// уже пришёл вместе с водителями (CHK_DRV).
+function bchDist(id){
+  const d = ((CHK_DRV && CHK_DRV.districts) || []).find(x => x.id === id);
+  return d ? `${d.code || ''} ${d.name || ''}`.trim() : (id || '');
+}
+function bchRow(c, from){
+  const [cls, word] = bchVerdict(c);
+  const free = !c.driver;
+  const where = [bchDist(c.district), from === 'hist' ? _hm(c.at) : _when(c.at),
+                 c.by_name ? 'проверял ' + c.by_name : ''].filter(Boolean).join(' · ');
+  return `<button class="bch-r ${cls}${free ? ' free' : ''}" onclick="bchOpen('${escS(c.id)}', '${from}')">
+    <span class="bch-i">${IC(free ? 'search' : 'car', 15)}</span>
+    <span class="bch-b"><span class="bch-n">${escS(c.driver || 'Свободная проверка')}</span>
+      <span class="bch-s">${escS(where)}</span></span>
+    <span class="bch-v"><b>${escS(word)}</b><i>${c.total} ${pluralize(c.total,'бутылка','бутылки','бутылок')}</i></span>
+    <span class="bch-go">${ICO_CHEV}</span>
+  </button>`;
+}
+// Календарный день Дубая: проверки идут вечером у машины, и «вчера» должно
+// совпадать с тем, что человек помнит, а не с учётными сутками.
+function bchDayIso(iso){
+  const t = String(iso || '').replace(' ', 'T');
+  const d = iso instanceof Date ? iso : new Date(/Z$|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
+  if(isNaN(d)) return '';
+  let s = '';
+  try{ s = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai', year:'numeric', month:'2-digit', day:'2-digit'}).format(d); }catch(e){}
+  if(!/^\d{4}-\d\d-\d\d$/.test(s))
+    s = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return s;
+}
+let BCH = {cur: null, items: []};
+function bchHome(){
+  ACC_BACK = null;
+  _setText('accTitle', 'Проверка бутылки');
+  chkHome();
+}
+// Все проверки за 30 дней по дням, новые сверху. Стрелка — к выбору водителя.
+function bchHist(){
+  ACC_BACK = bchHome;
+  const checks = (ACC_CHK && ACC_CHK.checks) || [];
+  const t = (ACC_CHK && ACC_CHK.totals) || {};
+  _setText('accTitle', 'История проверок');
+  _setText('accSub', checks.length
+    ? `${checks.length} ${pluralize(checks.length,'проверка','проверки','проверок')} · ${
+        fmt(t.bottles || 0)} ${pluralize(t.bottles || 0,'бутылка','бутылки','бутылок')} за 30 дней`
+    : 'проверок ещё не было');
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  const today = bchDayIso(new Date());
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const yday = bchDayIso(y);
+  const days = [];
+  checks.forEach(c => {
+    const dt = bchDayIso(c.at);
+    let g = days[days.length - 1];
+    if(!g || g.dt !== dt){ g = {dt, rows: []}; days.push(g); }
+    g.rows.push(c);
+  });
+  const name = dt => dt === today ? 'Сегодня' : dt === yday ? 'Вчера' : _dayName(dt);
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = days.length
+    ? days.map(g => `<div class="bch-day"><span>${escS(name(g.dt))}</span>${
+        g.rows.length > 1 ? `<i>${g.rows.length}</i>` : ''}</div>
+        <div class="bch">${g.rows.map(c => bchRow(c, 'hist')).join('')}</div>`).join('')
+    : '<div class="exp-empty">Проверок за 30 дней не было</div>';
+  mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+// Одна проверка: итог крупно, как на экране «Проверка завершена», ниже
+// бутылки — сначала не наши, потом с вопросами, потом наши; по нажатию —
+// карточка бутылки. Стрелка — туда, откуда открыли: на экран проверки или в
+// историю.
+const BCH_ORD = {alien: 0, written: 1, other_district: 2, sold: 3, ok: 3};
+function bchOpen(id, from){
+  const c = ((ACC_CHK && ACC_CHK.checks) || []).find(x => x.id === id); if(!c) return;
+  BCH.cur = c;
+  BCH.items = [...(c.items || [])].map((x, i) => ({...x, i}))
+    .sort((a, b) => ((BCH_ORD[a.verdict] ?? 3) - (BCH_ORD[b.verdict] ?? 3)) || (a.i - b.i));
+  ACC_BACK = from === 'hist' ? bchHist : bchHome;
+  _setText('accTitle', c.driver || 'Свободная проверка');
+  _setText('accSub', [bchDist(c.district), _when(c.at), c.by_name ? 'проверял ' + c.by_name : '']
+    .filter(Boolean).join(' · '));
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  const total = c.total || BCH.items.length, bad = c.bad || 0, warn = c.warn || 0;
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = `
+    <div class="chk-sum ${bad ? 'bad' : 'ok'}">
+      <div class="chk-sum-v">${total}</div>
+      <div class="chk-sum-l">${pluralize(total,'бутылка проверена','бутылки проверены','бутылок проверено')}</div>
+      ${bad ? `<div class="chk-sum-bad">Не наших: ${bad}</div>`
+            : total ? `<div class="chk-sum-ok">Все бутылки наши</div>` : ''}
+      ${warn ? `<div class="chk-sum-s">С вопросами: ${warn}</div>` : ''}
+    </div>
+    ${BCH.items.length ? `<div class="scan-sect"><span>Что проверили</span></div>
+      <div class="scan-feed">${BCH.items.map((x, i) => {
+        const v = CHK_V[x.verdict] || CHK_V.ok;
+        const sub = [x.product_name ? (x.label || '') : '', x.district ? bchDist(x.district) : '',
+                     x.added_at ? 'заведена ' + _when(x.added_at) : ''].filter(Boolean).join(' · ');
+        return `<div class="chk-item ${v.c}" onclick="bchBottle(${i})">
+          <div class="chk-item-t"><b>${escS(x.product_name || x.label || String(x.code || '').slice(0, 34))}</b>
+            <span>${escS(v.t)}</span></div>
+          ${sub ? `<div class="chk-item-s">${escS(sub)}</div>` : ''}
+        </div>`; }).join('')}</div>` : ''}`;
+  mid.scrollTop = 0;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+// Карточка бутылки из прошлой проверки — та же шторка, что при сканировании.
+function bchBottle(i){
+  const x = (BCH.items || [])[i]; if(!x) return;
+  const v = CHK_V[x.verdict] || CHK_V.ok;
+  const кл = v.c === 'ok' ? 'ok' : v.c === 'bad' ? 'bad' : 'warn';
+  scanInfo(x.product_name || x.label || 'Нет в реестре', v.t, кл, [
+    _siRow('Проверена', x.at ? escS(_when(x.at)) : ''),
+    _siRow('Район', escS(x.district ? bchDist(x.district) : '')),
+    _siRow('Заведена', x.added_at ? escS(_when(x.added_at)) : ''),
+    _siRow('Метка', escS(x.label || ''), 'mono'),
+    _siRow('Код', escS(String(x.code || '')), 'mono'),
+  ]);
 }
 
 // Дата в истории: сегодняшнее время, вчерашнее «вчера», дальше — число.

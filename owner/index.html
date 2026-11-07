@@ -36900,8 +36900,15 @@ function supCancelBtn(sup){
   // Отменять нечего — кнопки нет. Принятый район не отменяют: товар уже на
   // полке. Сервер это и так знал и отвечал отказом, а кнопка об этом не
   // спрашивала и вела в пустой экран (владелец, 25 сен 2026).
-  const живых = s => s && (s.can_cancel != null
-    ? s.can_cancel > 0
+  // Страница заявки отдаёт саму заявку (_supply_view): числа can_cancel там
+  // нет, а districts — перечень районов с кодами, не счёт; арифметика на нём
+  // давала NaN, и кнопка на странице не показывалась ни у основной, ни у доп.
+  // заявки с 25 сен (владелец, 7 ноя 2026: «почему нельзя отменить заявку»).
+  // Живые районы считаем по задачам страницы тем же правилом, что сервер и
+  // экран отмены: не принят, не отменён, не принят без сканирования.
+  const живых = s => s && (Array.isArray(s.tasks)
+    ? s.tasks.some(t => !t.done_at && !t.cancelled_at && !t.noscan_at)
+    : s.can_cancel != null ? s.can_cancel > 0
     : (s.districts || 0) - (s.done || 0) > 0);
   // Черновик докупки отменяется целиком: водителям он не виден, районов не
   // выбирают — окно-вопрос, и заявка уходит в отработанные.
@@ -37017,17 +37024,27 @@ function supActShow(sup){
 // экран: карточка на каждую открытую заявку (основная и другие базы), строка
 // на район с отметкой. Отменяют выбранные районы; отмечены все — отменяется
 // заявка. Принятый район отменить нельзя: товар уже на полке.
-let SUPC = {sups: [], sel: {}, from: '', view: null};
+let SUPC = {sups: [], sel: {}, from: '', view: null, sid: '', back: null};
 function supCancelOpen(from){
   // view — раздел, из которого пришли: accOpen('supcancel') его перепишет, а
   // «назад» на поставку должно вернуть её с тем же «назад», что был (с
   // чек-листа — в чек-лист, из хаба — в хаб), см. accSupply.
-  SUPC = {sups: [], sel: {}, from: from || '', view: ACC_VIEW};
+  // Со страницы заявки (from 'sup' / 'extra') запоминаем и саму заявку, и её
+  // «назад»: стрелка с экрана отмены ведёт на ту же страницу, а не на главную
+  // поставку или в список баз, где не были (как RCV_BACK у района приёмки).
+  SUPC = {sups: [], sel: {}, from: from || '', view: ACC_VIEW, sid: SUP_ID, back: ACC_BACK};
   accOpen('supcancel');
 }
+// Назад на страницу заявки, с которой пришли: тот же sid и тот же «назад».
+function supcReturn(){
+  ACC_VIEW = SUPC.view || 'order';
+  const back = SUPC.back;
+  _setText('accSub', 'загрузка…');
+  supLoad(SUPC.sid);            // ACC_BACK не трогает — возвращаем сами
+  ACC_BACK = back;
+}
 async function accSupCancel(){
-  ACC_BACK = SUPC.from === 'sup' ? () => { ACC_VIEW = SUPC.view || 'order'; accSupply(); }
-           : SUPC.from === 'extra' ? accExtra : accOrder;
+  ACC_BACK = (SUPC.from === 'sup' || SUPC.from === 'extra') && SUPC.sid ? supcReturn : accOrder;
   _setText('accTitle', 'Отмена заявки');
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';

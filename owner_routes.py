@@ -5214,19 +5214,61 @@ def _is_prepaid_order(o: dict) -> bool:
     return bool(o.get("paid") or o.get("prepaid") or o.get("crypto_paid"))
 
 
-async def _chk_expenses(day: str):
-    """Разовые траты водителей, ждущие решения владельца."""
+CHK_EXP_DAYS = 60     # как далеко назад чек-лист ищет расходы, ждущие решения
+
+
+async def _chk_expenses(day: str) -> tuple:
+    """Разовые траты водителей, ждущие решения владельца, — за любой день, а
+    не только за день чек-листа (владелец, 7 ноя 2026: «не важно, за эту они
+    смену или за любую другую, мне нужно, чтобы при любом несогласованном
+    расходе плашка горела красным»). До этого считался один день: расход за
+    вчера висел на экране «Расходы смены», а чек-лист писал «все разобраны».
+    Считаем так же, как экран (expense_routes: любой pending, и бутылка
+    охране, и безнал), за CHK_EXP_DAYS дней до сегодняшних суток включительно.
+    Возвращает (сколько, дни по возрастанию): день нужен строке, чтобы вести
+    в ту смену, где расход висит, а не в день чек-листа."""
+    today = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
+    hi = max(day, today)
+    lo = (datetime.strptime(hi, "%Y-%m-%d") - timedelta(days=CHK_EXP_DAYS)).strftime("%Y-%m-%d")
     try:
-        rows = await db.get_driver_days(day)
+        rows = await db.get_driver_days_range(lo, hi)
     except Exception as e:
-        log.warning(f"[chk] расходы за {day}: {e}")
-        return 0
-    n = 0
+        log.warning(f"[chk] расходы {lo}…{hi}: {e}")
+        return 0, []
+    by_day: dict = {}
     for d in rows:
-        for e in (d.get("extras") or []):
-            if (e.get("status") or "approved") == "pending":
-                n += 1
-    return n
+        n = sum(1 for e in (d.get("extras") or []) if (e.get("status") or "approved") == "pending")
+        if n and d.get("day"):
+            by_day[d["day"]] = by_day.get(d["day"], 0) + n
+    return sum(by_day.values()), sorted(by_day)
+
+
+def _pl_wait(n: int) -> str:
+    n = abs(int(n)) % 100
+    return "ждёт" if n % 10 == 1 and n != 11 else "ждут"
+
+
+def _chk_days_human(days: list) -> str:
+    """Дни, где висят расходы: «6 ноября», «5 и 6 ноября», «3, 5 и 6 ноября»;
+    больше трёх — «с 3 по 6 ноября». Разные месяцы — каждый с месяцем."""
+    days = [d for d in days if d]
+    if not days:
+        return ""
+    try:
+        dts = [datetime.strptime(d, "%Y-%m-%d") for d in days]
+    except ValueError:
+        return ", ".join(days)
+    один_месяц = len({(d.year, d.month) for d in dts}) == 1
+    if len(days) > 3:
+        return (f"с {dts[0].day} по {dts[-1].day} {_MONTHS[dts[-1].month - 1]}" if один_месяц
+                else f"с {_day_human(days[0])} по {_day_human(days[-1])}")
+    if один_месяц:
+        nums = [str(d.day) for d in dts]
+        head = ", ".join(nums[:-1])
+        return (f"{head} и {nums[-1]}" if head else nums[-1]) + f" {_MONTHS[dts[-1].month - 1]}"
+    names = [_day_human(d) for d in days]
+    head = ", ".join(names[:-1])
+    return f"{head} и {names[-1]}" if head else names[-1]
 
 
 async def _chk_support():
@@ -5531,7 +5573,7 @@ async def handle_checklist(request):
 
     sh = await _chk_shift(day)
     sup = await _chk_supply(day)
-    exp = await _chk_expenses(day)
+    exp, exp_days = await _chk_expenses(day)
     try:
         wo = len(await db.writeoff_pending(limit=200))
     except Exception:
@@ -5611,7 +5653,7 @@ async def handle_checklist(request):
         shift_row,
         *_order_rows(sup, marks, now, day, plan),
         _chk_row("expenses", "Расходы водителей",
-                 (f"{exp} ждут решения" if exp else "все разобраны"),
+                 (f"{exp} {_pl_wait(exp)} решения · {_chk_days_human(exp_days)}" if exp else "все разобраны"),
                  exp == 0, now, day, plan, go="expenses", n=exp),
         _chk_row("writeoffs", "Бой, брак и утеря",
                  (f"{wo} ждут решения" if wo else "разобрано"),
@@ -5643,6 +5685,17 @@ async def handle_checklist(request):
         for r in rows:
             if r["id"] == "cash":
                 r.update({"state": "late", "due": "", "late_min": 0})
+    # Несогласованный расход — красный сразу, в любой час и за любой день
+    # (владелец, 7 ноя 2026); окно «с 12:00, к 23:00» из плана остаётся только
+    # зелёному «все разобраны». За прошлую смену — «опаздывает», за эту —
+    # «пора». Дни уходят клиенту: нажатие ведёт в «Расходы смены» самого
+    # старого из них («чтобы, нажимая на плашку, меня переносило конкретно в
+    # ту смену, где расход не утверждён»).
+    if exp:
+        for r in rows:
+            if r["id"] == "expenses":
+                r.update({"state": "late" if exp_days and exp_days[0] < day else "now",
+                          "days": exp_days})
     # Недобор ответа магазина строки в чек-листе больше не даёт (владелец,
     # 5 ноя 2026: «не надо ничего автоматом туда пихать»). Строка «Докупить на
     # базах» зажигалась сама по gap_qty поставки и не гасла до следующих суток,

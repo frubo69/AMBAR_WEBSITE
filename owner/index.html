@@ -21298,7 +21298,11 @@ const CK_GO = {
   supply:    () => chkSupply(),
   short:     () => { ACC_VIEW = 'short'; cklSkin(false); accShort(); },
   qr:        () => accOpen('qr'),
-  expenses:  () => { SH_TAB = 'exp'; accOpen('expenses'); },
+  // Расход ждёт решения за любой день, не только за день чек-листа: строка
+  // ведёт в «Расходы смены» того дня, где он висит (владелец, 7 ноя 2026:
+  // «чтобы, нажимая на плашку, меня переносило конкретно в ту смену, где
+  // расход не утверждён»).
+  expenses:  () => chkExpenses(),
   writeoffs: () => { SH_TAB = 'wo';  accOpen('expenses'); },
   // Единственная задача, которую система знать не может: деньги переходят из
   // рук в руки, и подтвердить это может только человек.
@@ -21327,6 +21331,20 @@ const CK_GO = {
 
 async function chkPrices(){
   await ordPrices(true);
+}
+
+// Расходы ждут решения: в «Расходы смены» за день самого старого из них.
+// Полоса дня переставляется, как у crDrvToExp; стрелка назад возвращает её
+// на место и ведёт в чек-лист (CKL_RETURN остаётся за accBack).
+function chkExpenses(){
+  SH_TAB = 'exp';
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'expenses')) || {};
+  const day = (r.days || [])[0] || '';
+  const prev = DAY_OFFSET;
+  const off = day ? Math.max(0, Math.round((Date.parse(_dayIsoFor(0)) - Date.parse(day)) / 86400000) || 0) : prev;
+  if(off !== DAY_OFFSET) accDaySet(off);
+  accOpen('expenses');
+  if(off !== prev) ACC_BACK = () => { if(DAY_OFFSET !== prev) accDaySet(prev); accBack(); };
 }
 
 async function chkAudit(){

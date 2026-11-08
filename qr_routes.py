@@ -587,18 +587,18 @@ async def _story(doc: dict) -> list:
     code = doc.get("code") or ""
     out = []
     if doc.get("at"):
-        out.append({"at": str(doc.get("at")), "what": "заведена",
+        out.append({"at": _iso(doc.get("at")), "what": "заведена",
                     "who": await _who(doc.get("by")),
                     "where": doc.get("district") or ""})
     if doc.get("re_at"):
         # Убрали и внесли заново (db.qr_readd): у бутылки с поставки «заведена»
         # остаётся приходом, а возврат — отдельной строкой.
-        out.append({"at": str(doc.get("re_at")),
+        out.append({"at": _iso(doc.get("re_at")),
                     "what": "внесена заново" + (f" · была {doc['re_from']}" if doc.get("re_from") else ""),
                     "who": await _who(doc.get("re_by")),
                     "where": doc.get("district") or ""})
     for m in (doc.get("moves") or []):
-        out.append({"at": str(m.get("at") or ""), "what": "переезд",
+        out.append({"at": _iso(m.get("at")), "what": "переезд",
                     "who": await _who(m.get("by")),
                     "where": f"{m.get('from') or ''} → {m.get('to') or ''}"})
     if doc.get("written_at"):
@@ -607,21 +607,30 @@ async def _story(doc: dict) -> list:
             w = await db.writeoff_get(doc.get("writeoff") or "") or {}
         except Exception:
             w = {}
-        out.append({"at": str(doc.get("written_at")), "what": "списана",
+        out.append({"at": _iso(doc.get("written_at")), "what": "списана",
                     "who": w.get("by") or "",
                     "where": " · ".join(x for x in (w.get("kind") or "",
                                                     w.get("note") or "") if x)})
     try:
+        # Свободная проверка — не «у водителя»: водителя в ней нет, зато есть
+        # тот, кто сканировал. Чем бутылка была в момент проверки — словами:
+        # «не было в реестре» объясняет, откуда у неё потом взялась запись.
+        словом = {"alien": "не было в реестре", "written": "была списана",
+                  "other_district": "числилась на другом районе", "sold": "ушла с заказом"}
         for c in await db.qr_seen_in_checks(code):
-            out.append({"at": str(c.get("at") or ""), "what": "проверка у водителя",
-                        "who": c.get("driver") or "", "where": c.get("district") or ""})
+            чем = словом.get(c.get("verdict") or "", "")
+            out.append({"at": _iso(c.get("at")),
+                        "what": ("проверка у водителя" if c.get("driver") else "свободная проверка")
+                                + (f" · {чем}" if чем else ""),
+                        "who": c.get("driver") or _checker(c),
+                        "where": c.get("district") or ""})
         for a in await db.qr_seen_in_audits(code):
-            out.append({"at": str(a.get("at") or a.get("day") or ""), "what": "ревизия",
-                        "who": "", "where": a.get("district") or ""})
+            out.append({"at": _iso(a.get("at")) if a.get("at") else str(a.get("day") or ""),
+                        "what": "ревизия", "who": "", "where": a.get("district") or ""})
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[qr] история кода собрана не вся: {e}")
     if doc.get("del_at"):
-        out.append({"at": str(doc.get("del_at")), "what": "убрана из реестра",
+        out.append({"at": _iso(doc.get("del_at")), "what": "убрана из реестра",
                     "who": await _who(doc.get("del_by")), "where": ""})
     out.sort(key=lambda r: r["at"])
     return out
@@ -971,18 +980,45 @@ def _md(s: str) -> str:
     return str(s or "").replace("*", "").replace("_", "").replace("`", "")
 
 
+def _iso(v) -> str:
+    """Момент для клиента — всегда с поясом. Монга отдаёт datetime без tzinfo,
+    хотя писали UTC: str() такого времени («2026-11-07 11:13:58») телефон читал
+    как местное, и проверка, сделанная в 15:13 по Дубаю, на главном экране
+    стояла как 11:13, а в истории — как 15:13 (владелец, 8 ноя 2026: «история
+    проверки бутылки не понятная»)."""
+    if isinstance(v, datetime):
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
+    return str(v or "")
+
+
+def _checker(c: dict) -> str:
+    """Кто проверял — рабочим именем: старший из AMBAR_SENIOR_STAR_IDS или из
+    таблицы имён, иначе так, как назвался телеграм («STAR», «Am Bar»)."""
+    import config_staff as staff
+    try:
+        tid = int(c.get("by") or 0)
+    except (TypeError, ValueError):
+        tid = 0
+    return (staff.senior_star_by_tg(tid) or staff.DISPLAY_NAMES.get(tid)
+            or str(c.get("by_name") or "").strip())
+
+
 def _check_view(c: dict) -> dict:
+    who = _checker(c)
     return {
         "id": c.get("id") or "",
         "driver": c.get("driver") or "",
         "district": c.get("district") or "",
-        "by_name": c.get("by_name") or "",
-        "at": str(c.get("at") or ""),
+        "by_name": who,
+        "who": who,
+        "at": _iso(c.get("at")),
         "open": bool(c.get("open")),
         "total": c.get("total", 0),
         "bad": c.get("bad", 0),
         "warn": c.get("warn", 0),
-        "items": [{**i, "at": str(i.get("at") or "")} for i in (c.get("items") or [])],
+        "items": [{**i, "at": _iso(i.get("at"))} for i in (c.get("items") or [])],
     }
 
 
@@ -998,6 +1034,10 @@ async def handle_checks(request):
     except ValueError:
         days = 30
     rows = await db.qr_checks(days)
+    # Проверка, в которой ничего не отсканировали, — нажатая и брошенная
+    # кнопка, а не проверка: ни в истории, ни в счёте, ни во флажках её нет
+    # (на 8 ноя 2026 таких было 6 из 29, две из них «у Худобы»).
+    rows = [c for c in rows if c.get("total")]
     by_driver = {}
     for c in rows:
         n = c.get("driver") or ""

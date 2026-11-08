@@ -16029,6 +16029,11 @@ function _distName(id){
   const d = ((typeof STK!=='undefined' && STK.districts) || []).find(x => x.id === id);
   return d ? `${d.code || ''} ${d.name || ''}`.trim() : (id || '');
 }
+// Районы в истории бутылки приходят ключами базы («jvc → tecom»): показываем
+// их кодом и названием, как везде.
+function _placeName(w){
+  return String(w || '').split('→').map(x => _distName(x.trim()) || x.trim()).join(' → ');
+}
 
 // ── Карточка бутылки по тапу на плашку ──────────────────────────────────────
 // Одна шторка на все три экрана. Строки показываем ТОЛЬКО те, по которым есть
@@ -16093,7 +16098,7 @@ function chkRowInfo(i){
   scanInfo(x.product_name || x.label, v.t, кл, [
     _siRow('В этой проверке', таких > 1 ? таких + ' шт' : '', 'big'),
     _siRow('Заведена', x.added_at ? escS(_when(x.added_at)) : ''),
-    _siRow('Район', escS(x.district || '')),
+    _siRow('Район', escS(x.district ? bchDist(x.district) : '')),
     _siRow('Закупочная цена', !цены ? '' : x.cost ? aed(x.cost) : 'не внесена', x.cost ? '' : 'mute'),
     _siRow('Цена продажи', цены && x.price ? aed(x.price) : ''),
     _siRow('Метка', escS(x.label || ''), 'mono'),
@@ -33894,7 +33899,7 @@ function qrDelRowInfo(i){
   ];
   (r.story || []).forEach(e => rows.push(_siRow(
     escS(e.what || ''),
-    [_when(e.at), e.who, e.where].filter(Boolean).map(escS).join(' · '))));
+    [_when(e.at), e.who, _placeName(e.where)].filter(Boolean).map(escS).join(' · '))));
   scanInfo(r.name || r.label, st[0], st[1], rows);
 }
 
@@ -33923,11 +33928,9 @@ async function audBottle(code, pid){
     _siRow('Метка', escS(d.label || ''), 'mono'),
     _siRow('Код', escS(code), 'mono'),
   ];
-  // В истории районы приходят ключами базы: показываем их так же, как везде.
-  const место = w => String(w || '').split('→').map(x => _distName(x.trim()) || x.trim()).join(' → ');
   (d.story || []).forEach(e => rows.push(_siRow(
     escS(e.what || ''),
-    [_when(e.at), e.who, место(e.where)].filter(Boolean).map(escS).join(' · '))));
+    [_when(e.at), e.who, _placeName(e.where)].filter(Boolean).map(escS).join(' · '))));
   rows.push(_siRow('Камера её не видела', 'на этой ревизии'));
   scanInfo(d.product_name || d.label || code, ст[0], ст[1], rows);
 }
@@ -35877,14 +35880,21 @@ function supLogRow(e){
 
 const _dayName = d => { const x = d ? new Date(d + 'T12:00:00Z') : null;
   return x && !isNaN(x) ? x.toLocaleDateString('ru-RU', {day:'numeric', month:'long'}) : (d || ''); };
-const _hm = iso => {
-  if(!iso) return '';
-  // str() у монги отдаёт «2026-08-20 04:33:50+00:00» — с пробелом вместо T.
-  // Сафари такую строку не разбирает вовсе, и время молча пропадает с экрана.
-  const t = String(iso).replace(' ', 'T');
+// Момент из базы → Date, в одном месте. str() у монги отдаёт «2026-08-20
+// 04:33:50+00:00» — с пробелом вместо T (Сафари такую строку не разбирает
+// вовсе, и время молча пропадает с экрана); datetime без пояса — это UTC, а
+// не местное время; дробные секунды длиннее трёх знаков Сафари тоже не читает.
+function _utcDate(iso){
+  if(iso instanceof Date) return isNaN(iso) ? null : iso;
+  let t = String(iso || '').trim().replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1');
+  if(!t) return null;
+  if(/^\d{4}-\d\d-\d\d$/.test(t)) t += 'T00:00:00';
   const d = new Date(/Z$|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
-  return d && !isNaN(d) ? d.toLocaleTimeString('ru-RU',
-    {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'}) : ''; };
+  return isNaN(d) ? null : d;
+}
+const _hm = iso => {
+  const d = _utcDate(iso);
+  return d ? d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'}) : ''; };
 
 // Подвал поставки. Действий тут два, и они не равны: пока магазин чего-то не
 // дал — главное это отдать список на доп. склады, а загрузка ответа ждёт своей
@@ -43084,16 +43094,42 @@ function bchVerdict(c){
 // уже пришёл вместе с водителями (CHK_DRV).
 function bchDist(id){
   const d = ((CHK_DRV && CHK_DRV.districts) || []).find(x => x.id === id);
-  return d ? `${d.code || ''} ${d.name || ''}`.trim() : (id || '');
+  return d ? `${d.code || ''} ${d.name || ''}`.trim() : (_distName(id) || id || '');
 }
+// Что сканировали — позициями: одна — её название, несколько — самая частая
+// «и ещё N» (две через запятую в строку 430 px не влезают); коды не из реестра
+// — «Нет в реестре». У свободной проверки это и есть заголовок строки:
+// водителя в ней нет, а «Свободная проверка · 1 бутылка» не говорит ничего
+// (владелец, 8 ноя 2026: «история проверки бутылки не понятная» — старший
+// проверял по одной бутылке).
+function bchWhat(c){
+  const g = new Map();
+  (c.items || []).forEach(x => {
+    const k = x.product_name || (x.verdict === 'alien' ? 'Нет в реестре' : (x.label || String(x.code || '')));
+    if(k) g.set(k, (g.get(k) || 0) + 1);
+  });
+  const names = [...g.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  return names.length ? names[0] + (names.length > 1 ? ` и ещё ${names.length - 1}` : '') : '';
+}
+// Где проверяли: у проверки с водителем — его район, у свободной — район, на
+// котором числится большинство проверенных бутылок.
+function bchWhere(c){
+  if(c.district) return bchDist(c.district);
+  const n = {};
+  (c.items || []).forEach(x => { if(x.district) n[x.district] = (n[x.district] || 0) + 1; });
+  const top = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+  return top ? bchDist(top) : '';
+}
+function bchWho(c){ const w = c.who || c.by_name || ''; return w ? 'проверял ' + w : ''; }
 function bchRow(c, from){
   const [cls, word] = bchVerdict(c);
   const free = !c.driver;
-  const where = [bchDist(c.district), from === 'hist' ? _hm(c.at) : _when(c.at),
-                 c.by_name ? 'проверял ' + c.by_name : ''].filter(Boolean).join(' · ');
+  const title = c.driver || bchWhat(c) || 'Свободная проверка';
+  const where = [free && title !== 'Свободная проверка' ? 'Свободная проверка' : '', bchWhere(c),
+                 from === 'hist' ? _hm(c.at) : _when(c.at), bchWho(c)].filter(Boolean).join(' · ');
   return `<button class="bch-r ${cls}${free ? ' free' : ''}" onclick="bchOpen('${escS(c.id)}', '${from}')">
     <span class="bch-i">${IC(free ? 'search' : 'car', 15)}</span>
-    <span class="bch-b"><span class="bch-n">${escS(c.driver || 'Свободная проверка')}</span>
+    <span class="bch-b"><span class="bch-n">${escS(title)}</span>
       <span class="bch-s">${escS(where)}</span></span>
     <span class="bch-v"><b>${escS(word)}</b><i>${c.total} ${pluralize(c.total,'бутылка','бутылки','бутылок')}</i></span>
     <span class="bch-go">${ICO_CHEV}</span>
@@ -43102,9 +43138,8 @@ function bchRow(c, from){
 // Календарный день Дубая: проверки идут вечером у машины, и «вчера» должно
 // совпадать с тем, что человек помнит, а не с учётными сутками.
 function bchDayIso(iso){
-  const t = String(iso || '').replace(' ', 'T');
-  const d = iso instanceof Date ? iso : new Date(/Z$|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
-  if(isNaN(d)) return '';
+  const d = _utcDate(iso);
+  if(!d) return '';
   let s = '';
   try{ s = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai', year:'numeric', month:'2-digit', day:'2-digit'}).format(d); }catch(e){}
   if(!/^\d{4}-\d\d-\d\d$/.test(s))
@@ -43161,8 +43196,7 @@ function bchOpen(id, from){
     .sort((a, b) => ((BCH_ORD[a.verdict] ?? 3) - (BCH_ORD[b.verdict] ?? 3)) || (a.i - b.i));
   ACC_BACK = from === 'hist' ? bchHist : bchHome;
   _setText('accTitle', c.driver || 'Свободная проверка');
-  _setText('accSub', [bchDist(c.district), _when(c.at), c.by_name ? 'проверял ' + c.by_name : '']
-    .filter(Boolean).join(' · '));
+  _setText('accSub', [bchWhere(c), _when(c.at), bchWho(c)].filter(Boolean).join(' · '));
   document.getElementById('accAct').innerHTML = '';
   document.getElementById('accFoot').innerHTML = '';
   const total = c.total || BCH.items.length, bad = c.bad || 0, warn = c.warn || 0;
@@ -43202,16 +43236,25 @@ function bchBottle(i){
   ]);
 }
 
-// Дата в истории: сегодняшнее время, вчерашнее «вчера», дальше — число.
+// Дата в истории: сегодняшнее — время, вчерашнее — «вчера», дальше — число.
+// Строка без пояса — UTC из базы (монга отдаёт datetime без tzinfo), а не
+// местное время: раньше «2026-11-07 11:13» читалось как 11:13 по Дубаю, и
+// проверка, сделанная в 15:13, на главном экране стояла на четыре часа раньше,
+// чем в истории (владелец, 8 ноя 2026: «история проверки бутылки не
+// понятная»). Считаем и показываем всё по Дубаю, как _hm и bchDayIso. День
+// без времени («2026-11-07») — просто число.
 function _when(iso){
-  const d = new Date(String(iso || '').replace(' ', 'T'));
-  if(isNaN(d)) return '';
-  const now = new Date(), day = 86400000;
-  const midn = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const hm = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-  if(d.getTime() >= midn) return hm;
-  if(d.getTime() >= midn - day) return 'вчера ' + hm;
-  return d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}) + ' ' + hm;
+  const s = String(iso || '').trim();
+  const d = _utcDate(s);
+  if(!d) return '';
+  const dm = d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', timeZone:'Asia/Dubai'});
+  if(/^\d{4}-\d\d-\d\d$/.test(s)) return dm;
+  const hm = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
+  const day = bchDayIso(d), today = bchDayIso(new Date());
+  if(day === today) return hm;
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  if(day === bchDayIso(y)) return 'вчера ' + hm;
+  return dm + ' ' + hm;
 }
 
 // Кто проверяет — из телеграма: в истории должно быть видно, кто ходил.
@@ -43332,7 +43375,7 @@ function chkFeed(){
             <span>${escS(v.t)}</span></div>
           <div class="chk-item-s">${x.product_name
             ? escS(x.product_name) + (x.added_at ? ' · заведена ' + escS(_when(x.added_at)) : '')
-              + (x.district ? ' · ' + escS(x.district) : '')
+              + (x.district ? ' · ' + escS(bchDist(x.district)) : '')
             : escS(String(x.code || '').slice(0, 34))}</div>
         </div>`; }).join('')
     : '';

@@ -5011,12 +5011,14 @@ async def qr_seen_in_checks(code: str, limit: int = 20) -> list:
     if db is None: return []
     out = []
     cur = db.qr_checks.find({"items.code": code}, {"_id": 0, "at": 1, "driver": 1,
-                                                  "district": 1, "items": 1}
+                                                  "district": 1, "items": 1,
+                                                  "by": 1, "by_name": 1}
                             ).sort("at", -1).limit(limit)
     async for d in cur:
         it = next((x for x in (d.get("items") or []) if x.get("code") == code), {})
         out.append({"at": d.get("at"), "driver": d.get("driver") or "",
                     "district": d.get("district") or "",
+                    "by": d.get("by"), "by_name": d.get("by_name") or "",
                     "verdict": it.get("verdict") or ""})
     return out
 

@@ -29106,7 +29106,8 @@ function ordPick(){
   const who = live ? Object.entries(sup.tasks || {}).filter(([, t]) => t.driver && !t.done_at && !t.cancelled_at)
       .map(([o, t]) => `${code(o)} · ${t.driver}`).join(', ') : '';
   const phase = !sup ? (d.skip ? 'сегодня не заказываем' : d.phase === 'asked' ? 'ждём ответ' : 'заявка')
-    : cancelled ? 'отменена' : complete ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
+    : cancelled ? 'отменена' : complete ? 'принято' : taking ? 'идёт приёмка'
+    : st.k === 'wait' ? 'никто не взял · ждёт приёма' : 'ждёт приёма';   // как на карточке заявки (auOrderCard)
   // Новые цены магазина ждут решения — это единственное, что здесь просит
   // руки, и слово под названием мигает (владелец, 26 окт 2026).
   const prN = prCount();
@@ -29609,8 +29610,14 @@ function auOrderCard(){
                  : [aed(d.total_cost != null ? d.total_cost : d.total_aed), '', ''];
   const taking = live && Object.values(sup.tasks || {}).some(t => t.driver && !t.done_at && !t.cancelled_at);
   const prN = prCount();
+  // Открыта, а ни один район никто не держит и ни один не принят — так и
+  // пишем (владелец, 8 ноя 2026: «вместо „ждёт приёма“ — „никто не взял /
+  // ждёт приёма“, чтобы было ясно, что на себя эту задачу никто не взял»).
+  // Кто-то принял, остальное свободно — по-прежнему «ждёт приёма»: районы
+  // ниже говорят, кто и что.
   const phase = prN ? `новые цены · ${prN}` : !sup ? (d.phase === 'asked' ? 'ждём ответ' : 'заявка')
-    : cancelled ? 'отменена' : done ? 'принято' : taking ? 'идёт приёмка' : 'ждёт приёма';
+    : cancelled ? 'отменена' : done ? 'принято' : taking ? 'идёт приёмка'
+    : st.k === 'wait' ? 'никто не взял · ждёт приёма' : 'ждёт приёма';
   const cls = i => done ? (i < 2 ? 'is-done' : 'is-complete')
     : (i + 1 < step ? 'is-done' : i + 1 === step ? 'is-current' : 'is-pending');
   const fill = done ? 100 : live ? 50 : 0;
@@ -29676,15 +29683,16 @@ function auHistRow(){
 // последней строкой, как у карточки заявки (владелец, 30 окт 2026).
 // С 8 ноя 2026 плитка живая (владелец: «почему нет свободной заявки в
 // Барракуде?»): ведёт в список свободных заявок (accFree); под «Барракуда» —
-// где сейчас активная: ждёт отправки, ждём ответ магазина, ждёт приёма, идёт
-// приёмка; несколько активных — числом.
+// где сейчас активная: ждёт отправки, ждём ответ магазина, никто не взял ·
+// ждёт приёма (владелец, 8 ноя 2026: «чтобы было ясно, что на себя эту задачу
+// никто не взял»), идёт приёмка; несколько активных — числом.
 function auOps(){
   const act = _fList().filter(x => x.status === 'wait' || x.status === 'open');
   const one = act.length === 1 ? act[0] : null;
   const busy = one && one.status === 'open' && _xState(one)[0] === 'в работе';
   const word = !act.length ? '' : !one ? `${act.length} ${pluralize(act.length,'заявка','заявки','заявок')}`
     : one.status === 'wait' ? (one.sent_at ? 'ждём ответ магазина' : 'ждёт отправки')
-    : busy ? 'идёт приёмка' : 'ждёт приёма';
+    : busy ? 'идёт приёмка' : 'никто не взял · ждёт приёма';
   return `<div class="au-operations au-one" aria-label="Закупки">
     <div class="au-panel au-operation au-free" data-barracuda-free-purchase>
       <button type="button" class="au-free-main cursor-interaction" onclick="accFree()">
@@ -34165,13 +34173,15 @@ function _xList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.kind =
 function _fList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.free_order); }
 
 // Состояние заявки одним словом и цветом. Слово короткое: оно стоит в чипе.
+// Открытая, которую никто не держит, — «никто не взял» (владелец, 8 ноя
+// 2026), а не «ждёт»: то же слово, что на плитке хаба.
 function _xState(x){
   if(x.status === 'draft') return ['черновик', 'wait'];
   if(x.status === 'wait') return [x.sent_at ? 'ждём ответ' : 'не выслана', 'wait'];
   if(x.status === 'cancelled') return ['отменена', 'no'];
   if(x.status !== 'open') return [x.took < x.total_qty ? 'недобор' : 'принято', 'done'];
   const busy = (x.districts || 0) - (x.done || 0) - (x.free || 0);
-  return (busy > 0 || x.done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
+  return (busy > 0 || x.done) ? ['в работе', 'live'] : ['никто не взял', 'wait'];
 }
 
 // Только название и дверь, как у «Заявки». Перечисление баз с числом в работе
@@ -34705,7 +34715,7 @@ function xSupRender(d){
            : wait ? [d.sent_at ? 'ждём ответ магазина' : 'ждёт отправки', 'wait']
            : d.status === 'cancelled' ? ['отменена', 'no']
            : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
-           : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
+           : (busy || done) ? ['в работе', 'live'] : ['никто не взял', 'wait'];
   _setText('accTitle', draft ? 'Доп. заявка' : free ? 'Свободная заявка' : extra ? (d.base || 'Другая база') : 'Приёмка');
   _setText('accSub', draft ? (d.source === 'shortfall'
                      ? `не довезла ${d.from_base && d.from_base !== 'магазина' ? d.from_base : 'Барракуда'}` : 'вручную')
@@ -35789,7 +35799,7 @@ function supHistRow(x){
   const st = x.status === 'cancelled' ? ['отменена', 'is-cancelled', AH_ICO.x, 'cancelled']
            : x.status === 'done' ? [x.took < x.total_qty ? 'недобор' : 'принято', 'is-accepted', AH_ICO.check, 'accepted']
            : x.status === 'wait' ? ['ждём ответ', 'is-waiting', AH_ICO.clock, 'waiting']
-           : x.free === x.districts ? ['ждёт', 'is-waiting', AH_ICO.clock, 'waiting'] : ['в работе', 'is-waiting', AH_ICO.clock, 'working'];
+           : x.free === x.districts ? ['никто не взял', 'is-waiting', AH_ICO.clock, 'waiting'] : ['в работе', 'is-waiting', AH_ICO.clock, 'working'];
   return `<button type="button" class="ah-record" onclick="supOpenOne('${escS(x.supply_id)}')" data-source="${extra ? 'additional' : 'store'}" data-status="${st[3]}">
     <span class="ah-source-icon" aria-hidden="true">${extra ? AH_ICO.warehouse : AH_ICO.store}</span>
     <span class="ah-record-body"><span class="ah-record-top"><strong>${free ? 'Барракуда · свободная' : extra ? escS(x.base || 'Другая база') : 'Барракуда'}</strong><span class="ah-status ${st[1]}">${st[2]}${st[0]}</span></span><span class="ah-record-meta"><span>${

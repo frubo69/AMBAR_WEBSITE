@@ -45,6 +45,7 @@ KINDS = {
     "answer":           ("Ответ магазина загружен", "ok"),
     "answer_replaced":  ("Ответ загружен заново", "warn"),
     "created":          ("Заявка на другую базу создана", ""),
+    "free_created":     ("Свободная заявка собрана", ""),
     "draft":            ("Черновик докупки собран", "wait"),
     "confirmed":        ("Докупка подтверждена", "ok"),
     "base":             ("База названа", ""),
@@ -262,7 +263,19 @@ async def timeline(sid: str) -> dict | None:
 
     first = sup.get("first_at") or sup.get("at")
     base = sup.get("base") or ""
-    if extra:
+    if extra and sup.get("free_order"):
+        # Свободная заявка Барракуде (8 ноя 2026): собрана → файл выслан →
+        # ответ магазина загружен — как у основной, только без заявки дня.
+        der.append(_ev("free_created", sup.get("created_at") or first,
+                       who=sup.get("by_name") or "", note=what_note(sup)))
+        if sup.get("sent_at"):
+            der.append(_ev("sent", sup["sent_at"], who=sup.get("sent_by") or ""))
+        if sup.get("answer_at"):
+            der.append(_ev("answer", sup["answer_at"], note=answer_note(sup)))
+            if sup.get("replaced_at"):
+                der.append(_ev("answer_replaced", sup["replaced_at"], note=answer_note(sup)
+                               + (f" · раз {int(sup.get('replaced_n') or 0)}" if int(sup.get("replaced_n") or 0) > 1 else "")))
+    elif extra:
         what = what_note(sup)
         if sup.get("confirmed_at") or sup.get("status") == "draft":
             der.append(_ev("draft", first, note=what + (f" · из недобора {sup['from_supply']}" if sup.get("from_supply") else "")))
@@ -372,7 +385,10 @@ async def timeline(sid: str) -> dict | None:
         out.append(d)
     out.sort(key=lambda e: (e["at"], e["seq"]))
     return {"supply_id": sid, "day": day, "order_day": order_day,
-            "kind": sup.get("kind") or "main", "base": base,
+            "kind": sup.get("kind") or "main",
+            # Свободная заявка Барракуде — своим именем, как в списках STAR.
+            "base": "Барракуда · свободная" if sup.get("free_order") else base,
+            "free_order": bool(sup.get("free_order")),
             "events": [{"at": e["at"].isoformat(), "kind": e["kind"],
                         "title": KINDS[e["kind"]][0], "cls": KINDS[e["kind"]][1],
                         "who": e["who"], "district": e["district"],

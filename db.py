@@ -3051,14 +3051,15 @@ async def once_mark(key: str, day: str) -> bool:
         return False
 
 
-async def supply_replace_untouched(doc: dict, districts: list) -> bool:
+async def supply_replace_untouched(doc: dict, districts: list, statuses: tuple = ("open",)) -> bool:
     """Заменить открытую поставку новой целиком — только если по ней ещё ничего
     не приняли. Условие стоит в самом запросе: между «посмотрел, что не
     начинали» и «записал» помещается первая бутылка водителя, и замена стёрла
-    бы её из заявки, оставив в реестре."""
+    бы её из заявки, оставив в реестре. statuses — в каких статусах можно:
+    свободная заявка Барракуде получает ответ магазина из wait."""
     db = _db_or_none()
     if db is None: return False
-    q = {"_id": doc["_id"], "status": "open"}
+    q = {"_id": doc["_id"], "status": {"$in": list(statuses)}}
     for o in districts:
         q[f"tasks.{o}.noscan_at"] = None
         q[f"tasks.{o}.done_at"] = None
@@ -3306,7 +3307,8 @@ async def supply_line_set(sid: str, district: str, product_id: str, qty,
     if db is None: return None
     # Черновик тоже правится: это заявка, которую ещё не отправили водителям,
     # и поправить её до отправки — самое время.
-    guard = {"_id": sid, "status": {"$in": ["open", "draft"]},
+    # wait — свободная заявка Барракуде до ответа магазина: состав ещё правится.
+    guard = {"_id": sid, "status": {"$in": ["open", "draft", "wait"]},
              f"tasks.{district}.started_at": None,
              f"tasks.{district}.noscan_at": None,
              f"tasks.{district}.done_at": None}
@@ -3345,11 +3347,13 @@ async def supply_line_set(sid: str, district: str, product_id: str, qty,
     if not doc:
         return None
     items = doc.get("items") or []
+    # До полкоробки, не int: у пива в заявке на базу 2,5 коробки резались до 2,
+    # а 0,5 — до нуля в итогах позиции, района и заявки (найдено 8 ноя 2026).
     for it in items:
-        it["qty"] = sum(int(v or 0) for v in (it.get("by_district") or {}).values())
-    tq = sum(int((it.get("by_district") or {}).get(district) or 0) for it in items)
-    tp = sum(1 for it in items if int((it.get("by_district") or {}).get(district) or 0) > 0)
-    total = sum(int(it.get("qty") or 0) for it in items)
+        it["qty"] = _qn(sum(float(v or 0) for v in (it.get("by_district") or {}).values()))
+    tq = _qn(sum(float((it.get("by_district") or {}).get(district) or 0) for it in items))
+    tp = sum(1 for it in items if float((it.get("by_district") or {}).get(district) or 0) > 0)
+    total = _qn(sum(float(it.get("qty") or 0) for it in items))
     await db.supplies.update_one({"_id": sid}, {"$set": {
         "items": items, f"tasks.{district}.qty": tq, f"tasks.{district}.positions": tp,
         "total_qty": total}})
@@ -3641,6 +3645,15 @@ async def supplies_with_open_tasks(limit: int = 10) -> list:
     db = _db_or_none()
     if db is None: return []
     cur = db.supplies.find({"status": "open"}).sort("at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
+async def supplies_free_waiting(limit: int = 12) -> list:
+    """Свободные заявки Барракуде, ещё без ответа магазина (status wait):
+    заявка по норме вычитает их как уже попрошенное (supply_routes.pending_qty)."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.supplies.find({"status": "wait", "free_order": True}).sort("at", -1).limit(limit)
     return await cur.to_list(length=limit)
 
 

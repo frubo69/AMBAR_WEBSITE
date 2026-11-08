@@ -260,7 +260,8 @@ async def _purchases(days: list[str]) -> dict:
         s = out.get(sup.get("day") or "")
         if s is None:
             continue
-        extra = (sup.get("kind") or "main") == "extra"
+        # Свободная заявка Барракуде — деньги в магазине, не на другой базе.
+        extra = (sup.get("kind") or "main") == "extra" and not sup.get("free_order")
         buys = sup.get("buys") or {}
         total = 0.0
         for it in (sup.get("items") or []):
@@ -292,7 +293,8 @@ async def _purchases(days: list[str]) -> dict:
         else:
             s["ordered"] += total
         s["supplies"].append({"id": sup.get("supply_id"), "kind": "extra" if extra else "main",
-                              "base": sup.get("base") or "", "aed": round(total),
+                              "base": ("Барракуда · свободная" if sup.get("free_order")
+                                       else sup.get("base") or ""), "aed": round(total),
                               "status": sup.get("status") or "open"})
     for s in out.values():
         s["ordered"] = round(s["ordered"])

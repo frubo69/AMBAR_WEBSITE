@@ -4805,6 +4805,7 @@ button.path:active{transform:scale(.995)}
 #ambar-receiving-finished .au-order>.au-receiving{flex-grow:max(.7,var(--au-receiving-grow))}
 #ambar-receiving-finished .au-free-main{display:grid;flex:1 0 auto;grid-template-columns:16px minmax(0,1fr) 16px;grid-template-rows:auto minmax(min-content,1fr);column-gap:6px;row-gap:2px;align-items:start;width:100%;min-width:0;padding:clamp(7px,calc(4cqh - 18.6px),15px) 10px;border:0;border-radius:16px 16px 0 0;background:transparent;text-align:left}
 #ambar-receiving-finished .au-free-main:disabled{opacity:.42;cursor:default}
+#ambar-receiving-finished .au-free .au-op-caption .au-phase{display:block;margin-top:2px}
 #ambar-receiving-finished .au-free>.au-history-row{width:calc(100% - 20px);margin:0 10px}
 @container au-finished-phone (min-height:760px){
   #ambar-receiving-finished .au-app[data-sparse="true"] .au-free-main{grid-template-columns:minmax(0,1fr) 16px;grid-template-rows:auto auto minmax(min-content,1fr);row-gap:8px;column-gap:10px;padding:15px}
@@ -6029,6 +6030,7 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .xf-prices b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--gold2)}
 .xf-prices.warn b{color:var(--warn)}
 .xf-prices em{display:flex;color:var(--muted)}
+.xf-prices:disabled{cursor:default}
 /* Хронология заявки (3 ноя 2026): строка под сводкой поставки и страница
    шагов — время слева, рейка с точками, шаг и подпись (район · кто · что). */
 .sl-btn{margin:-2px 0 12px}
@@ -29672,13 +29674,24 @@ function auHistRow(){
 // а свободная заявка») — поток под клиентов ещё не построен.
 // Плитка — карточка из двух кнопок: сама заявка (пока выключена) и «История»
 // последней строкой, как у карточки заявки (владелец, 30 окт 2026).
+// С 8 ноя 2026 плитка живая (владелец: «почему нет свободной заявки в
+// Барракуде?»): ведёт в список свободных заявок (accFree); под «Барракуда» —
+// где сейчас активная: ждёт отправки, ждём ответ магазина, ждёт приёма, идёт
+// приёмка; несколько активных — числом.
 function auOps(){
+  const act = _fList().filter(x => x.status === 'wait' || x.status === 'open');
+  const one = act.length === 1 ? act[0] : null;
+  const busy = one && one.status === 'open' && _xState(one)[0] === 'в работе';
+  const word = !act.length ? '' : !one ? `${act.length} ${pluralize(act.length,'заявка','заявки','заявок')}`
+    : one.status === 'wait' ? (one.sent_at ? 'ждём ответ магазина' : 'ждёт отправки')
+    : busy ? 'идёт приёмка' : 'ждёт приёма';
   return `<div class="au-operations au-one" aria-label="Закупки">
     <div class="au-panel au-operation au-free" data-barracuda-free-purchase>
-      <button type="button" class="au-free-main" disabled>
+      <button type="button" class="au-free-main cursor-interaction" onclick="accFree()">
         <span class="au-op-top">${AR_ICO.file}${AR_ICO.right}</span>
         <span class="au-op-title ambar-free-purchase-title"><span>СВОБОДНАЯ</span><span>ЗАЯВКА</span></span>
-        <span class="au-op-caption ambar-free-purchase-caption">Барракуда</span>
+        <span class="au-op-caption ambar-free-purchase-caption">Барракуда${
+          word ? `<span class="au-phase${busy ? ' au-live' : ''}">${escS(word)}</span>` : ''}</span>
       </button>
       ${auHistRow()}
     </div></div>`;
@@ -34077,8 +34090,8 @@ function shortBody(d){
     return;
   }
   _setText('accSub', `${fmt(left)} ${pluralize(left,'бутылка','бутылки','бутылок')}${
-    short.qty !== left ? ` из ${fmt(short.qty)}` : ''} · ${extra ? (d.base || 'база') : 'заявка ' + String(d.day || '').slice(0,10)}`);
-  const why = {dropped:'магазин отказал', short:'урезал', gap: extra ? 'не выдали на базе' : 'не выдал при отгрузке',
+    short.qty !== left ? ` из ${fmt(short.qty)}` : ''} · ${d.free_order ? 'Барракуда · свободная' : extra ? (d.base || 'база') : 'заявка ' + String(d.day || '').slice(0,10)}`);
+  const why = {dropped:'магазин отказал', short:'урезал', gap: extra && !d.free_order ? 'не выдали на базе' : 'не выдал при отгрузке',
                cancelled:'район отменили'};
   // Цены докупа приходят с заявкой: они её часть, а не отдельная книга.
   SUP_BUYS = (d && d.buys) || {};
@@ -34146,11 +34159,15 @@ function shortBody(d){
 const ICO_BASE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9h18v11H3z"/><path d="M9 20v-6h6v6"/></svg>';
 const ICO_XPLUS = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
 
-function _xList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.kind === 'extra'); }
+// Свободные заявки Барракуде (free_order) — тоже kind extra, но живут в своём
+// списке (accFree), а не в «Других базах».
+function _xList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.kind === 'extra' && !x.free_order); }
+function _fList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.free_order); }
 
 // Состояние заявки одним словом и цветом. Слово короткое: оно стоит в чипе.
 function _xState(x){
   if(x.status === 'draft') return ['черновик', 'wait'];
+  if(x.status === 'wait') return [x.sent_at ? 'ждём ответ' : 'не выслана', 'wait'];
   if(x.status === 'cancelled') return ['отменена', 'no'];
   if(x.status !== 'open') return [x.took < x.total_qty ? 'недобор' : 'принято', 'done'];
   const busy = (x.districts || 0) - (x.done || 0) - (x.free || 0);
@@ -34230,7 +34247,7 @@ function xbFilterPaint(){
 function _xFromName(x){
   const list = (ACC_SUP && ACC_SUP.list) || [];
   const p = x.from_supply ? list.find(v => v.supply_id === x.from_supply) : null;
-  return (p && p.kind === 'extra' && p.base) ? p.base : 'Барракуда';
+  return (p && p.kind === 'extra' && p.base && !p.free_order) ? p.base : 'Барракуда';
 }
 // Заявка из недобора: вся строка — дверь на страницу состава (xDraftView),
 // оттуда — база и отправка. Штрих слева и иконки — украшение.
@@ -34258,12 +34275,13 @@ function xbRecord(x){
   const dt = x.day || String(x.at || '').slice(0, 10);
   const q = x.total_qty || 0, p = x.positions || 0;
   const kind = x.status === 'cancelled' ? ['cancelled', 'is-cancelled', OB_ICO.x]
-             : x.status === 'open' ? ['working', 'is-waiting', OB_ICO.clock]
+             : x.status === 'open' || x.status === 'wait' ? ['working', 'is-waiting', OB_ICO.clock]
              : ['accepted', 'is-accepted', OB_ICO.check];
   return `<button type="button" class="bp-record" onclick="xOpen('${escS(x.supply_id)}')" data-record="${escS(x.supply_id)}" data-status="${kind[0]}">
     <span class="bp-record-icon" aria-hidden="true">${OB_ICO.store}</span>
     <span class="bp-record-identity"><strong>${escS(x.base || 'База')}</strong><span>${p} ${pluralize(p,'позиция','позиции','позиций')}${
-      x.short_left ? ` · докупить ${fmt(x.short_left)}` : ''}</span></span>
+      x.short_left ? ` · докупить ${fmt(x.short_left)}` : ''}${
+      x.free_order && x.status === 'wait' ? (x.sent_at ? ` · файл выслан ${_hm(x.sent_at)}` : ' · файл не выслан') : ''}</span></span>
     <span class="bp-record-quantity"><strong>${fmt(q)}</strong><span>${pluralize(q,'бутылка','бутылки','бутылок')}</span></span>
     ${OB_ICO.chev}
     <span class="bp-record-head"><time class="bp-record-date" datetime="${escS(dt)}">${OB_ICO.cal}<span>${escS(_xbDay(dt))}</span></time><span class="bp-status ${kind[1]}">${kind[2]}${st[0]}</span></span>
@@ -34297,8 +34315,8 @@ async function accExtra(){
   // «Закрытых» со словом «недобор», и отправить их было нечем.
   const open = ex.filter(x => x.status === 'open'), wait = ex.filter(x => x.status === 'draft'),
         past = ex.filter(x => x.status !== 'open' && x.status !== 'draft');
-  const local = xDraftRows();
-  const nWait = wait.length + xDrafts().length;
+  const local = xDraftRows('');
+  const nWait = wait.length + xDraftsOf('').length;
   const head = (id, t, right) => `<div class="bp-section-head"><h2 id="${id}">${t}</h2>${right || ''}</div>`;
   const pending = nWait ? `<section class="bp-pending" aria-labelledby="bp-pending-title">${
       head('bp-pending-title', 'ТРЕБУЮТ РЕШЕНИЯ', `<span class="bp-count" aria-label="${nWait} ${pluralize(nWait,'заявка','заявки','заявок')}">${nWait}</span>`)}
@@ -34319,6 +34337,62 @@ async function accExtra(){
   mid.innerHTML = `<div id="ambar-other-bases-priority" lang="ru"><div class="bp-stage"><div class="bp-app" aria-label="Другие базы — заявки">
     <main class="bp-scroll">${tob ? `${head('bp-tob-title', 'ЗАКУПАЕМ ОТДЕЛЬНО')}<div class="xs-tob" id="xTob">${tob}</div>` : ''}${pending}${active}${done}${empty}</main>
     <footer class="bp-footer"><button type="button" class="bp-new" onclick="xNewAsk()">${OB_ICO.plus}<span>Новая заявка</span></button></footer>
+  </div></div></div>`;
+  xbFilterPaint();
+}
+
+// ── Свободная заявка Барракуде (владелец, 8 ноя 2026: «почему нет свободной
+// заявки в Барракуде?») ────────────────────────────────────────────────────
+// Вторая карточка ветки «Барракуда»: заявка вне нормы, собранная тем же
+// мастером, что заявка на другую базу, но база всегда Барракуда (шаг «Куда
+// едем?» пропущен), цены не вводятся — из прайса, пиво целыми коробками.
+// Файл заявки уходит в магазин кнопкой, ответ магазина ложится в эту же
+// заявку, приёмка — как у основной. Основную заявку по норме не трогает.
+// Группы: ждут магазин (wait: файл не выслан / выслан, и незаконченные
+// черновики мастера), в работе (open), отработанные (done / cancelled).
+// Назад — в ветку «Барракуда»; хаб требует загруженной заявки дня, без неё —
+// вход в закупку.
+function accFreeBack(){ if(ORD && ORD.d) ordHub(); else accOrder(); }
+async function accFree(){
+  document.getElementById('accMid').classList.remove('ap-host', 'xs-fix'); arVisOff();
+  ORD_BRANCH = 'bar';
+  ACC_BACK = accFreeBack;
+  XS = null;
+  _setText('accTitle', 'Свободная заявка');
+  _setText('accSub', 'Барракуда');
+  document.getElementById('accAct').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accFoot').innerHTML = '';
+  let list;
+  try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
+  catch(e){ list = (ACC_SUP && ACC_SUP.list) || []; }
+  ACC_SUP = {list, open: _supMain(list)};
+  const fr = _fList();
+  const wait = fr.filter(x => x.status === 'wait'), open = fr.filter(x => x.status === 'open'),
+        past = fr.filter(x => x.status !== 'open' && x.status !== 'wait');
+  const local = xDraftRows('free');
+  const nWait = wait.length + xDraftsOf('free').length;
+  const head = (id, t, right) => `<div class="bp-section-head"><h2 id="${id}">${t}</h2>${right || ''}</div>`;
+  const cnt = n => `<span class="bp-count" aria-label="${n} ${pluralize(n,'заявка','заявки','заявок')}">${n}</span>`;
+  const pending = nWait ? `<section class="bp-pending" aria-labelledby="bp-pending-title">${
+      head('bp-pending-title', 'ЖДУТ МАГАЗИН', cnt(nWait))}
+    <div class="bp-records">${wait.map(xbRecord).join('')}</div>${local ? `<div class="bp-pending-list">${local}</div>` : ''}</section>` : '';
+  const active = open.length ? `<section class="bp-reviewed bp-active" aria-labelledby="bp-active-title">${
+      head('bp-active-title', 'В РАБОТЕ', cnt(open.length))}
+    <div class="bp-records">${open.map(xbRecord).join('')}</div></section>` : '';
+  const filt = `<span class="bp-filter" data-value="${XB_FILTER}"><select class="bp-filter-select" aria-label="Фильтр отработанных заявок" onchange="xbFilter(this.value)">${
+      [['all', 'Все'], ['accepted', 'Выполненные'], ['cancelled', 'Отменённые']].map(([v, t]) =>
+        `<option value="${v}"${XB_FILTER === v ? ' selected' : ''}>${t}</option>`).join('')}</select>${OB_ICO.down}</span>`;
+  const done = past.length ? `<section class="bp-reviewed" aria-labelledby="bp-reviewed-title">${head('bp-reviewed-title', 'ОТРАБОТАННЫЕ', filt)}
+    <div class="bp-records">${past.map(xbRecord).join('')}<div class="bp-none" hidden>Пока пусто</div></div></section>` : '';
+  const empty = (pending || active || done) ? '' : `<div class="xs-empty"><div class="sh-empty xs-ecard">
+        <span class="sh-empty-i">${OB_ICO.store}</span>
+        <div class="sh-empty-t">Пока пусто</div>
+      </div></div>`;
+  mid.innerHTML = `<div id="ambar-other-bases-priority" lang="ru"><div class="bp-stage"><div class="bp-app" aria-label="Свободные заявки Барракуде">
+    <main class="bp-scroll">${pending}${active}${done}${empty}</main>
+    <footer class="bp-footer"><button type="button" class="bp-new" onclick="xNew('', 'free')">${OB_ICO.plus}<span>Новая заявка</span></button></footer>
   </div></div></div>`;
   xbFilterPaint();
 }
@@ -34563,10 +34637,11 @@ async function xDraftDropGo(){
     await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(SUP_ID)}/cancel`,
       {method: 'POST', body: {as: _rcvMe()}});
   }catch(e){ return _toast('Не удалось отменить'); }
+  const free = !!(SUP_D && SUP_D.supply_id === SUP_ID && SUP_D.free_order);
   XS_DRAFT = {};
   _toast('Заявка отменена');
   ACC_SUP = null;
-  accExtra();
+  if(free) accFree(); else accExtra();
 }
 
 // Заявка на базу открывается в ту же приёмку, что и основная: тот же экран,
@@ -34581,7 +34656,9 @@ async function xOpen(sid, from){
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   await supLoad(sid);
-  ACC_BACK = X_FROM === 'short' ? () => accShort(SHORT_SID) : accExtra;
+  // Свободная заявка Барракуде живёт в своём списке (accFree), не в «Других базах».
+  ACC_BACK = X_FROM === 'short' ? () => accShort(SHORT_SID)
+           : (X_FROM === 'free' || (SUP_D && SUP_D.supply_id === sid && SUP_D.free_order)) ? accFree : accExtra;
 }
 
 // ── приёмка ──
@@ -34611,6 +34688,10 @@ function xSupRender(d){
   // Черновик докупки: состав по районам со степперами, без приёмки и без
   // шагов потока; статус один — «черновик». Откуда состав — подписью в шапке.
   const draft = d.status === 'draft';
+  // Свободная заявка Барракуде (8 ноя 2026): до ответа магазина статус wait —
+  // состав правится, как у черновика, водителям не видна; после ответа —
+  // открытая приёмка, как у основной.
+  const free = !!d.free_order, wait = d.status === 'wait';
   const D = d.districts || {};
   const tasks = d.tasks || [];
   // Отменённые районы — не в счёт: ни в «N из M», ни в бутылках к приёму.
@@ -34621,13 +34702,14 @@ function xSupRender(d){
   const need = live_.reduce((a, t) => a + (t.need || 0), 0);
   const got  = live_.reduce((a, t) => a + (t.got || 0), 0);
   const st = draft ? ['ждёт решения', 'wait']
+           : wait ? [d.sent_at ? 'ждём ответ магазина' : 'ждёт отправки', 'wait']
            : d.status === 'cancelled' ? ['отменена', 'no']
            : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
            : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
-  _setText('accTitle', draft ? 'Доп. заявка' : extra ? (d.base || 'Другая база') : 'Приёмка');
+  _setText('accTitle', draft ? 'Доп. заявка' : free ? 'Свободная заявка' : extra ? (d.base || 'Другая база') : 'Приёмка');
   _setText('accSub', draft ? (d.source === 'shortfall'
                      ? `не довезла ${d.from_base && d.from_base !== 'магазина' ? d.from_base : 'Барракуда'}` : 'вручную')
-                   : extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
+                   : free ? 'Барракуда' : extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
   const order = t => t.cancelled_at ? 3 : t.done_at ? 2 : (t.driver ? 1 : 0);
   const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {
     const x = D[t.district] || {};
@@ -34638,7 +34720,7 @@ function xSupRender(d){
     // 2026): остаток на полке без кодов, пока он есть — карточка жёлтая, как
     // у принятого без сканирования, и в ней кнопка «Сканировать».
     const uns = !!t.done_at && !!t.unscanned_at && !t.cancelled_at;
-    const who = draft ? `${(t.lines || []).length} ${pluralize((t.lines || []).length,'позиция','позиции','позиций')}`
+    const who = (draft || wait) ? `${(t.lines || []).length} ${pluralize((t.lines || []).length,'позиция','позиции','позиций')}`
               : t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
               : uns ? `завершена без сканирования · ${_hm(t.done_at)}${t.unscanned_ok_by ? ' · разрешил ' + escS(t.unscanned_ok_by) : ''}`
               : t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
@@ -34655,7 +34737,7 @@ function xSupRender(d){
     // Пока район не начали принимать, состав правится прямо тут: − n +.
     // Первый скан (или «принято без сканирования») запирает район — замок в
     // подписи, кнопки исчезают, а водитель у себя видит, что именно поменяли.
-    const edit = (draft || (!extra && d.status === 'open')) && !t.locked && !t.cancelled_at;
+    const edit = (draft || (!extra && d.status === 'open') || (free && (wait || d.status === 'open'))) && !t.locked && !t.cancelled_at;
     // Район заперли, пока правили черновик: правки по нему пропадают, и об
     // этом говорим сразу, а не в момент сохранения.
     if(t.locked && XS_DRAFT[t.district] && Object.keys(XS_DRAFT[t.district]).length){
@@ -34688,7 +34770,7 @@ function xSupRender(d){
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
         <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i>${lock}</span>
-        <span class="xs-dcard-n">${draft ? `${fmtQty(t.need)}<i>бут.</i>` : `${fmt(t.got)}<i>/ ${fmt(t.need)}</i>`}</span>
+        <span class="xs-dcard-n">${(draft || wait) ? `${fmtQty(t.need)}<i>бут.</i>` : `${fmt(t.got)}<i>/ ${fmt(t.need)}</i>`}</span>
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
           <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
@@ -34705,7 +34787,9 @@ function xSupRender(d){
     </div>`;
   }).join('');
   const было = (d.tried_bases || []).filter(Boolean);
-  document.getElementById('accMid').innerHTML = (draft ? `<div class="xs-top xs-card">
+  // Свободная заявка до ответа магазина — сводка как у черновика (районы,
+  // позиции, бутылки), но с хронологией и шагами потока под ней.
+  document.getElementById('accMid').innerHTML = ((draft || wait) ? `<div class="xs-top xs-card">
       <span class="xs-top-b"><span class="pstat-c ${st[1]}">${st[0]}</span>
         <span class="xs-top-s">${all} ${pluralize(all,'район','района','районов')} · ${d.positions || 0} ${pluralize(d.positions || 0,'позиция','позиции','позиций')}${
           было.length ? ` · нет на: ${escS(было.join(', '))}` : ''}</span></span>
@@ -34715,7 +34799,7 @@ function xSupRender(d){
         <span class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span></span>
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
-    </div>${supLogBtn(d)}${extra ? xFlowCard(d) : ''}`) + `<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
+    </div>`) + (draft ? '' : `${supLogBtn(d)}${extra ? xFlowCard(d) : ''}`) + `<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
   supActShow(d);
   supFoot();
   const goto = SUP_GOTO === 'who' ? 'supWho'
@@ -34834,7 +34918,7 @@ function xsDraftCount(){ return Object.values(XS_DRAFT).reduce((a, m) => a + Obj
 // заявка»), в основной заявке и у бутылок — по одной: магазин полкоробки не
 // отгружает.
 function xsStepOf(pid){
-  if(!SUP_D || SUP_D.kind !== 'extra') return 1;
+  if(!SUP_D || SUP_D.kind !== 'extra' || SUP_D.free_order) return 1;
   const p = (PRODUCTS || []).find(x => x.id === pid);
   return p && p.unit > 1 ? 0.5 : 1;
 }
@@ -34963,7 +35047,7 @@ async function supPollTick(){
   _supPollBusy = true;
   try{
     const d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(SUP_ID));
-    const sig = x => JSON.stringify((x.tasks || []).map(t => [t.district, t.erev, t.locked, t.got, t.done_at, t.driver, t.noscan_at, t.cancelled_at]) .concat([x.status]));
+    const sig = x => JSON.stringify((x.tasks || []).map(t => [t.district, t.erev, t.locked, t.got, t.done_at, t.driver, t.noscan_at, t.cancelled_at]) .concat([x.status, x.sent_at, x.answer_at]));
     if(SUP_D && sig(d) !== sig(SUP_D)){ SUP_D = d; if(document.getElementById('supWho')) supRender(); }
   }catch(e){}
   finally{ _supPollBusy = false; }
@@ -34991,15 +35075,23 @@ let XS = null;
 //          (кнопка «Заявка на другую базу» на экране самой поставки);
 //   ''   — пусто (черновик мастера из памяти телефона).
 // Раньше состав подставлялся молча из недобора текущей основной заявки.
+//   'free' — свободная заявка Барракуде (8 ноя 2026): база известна, шаг
+//          «Куда едем?» пропущен, мастер открывается сразу на первом районе,
+//          всё целыми (магазин полкоробки не отгружает).
 async function xNew(from, mode){
   mode = mode || (from ? 'left' : '');
-  XS = {step: 1, di: 0, base: '', q: '', cat: '', rows: {}, dist: null, all: null, order: {},
+  const free = mode === 'free';
+  XS = {step: free ? 2 : 1, di: 0, base: free ? 'Барракуда' : '', q: '', cat: '', rows: {}, dist: null, all: null, order: {},
         src: mode === 'norm' ? 'norm' : (from ? 'shortfall' : 'manual'), from: from || '', mode, label: ''};
   document.getElementById('accAct').innerHTML = '';
   xRender();
   xLoad();
 }
 function xNorm(){ xNew('', 'norm'); }
+const _xFree = () => !!(XS && XS.mode === 'free');
+// Пустой мастер: у заявки на базу — ни базы, ни бутылок; у свободной заявки
+// база стоит всегда, пустая — без бутылок (иначе каждый заход плодил бы черновик).
+function xEmpty(){ return !XS || (!xTotal() && (_xFree() || !String(XS.base || '').trim())); }
 
 // Каталог для поиска и состав грузятся в фоне: первый шаг про базу, и ждать
 // список ради него незачем.
@@ -35051,7 +35143,7 @@ async function xLoad(){
           Object.entries(src).forEach(([o, n]) => { if(n > 0) by[o] = n; });
           if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
         });
-        const кто = (sd && sd.kind === 'extra' && sd.base) ? sd.base : 'Барракуды';
+        const кто = (sd && sd.kind === 'extra' && sd.base && !sd.free_order) ? sd.base : 'Барракуды';
         XS.label = `недобор ${кто}` + (sd && sd.day ? ` · ${_dayName(sd.day)}` : '');
       }
     }catch(e){}
@@ -35065,9 +35157,11 @@ async function xLoad(){
 // Стрелка ведёт на шаг назад (район за районом), а «Выйти» — сразу к списку
 // баз. Набранное не пропадает: заявка остаётся черновиком на том же шаге.
 function xLeave(){
-  if(!XS || (!String(XS.base || '').trim() && !xTotal())){
+  // Свободная заявка уходит в свой список, заявка на базу — в «Другие базы».
+  const go = _xFree() ? accFree : accExtra, goS = _xFree() ? 'accFree()' : 'accExtra()';
+  if(xEmpty()){
     if(XS && XS.did) xDraftDrop(XS.did);
-    XS = null; accExtra(); return;
+    XS = null; go(); return;
   }
   closePinPop();
   const back = document.createElement('div');
@@ -35077,9 +35171,9 @@ function xLeave(){
   box.className = 'pin-pop crw-ask';
   box.innerHTML = `
     <div class="crw-ask-t">Выйти из заявки?</div>
-    <div class="crw-ask-s">Черновик откроется на этом же шаге — в «Других базах», ниже списка.</div>
-    <button class="crw-ask-b go" onclick="closePinPop(); xDraftSave(); XS = null; accExtra()">Сохранить черновик и выйти</button>
-    <button class="crw-ask-b bad" onclick="closePinPop(); if(XS && XS.did) xDraftDrop(XS.did); XS = null; accExtra()">Всё равно уйти</button>`;
+    <div class="crw-ask-s">Черновик откроется на этом же шаге — ${_xFree() ? 'в списке свободных заявок' : 'в «Других базах», ниже списка'}.</div>
+    <button class="crw-ask-b go" onclick="closePinPop(); xDraftSave(); XS = null; ${goS}">Сохранить черновик и выйти</button>
+    <button class="crw-ask-b bad" onclick="closePinPop(); if(XS && XS.did) xDraftDrop(XS.did); XS = null; ${goS}">Всё равно уйти</button>`;
   document.body.append(back, box);
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
 }
@@ -35092,28 +35186,33 @@ function xLeave(){
 const XS_DRAFTS_KEY = 'ambar_xs_drafts';
 function xDrafts(){ try{ return JSON.parse(localStorage.getItem(XS_DRAFTS_KEY) || '[]') || []; }catch(e){ return []; } }
 function xDraftsWrite(list){ try{ localStorage.setItem(XS_DRAFTS_KEY, JSON.stringify(list.slice(0, 10))); }catch(e){} }
+// Черновики одного мастера: свободные заявки Барракуде (mode 'free') — отдельно
+// от заявок на базы; у старых черновиков режима нет — это заявки на базы.
+function xDraftsOf(mode){ return xDrafts().filter(d => ((d.mode || '') === 'free') === (mode === 'free')); }
 function xDraftSave(){
-  if(!XS) return;
-  if(!String(XS.base || '').trim() && !xTotal()) return;
+  if(xEmpty()) return;
   XS.did = XS.did || String(Date.now());
   const d = {id: XS.did, base: XS.base, step: XS.step, di: XS.di, rows: XS.rows,
-             src: XS.src, from: XS.from, label: XS.label || '', at: new Date().toISOString()};
+             src: XS.src, from: XS.from, mode: XS.mode || '', label: XS.label || '', at: new Date().toISOString()};
   xDraftsWrite([d, ...xDrafts().filter(x => x.id !== XS.did)]);
 }
 function xDraftDrop(id){ xDraftsWrite(xDrafts().filter(x => x.id !== id)); }
 async function xDraftOpen(id){
   const d = xDrafts().find(x => x.id === id); if(!d) return;
-  await xNew();
+  const free = d.mode === 'free';
+  await xNew('', free ? 'free' : '');
   if(!XS) return;
-  Object.assign(XS, {did: d.id, base: d.base || '', rows: d.rows || {}, src: d.src || 'manual',
-                     from: d.from || '', label: d.label || '', step: d.step || 1, di: d.di || 0});
+  Object.assign(XS, {did: d.id, base: free ? 'Барракуда' : (d.base || ''), rows: d.rows || {}, src: d.src || 'manual',
+                     from: d.from || '', label: d.label || '', step: free ? Math.max(2, d.step || 2) : (d.step || 1), di: d.di || 0});
   xRender();
 }
-function xDraftRows(){
+function xDraftRows(mode){
   // Строки незаконченных заявок мастера — в группе «Требуют решения» рядом с
-  // черновиками из недобора. Нажатие открывает мастер на том же шаге; крестик
-  // справа (вместо стрелки) убирает черновик — прежний обработчик.
-  const list = xDrafts(); if(!list.length) return '';
+  // черновиками из недобора (у свободных заявок — в своём списке). Нажатие
+  // открывает мастер на том же шаге; крестик справа (вместо стрелки) убирает
+  // черновик — прежний обработчик.
+  const list = xDraftsOf(mode); if(!list.length) return '';
+  const home = mode === 'free' ? 'accFree()' : 'accExtra()';
   const qty = d => Object.values(d.rows || {}).reduce((a, r) => a + Object.values(r.by || {}).reduce((x, n) => x + (n || 0), 0), 0);
   const pos = d => Object.values(d.rows || {}).filter(r => Object.values(r.by || {}).some(n => n > 0)).length;
   const where = d => d.step === 1 ? 'куда едем' : d.step === 3 ? 'итог' : `район ${(d.di || 0) + 1}`;
@@ -35125,7 +35224,7 @@ function xDraftRows(){
       ${n ? (t => `<span class="bp-quantity"><strong>${fmtQty(t.box || t.btl)}</strong><span>${t.box
             ? _xBoxWord(t.box) + (t.btl ? ` · ${fmtQty(t.btl)} бут.` : '') : pluralize(t.btl,'бутылка','бутылки','бутылок')}</span></span>`)(xTally(d.rows || {}))
           : '<span class="bp-quantity"></span>'}
-      <span class="bp-request-arrow bp-request-drop" role="button" aria-label="Убрать" onclick="event.stopPropagation(); xDraftDrop('${escS(d.id)}'); accExtra()">${OB_ICO.x}</span>
+      <span class="bp-request-arrow bp-request-drop" role="button" aria-label="Убрать" onclick="event.stopPropagation(); xDraftDrop('${escS(d.id)}'); ${home}">${OB_ICO.x}</span>
       <span class="bp-request-meta">${n ? `<span>${p} ${pluralize(p,'позиция','позиции','позиций')}</span>` : ''}<span>${where(d)}</span><span>${_hm(d.at)}</span></span>
     </button>`; }).join('');
 }
@@ -35135,9 +35234,11 @@ function xBack(){
   XS.q = ''; XS.cat = '';
   if(XS.step === 3){ XS.step = 2; XS.di = Math.max(0, (XS.dist || []).length - 1); xRender(); return; }
   if(XS.step === 2 && XS.di > 0){ XS.di--; xRender(); return; }
-  if(XS.step === 2){ XS.step = 1; xRender(); return; }
+  // У свободной заявки шага базы нет: с первого района — к её списку.
+  if(XS.step === 2 && !_xFree()){ XS.step = 1; xRender(); return; }
+  const go = _xFree() ? accFree : accExtra;
   xDraftSave();
-  XS = null; accExtra();
+  XS = null; go();
 }
 
 const xQty = r => Object.values((r && r.by) || {}).reduce((a, n) => a + (n || 0), 0);
@@ -35155,7 +35256,8 @@ function _xBox(pid){
   const p = ((XS && XS.all) || []).find(x => x.id === pid) || (PRODUCTS || []).find(x => x.id === pid);
   return !!(p && p.unit > 1);
 }
-function xStepOf(pid){ return _xBox(pid) ? 0.5 : 1; }
+// Свободная заявка Барракуде — целыми: магазин полкоробки не отгружает.
+function xStepOf(pid){ return _xBox(pid) && !_xFree() ? 0.5 : 1; }
 const _xHalf = v => Math.max(0, Math.round((+v || 0) * 2) / 2);
 // {btl, box} по строкам: одного района (oid) или всей заявки.
 function xTally(rows, oid){
@@ -35191,9 +35293,9 @@ function xRender(){
   const s = XS.step;
   const dist = XS.dist || [];
   // Полоска на каждый шаг: база, по одной на район, итог.
-  const nSteps = 2 + Math.max(1, dist.length);
-  const cur = s === 1 ? 1 : s === 2 ? 2 + XS.di : nSteps;
-  _setText('accTitle', 'Новая заявка');
+  const nSteps = (_xFree() ? 1 : 2) + Math.max(1, dist.length);
+  const cur = s === 1 ? 1 : s === 2 ? (_xFree() ? 1 : 2) + XS.di : nSteps;
+  _setText('accTitle', _xFree() ? 'Свободная заявка' : 'Новая заявка');
   xSub();
   // Справа в шапке — выход к списку баз одним нажатием: стрелка идёт по
   // районам назад, а сюда попадают с любого шага.
@@ -35265,7 +35367,7 @@ function xRender(){
       </div>`);
     });
     mid.innerHTML = steps + `<div class="xs-top">
-        <span class="xs-top-b"><i>База</i><b>${escS(XS.base.trim())}</b></span>
+        <span class="xs-top-b"><i>${_xFree() ? 'Магазин' : 'База'}</i><b>${escS(XS.base.trim())}</b></span>
         <span class="xs-top-n">${(t => [t.btl ? `<span class="xs-top-u"><b>${fmtQty(t.btl)}</b><i>${pluralize(t.btl,'бутылка','бутылки','бутылок')}</i></span>` : '',
             t.box ? `<span class="xs-top-u"><b>${fmtQty(t.box)}</b><i>${_xBoxWord(t.box)}</i></span>` : ''].join(''))(xTally(XS.rows))
           }<i class="xs-top-p">${pos} ${pluralize(pos,'позиция','позиции','позиций')}</i></span>
@@ -35282,9 +35384,9 @@ function xRender(){
 function xSub(){
   if(!XS) return;
   const s = XS.step, dist = XS.dist || [];
-  const nSteps = 2 + Math.max(1, dist.length);
-  const cur = s === 1 ? 1 : s === 2 ? 2 + XS.di : nSteps;
-  _setText('accSub', (XS.label ? XS.label + ' · ' : '')
+  const nSteps = (_xFree() ? 1 : 2) + Math.max(1, dist.length);
+  const cur = s === 1 ? 1 : s === 2 ? (_xFree() ? 1 : 2) + XS.di : nSteps;
+  _setText('accSub', (XS.label ? XS.label + ' · ' : _xFree() ? 'Барракуда · ' : '')
     + (s === 2 && dist.length ? `район ${XS.di + 1} из ${dist.length}` : `шаг ${cur} из ${nSteps}`));
 }
 
@@ -35453,17 +35555,23 @@ async function xCreate(){
   const items = Object.entries(XS.rows).map(([id, r]) => ({id,
       by_district: Object.fromEntries(Object.entries(r.by).filter(([, n]) => n > 0))}))
     .filter(x => Object.keys(x.by_district).length);
+  // Свободная заявка Барракуде: {free: true}, база и цены — у сервера; водителям
+  // она пока не видна — сперва файл в магазин и его ответ, поэтому дальше
+  // сразу страница заявки с кнопкой «Отправить в магазин».
+  const free = _xFree();
   try{
-    await ownerApi.ownerFetch('/api/owner/supply/extra',
-      {method:'POST', body:{base: XS.base.trim(), items, as: _meName(),
-                            source: XS.src || 'manual', from_supply: XS.from || ''}});
+    const r = await ownerApi.ownerFetch('/api/owner/supply/extra',
+      {method:'POST', body: free ? {free: true, items, as: _meName()}
+                            : {base: XS.base.trim(), items, as: _meName(),
+                               source: XS.src || 'manual', from_supply: XS.from || ''}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    _toast('Заявка создана — водители её видят');
+    _toast(free ? 'Заявка собрана' : 'Заявка создана — водители её видят');
     if(XS && XS.did) xDraftDrop(XS.did);
     // Заявка и её недобор изменились — кэш поставки тоже устарел, иначе
     // экран недобора подставит те же бутылки второй раз.
     XS = null; ACC_SUP = null; SUP_D = null;
-    await accExtra();
+    document.getElementById('accMid').classList.remove('xs-fix');
+    if(free && r && r.supply_id) await xOpen(r.supply_id, 'free'); else await accExtra();
   }catch(e){
     _toast('Не удалось создать');
     b.disabled = false; b.textContent = 'Создать заявку';
@@ -35676,13 +35784,15 @@ async function supHistory(){
 // Строка закупки: источник (Барракуда / другая база), статус словом и
 // значком, «принято из · не дала»; по нажатию — та же поставка (supOpenOne).
 function supHistRow(x){
-  const extra = x.kind === 'extra';
+  // Свободная заявка Барракуде — источник «магазин», как основная, со своим именем.
+  const free = !!x.free_order, extra = x.kind === 'extra' && !free;
   const st = x.status === 'cancelled' ? ['отменена', 'is-cancelled', AH_ICO.x, 'cancelled']
            : x.status === 'done' ? [x.took < x.total_qty ? 'недобор' : 'принято', 'is-accepted', AH_ICO.check, 'accepted']
+           : x.status === 'wait' ? ['ждём ответ', 'is-waiting', AH_ICO.clock, 'waiting']
            : x.free === x.districts ? ['ждёт', 'is-waiting', AH_ICO.clock, 'waiting'] : ['в работе', 'is-waiting', AH_ICO.clock, 'working'];
   return `<button type="button" class="ah-record" onclick="supOpenOne('${escS(x.supply_id)}')" data-source="${extra ? 'additional' : 'store'}" data-status="${st[3]}">
     <span class="ah-source-icon" aria-hidden="true">${extra ? AH_ICO.warehouse : AH_ICO.store}</span>
-    <span class="ah-record-body"><span class="ah-record-top"><strong>${extra ? escS(x.base || 'Другая база') : 'Барракуда'}</strong><span class="ah-status ${st[1]}">${st[2]}${st[0]}</span></span><span class="ah-record-meta"><span>${
+    <span class="ah-record-body"><span class="ah-record-top"><strong>${free ? 'Барракуда · свободная' : extra ? escS(x.base || 'Другая база') : 'Барракуда'}</strong><span class="ah-status ${st[1]}">${st[2]}${st[0]}</span></span><span class="ah-record-meta"><span>${
       fmt(x.took)} из ${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылки','бутылок','бутылок')}</span>${
       x.gap_qty ? `<span class="ah-not-given">не дала ${fmt(x.gap_qty)}</span>` : ''}${
       x.status === 'open' && x.free ? `<span class="ah-not-given">${x.free} без водителя</span>` : ''}</span></span>
@@ -35842,7 +35952,7 @@ async function supLogOpen(sid){
   supPollStop();
   _setText('accTitle', 'Хронология');
   _setText('accSub', SUP_D && SUP_D.supply_id === sid
-    ? (SUP_D.kind === 'extra' ? (SUP_D.base || 'Другая база') : _dayName(SUP_D.day || String(SUP_D.at || '').slice(0, 10)))
+    ? (SUP_D.free_order ? 'Барракуда · свободная' : SUP_D.kind === 'extra' ? (SUP_D.base || 'Другая база') : _dayName(SUP_D.day || String(SUP_D.at || '').slice(0, 10)))
     : '');
   document.getElementById('accAct').innerHTML = '';
   document.getElementById('accFoot').innerHTML = '';
@@ -35853,7 +35963,7 @@ async function supLogOpen(sid){
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(sid) + '/log'); }
   catch(e){ mid.innerHTML = loadFail(`supLogOpen('${escS(sid)}')`); return; }
-  if(d.kind === 'extra') _setText('accSub', d.base || 'Другая база');
+  if(d.kind === 'extra') _setText('accSub', d.free_order ? 'Барракуда · свободная' : (d.base || 'Другая база'));
   else if(d.day) _setText('accSub', _dayName(d.day));
   mid.innerHTML = supLogHtml(d);
 }
@@ -35916,7 +36026,14 @@ function supFoot(){
   }
   // У доп. заявки внизу — следующий шаг потока. У основной подвал появляется
   // только с черновиком: одна кнопка, сколько строк уйдёт.
-  if(SUP_D && SUP_D.kind === 'extra'){ document.getElementById('accFoot').innerHTML = xFlowFoot(SUP_D); return; }
+  // У свободной заявки Барракуде состав правится (до ответа магазина и до
+  // первого скана): есть правки — сперва «Сохранить», как у основной.
+  if(SUP_D && SUP_D.kind === 'extra'){
+    const nf = SUP_D.free_order ? xsDraftCount() : 0;
+    document.getElementById('accFoot').innerHTML = nf ? `<div class="qb-wrap">
+      <button class="qb" id="xsSaveBtn" onclick="xsSave()">Сохранить · ${nf}</button></div>` : xFlowFoot(SUP_D);
+    return;
+  }
   const n = xsDraftCount();
   document.getElementById('accFoot').innerHTML = n ? `<div class="qb-wrap">
       <button class="qb" id="xsSaveBtn" onclick="xsSave()">Сохранить · ${n}</button></div>` : '';
@@ -35949,6 +36066,7 @@ function xFlow(d){
   return {step, items, priced, n: items.length, takenAll, doneAll, next, cost};
 }
 function xFlowCard(d){
+  if(d.free_order) return fFlowCard(d);
   const f = xFlow(d);
   const when = `${_dayName(d.day || String(d.at || '').slice(0, 10))}${d.at ? ' ' + _hm(d.at) : ''}`;
   const src = d.source === 'shortfall' ? `из недобора · ${d.from_base || 'магазина'}` : d.source === 'norm' ? 'по норме' : 'вручную';
@@ -35993,6 +36111,7 @@ function xFlowCard(d){
   </div>`;
 }
 function xFlowFoot(d){
+  if(d.free_order) return fFlowFoot(d);
   const f = xFlow(d);
   if(f.step === 1) return `<div class="qb-wrap"><button class="qb" onclick="xTakeAll()">Взять всю заявку на себя</button></div>`;
   if(f.step === 2) return `<div class="qb-wrap"><button class="qb" onclick="xPrices('${escS(d.supply_id)}')">Вписать цены · ${f.priced} из ${f.n}</button></div>`;
@@ -36002,6 +36121,103 @@ function xFlowFoot(d){
   }
   return '';
 }
+// ── Свободная заявка Барракуде: поток по шагам (8 ноя 2026) ────────────────
+// Файл → ответ → приём → готово. Цен нет — из прайса Барракуды. До ответа
+// магазина заявка в статусе wait и водителям не видна. «Отправить в магазин»
+// шлёт тот же файл заявки, что у основной, в чат с ботом (/supply/send с sid);
+// «Загрузить ответ магазина» кладёт ответ в эту же заявку (/supply/import с
+// sid): отказы и дописанное — как у основной, после чего приёмка идёт как у
+// основной — задачи по районам у водителей, сканирование, недовоз.
+function fFlow(d){
+  const tasks = d.tasks || [];
+  const live_ = tasks.filter(t => !t.cancelled_at);
+  const doneAll = live_.length > 0 && live_.every(t => t.done_at);
+  const next = live_.find(t => !t.done_at) || null;
+  const step = d.status === 'cancelled' ? 0
+             : d.status === 'wait' ? (d.sent_at ? 2 : 1)
+             : (d.status !== 'open' || doneAll) ? 4 : 3;
+  return {step, next, doneAll};
+}
+function fFlowCard(d){
+  const f = fFlow(d), sid = escS(d.supply_id);
+  const t0 = d.created_at || d.at;
+  const when = `${_dayName(d.day || String(t0 || '').slice(0, 10))}${t0 ? ' ' + _hm(t0) : ''}`;
+  const meta = [when, d.by_name].filter(Boolean).join(' · ');
+  const sh = d.shortfall || {}, left = sh.qty_left != null ? sh.qty_left : (sh.qty || 0);
+  const kids = sh.children || [];
+  const more = left ? `<button class="xf-prices warn" onclick="accShort('${sid}')">
+      <span>Осталось докупить</span>
+      <b>${fmt(left)} ${pluralize(left,'бутылка','бутылки','бутылок')}</b>
+      <em>${ICO_CHEV}</em></button>`
+    : kids.length ? `<button class="xf-prices" onclick="accShort('${sid}')">
+      <span>Докупаем на ${escS(kids.map(k => k.base).filter(Boolean).join(', ') || 'другой базе')}</span>
+      <b>${fmt(kids.reduce((a, k) => a + (k.qty || 0), 0))}</b>
+      <em>${ICO_CHEV}</em></button>` : '';
+  const STEPS = ['Файл', 'Ответ', 'Приём', 'Готово'];
+  const HINT = {
+    0: 'Заявка отменена',
+    1: 'Отправьте файл заявки в магазин',
+    2: 'Файл выслан — загрузите ответ магазина',
+    3: 'Отсканируйте бутылки по районам или примите без сканирования',
+    4: 'Заявка принята',
+  };
+  const wait = d.status === 'wait';
+  const sent = d.sent_at ? `выслан ${_hm(d.sent_at)}${d.sent_n > 1 ? ` · ${d.sent_n}` : ''}` : 'не выслан';
+  const ans = d.answer_at ? `загружен ${_hm(d.answer_at)}${d.answer_n > 1 ? ` · ${d.answer_n}` : ''}` : 'ждём';
+  // Файл можно выслать ещё раз, пока магазин не ответил; ответ — заменить,
+  // пока по заявке не начали принимать (как у основной).
+  const canSend = wait;
+  const canUp = wait || (d.status === 'open' && !(d.tasks || []).some(t => t.locked || t.done_at || t.noscan_at));
+  return `<div class="xf-card">
+    <div class="xf-meta">${escS(meta)}</div>
+    <div class="xf-steps">${STEPS.map((t, i) => {
+      const k = i + 1, cls = f.step > k || f.step === 4 && k === 4 ? 'done' : f.step === k ? 'on' : '';
+      return `<span class="xf-s ${cls}"><b>${cls === 'done' ? IC('check', 12) : k}</b><i>${t}</i></span>`;
+    }).join('<u></u>')}</div>
+    <div class="xf-hint">${HINT[f.step] || ''}</div>
+    ${d.status === 'cancelled' ? '' : `<button class="xf-prices${wait && !d.sent_at ? ' warn' : ''}" id="freeSendRow"${canSend ? ` onclick="freeSend('${sid}')"` : ' disabled'}>
+      <span>Файл заявки</span>
+      <b>${escS(sent)}</b>
+      <em>${canSend ? ICO_CHEV : ''}</em>
+    </button>
+    <button class="xf-prices${wait && d.sent_at ? ' warn' : ''}" id="freeUpRow"${canUp ? ` onclick="document.getElementById('freeFile').click()"` : ' disabled'}>
+      <span>Ответ магазина</span>
+      <b>${escS(ans)}</b>
+      <em>${canUp ? ICO_CHEV : ''}</em>
+    </button>
+    <input type="file" id="freeFile" accept=".xlsx" style="display:none" onchange="supImport(this,'freeUpRow','${sid}')">`}${more}
+  </div>`;
+}
+// Внизу — главное действие шага: отправить файл, загрузить ответ; приёмку
+// ведут водители (и старший по карточкам районов), как у основной.
+function fFlowFoot(d){
+  const f = fFlow(d), sid = escS(d.supply_id);
+  if(f.step === 1) return `<div class="qb-wrap"><button class="qb" id="freeSend" onclick="freeSend('${sid}')">Отправить в магазин</button></div>`;
+  if(f.step === 2) return `<div class="qb-wrap"><button class="qb" id="freeUp" onclick="document.getElementById('freeFileF').click()">Загрузить ответ магазина</button>
+    <input type="file" id="freeFileF" accept=".xlsx" style="display:none" onchange="supImport(this,'freeUp','${sid}')"></div>`;
+  return '';
+}
+let _freeBusy = false;
+async function freeSend(sid){
+  if(_freeBusy) return;
+  _freeBusy = true;
+  const btns = ['freeSend', 'freeSendRow'].map(id => document.getElementById(id)).filter(Boolean);
+  btns.forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+  try{
+    await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{sid, as: _meName()}});
+    _toast('Файл в чате с ботом');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(SUP_ID === sid) await supLoad(sid);
+  }catch(e){
+    const p = (e && e.payload) || {};
+    _toast(p.error === 'free_status' ? (p.status === 'open' ? 'Магазин уже ответил' : p.status === 'cancelled' ? 'Заявка отменена' : 'Заявка уже закрыта')
+         : p.error === 'not_found' ? 'Заявка не найдена' : 'Не отправилось — попробуйте ещё раз');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+    btns.forEach(b => { b.disabled = false; b.style.opacity = ''; });
+  }
+  _freeBusy = false;
+}
+
 // Взять все свободные районы разом: заявка на базу — одна поездка, а не пять
 // «взять на себя» по карточкам.
 async function xTakeAll(){
@@ -36088,15 +36304,18 @@ async function xPriceSave(pid){
   if(btn) btn.textContent = f.priced >= f.n ? 'Готово' : `Готово · ${f.priced} из ${f.n}`;
 }
 
-async function supImport(inp, btnId){
+// sid — свободная заявка Барракуде (8 ноя 2026): ответ магазина ложится в
+// неё, а не в заявку дня по норме.
+async function supImport(inp, btnId, sid){
   const f = inp.files && inp.files[0];
   inp.value = '';
   if(!f) return;
   const b = document.getElementById(btnId || 'supUp');
-  const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Читаю файл…';
+  const html = b ? b.innerHTML : ''; if(b){ b.disabled = true; b.innerHTML = 'Читаю файл…'; }
   try{
     const fd = new FormData(); fd.append('file', f, f.name);
-    const res = await fetch((ownerApi.AMBAR_API || '') + '/api/owner/supply/import?as=' + encodeURIComponent(_meName()),
+    const res = await fetch((ownerApi.AMBAR_API || '') + '/api/owner/supply/import?as=' + encodeURIComponent(_meName())
+        + (sid ? '&sid=' + encodeURIComponent(sid) : ''),
       {method:'POST', body:fd,
        headers:{'Authorization':'tma ' + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
     const j = await res.json();
@@ -36105,11 +36324,11 @@ async function supImport(inp, btnId){
     // Строки, которых нет в каталоге, называем сразу: магазин вписал своё, и
     // молча потерять это нельзя — за товаром по ней никто не поедет.
     const чужие = (j.unknown || []).length;
-    _toast(`${j.replaced ? 'Поставка заменена · ' : 'Поставка на '}${j.total_qty} бутылок${чужие ? ` · не узнано строк: ${чужие} (${
+    _toast(`${j.free_order ? (j.replaced ? 'Ответ магазина заменён · ' : 'Ответ магазина · ') : j.replaced ? 'Поставка заменена · ' : 'Поставка на '}${j.total_qty} бутылок${чужие ? ` · не узнано строк: ${чужие} (${
       String(j.unknown[0]).slice(0, 28)}${чужие > 1 ? '…' : ''})` : ''}`);
     ACC_SUP = null;
     await supLoad(j.supply_id);
-    ACC_BACK = accOrder;
+    if(!j.free_order) ACC_BACK = accOrder;      // свободная: стрелка остаётся, откуда пришли
     try{ ACC_SUP = {list: (await ownerApi.ownerFetch('/api/owner/supply')).supplies || []};
          ACC_SUP.open = _supMain(ACC_SUP.list); accRender(); }catch(e){}
   }catch(e){
@@ -36119,11 +36338,13 @@ async function supImport(inp, btnId){
                nothing_confirmed:'Магазин не подтвердил ни одной позиции',
                already_started:'По этой поставке уже принимают товар' + ((e||{}).districts && e.districts.length
                  ? ' (' + e.districts.join(', ') + ')' : '') + ' — заменить нельзя',
-               file_required:'Файл не пришёл', empty_file:'Файл пустой'};
+               file_required:'Файл не пришёл', empty_file:'Файл пустой',
+               not_found:'Заявка не найдена',
+               free_status: ({cancelled:'Заявка отменена', done:'Заявка уже принята'})[(e||{}).status] || 'Заявка уже закрыта'};
     _toast(E[(e||{}).error] || 'Файл не прочитался');
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
   }
-  b.disabled = false; b.innerHTML = html;
+  if(b){ b.disabled = false; b.innerHTML = html; }
 }
 
 // Что можно сделать с районом прямо отсюда. Свободный старший может забрать
@@ -36991,7 +37212,9 @@ function supCancelBtn(sup){
     : (s.districts || 0) - (s.done || 0) > 0);
   // Черновик докупки отменяется целиком: водителям он не виден, районов не
   // выбирают — окно-вопрос, и заявка уходит в отработанные.
-  if(sup && sup.status === 'draft') return sup.supply_id
+  // Свободная заявка Барракуде до ответа магазина (wait) — тоже целиком:
+  // водителям не видна, районов не выбирают.
+  if(sup && (sup.status === 'draft' || sup.status === 'wait')) return sup.supply_id
     ? `<button class="acc-act dn" onclick="xDraftDropAsk()">Отменить заявку</button>` : '';
   if(sup) return (sup.status === 'open' && sup.supply_id && живых(sup))
     ? `<button class="acc-act dn" onclick="supCancelOpen('${sup.kind === 'extra' ? 'extra' : 'sup'}')"
@@ -37089,6 +37312,7 @@ function _supCancelAskOld(){
 function _supName(x, caps){
   const base = (x || {}).base || '';
   if((x || {}).kind !== 'extra') return caps ? 'Основную заявку' : 'основную заявку';
+  if((x || {}).free_order) return caps ? 'Свободную заявку' : 'свободную заявку';
   return (caps ? 'Доп. заявку' : 'доп. заявку') + (base ? ` · ${base}` : '');
 }
 
@@ -37181,8 +37405,8 @@ function supcRender(){
     }).join('');
     const qty = d.total_qty || 0;
     return `<div class="sc supc">
-      <div class="sc-cap"><span class="supc-ico">${main ? ICO_LIST : ICO_BASE}</span>
-        <span>${escS(main ? 'Заявка' : (d.base || 'База'))}</span>
+      <div class="sc-cap"><span class="supc-ico">${main || d.free_order ? ICO_LIST : ICO_BASE}</span>
+        <span>${escS(main ? 'Заявка' : d.free_order ? 'Барракуда · свободная' : (d.base || 'База'))}</span>
         <b>${fmt(qty)}<u>${pluralize(qty,'бутылка','бутылки','бутылок')}</u></b></div>
       ${rows || '<div class="fb-none">Районов нет</div>'}
       ${active.length > 1 ? `<button class="sc-r supc-all${allOn ? ' on' : ''}" onclick="supcAll('${escS(sid)}')">

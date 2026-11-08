@@ -218,8 +218,16 @@ async def answer_day(snap: dict = None) -> tuple[str, str]:
 
 @require_owner
 async def handle_export(request):
-    """Заявка файлом по ссылке — для браузера."""
-    raw, name = await _build_book((request.query.get("day") or "").strip())
+    """Заявка файлом по ссылке — для браузера. ?sid= — файл свободной заявки
+    Барракуде по её составу."""
+    free_sid = str(request.query.get("sid") or "").strip()[:40]
+    if free_sid:
+        sup, no = await _free_for(free_sid, ("wait", "open"))
+        if no:
+            return no
+        raw, name = await _free_book(sup)
+    else:
+        raw, name = await _build_book((request.query.get("day") or "").strip())
     return web.Response(
         body=raw,
         headers={**CORS_HEADERS,
@@ -240,14 +248,27 @@ async def handle_send(request):
     if not OWNER_BOT_TOKEN:
         return web.json_response({"error": "no_bot"}, status=500, headers=CORS_HEADERS)
     try:
-        body = await request.json()              # {day, as}: «as» — подпись в хронологии
+        body = await request.json()              # {day, as, sid?}: «as» — подпись в хронологии
     except Exception:                            # noqa: BLE001
         body = {}
-    raw, name = await _build_book((request.query.get("day") or "").strip())
+    # Свободная заявка Барракуде — своим файлом по её составу (владелец, 8 ноя
+    # 2026); снимок заявки дня она не трогает — ответ на неё грузят с тем же
+    # sid. Выслать можно, пока магазин не ответил.
+    free_sid = str(body.get("sid") or request.query.get("sid") or "").strip()[:40]
+    free_sup = None
+    if free_sid:
+        free_sup, no = await _free_for(free_sid, ("wait",))
+        if no:
+            return no
+        raw, name = await _free_book(free_sup)
+        caption = ("Свободная заявка в магазин · "
+                   + name.removeprefix("AMBAR-zayavka-extra-").removesuffix(".xlsx"))
+    else:
+        raw, name = await _build_book((request.query.get("day") or "").strip())
+        caption = "Заявка в магазин · " + name.removeprefix("AMBAR-zayavka-").removesuffix(".xlsx")
     form = _aiohttp.FormData()
     form.add_field("chat_id", str(request.get("owner_id") or 0))
-    form.add_field("caption", "Заявка в магазин · "
-                + name.removeprefix("AMBAR-zayavka-").removesuffix(".xlsx"))
+    form.add_field("caption", caption)
     form.add_field("document", raw, filename=name,
                    content_type="application/vnd.openxmlformats-officedocument."
                                 "spreadsheetml.sheet")
@@ -272,6 +293,15 @@ async def handle_send(request):
         await _remember_owner_msg(OWNER_BOT_TOKEN, request.get("owner_id") or 0, res)
     except Exception as e:
         log.debug(f"[supply] реестр заявки: {e}")
+    if free_sup:
+        now = datetime.now(timezone.utc)
+        who = _owner_name(request, body)
+        await db.supply_set(free_sid, {"sent_at": now, "sent_by": who,
+                                       "sent_n": int(free_sup.get("sent_n") or 0) + 1},
+                            only_open=False)
+        await supply_log.add("sent", free_sid, who=who, note=name, at=now)
+        log.info(f"[supply] свободная заявка {free_sid}: файл {name} выслан · {who}")
+        return web.json_response({"ok": True, "file": name, "supply_id": free_sid}, headers=CORS_HEADERS)
     # Хронология заявки: файл выслан — кем и когда. Под днём заявки, снимок
     # которой только что записал _build_book (zayavka_save → at = сейчас).
     try:
@@ -306,10 +336,6 @@ async def _build_book(day: str):
 
     Total в строке — формула. Магазин правит числа по точкам, и переписанный
     руками итог разошёлся бы с ними в первый же раз."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-    from openpyxl.utils import get_column_letter
-
     data = await _order_rows(day)
     # Заявку датируем днём закупки, а не уходящей сменой: файл уходит в
     # магазин под утро, и дата на нём — та, в которую мы приедем. Иначе
@@ -332,6 +358,69 @@ async def _build_book(day: str):
     # Выключенный район в файл не едет вовсе: магазину не нужна колонка с
     # нулями, а нам — вопрос «а сюда сколько?» (владелец, 24 сен 2026).
     dist = [d["id"] for d in data["districts"] if not d.get("off")]
+    raw, info = await _book_xlsx(rows, dist, f"Purchase order · {buy}")
+
+    # Снимок того, что просили: в файле все позиции каталога, и вернувшийся ноль
+    # сам по себе не отличает «магазин отказал» от «мы и не заказывали».
+    # Только у заявки дня: файл свободной заявки Барракуде (_free_book) снимка
+    # не трогает — иначе её файл подменил бы заявку дня при загрузке ответа.
+    try:
+        await db.zayavka_save(
+            data["day"],
+            {r["id"]: r["need_total"] for r in rows if r["need_total"]},
+            by={r["id"]: {o: c["need"] for o, c in r["cells"].items() if c["need"]}
+                for r in rows if r["need_total"]})
+    except Exception as e:
+        log.warning(f"[supply] снимок заявки: {e}")
+
+    name = f"AMBAR-zayavka-{buy}.xlsx"
+    log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
+             f"из них с потребностью {sum(1 for r in rows if r['need_total'])}, "
+             f"на {info['money']:,.2f} AED, без цены {info['no_price']}")
+    return raw, name
+
+
+async def _free_book(sup: dict):
+    """Файл свободной заявки Барракуде — тот же лист, что у заявки дня, по её
+    составу: до ответа магазина — текущие строки (их ещё можно править),
+    после — снимок ask_by, что просили. Районы — только те, куда что-то
+    заказано. Снимок заявки дня не пишется."""
+    cat = _catalog_by_id()
+    items = sup.get("items") or []
+    ask = sup.get("ask_by") or {it["id"]: (it.get("by_district") or {}) for it in items}
+    names = {it["id"]: it.get("name") or "" for it in items}
+    rows = []
+    for pid, by in ask.items():
+        cells = {}
+        for o, n in (by or {}).items():
+            try:
+                n = _qn(n)
+            except (TypeError, ValueError):
+                n = 0
+            if o in OFFICE_IDS and n > 0:
+                cells[o] = {"need": n}
+        if not cells:
+            continue
+        rows.append({"id": pid, "name": (cat.get(pid) or {}).get("name") or names.get(pid) or pid,
+                     "need_total": _qn(sum(c["need"] for c in cells.values())), "cells": cells})
+    rows.sort(key=lambda r: order_key(r["id"]))
+    dist = [o for o in OFFICE_IDS if any(o in r["cells"] for r in rows)]
+    date = _now_dubai().strftime("%Y-%m-%d")
+    raw, info = await _book_xlsx(rows, dist, f"Additional purchase order · {date}")
+    name = f"AMBAR-zayavka-extra-{date}.xlsx"
+    log.info(f"[supply] файл свободной заявки {sup.get('_id') or ''}: {len(rows)} позиций, "
+             f"на {info['money']:,.2f} AED, без цены {info['no_price']}")
+    return raw, name
+
+
+async def _book_xlsx(rows: list, dist: list, title: str):
+    """Сам лист .xlsx по строкам {id, name, need_total, cells{район: {need}}} и
+    районам — один файл и для заявки дня, и для свободной заявки Барракуде
+    (владелец, 8 ноя 2026). Снимка заявки здесь нет — его пишет _build_book.
+    Возвращает (байты, {money, no_price})."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
     try:
         import stock_value
         costs = await stock_value.cost_map()
@@ -380,7 +469,7 @@ async def _build_book(day: str):
     AMT = TOT + 1                              # Amount
     PL, TL, AL = get_column_letter(PR), get_column_letter(TOT), get_column_letter(AMT)
 
-    ws.cell(row=1, column=N, value=f"Purchase order · {buy}")
+    ws.cell(row=1, column=N, value=title)
     ws.cell(row=1, column=N).font = Font(bold=True, size=16)
     ws.cell(row=1, column=N).border = Border(bottom=thin)
     ws.merge_cells(start_row=1, start_column=N, end_row=1, end_column=I)
@@ -511,24 +600,9 @@ async def _build_book(day: str):
     # точкам и без этого перестаёт понимать, в какой он строке.
     ws.freeze_panes = f"{get_column_letter(D0)}{first}"
 
-    # Снимок того, что просили: в файле все позиции каталога, и вернувшийся ноль
-    # сам по себе не отличает «магазин отказал» от «мы и не заказывали».
-    try:
-        await db.zayavka_save(
-            data["day"],
-            {r["id"]: r["need_total"] for r in rows if r["need_total"]},
-            by={r["id"]: {o: c["need"] for o, c in r["cells"].items() if c["need"]}
-                for r in rows if r["need_total"]})
-    except Exception as e:
-        log.warning(f"[supply] снимок заявки: {e}")
-
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     raw = _with_cached_values(buf.read(), calc)
-    name = f"AMBAR-zayavka-{buy}.xlsx"
-    log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
-             f"из них с потребностью {sum(1 for r in rows if r['need_total'])}, "
-             f"на {money:,.2f} AED, без цены {sum(1 for r in rows if not price_of(r['id']))}")
-    return raw, name
+    return raw, {"money": money, "no_price": sum(1 for r in rows if not price_of(r["id"]))}
 
 
 def _tail(ws, last_row: int, col: int):
@@ -792,13 +866,31 @@ async def handle_import(request):
     # правками на заявку 1 ноября. Владелец, 4 ноя 2026: «отработали заявку
     # 3 числа, значит и пиши её 3-м числом».
     asked_map, asked_full, snap = {}, {}, {}
-    try:
-        snap = await db.zayavka_last_full()
-        asked_map = snap.get("asked") or {}
-        asked_full = snap.get("by") or {}
-    except Exception as e:
-        log.warning(f"[supply] снимок заявки не прочитан: {e}")
-    day, order_day = await answer_day(snap)
+    # Ответ на СВОБОДНУЮ заявку Барракуде (?sid=, владелец, 8 ноя 2026):
+    # просили — её собственный состав (ask_by — снимок на момент первого
+    # ответа, до него — текущие строки), не снимок заявки дня; поставка — она
+    # же, wait → open. Дата — календарный день по Дубаю: отработали сегодня —
+    # сегодняшним числом (то же, что answer_day для основной, без дня закупки).
+    free_sid = str((getattr(request, "query", None) or {}).get("sid") or "").strip()[:40]
+    free_sup, free_ask, order_day = None, {}, ""
+    if free_sid:
+        free_sup, no = await _free_for(free_sid, ("wait", "open"))
+        if no:
+            return no
+        free_ask = free_sup.get("ask_by") or {it["id"]: dict(it.get("by_district") or {})
+                                              for it in free_sup.get("items") or []}
+        asked_full = {pid: {o: _qn(n) for o, n in (by or {}).items() if float(n or 0) > 0}
+                      for pid, by in free_ask.items()}
+        asked_map = {pid: _qn(sum(by.values())) for pid, by in asked_full.items() if by}
+        day = _now_dubai().strftime("%Y-%m-%d")
+    else:
+        try:
+            snap = await db.zayavka_last_full()
+            asked_map = snap.get("asked") or {}
+            asked_full = snap.get("by") or {}
+        except Exception as e:
+            log.warning(f"[supply] снимок заявки не прочитан: {e}")
+        day, order_day = await answer_day(snap)
 
     cat = _catalog_by_id()
     _, ПО_НОМЕРУ = _nums()
@@ -957,7 +1049,7 @@ async def handle_import(request):
     # приняли, заменять нельзя: принятое записано в неё, и новая заявка стёрла
     # бы его из строк, оставив в реестре.
     заменена, снятые = "", []
-    было = await db.supply_main_open(day)
+    было = free_sup if free_sup else await db.supply_main_open(day)
     if было:
         начато = sorted(OFFICE_CODES.get(o, o) for o, t in (было.get("tasks") or {}).items()
                         if t.get("noscan_at") or t.get("done_at") or int(t.get("scanned") or 0) > 0)
@@ -977,13 +1069,31 @@ async def handle_import(request):
             t["erev"] = int(st.get("erev") or 0) + 1
         снятые = [(t["driver"], o) for o, t in старые.items()
                   if t.get("driver") and o not in tasks and not t.get("cancelled_at")]
-        doc = {**doc, "_id": было["_id"], "replaced_at": now,
-               "replaced_n": int(было.get("replaced_n") or 0) + 1,
-               "first_at": было.get("first_at") or было.get("at")}
-        if not await db.supply_replace_untouched(doc, list(старые)):
-            return web.json_response({"error": "already_started", "supply_id": было["_id"],
-                                      "districts": []}, status=409, headers=CORS_HEADERS)
-        заменена = sid = было["_id"]
+        if free_sup:
+            # Свободная заявка: документ тот же, что собрали (номер, автор,
+            # когда выслан), ответ переписывает состав и открывает её
+            # водителям; at — момент ответа, чтобы в списках и у водителей она
+            # всплыла тогда, когда по ней есть что принимать. Повторная
+            # загрузка — как у основной: заменяет, пока ничего не приняли.
+            n_ans = int(было.get("answer_n") or 0) + 1
+            doc = {**было, **doc, "_id": было["_id"], "status": "open", "at": now,
+                   "by": было.get("by") or 0, "ask_by": free_ask,
+                   "answer_at": было.get("answer_at") or now, "answer_n": n_ans,
+                   "first_at": было.get("first_at") or было.get("created_at") or было.get("at"),
+                   **({"replaced_at": now, "replaced_n": n_ans - 1} if n_ans > 1 else {})}
+            if not await db.supply_replace_untouched(doc, list(старые), statuses=("wait", "open")):
+                return web.json_response({"error": "already_started", "supply_id": было["_id"],
+                                          "districts": []}, status=409, headers=CORS_HEADERS)
+            sid = было["_id"]
+            заменена = sid if n_ans > 1 else ""
+        else:
+            doc = {**doc, "_id": было["_id"], "replaced_at": now,
+                   "replaced_n": int(было.get("replaced_n") or 0) + 1,
+                   "first_at": было.get("first_at") or было.get("at")}
+            if not await db.supply_replace_untouched(doc, list(старые)):
+                return web.json_response({"error": "already_started", "supply_id": было["_id"],
+                                          "districts": []}, status=409, headers=CORS_HEADERS)
+            заменена = sid = было["_id"]
         # Черновик докупки прошлой версии — её недобор, а не нынешний: снимаем,
         # ниже соберётся новый. Подтверждённую докупку (её уже везут) не трогаем.
         try:
@@ -1002,7 +1112,10 @@ async def handle_import(request):
             pass
         if снятые:
             await _cancel_tell(снятые, whole=False)
-        log.info(f"[supply] поставка {sid} заменена новой загрузкой (раз {doc['replaced_n']})")
+        if заменена:
+            log.info(f"[supply] поставка {sid} заменена новой загрузкой (раз {doc['replaced_n']})")
+        else:
+            log.info(f"[supply] свободная заявка {sid}: ответ магазина загружен, открыта водителям")
     else:
         sid = await _save_new(doc, "S", now)
     # Ответ магазина ПИШЕТСЯ В ЗАЯВКУ этого дня (владелец, 29 сен 2026: «всё,
@@ -1021,17 +1134,19 @@ async def handle_import(request):
     # (order_day — документ снимка, см. answer_day), а поставка — под днём
     # закупки. Правки — в документ заявки, иначе они ложились на завтрашний
     # черновик (24 окт 2026) или на вчерашнюю заявку (3 ноя 2026).
-    try:
-        await _answer_to_order(order_day, items, asked_full)
-    except Exception as e:                           # noqa: BLE001
-        log.error(f"[supply] ответ в заявку не записан: {e}")
+    # У свободной заявки Барракуде заявки дня нет — правкам ложиться некуда.
+    if not free_sup:
+        try:
+            await _answer_to_order(order_day, items, asked_full)
+        except Exception as e:                           # noqa: BLE001
+            log.error(f"[supply] ответ в заявку не записан: {e}")
     # Хронология заявки: ответ загружен (или загружен заново), кем, и на
     # какую заявку он лёг — по этому дню страница находит её шаги.
     await supply_log.add("answer_replaced" if заменена else "answer", sid, day=day,
                          who=str((getattr(request, "query", None) or {}).get("as") or "").strip()[:60] or "старший",
                          note=supply_log.answer_note(doc)
                          + (f" · раз {doc['replaced_n']}" if заменена and int(doc.get("replaced_n") or 0) > 1 else ""),
-                         data={"order_day": order_day}, at=now)
+                         data=({"order_day": order_day} if order_day else None), at=now)
     # Цены магазина: что он написал в «Price, AED» против нашей закупочной.
     try:
         await _prices_tell(price_changes, sid)
@@ -1050,11 +1165,13 @@ async def handle_import(request):
     # бутылки. Недобор остаётся у поставки (_shortfall), а заявку на другую
     # базу собирает старший на «Других базах»: по норме или по недобору любой
     # заявки из истории.
-    try:
-        await _stale_tell(sid)
-    except Exception as e:                           # noqa: BLE001
-        log.warning(f"[supply] о снятых прошлых задачах не сказали: {e}")
-    return web.json_response({"ok": True, "supply_id": sid,
+    # Свободная заявка основную не подменяет — задачи прошлой основной при ней.
+    if not free_sup:
+        try:
+            await _stale_tell(sid)
+        except Exception as e:                           # noqa: BLE001
+            log.warning(f"[supply] о снятых прошлых задачах не сказали: {e}")
+    return web.json_response({"ok": True, "supply_id": sid, "free_order": bool(free_sup),
                               "replaced": bool(заменена),
                               "items": len(items), "total_qty": doc["total_qty"],
                               "asked_qty": doc["asked_qty"], "gap_qty": doc["gap_qty"],
@@ -1303,15 +1420,53 @@ def _qs(v) -> str:
     return str(_qn(v)).replace(".", ",")
 
 
+# ── Свободная заявка Барракуде ──────────────────────────────────────────────
+# Владелец, 8 ноя 2026: «почему нет свободной заявки в Барракуде?». Заявка вне
+# круга «норма → файл → ответ»: состав набирают тем же мастером, что заявку на
+# другую базу, база — всегда Барракуда. Документ — kind=extra (отдельная
+# заявка, не основная: её не подменяет новая основная, у водителей она
+# отдельной строкой с меткой), с признаком free_order и без всего, что у
+# других баз про цены: цены берутся из прайса, как у основной. Путь как у
+# основной: файл магазину (handle_send ?sid) → ответ файлом (handle_import
+# ?sid) → приёмка по районам. До ответа статус wait — водителям не видна.
+FREE_BASE = "Барракуда"
+FREE_LABEL = "Барракуда · свободная"
+
+
+def _is_free(sup: dict) -> bool:
+    return bool((sup or {}).get("free_order"))
+
+
+def _base_label(sup: dict) -> str:
+    """Подпись заявки: имя базы, у свободной — «Барракуда · свободная»."""
+    if _is_free(sup):
+        return FREE_LABEL
+    return (sup or {}).get("base") or ""
+
+
+async def _free_for(sid: str, statuses: tuple):
+    """Свободная заявка по номеру и в нужном статусе: (поставка, None) или
+    (None, ответ-отказ). 404 — нет или не свободная; 409 free_status — не в
+    том статусе (ответ уже загружен, отменена, принята)."""
+    sup = await db.supply_get(sid)
+    if not sup or not _is_free(sup):
+        return None, web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if (sup.get("status") or "") not in statuses:
+        return None, web.json_response({"error": "free_status", "status": sup.get("status") or ""},
+                                        status=409, headers=CORS_HEADERS)
+    return sup, None
+
+
 def _line_qty(raw, sup: dict, p: dict):
     """Количество строки района из правки старшего: у пива в заявке на базу —
-    до полкоробки, иначе целое (магазин полкоробки не отгружает)."""
+    до полкоробки, иначе целое (магазин полкоробки не отгружает — и свободной
+    заявке Барракуде тоже)."""
     try:
         q = max(0.0, min(999.0, float(str(raw or 0).replace(",", "."))))
     except (TypeError, ValueError):
         q = 0.0
     import stock_routes
-    if (sup.get("kind") or "main") == "extra" and stock_routes._unit(p or {}) > 1:
+    if (sup.get("kind") or "main") == "extra" and not _is_free(sup) and stock_routes._unit(p or {}) > 1:
         return _qn(q)
     return int(q + 0.5)
 
@@ -1358,8 +1513,9 @@ def _buy_unit(pid: str) -> dict:
 
 
 def _prices_missing(sup: dict, oid: str) -> list:
-    """Позиции района без закупочной цены — только у заявок на другие базы."""
-    if (sup.get("kind") or "main") != "extra":
+    """Позиции района без закупочной цены — только у заявок на другие базы;
+    свободная заявка Барракуде берётся по прайсу, цен не ждёт."""
+    if (sup.get("kind") or "main") != "extra" or _is_free(sup):
         return []
     buys = sup.get("buys") or {}
     task = (sup.get("tasks") or {}).get(oid) or {}
@@ -1391,7 +1547,9 @@ async def na_set(sid: str, oid: str, pid: str, on: bool, me: str) -> dict:
     sup = await db.supply_get(sid)
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
-    if (sup.get("kind") or "main") != "extra":
+    # У свободной заявки Барракуде «нет в наличии» не бывает: чего магазин не
+    # дал — говорят через «Не всё привезли», как по основной.
+    if (sup.get("kind") or "main") != "extra" or _is_free(sup):
         return {"ok": False, "verdict": "not_extra"}
     task = (sup.get("tasks") or {}).get(oid) or {}
     if task.get("driver") != me:
@@ -1433,7 +1591,7 @@ async def buy_set(sup: dict, pid: str, price: float, qty: int, who: str, by_id: 
     sid = sup.get("_id")
     short = _shortfall(sup)
     row = next((r for r in short["rows"] if r["id"] == pid), None)
-    if not row and (sup.get("kind") or "main") == "extra":
+    if not row and (sup.get("kind") or "main") == "extra" and not _is_free(sup):
         it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
         if it:
             row = {"id": pid, "name": it.get("name") or "", "gap": int(it.get("qty") or 0)}
@@ -1458,7 +1616,7 @@ async def buy_set(sup: dict, pid: str, price: float, qty: int, who: str, by_id: 
     # Цена другой базы живёт при этой базе (владелец, 30 сен 2026: «цены, по
     # которым покупаем, сохраняй только по определённым доп. базам… не вписывай
     # их в учёт»). В закупочную цену позиции она не идёт — см. cost_map.
-    if (sup.get("kind") or "main") == "extra" and sup.get("base"):
+    if (sup.get("kind") or "main") == "extra" and sup.get("base") and not _is_free(sup):
         try:
             await db.base_price_set(_base_key(sup.get("base")), sup.get("base"), pid,
                                     price if price > 0 else 0, row.get("name") or "",
@@ -1475,6 +1633,8 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
     """Задача глазами водителя: что забрать и сколько уже принято."""
     lines = []
     extra = (sup.get("kind") or "main") == "extra"
+    # Свободная заявка Барракуде — без цен: берём по прайсу, как по основной.
+    priced = extra and not _is_free(sup)
     buys = sup.get("buys") or {}
     cost = 0.0
     for it in sup.get("items") or []:
@@ -1489,7 +1649,7 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         line = {"id": it["id"], "name": it.get("name", ""), "unit": _uof(it["id"]),
                 "need": need, "got": got_u, "left": _left_units(need, got_u),
                 "plan": plan, "miss": _qn(_miss(task, it["id"]))}
-        if extra:
+        if priced:
             # Цена за учётную единицу и сколько таких единиц во всей заявке:
             # экран цен у водителя считает по ним «= N AED» и итог. Количества
             # в заявке уже в единицах — делить их на 24 было ошибкой.
@@ -1521,7 +1681,10 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "driver": task.get("driver") or "",
         "mine": bool(me and task.get("driver") == me),
         "extra": (sup.get("kind") or "main") == "extra",
-        "base": sup.get("base") or "",
+        # У свободной заявки Барракуде — её метка: водитель видит, что это не
+        # основная и не другая база (владелец, 8 ноя 2026).
+        "free_order": _is_free(sup),
+        "base": _base_label(sup),
         "claimed_at": str(task.get("claimed_at") or ""),
         "started_at": str(task.get("started_at") or ""),
         "done_at": str(task.get("done_at") or ""),
@@ -1568,7 +1731,7 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "hold": _hold_view(task, me),
         # Заявка на другую базу: пока цены не вписаны, приёмка не начинается.
         **({"prices_ok": all(l["price"] > 0 or l.get("na") for l in lines),
-            "cost": round(cost)} if extra else {}),
+            "cost": round(cost)} if priced else {}),
     }
 
 
@@ -1993,7 +2156,9 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
     # На этой базе чего-то не оказалось — собираем следующую доп. заявку, на
     # другую базу (владелец, 30 сен 2026). Черновиком: базу называет человек.
     дальше = None
-    if gaps and (doc.get("kind") or "main") == "extra":
+    # У свободной заявки Барракуде недобор остаётся при ней, как у основной:
+    # черновик на другую базу программа не собирает (владелец, 30 окт 2026).
+    if gaps and (doc.get("kind") or "main") == "extra" and not _is_free(doc):
         try:
             дальше = await _draft_from_extra(doc, oid, gaps)
         except Exception as e:                       # noqa: BLE001
@@ -2462,7 +2627,7 @@ async def task_noscan(sid: str, oid: str, me: str, owner: bool = False,
     try:
         from owner_routes import notify_owners_force
         where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
-        base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
+        base = f" · {_md(_base_label(doc))}" if doc.get("kind") == "extra" and _base_label(doc) else ""
         text = (f"📦 *Принято без сканирования — {_md(where)}{base}*\n"
                 f"{_md(me)} · {v['left']} {_plural(v['left'], 'бутылка', 'бутылки', 'бутылок')}"
                 f" · {v['positions']} {_plural(v['positions'], 'позиция', 'позиции', 'позиций')}")
@@ -2629,7 +2794,16 @@ async def pending_qty() -> dict:
     прибавляет _noscan_after, и вычесть их вторым концом значит потерять их
     дважды."""
     out = {}
-    for sup in await db.supplies_with_open_tasks(limit=12):
+    sups = list(await db.supplies_with_open_tasks(limit=12))
+    # Свободная заявка Барракуде, высланная и ещё без ответа (владелец, 8 ноя
+    # 2026): товар у магазина уже попрошен, и заявка по норме не должна просить
+    # его второй раз — иначе он приедет дважды. Откажет магазин — недобор
+    # останется при свободной заявке, а норма доберёт своё следующей заявкой.
+    try:
+        sups += await db.supplies_free_waiting()
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[supply] свободные заявки без ответа не прочитаны: {e}")
+    for sup in sups:
         for oid, t in (sup.get("tasks") or {}).items():
             if t.get("done_at") or t.get("cancelled_at") or t.get("noscan_at"):
                 continue
@@ -2712,7 +2886,7 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
             mins = f" · {int((task['done_at'] - task['started_at']).total_seconds() // 60)} мин"
     except Exception:
         pass
-    base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
+    base = f" · {_md(_base_label(doc))}" if doc.get("kind") == "extra" and _base_label(doc) else ""
     head = f"📥 *Приёмка — {_md(where)}{base}*\n{_md(me)} · принято {took} из {need}{mins}"
     if uns:
         # Закрыт с разрешения старшего без сканирования остатка: остаток на
@@ -3139,6 +3313,10 @@ def _sup_brief(sup: dict) -> dict:
         "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
         "status": sup.get("status") or "open",
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
+        # Свободная заявка Барракуде: без цен, с файлом магазину и его ответом.
+        "free_order": _is_free(sup),
+        "sent_at": str(sup.get("sent_at") or ""), "sent_n": int(sup.get("sent_n") or 0),
+        "answer_at": str(sup.get("answer_at") or ""),
         "by_name": sup.get("by_name") or "",
         "source": sup.get("source") or "", "from_supply": sup.get("from_supply") or "",
         # Где этот товар уже искали и не нашли — у доп. заявки, собранной из
@@ -3201,10 +3379,16 @@ async def _supply_view(sup: dict) -> dict:
         "unmarked": await _unmarked(sup, short),
         "status": sup.get("status") or "open",
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
+        # Свободная заявка Барракуде: без цен, с файлом магазину и его ответом.
+        "free_order": _is_free(sup),
+        "sent_at": str(sup.get("sent_at") or ""), "sent_n": int(sup.get("sent_n") or 0),
+        "answer_at": str(sup.get("answer_at") or ""),
         "by_name": sup.get("by_name") or "",
         "source": sup.get("source") or "", "from_supply": sup.get("from_supply") or "",
         "tried_bases": list(sup.get("tried_bases") or []),
         "closed_at": str(sup.get("closed_at") or ""),
+        "created_at": str(sup.get("created_at") or ""),
+        "sent_by": sup.get("sent_by") or "", "answer_n": int(sup.get("answer_n") or 0),
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "cancelled_by": sup.get("cancelled_by") or "",
         "positions": len(sup.get("items") or []),
@@ -3581,6 +3765,10 @@ async def handle_base_set(request):
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     if (sup.get("kind") or "main") != "extra":
         return web.json_response({"error": "not_extra"}, status=403, headers=CORS_HEADERS)
+    # Свободная заявка — всегда Барракуде: переименовать её в другую базу
+    # значило бы потерять ответ магазина и прайс.
+    if _is_free(sup):
+        return web.json_response({"error": "free_order"}, status=403, headers=CORS_HEADERS)
     if (sup.get("status") or "") == "cancelled":
         return web.json_response({"error": "cancelled"}, status=409, headers=CORS_HEADERS)
     base = re.sub(r"\s+", " ", str(body.get("base") or "")).strip()[:60]
@@ -3625,14 +3813,17 @@ async def handle_cancel(request):
     st = sup.get("status") or "open"
     # Черновик докупки отменяется целиком и без разговоров: водителям он не
     # показывался, принимать по нему нечего.
-    if st == "draft":
+    # Свободная заявка Барракуде до ответа магазина (wait) — так же: водителям
+    # её не показывали, принимать по ней нечего (владелец, 8 ноя 2026).
+    if st in ("draft", "wait"):
         await db.supply_set(sid, {"status": "cancelled",
                                   "cancelled_at": datetime.now(timezone.utc),
                                   "cancelled_by": _owner_name(request, body)},
                             only_open=False)
-        log.info(f"[supply] черновик докупки {sid} отменён")
-        await supply_log.add("supply_cancelled", sid, who=_owner_name(request, body), note="черновик")
-        return web.json_response({"ok": True, "cancelled": "draft"}, headers=CORS_HEADERS)
+        log.info(f"[supply] {'черновик докупки' if st == 'draft' else 'свободная заявка без ответа'} {sid} — отмена")
+        await supply_log.add("supply_cancelled", sid, who=_owner_name(request, body),
+                             note="черновик" if st == "draft" else "до ответа магазина")
+        return web.json_response({"ok": True, "cancelled": st}, headers=CORS_HEADERS)
     if st != "open":
         # Уже закрыта или уже отменена — второе нажатие ничего не меняет.
         return web.json_response({"error": "not_open", "status": st},
@@ -4106,7 +4297,13 @@ async def handle_extra_create(request):
         body = await request.json()
     except Exception:
         body = {}
-    base = re.sub(r"\s+", " ", str(body.get("base") or "")).strip()[:60]
+    # Свободная заявка Барракуде (владелец, 8 ноя 2026): {free: true} — тот же
+    # мастер и тот же документ, что у заявки на другую базу, но база — всегда
+    # Барракуда, количества целые (магазин полкоробки не отгружает), цен нет —
+    # берём по прайсу, как по основной. Рождается в статусе wait: водителям
+    # не видна, пока магазин не ответит файлом (handle_import ?sid=).
+    free = bool(body.get("free"))
+    base = FREE_BASE if free else re.sub(r"\s+", " ", str(body.get("base") or "")).strip()[:60]
     if not base:
         return web.json_response({"error": "no_base"}, status=400, headers=CORS_HEADERS)
     cat = _catalog_by_id()
@@ -4122,7 +4319,8 @@ async def handle_extra_create(request):
         by = {}
         # Пиво — коробками до половины (на коробке два кода, каждый —
         # полкоробки; владелец, 8 ноя 2026), остальное — целыми бутылками.
-        half = SR._unit(p) > 1
+        # Магазину — только целыми: полкоробки он не отгружает.
+        half = SR._unit(p) > 1 and not free
         for oid, n in (row.get("by_district") or {}).items():
             try:
                 n = float(str(n).replace(",", "."))
@@ -4160,14 +4358,25 @@ async def handle_extra_create(request):
     # ночью, относится к уходящей смене — как основная, у которой день берётся
     # из снимка склада. По календарю она попадала в следующий день и пропадала
     # с хаба той смены, в которую её собрали.
-    import stock_routes as SR
-    doc = {"at": now, "status": "open", "day": SR._biz_day(),
+    doc = {"at": now, "status": "wait" if free else "open", "day": SR._biz_day(),
            "kind": "extra", "base": base, "source": source, "from_supply": from_supply,
            "by": request.get("owner_id") or 0, "by_name": who,
            "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
            "tasks": tasks,
            "total_qty": _qn(sum(i["qty"] for i in items)),
            "asked_qty": _qn(sum(i["qty"] for i in items)), "gap_qty": 0}
+    if free:
+        # created_at — когда собрали: at станет моментом ответа магазина.
+        # ask_by (что просили) ложится при первом ответе: до него состав ещё
+        # правится на странице заявки.
+        doc.update(free_order=True, created_at=now, first_at=now,
+                   sent_at=None, sent_by="", sent_n=0, answer_at=None, answer_n=0)
+        sid = await _save_new(doc, "F", now)
+        log.info(f"[supply] свободная заявка Барракуде {sid}: {who} · {len(items)} позиций, "
+                 f"{doc['total_qty']} бутылок, районов {len(tasks)}")
+        await supply_log.add("free_created", sid, who=who, at=now, note=supply_log.what_note(doc))
+        return web.json_response({"ok": True, **_sup_brief(doc)}, headers=CORS_HEADERS,
+                                 dumps=lambda o: __import__("json").dumps(o, default=str))
     sid = await _save_new(doc, "X", now)
     log.info(f"[supply] заявка на базу «{base}» {sid}: {who} · {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, районов {len(tasks)}")

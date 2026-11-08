@@ -5317,11 +5317,15 @@ async def _chk_supply(day: str):
             continue
         open_list.append({"supply_id": r.get("supply_id") or "", "day": r.get("day") or "",
                           "kind": r.get("kind") or "main", "base": r.get("base") or "",
+                          "free_order": bool(r.get("free_order")),
                           "left": left,
                           "free": sum(1 for o in left if not tasks[o].get("driver"))})
     # Самая старая — первой: по её дню считается срок строки.
     open_list.sort(key=lambda x: (x["day"], x["supply_id"]))
-    sup = next((r for r in rows if (r.get("day") or "") == day), None)
+    # Только основная: заявка на другую базу или свободная заявка Барракуде,
+    # собранная в эти же сутки, — не «магазин ответил» на заявку дня.
+    sup = next((r for r in rows if (r.get("day") or "") == day
+                and (r.get("kind") or "main") != "extra"), None)
     if not sup:
         return {"exists": False, "free": 0, "done": False, "total": 0, "planned": 0,
                 "open_list": open_list}
@@ -5434,7 +5438,8 @@ def _order_rows(sup: dict, marks: dict, now, day: str, plan) -> list:
     def _open_row():
         parts = []
         for x in open_list:
-            кто = x["base"] if x["kind"] == "extra" and x["base"] else "Барракуда"
+            кто = ("Барракуда · свободная" if x.get("free_order")
+                   else x["base"] if x["kind"] == "extra" and x["base"] else "Барракуда")
             когда = _day_human(x["day"]) if x["day"] else ""
             коды = [OFFICE_CODES.get(o, o) for o in x["left"]]
             parts.append(" ".join(filter(None, [кто, когда]))

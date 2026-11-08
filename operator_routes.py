@@ -2534,7 +2534,9 @@ async def _extra_only(request):
     sup = await db.supply_get(request.match_info.get("sid") or "")
     if not sup:
         return None, web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    if (sup.get("kind") or "main") != "extra":
+    # Свободная заявка Барракуде — не доп. база: цен у неё нет, состав — как
+    # у основной, оператору она не отдаётся.
+    if (sup.get("kind") or "main") != "extra" or sup.get("free_order"):
         return None, web.json_response({"error": "not_extra"}, status=403, headers=CORS_HEADERS)
     return sup, None
 
@@ -2543,7 +2545,8 @@ async def _extra_only(request):
 async def handle_extra_list(request):
     """GET — доп. заявки: черновики, открытые и недавние закрытые."""
     import supply_routes
-    rows = [r for r in await db.supply_list(limit=80) if (r.get("kind") or "main") == "extra"]
+    rows = [r for r in await db.supply_list(limit=80)
+            if (r.get("kind") or "main") == "extra" and not r.get("free_order")]
     return _mv_json({"supplies": [supply_routes._sup_brief(r) for r in rows[:40]],
                      "districts": [{"id": d["id"], "code": d.get("code", ""), "name": d.get("name", "")}
                                    for d in await _fresh_districts()]})

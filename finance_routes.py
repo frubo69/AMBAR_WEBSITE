@@ -234,12 +234,24 @@ async def _spend(days: list[str]) -> dict:
     return out
 
 
+def _units(v) -> float:
+    """Количество заявки в учётных единицах, до полкоробки (пиво)."""
+    try:
+        return round(float(v or 0) * 2) / 2
+    except (TypeError, ValueError):
+        return 0.0
+
+
 async def _purchases(days: list[str]) -> dict:
     """Поставки по дням в закупочных ценах. Основная — «заказали у базы», с
-    других баз — отдельно. Цена за бутылку = цена учётной единицы / бутылок в
-    ней (пиво идёт ящиками). Позиция без цены в сумму не попадает — рядом доля
-    бутылок, у которых цена известна."""
-    import stock_routes
+    других баз — отдельно. Количества заявки и цена закупки — в одних учётных
+    единицах: бутылка, у пива коробка (supply_routes._uof, stock_value.cost_map),
+    сумма строки = количество × цена. Позиция без цены в сумму не попадает —
+    рядом доля единиц, у которых цена известна.
+
+    До 8 ноя 2026 количество делилось на бутылок в единице (24 у пива), как
+    если бы заявка считала банками, — пиво шло в закупку в 24 раза дешевле:
+    8 коробок Carlsberg по 100 AED ложились как 33 AED вместо 800."""
     import stock_value
     try:
         sups = await db.supplies_between(days[0], days[-1])
@@ -251,8 +263,7 @@ async def _purchases(days: list[str]) -> dict:
     except Exception as e:                        # noqa: BLE001
         log.warning(f"[fin] цены закупки не прочитаны: {e}")
         cost = {}
-    cat = stock_routes._catalog()
-    out = {d: dict(ordered=0.0, ordered_extra=0.0, bottles=0, known=0,
+    out = {d: dict(ordered=0.0, ordered_extra=0.0, bottles=0.0, known=0.0,
                    supplies=[]) for d in days}
     for sup in sups:
         if sup.get("cancelled_at"):
@@ -266,12 +277,12 @@ async def _purchases(days: list[str]) -> dict:
         total = 0.0
         for it in (sup.get("items") or []):
             pid = it.get("id")
-            qty = int(it.get("qty") or 0) or int(it.get("asked") or 0)
+            qty = _units(it.get("qty")) or _units(it.get("asked"))
             # Чего на другой базе не оказалось — не покупали, и в сумму этой
             # закупки оно не входит.
             if extra:
-                qty -= int(sum(float(((t or {}).get("na") or {}).get(pid) or 0)
-                               for t in (sup.get("tasks") or {}).values()))
+                qty -= _units(sum(float(((t or {}).get("na") or {}).get(pid) or 0)
+                                  for t in (sup.get("tasks") or {}).values()))
             if qty <= 0:
                 continue
             b = buys.get(pid) or {}
@@ -282,11 +293,10 @@ async def _purchases(days: list[str]) -> dict:
                     continue
                 except (TypeError, ValueError):
                     pass
-            p = cat.get(pid) or {}
             c = float(cost.get(pid) or 0)
             s["bottles"] += qty
             if c > 0:
-                total += qty * c / max(1, stock_routes._unit(p))
+                total += qty * c
                 s["known"] += qty
         if extra:
             s["ordered_extra"] += total

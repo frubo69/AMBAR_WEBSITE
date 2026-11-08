@@ -193,6 +193,21 @@ window.drvApi = {AMBAR_API: '', drvFetch: async (path, opts = {}) => {
     stLog('SUP poll ' + window.__supN + (taken ? ' taken' : ' free'));
     return taken ? {mine: [], free: [], extra: [], taken: [{...t, driver: 'Фарух'}]} : {mine: [], free: [t], extra: [], taken: []};
   }
+  // ?sup=free — список «Товара» с основной заявкой, свободной заявкой
+  // Барракуде и заявкой на другую базу: свободная стоит своим разделом.
+  if(path === '/api/driver/supply' && ST_Q.get('sup') === 'free'){
+    const hold = {who: '', kind: '', live: false, mine: false};
+    const основная = {supply_id: 's1', district: 'jvc', district_code: 'B1', district_name: 'JVC', need: 86, got: 0, left: 86, positions: 2,
+      lines: [{id: 'p1', name: 'Absolut 1 ltr', need: 24, got: 0, left: 24}, {id: 'p10', name: 'Red Label 1 ltr', need: 62, got: 0, left: 62}],
+      mine: false, extra: false, free_order: false, base: '', hold, noscan_at: '', stale: false, home: true, at: _agoIso(40)};
+    const свободная = {supply_id: 'F1', district: 'bbay', district_code: 'B2', district_name: 'Бизнес Бей', need: 10, got: 0, left: 10, positions: 1,
+      lines: [{id: 'p20', name: 'Chivas Regal 12Y 1 ltr', need: 10, got: 0, left: 10}],
+      mine: false, extra: true, free_order: true, base: 'Барракуда · свободная', hold, noscan_at: '', stale: false, home: false, at: _agoIso(20)};
+    const база = {supply_id: 'X1', district: 'tecom', district_code: 'B5', district_name: 'Тиком', need: 6, got: 0, left: 6, positions: 1,
+      lines: [{id: 'p55', name: "Gordon's 1 ltr", need: 6, got: 0, left: 6}],
+      mine: false, extra: true, free_order: false, base: 'Blue Mart', prices_ok: false, hold, noscan_at: '', stale: false, home: false, at: _agoIso(10)};
+    return {mine: [], free: [основная], extra: [свободная, база], taken: []};
+  }
   if(path === '/api/driver/supply') return {mine: [], free: [], extra: [], taken: []};
   if(path === '/api/driver/shift/recon' && m === 'POST'){
     // Сервер сверки (shift_recon) в двух словах: число снимает отметку «Деньги»,

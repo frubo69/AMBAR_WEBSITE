@@ -494,6 +494,64 @@ def _build_items(raw_items: list, source: str = "manual") -> tuple[list, str]:
     return items, ""
 
 
+async def _zero_stock(items: list, driver: str, office_id: str) -> tuple[str, list]:
+    """Позиции заказа, которых на полке водителя числится ноль.
+
+    Владелец, 8 ноя 2026: «если на районе числится 0 товара, они не могли его
+    продать… алерт операторам, когда вручную заказ составляют, что товар
+    закончился». Полка — район водителя (config_staff.stock_office), тот же,
+    с которого заказ спишется при «доставлен». Остаток — живая цифра склада
+    (stock_routes._district_base), та же, что в STAR и в «Остатках» оператора.
+    Ноль — считали, и нет; позиция, которую в район ни разу не вносили, — не
+    ноль, а неизвестность (см. stock_value.build), её не держим. Склад не
+    прочитался — заказ не держим тоже: продажа дороже проверки."""
+    import stock_routes
+    shelf = _staff_mod.stock_office(driver, office_id)
+    try:
+        base = await stock_routes._district_base(stock_routes._biz_day())
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[pos] остаток для проверки заказа не прочитан: {e}")
+        return shelf, []
+    b = base.get(shelf) or {}
+    have = b.get("have_exact") or b.get("have") or {}
+    пусто, seen = [], set()
+    for it in items or []:
+        pid = str(it.get("id") or "")
+        if pid in seen or pid not in have:
+            continue
+        seen.add(pid)
+        if float(have.get(pid) or 0) <= 0:
+            # у пива имя строки с упаковкой («… ×24») — позиция без неё
+            пусто.append({"id": pid, "name": str(it.get("name") or "").split(" ×")[0]})
+    return shelf, пусто
+
+
+def _out_of_stock(shelf: str, пусто: list):
+    return web.json_response({"error": "out_of_stock", "district": shelf,
+                              "district_code": OFFICE_CODES.get(shelf, ""),
+                              "district_name": OFFICE_NAMES.get(shelf, shelf),
+                              "items": пусто}, status=409, headers=CORS_HEADERS)
+
+
+def _grown_lines(old_items: list, new_items: list) -> list:
+    """Строки, которых в заказе не было или которых стало больше: по ним
+    правку проверяют остатком, как новый заказ. Что уже лежало в заказе,
+    не трогаем — иначе смену адреса держал бы ноль по соседней продаже."""
+    def по(items):
+        out: dict = {}
+        for i in items or []:
+            pid = str(i.get("id") or "")
+            out[pid] = out.get(pid, 0) + int(i.get("qty") or 0)
+        return out
+    было, стало = по(old_items), по(new_items)
+    seen, out = set(), []
+    for i in new_items or []:
+        pid = str(i.get("id") or "")
+        if стало.get(pid, 0) > было.get(pid, 0) and pid not in seen:
+            seen.add(pid); out.append(i)
+    return out
+
+
 def _keep_gift(old_items: list, new_items: list) -> list:
     """Подарок приложения переживает правку заказа.
 
@@ -1015,6 +1073,14 @@ async def handle_create(request):
             n = datetime.now(DUBAI_TZ)
             back_dt = datetime(d.year, d.month, d.day, 20, n.minute, n.second,
                                tzinfo=DUBAI_TZ).astimezone(timezone.utc)
+
+    # Чего на полке водителя числится ноль, продать нельзя (владелец, 8 ноя
+    # 2026). Заказ задним числом — уже случившаяся продажа: сегодняшний
+    # остаток о ней ничего не говорит, его не держим.
+    if not back:
+        shelf, пусто = await _zero_stock(items, driver, office_id)
+        if пусто:
+            return _out_of_stock(shelf, пусто)
 
     # Смену района за текущие учётные сутки уже закрыли (владелец, 9 окт
     # 2026: два ночных заказа, вписанные в 06:13 после закрытия в 05:57,
@@ -1685,6 +1751,15 @@ async def handle_patch(request):
         items = _keep_gift(order.get("items"), items)
         import offers as _of
         items = _of.keep_lines(order.get("items"), items)
+        # Добавленное в заказ держит тот же ноль на полке, что и новый заказ
+        # (владелец, 8 ноя 2026): только строки, которых не было или которых
+        # стало больше. Заказ закрытого дня — уже случившаяся продажа.
+        if not back:
+            drv = str(body.get("driver", order.get("driver") or "")).strip()
+            off = str(body.get("district_id", order.get("district_id") or order.get("office_id") or "")).strip()
+            shelf, пусто = await _zero_stock(_grown_lines(order.get("items"), items), drv, off)
+            if пусто:
+                return _out_of_stock(shelf, пусто)
         # личный ценник клиента: снимок заказа главнее, текущий ценник — для
         # строк, которых в снимке не было (clients.py)
         import clients as _clients

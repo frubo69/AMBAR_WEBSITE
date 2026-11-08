@@ -32,7 +32,7 @@ CATALOG = {"beer": {"id": "beer", "name": "Пиво", "price_24_full": 240},
 COST = {"beer": 120.0, "gin": 40.0}     # ящик пива 120, бутылка джина 40
 SUPPLIES = [
     dict(supply_id="S1", day="2026-09-03", status="done", items=[
-        dict(id="beer", qty=48, asked=48, got={"jbr": 48}),   # 2 ящика × 120 = 240
+        dict(id="beer", qty=2, asked=2, got={"jbr": 2}),      # 2 коробки × 120 = 240: количества заявки — в учётных единицах
         dict(id="gin", qty=10, asked=10, got={}),             # 10 × 40 = 400
         dict(id="nocost", qty=5, asked=5, got={}),            # цены нет → мимо суммы
     ]),
@@ -151,7 +151,7 @@ async def main():
     eq("ЧП+ = 200 − 100 − 80 (вписано руками)", d3["np_plus"], 20)
     eq("ordered auto = 240 + 400", d3["ordered_auto"], 640); eq("ordered", d3["ordered"], 640)
     eq("ordered_extra (по buys)", d3["ordered_extra"], 165)
-    eq("cover: 58 из 63 бутылок", d3["ordered_cover"], 92)
+    eq("cover: 15 из 20 единиц с ценой", d3["ordered_cover"], 75)
     eq("supplies 2", len(d3["supplies"]), 2)
     eq("expenses_sum", d3["expenses_sum"], 25); eq("note", d3["note"], "тест")
     eq("cash_need/got", (d3["cash_need"], d3["cash_got"]), (1, 1))

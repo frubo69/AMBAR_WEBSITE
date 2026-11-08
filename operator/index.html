@@ -3732,6 +3732,7 @@ async function boot(){
     dayPaint();
     $('gate').classList.add('hidden');
     await loadCatalog();
+    stockLoad();
     // Чем открыть панель, решает очередь: есть непринятые заказы — открываем
     // ими, нет — сразу каталогом, чтобы вбивать телефонный заказ без лишнего
     // шага. Выбор делается один раз за сеанс (см. _landed в loadQueue).
@@ -3866,9 +3867,9 @@ function pickDist(id){
     curDriver = (editingOid && id === editDistWas) ? editDrvWas
       : ((editDrvWas && d && (d.drivers||[]).includes(editDrvWas)) ? editDrvWas : '');
   }
-  curDist=id; renderDispatch(); haptic('sel');
+  curDist=id; renderDispatch(); haptic('sel'); stockLoad();
 }
-function pickDriver(n){ curDriver=n; renderDrivers(); haptic('sel'); }
+function pickDriver(n){ curDriver=n; renderDrivers(); haptic('sel'); stockLoad(); }
 
 // ── catalog ──
 async function loadCatalog(){
@@ -3997,7 +3998,55 @@ function packPick(pcs){
   hideOv('packOv');
   if(_pendingBeer){ addLine(_pendingBeer.id, pcs, 1); _pendingBeer=null; }
 }
+// Остаток района для чека (владелец, 8 ноя 2026: «если на районе числится 0
+// товара, они не могли его продать… алерт операторам, когда вручную заказ
+// составляют, что товар закончился»). Та же цифра, что в «Остатках»: ноль —
+// считали и нет, прочерк — не вносили, его не трогаем. Последнее слово за
+// сервером (409 out_of_stock); здесь — чтобы сказать сразу, при нажатии на
+// плитку, а не после «Создать».
+const STK0 = {d: null, at: 0, busy: false};
+async function stockLoad(){
+  if(STK0.busy || Date.now() - STK0.at < 60000) return STK0.d;
+  STK0.busy = true;
+  try{ STK0.d = await opApi.opFetch('/api/operator/stock/board', {params: {as: curOp}}); STK0.at = Date.now(); }
+  catch(e){}
+  STK0.busy = false;
+  return STK0.d;
+}
+// Полка заказа — район водителя: бутылки едут с его полки (stock_office).
+function shelfDist(){
+  const d = curDriver && DISTRICTS.find(x => (x.drivers || []).includes(curDriver));
+  return (d && d.id) || curDist;
+}
+// Из позиций — те, которых на полке числится ноль. Названия, как на плитках.
+function zeroLines(ids){
+  const dist = shelfDist(), d = STK0.d;
+  if(!dist || !d || !d.items) return [];
+  return ids.filter((id, i) => ids.indexOf(id) === i)
+    .filter(id => { const r = d.items.find(x => x.id === id); return !!r && !!r.have && r.have[dist] === 0; })
+    .map(id => (CATALOG.find(x => x.id === id) || {}).name || id);
+}
+// В правке заказа проверяем только то, чего прибавилось: что уже лежало в
+// заказе, ноль по соседней продаже держать не должен (так же считает сервер).
+function grownIds(){
+  const было = {};
+  if(editingOid){
+    const o = ORDERS.find(x => x.order_id === editingOid);
+    (o && o.items || []).forEach(i => { было[i.id] = (было[i.id] || 0) + (+i.qty || 0); });
+  }
+  const стало = {};
+  Object.values(TICKET).forEach(l => { стало[l.id] = (стало[l.id] || 0) + l.qty; });
+  return Object.keys(стало).filter(id => стало[id] > (было[id] || 0));
+}
+function zeroAlert(names, dist, code, name){
+  const d = _dist(dist) || {};
+  const где = [code || d.code || '', name || d.name || ''].filter(Boolean).join(' ');
+  const список = names.slice(0, 5).join('\n') + (names.length > 5 ? `\nи ещё ${names.length - 5}` : '');
+  haptic('medium');
+  return alertOp('Товар закончился', `${список}\n\n${где} · числится 0`);
+}
 function addLine(pid, pcs, d){
+  if(d > 0){ const нет = zeroLines([pid]); if(нет.length){ zeroAlert(нет, shelfDist()); return; } }
   const key = pcs ? pid+'_'+pcs : pid;
   const cur = TICKET[key] || {id:pid, pcs:pcs||undefined, qty:0};
   cur.qty += d;
@@ -4360,6 +4409,8 @@ function askCreate(){
   // У онлайн-заказа водитель назначается при принятии, а не здесь: до этого
   // момента его просто нет, и требовать его — значит не дать поправить состав.
   if(!curDriver && !editOnline){ toast('Выберите водителя','err'); openTicket(); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
+  // Чего на полке водителя ноль, продать нельзя — подтверждать нечего.
+  { const нет = zeroLines(grownIds()); if(нет.length){ zeroAlert(нет, shelfDist()); return; } }
   const total = $('totalV').textContent;
   const d=_dist(curDist);
   $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?`
@@ -4453,7 +4504,11 @@ async function doCreate(){
     }
   }catch(e){
     const err=(e.payload&&e.payload.error)||('код '+(e.status||'сеть'));
-    if(!shiftBlocked(e)) toast(err==='driver_released'
+    if(err==='out_of_stock'){
+      const p=e.payload||{}; STK0.at=0; stockLoad();
+      zeroAlert((p.items||[]).map(i=>i.name), p.district, p.district_code, p.district_name);
+    }
+    else if(!shiftBlocked(e)) toast(err==='driver_released'
       ? `${(e.payload||{}).driver||'Водитель'} отпущен — выберите другого` : 'Ошибка: '+err,'err');
   }
   btn.disabled=false; renderTicket();
@@ -6585,6 +6640,18 @@ function askPickOp(текст, кнопки){
     }catch(e){}
     const ok = confirm(текст + '\n\nOK — ' + кнопки[0][1] + ', Отмена — ' + кнопки[1][1]);
     готово(ok ? кнопки[0][0] : кнопки[1][0]);
+  });
+}
+// Сообщение без вопроса: окно телеграма с одной кнопкой, вне телеграма — alert.
+function alertOp(заголовок, текст){
+  return new Promise(готово => {
+    try{
+      if(tg && tg.showPopup){
+        tg.showPopup({title: заголовок, message: текст, buttons: [{type: 'ok'}]}, () => готово());
+        return;
+      }
+    }catch(e){}
+    alert(заголовок + '\n\n' + текст); готово();
   });
 }
 

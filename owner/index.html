@@ -4814,6 +4814,186 @@ button.path:active{transform:scale(.995)}
 #accOv:has(#ambar-receiving-finished) .stk-top-a{display:flex;align-items:center;gap:4px}
 #accOv:has(#ambar-receiving-finished) .stk-top-a .acc-act.au-cancel{min-height:44px;margin:0;padding:4px;border:0;border-radius:10px;background:transparent;box-shadow:none;color:#d58288!important;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap}
 #accOv:has(#ambar-receiving-finished) .stk-top-a svg.lucide{display:block;width:16px!important;height:16px!important;flex:none;margin:0!important;stroke-width:1.7}
+/* ── Страница «Заявка» Барракуде (AMBAR-ORDER-PAGE, 9 ноя 2026) ─────────────
+   Утверждённый визуал: корень #ambar-order-completed внутри #accMid, классы
+   oc-*. Шапка и подвал у раздела общие (#accTitle/#accSub/#accAct, #accFoot),
+   поэтому их вид на этой странице задаётся через :has(корень) — как у хаба
+   (#ambar-receiving-finished). Телефонная рамка и фиксированные размеры
+   эталона сняты: высотой владеет оболочка раздела, в районном виде листается
+   #accMid, в общем каталоге (xs-fix) — только #ordRows. */
+#ambar-order-completed{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-order-completed .oc-app{--oc-bg:#08070d;--oc-surface:#14111e;--oc-raised:#211b29;--oc-line:#39313f;--oc-gold:#e2c386;--oc-text:#eeeae5;--oc-muted:#afa5b8;--oc-subtle:#91869f;--oc-danger:#d4a0a7;display:flex;flex-direction:column;min-width:0;color:var(--oc-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:order-phone / inline-size}
+#ambar-order-completed .oc-app *{box-sizing:border-box}
+#ambar-order-completed .oc-app :where(button,input){font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+#ambar-order-completed .oc-app :where(button){appearance:none;margin:0;padding:0;border:0;background:transparent;text-align:left;cursor:pointer}
+#ambar-order-completed .oc-app :where(h1,h2,h3,p,dl,dd){margin:0}
+#ambar-order-completed .oc-app [hidden]{display:none!important}
+#ambar-order-completed .oc-app svg.lucide{display:block;flex:none;width:18px!important;height:18px!important;stroke-width:1.7}
+#ambar-order-completed .oc-phase{display:flex;align-items:center;gap:11px;min-height:79px;padding:16px 2px}
+#ambar-order-completed .oc-phase-mark{width:32px;height:32px;border-radius:50%;background:#e2c3860d;display:grid;place-items:center;color:var(--oc-gold);flex:none}
+#ambar-order-completed .oc-phase strong{display:block;font-size:14px;line-height:21px;font-weight:600;letter-spacing:-.015em}
+#ambar-order-completed .oc-phase p{margin-top:2px;font-size:11px;line-height:17px;color:var(--oc-muted)}
+#ambar-order-completed .oc-summary{overflow:hidden;border:1px solid #493d47;border-radius:18px;background:linear-gradient(135deg,#221c29,#15121f 85%)}
+#ambar-order-completed .oc-section-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:14px 15px 3px}
+#ambar-order-completed .oc-section-top h2{font-size:16px;line-height:24px;font-weight:700;letter-spacing:-.025em}
+#ambar-order-completed .oc-section-top>span{font-size:11px;line-height:16px;color:var(--oc-muted);text-align:right}
+/* Сводка .ord-sum перерисовывается pathPaint(): здесь она — сетка oc-metrics,
+   а общие стили .ord-sum (рамка, фон, отступ) сняты. */
+#ambar-order-completed .oc-metrics{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.6fr) minmax(0,.7fr);margin:0;padding:13px 7px 17px;border:0;border-radius:0;background:none;overflow:visible}
+#ambar-order-completed .oc-metrics>div,#ambar-order-completed .oc-metrics>button{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0 6px}
+#ambar-order-completed .oc-metrics>*+*{border-left:1px solid #413646}
+#ambar-order-completed .oc-metrics strong{font-family:"Space Grotesk",sans-serif;font-size:31px;line-height:36px;font-weight:500;letter-spacing:-.05em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-order-completed .oc-metrics strong.oc-long-value{font-size:22px;letter-spacing:-.06em}
+#ambar-order-completed .oc-metrics span{display:flex;align-items:center;gap:2px;font-size:11px;line-height:17px;color:var(--oc-muted)}
+#ambar-order-completed .oc-metrics .oc-cost strong{color:var(--oc-gold)}
+#ambar-order-completed .oc-metrics .oc-cost svg.lucide{width:11px!important;height:11px!important;color:var(--oc-gold)}
+#ambar-order-completed .oc-price-link{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:47px;padding:10px 15px;border-top:1px solid #3b303f;background:#201925}
+#ambar-order-completed .oc-price-link>span{display:flex;align-items:center;gap:8px;font-size:12px;line-height:18px;color:var(--oc-muted)}
+#ambar-order-completed .oc-price-link>span:first-child{color:#d8cedd}
+#ambar-order-completed .oc-price-link b{font-weight:500;color:var(--oc-gold)}
+#ambar-order-completed .oc-price-link b.is-skel{min-width:40px;height:14px;border-radius:5px}
+#ambar-order-completed .oc-price-link svg.lucide{width:15px!important;height:15px!important;color:#bcaa8f}
+#ambar-order-completed .oc-price-warning{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:10px 15px;border-top:1px solid #50343e;background:#291b27;color:#dbadb3;font-size:11px;line-height:17px}
+#ambar-order-completed .oc-price-warning>span{flex:1}
+#ambar-order-completed .oc-price-warning svg.lucide{width:15px!important;height:15px!important}
+#ambar-order-completed .oc-viewbar{margin-top:12px}
+#ambar-order-completed .oc-all-link{display:grid;grid-template-columns:34px minmax(0,1fr) 18px;align-items:center;gap:10px;width:100%;padding:13px 14px;border:1px solid #342b3e;border-radius:14px;background:#14101d}
+#ambar-order-completed .oc-list-mark{display:grid;place-items:center;width:32px;height:32px;color:#baa98d}
+#ambar-order-completed .oc-all-link strong{display:block;font-size:14px;line-height:21px;font-weight:600;letter-spacing:-.02em}
+#ambar-order-completed .oc-all-link small{display:block;margin-top:2px;font-size:11px;line-height:16px;color:var(--oc-muted)}
+#ambar-order-completed .oc-all-link>svg.lucide{width:15px!important;height:15px!important;color:#a697ae}
+#ambar-order-completed .oc-section-label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:23px 2px 12px}
+#ambar-order-completed .oc-section-label h2{font-size:16px;line-height:22px;letter-spacing:-.025em;font-weight:600}
+#ambar-order-completed .oc-section-label p{font-size:11px;line-height:17px;margin-top:4px;color:var(--oc-muted)}
+#ambar-order-completed .oc-section-label>span{font-size:11px;line-height:17px;color:var(--oc-subtle);white-space:nowrap}
+#ambar-order-completed .oc-district-cards{display:flex;flex-direction:column;gap:10px}
+#ambar-order-completed .oc-district{border:1px solid #3b3142;border-radius:16px;background:#17121f;overflow:hidden}
+#ambar-order-completed .oc-district-head{width:100%;display:grid;grid-template-columns:38px minmax(0,1fr) auto 13px;gap:10px;align-items:center;padding:17px 13px}
+#ambar-order-completed .oc-code{display:grid;place-items:center;width:38px;height:40px;border:1px solid #4b3c47;border-radius:11px;background:#29212d;color:#e0c18a;font-family:"Space Grotesk",sans-serif;font-size:16px;line-height:20px;font-weight:500;flex:none}
+#ambar-order-completed .oc-district-name{min-width:0}
+#ambar-order-completed .oc-district-name>strong{display:block;font-size:14px;line-height:21px;font-weight:600;letter-spacing:-.02em;overflow-wrap:anywhere}
+#ambar-order-completed .oc-district-name>small{display:block;margin-top:4px;font-size:11px;line-height:17px;color:var(--oc-muted)}
+#ambar-order-completed .oc-district-value{text-align:right}
+#ambar-order-completed .oc-district-value>strong{display:block;font:500 20px/25px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+#ambar-order-completed .oc-district-value>small{display:block;margin-top:3px;font-size:11px;line-height:17px;color:var(--oc-muted)}
+#ambar-order-completed .oc-district-head>svg.lucide{width:13px!important;height:13px!important;color:#9684a5}
+#ambar-order-completed .oc-district-head[aria-expanded="true"]>svg{transform:rotate(180deg)}
+#ambar-order-completed .oc-district-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 13px 11px}
+#ambar-order-completed .oc-district-tools>span{font-size:11px;line-height:17px;color:var(--oc-subtle)}
+#ambar-order-completed .oc-district-tools>button{min-height:40px;font-size:11px;line-height:17px;color:#caa9b4}
+#ambar-order-completed .oc-district.is-off .oc-district-head{opacity:.55}
+#ambar-order-completed .oc-district.is-off .oc-district-value>strong{font-family:Manrope,sans-serif;font-size:13px}
+#ambar-order-completed .oc-district.is-off .oc-district-tools>button{color:var(--oc-gold)}
+#ambar-order-completed .oc-district.is-complete{border-color:#414044;background:#17151f}
+#ambar-order-completed .oc-district.is-complete .oc-code{border-color:#494346;background:#27222b;color:#c7b798}
+#ambar-order-completed .oc-receipt{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 14px;padding:11px 13px 12px;border-top:1px solid #333b36;background:#19201e}
+#ambar-order-completed .oc-receipt-label{display:flex;align-items:center;gap:7px;color:#a9bbaa;font-size:12px;line-height:19px;font-weight:500}
+#ambar-order-completed .oc-receipt-label svg.lucide{width:15px!important;height:15px!important;stroke-width:1.8}
+#ambar-order-completed .oc-receipt-value{font:500 17px/23px "Space Grotesk",sans-serif;color:#d8e0d7;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-order-completed .oc-receipt-value small{font:400 11px/17px Manrope,sans-serif;color:#a1ada3;margin-left:3px}
+#ambar-order-completed .oc-receipt.is-pending{background:#1c1823;border-top-color:#39303f}
+#ambar-order-completed .oc-receipt.is-pending .oc-receipt-label{color:var(--oc-muted)}
+#ambar-order-completed .oc-products{padding:0 11px 8px}
+#ambar-order-completed .oc-product{border-top:1px solid #332a3b}
+#ambar-order-completed .oc-product-line{display:grid;grid-template-columns:17px 31px minmax(0,1fr) auto 12px;gap:7px;align-items:center;width:100%;min-height:70px;padding:10px 1px}
+#ambar-order-completed .oc-number{font:400 11px/16px "Space Grotesk",sans-serif;color:var(--oc-subtle)}
+#ambar-order-completed .oc-product-art{width:30px;height:38px;display:grid;place-items:center;border-radius:7px;background:#241d2c;color:#bcafa5;overflow:hidden}
+#ambar-order-completed .oc-product-art img{display:block;width:100%;height:100%;object-fit:contain}
+#ambar-order-completed .oc-product-title{min-width:0}
+#ambar-order-completed .oc-product-title>strong{display:block;font-size:13px;line-height:19px;font-weight:500;overflow-wrap:anywhere}
+#ambar-order-completed .oc-product-title>small{display:block;margin-top:3px;font-size:11px;line-height:16px;color:var(--oc-muted)}
+#ambar-order-completed .oc-product-title>small:empty{display:none}
+#ambar-order-completed .oc-product-title>small.is-edited{color:#cdb17c}
+#ambar-order-completed .oc-quantity{font:500 22px/27px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-order-completed .is-edited .oc-quantity{color:var(--oc-gold)}
+#ambar-order-completed .oc-product-line>svg.lucide{width:12px!important;height:12px!important;color:#a394b1}
+#ambar-order-completed .oc-product-line[aria-expanded="true"]>svg{transform:rotate(180deg)}
+#ambar-order-completed .oc-edit-panel{padding:3px 0 12px}
+#ambar-order-completed .oc-edit-cell{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;background:#211a29;border:1px solid #413347;border-radius:10px;margin-top:6px}
+#ambar-order-completed .oc-edit-label{min-width:0}
+#ambar-order-completed .oc-edit-label>strong{font-size:12px;line-height:18px;font-weight:500;display:block}
+#ambar-order-completed .oc-edit-label>small{font-size:11px;line-height:16px;color:var(--oc-muted);display:block;margin-top:3px}
+#ambar-order-completed .oc-stepper{display:grid;grid-template-columns:36px 44px 36px;align-items:center;flex:none;overflow:hidden;border:1px solid #5d4a40;border-radius:9px;background:#2c2230}
+#ambar-order-completed .oc-stepper button{display:grid;place-items:center;min-height:44px;color:var(--oc-gold)}
+#ambar-order-completed .oc-stepper button:disabled{color:#6c5b6e}
+#ambar-order-completed .oc-stepper input{width:100%;min-width:0;padding:0;border:0;border-radius:0;background:transparent;font:500 18px/26px "Space Grotesk",sans-serif;text-align:center;color:var(--oc-text);appearance:textfield;-webkit-appearance:none;outline:none}
+#ambar-order-completed .oc-stepper input::-webkit-inner-spin-button,#ambar-order-completed .oc-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#ambar-order-completed .oc-reset{display:flex;gap:6px;align-items:center;justify-content:center;width:100%;min-height:40px;margin-top:6px;font-size:11px;line-height:17px;color:#c6ad7f}
+#ambar-order-completed .oc-reset svg.lucide{width:13px!important;height:13px!important}
+/* «Вернуть расчёт» рисуется всегда, виден только у правленой строки: так
+   ordPatch показывает его с первого нажатия, не перерисовывая список. */
+#ambar-order-completed .oc-product:not(.is-edited) .oc-reset{display:none}
+#ambar-order-completed .oc-collapse{display:block;width:100%;min-height:44px;margin-top:6px;border-top:1px solid #3a2f42;text-align:center;font-size:11px;line-height:17px;color:var(--oc-muted)}
+#ambar-order-completed .oc-hints{display:flex;align-items:flex-start;gap:8px;padding:14px 3px 0;color:#b6aa9d}
+#ambar-order-completed .oc-hints svg.lucide{width:14px!important;height:14px!important;margin-top:2px}
+#ambar-order-completed .oc-hints p{font-size:11px;line-height:19px}
+#ambar-order-completed .oc-hints p>span{color:var(--oc-subtle)}
+#ambar-order-completed .oc-search{display:flex;align-items:center;gap:9px;width:100%;padding:0 10px 0 13px;border:1px solid #493b50;border-radius:12px;background:#1b1524;min-height:47px;color:#a89bb8}
+#ambar-order-completed .oc-search input{border:0;background:transparent;min-width:0;flex:1;font-size:16px;line-height:22px;padding:9px 0;outline:none;-webkit-appearance:none;appearance:none}
+#ambar-order-completed .oc-search input::placeholder{color:#9c8da9;font-size:13px}
+#ambar-order-completed .oc-search input::-webkit-search-cancel-button,#ambar-order-completed .oc-search input::-webkit-search-decoration{-webkit-appearance:none;display:none}
+#ambar-order-completed .oc-clear{display:grid;place-items:center;width:36px;height:44px}
+#ambar-order-completed .oc-catalog{display:flex;flex-direction:column;flex:1;min-height:0}
+#ambar-order-completed .oc-catalog-title{display:flex;justify-content:space-between;gap:10px;font-size:11px;line-height:16px;color:var(--oc-muted);padding:13px 2px 10px;flex:none}
+#ambar-order-completed .oc-catalog #ordRows{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:0 2px 16px;-webkit-overflow-scrolling:touch}
+#ambar-order-completed .oc-catalog #ordRows::-webkit-scrollbar{display:none}
+#ambar-order-completed .oc-catalog .oc-product{border-top-color:#3a2f42}
+#ambar-order-completed .oc-catalog .oc-product-line{padding:12px 1px;min-height:78px}
+#ambar-order-completed .oc-empty{padding:36px 16px;font-size:13px;line-height:21px;text-align:center;color:var(--oc-muted)}
+/* Общий каталог (xs-fix): сводка и поиск стоят, листается только #ordRows. */
+#accOv:has(#ambar-order-completed) .stk-mid.xs-fix{padding-bottom:0}
+#accOv:has(#ambar-order-completed) .stk-mid.xs-fix>#ambar-order-completed{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#accOv:has(#ambar-order-completed) .stk-mid.xs-fix .oc-app{flex:1 1 auto;min-height:0}
+#ambar-order-completed .xs-fix .oc-overview,#ambar-order-completed .xs-fix .oc-viewbar,.stk-mid.xs-fix #ambar-order-completed .oc-overview,.stk-mid.xs-fix #ambar-order-completed .oc-viewbar{flex:none}
+.stk-mid.xs-fix #ambar-order-completed .oc-phase{min-height:62px;padding-block:10px}
+/* Шапка и подвал раздела в оформлении страницы, пока на экране её корень. */
+#accOv:has(#ambar-order-completed) .stk-top{min-height:calc(82px + var(--safe-top));padding:calc(16px + var(--safe-top)) 14px 14px;border-bottom:1px solid #26212e;background:#0c0a12}
+#accOv:has(#ambar-order-completed) .stk-top-r{gap:11px}
+#accOv:has(#ambar-order-completed) .stk-x{width:42px;height:44px;border:1px solid #352c41;border-radius:12px;background:#17131f;color:#b7a7c5}
+#accOv:has(#ambar-order-completed) .stk-x svg{width:22px;height:22px;stroke-width:1.7}
+#accOv:has(#ambar-order-completed) .stk-ttl-t{font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;font-size:22px;line-height:29px;letter-spacing:-.035em;font-weight:700;color:#eeeae5}
+#accOv:has(#ambar-order-completed) .stk-ttl-s{margin-top:3px;font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;line-height:17px;color:#afa5b8}
+#accOv:has(#ambar-order-completed) .acc-act,#accOv:has(#ambar-order-completed) .acc-act.dn{height:auto;min-height:44px;padding:0 4px;border:0;border-radius:0;background:none;font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;line-height:18px;font-weight:500;color:#d4a0a7;white-space:nowrap}
+#accOv:has(#ambar-order-completed) .stk-mid{padding:0 13px 18px;background:#08070d;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#51465a transparent}
+#accOv:has(#ambar-order-completed) .stk-foot{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:9px;padding:12px 13px calc(16px + var(--safe-bottom));background:#100c15;border-top:1px solid #332938}
+#accOv:has(#ambar-order-completed) .stk-foot:empty{display:none}
+#accOv:has(#ambar-order-completed) .stk-foot button{appearance:none;margin:0;cursor:pointer;font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-tap-highlight-color:transparent}
+#accOv:has(#ambar-order-completed) .stk-foot svg{display:block;flex:none}
+#accOv:has(#ambar-order-completed) .oc-primary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:52px;padding:12px;border:1px solid #d8b97d;border-radius:13px;background:#dfc084;color:#20190f;font-size:14px;line-height:21px;font-weight:700;letter-spacing:-.02em}
+#accOv:has(#ambar-order-completed) .oc-primary svg{width:17px;height:17px;stroke-width:2}
+#accOv:has(#ambar-order-completed) .oc-primary:disabled{opacity:.75}
+#accOv:has(#ambar-order-completed) .oc-telegram{display:grid;place-items:center;width:52px;min-height:52px;padding:0;border:1px solid #61503f;border-radius:13px;background:#2c2230;color:#e2c386}
+#accOv:has(#ambar-order-completed) .oc-telegram svg{width:20px;height:20px}
+@container order-phone (max-width:365px){
+  #ambar-order-completed .oc-section-top{padding-inline:12px}
+  #ambar-order-completed .oc-section-top>span{max-width:115px}
+  #ambar-order-completed .oc-metrics strong{font-size:27px;line-height:33px}
+  #ambar-order-completed .oc-district-head{grid-template-columns:32px minmax(0,1fr) auto 12px;gap:8px;padding-inline:10px}
+  #ambar-order-completed .oc-code{width:32px;height:36px;font-size:14px}
+  #ambar-order-completed .oc-district-name>strong{font-size:13px}
+  #ambar-order-completed .oc-district-value>strong{font-size:18px}
+  #ambar-order-completed .oc-product-line{grid-template-columns:14px 26px minmax(0,1fr) auto 11px;gap:6px}
+  #ambar-order-completed .oc-product-art{width:26px}
+  #ambar-order-completed .oc-product-title>strong{font-size:12px}
+  #ambar-order-completed .oc-edit-cell{padding-inline:8px;gap:7px}
+  #ambar-order-completed .oc-stepper{grid-template-columns:34px 42px 34px}
+}
+@media (max-width:365px){
+  #accOv:has(#ambar-order-completed) .stk-top{padding-inline:10px}
+  #accOv:has(#ambar-order-completed) .stk-top-r{gap:9px}
+  #accOv:has(#ambar-order-completed) .stk-ttl-t{font-size:20px}
+  #accOv:has(#ambar-order-completed) .stk-mid{padding-inline:10px}
+  #accOv:has(#ambar-order-completed) .stk-foot{padding-inline:10px}
+  #accOv:has(#ambar-order-completed) .oc-primary{font-size:13px;padding-inline:8px}
+  #accOv:has(#ambar-order-completed) .oc-primary svg{width:15px;height:15px}
+}
+@media (pointer:coarse){#ambar-order-completed .oc-stepper{grid-template-columns:44px 44px 44px;margin-left:auto}#ambar-order-completed .oc-edit-cell{flex-wrap:wrap}}
+/* Общие правила старого списка (.ord-r/.ord-c на тех же классах) здесь не
+   действуют: строка каталога — плоская, с волоском сверху. */
+#ambar-order-completed #ordRows > .ord-r{border-radius:0;margin:0;padding:0;background:none;border:0;border-top:1px solid #3a2f42;overflow:visible}
+#ambar-order-completed .oc-product-title>small{white-space:normal}
+#ambar-order-completed .oc-quantity{min-width:0;text-align:right}
+#ambar-order-completed .oc-edit-cell.is-off{opacity:.6}
 .oprp-r{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
 .oprp-b{flex:1;min-width:0}
 .oprp-b b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -29874,21 +30054,34 @@ let _ordTickBusy = false;
 async function ordLiveTick(){
   if(document.hidden || _ordTickBusy || !window.ownerApi || !ORD || !ORD.d) return;
   const hub = document.querySelector('#accMid .ohub');
-  const list = !hub && document.querySelector('#accMid .ord-r');
+  // Страница заявки на экране — по #ordRows: в районном виде со свёрнутыми
+  // карточками строк .ord-r нет, а перечитывать её всё равно надо.
+  const list = !hub && document.querySelector('#accMid #ordRows');
   if(!hub && !list) return;
   if(list && (ORD.open || ORD.timer || Object.keys(ORD.pend || {}).length)) return;
   _ordTickBusy = true;
   try{
     const day = accDay();
-    const d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day}});
+    // Строки приёмки по районам читаются из списка поставок (ACC_SUP), а его
+    // accOrder грузит один раз — пока у заявки есть поставка, обновляем и его.
+    const sid = ((ORD.d || {}).supply || {}).supply_id || '';
+    const [d, sl] = await Promise.all([
+      ownerApi.ownerFetch('/api/owner/stock/order', {params:{day}}),
+      list && sid ? ownerApi.ownerFetch('/api/owner/supply').catch(() => null) : null]);
     if(!ORD || !ORD.d || accDay() !== day) return;
-    const sig = x => JSON.stringify([x.total_qty, x.total_aed, x.edited_count,
-      (x.all_rows || []).map(r => [r.id, r.need_total])]);
-    if(sig(d) === sig(ORD.d)) return;          // ничего не продали — не мигаем
+    const sig = x => JSON.stringify([x.total_qty, x.total_aed, x.edited_count, x.phase,
+      (x.supply || {}).done, (x.all_rows || []).map(r => [r.id, r.need_total])]);
+    const tsig = l => JSON.stringify(((l || []).find(s => s.supply_id === sid) || {}).tasks || null);
+    const same = sig(d) === sig(ORD.d) && (!sl || tsig(sl.supplies) === tsig((ACC_SUP || {}).list));
+    if(sl && sl.supplies) ACC_SUP = {list: sl.supplies, open: _supMain(sl.supplies)};
+    if(same) return;          // ничего не продали и не приняли — не мигаем
     ORD.d = d; ACC_ORDER = d;
     if(document.querySelector('#accMid .ohub')) ordHub();
-    else if(document.querySelector('#accMid .ord-r') && !ORD.open){
-      const y = window.scrollY; ordRender(); window.scrollTo(0, y);
+    else if(document.querySelector('#accMid #ordRows') && !ORD.open){
+      // Листается #accMid: возвращаем и его прокрутку, и окна.
+      const mid = document.getElementById('accMid');
+      const y = window.scrollY, my = mid ? mid.scrollTop : 0;
+      ordRender(); window.scrollTo(0, y); if(mid) mid.scrollTop = my;
     }
   }catch(e){}
   finally{ _ordTickBusy = false; }
@@ -29924,15 +30117,22 @@ function ordSumInner(){
   const d = ORD.d || {};
   // «Закупаем» — это то, что покупаем НА САМОМ ДЕЛЕ: пока магазин не ответил,
   // то, что просим; ответил — то, что он даёт (владелец, 25 сен 2026). Сколько
-  // просили и сколько не дали — на трёх шагах пути, там история целиком.
+  // просили и сколько не дали — в строке фазы и на хабе, там история целиком.
   const b = d.buy || {qty: d.total_qty || 0, rows: (d.rows || []).length,
                       cost: d.total_cost != null ? d.total_cost : d.total_aed || 0};
   // Первым числом — то, что платим магазину. Прайс продажи тут ни при чём:
-  // заявка — это счёт, а не витрина (владелец, 18 сен 2026).
-  return `<span class="ord-sum-c"><b>${fmtQty(b.qty || 0)}</b><i>единиц</i></span>
-    <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
-          aria-label="Цена по позициям"><b>${fmt(b.cost || 0)}<u>AED</u></b><i>закупка</i></span>
-    <span class="ord-sum-c"><b>${b.rows || 0}</b><i>категорий</i></span>`;
+  // заявка — это счёт, а не витрина (владелец, 18 сен 2026). Длинное число —
+  // мельче (oc-long-value), чтобы три колонки не разъезжались.
+  const qty = fmtQty(b.qty || 0), cost = fmt(b.cost || 0), rows = b.rows || 0;
+  return `<div><strong${_ordLong(qty)}>${qty}</strong><span>${pluralize(b.qty || 0, 'единица', 'единицы', 'единиц')}</span></div>
+    <button type="button" class="oc-cost" onclick="ordPrices()" aria-label="Цена по позициям"><strong${_ordLong(cost)}>${cost}</strong><span>AED закупка ${ocI('chevron-right')}</span></button>
+    <div><strong>${rows}</strong><span>${pluralize(rows, 'позиция', 'позиции', 'позиций')}</span></div>`;
+}
+function _ordLong(s){ return String(s).length > 7 ? ' class="oc-long-value"' : ''; }
+// Откуда числа сводки: ответ магазина (поставка есть), снимок собранной заявки
+// или живой расчёт — ровно так их выбирает сервер (order_rows: buy).
+function _ordBuySrc(d){
+  return d.supply ? 'По ответу Барракуды' : d.frozen ? 'По заявке' : 'По расчёту';
 }
 
 // Прайс — внизу карточки «Закупаем», строками, как «По районам» под остатками
@@ -29964,11 +30164,11 @@ function ordPrInner(){
   // Та же накрутка, что в карточке «Прайс»: от сумм, одним расчётом.
   const mark = _oprTotals(rows).mark;
   const miss = rows.filter(r => !r.cost).length;
-  return `<button class="sc-r" onclick="ordPrices()"><span>Прайс</span>${d
-      ? `<b>${_oprMarkTxt(mark)}<u>накрутка</u></b>`
-      : '<b class="is-skel">0000</b>'}<em>${_SC_CHEV}</em></button>${miss ? `
-    <button class="sc-r dn" onclick="ordPrices(true)"><span>Без закупочной цены</span>
-      <b>${miss}<u>${pluralize(miss, 'позиция', 'позиции', 'позиций')}</u></b><em>${_SC_CHEV}</em></button>` : ''}`;
+  // Обе строки — внутри #ordPr: prPaint() перерисовывает только его.
+  return `<button type="button" class="oc-price-link" onclick="ordPrices()"><span>${ocI('tags')}Прайс</span><span>Накрутка ${d
+      ? `<b>${_oprMarkTxt(mark)}</b>` : '<b class="is-skel">0000</b>'}${ocI('chevron-right')}</span></button>${miss ? `
+    <button type="button" class="oc-price-warning" onclick="ordPrices(true)">${ocI('circle-alert')}<span>Без закупочной цены · ${miss} ${
+      pluralize(miss, 'позиция', 'позиции', 'позиций')}</span>${ocI('chevron-right')}</button>` : ''}`;
 }
 
 // Откуда нормы, словами: снимок склада на утро такого-то дня (владелец, 16 сен
@@ -29990,111 +30190,189 @@ function _normRuleText(rule, coverDays){
   return `норма на ${coverDays} ${pluralize(coverDays, 'день', 'дня', 'дней')}`;
 }
 
-// Подпись заявки — это в первую очередь ЕЁ СОСТОЯНИЕ, а не правило норм.
-// Заявка собирается один раз, при закрытии смены, и окончательный вид
-// принимает после ответа магазина (владелец, 25 сен 2026). Пока этого не
-// было написано, владелец смотрел на живой прикид и принимал его за заявку —
-// а числа в нём ехали от каждой продажи и каждой приёмки.
-function _ordPhaseText(d){
+// ── Страница «Заявка» Барракуде в утверждённом виде (AMBAR-ORDER-PAGE, 9 ноя
+// 2026). Корень #ambar-order-completed внутри #accMid, классы oc-*; шапка
+// (#accTitle/#accSub/#accAct) и подвал (#accFoot) — общие у раздела, их вид на
+// этой странице задаёт CSS через #accOv:has(#ambar-order-completed). Значки —
+// Lucide, обводка 1.7, класс lucide, как у хаба «Барракуда».
+const OC_ICO = {
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'list-filter': '<path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/>',
+  'tags': '<path d="m15 5 6.3 6.3a2.4 2.4 0 0 1 0 3.4L17 19"/><path d="M9.586 5.586A2 2 0 0 0 8.172 5H3a1 1 0 0 0-1 1v5.172a2 2 0 0 0 .586 1.414L8.29 18.29a2.426 2.426 0 0 0 3.42 0l3.58-3.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="6.5" cy="9.5" r=".5" fill="currentColor"/>',
+  'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  'x': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'plus': '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  'minus': '<path d="M5 12h14"/>',
+  'rotate-ccw': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  'upload': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+  'check': '<path d="M20 6 9 17l-5-5"/>',
+  'circle-check': '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  'circle-alert': '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+  'clock-3': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/>',
+  'calculator': '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
+  'file-check-2': '<path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m3 15 2 2 4-4"/>',
+  'package-open': '<path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/>',
+  'circle-slash': '<circle cx="12" cy="12" r="10"/><line x1="9" x2="15" y1="15" y2="9"/>',
+  'arrow-right-left': '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+};
+function ocI(name){
+  return `<svg class="lucide lucide-${name}" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${OC_ICO[name] || ''}</svg>`;
+}
+function _ordCap(s){ s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+function _ordNum(n){ return n ? String(n).padStart(2, '0') : ''; }
+
+// Фаза заявки — строкой под шапкой: значок, заголовок, подпись. Это в первую
+// очередь ЕЁ СОСТОЯНИЕ, а не правило норм. Заявка собирается один раз, при
+// закрытии смены, и окончательный вид принимает после ответа магазина
+// (владелец, 25 сен 2026). Пока этого не было написано, владелец смотрел на
+// живой прикид и принимал его за заявку — а числа в нём ехали от каждой
+// продажи и каждой приёмки. Количества — fmtQty (fmt переводит валюту);
+// районы — живые, без отменённых, как supStage() на хабе. Фазы нет —
+// правило норм, как раньше.
+function _ordPhase(d){
   const s = d.supply || {};
+  const n = Math.max(0, (s.districts || 0) - (s.cancelled || 0)), k = s.done || 0;
+  const районов = `${k} из ${n} ${pluralize(n, 'района', 'районов', 'районов')}`;
+  const собрана = d.frozen_at ? `Собрана в ${_hm(d.frozen_at)}` : 'Собрана';
   switch(d.phase){
     case 'draft':
-      return 'предварительный расчёт · смену ещё не закрывали';
+      return {ico: 'calculator', t: 'Предварительный расчёт', s: 'Смену ещё не закрывали'};
     case 'asked':
-      return 'собрана' + (d.frozen_at ? ' в ' + _hm(d.frozen_at) : '') + ' · ждём ответ магазина';
+      return d.sent ? {ico: 'clock-3', t: 'Ожидает ответа магазина', s: `${собрана} · отправлена в магазин`}
+                    : {ico: 'upload', t: 'Ожидает отправки в магазин', s: собрана};
     case 'answered':
-      return s.gap_qty
-        ? `магазин ответил · даёт ${fmt(s.give_qty)}, не даёт ${fmt(s.gap_qty)}`
-        : `магазин ответил · даёт всё, ${fmt(s.give_qty)}`;
+      return {ico: 'file-check-2', t: 'Магазин ответил', s: s.gap_qty
+        ? `Даёт ${fmtQty(s.give_qty)} · не даёт ${fmtQty(s.gap_qty)}`
+        : `Даёт всё · ${fmtQty(s.give_qty)}`};
     case 'taking':
-      return `идёт приёмка · ${fmt(s.done || 0)} из ${fmt(s.districts || 0)} `
-        + pluralize(s.districts || 0, 'района', 'районов', 'районов');
+      return {ico: 'package-open', t: 'Идёт приёмка', s: районов};
     case 'done':
-      return 'приняли всё · до конца дня только просмотр';
+      return {ico: 'circle-check', t: 'Приняли всё', s: `Приёмка завершена · ${районов}`};
     case 'cancelled':
-      return 'заявка отменена';
+      return {ico: 'circle-slash', t: 'Заявка отменена', s: ''};
   }
-  return '';
+  return {ico: 'calculator', t: _ordCap(_normRuleText(d.norm_rule, d.cover_days)), s: ''};
 }
 
 function ordRender(){
   const d = ORD.d; if(!d) return;
   const dist = d.districts || [];
   const list = ordList();
-  const ed = d.edited_count || 0;
   const q = ORD.q.trim();
   // День — тот, НА который закупаем: смену закрывают утром, и собранная в
-  // этот момент заявка — заявка на сегодня, а не на уходящую смену.
+  // этот момент заявка — заявка на сегодня, а не на уходящую смену. «На» —
+  // только у собранной: живой расчёт ещё не заявка.
   const когда = d.buy_day || d.day;
-  const фаза = _ordPhaseText(d);
-  _setText('accSub', `${d.frozen ? 'на ' : ''}${_dayName(когда)} · ${
-    фаза || _normRuleText(d.norm_rule, d.cover_days)}`);
+  _setText('accSub', `Барракуда · ${d.frozen ? 'на ' : ''}${_dayName(когда)}`);
+  const ph = _ordPhase(d);
 
-  // Два вида одной заявки. По районам — карточки, как везде в панели. Общий
-  // список — старый вид: каждая позиция строкой с кодами всех районов, и
-  // поиск живёт там: искать позицию имеет смысл в списке, а не в карточках.
+  // Два вида одной заявки. По районам — карточки; общий каталог — каждая
+  // позиция строкой с кодами районов, и поиск живёт там: искать позицию
+  // имеет смысл в списке, а не в карточках.
   const общий = ORD.view === 'all';
-  const find = `<div class="ord-find">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="ordQ" type="search" placeholder="Найти позицию"
-             value="${escS(ORD.q)}" oninput="ordSearch(this.value)">
-      ${q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
-    </div>`;
+  const панель = общий
+    ? `<div class="oc-search" role="search">${ocI('search')}<input id="ordQ" type="search" placeholder="Найти позицию"
+          value="${escS(ORD.q)}" oninput="ordSearch(this.value)" autocomplete="off">${
+        q ? `<button type="button" class="oc-clear" onclick="ordSearch('')" aria-label="Очистить">${ocI('x')}</button>` : ''}</div>`
+    : `<button type="button" class="oc-all-link" onclick="ordAll(true)"><span class="oc-list-mark">${ocI('list-filter')}</span>
+        <span><strong>Общая заявка</strong><small>Все позиции · поиск · правки</small></span>${ocI('chevron-right')}</button>`;
+  // Подсказки расчёта — только при ненулевом значении и только у районов: в
+  // каталоге сводка и поиск стоят, листается список, и строки над ним отъедали
+  // бы экран.
+  const hints = [];
+  if(d.moving_qty) hints.push(`${fmtQty(d.moving_qty)} ед. переместят между районами`);
+  if(d.pending_qty) hints.push(`${fmtQty(d.pending_qty)} ед. уже заказаны и ждут на базе`);
+  if(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
+    hints.push(`Норма выше спроса · на полке лишнего на ${fmt(d.frozen_aed)} AED`);
+  const подсказки = hints.length && !общий
+    ? `<div class="oc-hints">${ocI('arrow-right-left')}<p>${hints.map((h, i) => i ? `<span>${escS(h)}</span>` : escS(h)).join('<br>')}</p></div>` : '';
   const num = {}; (d.all_rows || d.rows || []).forEach((r, i) => { num[r.id] = i + 1; });
-  document.getElementById('accMid').innerHTML = `
-    <div class="ord-sumc">
-      <div class="ord-cap">Закупаем</div>
-      <div class="ord-sum">${ordSumInner()}</div>
-      <div id="ordPr">${ordPrInner()}</div>
+  const каталог = `<div class="oc-catalog-title"><span>${q ? `Найдено · ${list.length}` : 'Все позиции'}</span><span>Заявлено, ед.</span></div>
+    <div id="ordRows">${list.length ? list.map(r => ordRowAll(r, dist, num[r.id])).join('')
+      : '<div class="oc-empty">' + (q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает') + '</div>'}</div>`;
+  document.getElementById('accMid').innerHTML = `<div id="ambar-order-completed"><div class="oc-app">
+    <div class="oc-overview">
+      <div class="oc-phase"><span class="oc-phase-mark">${ocI(ph.ico)}</span><div><strong>${escS(ph.t)}</strong>${
+        ph.s ? `<p>${escS(ph.s)}</p>` : ''}</div></div>
+      <section class="oc-summary">
+        <div class="oc-section-top"><h2>Закупаем</h2><span>${_ordBuySrc(d)}</span></div>
+        <div class="ord-sum oc-metrics">${ordSumInner()}</div>
+        <div id="ordPr">${ordPrInner()}</div>
+      </section>
+      <div class="oc-viewbar">${панель}</div>
+      ${подсказки}
     </div>
-
-    ${общий ? find : `<button class="shl-card ord-dh ord-all" onclick="ordAll(true)">
-      <span class="shl-h">
-        <span class="shl-code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-          stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
-        <span class="shl-b"><b>Общая заявка</b><i>все позиции / коды районов в строке / поиск</i></span>
-        <span class="ord-dh-go">${ICO_CHEV}</span>
-      </span>
-    </button>`}
-
-    ${d.moving_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.moving_qty)} ед</b> —
-      их сегодня переместят между районами</div>` : ''}
-    ${d.pending_qty ? `<div class="ord-hint">Заявка не просит <b>${fmtQty(d.pending_qty)} ед</b> —
-      они уже заказаны и ждут на базе</div>` : ''}
-    ${(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
-      ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
-      на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
-
-    <div id="ordRows">${общий
-      ? (q ? `<div class="ord-grp">Найдено · ${list.length}</div>` : '')
-        + (list.length ? list.map(r => ordRowAll(r, dist, num[r.id])).join('')
-           : '<div class="exp-empty">' + (q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает') + '</div>')
-      : ordDistricts(list, dist, q)}</div>`;
-  // В общем списке листается только каталог: сводка и поиск стоят на месте,
+    ${общий ? `<div class="oc-catalog">${каталог}</div>` : `<div id="ordRows">${ordDistricts(list, dist, q)}</div>`}
+  </div></div>`;
+  // В общем каталоге листается только список: сводка и поиск стоят на месте,
   // иначе, чтобы найти позицию в середине сотни строк, поиск приходится
   // сначала домотать обратно наверх.
   document.getElementById('accMid').classList.toggle('xs-fix', общий);
 
   // Заявку отправляют не только себе: её шлют поставщику в ватсап или на почту.
   // Поэтому главная кнопка отдаёт файл системе — оттуда он уходит куда угодно, —
-  // а рядом маленькая, которая кладёт его в чат с ботом: привычный путь.
+  // а рядом квадратная, которая кладёт его в чат с ботом: привычный путь.
   // Стоит она здесь, а не на хабе: отправляют то, что только что смотрели.
-  document.getElementById('accFoot').innerHTML = `
-    <div class="qb-wrap qb-row">
-      <button class="qb" id="ordShare" onclick="ordShare()">${ICO_SHARE}Отправить в магазин</button>
-      <button class="qb qb-ico" id="ordSend" onclick="ordSend()"
-              aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
-    </div>`;
+  document.getElementById('accFoot').innerHTML = `<button type="button" class="oc-primary" id="ordShare" onclick="ordShare()">${
+      ocI('upload')}<span>Отправить в магазин</span></button><button type="button" class="oc-telegram" id="ordSend" onclick="ordSend()"
+      aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>`;
 }
 
-// Заявка по районам — как везде в панели: карточка района с кодом, названием
-// и итогом, внутри строки позиций с количеством для этого района. Позиция с
-// нулём в карточке не стоит: она нужна только для дозаказа, и появляется,
-// когда её ищут. Номер строки — общий по заявке: тот же, что в файле для
-// магазина, по нему сверяют голосом.
+// Задачи районов у поставки этой заявки — из списка поставок (ACC_SUP), той
+// самой, что сервер указал в заявке (supply.supply_id). По ним — строка
+// приёмки под шапкой района.
+function _ordTasks(){
+  const d = ORD.d || {}, sid = (d.supply || {}).supply_id;
+  if(!sid) return {};
+  const sup = ((ACC_SUP && ACC_SUP.list) || []).find(s => s.supply_id === sid);
+  return (sup && sup.tasks) || {};
+}
+
+// Строка приёмки под шапкой района — по его настоящей задаче: принято
+// (сколько из скольких, в единицах склада: got_units / need_units — план
+// минус подтверждённый недовоз), принято без сканирования, сканируют после
+// такого приёма, район отменён, приёмка не завершена. Нет задачи, или за
+// товаром ещё не ездили, — строки нет: «0 из 0» и выдуманных 100% не бывает.
+function _ordReceipt(x, t){
+  if(!t) return null;
+  const d = ORD.d || {};
+  const row = (cls, ico, label, val) => `<div class="oc-receipt${cls ? ' ' + cls : ''}"><span class="oc-receipt-label">${
+    ocI(ico)}${escS(label)}</span>${val ? `<span class="oc-receipt-value">${val}</span>` : ''}</div>`;
+  const got = t.got_units != null ? +t.got_units : +(t.scanned || 0);
+  const need = t.need_units != null ? +t.need_units : +(t.qty || 0);
+  const изСкольких = need > 0 || got > 0 ? `${fmtQty(got)} <small>из ${fmtQty(need)} ед.</small>` : '';
+  if(t.cancelled_at) return {complete: false, html: row('is-pending', 'circle-slash', 'Отменён', '')};
+  if(t.done_at) return {complete: true, html: row('', 'circle-check', 'Принято', изСкольких)};
+  if(t.noscan_at){
+    // «принято без сканирования» — своё состояние, не количество; пошли
+    // сканы после такого приёма — «сканируют · N из M», как на хабе.
+    const w = _ordCap(_noscanWord(t));
+    return got > 0 ? {complete: false, html: row('is-pending', 'clock-3', w, '')}
+                   : {complete: true, html: row('', 'check', w, '')};
+  }
+  if(d.phase === 'taking' || d.phase === 'done' || t.driver || got > 0)
+    return {complete: false, html: row('is-pending', 'clock-3', 'Приёмка не завершена', got > 0 ? изСкольких : '')};
+  return null;
+}
+function _ordDistSub(x, qty, pos){
+  return x.off ? `Не везём · было ${fmtQty(qty)} ед.`
+               : `В заявке ${fmtQty(qty)} ед. · ${pos} поз.`;
+}
+function _ordAskedText(d){
+  const n = (d || {}).total_qty || 0;
+  return `Запрошено ${fmtQty(n)} ${pluralize(n, 'единица', 'единицы', 'единиц')}`;
+}
+
+// Заявка по районам — карточка района с кодом, названием и итогом, внутри
+// строки позиций с количеством для этого района. Позиция с нулём в карточке
+// не стоит: она нужна только для дозаказа и появляется, когда её ищут в общем
+// каталоге. Номер строки — общий по заявке: тот же, что в файле для магазина,
+// по нему сверяют голосом. Степперы и «Не везём сюда» — только в раскрытой
+// карточке; у выключенного района — «Вернуть в заявку».
 function ordDistricts(list, dist, q){
   const num = {}; (ORD.d.all_rows || ORD.d.rows || []).forEach((r, i) => { num[r.id] = i + 1; });
+  const tasks = _ordTasks();
   const cards = dist.map(x => {
     // Выключенный район считаем по расчёту, а не по «нужно»: у него нужно —
     // ноль, и карточка иначе просто исчезла бы, а её надо видеть и вернуть
@@ -30107,32 +30385,36 @@ function ordDistricts(list, dist, q){
     // читается как ошибка (владелец, 18 сен 2026).
     const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {})[поле] || 0) * (r.cost || 0), 0);
     const pos = rows.filter(r => ((r.cells[x.id] || {})[поле] || 0) > 0).length;
-    if(!rows.length && !x.off) return '';
+    // Есть задача приёмки — карточка остаётся и у заявки, правленной в ноль:
+    // запись о приёме не теряем.
+    const rc = _ordReceipt(x, tasks[x.id]);
+    if(!rows.length && !x.off && !rc) return '';
     // Свёрнутая карточка отвечает на главный вопрос — сколько и на сколько —
     // без ста строк под ней; список раскрывают, когда надо править. Поиск
     // раскрывает все: искали позицию — её надо увидеть.
     const open = (!!q || !!(ORD.fold || {})[x.id]) && !x.off;
-    return `<div class="shl-card ord-dc${open ? ' open' : ''}${x.off ? ' ord-dc-off' : ''}" data-fold="ordd-${escS(x.id)}">
-      <button class="shl-h ord-dh" onclick="ordFold('${x.id}')">
-        <span class="shl-code">${escS(x.code || '')}</span>
-        <span class="shl-b"><b>${escS(x.name || x.id)}</b>
-          <i>${x.off ? `не везём · по расчёту было ${fmt(qty)} бут`
-                     : `${pos} ${pluralize(pos,'категория','категории','категорий')} / ${fmtQty(qty)} ${pluralize(qty,'единица','единицы','единиц')}`}</i></span>
-        <span class="shl-v"><b>${x.off ? '—' : fmt(Math.round(aed)) + '<u>AED</u>'}</b><i>${x.off ? 'выключен' : 'закупка'}</i></span>
-        <span class="ord-dh-go">${ICO_CHEV}</span>
+    const id = escS(x.id);
+    return `<section class="oc-district${open ? ' is-open' : ''}${x.off ? ' is-off' : ''}${
+        rc && rc.complete ? ' is-complete' : ''}" data-fold="ordd-${id}" data-d="${id}">
+      <button type="button" class="oc-district-head" onclick="ordFold('${x.id}')" aria-expanded="${open ? 'true' : 'false'}"${x.off ? ' disabled' : ''}>
+        <span class="oc-code">${escS(x.code || '')}</span>
+        <span class="oc-district-name"><strong>${escS(x.name || x.id)}</strong><small data-oc-sub>${escS(_ordDistSub(x, qty, pos))}</small></span>
+        <span class="oc-district-value"><strong data-oc-aed>${x.off ? '—' : fmt(Math.round(aed))}</strong><small>${x.off ? 'выключен' : 'AED по заявке'}</small></span>
+        ${ocI('chevron-down')}
       </button>
-      <button class="ord-dc-b" onclick="ordDistOff('${x.id}', ${x.off ? 'false' : 'true'})">${
-        x.off ? 'Вернуть в заявку' : 'Не везём сюда'}</button>
-      ${open ? `<div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${
-        foldEnd(rows.length, `ordFold('${x.id}', 1)`)}</div>` : ''}
-    </div>`;
+      ${rc ? rc.html : ''}
+      ${x.off ? `<div class="oc-district-tools"><span>На этот день</span><button type="button" onclick="ordDistOff('${x.id}', false)">Вернуть в заявку</button></div>`
+      : open ? `<div class="oc-district-tools"><span>Запрошенные количества</span><button type="button" onclick="ordDistOff('${x.id}', true)">Не везём сюда</button></div>
+        <div class="oc-products">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${
+          rows.length >= FOLD_MIN ? `<button type="button" class="oc-collapse" onclick="ordFold('${x.id}', 1)">Свернуть список</button>` : ''}</div>` : ''}
+    </section>`;
   }).filter(Boolean);
-  if(!cards.length) return '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
+  if(!cards.length) return '<div class="oc-empty">' + (q ? 'Ничего не нашлось'
       : 'Довозить нечего — остатков хватает') + '</div>';
-  // Районы — одной слитной карточкой: пять плиток подряд читались как пять
-  // разных вещей, а это один список. Шапка у карточки та же, что у сводки
-  // «Закупаем» сверху: заглавными, на всю ширину, под ней волосок.
-  return `<div class="ord-dists"><div class="ord-cap">Заявка по районам</div>${cards.join('')}</div>`;
+  const n = cards.length;
+  return `<div class="oc-section-label"><div><h2>Заявка по районам</h2><p id="ocRequested">${escS(_ordAskedText(ORD.d))}</p></div>
+      <span>${n} ${pluralize(n, 'район', 'района', 'районов')}</span></div>
+    <div class="oc-district-cards">${cards.join('')}</div>`;
 }
 
 // Район выключают, когда закупка нужна не всем: «честно прям именно на один
@@ -30171,40 +30453,56 @@ function ordFold(id, снизу){
 // Строка позиции в карточке района. Свёрнутая — что и сколько; раскрытая —
 // счётчик этого района: править приходится именно точку. Картинка слева —
 // бутылку узнают по этикетке быстрее, чем по названию; номер остаётся: по
-// нему сверяют с файлом магазина.
+// нему сверяют с файлом магазина. «Вернуть расчёт» рисуется всегда и виден
+// только у правленой строки (CSS по is-edited): так ordPatch показывает его
+// с первого нажатия, не перерисовывая список.
 function ordRow(r, x, num){
   const key = r.id + '|' + x.id;
   const open = ORD.open === key;
   const c = r.cells[x.id] || {};
-  return `<div class="ord-r${open ? ' open' : ''}${c.edited ? ' fixed' : ''}${
-      c.need ? '' : ' zero'}${c.crit ? ' crit' : ''}" data-id="${r.id}">
-    <button class="ord-r-h" onclick="ordOpen('${key}')">
-      <span class="ord-r-i">${num || ''}</span>
-      <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
+  return `<article class="oc-product ord-r${open ? ' is-open' : ''}${c.edited ? ' is-edited' : ''}" data-id="${r.id}" data-d="${escS(x.id)}">
+    <button type="button" class="oc-product-line" onclick="ordOpen('${key}')" aria-expanded="${open ? 'true' : 'false'}">
+      <span class="oc-number">${_ordNum(num)}</span>
+      <span class="oc-product-art"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
         onerror="this.style.visibility='hidden'"></span>
-      <span class="ord-r-n">${escS(r.name)}</span>
-      <span class="ord-r-d">${c.edited ? `расчёт ${fmtQty(c.calc)}`
-        : c.crit ? ((+c.have || 0) > 0 ? `на полке ${fmtQty(c.have)}` : 'пусто') : ''}</span>
-      <span class="ord-r-v${c.edited ? ' gold' : ''}">${fmtQty(c.need || 0)}</span>
-      <span class="ord-r-go">${open ? '⌄' : '›'}</span>
+      <span class="oc-product-title"><strong>${escS(r.name)}</strong><small class="ord-r-d${c.edited ? ' is-edited' : ''}">${
+        c.edited ? `Расчёт ${fmtQty(c.calc || 0)}` : ''}</small></span>
+      <span class="oc-quantity ord-r-v">${fmtQty(c.need || 0)}</span>
+      ${ocI('chevron-down')}
     </button>
-    ${open ? `<div class="ord-r-b">
-      <div class="ord-c ord-c-big" data-d="${x.id}">
-        <span class="ord-st">
-          <button onclick="ordStep('${r.id}','${x.id}',-1)" aria-label="Меньше">−</button>
-          <input inputmode="numeric" value="${fmtQty(c.need||0)}"
-                 onchange="ordSet('${r.id}','${x.id}',this.value)"
-                 class="${c.edited ? 'fixed' : ''}">
-          <button onclick="ordStep('${r.id}','${x.id}',1)" aria-label="Больше">+</button>
-        </span>
+    ${open ? `<div class="oc-edit-panel">
+      <div class="oc-edit-cell ord-c" data-d="${escS(x.id)}">
+        <span class="oc-edit-label"><strong>${escS(x.code || '')} · ${escS(x.name || x.id)}</strong><small class="ord-c-calc">${escS(_ordCellCalc(c))}</small></span>
+        ${_ordStepper(r.id, x.id, c)}
       </div>
-      ${c.edited ? `<button class="ord-reset" onclick="ordSet('${r.id}','${x.id}','${c.calc||0}')">
-        Вернуть расчёт · <b>${fmtQty(c.calc||0)}</b></button>` : ''}
+      <button type="button" class="oc-reset" onclick="ordSet('${r.id}','${x.id}','${c.calc || 0}')">${
+        ocI('rotate-ccw')}Вернуть расчёт · <b>${fmtQty(c.calc || 0)}</b></button>
     </div>` : ''}
+  </article>`;
+}
+// Подпись клетки района: правка — расчёт рядом, иначе остаток на полке;
+// у выключенного района клетку не правят — сервер держит в ней ноль.
+function _ordCellCalc(c){
+  return c.off ? 'Не везём' : c.edited ? `Расчёт ${fmtQty(c.calc || 0)}` : `На полке ${fmtQty(c.have || 0)}`;
+}
+function _ordStepper(id, o, c){
+  return `<div class="oc-stepper">
+    <button type="button" onclick="ordStep('${id}','${o}',-1)" aria-label="Меньше">${ocI('minus')}</button>
+    <input inputmode="numeric" value="${fmtQty(c.need || 0)}" aria-label="Количество"
+           onchange="ordSet('${id}','${o}',this.value)">
+    <button type="button" onclick="ordStep('${id}','${o}',1)" aria-label="Больше">${ocI('plus')}</button>
   </div>`;
 }
+// Подпись строки общего каталога: коды районов с количеством, «изменено» у
+// правленой. Без разметки — ordPatch пишет её же в textContent.
+function _ordCodesLine(r){
+  const parts = ((ORD.d || {}).districts || [])
+    .filter(x => ((r.cells[x.id] || {}).need || 0) > 0)
+    .map(x => `${x.code || x.id} · ${fmtQty(r.cells[x.id].need)}`);
+  return [parts.join(' / '), r.edited ? 'изменено' : ''].filter(Boolean).join(' · ');
+}
 
-// Общая заявка: старый вид списком. Вход с плитки, выход стрелкой назад —
+// Общая заявка: весь каталог списком. Вход с плитки, выход стрелкой назад —
 // обратно к районам. Поиск живёт здесь.
 function ordAll(on){
   ORD.view = on ? 'all' : 'districts';
@@ -30213,42 +30511,38 @@ function ordAll(on){
   _setText('accTitle', on ? 'Общая заявка' : 'Заявка');
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   ordRender();
+  // Листается #accMid, а не окно: другой вид начинаем с начала.
+  const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
   window.scrollTo({top:0});
 }
 
 // Строка на все районы разом: свёрнутая — что, по каким районам и сколько;
-// раскрытая — счётчик каждого района. Картинка слева, номер остаётся.
+// раскрытая — счётчик каждого района. Картинка слева, номер остаётся. У
+// выключенного района степпера нет: сервер держит в его клетке ноль, и ответ
+// на правку тут же вернул бы его обратно.
 function ordRowAll(r, dist, num){
   const open = ORD.open === r.id;
   const cells = dist.map(x => ({x, c: r.cells[x.id] || {}}));
   // Номер строки — тот же, что в файле для магазина: по нему сверяют позицию
   // голосом и пальцем, не читая название целиком.
-  return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}${
-      r.need_total ? '' : ' zero'}${r.crit ? ' crit' : ''}" data-id="${r.id}">
-    <button class="ord-r-h" onclick="ordOpen('${r.id}')">
-      <span class="ord-r-i">${num || ''}</span>
-      <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
+  return `<article class="oc-product ord-r${open ? ' is-open' : ''}${r.edited ? ' is-edited' : ''}" data-id="${r.id}" data-d="all">
+    <button type="button" class="oc-product-line" onclick="ordOpen('${r.id}')" aria-expanded="${open ? 'true' : 'false'}">
+      <span class="oc-number">${_ordNum(num)}</span>
+      <span class="oc-product-art"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
         onerror="this.style.visibility='hidden'"></span>
-      <span class="ord-r-n">${escS(r.name)}</span>
-      <span class="ord-r-v${r.edited ? ' gold' : ''}">${fmtQty(r.need_total)}</span>
-      <span class="ord-r-go">${open ? '⌄' : '›'}</span>
+      <span class="oc-product-title"><strong>${escS(r.name)}</strong><small class="ord-r-d${r.edited ? ' is-edited' : ''}">${escS(_ordCodesLine(r))}</small></span>
+      <span class="oc-quantity ord-r-v">${fmtQty(r.need_total || 0)}</span>
+      ${ocI('chevron-down')}
     </button>
-    ${open ? `<div class="ord-r-b">
-      ${cells.map(o => `<div class="ord-c${o.c.crit ? ' crit' : ''}" data-d="${o.x.id}">
-        <span class="ord-c-n"><b>${o.x.code}</b> ${escS(o.x.name)}</span>
-        <span class="ord-c-calc">${o.c.edited ? `расчёт ${fmtQty(o.c.calc)}` : `на полке ${fmtQty(o.c.have||0)}`}</span>
-        <span class="ord-st">
-          <button onclick="ordStep('${r.id}','${o.x.id}',-1)" aria-label="Меньше">−</button>
-          <input inputmode="numeric" value="${fmtQty(o.c.need||0)}"
-                 onchange="ordSet('${r.id}','${o.x.id}',this.value)"
-                 class="${o.c.edited ? 'fixed' : ''}">
-          <button onclick="ordStep('${r.id}','${o.x.id}',1)" aria-label="Больше">+</button>
-        </span>
+    ${open ? `<div class="oc-edit-panel">
+      ${cells.map(o => `<div class="oc-edit-cell ord-c${o.x.off ? ' is-off' : ''}" data-d="${escS(o.x.id)}">
+        <span class="oc-edit-label"><strong>${escS(o.x.code || '')} · ${escS(o.x.name || o.x.id)}</strong><small class="ord-c-calc">${escS(_ordCellCalc(o.c))}</small></span>
+        ${o.x.off ? '' : _ordStepper(r.id, o.x.id, o.c)}
       </div>`).join('')}
-      <button class="ord-reset" onclick="ordReset('${r.id}')">
-        Вернуть расчёт · <b>${r.calc_total}</b></button>
+      <button type="button" class="oc-reset" onclick="ordReset('${r.id}')">${
+        ocI('rotate-ccw')}Вернуть расчёт · <b>${fmtQty(r.calc_total || 0)}</b></button>
     </div>` : ''}
-  </div>`;
+  </article>`;
 }
 
 // Цена по позициям — отдельной страницей, а не шторкой снизу.
@@ -30736,36 +31030,54 @@ function ordTotals(){
   ACC_ORDER = d;
 }
 
+// Правка одной клетки чинит ровно то, что изменилось, без перерисовки
+// страницы. Строк у позиции может быть несколько: в общем каталоге одна
+// (data-d="all"), в карточках районов — по одной на район; каждую правим по её
+// району. Следом — шапки районов (единицы, позиции, AED) и «Запрошено».
 function ordPatch(r, district){
-  const root = document.querySelector('.ord-r[data-id="' + r.id + '"]');
-  if(root){
-    root.classList.toggle('fixed', !!r.edited);
+  document.querySelectorAll('#accMid .ord-r[data-id="' + r.id + '"]').forEach(root => {
+    const dd = root.getAttribute('data-d') || 'all';
+    const all = dd === 'all';
+    const c = all ? null : (r.cells[dd] || {});
+    const edited = all ? !!r.edited : !!c.edited;
+    root.classList.toggle('is-edited', edited);
     const v = root.querySelector('.ord-r-v');
-    if(v){ v.textContent = r.need_total; v.classList.toggle('gold', !!r.edited); }
+    if(v) v.textContent = fmtQty(all ? (r.need_total || 0) : (c.need || 0));
     const sub = root.querySelector('.ord-r-d');
-    if(sub) sub.textContent = (ORD.d.districts || [])
-      .filter(x => (r.cells[x.id] || {}).need)
-      .map(x => x.code + '·' + r.cells[x.id].need).join(' ') || 'не нужно';
-    if(district){
-      const cell = root.querySelector('.ord-c[data-d="' + district + '"]');
-      const c = r.cells[district] || {};
-      if(cell){
-        const i = cell.querySelector('input');
-        if(i && document.activeElement !== i) i.value = c.need || 0;
-        if(i) i.classList.toggle('fixed', !!c.edited);
-        const calc = cell.querySelector('.ord-c-calc');
-        if(calc) calc.textContent = c.edited ? ('расчёт ' + (c.calc || 0))
-                                             : ('на полке ' + (c.have || 0));
-      }
+    if(sub){
+      sub.textContent = all ? _ordCodesLine(r) : (edited ? `Расчёт ${fmtQty(c.calc || 0)}` : '');
+      sub.classList.toggle('is-edited', edited);
     }
-  }
+    root.querySelectorAll('.ord-c[data-d]').forEach(cell => {
+      const o = cell.getAttribute('data-d');
+      if(district && o !== district) return;
+      const cc = r.cells[o] || {};
+      const i = cell.querySelector('input');
+      if(i && document.activeElement !== i) i.value = fmtQty(cc.need || 0);
+      const calc = cell.querySelector('.ord-c-calc');
+      if(calc) calc.textContent = _ordCellCalc(cc);
+    });
+  });
+  _ordDistHeadPaint();
   pathPaint();
-  // Счётчик правок на вкладке — единственное, что меняется вне самой строки.
-  const t = document.querySelector('.ord-tab.on i, .ord-tabs .ord-tab i');
-  const n = ORD.d.edited_count || 0;
-  const et = [...document.querySelectorAll('.ord-tabs .ord-tab')]
-    .find(b => (b.getAttribute('onclick') || '').includes("'edited'"));
-  if(et){ const i = et.querySelector('i'); if(i) i.textContent = n; et.hidden = !n; }
+}
+
+// Шапки карточек районов и «Запрошено N единиц» — из тех же строк, что уже на
+// экране: после правки числа района не должны ждать ответа сервера.
+function _ordDistHeadPaint(){
+  const d = ORD.d; if(!d) return;
+  const rows = d.all_rows || d.rows || [];
+  document.querySelectorAll('#accMid .oc-district[data-d]').forEach(card => {
+    const o = card.getAttribute('data-d');
+    const x = (d.districts || []).find(y => y.id === o);
+    if(!x || x.off) return;
+    let qty = 0, aed = 0, pos = 0;
+    rows.forEach(r => { const n = (r.cells[o] || {}).need || 0; if(n > 0){ qty += n; pos++; aed += n * (r.cost || 0); } });
+    const sub = card.querySelector('[data-oc-sub]'); if(sub) sub.textContent = _ordDistSub(x, qty, pos);
+    const v = card.querySelector('[data-oc-aed]'); if(v) v.textContent = fmt(Math.round(aed));
+  });
+  const req = document.getElementById('ocRequested');
+  if(req) req.textContent = _ordAskedText(d);
 }
 
 async function ordFlush(){

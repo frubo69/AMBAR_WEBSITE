@@ -5977,10 +5977,13 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
   text-transform:uppercase;color:var(--muted);margin-bottom:4px}
 .xs-top-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
   letter-spacing:-.4px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.xs-top-n{flex-shrink:0;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:34px;
-  font-weight:700;line-height:1;color:var(--gold2)}
+.xs-top-n{flex-shrink:0;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:flex-end;
+  gap:0 14px;text-align:right}
+.xs-top-u b{display:block;font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
+  line-height:1;color:var(--gold2)}
 .xs-top-n i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;
   font-weight:500;color:var(--muted);margin-top:5px}
+.xs-top-p{flex-basis:100%}
 .xs-dcard{border-radius:16px;background:var(--card);border:1px solid var(--border2);
   padding:12px 14px 6px;margin-bottom:10px}
 .xs-dcard-h{display:flex;align-items:center;gap:12px;padding-bottom:10px;
@@ -34665,11 +34668,11 @@ function xSupRender(d){
     const list = rows.map(l => `<div class="xs-pl ${l.left ? '' : 'ok'} ${l.chg ? 'chg' : ''} ${l.chg && !l.need ? 'gone' : ''}">
         <img class="xr-img" src="/products/${escS(l.id)}.webp" alt="" loading="lazy"
              onerror="this.style.visibility='hidden'">
-        <span class="xs-pl-n">${escS(l.name)}${l.chg ? `<i>${l.fresh ? 'новая' : !l.need ? 'убрана' : 'было ' + l.cur}</i>` : ''}</span>
+        <span class="xs-pl-n">${escS(l.name)}${l.chg ? `<i>${l.fresh ? 'новая' : !l.need ? 'убрана' : 'было ' + fmtQty(l.cur)}</i>` : ''}</span>
         ${edit ? `<span class="xs-step">
-            <button onclick="xsDraft('${escS(t.district)}','${escS(l.id)}',${l.need - 1})" aria-label="меньше">−</button>
-            <b>${l.need}</b>
-            <button onclick="xsDraft('${escS(t.district)}','${escS(l.id)}',${l.need + 1})" aria-label="больше">+</button>
+            <button onclick="xsDraft('${escS(t.district)}','${escS(l.id)}',${l.need - xsStepOf(l.id)})" aria-label="меньше">−</button>
+            <b>${fmtQty(l.need)}</b>
+            <button onclick="xsDraft('${escS(t.district)}','${escS(l.id)}',${l.need + xsStepOf(l.id)})" aria-label="больше">+</button>
           </span>`
         : `<span class="xs-pl-q">${l.got ? `${fmtQty(l.got)}<u>/${fmtQty(l.need)}</u>` : fmtQty(l.need)}</span>`}
       </div>`).join('') + (edit ? xsAddRow(t.district) : '');
@@ -34824,9 +34827,17 @@ let XS_BUSY = false;
 let XS_AFTER = null;    // куда шли, когда спросили «Сохранить изменения?»
 function xsDirty(){ return Object.values(XS_DRAFT).some(m => Object.keys(m).length); }
 function xsDraftCount(){ return Object.values(XS_DRAFT).reduce((a, m) => a + Object.keys(m).length, 0); }
+// Шаг строки: у пива в заявке на базу — полкоробки (как в мастере «Новая
+// заявка»), в основной заявке и у бутылок — по одной: магазин полкоробки не
+// отгружает.
+function xsStepOf(pid){
+  if(!SUP_D || SUP_D.kind !== 'extra') return 1;
+  const p = (PRODUCTS || []).find(x => x.id === pid);
+  return p && p.unit > 1 ? 0.5 : 1;
+}
 function xsDraft(oid, pid, qty, name){
   if(!SUP_D) return;
-  qty = Math.max(0, Math.min(999, qty | 0));
+  qty = Math.max(0, Math.min(999, xsStepOf(pid) === 0.5 ? Math.round(qty * 2) / 2 : Math.round(qty)));
   const t = (SUP_D.tasks || []).find(x => x.district === oid);
   const line = t && (t.lines || []).find(l => l.id === pid);
   const cur = line ? line.need : 0;
@@ -34933,7 +34944,7 @@ function xsAddPaint(oid){
 }
 function xsAddPick(oid, pid){
   XS_ADD = {oid: '', q: ''};
-  xsDraft(oid, pid, 1);
+  xsDraft(oid, pid, xsStepOf(pid));
 }
 
 // Экран поставки живёт под опросом: раз в пять секунд — свежая картина, чтобы
@@ -35108,7 +35119,9 @@ function xDraftRows(){
     return `<button type="button" class="bp-request bp-local" onclick="xDraftOpen('${escS(d.id)}')" data-record="${escS(d.id)}" data-status="draft">
       <span class="bp-request-icon" aria-hidden="true">${OB_ICO.pen}</span>
       <span class="bp-request-identity"><strong>${escS(d.base || 'Без названия')}</strong><span class="bp-draft"><span aria-hidden="true"></span>не закончена</span></span>
-      ${n ? `<span class="bp-quantity"><strong>${fmt(n)}</strong><span>${pluralize(n,'бутылка','бутылки','бутылок')}</span></span>` : '<span class="bp-quantity"></span>'}
+      ${n ? (t => `<span class="bp-quantity"><strong>${fmtQty(t.box || t.btl)}</strong><span>${t.box
+            ? _xBoxWord(t.box) + (t.btl ? ` · ${fmtQty(t.btl)} бут.` : '') : pluralize(t.btl,'бутылка','бутылки','бутылок')}</span></span>`)(xTally(d.rows || {}))
+          : '<span class="bp-quantity"></span>'}
       <span class="bp-request-arrow bp-request-drop" role="button" aria-label="Убрать" onclick="event.stopPropagation(); xDraftDrop('${escS(d.id)}'); accExtra()">${OB_ICO.x}</span>
       <span class="bp-request-meta">${n ? `<span>${p} ${pluralize(p,'позиция','позиции','позиций')}</span>` : ''}<span>${where(d)}</span><span>${_hm(d.at)}</span></span>
     </button>`; }).join('');
@@ -35127,6 +35140,46 @@ function xBack(){
 const xQty = r => Object.values((r && r.by) || {}).reduce((a, n) => a + (n || 0), 0);
 function xTotal(){ return Object.values((XS && XS.rows) || {}).reduce((a, r) => a + xQty(r), 0); }
 function _xCode(o){ return ((XS && XS.dist) || []).find(x => x.id === o) || {code: o, name: o}; }
+
+// Пиво в заявке на базу считается коробками по половине (на коробке два кода,
+// каждый — полкоробки; владелец, 8 ноя 2026: «должно же по полкоробки
+// считать»), остальное — бутылками по одной. Коробка или бутылка — из
+// каталога (unit > 1); у строки черновика признак сохранён (box), чтобы список
+// черновиков считал верно и без каталога.
+function _xBox(pid){
+  const r = XS && XS.rows && XS.rows[pid];
+  if(r && typeof r.box === 'boolean') return r.box;
+  const p = ((XS && XS.all) || []).find(x => x.id === pid) || (PRODUCTS || []).find(x => x.id === pid);
+  return !!(p && p.unit > 1);
+}
+function xStepOf(pid){ return _xBox(pid) ? 0.5 : 1; }
+const _xHalf = v => Math.max(0, Math.round((+v || 0) * 2) / 2);
+// {btl, box} по строкам: одного района (oid) или всей заявки.
+function xTally(rows, oid){
+  let btl = 0, box = 0;
+  Object.entries(rows || {}).forEach(([id, r]) => {
+    const n = oid ? ((r.by || {})[oid] || 0) : xQty(r);
+    if(!n) return;
+    if(typeof r.box === 'boolean' ? r.box : _xBox(id)) box += n; else btl += n;
+  });
+  return {btl, box};
+}
+const _xBoxWord = n => n % 1 ? 'коробки' : pluralize(n, 'коробка', 'коробки', 'коробок');
+// Словами: «3 бутылки», «2,5 коробки», вместе — «3 бутылки · 2,5 коробки»;
+// short — «бут.» / «кор.».
+function xSay(t, short){
+  const p = [];
+  if(t.btl) p.push(`${fmtQty(t.btl)} ${short ? 'бут.' : pluralize(t.btl, 'бутылка', 'бутылки', 'бутылок')}`);
+  if(t.box) p.push(`${fmtQty(t.box)} ${short ? 'кор.' : _xBoxWord(t.box)}`);
+  return p.join(' · ');
+}
+// Крупным числом с мелкой единицей: «3<i>бут.</i> 2,5<i>кор.</i>».
+function xSayBig(t){
+  const p = [];
+  if(t.btl) p.push(`${fmtQty(t.btl)}<i>бут.</i>`);
+  if(t.box) p.push(`${fmtQty(t.box)}<i>кор.</i>`);
+  return p.join(' ');
+}
 
 function xRender(){
   if(!XS) return;
@@ -35167,7 +35220,7 @@ function xRender(){
     const tabs = dist.map((x, i) => {
       const n = Object.values(XS.rows).reduce((a, r) => a + (r.by[x.id] || 0), 0);
       return `<button class="xs-dt ${i === XS.di ? 'on' : ''} ${n ? 'has' : ''}" onclick="xGo(${i})">${
-        escS(x.code)}${n ? `<i>${n}</i>` : ''}</button>`;
+        escS(x.code)}${n ? `<i>${fmtQty(n)}</i>` : ''}</button>`;
     }).join('');
     mid.innerHTML = steps + `<div class="xs-dtabs">${tabs}</div>
       <div class="xs-dh"><span class="xs-dc">${escS(d.code)}</span>
@@ -35183,7 +35236,6 @@ function xRender(){
   }else{
     // Итог — по районам, как и набирали: карточка на район, внутри товар с
     // картинкой и числом. Пропущенные районы — одной тихой строкой.
-    const total = xTotal();
     const pos = Object.values(XS.rows).filter(r => xQty(r) > 0).length;
     const cards = [], skipped = [];
     dist.forEach(x => {
@@ -35195,7 +35247,7 @@ function xRender(){
           <span class="xs-dc">${escS(x.code)}</span>
           <span class="xs-dcard-b"><b>${escS(x.name)}</b>
             <i>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}</i></span>
-          <span class="xs-dcard-n">${fmt(n)}<i>${pluralize(n,'бут.','бут.','бут.')}</i></span>
+          <span class="xs-dcard-n">${xSayBig(xTally(XS.rows, x.id))}</span>
         </div>
         ${lines.map(([id, r]) => `<div class="xs-pl">
           <img class="xr-img" src="/products/${escS(id)}.webp" alt="" loading="lazy"
@@ -35203,7 +35255,7 @@ function xRender(){
           <span class="xs-pl-n">${escS(r.name)}</span>
           <span class="xs-step">
             <button onclick="xSumStep('${escS(x.id)}','${escS(id)}',-1)" aria-label="меньше">−</button>
-            <b>${r.by[x.id]}</b>
+            <b>${fmtQty(r.by[x.id])}</b>
             <button onclick="xSumStep('${escS(x.id)}','${escS(id)}',1)" aria-label="больше">+</button>
           </span>
         </div>`).join('')}
@@ -35211,8 +35263,9 @@ function xRender(){
     });
     mid.innerHTML = steps + `<div class="xs-top">
         <span class="xs-top-b"><i>База</i><b>${escS(XS.base.trim())}</b></span>
-        <span class="xs-top-n">${fmt(total)}<i>${pluralize(total,'бутылка','бутылки','бутылок')} · ${
-          pos} ${pluralize(pos,'позиция','позиции','позиций')}</i></span>
+        <span class="xs-top-n">${(t => [t.btl ? `<span class="xs-top-u"><b>${fmtQty(t.btl)}</b><i>${pluralize(t.btl,'бутылка','бутылки','бутылок')}</i></span>` : '',
+            t.box ? `<span class="xs-top-u"><b>${fmtQty(t.box)}</b><i>${_xBoxWord(t.box)}</i></span>` : ''].join(''))(xTally(XS.rows))
+          }<i class="xs-top-p">${pos} ${pluralize(pos,'позиция','позиции','позиций')}</i></span>
       </div>
       ${cards.join('')}
       ${skipped.length ? `<div class="xs-skip">${skipped.join(' · ')} — ничего не надо</div>` : ''}`;
@@ -35263,12 +35316,12 @@ function xTile(r){
   const n = xQtyAt(r.id);
   const unit = r.unit > 1 ? `<small>/ ${escS(r.unit_name || 'коробка')}</small>` : '<small>AED</small>';
   return `<div class="xt" data-pid="${escS(r.id)}">
-    ${n ? `<span class="xt-q">${n}</span>` : ''}
+    ${n ? `<span class="xt-q">${fmtQty(n)}</span>` : ''}
     <div class="xt-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
          onerror="this.style.visibility='hidden'"></div>
     <div class="xt-nm">${escS(r.name)}</div>
     <div class="xt-bot">${n ? '<span class="xt-b" data-d="-1">−</span>' : ''}
-      <div class="xt-info"><div class="xt-pr">${n ? `<b class="xt-n">${n}</b>` : ''}${r.unit > 1 ? `<small>${escS(r.unit_name || 'коробка')}</small>` : ''}</div></div>
+      <div class="xt-info"><div class="xt-pr">${n ? `<b class="xt-n">${fmtQty(n)}</b>` : ''}${r.unit > 1 ? `<small>${escS(r.unit_name || 'коробка')}</small>` : ''}</div></div>
       ${n ? '<span class="xt-b" data-d="1">+</span>' : ''}</div>
   </div>`;
 }
@@ -35291,7 +35344,7 @@ function xCat(c){
 function xEnsure(id){
   if(!XS.rows[id]){
     const a = (XS.all || []).find(r => r.id === id);
-    XS.rows[id] = {name: a ? a.name : id, by: {}};
+    XS.rows[id] = {name: a ? a.name : id, by: {}, box: !!(a && a.unit > 1)};
   }
   return XS.rows[id];
 }
@@ -35306,7 +35359,7 @@ function xPaintGrid(){
 // в «ничего не надо». Возвращаться по районам ради одной цифры не нужно.
 function xSumStep(oid, id, d){
   const r = XS.rows[id]; if(!r) return;
-  r.by[oid] = Math.max(0, (r.by[oid] || 0) + d);
+  r.by[oid] = _xHalf((r.by[oid] || 0) + d * xStepOf(id));
   if(!r.by[oid]) delete r.by[oid];
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   const y = (document.getElementById('xsScroll') || document.getElementById('accMid') || {}).scrollTop;
@@ -35317,7 +35370,7 @@ function xSumStep(oid, id, d){
 
 function xStep(id, d){
   const r = xEnsure(id), o = xCur();
-  r.by[o] = Math.max(0, (r.by[o] || 0) + d);
+  r.by[o] = _xHalf((r.by[o] || 0) + d * xStepOf(id));
   if(!r.by[o]) delete r.by[o];
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   const t = document.querySelector(`.xt[data-pid="${CSS.escape(id)}"]`);
@@ -35381,7 +35434,7 @@ function xFoot(){
     const last = XS.di >= (XS.dist || []).length - 1;
     const word = last ? 'К итогу' : 'Дальше';
     document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
-      ${n ? `<button class="qb" id="xsGo" onclick="xNext()">${word} · ${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')}</button>`
+      ${n ? `<button class="qb" id="xsGo" onclick="xNext()">${word} · ${xSay(xTally(XS.rows, xCur()))}</button>`
           : `<button class="qb qb-skip qb-wide" id="xsGo" onclick="xSkip()">На этот район ничего не надо</button>`}</div>`;
     return;
   }

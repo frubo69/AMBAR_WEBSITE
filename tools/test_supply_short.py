@@ -152,8 +152,10 @@ async def main():
     import inspect, re as _re
     src = inspect.getsource(sr.task_scan)
     need_строки = [l.strip() for l in src.splitlines() if _re.match(r"\s*need\s*=", l)]
+    # С 8 ноя 2026 план читает _plan — тот же by_district, но до полкоробки
+    # (пиво в заявке на базу).
     eq("предел скана считается по плану заявки",
-       need_строки, ['need = int((item.get("by_district") or {}).get(oid) or 0)'])
+       need_строки, ['need = _plan(item, oid)'])
     eq("и это НЕ заниженное недовозом число",
        any("_need_eff" in l for l in need_строки), False)
     eq("отказ «уже всё» сравнивает с ним же",

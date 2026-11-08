@@ -3292,7 +3292,7 @@ async def supply_untake(sid: str, district: str, product_id: str, qty=1) -> bool
     return r.modified_count > 0
 
 
-async def supply_line_set(sid: str, district: str, product_id: str, qty: int,
+async def supply_line_set(sid: str, district: str, product_id: str, qty,
                           name: str, now) -> dict | None:
     """Поправить строку задачи района: сколько этого товара везти в район.
 
@@ -3310,7 +3310,7 @@ async def supply_line_set(sid: str, district: str, product_id: str, qty: int,
              f"tasks.{district}.started_at": None,
              f"tasks.{district}.noscan_at": None,
              f"tasks.{district}.done_at": None}
-    qty = max(0, int(qty or 0))
+    qty = max(0, _qn(qty or 0))            # у пива на базе — до полкоробки
     # got.{district} = 0 ставим явно: приём считает «got < need» прямо в
     # запросе, а сравнение с отсутствующим полем в Mongo не совпадает никогда —
     # строка без ключа была бы «полной» с первой же бутылки. До первого скана

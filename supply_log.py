@@ -158,9 +158,14 @@ def answer_note(sup: dict) -> str:
 def what_note(sup: dict) -> str:
     """«M бутылок · N позиций» — подпись к заявке на другую базу."""
     n = len(sup.get("items") or [])
-    qty = int(sup.get("total_qty") or 0)
-    return (f"{qty} {_plural(qty, 'бутылка', 'бутылки', 'бутылок')} · "
-            f"{n} {_plural(n, 'позиция', 'позиции', 'позиций')}")
+    try:
+        q = round(float(sup.get("total_qty") or 0) * 2) / 2
+    except (TypeError, ValueError):
+        q = 0.0
+    # У пива в заявке на базу бывает полкоробки: «7,5 бутылки».
+    qs = str(int(q)) if q == int(q) else str(q).replace(".", ",")
+    word = "бутылки" if q != int(q) else _plural(int(q), "бутылка", "бутылки", "бутылок")
+    return f"{qs} {word} · {n} {_plural(n, 'позиция', 'позиции', 'позиций')}"
 
 
 def _task_counts(sup: dict, oid: str) -> tuple:

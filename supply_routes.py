@@ -1291,6 +1291,31 @@ def _qn(v):
     return int(v) if v == int(v) else v
 
 
+def _plan(it: dict, oid: str):
+    """План района по позиции в единицах склада. Не int: у пива в заявке на
+    другую базу бывает полкоробки (владелец, 8 ноя 2026: «должно же по
+    полкоробки считать») — целое резало бы 2,5 до 2, а 0,5 до нуля."""
+    return _qn(((it or {}).get("by_district") or {}).get(oid) or 0)
+
+
+def _qs(v) -> str:
+    """Количество словом для сообщений: «2,5», «7»."""
+    return str(_qn(v)).replace(".", ",")
+
+
+def _line_qty(raw, sup: dict, p: dict):
+    """Количество строки района из правки старшего: у пива в заявке на базу —
+    до полкоробки, иначе целое (магазин полкоробки не отгружает)."""
+    try:
+        q = max(0.0, min(999.0, float(str(raw or 0).replace(",", "."))))
+    except (TypeError, ValueError):
+        q = 0.0
+    import stock_routes
+    if (sup.get("kind") or "main") == "extra" and stock_routes._unit(p or {}) > 1:
+        return _qn(q)
+    return int(q + 0.5)
+
+
 def _left_units(need, got):
     """Сколько осталось в единицах — до полкоробки вверх."""
     import math
@@ -1322,7 +1347,7 @@ def _need_eff(it: dict, oid: str, task: dict) -> float:
     половины нет; конечное решение принимаю я через STAR»). Недовоз в заявке
     остаётся — в недобор для магазина он всё равно уйдёт, — но отсканировать
     то, чего не дали, от человека больше не требуют."""
-    need = int((it.get("by_district") or {}).get(oid) or 0)
+    need = _plan(it, oid)
     return max(0.0, need - _miss(task, it.get("id")))
 
 
@@ -1340,7 +1365,7 @@ def _prices_missing(sup: dict, oid: str) -> list:
     task = (sup.get("tasks") or {}).get(oid) or {}
     out = []
     for it in sup.get("items") or []:
-        if int((it.get("by_district") or {}).get(oid) or 0) <= 0:
+        if _plan(it, oid) <= 0:
             continue
         # Нет в наличии — цены на неё не бывает, и приёмку остального она не держит.
         if _na(task, it["id"]) > 0:
@@ -1374,7 +1399,7 @@ async def na_set(sid: str, oid: str, pid: str, on: bool, me: str) -> dict:
     if task.get("done_at") or task.get("cancelled_at"):
         return {"ok": False, "verdict": "closed"}
     it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
-    plan = int(((it or {}).get("by_district") or {}).get(oid) or 0)
+    plan = _plan(it, oid)
     if not it or plan <= 0:
         return {"ok": False, "verdict": "not_in_supply"}
     if on and float((it.get("got") or {}).get(oid) or 0) > 0:
@@ -1382,7 +1407,7 @@ async def na_set(sid: str, oid: str, pid: str, on: bool, me: str) -> dict:
     await db.supply_task_na(sid, oid, pid, plan if on else 0)
     # Цена у позиции, которой нет, — не цена: стираем, чтобы не ушла в итог.
     if on and (sup.get("buys") or {}).get(pid) and \
-            sum(int(v or 0) for v in (it.get("by_district") or {}).values()) == plan:
+            _qn(sum(float(v or 0) for v in (it.get("by_district") or {}).values())) == plan:
         await db.supply_buy_set(sid, pid, None)
     try:
         import stock_routes
@@ -1453,7 +1478,7 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
     buys = sup.get("buys") or {}
     cost = 0.0
     for it in sup.get("items") or []:
-        plan = int((it.get("by_district") or {}).get(oid) or 0)
+        plan = _plan(it, oid)
         if not plan:
             continue
         # Принятое — сумма qty кодов: бутылка 1, код пива 0.5 — единицы.
@@ -1697,7 +1722,7 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     item = next((i for i in (sup.get("items") or []) if i["id"] == pid), None)
     if not item:
         return {"ok": False, "verdict": "not_in_supply"}
-    need = int((item.get("by_district") or {}).get(oid) or 0)
+    need = _plan(item, oid)
     # Код бутылки — 1, код пива — полкоробки (на коробке два кода; qty из
     # приложения не слушаем); строка закрывается, когда принятые единицы
     # дошли до плана.
@@ -1885,7 +1910,7 @@ async def task_undo(sid: str, oid: str, code: str, me: str,
     # сервер: у пива код — полкоробки, и «минус одна» на экране врала бы.
     sup = await db.supply_get(sid) or {}
     item = next((i for i in (sup.get("items") or []) if i.get("id") == pid), {})
-    need = int((item.get("by_district") or {}).get(oid) or 0)
+    need = _plan(item, oid)
     got = _qn((item.get("got") or {}).get(oid) or 0)
     rev = int((((sup.get("tasks") or {}).get(oid) or {}).get("rev")) or 0)
     return {"ok": True, "code": code, "product_id": pid,
@@ -1932,7 +1957,7 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "",
 
     gaps = []
     for it in sup.get("items") or []:
-        need = int((it.get("by_district") or {}).get(oid) or 0)
+        need = _plan(it, oid)
         if not need:
             continue
         got_u = _qn((it.get("got") or {}).get(oid) or 0)
@@ -2889,7 +2914,7 @@ def _shortfall(sup: dict) -> dict:
         # что не успели принять, идёт в недобор, как и «не выдали».
         if t.get("cancelled_at"):
             for it in sup.get("items") or []:
-                need = int((it.get("by_district") or {}).get(oid) or 0)
+                need = _plan(it, oid)
                 left = _left_units(need, (it.get("got") or {}).get(oid) or 0)
                 if left > 0:
                     put(it["id"], it.get("name", ""), "cancelled", left, {oid: left})
@@ -3105,8 +3130,9 @@ def _sup_brief(sup: dict) -> dict:
     # Отменённые районы — не в счёт: «N районов», «свободных», «принято»
     # считаются по тем, за которыми едут.
     tasks = {o: t for o, t in all_tasks.items() if not t.get("cancelled_at")}
-    took = sum(sum(int(v or 0) for v in (it.get("got") or {}).values())
-               for it in (sup.get("items") or []))
+    # Только ключи районов: в got лежат районы, а не служебные поля.
+    took = _qn(sum(sum(float(v or 0) for o, v in (it.get("got") or {}).items() if o in OFFICE_IDS)
+                   for it in (sup.get("items") or [])))
     return {
         "supply_id": sup.get("_id") or sup.get("supply_id") or "",
         "cancelled": len(all_tasks) - len(tasks),
@@ -3119,9 +3145,9 @@ def _sup_brief(sup: dict) -> dict:
         # недобора другой доп. заявки.
         "tried_bases": list(sup.get("tried_bases") or []),
         "cancelled_at": str(sup.get("cancelled_at") or ""),
-        "asked_qty": int(sup.get("asked_qty") or 0),
-        "total_qty": int(sup.get("total_qty") or 0),
-        "gap_qty": int(sup.get("gap_qty") or 0),
+        "asked_qty": _qn(sup.get("asked_qty") or 0),
+        "total_qty": _qn(sup.get("total_qty") or 0),
+        "gap_qty": _qn(sup.get("gap_qty") or 0),
         "took": took,
         "positions": len(sup.get("items") or []),
         "districts": len(tasks),
@@ -3220,7 +3246,7 @@ async def handle_own_lines(request):
             return web.json_response({"error": "no_item", "product_id": pid},
                                      status=400, headers=CORS_HEADERS)
         try:
-            qty = max(0, min(999, int((raw or {}).get("qty") or 0)))
+            qty = float(str((raw or {}).get("qty") or 0).replace(",", "."))
         except (TypeError, ValueError):
             return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
         lines.append((pid, qty))
@@ -3234,6 +3260,8 @@ async def handle_own_lines(request):
         return web.json_response({"error": "no_task"}, status=404, headers=CORS_HEADERS)
     who = str(body.get("as") or "").strip()[:60] or "старший"
     now = datetime.now(timezone.utc)
+    # Целое или до полкоробки — зависит от заявки и товара, см. _line_qty.
+    lines = [(pid, _line_qty(q, sup, cat[pid])) for pid, q in lines]
     doc, done = None, 0
     for pid, qty in lines:
         doc = await db.supply_line_set(sid, oid, pid, qty, cat[pid].get("name", ""), now)
@@ -3285,7 +3313,7 @@ async def handle_own_line(request):
     if pid not in cat:
         return web.json_response({"error": "no_item"}, status=400, headers=CORS_HEADERS)
     try:
-        qty = max(0, min(999, int(body.get("qty") or 0)))
+        qty = float(str(body.get("qty") or 0).replace(",", "."))
     except (TypeError, ValueError):
         return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
     sup = await db.supply_get(sid)
@@ -3295,6 +3323,7 @@ async def handle_own_line(request):
     if task is None:
         return web.json_response({"error": "no_task"}, status=404, headers=CORS_HEADERS)
     now = datetime.now(timezone.utc)
+    qty = _line_qty(qty, sup, cat[pid])
     doc = await db.supply_line_set(sid, oid, pid, qty, cat[pid].get("name", ""), now)
     if not doc:
         cur = await db.supply_get(sid) or sup
@@ -4081,6 +4110,7 @@ async def handle_extra_create(request):
     if not base:
         return web.json_response({"error": "no_base"}, status=400, headers=CORS_HEADERS)
     cat = _catalog_by_id()
+    import stock_routes as SR
     items, tasks = [], {}
     for row in body.get("items") or []:
         if not isinstance(row, dict):
@@ -4090,16 +4120,20 @@ async def handle_extra_create(request):
         if not p or any(i["id"] == pid for i in items):
             continue
         by = {}
+        # Пиво — коробками до половины (на коробке два кода, каждый —
+        # полкоробки; владелец, 8 ноя 2026), остальное — целыми бутылками.
+        half = SR._unit(p) > 1
         for oid, n in (row.get("by_district") or {}).items():
             try:
-                n = int(n)
+                n = float(str(n).replace(",", "."))
             except (TypeError, ValueError):
-                n = 0
+                n = 0.0
+            n = _qn(n) if half else int(n + 0.5) if n > 0 else 0
             if oid in OFFICE_IDS and n > 0:
                 by[oid] = min(n, 9999)
         if not by:
             continue
-        qty = sum(by.values())
+        qty = _qn(sum(by.values()))
         items.append({"id": pid, "name": p.get("name", ""),
                       "asked": qty, "qty": qty, "scanned": 0,
                       "by_district": by, "got": {o: 0 for o in by}})
@@ -4109,7 +4143,7 @@ async def handle_extra_create(request):
                                        "claimed_at": None, "started_at": None,
                                        "done_at": None, "last_at": None,
                                        "undo": 0, "note": "", "gaps": [], "flags": []})
-            t["qty"] += n
+            t["qty"] = _qn(t["qty"] + n)
             t["positions"] += 1
     if not items:
         return web.json_response({"error": "nothing"}, status=400, headers=CORS_HEADERS)
@@ -4132,8 +4166,8 @@ async def handle_extra_create(request):
            "by": request.get("owner_id") or 0, "by_name": who,
            "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
            "tasks": tasks,
-           "total_qty": sum(i["qty"] for i in items),
-           "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
+           "total_qty": _qn(sum(i["qty"] for i in items)),
+           "asked_qty": _qn(sum(i["qty"] for i in items)), "gap_qty": 0}
     sid = await _save_new(doc, "X", now)
     log.info(f"[supply] заявка на базу «{base}» {sid}: {who} · {len(items)} позиций, "
              f"{doc['total_qty']} бутылок, районов {len(tasks)}")
@@ -4141,10 +4175,10 @@ async def handle_extra_create(request):
     # Это деньги мимо магазина — владелец узнаёт сразу, а не по итогу приёмки.
     try:
         from owner_routes import notify_owners
-        where = " · ".join(f"{OFFICE_CODES.get(o, o)} {t['qty']}" for o, t in tasks.items())
+        where = " · ".join(f"{OFFICE_CODES.get(o, o)} {_qs(t['qty'])}" for o, t in tasks.items())
         await notify_owners("supply.done",
                             f"🏬 *Закупка на другой базе — {_md(base)}*\n{_md(who)} · "
-                            f"{doc['total_qty']} бутылок, {len(items)} позиций\n{_md(where)}")
+                            f"{_qs(doc['total_qty'])} бутылок, {len(items)} позиций\n{_md(where)}")
     except Exception as e:
         log.error(f"[supply] уведомление о заявке на базу: {e}")
     await _costs_refresh()

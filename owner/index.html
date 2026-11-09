@@ -4822,7 +4822,7 @@ button.path:active{transform:scale(.995)}
    эталона сняты: высотой владеет оболочка раздела, в районном виде листается
    #accMid, в общем каталоге (xs-fix) — только #ordRows. */
 #ambar-order-completed{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
-#ambar-order-completed .oc-app{--oc-bg:#08070d;--oc-surface:#14111e;--oc-raised:#211b29;--oc-line:#39313f;--oc-gold:#e2c386;--oc-text:#eeeae5;--oc-muted:#afa5b8;--oc-subtle:#91869f;--oc-danger:#d4a0a7;display:flex;flex-direction:column;min-width:0;color:var(--oc-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:order-phone / inline-size}
+#ambar-order-completed .oc-app{--oc-bg:#08070d;--oc-surface:#14111e;--oc-raised:#211b29;--oc-line:#39313f;--oc-gold:#e2c386;--oc-text:#eeeae5;--oc-muted:#afa5b8;--oc-subtle:#91869f;--oc-danger:#d4a0a7;display:flex;flex-direction:column;min-width:0;color:var(--oc-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark}
 #ambar-order-completed .oc-app *{box-sizing:border-box}
 #ambar-order-completed .oc-app :where(button,input){font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 #ambar-order-completed .oc-app :where(button){appearance:none;margin:0;padding:0;border:0;background:transparent;text-align:left;cursor:pointer}
@@ -4964,7 +4964,17 @@ button.path:active{transform:scale(.995)}
 #accOv:has(#ambar-order-completed) .oc-primary:disabled{opacity:.75}
 #accOv:has(#ambar-order-completed) .oc-telegram{display:grid;place-items:center;width:52px;min-height:52px;padding:0;border:1px solid #61503f;border-radius:13px;background:#2c2230;color:#e2c386}
 #accOv:has(#ambar-order-completed) .oc-telegram svg{width:20px;height:20px}
-@container order-phone (max-width:365px){
+/* Узкий телефон. Было @container по ширине .oc-app (365 px — это экран 391 px:
+   поля #accMid по 13 px). У контейнерного запроса WebKit сначала раскладывает
+   контейнер БЕЗ новых потомков и только потом их стилизует: на этом
+   промежуточном проходе только что перерисованная страница весит ноль,
+   #accMid прижимает прокрутку к нулю — и любое нажатие, которое перерисовывает
+   страницу (раскрыть район или строку, «Не везём сюда»), кидало на iPhone в
+   начало (владелец, 9 ноя 2026: «почему когда я нажимаю на район любой чтобы
+   его раскрыть меня кидает в начало страницы»). В Chrome второго прохода нет,
+   там не повторялось. .oc-app всегда во всю ширину раздела — медиа-запрос
+   даёт те же правила без него. */
+@media (max-width:391px){
   #ambar-order-completed .oc-section-top{padding-inline:12px}
   #ambar-order-completed .oc-section-top>span{max-width:115px}
   #ambar-order-completed .oc-metrics strong{font-size:27px;line-height:33px}
@@ -30078,10 +30088,10 @@ async function ordLiveTick(){
     ORD.d = d; ACC_ORDER = d;
     if(document.querySelector('#accMid .ohub')) ordHub();
     else if(document.querySelector('#accMid #ordRows') && !ORD.open){
-      // Листается #accMid: возвращаем и его прокрутку, и окна.
-      const mid = document.getElementById('accMid');
-      const y = window.scrollY, my = mid ? mid.scrollTop : 0;
-      ordRender(); window.scrollTo(0, y); if(mid) mid.scrollTop = my;
+      // Листается #accMid (в каталоге — #ordRows): возвращаем и их прокрутку,
+      // и окна.
+      const y = window.scrollY;
+      ordRenderKeep(); window.scrollTo(0, y);
     }
   }catch(e){}
   finally{ _ordTickBusy = false; }
@@ -30319,6 +30329,17 @@ function ordRender(){
       aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>`;
 }
 
+// Перерисовка на месте — раскрыли район или строку, выключили район: страница
+// собирается заново целиком, а человек остаётся там, где нажал. Листается
+// #accMid, в общем каталоге — #ordRows: он пересоздаётся вместе со страницей,
+// и без этого список после каждого нажатия начинался с первой строки.
+function ordRenderKeep(){
+  const at = () => [document.getElementById('accMid'), document.querySelector('#accMid #ordRows')];
+  const was = at().map(el => el ? el.scrollTop : 0);
+  ordRender();
+  at().forEach((el, i) => { if(el && was[i]) el.scrollTop = was[i]; });
+}
+
 // Задачи районов у поставки этой заявки — из списка поставок (ACC_SUP), той
 // самой, что сервер указал в заявке (supply.supply_id). По ним — строка
 // приёмки под шапкой района.
@@ -30368,8 +30389,12 @@ function _ordAskedText(d){
 // строки позиций с количеством для этого района. Позиция с нулём в карточке
 // не стоит: она нужна только для дозаказа и появляется, когда её ищут в общем
 // каталоге. Номер строки — общий по заявке: тот же, что в файле для магазина,
-// по нему сверяют голосом. Степперы и «Не везём сюда» — только в раскрытой
-// карточке; у выключенного района — «Вернуть в заявку».
+// по нему сверяют голосом. Степперы — только в раскрытой карточке. «Не везём
+// сюда» стоит на карточке всегда, и на свёрнутой: район выключают, не
+// раскрывая его (владелец, 9 ноя 2026: «сделай тут как раньше чтобы можно
+// было не раскрывая сам район на нем нажать, что сюда мы не везем»). Строка
+// одна и та же, кнопка на одном месте: у раскрытой слева подпись списка, у
+// выключенного района — «Вернуть в заявку».
 function ordDistricts(list, dist, q){
   const num = {}; (ORD.d.all_rows || ORD.d.rows || []).forEach((r, i) => { num[r.id] = i + 1; });
   const tasks = _ordTasks();
@@ -30403,9 +30428,10 @@ function ordDistricts(list, dist, q){
         ${ocI('chevron-down')}
       </button>
       ${rc ? rc.html : ''}
-      ${x.off ? `<div class="oc-district-tools"><span>На этот день</span><button type="button" onclick="ordDistOff('${x.id}', false)">Вернуть в заявку</button></div>`
-      : open ? `<div class="oc-district-tools"><span>Запрошенные количества</span><button type="button" onclick="ordDistOff('${x.id}', true)">Не везём сюда</button></div>
-        <div class="oc-products">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${
+      <div class="oc-district-tools">${x.off
+        ? `<span>На этот день</span><button type="button" onclick="ordDistOff('${x.id}', false)">Вернуть в заявку</button>`
+        : `<span>${open ? 'Запрошенные количества' : ''}</span><button type="button" onclick="ordDistOff('${x.id}', true)">Не везём сюда</button>`}</div>
+      ${open ? `<div class="oc-products">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${
           rows.length >= FOLD_MIN ? `<button type="button" class="oc-collapse" onclick="ordFold('${x.id}', 1)">Свернуть список</button>` : ''}</div>` : ''}
     </section>`;
   }).filter(Boolean);
@@ -30439,14 +30465,14 @@ async function ordDistOff(id, off){
       ? 'Нельзя выключить все районы' : 'Не получилось — повторите');
   }
   ORD.busy = false;
-  ordRender();
+  ordRenderKeep();
 }
 
 function ordFold(id, снизу){
   if(!ORD.fold) ORD.fold = {};
   ORD.fold[id] = !ORD.fold[id];
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  ordRender();
+  ordRenderKeep();
   if(снизу) foldSeen('ordd-' + id);
 }
 
@@ -30968,7 +30994,7 @@ function ordSearch(v){
 function ordOpen(id){
   ORD.open = ORD.open === id ? null : id;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  ordRender();
+  ordRenderKeep();
 }
 
 function _ordRow(id){ return (ORD.d.all_rows || []).find(r => r.id === id); }
@@ -31103,7 +31129,7 @@ async function ordFlush(){
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
     try{
       const d = await ownerApi.ownerFetch('/api/owner/stock/order');
-      ORD.d = d; ACC_ORDER = d; ordRender();
+      ORD.d = d; ACC_ORDER = d; ordRenderKeep();
     }catch(e3){}
   }finally{
     ORD.busy = false;
@@ -31134,7 +31160,7 @@ async function ordReset(id){
     await ownerApi.ownerFetch('/api/owner/stock/order/reset', {method:'POST',
       body:{day: ORD.d.day, id, as: _meName()}});
     const d = await ownerApi.ownerFetch('/api/owner/stock/order');
-    ORD.d = d; ACC_ORDER = d; ordRender();
+    ORD.d = d; ACC_ORDER = d; ordRenderKeep();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   }catch(e){}
   finally{ ORD.busy = false; }

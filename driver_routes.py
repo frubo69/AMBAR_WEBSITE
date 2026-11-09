@@ -1462,11 +1462,12 @@ async def handle_writeoff_scan(request):
     """Списать бутылку по коду с крышки — как у старшего, но в ожидании
     решения. body: {code, kind, note?, photo, thumb?}
 
-    Код знает позицию, район и что это ровно одна бутылка; водителю остаётся
-    сказать, что случилось, и показать. В реестре бутылка при скане НЕ
-    помечается: до согласования списание — заявление, а не факт, и остаток
-    трогать нельзя. Помечает её решение (db.writeoff_decide). Утеря сюда не
-    ходит: потерянную бутылку к камере не поднесёшь."""
+    Код знает позицию, район и количество — одна бутылка, у пива полкоробки
+    (stock_routes.code_units); водителю остаётся сказать, что случилось, и
+    показать. В реестре бутылка при скане НЕ помечается: до согласования
+    списание — заявление, а не факт, и остаток трогать нельзя. Помечает её
+    решение (db.writeoff_decide). Утеря сюда не ходит: потерянную бутылку к
+    камере не поднесёшь."""
     me = request["driver"]
     try:
         body = await request.json()
@@ -1479,7 +1480,7 @@ async def handle_writeoff_scan(request):
     if kind not in db.WRITEOFF_KINDS or kind == "потеря":
         return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
     from config_offices import OFFICE_IDS, OFFICE_CODES
-    from stock_routes import WO_SAY, _wo_say
+    from stock_routes import WO_SAY, _wo_say, code_units
     doc = await db.qr_get(code)
     if not doc:
         return _wo_say("unknown", code=code)
@@ -1518,9 +1519,12 @@ async def handle_writeoff_scan(request):
         thumb = ""
     note = (body.get("note") or "").strip()[:200]
     now = datetime.now(timezone.utc)
+    # Сколько несёт код, а не единица: у пива единица журнала — коробка, и
+    # запись «1» снимала с остатка коробку при наклейке на половину.
+    qty = code_units(doc, p)
     wid = await db.writeoff_add({
         "at": now, "day": _biz_day(), "item": pid, "thumb": thumb,
-        "name": p.get("name", ""), "qty": 1, "kind": kind, "note": note,
+        "name": p.get("name", ""), "qty": qty, "kind": kind, "note": note,
         "district": district, "district_code": OFFICE_CODES.get(district, ""),
         "by": me["name"], "by_id": int(me.get("telegram_id") or 0),
         "code": code, "label": doc.get("label") or "",
@@ -1532,7 +1536,7 @@ async def handle_writeoff_scan(request):
         log.warning(f"[writeoff] кэш заявки не сброшен: {e}")
     log.info(f"[writeoff] {me['name']} сканом: {kind} · {p.get('name','')} · "
              f"{OFFICE_CODES.get(district, district)} · ждёт согласования")
-    await _writeoff_tell(wid, me, p, 1, kind, note, photo)
+    await _writeoff_tell(wid, me, p, qty, kind, note, photo)
     return _wo_say("ok", code=code, id=wid, name=p.get("name", ""),
                    label=doc.get("label") or "", district=district,
                    district_code=OFFICE_CODES.get(district, ""), state="pending")
@@ -2659,13 +2663,19 @@ async def _guard_bottle(code) -> tuple[dict | None, str]:
     if await db.expense_by_code(code):
         return None, "taken"
 
-    # Цена за бутылку, а не за учётную единицу: у пива единица — ящик из 24, и
-    # охраннику отдают одну банку, а не ящик.
+    # Цена за то, что несёт код, а не за одну банку: у бутылки код — бутылка,
+    # у пива наклейка стоит на коробке и значит полкоробки, охране уходит
+    # упаковка из двенадцати (владелец, 9 ноя 2026, по записи «Corona · 6 AED»:
+    # «водители отсканили охране пиво, почему пишется 6 дирхам??» · «упаковку
+    # из 12 · один код на пиве - всегда полкоробки»). Раньше цену коробки
+    # делили на 24: в расходе стояла одна бутылка, а со склада по тому же коду
+    # уходила коробка. Закупка в cost_map — за учётную единицу, у пива за
+    # коробку: 142 × 0,5 = 71.
     цена = 0
     try:
         import stock_value, stock_routes
-        unit = max(1, int(stock_routes._unit(p) or 1))
-        цена = int(round(float((await stock_value.cost_map()).get(p["id"]) or 0) / unit))
+        несёт = float(stock_routes.code_units(doc, p))
+        цена = int(round(float((await stock_value.cost_map()).get(p["id"]) or 0) * несёт))
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[driver] цена бутылки не посчиталась: {e}")
     return {"cost": max(0, цена),

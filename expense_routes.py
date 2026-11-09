@@ -926,12 +926,19 @@ async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) 
     code = str((item or {}).get("code") or "").strip()
     if not code:
         return
+    # Со склада уходит столько, сколько несёт код: бутылка — одна, наклейка
+    # пива — полкоробки (владелец, 9 ноя 2026: «один код на пиве - всегда
+    # полкоробки»). Раньше в журнал писали единицу: у пива это коробка, и
+    # остаток района падал на коробку при коде на половину.
+    import stock_routes
+    несёт = stock_routes.code_units(
+        await db.qr_get(code), stock_routes._catalog().get(str(item.get("bottle_id") or "")))
     now = datetime.now(timezone.utc)
     wid = await db.writeoff_add({
         # Позиция обязательна: журнал вычитает со склада по ней, и запись без
         # неё честно лежит в истории, ничего при этом не вычитая.
         "at": now, "day": day, "item": item.get("bottle_id") or "", "code": code,
-        "name": item.get("bottle") or "", "qty": 1, "kind": "охрана",
+        "name": item.get("bottle") or "", "qty": несёт, "kind": "охрана",
         "note": (item.get("comment") or "")[:200],
         "district": item.get("district") or "",
         "by": driver, "by_id": 0, "label": item.get("label") or "",

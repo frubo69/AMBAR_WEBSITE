@@ -151,6 +151,15 @@ def code_qty(p: dict) -> float:
     return STEP if _unit(p or {}) > 1 else 1
 
 
+def code_units(doc: dict, p: dict):
+    """Сколько единиц склада несёт ЭТОТ код: то, что записано у него в
+    реестре. Это количество складывают счётчики реестра, и оно же должно уйти
+    в журнал списаний, когда код списывают или отдают охране: бутылка — одна,
+    наклейка пива — полкоробки (владелец, 9 ноя 2026: «один код на пиве -
+    всегда полкоробки»). У записи без поля — правило позиции (code_qty)."""
+    return _num((doc or {}).get("qty") or code_qty(p or {}))
+
+
 def _round_step(v) -> float:
     """К ближайшей половине. Считают глазами, дробей мельче не бывает.
 
@@ -4385,7 +4394,7 @@ async def _blame_set(wid: str, body: dict, request, by_name: str, note: str = ""
     сумма = body.get("comp")
     await _loss_load()
     сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
-               else _comp_of(doc.get("item") or "", int(doc.get("qty") or 0), doc.get("kind", "")))
+               else _comp_of(doc.get("item") or "", _num(doc.get("qty") or 0), doc.get("kind", "")))
     split = _split_parse(body)
     if split:
         кто = ", ".join(x["who"] for x in split)
@@ -4409,7 +4418,8 @@ async def handle_writeoff_scan(request):
     """Списать бутылку по коду с крышки. body: {code, kind, photo, note?, day?, as?}
 
     Позицию, район и количество спрашивать не у кого: код знает, что это за
-    бутылка и где она числится, а одна крышка — это одна бутылка. Человеку
+    бутылка и где она числится, а одна крышка — это одна бутылка; у пива
+    наклейка стоит на коробке и несёт полкоробки (code_units). Человеку
     остаётся сказать, что с ней случилось, и показать это.
 
     Утеря сюда не ходит: чтобы отсканировать бутылку, надо держать её в руках,
@@ -4465,7 +4475,9 @@ async def handle_writeoff_scan(request):
     now = datetime.now(timezone.utc)
     wid = await db.writeoff_add({
         "at": now, "day": day, "item": pid, "thumb": thumb,
-        "name": p.get("name", ""), "qty": 1, "kind": kind,
+        # Сколько несёт код, а не единица: у пива единица журнала — коробка,
+        # и запись «1» снимала с остатка коробку при наклейке на половину.
+        "name": p.get("name", ""), "qty": code_units(doc, p), "kind": kind,
         "note": str(body.get("note") or "").strip()[:200],
         "district": district, "district_code": OFFICE_CODES.get(district, ""),
         "by": who, "by_id": int(request["owner_id"] or 0),
@@ -4658,7 +4670,7 @@ async def handle_writeoff_decide(request):
         виновный = (str(body.get("who") or "").strip()[:60]
                     or str(doc.get("by") or "").strip()[:60])
         сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
-                   else _comp_of(doc.get("item") or "", int(doc.get("qty") or 0), doc.get("kind", "")))
+                   else _comp_of(doc.get("item") or "", _num(doc.get("qty") or 0), doc.get("kind", "")))
         split = _split_parse(body)
         if split:
             виновный = ", ".join(x["who"] for x in split)
@@ -4782,7 +4794,7 @@ async def _writeoff_comp_tell(doc: dict):
     import pay_notify as _pn
     comp = doc.get("comp") or {}
     name = doc.get("name") or doc.get("item") or "товар"
-    qty = int(doc.get("qty") or 0)
+    qty = _num(doc.get("qty") or 0)          # у пива бывает полкоробки
     kind = doc.get("kind") or "списание"
     # Виноватых несколько — каждому его доля, а не общая сумма на всех.
     parts = comp.get("split") or ([{"who": comp.get("who"), "amount": comp.get("amount")}]
@@ -4813,11 +4825,12 @@ async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):
         from owner_routes import tg_edit_caption, OWNER_BOT_TOKEN
         cat = _catalog()
         p = cat.get(doc.get("item") or "") or {}
+        qty = _num(doc.get("qty") or 0)      # у пива бывает полкоробки
         base = wm.caption(doc.get("name", "") or p.get("name", ""),
-                          int(doc.get("qty") or 0), doc.get("kind", ""),
+                          qty, doc.get("kind", ""),
                           doc.get("by", ""), doc.get("district_code", ""),
                           doc.get("note", ""),
-                          round(_price(p) / max(1, _unit(p)) * int(doc.get("qty") or 0)))
+                          round(_price(p) / max(1, _unit(p)) * qty))
         kind = doc.get("kind", "")
         if kind == "отмена":
             base = wm.cancel_text(doc)

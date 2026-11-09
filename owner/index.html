@@ -27599,7 +27599,9 @@ function fbExpHtml(){
   if(!d) return c.err ? loadFail('accFinExp()') : '<div class="exp-empty">Загрузка…</div>';
   const items = d.items || [], rows = fbExpUnder(items, st.drv, st.kind);
   const sum = fbExpSum(rows);
-  const pend = rows.filter(e => e.status === 'pending' && !e.goods);
+  // Ждут решения — с бутылкой охране: плитка считает записи, по которым нет
+  // ответа, и их сумму, иначе «1 запись · 0 AED».
+  const pend = rows.filter(e => e.status === 'pending');
   const pendSum = pend.reduce((a, e) => a + e.signed, 0);
   // Чипы: у водителя — сумма при выбранной категории, у категории — при
   // выбранном водителе; кого в этом месяце нет — не показываем, кроме выбранного.

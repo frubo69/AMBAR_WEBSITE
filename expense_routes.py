@@ -226,7 +226,11 @@ def _day_row(d: dict, saved: dict) -> dict:
     extra_sum = sum(_signed(e) for e in extras if _status(e) == "approved" and not is_bottle(e))
     # безналом (владелец, 21 окт 2026: «добавь общую сумму расходов по карте»)
     card_sum = sum(_signed(e) for e in extras if _status(e) == "approved" and not is_bottle(e) and is_card(e))
-    pending = sum(_signed(e) for e in extras if _status(e) == "pending" and not is_bottle(e))
+    # Ждёт решения — всё, что ждёт, бутылка в том числе: это сумма записей, по
+    # которым старший ещё не ответил, а не деньги дня. Без бутылки карточка
+    # писала «1 расход ждёт решения · 0 AED», хотя у записи ниже стояла её
+    # закупочная цена (владелец, 10 ноя 2026: «почему пишет 0, хотя по факту 71»).
+    pending = sum(_signed(e) for e in extras if _status(e) == "pending")
     return {
         **d,
         "working": working,                 # None — ещё не отмечали
@@ -908,7 +912,9 @@ async def handle_month(request):
     money = [i for i in items if i["money"]]
     meal = sum(i["signed"] for i in money if i["kind"] == "meal")
     total = sum(i["signed"] for i in money)
-    pend = [i for i in items if i["status"] == "pending" and not i.get("goods")]
+    # Ждущее решения — с бутылкой охране, как в расходах дня: счёт записей и их
+    # сумма должны говорить об одном и том же.
+    pend = [i for i in items if i["status"] == "pending"]
     return web.json_response({
         "month": month, "from": start, "to": end, "today": _biz_day(),
         "drivers": drivers,

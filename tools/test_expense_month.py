@@ -12,7 +12,10 @@ mongomock + настоящая ручка GET /api/owner/expenses/month:
   • total сходится с расходами водителей в книге (finance_routes._spend) по
     тем же дням, extra — без питания, card — безнал; бутылка охране, заказ в
     долг, зарплата из выручки, отклонённое и ждущее — не деньги (money);
-  • pending — ждущее решения с суммой и числом, как в расходах дня;
+  • pending — ждущее решения с суммой и числом, как в расходах дня; бутылка
+    охране, пока ждёт, в сумме тоже (владелец, 10 ноя 2026: «почему пишет 0,
+    хотя по факту 71») — иначе «1 запись · 0 AED»; принятая бутылка деньгами
+    не становится;
   • люди — реестр в порядке районов плюс те, кого в реестре нет, но записи
     были (уехал до реестра);
   • миниатюр в ленте нет — только признак снимка; месяц мимо формы — текущий;
@@ -62,7 +65,9 @@ async def main():
             x("a4", "fuel", 60, pay="card", at="2026-11-02T10:00:00+00:00"),
             x("a5", "guard", 85, code="abs#000001", bottle="Absolut", bottle_id="absolut", at="2026-11-02T11:00:00+00:00"),
             x("a6", "owed_us", 300, "pending", nocash=True, auto=True, order="X1",
-              comment="#X1 · заказ в долг", at="2026-11-02T12:00:00+00:00")]},
+              comment="#X1 · заказ в долг", at="2026-11-02T12:00:00+00:00"),
+            x("a7", "guard", 71, "pending", by_driver="Водитель А", code="cor#000001", bottle="Corona Extra 0.355 bottle",
+              bottle_id="p43", comment="Менеджер", at="2026-11-02T13:00:00+00:00")]},
         {"day": D2, "driver": "Водитель Б", "working": True, "extras": [
             x("b1", "we_got", 40, at="2026-11-02T10:00:00+00:00"),
             x("b2", "other", 500, salary_of="s1", comment="Зарплата за октябрь", at="2026-11-02T11:00:00+00:00"),
@@ -83,15 +88,16 @@ async def main():
         st, d = await get("/api/owner/expenses/month", month=M)
         eq("ответ 200, месяц и границы", (st, d["month"], d["from"], d["to"]), (200, M, "2026-11-01", "2026-11-30"))
         it = {i["id"]: i for i in d["items"]}
-        eq("записей: 4 питания + 10 трат, соседних месяцев нет",
-           (d["n"], len(it), "o1" in it, "o2" in it), (14, 14, False, False))
+        eq("записей: 4 питания + 11 трат, соседних месяцев нет",
+           (d["n"], len(it), "o1" in it, "o2" in it), (15, 15, False, False))
         eq("новые сверху: первая запись — 3 ноября", d["items"][0]["day"], D3)
         eq("питание: по строке на отмеченный день, не отмечен — нет",
            sorted((i["driver"], i["day"], i["amount"]) for i in d["items"] if i["kind"] == "meal"),
            sorted([("Водитель А", D1, MEAL_ON), ("Водитель А", D2, MEAL_ON), ("Водитель Б", D2, MEAL_ON), ("Водитель В", D3, MEAL_OFF)]))
         meal = 3 * MEAL_ON + MEAL_OFF
         eq("итоги: всего / питание / разовые / безнал", (d["total"], d["meal"], d["extra"], d["card"]), (meal + 165, meal, 165, 60))
-        eq("ждут решения: парковка 20 и заказ в долг 300", (d["pending"], d["pending_n"]), (320, 2))
+        eq("ждут решения: парковка 20, заказ в долг 300 и бутылка охране 71 — число и сумма об одном",
+           (d["pending"], d["pending_n"]), (391, 3))
 
         print("── сходится с книгой месяца (_spend) ────────────────────────────")
         days = [f"2026-11-{n:02d}" for n in range(1, 31)]
@@ -110,6 +116,18 @@ async def main():
             a3["photo_ok"], a3["car_ok"], a3["by_driver"], a3["money"]),
            ("rejected", "2026-11-01T12:00", "2026-11-01T13:00", "Не видно мойки", True, True, "no", "no", True, False))
         eq("охрана бутылкой: товар, не деньги, название бутылки", (a5["goods"], a5["money"], a5["bottle"], a5["amount"]), (True, False, "Absolut", 85))
+        a7 = it["a7"]
+        eq("бутылка охране, пока ждёт: товар, не деньги, в ожидающих — да", (a7["status"], a7["goods"], a7["money"], a7["signed"]),
+           ("pending", True, False, 71))
+
+        print("── расходы дня: «ждёт решения» с бутылкой ──────────────────────")
+        st, dd = await get("/api/owner/expenses", day=D2)
+        ra = next(r for r in dd["drivers"] if r["name"] == "Водитель А")
+        eq("строка водителя: ждут заказ в долг 300 и бутылка 71, записей 2",
+           (st, ra["pending_sum"], ra["pending_count"]), (200, 371, 2))
+        eq("итоги дня: сумма и число ожидающих об одном", (dd["totals"]["pending"], dd["totals"]["pending_count"]), (371, 2))
+        eq("принятая бутылка 85 в расходы дня не идёт, ждущая — тоже", (ra["extra_sum"], ra["card_sum"], ra["total"]),
+           (60, 60, MEAL_ON + 60))
         eq("заказ в долг: ждёт, не деньги, nocash", (a6["status"], a6["money"], a6["nocash"], a6["auto"]), ("pending", False, True, True))
         eq("нам вернули: со знаком минус, деньги", (b1["signed"], b1["plus"], b1["money"]), (-40, True, True))
         eq("зарплата из выручки: не расход", (b2["salary"], b2["money"], b2["comment"]), (True, False, "Зарплата за октябрь"))

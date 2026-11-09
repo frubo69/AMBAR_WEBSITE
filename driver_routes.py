@@ -1559,11 +1559,12 @@ async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
         from owner_routes import notify_owners_photo
         # Цена продажная, «по прайсу»: закупочной система не знает, а выдумывать
         # себестоимость в сообщении о убытке — врать в цифре, по которой примут
-        # решение. Делим на единицу учёта: списывают бутылки, а пиво в прайсе
-        # стоит ящиком.
+        # решение. Прайс и количество — в одних учётных единицах: у пива это
+        # коробка, и списывают её половинами. Раньше прайс коробки делили на
+        # 24, как если бы количество считали банками, и полкоробки Corona
+        # выходили в 6 AED вместо 150 (владелец, 9 ноя 2026: «чини»).
         price = int(p.get("price_24_full") or p.get("price_full") or p.get("price") or 0)
-        unit = 24 if p.get("price_24_full") or p.get("price_12_full") else 1
-        aed = round(price / max(1, unit) * qty)
+        aed = round(price * qty)
         cap = wm.caption(p.get("name", ""), qty, kind, me["name"],
                          me.get("district_code") or "", note, aed)
         sent = await notify_owners_photo("stock.writeoff", cap, photo,
@@ -1781,7 +1782,8 @@ async def handle_writeoffs(request):
     rows = await db.writeoff_list(since=start, by=me["name"], limit=60)
     return web.json_response({"day": day, "rows": [{
         "id": r.get("_id"), "item": r.get("item"), "name": r.get("name", ""),
-        "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
+        # У пива бывает полкоробки: int() показывал её водителю нулём.
+        "qty": db._qn(r.get("qty") or 0), "kind": r.get("kind", ""),
         # Решение владельца водитель должен видеть у себя: пока списание висит
         # несогласованным, эти бутылки числятся за ним, и узнавать об этом в
         # конце смены поздно.

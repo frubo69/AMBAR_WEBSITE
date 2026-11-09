@@ -288,7 +288,8 @@ async def _held(day_from: str, day_to: str = "") -> list:
                 h["items"].append({
                     "id": r.get("_id"), "day": d, "amount": amount,
                     "name": r.get("name", "") or r.get("item", ""),
-                    "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
+                    # У пива бывает полкоробки: int() показывал её нулём.
+                    "qty": db._qn(r.get("qty") or 0), "kind": r.get("kind", ""),
                     "note": c.get("note", ""), "by": r.get("by", "")})
     return sorted(out.values(), key=lambda x: -x["amount"])
 

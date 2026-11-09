@@ -2668,6 +2668,51 @@ async def supply_of_day(day: str) -> dict:
         {"day": day, "kind": {"$ne": "extra"}}, sort=[("at", -1)]) or {}
 
 
+async def supply_of_order(days: list, since=None, until=None) -> dict:
+    """Основная поставка, заведённая по СОБРАННОЙ заявке (kind != extra), или {}.
+
+    days  — день закупки документа и день его смены. Поставка датируется днём
+            закупки (4 ноя 2026); до того — учётными сутками загрузки ответа,
+            и у ответа, загруженного до 10:00, это был день смены.
+    since — когда заявку собрали (frozen_at). Поставка, заведённая раньше, —
+            ответ на ПРОШЛУЮ заявку: её день закупки и есть день этой смены.
+            Без этой границы утром, пока магазин не ответил, новая заявка
+            показывала вчерашнюю поставку — «Приняли всё» и вчерашние числа
+            вместо того, что просим сегодня (владелец, 9 ноя 2026).
+    until — когда собрали следующую заявку: с этого момента ответ магазина
+            ложится уже на неё (supply_routes.answer_day берёт последний
+            высланный документ). Нужна старым дням, где две поставки стоят
+            под одним числом.
+    """
+    db = _db_or_none()
+    if db is None: return {}
+    days = [d for d in dict.fromkeys(days or []) if d]
+    if not days: return {}
+    since, until = _dt_aware(since), _dt_aware(until)
+    rows = await db.supplies.find({"day": {"$in": days}, "kind": {"$ne": "extra"}}) \
+                            .sort("at", -1).to_list(length=20)
+    for s in rows:
+        at = _dt_aware(s.get("at"))
+        if at and since and at < since:
+            continue                    # заведена до сборки этой заявки
+        if at and until and at >= until:
+            continue                    # заведена уже при следующей заявке
+        return s
+    return {}
+
+
+async def zayavka_frozen_after(day: str):
+    """Когда собрали следующую заявку после документа этого дня, или None."""
+    db = _db_or_none()
+    if db is None or not day: return None
+    rows = await db.zayavki.find({"_id": {"$gt": day}, "base": {"$exists": True}},
+                                 {"frozen_at": 1}).sort("_id", 1).to_list(length=3)
+    for doc in rows:
+        if isinstance(doc.get("_id"), str) and len(doc["_id"]) == 10:
+            return doc.get("frozen_at")
+    return None
+
+
 # ── коды, найденные водителем и не внесённые в реестр ───────────────────────
 # Водитель пикает мешки свободным сканером и натыкается на наклейку, которой в
 # учёте нет. Сам он её внести не может — позицию выбирает владелец (25 сен

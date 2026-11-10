@@ -21363,6 +21363,10 @@ async function accChecklist(keepDay){
   _setText('accTitle', 'Чек-лист смены');
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';
+  // Вернулись стрелкой из поставки или заявки: их кнопка в шапке («Отменить
+  // заявку») чек-листу не принадлежит — accOpen её снимает, стрелка сюда
+  // идёт мимо accOpen.
+  document.getElementById('accAct').innerHTML = '';
   if(!keepDay) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   else daySkel('accMid');            // листаем день — числа шиммерят на месте
   let _p = {};
@@ -21427,7 +21431,7 @@ function chkRender(){
   // пока требуют внимания — сделанное уходит, счёт в шапке считает всё.
   const видно = rows.filter(r => CK_ALWAYS.has(r.id) || r.state !== 'done');
   document.getElementById('accMid').innerHTML = ckDayBar() + head +
-    `<div class="ck-list">${видно.map(chkRow).join('')}</div>`;
+    `<div class="ck-list">${видно.map(r => chkRow(r, rows.indexOf(r))).join('')}</div>`;
 }
 const CK_ALWAYS = new Set(['shift', 'expenses', 'order_sent', 'cash']);
 
@@ -21443,7 +21447,10 @@ function ckDaySet(off){
   accChecklist(true);
 }
 
-function chkRow(r){
+// i — место строки в CKL.rows: нажатие ведёт в СВОЮ строку (свою приёмку,
+// свою заявку, свою просьбу), а не в первую с таким же id (10 ноя 2026:
+// открытых приёмок может быть несколько, и у каждой своя строка).
+function chkRow(r, i){
   const st = CK_ST[r.state] || CK_ST.soon;
   // Справа времени нет (владелец, 10 сен 2026: «убери отсюда время»): «к 21:00»
   // и «+9 мин» отнимали место у названия, а состояние и так говорит цвет
@@ -21453,7 +21460,7 @@ function chkRow(r){
   // квадрат слева повисал между подписью и плашкой, а «Не отправляли» под
   // «отправлена» читалось как состояние, а не как действие.
   const acts = chkRowAct(r);
-  return `<button class="ck-r ${st.c}${acts ? ' acts' : ''}" onclick="chkGo('${escS(r.go)}')">
+  return `<button class="ck-r ${st.c}${acts ? ' acts' : ''}" onclick="chkGo('${escS(r.go)}', ${i | 0})">
     <span class="ck-dot">${r.state === 'done'
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
@@ -21511,8 +21518,12 @@ const CK_GO = {
   shifts:    () => accOpen('shifts'),
   order:     () => accOpen('order'),
   // Открытая приёмка любого дня: строка ведёт в ту поставку, что не закрыта
-  // (sid в строке), а не в поставку дня чек-листа.
-  supply:    () => chkSupply(),
+  // (sid в строке), а не в поставку дня чек-листа; открытых несколько — у
+  // каждой своя строка, и каждая ведёт в свою (10 ноя 2026).
+  supply:    r => chkSupply(r),
+  // Свободная заявка Барракуде, которая ещё ждёт ответа магазина: строка
+  // ведёт в саму заявку — выслать файл, поправить состав, загрузить ответ.
+  free:      r => chkFree(r),
   short:     () => { ACC_VIEW = 'short'; cklSkin(false); accShort(); },
   qr:        () => accOpen('qr'),
   // Расход ждёт решения за любой день, не только за день чек-листа: строка
@@ -21529,12 +21540,12 @@ const CK_GO = {
   geo_lock:  () => chkGeoUnlock(),
   // Принято без кодов: строка ведёт прямо в район той поставки, где это
   // случилось, — и там уже кнопка «Сканировать».
-  noscan:    () => chkNoscan(),
+  noscan:    r => chkNoscan(r),
   // Просьба завершить без сканирования: в район той поставки, где решают.
-  finreq:    () => chkFinReq(),
+  finreq:    r => chkFinReq(r),
   // Остаток без кодов после приёмки: в «Внести / удалить товар» → район,
   // где видно, что за бутылки и откуда.
-  unscanned_left: () => chkUnscanned(),
+  unscanned_left: r => chkUnscanned(r),
   // Ревизия ждёт решения: строка ведёт прямо в её отчёт, где решение и
   // принимают. Решать нечего — просто на склад.
   audit:     () => chkAudit(),
@@ -21615,8 +21626,8 @@ async function audReportOpen(district, day, from){
   audReport(rep);
 }
 
-function chkNoscan(){
-  const r = (CKL && (CKL.rows || []).find(x => x.id === 'noscan')) || {};
+function chkNoscan(row){
+  const r = row || (CKL && (CKL.rows || []).find(x => x.id === 'noscan')) || {};
   const t = (r.tasks || [])[0];
   if(!t){ accOpen('supply'); return; }
   accOpen('supply-at');             // только раздел: поставку выбираем сами
@@ -21624,8 +21635,8 @@ function chkNoscan(){
   accSupply('who', t.district, t.supply_id);
 }
 
-function chkFinReq(){
-  const r = (CKL && (CKL.rows || []).find(x => x.id === 'fin_req')) || {};
+function chkFinReq(row){
+  const r = row || (CKL && (CKL.rows || []).find(x => x.id === 'fin_req')) || {};
   const t = (r.tasks || [])[0];
   if(!t){ accOpen('supply'); return; }
   accOpen('supply-at');             // только раздел: поставку выбираем сами
@@ -21633,19 +21644,31 @@ function chkFinReq(){
   accSupply('who', t.district, t.supply_id);
 }
 
-function chkUnscanned(){
-  const r = (CKL && (CKL.rows || []).find(x => x.id === 'unscanned_left')) || {};
+function chkUnscanned(row){
+  const r = row || (CKL && (CKL.rows || []).find(x => x.id === 'unscanned_left')) || {};
   const t = (r.tasks || [])[0];
   QR_WANT_IN = t ? t.district : null;
   accOpen('qr');
 }
 
-function chkSupply(){
-  const r = (CKL && (CKL.rows || []).find(x => x.id === 'supply_in')) || {};
+// row — нажатая строка: открытых приёмок может быть несколько, и каждая
+// строка ведёт в свою (10 ноя 2026); без строки — первая «Принятие поставки».
+function chkSupply(row){
+  const r = row || (CKL && (CKL.rows || []).find(x => x.id === 'supply_in')) || {};
   if(!r.sid){ accOpen('supply'); return; }
   accOpen('supply-at');             // только раздел: поставку выбираем сами
   ACC_VIEW = 'supply';
   accSupply('', '', r.sid);
+}
+
+// Свободная заявка без ответа магазина — в саму заявку; стрелка назад — в
+// чек-лист (xOpen с from 'checklist'), а не в список свободных заявок.
+function chkFree(row){
+  const r = row || (CKL && (CKL.rows || []).find(x => x.id === 'free_order')) || {};
+  if(!r.sid){ accOpen('order'); return; }
+  accOpen('supply-at');             // только раздел: заявку выбираем сами
+  ACC_VIEW = 'supply';
+  xOpen(r.sid, 'checklist');
 }
 
 async function chkGeoUnlock(){
@@ -22819,11 +22842,11 @@ async function crDistOk(day, aside, collected, collected_cr){
   crDistRender();
 }
 
-function chkGo(id){
+function chkGo(id, i){
   const fn = CK_GO[id];
   if(!fn) return;
   CKL_RETURN = true;
-  fn();
+  fn(((CKL && CKL.rows) || [])[i | 0]);
 }
 
 // Ручных галочек в пульте нет: всё, что он показывает, выводится из данных.
@@ -35007,7 +35030,10 @@ async function xOpen(sid, from){
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   await supLoad(sid);
   // Свободная заявка Барракуде живёт в своём списке (accFree), не в «Других базах».
-  ACC_BACK = X_FROM === 'short' ? () => accShort(SHORT_SID)
+  // Со строки чек-листа (from 'checklist') стрелка ведёт обратно в чек-лист
+  // (accBack по CKL_RETURN), а не в список, на котором не были.
+  ACC_BACK = X_FROM === 'checklist' ? null
+           : X_FROM === 'short' ? () => accShort(SHORT_SID)
            : (X_FROM === 'free' || (SUP_D && SUP_D.supply_id === sid && SUP_D.free_order)) ? accFree : accExtra;
 }
 

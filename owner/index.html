@@ -19124,7 +19124,7 @@ function audReport(rep){
       : '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v9"/><path d="M12 18.5v.5"/></svg>'}</div>
     <div class="aud-res-t">${allOk ? 'Всё сошлось' : 'Есть расхождения'}</div>
     <div class="aud-res-s">${escS(_dayName(rep.day))} · ${fmt(t.positions || 0)} ${
-      pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmt(t.scan_qty || 0)}</div>
+      pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmtQty(t.scan_qty || 0)}</div>
     ${a.finished_kind === 'driver' ? `<div class="aud-res-s">Провёл водитель ${escS(a.finished_by || '')}</div>` : ''}
     ${a.note ? `<div class="aud-res-note">«${escS(a.note)}»</div>` : ''}
     ${allOk ? '' : `<div class="aud-res-g">
@@ -19240,17 +19240,17 @@ function audDecide(){
   const a = rep.audit || {}, s = a.short, o = a.over;
   let html = '';
   if(s && !s.resolved_at){
-    html += `<div class="crw-ask-g">Недостача · ${fmt(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
+    html += `<div class="crw-ask-g">Недостача · ${fmtQty(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
       <div class="crw-ask-box">${
         _audRow(true, I_AUD_HOLD, 'Удержать с виновного', 'с кого и сколько',
                 s.aed ? fmt(s.aed) : '', 'AED', 'audHoldOpen()')}${
         _audRow(false, I_AUD_NONE, 'Без виновного', 'за счёт компании', '', '', 'audShortNone()')}</div>`;
   }
   if(o && !o.resolved_at){
-    html += `<div class="crw-ask-g">Излишки · ${fmt(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
+    html += `<div class="crw-ask-g">Излишки · ${fmtQty(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
       <div class="crw-ask-box">${
         _audRow(true, I_AUD_IN, 'Внести на район', `${rep.district_code} ${rep.district_name}`,
-                fmt(o.qty), 'бут', 'audOver()')}</div>`;
+                fmtQty(o.qty), 'бут', 'audOver()')}</div>`;
   }
   const al = a.alien_codes || rep.alien;
   if(al && al.left){
@@ -19313,7 +19313,7 @@ async function audOverUndo(){
 async function audShortNone(){
   const rep = STK.report, s = rep && rep.audit && rep.audit.short; if(!s) return;
   const ok = await askDialog('Списать без виновного?',
-    `${fmt(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')} · ${fmt(s.aed || 0)} AED за счёт компании`,
+    `${fmtQty(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')} · ${fmt(s.aed || 0)} AED за счёт компании`,
     'Списать', 'Вернуться назад');
   if(!ok) return;
   let r;
@@ -19327,7 +19327,7 @@ async function audShortNone(){
 async function audOver(){
   const rep = STK.report, o = rep && rep.audit && rep.audit.over; if(!o) return;
   const ok = await askDialog('Внести излишки на район?',
-    `${fmt(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')} · ${rep.district_code} ${rep.district_name}`,
+    `${fmtQty(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')} · ${rep.district_code} ${rep.district_name}`,
     'Внести', 'Не сейчас');
   if(!ok) return;
   let r;
@@ -19370,7 +19370,7 @@ async function audHoldOpen(){
       <div class="wo-c-body">
         <div class="wo-c-h">
           <div class="wo-c-t">Удержать за недостачу</div>
-          <div class="wo-c-s">${fmt(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')} · ${
+          <div class="wo-c-s">${fmtQty(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')} · ${
             s.aed ? `прайс ${fmt(s.aed)} AED` : 'цены в прайсе нет'}</div>
         </div>
         <div class="wo-c-l">С кого <i>можно нескольких</i></div>
@@ -19751,8 +19751,8 @@ function hstDistCard(d, list){
     const short = +last.short_qty || 0, over = +last.over_qty || 0;
     if(last.state === 'pending'){ итог = 'ждёт решения'; cls = 'dn'; }
     else if(!short && !over){ итог = 'всё сошлось'; cls = 'ok'; }
-    else if(short){ итог = `недостача ${fmt(short)} бут`; cls = 'dn'; }
-    else{ итог = `излишки ${fmt(over)} бут`; cls = 'warn'; }
+    else if(short){ итог = `недостача ${fmtQty(short)} бут`; cls = 'dn'; }
+    else{ итог = `излишки ${fmtQty(over)} бут`; cls = 'warn'; }
     итог = `${_hstDay(last.day)} · ${итог}`;
   }
   return `<div class="sc hst${open ? ' open' : ''}" id="hst-${escS(d.id)}">
@@ -19792,8 +19792,8 @@ function hstRow(a){
   if(!short && !over){ res = 'всё сошлось'; cls = 'ok'; }
   else{
     const p = [];
-    if(short) p.push(`недостача ${fmt(short)} бут · ${fmt(a.short_aed || 0)} AED`);
-    if(over) p.push(`излишки ${fmt(over)} бут`);
+    if(short) p.push(`недостача ${fmtQty(short)} бут · ${fmt(a.short_aed || 0)} AED`);
+    if(over) p.push(`излишки ${fmtQty(over)} бут`);
     res = p.join(' · '); cls = short ? 'dn' : 'warn';
   }
   const tail = [];
@@ -19804,8 +19804,8 @@ function hstRow(a){
         ? `удержано с ${a.short_who}${a.short_amount ? ' · ' + fmt(a.short_amount) + ' AED' : ''}`
         : 'за счёт компании');
     if(over && a.over_resolved){
-      if(a.over_moved) tail.push(`внесено на район ${fmt(a.over_moved)}`);
-      if(a.over_restored) tail.push(`возвращено в учёт ${fmt(a.over_restored)}`);
+      if(a.over_moved) tail.push(`внесено на район ${fmtQty(a.over_moved)}`);
+      if(a.over_restored) tail.push(`возвращено в учёт ${fmtQty(a.over_restored)}`);
     }
   }
   const meta = [a.finished_by || a.started_by || '', a.minutes != null ? _hstDur(a.minutes) : '']
@@ -19814,7 +19814,7 @@ function hstRow(a){
     <span class="hst-b"><b>${escS(_hstDay(a.day))}${meta ? `<s>${escS(meta)}</s>` : ''}</b>
       <i class="${cls}">${escS(res)}</i>${tail.length
         ? `<i class="${pend ? 'dn' : ''}">${escS(tail.join(' · '))}</i>` : ''}</span>
-    <span class="hst-v"><b>${fmt(a.scan_qty || 0)}<u>бут</u></b></span>
+    <span class="hst-v"><b>${fmtQty(a.scan_qty || 0)}<u>бут</u></b></span>
     <em>${_SC_CHEV}</em>
   </button>`;
 }
@@ -42686,7 +42686,7 @@ function nmSet(pid, d){
 function nmPatch(r){
   const el = document.getElementById('nm-' + r.id); if(!el) return;
   el.classList.toggle('fix', !!r.manual);
-  const v = el.querySelector('.nm-v'); if(v) v.textContent = fmt(r.norm);
+  const v = el.querySelector('.nm-v'); if(v) v.textContent = fmtQty(r.norm);
   const m = el.querySelector('.nm-m'); if(m) m.innerHTML = nmMeta(r);
   nmTotals();
 }

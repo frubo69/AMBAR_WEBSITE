@@ -927,6 +927,21 @@ async def handle_month(request):
     }, headers=CORS_HEADERS)
 
 
+def _at_of(v):
+    """Момент из записи расхода: строка ISO, как её пишет приложение (бывает и
+    datetime). Нет или кривая — None."""
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
 async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) -> None:
     """Списать бутылку, отданную охране. Молча ничего не делаем для всего
     остального: код есть только у этого вида расхода."""
@@ -941,10 +956,26 @@ async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) 
     несёт = stock_routes.code_units(
         await db.qr_get(code), stock_routes._catalog().get(str(item.get("bottle_id") or "")))
     now = datetime.now(timezone.utc)
+    # Списание ложится моментом, когда бутылка ушла с полки, — временем самого
+    # расхода (водитель отсканировал код, когда отдавал), а не временем решения
+    # старшего. Остаток района считается от пересчёта: снимок минус списания
+    # ПОСЛЕ его counted_at (stock_routes._district_base → db.writeoff_since).
+    # Ревизия между расходом и решением бутылку камерой уже не видит и пишет
+    # снимок без неё; списание временем решения ложилось ПОСЛЕ снимка, и
+    # остаток терял её второй раз (B4, 9–10 ноя 2026: полкоробки Corona отдали
+    # охране 9-го, снимок ревизии 10-го в 07:27 — 4,5, согласовали в 07:41 —
+    # числилось 4,0 при 4,5 на полке). Временем расхода оно ложится ДО снимка,
+    # и снимок его уже учёл; расход после снимка — списание после него,
+    # вычитается один раз, как и было. Снимок между расходом и решением —
+    # обычное дело: ревизию делают утром, расход согласовывают после неё.
+    # День записи — день расхода, как и был: лента списаний, «Расходы смены»
+    # и удержания считают по нему. Записи без момента (старые) — временем
+    # решения, как раньше.
+    ушла = _at_of(item.get("at")) or now
     wid = await db.writeoff_add({
         # Позиция обязательна: журнал вычитает со склада по ней, и запись без
         # неё честно лежит в истории, ничего при этом не вычитая.
-        "at": now, "day": day, "item": item.get("bottle_id") or "", "code": code,
+        "at": min(ушла, now), "day": day, "item": item.get("bottle_id") or "", "code": code,
         "name": item.get("bottle") or "", "qty": несёт, "kind": "охрана",
         "note": (item.get("comment") or "")[:200],
         "district": item.get("district") or "",
@@ -958,7 +989,8 @@ async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) 
         await db.writeoff_del(wid)
         log.warning(f"[expenses] бутылка {code} уже ушла — списание не записано")
         return
-    log.info(f"[expenses] охране отдана {item.get('bottle','')} · {code} · {day}")
+    log.info(f"[expenses] охране отдана {item.get('bottle','')} · {code} · {day}"
+             f" · списана {min(ушла, now).isoformat(timespec='minutes')}")
 
 
 @require_owner

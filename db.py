@@ -5997,6 +5997,31 @@ async def expense_by_code(code: str) -> dict | None:
         {"_id": 1})
 
 
+async def guard_pending_codes() -> list:
+    """Бутылки, отданные охране и ждущие решения старшего: [{code, bottle_id,
+    district, at, day, driver, id}]. Со склада такая уходит только при
+    согласовании (expense_routes._guard_bottle_gone); до него про неё знает
+    лишь запись расхода — ревизии района это нужно, чтобы не писать бутылку,
+    которую камера уже не видит, недостачей (stock_routes._audit_lines)."""
+    db = _db_or_none()
+    if db is None: return []
+    out = []
+    cur = db.driver_days.find(
+        {"extras": {"$elemMatch": {"kind": "guard", "status": "pending",
+                                   "code": {"$nin": [None, ""]}}}},
+        {"_id": 0, "day": 1, "driver": 1, "extras": 1})
+    async for d in cur:
+        for e in d.get("extras") or []:
+            code = str(e.get("code") or "").strip()
+            if (e.get("kind") or "") != "guard" or (e.get("status") or "") != "pending" or not code:
+                continue
+            out.append({"code": code, "bottle_id": str(e.get("bottle_id") or ""),
+                        "district": str(e.get("district") or "").strip(),
+                        "at": e.get("at") or "", "day": str(d.get("day") or ""),
+                        "driver": str(d.get("driver") or ""), "id": str(e.get("id") or "")})
+    return out
+
+
 async def expense_photo_set(item_id: str, photo: bytes, thumb: str = "") -> None:
     """Снимок чека к разовой трате. Лежит отдельно от самой записи: строку
     расхода читают каждый день, а картинку открывают раз.

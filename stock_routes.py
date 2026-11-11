@@ -2504,6 +2504,26 @@ def _gone_after(events: list, t, until=None) -> float:
                if at > t and (until is None or at <= until) and dq < 0)
 
 
+async def _guard_pending(district: str, cat: dict) -> dict:
+    """{позиция: [(момент расхода, единиц), …]} — бутылки района, отданные
+    охране и ждущие решения старшего. Единиц — сколько несёт код (у пива
+    наклейка — полкоробки). Код, который уже ушёл из реестра другим путём,
+    не в счёт: его в «числится» и так нет."""
+    out: dict = {}
+    for e in await db.guard_pending_codes():
+        doc = await db.qr_get(e["code"]) or {}
+        if (doc.get("status") or "active").strip() != "active":
+            continue
+        if (doc.get("district") or e.get("district") or "").strip() != district:
+            continue
+        pid = doc.get("product_id") or e.get("bottle_id") or ""
+        p, at = cat.get(pid), _dt_of(e.get("at") or "")
+        if not p or not at:
+            continue
+        out.setdefault(pid, []).append((at, float(code_units(doc, p))))
+    return out
+
+
 async def _audit_lines(district: str, day: str) -> tuple:
     """Строки ревизии: ожидается / увидела камера / разница — в бутылках.
 
@@ -2529,16 +2549,32 @@ async def _audit_lines(district: str, day: str) -> tuple:
     after = await _audit_after(district, min(when.values())) if when else {}
     cat = _catalog()
     await _loss_load()
+    # Отдано охране и ждёт решения старшего: с полки ушло, когда водитель
+    # отсканировал код, а из учёта уйдёт только при согласовании
+    # (expense_routes._guard_bottle_gone) — до него ни в снимке, ни в
+    # списаниях этого нет. Камера между расходом и решением бутылку не видит,
+    # и без зачёта ревизия писала её недостачей, а старший закрывал бы одну
+    # бутылку дважды: решением по недостаче и тем же согласованием (B4, 9–10
+    # ноя 2026: полкоробки Corona). Это ушедшее, пока позицию считали, —
+    # расход не позже её последнего скана; позже — бутылка стояла под
+    # камерой, и списание после снимка вычтет её само.
+    охрана: dict = {}
+    try:
+        охрана = await _guard_pending(district, cat)
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[audit] отданное охране не прочитано ({district}): {e}")
     lines = []
     for pid, p in cat.items():
         e = _num(exp.get(pid) or 0)                    # числится всего, единиц
         t = when.get(pid)
-        ушло = 0.0
+        ушло, охр = 0.0, 0.0
         if t:                                          # считали её в этот момент
             e = _num(_roll_back(e, after.get(pid), t))
             # Зачёт — только за то, что ушло, пока позицию ещё считали: от
             # первого её скана до последнего (владелец, 3 ноя 2026).
             ушло = _num(_gone_after(after.get(pid), t, spans[pid][1]))
+            охр = _num(sum(q for at, q in (охрана.get(pid) or ()) if at <= spans[pid][1]))
+            ушло = _num(ушло + охр)
         q = _num(noqr.get(pid) or 0)                   # из них без кодов
         q = _num(min(q, e))                            # без кодов не больше, чем всего
         c = _num(max(0, e - q))                        # видимых камере
@@ -2568,6 +2604,8 @@ async def _audit_lines(district: str, day: str) -> tuple:
             # Ушло всего, пока считали, — без потолка разницы: по нему поздняя
             # наклейка (_audit_adjust) пересчитывает зачёт заново.
             "went": _num(ушло),
+            # Из них отдано охране и ждёт решения старшего (часть went).
+            "guard": _num(охр),
             "loss": _loss_of(pid, d) if d > 0 else 0,  # закупка за пропавшие
             # Недостача удерживается по прайсу (правило владельца): это и
             # есть сумма в отчёте и в окне «Удержать за недостачу».
@@ -3057,7 +3095,7 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
         "result": {**tot, "scan_qty": int(stats.get("total") or 0), "counted": counted},
         "lines": [{"id": l["id"], "expected": l["expected"], "coded": l["coded"], "actual": l["actual"],
                    "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"],
-                   "went": l.get("went", 0)} for l in lines],
+                   "went": l.get("went", 0), "guard": l.get("guard", 0)} for l in lines],
         **(extra or {}),
     }
     # Сошлось и чужих кодов нет — закрыта сразу. Чужие коды — это бутылки без

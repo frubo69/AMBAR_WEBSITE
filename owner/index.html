@@ -17580,8 +17580,11 @@ function stkBack(){
   if(STK.view === 'sheet'){
     if(STK.sheetFrom === 'checklist' || STK.sheetFrom === 'link'){ STK.sheetFrom = ''; closeStock(); return; }
     stkAuditPick(); return; }
-  // История открывается и с плитки склада, и с карточки района — назад туда же.
-  if(STK.view === 'audits'){ if(STK.audFrom === 'pick') stkAuditPick(); else stkPicker(); return; }
+  // История открывается с плитки склада, с карточки района и из чек-листа
+  // (несколько ревизий ждут решения) — назад туда же.
+  if(STK.view === 'audits'){
+    if(STK.audFrom === 'checklist'){ closeStock(); return; }
+    if(STK.audFrom === 'pick') stkAuditPick(); else stkPicker(); return; }
   if(STK.view === 'moves' || STK.view === 'moves-hist' || STK.view === 'audit-pick'){ stkPicker(); return; }
   if(STK.view === 'pick') closeStock(); else stkPicker();
 }
@@ -21577,7 +21580,7 @@ function chkExpenses(){
 
 async function chkAudit(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'audit')) || {};
-  const t = (r.tasks || [])[0];
+  const tasks = r.tasks || [], t = tasks[0];
   // Чек-лист живёт в #accOv, склад — в #stkOv: слой у них один, а #accOv в
   // разметке позже, и отчёт открывался ПОД карточкой чек-листа — нажатие
   // выглядело пустым (владелец, 10 сен 2026: «не открывается, нажимаю назад —
@@ -21587,6 +21590,21 @@ async function chkAudit(){
   ACC_VIEW = null;
   CKL_RETURN = true;
   if(!t){ openStock(); return; }
+  // Решения ждут несколько ревизий — не проваливаемся в первую из них, а
+  // открываем историю ревизий: на ней видно все, и человек выбирает сам
+  // (владелец, 11 ноя 2026: «если решений по ревизиям несколько, переходить
+  // из чек-листа не сразу на какую-то одну ревизию, а на общую страницу, где
+  // можно выбрать»). Карточки районов, где ждут решения, раскрыты сразу.
+  // «Назад» с истории — в чек-лист (stkBack → closeStock по CKL_RETURN).
+  if(tasks.length > 1){
+    document.getElementById('stkOv').classList.add('show');
+    _navSave();
+    try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+    STK.hstOpen = {};
+    tasks.forEach(x => { if(x.district) STK.hstOpen[x.district] = true; });
+    await stkAudits(null, 'checklist');
+    return;
+  }
   await audReportOpen(t.district, t.day, 'checklist');
 }
 

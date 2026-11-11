@@ -3428,7 +3428,13 @@ async def handle_audit_short(request):
     wids = []
     for l in short.get("lines") or []:
         pid = l.get("id")
-        if pid not in cat or not int(l.get("qty") or 0):
+        # Количество строки — в учётных единицах, у пива в коробках, и
+        # полкоробки обычное дело: int() превращал 0,5 в ноль, и строка
+        # ровно в полкоробки решалась отчётом, а списанием не записывалась
+        # (на проде 11 ноя 2026: B2 Stella 0,5; B4 Budweiser банка, Corona,
+        # Stella по 0,5). Удержание при этом вешается на первое списание —
+        # у ревизии из одной такой строки его не было бы вовсе.
+        if pid not in cat or not _num(l.get("qty") or 0):
             continue
         wid = await db.writeoff_add({
             "at": now, "day": day, "item": pid, "thumb": "",

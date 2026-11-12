@@ -262,6 +262,18 @@ async def handle_stats(request):
     _t2 = _t.monotonic()
     unscanned_detail = {}
     unscanned, no_count = await unscanned_by_district(by_prod_dist, unscanned_detail)
+    # Принятое, но ещё без кодов — принятое без сканирования и остаток района,
+    # закрытого с разрешения старшего: на складе его нет (владелец, 12 ноя
+    # 2026), в долг реестра оно не попадает, а горит во «Внести QR коды».
+    # Карточка «Внести / удалить товар» и шапка её страницы считают его
+    # вместе с долгом реестра — одно число везде (12 ноя у хаба стояло
+    # «0 бут» при «1 без QR кода» на странице).
+    try:
+        import supply_routes as _sup
+        intake_left = await _sup.nocode_by_district()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[qr] принятое без кодов не посчитано: {e}")
+        intake_left = {}
 
     # Экран открывают у полки, с телефона, и ждут его молча. Если сборка
     # заняла больше секунды — пусть в журнале останется, на чём именно.
@@ -288,6 +300,8 @@ async def handle_stats(request):
         "unscanned": unscanned,
         "unscanned_by_product": unscanned_detail,
         "unscanned_total": sum(unscanned.values()),
+        "intake_left": intake_left,
+        "nocode_total": sum(unscanned.values()) + sum(intake_left.values()),
         "no_count": no_count,
         "added_shift": added_shift,
         "by_district": by_district,

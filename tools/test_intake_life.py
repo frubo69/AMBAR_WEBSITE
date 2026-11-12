@@ -10,8 +10,9 @@
 2. Случайные цепочки (скан, убрать, без сканирования, отчёт о недовозе,
    решение старшего, закрытие) и после КАЖДОГО шага — сверка с независимой
    моделью:
-     • склад района = пересчёт + коды этой приёмки + лежащее без кодов, где
-       «лежащее без кодов» = план − подтверждённый недовоз − принятое;
+     • склад района = пересчёт + коды этой приёмки; лежащее без кодов
+       (план − подтверждённый недовоз − принятое) на склад не идёт
+       (владелец, 12 ноя 2026), оно «без кода» — для заявки и «Внести»;
      • «заказано и не забрано» (его вычитает завтрашняя заявка) — то же число
        у района, который ещё принимают сканом, и ноль у остальных;
      • принятое не выше плана; сумма кодов = принятому;
@@ -185,14 +186,19 @@ async def scenarios():
     eq("принято без сканирования", (await sr.task_noscan(sid, "jvc", "Худоба")).get("ok"), True)
     eq("чек базы лёг рядом с задачей", (len(await db.supply_noscan_photo(sid, "jvc")) > 40,
        ((await db.supply_get(sid))["tasks"]["jvc"]).get("noscan_photo")), (True, True))
-    eq("товар на складе сразу", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    # Принятое без сканирования на склад не идёт, пока не отсканируют
+    # (владелец, 12 ноя 2026): склад растёт кодами, остальное — «без кода».
+    eq("на складе ничего нового — кодов нет", await stock("jvc"), base("jvc"))
+    eq("вся заявка — без кода", {p: n for (o, p), n in (await sr.nocode_qty()).items() if o == "jvc"}, PLAN["jvc"])
     eq("второй раз отметить нельзя", (await sr.task_noscan(sid, "jvc", "Худоба")).get("verdict"), "already")
     await scan_n(sid, "jvc", "p1", 2)
-    eq("досканировали часть — склад тот же", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    eq("досканировали 2 — склад вырос на 2", await stock("jvc"), base("jvc", p1=2))
+    eq("без кода стало на 2 меньше", (await sr.nocode_qty()).get(("jvc", "p1")), 1)
     await scan_n(sid, "jvc", "p1", 1); await scan_n(sid, "jvc", "p2", 2)
     r = [await scan(sid, "jvc", "p31") for _ in range(4)][-1]
     eq("последняя бутылка закрывает район сама", r.get("finished"), True)
-    eq("и склад не изменился", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    eq("всё отсканировано — склад по заявке, без кода ничего",
+       (await stock("jvc"), [k for k in await sr.nocode_qty() if k[0] == "jvc"]), (base("jvc", **PLAN["jvc"]), []))
 
     print("\nБез сканирования + «чего не дали» (ручной подсчёт у машины)")
     sid = await fresh()
@@ -200,17 +206,19 @@ async def scenarios():
                               [{"id": "p1", "qty": 2}, {"id": "p31", "qty": 0.5}], "не было")
     eq("отчёт принят", r.get("ok"), True)
     eq("и тут же принято без сканирования", (await sr.task_noscan(sid, "jvc", "Худоба")).get("ok"), True)
-    eq("пока старший молчит — склад по заявке", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    eq("пока старший молчит — склад не вырос, кодов нет", await stock("jvc"), base("jvc"))
+    eq("без кода — пока вся заявка", {p: n for (o, p), n in (await sr.nocode_qty()).items() if o == "jvc"}, PLAN["jvc"])
     r = await sr.short_decide(sid, "jvc", True, "STAR")
     eq("старший подтвердил", (r.get("ok"), r.get("finished")), (True, False))
-    eq("СКЛАД: того, чего не дали, на полке нет", await stock("jvc"),
-       base("jvc", p1=1, p2=2, p31=1.5))
+    eq("склад — кодов по-прежнему нет", await stock("jvc"), base("jvc"))
+    eq("БЕЗ КОДА: того, чего не дали, на полке нет",
+       {p: n for (o, p), n in (await sr.nocode_qty()).items() if o == "jvc"}, {"p1": 1, "p2": 2, "p31": 1.5})
     v = await task(sid, "jvc")
     eq("сканировать осталось только привезённое", (v["need"], v["left"]), (4.5, 4.5))
     await scan_n(sid, "jvc", "p1", 1); await scan_n(sid, "jvc", "p2", 2)
     r = [await scan(sid, "jvc", "p31") for _ in range(3)][-1]
     eq("досканировал привезённое — район закрылся сам", r.get("finished"), True)
-    eq("склад после закрытия тот же", await stock("jvc"), base("jvc", p1=1, p2=2, p31=1.5))
+    eq("склад после закрытия — по привезённому", await stock("jvc"), base("jvc", p1=1, p2=2, p31=1.5))
     s = await db.supply_get(sid)
     eq("недобор магазину — по заявке, а не по урезанному",
        {g["id"]: g["gap"] for g in s["tasks"]["jvc"]["gaps"]}, {"p1": 2, "p31": 0.5})
@@ -222,7 +230,8 @@ async def scenarios():
     r = await sr.short_decide(sid, "jvc", False, "STAR")
     eq("отклонён", (r.get("ok"), (r["task"]["short"] or {}).get("status")), (True, "no"))
     eq("план не тронут", (await task(sid, "jvc"))["need"], 7)
-    eq("склад по заявке", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    eq("склад — кодов нет, без кода вся заявка",
+       (await stock("jvc"), {p: n for (o, p), n in (await sr.nocode_qty()).items() if o == "jvc"}), (base("jvc"), PLAN["jvc"]))
     eq("решить второй раз нельзя", (await sr.short_decide(sid, "jvc", True, "STAR")).get("verdict"),
        "not_pending")
     r = await sr.short_report(sid, "jvc", "Худоба", "driver", [{"id": "p1", "qty": 1}], "точно нет")
@@ -484,6 +493,7 @@ async def check(m, sid, seed, step, trail):
             print("       …", t)
     s = await db.supply_get(sid)
     pend = await sr.pending_qty()
+    nocode = await sr.nocode_qty()
     for o in PLAN:
         t = s["tasks"][o]
         if bool(t.get("done_at")) != m.done[o]:
@@ -503,13 +513,17 @@ async def check(m, sid, seed, step, trail):
             if abs(sr._miss(t, p) - m.miss[o][p]) > 1e-9:
                 bad(f"{o}/{p}: недовоз", sr._miss(t, p), m.miss[o][p])
             rem = max(0.0, m.need_eff(o, p) - m.got[o][p])
-            want = COUNT[o].get(p, 0) + m.got[o][p] + (rem if m.noscan[o] and not m.done[o] else 0)
+            want = COUNT[o].get(p, 0) + m.got[o][p]
             if abs(st[p] - want) > 1e-9:
                 bad(f"склад {o}/{p}", st[p], want)
             wp = rem if (not m.noscan[o] and not m.done[o]) else 0
             gp = float(pend.get((o, p)) or 0)
             if abs(gp - wp) > 1e-9:
                 bad(f"заказано и не забрано {o}/{p}", gp, wp)
+            wn = rem if (m.noscan[o] and not m.done[o]) else 0
+            gn = float(nocode.get((o, p)) or 0)
+            if abs(gn - wn) > 1e-9:
+                bad(f"без кода на полке {o}/{p}", gn, wn)
         codes = await db._db.qr_codes.find({"supply_id": sid, "origin": o}).to_list(length=None)
         по = {}
         for c in codes:

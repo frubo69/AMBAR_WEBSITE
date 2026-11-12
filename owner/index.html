@@ -18522,6 +18522,7 @@ function stkFlowHtml(pid, day){
             : e.kind === 'writeoff' ? `Списание · ${escS(e.ref || '')}`
             : e.kind === 'count' ? (e.was != null ? `Ревизия · числилось ${fmtQty(e.was)}, насчитали ${fmtQty(e.ref || 0)}` : `Ревизия · насчитали ${fmtQty(e.ref || 0)}`)
             : e.kind === 'intake' || e.kind === 'rescan' ? `${STK_FLOW_T[e.kind]} · ${e.n} ${pluralize(e.n, 'код', 'кода', 'кодов')}`
+            : e.kind === 'noscan' ? `${STK_FLOW_T.noscan} · QR код не внесён ${fmtQty(e.n || 0)}`
             : e.kind === 'drop' || e.kind === 'relabel' || e.kind === 'found' ? `${STK_FLOW_T[e.kind]} · ${escS(e.ref || '')}`
             : STK_FLOW_T[e.kind] || e.kind;
     const когда = _hm(e.at) + (e.to && _hm(e.to) !== _hm(e.at) ? '–' + _hm(e.to) : '');
@@ -21054,7 +21055,10 @@ function accRender(){
     })(),
     // На плитке — не сколько внесено, а сколько ещё лежит мимо реестра: это
     // работа, а не справка.
-    qr:       [ACC_QR    ? fmtQty(ACC_QR.unscanned_total || 0) : null, 'бут'],
+    // Долг реестра плюс принятое, но ещё без кодов — то же число, что в
+    // чек-листе «QR код не внесён» (владелец, 12 ноя 2026: на карточке «0 бут»
+    // при «1 без QR кода» на странице).
+    qr:       [ACC_QR    ? fmtQty(ACC_QR.nocode_total != null ? ACC_QR.nocode_total : (ACC_QR.unscanned_total || 0)) : null, 'бут'],
     supply:   [ACC_SUP ? (ACC_SUP.open ? fmt(ACC_SUP.open.total_qty) : '—') : null,
                ACC_SUP && ACC_SUP.open
                  ? pluralize(ACC_SUP.open.total_qty,'бутылка','бутылки','бутылок')
@@ -30336,6 +30340,9 @@ function ordRender(){
   const hints = [];
   if(d.moving_qty) hints.push(`${fmtQty(d.moving_qty)} ед. переместят между районами`);
   if(d.pending_qty) hints.push(`${fmtQty(d.pending_qty)} ед. уже заказаны и ждут на базе`);
+  // Принято без сканирования или оставлено без кодов с разрешения старшего:
+  // на складе этого нет, а куплено — заявка вычла (владелец, 12 ноя 2026).
+  if(d.nocode_qty) hints.push(`${fmtQty(d.nocode_qty)} ед. приняты, QR код не внесён`);
   if(d.frozen_aed && !(d.norm_rule && (d.norm_rule.kind === 'snapshot' || d.norm_rule.kind === 'rule')))
     hints.push(`Норма выше спроса · на полке лишнего на ${fmt(d.frozen_aed)} AED`);
   const подсказки = hints.length && !общий

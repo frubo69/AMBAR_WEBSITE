@@ -5,7 +5,9 @@
   • карточка «Склад» = сумма остатков основы по районам;
   • долг «QR не внесён» района = Σ max(0, остаток − коды) по позициям;
   • ревизия: числится = остаток, кодовых = остаток − без кодов;
-  • заявка = ceil(норма − остаток) по клетке (правок нет).
+  • заявка = ceil(норма − остаток − без кода) по клетке (правок нет), где
+    «без кода» — принятое без сканирования, которое на склад не идёт, пока
+    не отсканируют (владелец, 12 ноя 2026).
 Настоящие db.* и настоящие функции stock_routes / qr_routes / supply_routes /
 stock_value; по одной позиции на поставку (items.$ у mongomock)."""
 import asyncio, os, sys, math
@@ -53,12 +55,13 @@ async def invariants(label):
             if l["expected"] or l["actual"]:
                 eq(f"[{label}] ревизия {oid} {l['id']}: числится = остаток", l["expected"], SR._num(h.get(l["id"], 0)))
                 eq(f"[{label}] ревизия {oid} {l['id']}: кодовых = остаток − без кодов", l["coded"], SR._num(max(0, l["expected"] - l["noqr"])))
-    o = await SR.order_rows(D); norms = await db.get_stock_norms()
+    o = await SR.order_rows(D); norms = await db.get_stock_norms(); nocode = await sr.nocode_qty()
     for r in o["all_rows"]:
         for oid in ("jvc", "silicon"):
             c = r["cells"][oid]; n = norms.get(f"{oid}:{r['id']}")
             if n is None: continue
-            want = int(math.ceil(round(max(0.0, float(n) - float(b[oid]["have_exact"].get(r["id"], 0))), 6)))
+            want = int(math.ceil(round(max(0.0, float(n) - float(b[oid]["have_exact"].get(r["id"], 0))
+                                           - float(nocode.get((oid, r["id"])) or 0)), 6)))
             if want or c["need"]:
                 eq(f"[{label}] заявка {oid} {r['id']} = ceil(норма − остаток)", c["need"], want)
 async def scan_code(sid, oid, pid, code, who="Худоба"):
@@ -96,13 +99,13 @@ async def main():
     for code in ("b1", "b2", "b3"): r = await scan_code("S2", "jvc", "p31", code)
     eq("приёмка пива: три кода по 0,5 → +1,5, осталось 0,5", (await have("jvc", "p31"), r["left"]), (3, 0.5))
     await invariants("после приёмки сканом")
-    # ── приём без сканирования: товар на складе сразу, кодов нет ────────────
+    # ── приём без сканирования: на склад не идёт, пока не отсканируют ───────
     await d.supplies.insert_one(supply("S3", "silicon", "p1", "Absolut", 4, T(130)))
     r = await sr.task_noscan("S3", "silicon", "Худоба", False)
-    eq("без сканирования: Силикон 5 + 4 = 9 сразу", (r.get("ok"), await have("silicon", "p1")), (True, 9))
-    u, _ = await QR.unscanned_by_district(None, {}); eq("долг без QR Силикон = 9 (кодов нет)", u["silicon"], 9)
+    eq("без сканирования: Силикон остаётся 5, четыре — «без кода»", (r.get("ok"), await have("silicon", "p1"), (await sr.nocode_qty()).get(("silicon", "p1"))), (True, 5, 4))
+    u, _ = await QR.unscanned_by_district(None, {}); eq("долг без QR Силикон = 5 (кодов нет)", u["silicon"], 5)
     for i in range(2): await scan_code("S3", "silicon", "p1", f"s{i}")
-    eq("досканировали 2 из 4: склад тот же 9, долг 7", (await have("silicon", "p1"), (await QR.unscanned_by_district(None, {}))[0]["silicon"]), (9, 7))
+    eq("досканировали 2 из 4: склад 7, долг 5, без кода 2", (await have("silicon", "p1"), (await QR.unscanned_by_district(None, {}))[0]["silicon"], (await sr.nocode_qty()).get(("silicon", "p1"))), (7, 5, 2))
     await invariants("после приёма без сканирования")
     # ── внесение кодов по пересчёту (cover) и новый товар (new) ─────────────
     for i in range(2): await db.qr_add(f"c{i}", "p1", "Absolut", "jvc", 1, T(140), "", extra={"src": "cover", "qty": 1, "origin": "jvc"})
@@ -114,7 +117,7 @@ async def main():
     await invariants("после внесения и удаления")
     # ── переезды: код сканом (qty кода) и руками полкоробки ─────────────────
     r = await SR.move_by_code("a0", "silicon", 1, "Худоба", "driver")
-    eq("переезд кода a0 JVC → Силикон: 9 и 10", (r["verdict"], await have("jvc", "p1"), await have("silicon", "p1")), ("ok", 9, 10))
+    eq("переезд кода a0 JVC → Силикон: 9 и 8", (r["verdict"], await have("jvc", "p1"), await have("silicon", "p1")), ("ok", 9, 8))
     await db.add_stock_transfer({"day": D, "from": "jvc", "to": "silicon", "product_id": "p31", "qty": 0.5, "at": iso(T(150))})
     eq("переезд полкоробки пива руками: 2,5 и 0,5", (await have("jvc", "p31"), await have("silicon", "p31")), (2.5, 0.5))
     await invariants("после переездов")
@@ -148,7 +151,7 @@ async def main():
     await invariants("после ревизии")
     # ── заявка: норма − остаток, пиво вверх до коробки ──────────────────────
     o = await SR.order_rows(D); rows = {r["id"]: r for r in o["all_rows"]}
-    eq("заявка JVC: Absolut 10 − 6 = 4; Heineken 2 − 2,5 → 0; Силикон Absolut 5 − 10 → 0", (rows["p1"]["cells"]["jvc"]["need"], rows["p31"]["cells"]["jvc"]["need"], rows["p1"]["cells"]["silicon"]["need"]), (4, 0, 0))
+    eq("заявка JVC: Absolut 10 − 6 = 4; Heineken 2 − 2,5 → 0; Силикон Absolut 5 − 8 − 2 без кода → 0", (rows["p1"]["cells"]["jvc"]["need"], rows["p31"]["cells"]["jvc"]["need"], rows["p1"]["cells"]["silicon"]["need"]), (4, 0, 0))
     print("ИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL[:6]}")
     sys.exit(1 if FAIL else 0)
 asyncio.run(main())

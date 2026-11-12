@@ -2327,11 +2327,12 @@ async def short_decide(sid: str, oid: str, ok: bool, who: str) -> dict:
 #
 # Просьба задачу не трогает: водитель может досканировать дальше, пока ждёт.
 # Разрешение закрывает район тем, что принято, а остаток записывает в
-# unscanned — он на полке, в недобор для магазина не идёт, склад держит его
-# как принятое без кодов (stock_routes._noscan_after), и «Внести / удалить
-# товар» показывает его с подписью, откуда он: день заявки, район, водитель,
-# кто разрешил. Досканировать остаток можно и после закрытия — тем же
-# task_scan, с полки.
+# unscanned — он на полке, в недобор для магазина не идёт, на складе его НЕТ,
+# пока не отсканируют (владелец, 12 ноя 2026: «на склад зачислять можно
+# только бутылки, которые уже отсканировали»; заявка вычитает его как
+# купленное — nocode_qty), и «Внести / удалить товар» показывает его с
+# подписью, откуда он: день заявки, район, водитель, кто разрешил.
+# Досканировать остаток можно и после закрытия — тем же task_scan, с полки.
 def _fin_view(fr):
     if not fr:
         return None
@@ -2692,24 +2693,20 @@ async def task_hold(sid: str, oid: str, me: str, tg_id: int, on: bool,
             "hold": {"who": me, "kind": kind, "at": str(now), "live": False, "mine": True}}
 
 
-async def intake_by_district(me: str = "") -> dict:
-    """Что принято без кодов и ещё не отсканировано — по районам, с задачами
-    и их строками. Этим живёт сектор «внести QR коды с незавершённого приёма»:
-    район без такого товара там серый, с товаром — число и кто сканирует."""
-    out = {oid: {"id": oid, "code": OFFICE_CODES.get(oid, ""),
-                 "name": OFFICE_NAMES.get(oid, oid), "left": 0, "need": 0, "got": 0,
-                 "tasks": [], "hold": {"who": "", "kind": "", "live": False, "mine": False}}
-           for oid in OFFICE_IDS}
-    # Кроме открытых поставок — закрытые, где остаток района разрешили
-    # оставить без кодов (владелец, 4 ноя 2026): он тоже «QR код не внесён»,
-    # с подписью, откуда он (finished + unscanned_*).
+async def _nocode_tasks(me: str = "") -> list:
+    """[(sid, sup, oid, задача, её вид)] — принято, но ещё без кодов: район,
+    принятый без сканирования и не закрытый, и район, закрытый с разрешения
+    старшего с остатком без кодов (владелец, 4 ноя 2026). Только с остатком;
+    в виде — строки с остатком, finished — закрыт ли. Отсюда сектор «внести
+    QR коды с незавершённого приёма», заявка и чек-лист «QR код не внесён»."""
     sups = await db.supplies_with_open_tasks(limit=12)
     seen = {s.get("_id") for s in sups}
     sups += [s for s in await db.supplies_unscanned(limit=20) if s.get("_id") not in seen]
+    out = []
     for sup in sups:
         sid = sup.get("_id")
         for oid, t in (sup.get("tasks") or {}).items():
-            if oid not in out or t.get("cancelled_at"):
+            if oid not in OFFICE_IDS or t.get("cancelled_at"):
                 continue
             uns = bool(t.get("unscanned_at")) and bool(t.get("done_at"))
             if not ((t.get("noscan_at") and not t.get("done_at")) or uns):
@@ -2719,13 +2716,64 @@ async def intake_by_district(me: str = "") -> dict:
                 continue
             v["lines"] = [l for l in v["lines"] if l["left"] > 0]
             v["finished"] = uns
-            d = out[oid]
-            d["tasks"].append(v)
-            d["left"] += v["left"]; d["need"] += v["need"]; d["got"] += v["got"]
-            if v["hold"]["live"] or v["hold"]["mine"]:
-                d["hold"] = v["hold"]
+            out.append((sid, sup, oid, t, v))
+    return out
+
+
+async def intake_by_district(me: str = "") -> dict:
+    """Что принято без кодов и ещё не отсканировано — по районам, с задачами
+    и их строками. Этим живёт сектор «внести QR коды с незавершённого приёма»:
+    район без такого товара там серый, с товаром — число и кто сканирует."""
+    out = {oid: {"id": oid, "code": OFFICE_CODES.get(oid, ""),
+                 "name": OFFICE_NAMES.get(oid, oid), "left": 0, "need": 0, "got": 0,
+                 "tasks": [], "hold": {"who": "", "kind": "", "live": False, "mine": False}}
+           for oid in OFFICE_IDS}
+    for _sid, _sup, oid, _t, v in await _nocode_tasks(me):
+        d = out[oid]
+        d["tasks"].append(v)
+        d["left"] += v["left"]; d["need"] += v["need"]; d["got"] += v["got"]
+        if v["hold"]["live"] or v["hold"]["mine"]:
+            d["hold"] = v["hold"]
     return {"districts": [out[o] for o in OFFICE_IDS],
             "now": datetime.now(timezone.utc).isoformat()}
+
+
+async def nocode_qty() -> dict:
+    """{(район, позиция): единиц} — принято, но ещё не внесено кодами:
+    принятое без сканирования и остаток района, закрытого с разрешения
+    старшего. На складе этого нет (владелец, 12 ноя 2026: «на склад зачислять
+    можно только бутылки, которые уже отсканировали и приёмку завершили…
+    если приняли без сканирования — эти бутылки не зачислять на склад»), а у
+    магазина оно уже куплено: заявка по норме вычитает его, как заказанное
+    и не забранное, — иначе купили бы дважды. Тот же список, что во «Внести
+    QR коды» (_nocode_tasks).
+
+    Район пересчитали после приёмки — пересчёт эти бутылки уже видел: они в
+    остатке по пересчёту и в долге реестра (qr_routes.unscanned_by_district),
+    их коды заводятся как cover (task_scan). Сюда такие не идут, иначе та же
+    бутылка вычиталась бы из заявки дважды и в «QR код не внесён» считалась
+    бы дважды."""
+    import stock_routes as _st
+    out, edges = {}, {}
+    for _sid, _sup, oid, t, v in await _nocode_tasks():
+        if oid not in edges:
+            cnt = await db.get_last_stock_count(oid, before_day=None)
+            edges[oid] = _st._dt_of((cnt or {}).get("counted_at") or "")
+        moment = _st._aware(t.get("noscan_at") or t.get("unscanned_at"))
+        if edges[oid] and moment and moment <= edges[oid]:
+            continue
+        for l in v["lines"]:
+            out[(oid, l["id"])] = out.get((oid, l["id"]), 0.0) + float(l["left"])
+    return out
+
+
+async def nocode_by_district() -> dict:
+    """{район: единиц} — то же, что nocode_qty, суммой по району: чек-лист
+    «QR код не внесён», карточка «Внести / удалить товар», шапка её страницы."""
+    out = {}
+    for (oid, _pid), n in (await nocode_qty()).items():
+        out[oid] = out.get(oid, 0.0) + n
+    return {o: _qn(n) for o, n in out.items()}
 
 
 async def intake_live() -> list:
@@ -2790,9 +2838,10 @@ async def pending_qty() -> dict:
     успели забрать Силикон, магазин его отложил и пробил слип, а заявка
     следующего дня собиралась попросить те же 86 единиц заново.
 
-    Принятое БЕЗ СКАНИРОВАНИЯ сюда не идёт: те бутылки уже на полке, их
-    прибавляет _noscan_after, и вычесть их вторым концом значит потерять их
-    дважды."""
+    Принятое БЕЗ СКАНИРОВАНИЯ сюда не идёт: те бутылки уже забрали, они на
+    полке. На складе их нет, пока не отсканируют (с 12 ноя 2026), и заявка
+    вычитает их отдельным слагаемым — nocode_qty; считать их ещё и здесь
+    значит вычесть дважды."""
     out = {}
     sups = list(await db.supplies_with_open_tasks(limit=12))
     # Свободная заявка Барракуде, высланная и ещё без ответа (владелец, 8 ноя

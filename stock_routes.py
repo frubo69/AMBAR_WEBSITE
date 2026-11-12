@@ -1092,50 +1092,19 @@ def base_drop():
     _BASE_AT.clear()
 
 
-async def _noscan_after(since: dict, until: datetime | None = None) -> dict:
-    """{район: {позиция: единиц}} — принято без сканирования после пересчёта
-    района и ещё не отсканировано: need − got по открытым задачам с noscan_at
-    позже counted_at. Отменённые и закрытые задачи не в счёт.
-
-    until — то же самое на прошедший момент (склад на начало смены): задача,
-    которую тогда уже приняли без сканирования и ещё не закрыли, отдаёт
-    need − отсканированное к тому моменту, а закрыта она сейчас или нет,
-    неважно."""
-    if until is not None:
-        return await _noscan_at(since, until)
-    out: dict = {}
-    # Район, закрытый с разрешения старшего без сканирования остатка
-    # (владелец, 4 ноя 2026), держит остаток на полке так же, как принятый
-    # без сканирования: задача уже done, поставка часто тоже, — такие поставки
-    # приходят из supplies_unscanned. Момент, с которого товар на полке, —
-    # noscan_at, если принимали без сканирования, иначе момент разрешения.
-    sups = await db.supplies_with_open_tasks(limit=12)
-    seen = {s.get("_id") for s in sups}
-    sups += [s for s in await db.supplies_unscanned(limit=20) if s.get("_id") not in seen]
-    for sup in sups:
-        for oid, t in (sup.get("tasks") or {}).items():
-            edge = since.get(oid)
-            if t.get("cancelled_at") or oid not in OFFICE_IDS:
-                continue
-            uns = bool(t.get("unscanned_at")) and bool(t.get("done_at"))
-            if not ((t.get("noscan_at") and not t.get("done_at")) or uns):
-                continue
-            ns = t.get("noscan_at") or t.get("unscanned_at")
-            ns_dt = ns if hasattr(ns, "tzinfo") else _dt_of(str(ns))
-            if ns_dt is not None and ns_dt.tzinfo is None:
-                ns_dt = ns_dt.replace(tzinfo=timezone.utc)
-            if edge and (ns_dt is None or ns_dt <= edge):
-                continue
-            for it in sup.get("items") or []:
-                need = float((it.get("by_district") or {}).get(oid) or 0)
-                got = float((it.get("got") or {}).get(oid) or 0)
-                # Подтверждённый недовоз на полке не лежит: его не привезли.
-                # Без этого район «принят без сканирования» держал на складе
-                # и то, чего магазин не дал (найдено прогоном 29 сен 2026).
-                rem = max(0.0, need - _task_miss(t, it.get("id")) - got)
-                if rem and it.get("id"):
-                    out.setdefault(oid, {})[it["id"]] = out.get(oid, {}).get(it["id"], 0) + rem
-    return out
+# Принятое без сканирования и остаток района, закрытого с разрешения старшего,
+# на склад НЕ идут (владелец, 12 ноя 2026: «на склад зачислять можно только
+# бутылки, которые уже отсканировали и приёмку завершили. Например, если
+# приняли без сканирования — эти бутылки не зачислять на склад»). С 17 сен по
+# 12 ноя здесь стояли _noscan_after / _noscan_at: need − got открытых задач с
+# noscan_at после пересчёта и остаток закрытых с unscanned_at прибавлялись к
+# остатку как «товар на полке без кодов» — и 12 ноя 2026 у B2 все 195 единиц
+# числились с минуты «принять без сканирования», а у B5 неотсканированная
+# бутылка легла на остаток в минуту разрешения. Теперь бутылка попадает в
+# остаток только кодом приёмки (db.intake_since, src intake); принятое и ещё
+# не внесённое кодами горит как «QR код не внесён» (supply_routes.nocode_qty:
+# заявка, чек-лист, «Внести / удалить товар»). Пересчёт, сделанный после такой
+# приёмки, бутылки на полке видит сам — и их коды заводятся как cover.
 
 
 def _task_miss(task: dict, pid, until=None) -> float:
@@ -1167,46 +1136,6 @@ def _aware(v):
     if d is not None and d.tzinfo is None:
         d = d.replace(tzinfo=timezone.utc)
     return d
-
-
-async def _noscan_at(since: dict, until: datetime) -> dict:
-    """Принятое без сканирования на прошедший момент until. Задачи смотрим
-    любые, не только открытые: закрытую сегодня вчера утром ещё досканировали.
-    Сколько к тому моменту отсканировали — по кодам самой поставки."""
-    out: dict = {}
-    for sup in await db.supply_list(limit=40):
-        sid = sup.get("supply_id") or sup.get("_id")
-        for oid, t in (sup.get("tasks") or {}).items():
-            if oid not in OFFICE_IDS:
-                continue
-            ns = _aware(t.get("noscan_at"))
-            if ns is not None and ns > until:
-                ns = None                   # тогда ещё сканировали или не начинали
-            # Закрыт с разрешения старшего без сканирования остатка: с момента
-            # разрешения остаток на полке без кодов, и закрытие задачи его не
-            # снимает — снимают только коды (их считает supply_codes_until).
-            ua = _aware(t.get("unscanned_at"))
-            if ua is not None and ua > until:
-                ua = None
-            moment = ns or ua
-            if moment is None:
-                continue
-            done, cancel = _aware(t.get("done_at")), _aware(t.get("cancelled_at"))
-            if cancel and cancel <= until:
-                continue                    # к тому моменту уже отменена
-            if done and done <= until and ua is None:
-                continue                    # к тому моменту уже закрыта
-            edge = since.get(oid)
-            if edge and moment <= edge:
-                continue                    # пересчёт после неё товар уже видел
-            got = await db.supply_codes_until(sid, oid, until)
-            for it in sup.get("items") or []:
-                pid = it.get("id")
-                need = float((it.get("by_district") or {}).get(oid) or 0)
-                rem = max(0.0, need - _task_miss(t, pid, until) - float(got.get(pid) or 0))
-                if rem and pid:
-                    out.setdefault(oid, {})[pid] = out.get(oid, {}).get(pid, 0) + rem
-    return out
 
 
 async def _moved_after(counts: dict, since: dict, until: datetime | None = None) -> dict:
@@ -1434,11 +1363,6 @@ async def _base_calc(day: str, until: datetime | None = None) -> dict:
         log.warning(f"[stock] переезды не учтены: {e}")
         moved = {}
     try:
-        noscan = await _noscan_after(since, until)
-    except Exception as e:
-        log.warning(f"[stock] принятое без сканирования не учтено: {e}")
-        noscan = {}
-    try:
         dropped = await _dropped_after(since, until)
     except Exception as e:
         log.warning(f"[stock] убранные из реестра не учтены: {e}")
@@ -1457,14 +1381,10 @@ async def _base_calc(day: str, until: datetime | None = None) -> dict:
         except Exception as e:
             log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
         for pid, n in came.items():
-            # Приёмка — в единицах: коробка пива — два кода по 0.5.
-            have[pid] = (have.get(pid) or 0) + n
-        # Принято без сканирования — товар на полке, кодов ещё нет. Он тоже на
-        # складе (владелец: «внёс — видно при любом раскладе»): не отсканированный
-        # остаток задачи прибавляем, а по мере сканирования он сам перетекает в
-        # приход по кодам (need − got + got = need). Задача старше пересчёта —
-        # её товар пересчёт уже видел, и её поздние сканы идут как cover.
-        for pid, n in (noscan.get(oid) or {}).items():
+            # Приёмка — в единицах: коробка пива — два кода по 0.5. Только
+            # кодами: принятое без сканирования и остаток, закрытый с
+            # разрешения старшего, в остаток не идут, пока их не отсканируют
+            # (владелец, 12 ноя 2026) — они горят как «QR код не внесён».
             have[pid] = (have.get(pid) or 0) + n
         # «Внести новый товар» — тоже приход: бутылку завели кодом руками,
         # значит она лежит на полке, и склад обязан её показать — даже там,
@@ -1649,7 +1569,7 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[stock] поставка дня не прочитана: {e}")
         _sup = {}
-    moving, leaving, waiting = {}, {}, {}
+    moving, leaving, waiting, nocode = {}, {}, {}, {}
     if not frozen_base:
         try:
             import move_routes
@@ -1664,6 +1584,15 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
             waiting = await _sup_mod.pending_qty()
         except Exception as e:                       # noqa: BLE001
             log.warning(f"[stock] заказанное и не забранное не прочитано: {e}")
+        # Принятое, но ещё без кодов — принятое без сканирования и остаток
+        # закрытого с разрешения района: на складе его нет (владелец, 12 ноя
+        # 2026), а куплено оно уже, и заявка вычитает его так же, как
+        # заказанное и не забранное.
+        try:
+            import supply_routes as _sup_mod
+            nocode = await _sup_mod.nocode_qty()
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[stock] принятое без кодов не прочитано: {e}")
     # Отправлена ли заявка магазину — отметка order_sent чек-листа ДНЯ ЗАКУПКИ:
     # её ставит старший («Отправил в магазин») или кнопка отправки файла в
     # приложении. order_skip — «сегодня не заказываем». Карточка «Закупки»
@@ -1681,6 +1610,7 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
         costs = {}
     rows, total_aed, total_qty, total_cost, moving_qty = [], 0, 0, 0.0, 0.0
     pending_qty = 0.0                 # заказано у магазина и ждёт водителя
+    nocode_qty = 0.0                  # принято, но ещё без кодов — на складе нет
     leaving_qty = 0.0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
@@ -1701,11 +1631,12 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
                 везут = _num(b.get("moving"))
                 уйдёт = _num(b.get("leaving"))
                 ждёт = _num(b.get("pending"))
+                без_кода = _num(b.get("nocode"))
                 calc = int(b.get("calc") or 0)
                 row_leave += int(b.get("leave_need") or 0)
                 пришло, ушло = _num(b.get("came")), _num(b.get("gone"))
             elif frozen_base:
-                have = sug = norm = везут = уйдёт = ждёт = calc = 0
+                have = sug = norm = везут = уйдёт = ждёт = без_кода = calc = 0
                 пришло = ушло = 0
             else:
                 d = per_district[oid]
@@ -1720,10 +1651,11 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
                 везут = _num(moving.get((oid, pid), 0))
                 уйдёт = _num(leaving.get((oid, pid), 0))
                 ждёт = _num(waiting.get((oid, pid), 0))
-                calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут - ждёт), 6)))
+                без_кода = _num(nocode.get((oid, pid), 0))
+                calc = int(math.ceil(round(max(0.0, norm - (have - уйдёт) - везут - ждёт - без_кода), 6)))
                 # Сколько заявка просит из-за того, что район отдаёт соседу:
                 # без перемещения этих единиц в клетке не было бы.
-                row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут - ждёт), 6)))
+                row_leave += calc - int(math.ceil(round(max(0.0, norm - have - везут - ждёт - без_кода), 6)))
                 пришло, ушло = _num(d["came"].get(pid) or 0), _num(d["gone"].get(pid) or 0)
             # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
             # которое предлагала программа, иначе непонятно, от чего отступили.
@@ -1736,6 +1668,7 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
             moving_qty += везут
             leaving_qty += уйдёт
             pending_qty += ждёт
+            nocode_qty += без_кода
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc, "off": oid in off,
                           # Сколько едет к району от соседа по заявке на
@@ -1747,6 +1680,9 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
                           # Сколько уже заказано у магазина и ждёт на базе:
                           # заявка это вычла, иначе купили бы дважды.
                           "pending": ждёт,
+                          # Сколько принято, но ещё без кодов: на складе этого
+                          # нет, а куплено — заявка это тоже вычла.
+                          "nocode": без_кода,
                           # Сколько из «есть» приехало уже после пересчёта и
                           # сколько с тех пор продали: владелец должен видеть,
                           # что число не с полки, а посчитанное.
@@ -1841,6 +1777,7 @@ async def order_rows(day: str = "", live: bool = False) -> dict:
         # Сколько уже заказано у магазина и ждёт на базе: заявка это
         # вычла, и на экране стоит строкой — иначе выглядит как сбой.
         "pending_qty": _num(pending_qty),
+        "nocode_qty": _num(nocode_qty),
         "leaving_qty": _num(leaving_qty), "leaving_need": leaving_need,
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
@@ -3847,8 +3784,6 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
         log.warning(f"[stock] лента: убранные коды не прочитаны: {e}")
     # коды: приёмка, cover, внесённые руками
     codes = await db.qr_codes_between(pid, start, end)
-    sids = {str(c.get("supply_id") or "") for c in codes if c.get("src") in ("intake", "cover") and c.get("supply_id")}
-    sups = {sid: (await db.supply_get(sid) or {}) for sid in sids}
     groups: dict = {}
     for c in codes:
         at = c.get("at")
@@ -3878,13 +3813,11 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
                                         "who": str(c.get("driver") or ""), "ref": ""})
         else:
             sid = str(c.get("supply_id") or "")
-            task = ((sups.get(sid) or {}).get("tasks") or {}).get(oid) or {}
-            ns = task.get("noscan_at")
-            ns = ns if isinstance(ns, datetime) else _dt_of(str(ns or ""))
-            if ns is not None and ns.tzinfo is None:
-                ns = ns.replace(tzinfo=timezone.utc)
-            # после отметки «без сканирования» код лишь закрывает долг по кодам
-            neutral = src == "cover" or (ns is not None and at >= ns)
+            # Код приёмки — приход, и после «принято без сканирования» тоже: на
+            # склад бутылка попадает только кодом (владелец, 12 ноя 2026).
+            # cover — код к бутылке, которую пересчёт уже видел: остаток не
+            # растёт, это «досканировано».
+            neutral = src == "cover"
             kind = "rescan" if neutral else "intake"
             key = (oid, kind, sid, str(c.get("driver") or ""))
             g = groups.setdefault(key, {"kind": kind, "at": at, "to": at, "qty": 0.0, "n": 0,
@@ -3895,7 +3828,9 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
             g["qty"] += q
     for (oid, *_), g in groups.items():
         put(oid, **g)
-    # принято без сканирования: план − недовоз − отсканированное к той минуте
+    # принято без сканирования: план − недовоз − отсканированное к той минуте.
+    # Остаток это не меняет (qty 0): бутылки без кодов на складе не числятся,
+    # пока их не отсканируют; сколько их — в n.
     try:
         import bizday as _bz
         since_day = (datetime.strptime(day, "%Y-%m-%d") - timedelta(days=5)).strftime("%Y-%m-%d")
@@ -3916,7 +3851,7 @@ async def _flow_events(day: str, pid: str, start: datetime, end: datetime, cat: 
                 before = await db.supply_codes_until(sid, oid, ns)
                 rem = max(0.0, need - _task_miss(t, pid) - float(before.get(pid) or 0))
                 if rem > 0:
-                    put(oid, kind="noscan", at=ns, qty=rem, who=str(t.get("noscan_by") or t.get("driver") or ""), ref=sid)
+                    put(oid, kind="noscan", at=ns, qty=0.0, n=rem, who=str(t.get("noscan_by") or t.get("driver") or ""), ref=sid)
     except Exception as e:                                       # noqa: BLE001
         log.warning(f"[stock] лента: без сканирования не прочитано: {e}")
     # переезды между районами

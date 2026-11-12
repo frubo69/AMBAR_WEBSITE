@@ -8,11 +8,13 @@
 
   • коды пива этой приёмки удаляются из реестра (копия — в файл);
   • принятое по строкам пива обнуляется, задача района снова открыта и
-    отмечена «принято без сканирования» — товар остаётся на складе
-    (need − got), а по мере сканирования перетекает в коды;
+    отмечена «принято без сканирования» — удалённые коды уходят со склада
+    на полку «без кода» (владелец, 12 ноя 2026: на складе только
+    отсканированное) и по мере сканирования возвращаются кодами;
   • водитель тот же — задача на нём; на последнем коде закрывается сама.
 
-После записи сверяется остаток района по этим позициям; разошёлся — откат.
+После записи сверяется остаток района по этим позициям: он должен упасть
+ровно на удалённые коды; разошёлся — откат.
 
 Запуск на сервере из /opt/ambar:
     PYTHONPATH=/opt/ambar venv/bin/python tools/rescan_beer_supply.py S260917-104601 bbay            # что будет
@@ -123,14 +125,21 @@ async def run(db, sr, qr, sid: str, oid: str, apply: bool, backup_dir: str = "/r
         say("заявку успели поменять — ничего не записано")
         return {"ok": False, "stop": ["race"], "backup": path}
     await d.qr_codes.delete_many({"_id": {"$in": [c["_id"] for c in p["codes"]]}})
+    # Удалённый код приёмки — это qty плюс intake_extra (вторая половина
+    # коробки у старых кодов пива), ровно так его считал intake_since.
+    gone = {}
+    for c in p["codes"]:
+        gone[c["product_id"]] = (gone.get(c["product_id"], 0.0) + float(c.get("qty") or 1)
+                                 + float(c.get("intake_extra") or 0))
     after = await snapshot(db, sr, qr, oid, pids)
     bad = {pid: (before["have"][pid], after["have"][pid]) for pid in pids
-           if round(before["have"][pid], 3) != round(after["have"][pid], 3)}
+           if round(before["have"][pid] - gone.get(pid, 0.0), 3) != round(after["have"][pid], 3)}
     if bad:
         say(f"СКЛАД РАЗОШЁЛСЯ {bad} — откатываю")
         await rollback(db, sr, path, say)
         return {"ok": False, "bad": bad, "backup": path}
-    say(f"после: склад {after['have']} (как был), в реестре {after['coded']}, долг района {after['debt']}")
+    say(f"после: склад {after['have']} (минус удалённые коды {gone}, они теперь «без кода»), "
+        f"в реестре {after['coded']}, долг района {after['debt']}")
     return {"ok": True, "backup": path, "before": before, "after": after, "codes": len(p["codes"])}
 
 

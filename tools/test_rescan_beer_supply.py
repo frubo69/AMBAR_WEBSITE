@@ -1,8 +1,9 @@
 """Пересканирование пива закрытой приёмки (tools/rescan_beer_supply.py) на
 mongomock с настоящими supply_routes.task_scan / tasks_for_driver /
-intake_by_district и stock_routes._district_base: склад района не сдвигается
-ни при открытии, ни по ходу сканирования, ни после; водка той же приёмки не
-тронута; водитель видит задачу у себя; на последнем коде задача и заявка
+intake_by_district и stock_routes._district_base: при открытии склад района
+падает ровно на удалённые коды (владелец, 12 ноя 2026: на складе только
+отсканированное), по ходу сканирования возвращается по полкоробки и в конце
+тот же, что был; водка той же приёмки не тронута; водитель видит задачу у себя; на последнем коде задача и заявка
 закрываются сами; откат возвращает как было; незакрытую задачу не трогаем."""
 import asyncio, os, sys, tempfile
 from datetime import datetime, timezone, timedelta
@@ -54,7 +55,8 @@ async def main():
     s = await db.supply_get("S1"); t = s["tasks"]["bbay"]
     eq("открыто: заявка open, задача без сканирования на Парвизе", (res["ok"], s["status"], t["done_at"], bool(t["noscan_at"]), t["driver"]), (True, "open", None, True, "Парвиз"))
     eq("коды пива удалены, водка осталась", sorted(c["_id"] for c in await d.qr_codes.find({}).to_list(10)), ["a1"])
-    eq("склад тот же: Heineken 12, Absolut 6", (await have("p31"), await have("p1")), (12, 6))
+    eq("склад упал на удалённые коды: Heineken 10, Absolut 6", (await have("p31"), await have("p1")), (10, 6))
+    eq("2 коробки — без кода, не на складе", (await sr.nocode_qty()).get(("bbay", "p31")), 2)
     lst = await sr.tasks_for_driver("Парвиз", "bbay")
     mine = [(v["supply_id"], v["left"], [(l["id"], l["left"]) for l in v["lines"] if l["left"]]) for v in lst["mine"]]
     eq("водитель видит у себя: осталось 2 коробки Heineken", mine, [("S1", 2, [("p31", 2)])])
@@ -70,8 +72,8 @@ async def main():
             L = await sr.intake_live()
             eq("статус после двух сканов: сканирует сейчас, 1 из 2, последний скан есть",
                (live(L), bool(L[0]["last_at"])), ([("S1", "live", "Парвиз", [("p31", 1, 2)])], True))
-    eq("4 кода по 0,5: склад всё время 12, на последнем задача закрылась сама", steps,
-       [(True, 0.5, 1.5, False, 12), (True, 1, 1, False, 12), (True, 1.5, 0.5, False, 12), (True, 2, 0, True, 12)])
+    eq("4 кода по 0,5: склад растёт по полкоробки до 12, на последнем задача закрылась сама", steps,
+       [(True, 0.5, 1.5, False, 10.5), (True, 1, 1, False, 11), (True, 1.5, 0.5, False, 11.5), (True, 2, 0, True, 12)])
     s = await db.supply_get("S1")
     eq("заявка снова принята", (s["status"], bool(s["tasks"]["bbay"]["done_at"])), ("done", True))
     L = await sr.intake_live()

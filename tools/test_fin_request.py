@@ -248,13 +248,17 @@ async def main():
     eq("водителю сказано", (len(ПИСЬМА), "разрешил" in ПИСЬМА[-1][1], "1 бутылка" in ПИСЬМА[-1][1]), (1, True, True))
     eq("старшим — итог приёмки с остатком", ("Завершена без сканирования: 1 бутылка" in СКАЗАНО[-1][1],
                                            "разрешил Старший" in СКАЗАНО[-1][1]), (True, True))
-    eq("СКЛАД: отсканированное + остаток на полке; недовоза нет", await stock("jvc"),
-       base("jvc", p1=30, p2=1, p31=2))
+    # На складе только отсканированное (владелец, 12 ноя 2026): остаток на
+    # полке без кодов не числится, он горит во «Внести» и вычитается из заявки.
+    eq("СКЛАД: только отсканированное; остаток без кодов не на складе, недовоза нет", await stock("jvc"),
+       base("jvc", p1=30, p2=1, p31=1))
+    eq("остаток — «без кода» для заявки и «Внести»", (await sr.nocode_qty()).get(("jvc", "p31")), 1)
+    eq("по районам: B1 — 1", await sr.nocode_by_district(), {"jvc": 1})
     st = await stock("jvc", until=ua - timedelta(seconds=1))
     # Сканы и решение легли в одну секунду — смотрим только то, что без кодов.
     eq("склад на момент ДО решения — остатка без кодов ещё нет", st["p31"], 3.0)
-    eq("склад на момент ПОСЛЕ решения — с остатком",
-       await stock("jvc", until=ua + timedelta(seconds=1)), base("jvc", p1=30, p2=1, p31=2))
+    eq("склад на момент ПОСЛЕ решения — тоже без остатка, только коды",
+       await stock("jvc", until=ua + timedelta(seconds=1)), base("jvc", p1=30, p2=1, p31=1))
     eq("в журнале: просьба, отказ, просьба, разрешение, закрытие без сканирования",
        [e["kind"] for e in (await supply_log.timeline(sid))["events"]
         if e["kind"] in ("fin_req", "fin_ok", "fin_no", "done_unscanned", "done")],
@@ -295,18 +299,20 @@ async def main():
     eq("чужой водитель не может", (await scan(sid, "jvc", "p2", who="Кто-то")).get("verdict"), "not_mine")
     r = await scan(sid, "jvc", "p31", who="Старший", owner=True)
     eq("старший с полки вносит код", (r.get("ok"), r.get("finished")), (True, False))
-    eq("код лёг как cover — склад не вырос", await stock("jvc"), base("jvc", p1=30, p2=1, p31=2))
+    eq("код с полки — приход, склад вырос на полкоробки", await stock("jvc"), base("jvc", p1=30, p2=1, p31=1.5))
+    eq("без кода осталось полкоробки", (await sr.nocode_qty()).get(("jvc", "p31")), 0.5)
     eq("остаток уменьшился — код банок Heineken это полкоробки", (await task(sid, "jvc"))["left"], 0.5)
     # Сверх подтверждённого недовоза, но в пределах заявки — нашедшаяся
     # бутылка, как в открытой приёмке: принимается и растит склад.
     eq("нашедшаяся сверх недовоза принимается", (await scan(sid, "jvc", "p2", who="Старший", owner=True)).get("verdict"), "taken")
-    eq("и она — приход, склад вырос", await stock("jvc"), base("jvc", p1=30, p2=2, p31=2))
+    eq("и она — приход, склад вырос", await stock("jvc"), base("jvc", p1=30, p2=2, p31=1.5))
     r = await scan(sid, "jvc", "p31")
     eq("последняя бутылка — остаток внесён", (r.get("ok"), r.get("finished")), (True, True))
     s = await db.supply_get(sid)
     eq("поставка больше не держит район", (s.get("unscanned_open"), bool(s["tasks"]["jvc"].get("unscanned_done_at"))),
        ([], True))
-    eq("склад тот же", await stock("jvc"), base("jvc", p1=30, p2=2, p31=2))
+    eq("склад: остаток внесён кодами — по заявке", await stock("jvc"), base("jvc", p1=30, p2=2, p31=2))
+    eq("без кода ничего", (await sr.nocode_qty()).get(("jvc", "p31")), None)
     eq("в «незавершённом приёме» района нет", next(x for x in (await sr.intake_by_district(DRV["jvc"]))["districts"] if x["id"] == "jvc")["tasks"], [])
     eq("строки чек-листа нет", "unscanned_left" in await checklist_rows(), False)
     eq("в закрытую больше не сканируют — поставка done", (await scan(sid, "jvc", "p1")).get("verdict"), "no_supply")
@@ -360,10 +366,16 @@ async def main():
     tk = _find(lst)["tasks"]["jvc"]
     eq("список поставок для хаба: принято без сканирования, отсканировано 31 из 34",
        (bool(tk["noscan_at"]), tk["got_units"], tk["need_units"]), (True, 31, 34))
-    eq("склад до решения — по заявке", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    # Принятое без сканирования на склад не идёт (владелец, 12 ноя 2026):
+    # числится только то, что отсканировали, остальное — «без кода».
+    eq("склад до решения — только отсканированное", await stock("jvc"), base("jvc", p1=30, p2=1))
+    eq("без кода до решения: что не отсканировано", {p: n for (o, p), n in (await sr.nocode_qty()).items() if o == "jvc"},
+       {"p2": 1, "p31": 2})
     r = await sr.fin_decide(sid, "jvc", True, "Старший")
     eq("разрешено", (r.get("ok"), r.get("finished")), (True, True))
-    eq("склад после — тот же, товар и так был на полке", await stock("jvc"), base("jvc", **PLAN["jvc"]))
+    eq("склад после — тот же, остаток так и без кодов", await stock("jvc"), base("jvc", p1=30, p2=1))
+    eq("без кода после решения — то же", {p: n for (o, p), n in (await sr.nocode_qty()).items() if o == "jvc"},
+       {"p2": 1, "p31": 2})
     eq("остаток — то, что без кодов", (await db.supply_get(sid))["tasks"]["jvc"].get("unscanned"), {"p2": 1, "p31": 2})
 
     print("\nИтог:", "FAIL " + ", ".join(FAIL) if FAIL else "всё прошло")

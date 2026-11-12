@@ -146,7 +146,6 @@ async def остаток(cat):
     sold = await sr._sold_after(since, None)
     broken = await db.writeoff_since(since, until=None)
     moved = await sr._moved_after(counts, since, None)
-    noscan = await sr._noscan_after(since, None)
     sr.base_drop()
     base = await sr._district_base(sr._biz_day())
     минус = []
@@ -156,8 +155,8 @@ async def остаток(cat):
         manual = {pid: ats for pid, ats in (await db.qr_manual_events(oid, since[oid])).items() if pid in cat}
         for pid, n in came.items():
             сырой[pid] = сырой.get(pid, 0) + n
-        for pid, n in (noscan.get(oid) or {}).items():
-            сырой[pid] = сырой.get(pid, 0) + n
+        # Принятое без сканирования на склад не идёт, пока не отсканируют
+        # (владелец, 12 ноя), поэтому здесь только коды приёмок.
         for pid in set(sold.get(oid) or {}) | set(manual) | set(moved.get(oid) or {}):
             ev = [(-q) for _, q in ((sold.get(oid) or {}).get(pid) or [])]
             ev += [q for _, q in (manual.get(pid) or [])]

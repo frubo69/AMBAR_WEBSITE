@@ -14,7 +14,8 @@
     расходятся ни на полкоробки); scanned задачи = число её кодов;
   • убранный код исчез из реестра и снова принимается;
   • раз в несколько шагов — склад района (_district_base): пересчёт + коды
-    прихода + неотсканированное «без сканирования» — ровно как в модели;
+    прихода — ровно как в модели; неотсканированное «без сканирования» на
+    склад не идёт (владелец, 12 ноя 2026), оно «без кода» (nocode_qty);
   • после закрытия района — недобор по строкам = план − принято, и в итоге
     приёмки старшему названы убранные позиции.
 
@@ -211,17 +212,22 @@ async def check_db(m, seed, step, trail):
 async def check_stock(m, seed, step, trail):
     """Склад района — тем же расчётом, что карточка «Склад» и заявка."""
     base = await SR._district_base(DAY)
+    nocode = await sr.nocode_qty()
     for o in PLAN:
         have = (base.get(o) or {}).get("have_exact") or {}
         for pid in PLAN[o]:
             want = COUNT[o].get(pid, 0)
             want += sum(d["qty"] for c, d in m.codes.items()
                         if d["supply"] == m.sid and d["origin"] == o and d["pid"] == pid)
-            if m.noscan[o] and not m.done[o]:
-                want += max(0.0, PLAN[o][pid] - m.got[o][pid])
             got = float(have.get(pid, 0))
             if abs(got - want) > 1e-9:
                 fail(seed, step, f"склад {o}/{pid}", got, want, trail)
+            # Принятое без сканирования лежит на полке без кодов: не на складе,
+            # а «без кода» — для заявки и «Внести» (владелец, 12 ноя 2026).
+            wn = max(0.0, PLAN[o][pid] - m.got[o][pid]) if (m.noscan[o] and not m.done[o]) else 0.0
+            gn = float(nocode.get((o, pid)) or 0)
+            if abs(gn - wn) > 1e-9:
+                fail(seed, step, f"без кода {o}/{pid}", gn, wn, trail)
 
 
 async def run_seed(seed):

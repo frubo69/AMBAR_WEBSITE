@@ -31954,10 +31954,13 @@ function qrInRows(){
     if(есть && h.live){ sub = `${h.who} вносит · ${fmtQty(x.got)} из ${fmtQty(x.need)}`; cls = 'warn'; }
     else if(есть){
       const кто = [...new Set((x.tasks || []).map(t => t.noscan_by || t.unscanned_by || t.driver).filter(Boolean))].join(', ');
-      // Все задачи района — закрытые с разрешения старшего без сканирования
-      // остатка: так и пишем; вперемешку с принятым без сканирования — общее.
+      // Все задачи района — закрытые с разрешения старшего с остатком без
+      // кодов: «приёмка закрыта», а сколько не внесено — число справа (владелец,
+      // 12 ноя 2026, про «закрыта без сканирования» при одном коде из 223: «не
+      // отсканировали только 1 процент»); вперемешку с принятым без
+      // сканирования — общее.
       const fin = (x.tasks || []).filter(t => t.finished).length;
-      sub = `${fin && fin === (x.tasks || []).length ? 'приёмка завершена без сканирования' : 'без сканирования'}${кто ? ' · ' + кто : ''}`;
+      sub = `${fin && fin === (x.tasks || []).length ? 'приёмка закрыта' : 'без сканирования'}${кто ? ' · ' + кто : ''}`;
     }
     const жив = есть || лист > 0;
     const go = есть ? `onclick="qrIntake('${d.id}')"` : лист ? `onclick="qrCover('${d.id}')"` : 'disabled';
@@ -32149,9 +32152,10 @@ async function qrIntake(district, тихо){
     ? 'Вчерашняя заявка' : 'Заявка от ' + _dayName(t.day)) + (t.extra && t.base ? ' · ' + t.base : '');
   // Откуда бутылки (владелец, 4 ноя 2026: «должно быть понятно, что это за
   // бутылка и откуда она взялась»): заявка какого дня, кто принимал, и если
-  // район закрыли без сканирования остатка — кто просил и кто разрешил.
+  // район закрыли с остатком без кодов — сколько не отсканировано, кто просил
+  // и кто разрешил.
   const откуда = t => t.finished
-    ? `${заявка(t)} · завершена без сканирования · ${t.unscanned_by || t.driver || ''}${
+    ? `${заявка(t)} · закрыта · не отсканировано ${fmtQty(t.left)} · ${t.unscanned_by || t.driver || ''}${
         t.unscanned_ok_by ? ' · разрешил ' + t.unscanned_ok_by + (t.unscanned_at ? ' ' + _hm(t.unscanned_at) : '') : ''}`
     : `${заявка(t)} · принята без сканирования · ${t.noscan_by || t.driver || ''}`;
   const body = QR_IN.tasks.map((t, ti) => `${many || t.finished || t.noscan_at
@@ -32202,12 +32206,11 @@ function _ilSum(t){
   return {need, got, cn, cg, pct: need ? Math.min(100, Math.round(got / need * 100)) : 0,
           u: beer === L.length ? 'кор' : beer ? 'ед.' : 'бут'};
 }
-// Район закрыт с разрешения старшего без сканирования остатка: пока никто не
-// сканирует, состояние — не «ждёт начала», а это.
-function _ilSt(t){
-  if(t.unscanned && (t.status === 'wait' || t.status === 'pause')) return ['закрыта без сканирования', 'warn'];
-  return IL_ST[t.status] || IL_ST.wait;
-}
+// Здесь только приёмки «без сканирования», которые досканируют; район,
+// закрытый с разрешения старшего с остатком без кодов, сервер сюда не отдаёт
+// (владелец, 12 ноя 2026: «не выноси приёмки вот сюда в обзор») — его остаток
+// в чек-листе и во «Внести QR коды».
+const _ilSt = t => IL_ST[t.status] || IL_ST.wait;
 function _ilWhen(t){
   if(t.status === 'done') return t.done_at ? `в ${_hmDubai(t.done_at)}` : '';
   if(t.last_at) return `скан ${_hmDubai(t.last_at)}`;
@@ -35110,13 +35113,15 @@ function xSupRender(d){
     // Принято без кодов — своё состояние между «везёт» и «принято»: товар на
     // полке, задача открыта, пока всё не отсканируют.
     const ns = !t.done_at && !!t.noscan_at;
-    // Закрыт с разрешения старшего без сканирования остатка (владелец, 4 ноя
-    // 2026): остаток на полке без кодов, пока он есть — карточка жёлтая, как
-    // у принятого без сканирования, и в ней кнопка «Сканировать».
+    // Закрыт с разрешения старшего с остатком без кодов (владелец, 4 ноя
+    // 2026): пока остаток есть — карточка жёлтая, как у принятого без
+    // сканирования, и в ней кнопка «Сканировать». В подписи — сколько не
+    // отсканировано, не «без сканирования» (владелец, 12 ноя 2026: «не
+    // отсканировали только 1 процент»); внесли всё — «принято».
     const uns = !!t.done_at && !!t.unscanned_at && !t.cancelled_at;
     const who = (draft || wait) ? `${(t.lines || []).length} ${pluralize((t.lines || []).length,'позиция','позиции','позиций')}`
               : t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
-              : uns ? `завершена без сканирования · ${_hm(t.done_at)}${t.unscanned_ok_by ? ' · разрешил ' + escS(t.unscanned_ok_by) : ''}`
+              : uns ? `${t.left ? 'не отсканировано ' + fmtQty(t.left) : 'принято'} · ${_hm(t.done_at)}${t.unscanned_ok_by ? ' · разрешил ' + escS(t.unscanned_ok_by) : ''}`
               : t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
               : ns ? `без сканирования · ${escS(t.noscan_by || t.driver)} · ${_hm(t.noscan_at)}`
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
@@ -35168,7 +35173,7 @@ function xSupRender(d){
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
           <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
-            t.left && (t.driver || t.done_at || ns) ? ` · ${uns || (ns && !t.done_at) ? 'не отсканировано' : t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}` : ''}</span>
+            t.left && !uns && (t.driver || t.done_at || ns) ? ` · ${ns && !t.done_at ? 'не отсканировано' : t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}` : ''}</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>${open ? `<div class="xs-fold-b">${list}${
           foldEnd(rows.length, `xSupToggle('${escS(t.district)}', 1)`)}</div>` : ''}`}
@@ -36200,8 +36205,10 @@ function supHistRow(x){
 // из плана; по нажатию — взял / начал / закрыл, кто сколько отсканировал,
 // убранное из приёмки, недовоз и позиции. Данные — /api/owner/supply/intake/history.
 let IH = null;
+// unscanned — закрыта с разрешения старшего, остаток ещё без кодов: слово со
+// счётом, «не отсканировано N», ставит intHistRow (владелец, 12 ноя 2026, про
+// «закрыта без сканирования» при одном коде из 223).
 const IH_ST = {done: ['', ''], short: ['недобор', 'warn'], noscan: ['без сканирования', 'warn'],
-               unscanned: ['закрыта без скана', 'warn'],
                live: ['в работе', 'live'], taken: ['взял, не начал', ''], cancelled: ['отменён', 'dn']};
 async function intHistory(){
   // Приёмки — вкладка страницы «История» (см. accHistory).
@@ -36244,7 +36251,7 @@ function intHistRow(r){
   const начало = r.started_at || r.claimed_at;
   const конец = r.done_at || r.cancelled_at || r.last_at || r.noscan_at;
   const когда = начало ? _hm(начало) + (конец && _hm(конец) !== _hm(начало) ? ' → ' + _hm(конец) : '') : '';
-  const [слово, кл] = IH_ST[r.status] || ['', ''];
+  const [слово, кл] = r.status === 'unscanned' ? [`не отсканировано ${fmtQty(r.left)}`, 'warn'] : IH_ST[r.status] || ['', ''];
   const vcls = r.status === 'cancelled' ? 'dn' : (r.status === 'short' || r.status === 'noscan') ? 'warn'
              : r.status === 'taken' ? 'dim' : '';
   return `<div class="ih-p">
@@ -36283,7 +36290,7 @@ function intHistDetail(r){
     t.push(row(st[1], `Просьба завершить без сканирования · ${escS(r.fin_req.by || '—')} · ${st[0]}${
       r.fin_req.decided_by ? ' · ' + escS(r.fin_req.decided_by) : ''}${r.fin_req.note ? ' · «' + escS(r.fin_req.note) + '»' : ''}`, fmtQty(n)));
   }
-  if(r.unscanned_at) t.push(row('warn', `Закрыта без сканирования · ${escS(r.unscanned_by || '—')} · разрешил ${escS(r.unscanned_ok_by || '—')} · без кодов ${fmtQty(r.unscanned_qty || 0)}`, _hm(r.unscanned_at)));
+  if(r.unscanned_at) t.push(row('warn', `Закрыта · не отсканировано ${fmtQty(r.unscanned_qty || 0)} · просил ${escS(r.unscanned_by || '—')} · разрешил ${escS(r.unscanned_ok_by || '—')}`, _hm(r.unscanned_at)));
   if(r.done_at && !r.unscanned_at) t.push(row('ok', `Закрыл${r.started_at ? ' · ' + intHistMins(r.started_at, r.done_at) : ''}`, _hm(r.done_at)));
   if(r.unscanned_done_at) t.push(row('ok', 'Остаток без кодов внесён', _hm(r.unscanned_done_at)));
   if(r.cancelled_at) t.push(row('dn', 'Район отменён', _hm(r.cancelled_at)));
@@ -36993,7 +37000,7 @@ function rcvRender(){
   const занято = !!(t.hold && t.hold.live);
   const head = `<div class="rcv">
     <div class="rcv-h"><span class="rcv-st ${занято ? 'warn' : (ns || uns) ? 'warn' : 'live'}">${
-      занято ? `${escS(t.hold.who)} вносит сейчас` : uns ? 'Завершена без сканирования' : ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
+      занято ? `${escS(t.hold.who)} вносит сейчас` : uns ? 'Закрыта' : ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
     <div class="rcv-n">
       <span class="rcv-v">${fmt(t.got)}</span>
       <span class="rcv-of">из ${fmt(t.need)}</span>

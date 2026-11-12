@@ -2737,35 +2737,37 @@ async def intake_live() -> list:
     rescan), в ней только те строки; иначе — все строки задачи.
 
     status: wait — сканов ещё нет; live — камера открыта (замок живой);
-    pause — сканы были, сейчас никто не сканирует; done — закрыта."""
+    pause — сканы были, сейчас никто не сканирует; done — закрыта.
+
+    Район, закрытый с разрешения старшего с остатком без кодов (4 ноя 2026),
+    сюда не идёт: с 4 по 12 ноя он висел тут «идущей приёмкой», пока остаток
+    не отсканируют, и на «Обзоре» стояли карточки «закрыта без сканирования»
+    у районов, где не хватало одного кода из двухсот (владелец, 12 ноя 2026:
+    «не выноси приёмки вот сюда в обзор»). Его остаток живёт там, где и
+    задано 4 ноя: в чек-листе («Остаток без сканирования») и во «Внести QR
+    коды» (intake_by_district)."""
     import bizday
     start = bizday.day_start(bizday.biz_day())
     sups = await db.supplies_with_open_tasks(limit=12)
     sups += await db.supplies_since((start - timedelta(days=3)).strftime("%Y-%m-%d"), limit=40)
-    sups += await db.supplies_unscanned(limit=20)
     iso = lambda v: v.isoformat() if v else ""
     seen, out = set(), []
     for sup in sups:
         sid = sup.get("_id")
         for oid, t in (sup.get("tasks") or {}).items():
             ns = db._dt_aware(t.get("noscan_at"))
-            # Закрытый без сканирования остатка район досканируют после
-            # закрытия: пока остаток без кодов, это тоже идущая приёмка.
-            ua = db._dt_aware(t.get("unscanned_at"))
-            if (sid, oid) in seen or oid not in OFFICE_IDS or not (ns or ua) or t.get("cancelled_at"):
+            if (sid, oid) in seen or oid not in OFFICE_IDS or not ns or t.get("cancelled_at"):
                 continue
-            v = _task_view(sid, sup, oid, t)
             done = db._dt_aware(t.get("done_at"))
-            if ua and v["left"] > 0:
-                done = None
             if done and done < start:
                 continue
             seen.add((sid, oid))
+            v = _task_view(sid, sup, oid, t)
             only = set(t.get("rescan") or [])
             lines = [l for l in v["lines"] if not only or l["id"] in only]
             lines.sort(key=lambda l: l["name"])
             last = db._dt_aware(t.get("last_at"))
-            if last and last < (ns or ua):
+            if last and last < ns:
                 last = None                      # скан из прежней приёмки — не этот
             got = sum(l["got"] for l in lines)
             status = ("done" if done else "live" if v["hold"]["live"]
@@ -2773,10 +2775,8 @@ async def intake_live() -> list:
             out.append({"supply_id": sid, "district": oid, "day": v["day"],
                         "district_code": v["district_code"], "district_name": v["district_name"],
                         "driver": v["driver"], "who": v["hold"]["who"], "status": status,
-                        "rescan": bool(only), "noscan_at": iso(ns or ua), "last_at": iso(last),
-                        "done_at": iso(done), "lines": lines,
-                        "unscanned": bool(ua), "unscanned_by": v["unscanned_by"],
-                        "unscanned_ok_by": v["unscanned_ok_by"]})
+                        "rescan": bool(only), "noscan_at": iso(ns), "last_at": iso(last),
+                        "done_at": iso(done), "lines": lines})
     out.sort(key=lambda x: (x["status"] == "done", x["noscan_at"]))
     return out
 

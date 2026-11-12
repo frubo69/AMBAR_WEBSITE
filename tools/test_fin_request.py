@@ -280,13 +280,15 @@ async def main():
     eq("строки — только то, что без кодов", {l["id"]: l["left"] for l in tt["lines"]}, {"p31": 1})
     ut = await sr.unscanned_tasks()
     eq("список остатков после приёмки", [(x["district"], x["left"], x["ok_by"]) for x in ut], [("jvc", 1, "Старший")])
+    # На «Обзор» STAR (intake_live) закрытый с остатком район не идёт (владелец,
+    # 12 ноя 2026: «не выноси приёмки вот сюда в обзор») — его остаток в
+    # чек-листе и во «Внести QR коды», что проверено выше.
     live = await sr.intake_live()
-    lj = next((x for x in live if x["district"] == "jvc"), None)
-    eq("в ленте приёма — идёт, не закрыта, с меткой", (lj["status"] != "done", lj["unscanned"], lj["unscanned_ok_by"]),
-       (True, True, "Старший"))
+    eq("на «Обзоре» закрытого с остатком района нет", [x["district"] for x in live], [])
     row = sr._intake_row(sid, s, "jvc", t, {})
-    eq("история приёмок: статус unscanned с полями", (row["status"], row["unscanned_by"], row["unscanned_ok_by"], row["unscanned_qty"]),
-       ("unscanned", DRV["jvc"], "Старший", 1))
+    eq("история приёмок: статус unscanned с полями и остатком",
+       (row["status"], row["unscanned_by"], row["unscanned_ok_by"], row["unscanned_qty"], row["left"]),
+       ("unscanned", DRV["jvc"], "Старший", 1, 1))
 
     print("\nДосканировать с полки после закрытия — поставка уже done")
     await db._db.supplies.update_one({"_id": sid}, {"$set": {"status": "done"}})

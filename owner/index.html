@@ -35080,6 +35080,18 @@ async function xSupRcp(sid, district, code){
   if(ov.classList.contains('show')) ov.innerHTML = кадр(_xsRcp[key]);
 }
 
+// Складка района, у которого товар на полке без кодов: «не отсканирована
+// 1 единица», без числа позиций (владелец, 12 ноя 2026, по карточке «47
+// позиций · не отсканировано 1»: «тут не пиши колво позиций, вместо этого
+// просто пиши не отсканирована 1 единица, а то путает»). Полкоробки пива —
+// «не отсканировано 0,5 единицы».
+function xsUnscanned(n){
+  const q = fmtQty(n);
+  if(n !== Math.floor(n)) return `не отсканировано ${q} единицы`;
+  const w = pluralize(n, 'единица', 'единицы', 'единиц');
+  return `${w === 'единица' ? 'не отсканирована' : w === 'единицы' ? 'не отсканированы' : 'не отсканировано'} ${q} ${w}`;
+}
+
 function xSupRender(d){
   const extra = d.kind === 'extra';
   // Черновик докупки: состав по районам со степперами, без приёмки и без
@@ -35115,13 +35127,14 @@ function xSupRender(d){
     const ns = !t.done_at && !!t.noscan_at;
     // Закрыт с разрешения старшего с остатком без кодов (владелец, 4 ноя
     // 2026): пока остаток есть — карточка жёлтая, как у принятого без
-    // сканирования, и в ней кнопка «Сканировать». В подписи — сколько не
-    // отсканировано, не «без сканирования» (владелец, 12 ноя 2026: «не
-    // отсканировали только 1 процент»); внесли всё — «принято».
+    // сканирования, и в ней кнопка «Сканировать». В подписи «закрыта · когда ·
+    // кто разрешил», а сколько без кодов — на складке (xsUnscanned), не
+    // «без сканирования» (владелец, 12 ноя 2026: «не отсканировали только 1
+    // процент»); внесли всё — «принято».
     const uns = !!t.done_at && !!t.unscanned_at && !t.cancelled_at;
     const who = (draft || wait) ? `${(t.lines || []).length} ${pluralize((t.lines || []).length,'позиция','позиции','позиций')}`
               : t.cancelled_at ? `отменён · ${_hm(t.cancelled_at)}${t.cancelled_by ? ' · ' + escS(t.cancelled_by) : ''}`
-              : uns ? `${t.left ? 'не отсканировано ' + fmtQty(t.left) : 'принято'} · ${_hm(t.done_at)}${t.unscanned_ok_by ? ' · разрешил ' + escS(t.unscanned_ok_by) : ''}`
+              : uns ? `${t.left ? 'закрыта' : 'принято'} · ${_hm(t.done_at)}${t.unscanned_ok_by ? ' · разрешил ' + escS(t.unscanned_ok_by) : ''}`
               : t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
               : ns ? `без сканирования · ${escS(t.noscan_by || t.driver)} · ${_hm(t.noscan_at)}`
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
@@ -35172,8 +35185,9 @@ function xSupRender(d){
         <span class="xs-dcard-n">${(draft || wait) ? `${fmtQty(t.need)}<i>бут.</i>` : `${fmt(t.got)}<i>/ ${fmt(t.need)}</i>`}</span>
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
-          <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
-            t.left && !uns && (t.driver || t.done_at || ns) ? ` · ${ns && !t.done_at ? 'не отсканировано' : t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}` : ''}</span>
+          <span>${t.left && (uns || (ns && !t.done_at)) ? xsUnscanned(t.left)
+            : `${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
+            t.left && (t.driver || t.done_at) ? ` · ${t.done_at ? 'не хватает' : 'осталось'} ${fmtQty(t.left)}` : ''}`}</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>${open ? `<div class="xs-fold-b">${list}${
           foldEnd(rows.length, `xSupToggle('${escS(t.district)}', 1)`)}</div>` : ''}`}

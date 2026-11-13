@@ -627,6 +627,20 @@ async def update_customer_card(oid: str, reply_markup=None):
     if not cid: return None
     lang   = order.get("lang", "ru")
     msg_id = _order_msg_id(order)
+    if order.get("customer_widget"):
+        # Карточка-виджет (widget_card.py): меняются только данные, текст не
+        # нужен. Кнопка под сообщением (поддержка после отказа) — отдельно.
+        import widget_card as _widget
+        await _widget.refresh(order)
+        if reply_markup and msg_id:
+            app = Application.builder().token(BOT_TOKEN).build()
+            async with app:
+                try:
+                    await app.bot.edit_message_reply_markup(chat_id=cid, message_id=msg_id,
+                                                            reply_markup=reply_markup)
+                except Exception as e:
+                    log.debug(f"customer widget markup {cid}/{msg_id}: {e}")
+        return msg_id
     text   = render_customer_card(order, lang)
 
     app = Application.builder().token(BOT_TOKEN).build()

@@ -1274,6 +1274,10 @@ async def _customer_card(oid: str):
     cid = (order or {}).get("customer_id")
     if not order or not cid:
         return                                  # телефонный заказ — некому
+    if order.get("customer_widget"):            # карточка-виджет: только данные
+        import widget_card as _widget
+        await _widget.refresh(order)
+        return
     text = render_customer_card(order, order.get("lang", "ru"))
     mid = order.get("customer_msg_id") or (order.get("customer_msg_ids") or [None])[0]
     if mid:

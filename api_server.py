@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 import db
 import offers as _offers
 from customer_card import render_customer_card
+import widget_card as _widget
 from config import (
     CRYPTO_REAL_MODE, CRYPTO_USDT_PER_AED, CRYPTO_REQUIRED_CONF,
     CRYPTO_TTL_MIN, CRYPTO_AMOUNT_STEP, TRON_RECEIVE_ADDRESS,
@@ -982,11 +983,18 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     except Exception as e:
         log.debug(f"prev msg cleanup: {e}")
     try:
-        confirm = render_customer_card(order_doc, lang)
-        conf_result = await tg_send(BOT_TOKEN, uid, confirm)
-        conf_msg_id = conf_result.get("result", {}).get("message_id")
-        if conf_msg_id and uid not in _TEST_ACCOUNTS:
-            await db.update_order(oid, customer_msg_id=conf_msg_id)
+        # Виджет вместо текста — пока только аккаунтам из config.WIDGET_IDS
+        # (widget_card.py). Его сообщение запоминаем всегда, иначе не обновить.
+        if _widget.wants(uid):
+            conf_msg_id = await _widget.send(order_doc)
+            if conf_msg_id:
+                await db.update_order(oid, customer_msg_id=conf_msg_id, customer_widget=True)
+        else:
+            confirm = render_customer_card(order_doc, lang)
+            conf_result = await tg_send(BOT_TOKEN, uid, confirm)
+            conf_msg_id = conf_result.get("result", {}).get("message_id")
+            if conf_msg_id and uid not in _TEST_ACCOUNTS:
+                await db.update_order(oid, customer_msg_id=conf_msg_id)
     except Exception as e:
         log.error(f"Customer confirm: {e}")
     # Warn the customer their order is held — same condition as the operator hold, so a
@@ -1878,7 +1886,12 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 
     # Update the customer's live status msg → "cancelled"
     cust_msg_id = order.get("customer_msg_id") or (order.get("customer_msg_ids") or [None])[0]
-    if cust_msg_id:
+    if order.get("customer_widget"):
+        try:
+            await _widget.refresh(order_id)
+        except Exception as e:
+            log.error(f"Customer cancel widget: {e}")
+    elif cust_msg_id:
         try:
             updated = await db.get_order(order_id)
             await tg_edit(BOT_TOKEN, uid, cust_msg_id,
@@ -2567,7 +2580,16 @@ async def handle_review(request: web.Request) -> web.Response:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("review_score"):
         return web.json_response({"error": "already reviewed"}, status=409, headers=CORS_HEADERS)
-    tags = data.get("tags", [])
+    await review_record(order, uid, int(score), comment, data.get("tags", []))
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+async def review_record(order: dict, uid, score: int, comment: str = "", tags: list | None = None):
+    """Записать оценку заказа и сказать операторам и владельцам. Одна дверь для
+    отзыва из приложения (/api/review) и звёзд в карточке-виджете (widget_card)."""
+    order_id = order.get("order_id", "")
+    tags = tags or []
+    comment = (comment or "").strip()
     await db.update_order(order_id, review_score=int(score), review_comment=comment,
                           review_tags=tags, reviewed_at=datetime.now(timezone.utc).isoformat())
     # Notify operators about the review
@@ -2621,8 +2643,6 @@ async def handle_review(request: web.Request) -> web.Response:
             )
     except Exception as e:
         log.error(f"[owner-notif] reviews.* failed: {e}")
-
-    return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
 # ── POST /api/review-skip ───────────────────────────────────────────────────

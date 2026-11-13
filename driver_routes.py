@@ -2429,6 +2429,7 @@ async def handle_arrived(request):
     phrase = arrived_phrase(car)
     sent = await _tell_arrived(oid, me, o, phrase, bool(car))
     log.info(f"[driver] {me['name']} на месте #{oid}: «{phrase}» → чатов {sent}")
+    await _widget_refresh(oid)          # клиенту с карточкой-виджетом: «водитель на месте»
     return web.json_response({"ok": True, "arrived_at": now, "phrase": phrase, "sent": sent},
                              headers=CORS_HEADERS)
 
@@ -2459,7 +2460,19 @@ async def handle_ack(request):
         await _refresh_cards({**o, "driver_ack_at": now})
     except Exception as e:
         log.warning(f"[driver] обновление карточек #{oid}: {e}")
+    await _widget_refresh(oid)          # клиенту с карточкой-виджетом: «водитель едет»
     return web.json_response({"ok": True, "driver_ack_at": now}, headers=CORS_HEADERS)
+
+
+async def _widget_refresh(oid: str):
+    """Карточка-виджет клиента (widget_card.py) переключается от отметок
+    водителя: «принял» → едет, «на месте» → на месте. Текстовой карточке эти
+    события не нужны, у заказа без виджета это пустой вызов."""
+    try:
+        import widget_card as _widget
+        await _widget.refresh(oid)
+    except Exception as e:
+        log.warning(f"[driver] виджет клиента #{oid}: {e}")
 
 
 @require_driver

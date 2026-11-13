@@ -9,9 +9,10 @@ from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyK
                       WebAppInfo, MenuButtonWebApp, MenuButtonDefault, InlineQueryResultPhoto,
                       InlineQueryResultsButton)
 from telegram.ext import (Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-                          InlineQueryHandler, ContextTypes, filters)
+                          InlineQueryHandler, TypeHandler, ContextTypes, filters)
 import db
 import support_inbox
+import widget_card as _widget
 from config_offices import OFFICE_NAMES, OFFICE_CODES
 
 load_dotenv()
@@ -218,11 +219,21 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
     # Приветствие с кнопкой приложения; его же закрепляем наверху чата, чтобы
     # кнопка была под рукой всегда, а не только в первом сообщении.
-    welcome = await update.message.reply_text(text, parse_mode="Markdown",
-                                              reply_markup=_app_kb(lang))
+    # Кому положена карточка-виджет (config.WIDGET_IDS), тому приветствие
+    # уходит карточкой с кнопкой внутри (widget_card.welcome); не ушла — текст.
+    welcome_mid = None
+    if _widget.wants(uid):
+        try:
+            welcome_mid = await _widget.welcome(uid, lang)
+        except Exception as e:
+            log.warning(f"welcome widget {uid}: {e}")
+    if not welcome_mid:
+        welcome = await update.message.reply_text(text, parse_mode="Markdown",
+                                                  reply_markup=_app_kb(lang))
+        welcome_mid = welcome.message_id
     try:
         await ctx.bot.unpin_all_chat_messages(chat_id=uid)
-        await ctx.bot.pin_chat_message(chat_id=uid, message_id=welcome.message_id,
+        await ctx.bot.pin_chat_message(chat_id=uid, message_id=welcome_mid,
                                        disable_notification=True)
     except Exception as e:
         log.debug(f"pin welcome: {e}")
@@ -288,6 +299,20 @@ async def cb_review(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         thanks_msg_id=thanks_msg.message_id,
         to_delete_on_order=[thanks_msg.message_id],
     )
+
+
+async def on_widget_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Запрос из карточки-виджета (звёзды оценки). PTB 21.6 про widget_query
+    не знает, поле лежит сырым в update.api_kwargs; ответить надо за 15 с."""
+    q = (update.api_kwargs or {}).get("widget_query") if hasattr(update, "api_kwargs") else None
+    if not isinstance(q, dict):
+        return
+    try:
+        res = await _widget.on_query((q.get("from") or {}).get("id"), q.get("message_id"), q.get("data") or "")
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[widget] query: {e}")
+        res = "error"
+    await _widget.answer(q.get("id") or "", res)
 
 
 async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -599,8 +624,12 @@ def main():
         (filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.VOICE) & ~filters.COMMAND,
         on_media))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
+    # Запросы из карточек-виджетов приходят отдельным типом апдейта, который
+    # надо явно запросить у телеграма; обработчик смотрит каждый апдейт и
+    # молча выходит, если это не он.
+    app.add_handler(TypeHandler(Update, on_widget_query), group=1)
     log.info("🍾 AMBAR Customer Bot started!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(allowed_updates=list(Update.ALL_TYPES) + ["widget_query"])
 
 
 if __name__ == "__main__":

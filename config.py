@@ -64,6 +64,14 @@ TEST_DRIVER_IDS = (set(_id_list("AMBAR_TEST_DRIVER_IDS")) if os.getenv("AMBAR_TE
 TEST_DRIVER_NAME = (os.getenv("AMBAR_TEST_DRIVER_NAME") or "Тест-водитель").strip() or "Тест-водитель"
 TEST_PERSON = "Тест"        # «кто за планшетом» у тест-оператора
 
+# ── Карточка заказа виджетом (13 ноя 2026) ──────────────────────────────────
+# Кому в клиентском боте карточка заказа и приветствие приходят HTML-виджетом
+# (widget_card.py), а не текстом. Владелец: «пока что примени это только к
+# моему аккаунту» — строки в .env нет → тест-заказчики (AMBAR_TEST_ORDER_IDS,
+# то есть его аккаунты); AMBAR_WIDGET_IDS=* — всем клиентам.
+WIDGET_ALL = os.getenv("AMBAR_WIDGET_IDS", "").strip() == "*"
+WIDGET_IDS = set(_id_list("AMBAR_WIDGET_IDS")) or set(TEST_ORDER_IDS)
+
 # Token for @ambar_manage_bot — the bot that launches the owner miniapp.
 # Separate from the customer BOT_TOKEN because initData is HMAC'd per-bot:
 # a miniapp launched from @ambar_manage_bot produces initData signed with

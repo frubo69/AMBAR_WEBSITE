@@ -444,7 +444,11 @@ async def get_all_orders(office_id=None, *, test=False) -> dict:
         filt = {"office_id": office_id}
     filt.update(_test_filt(test))
     cursor = db.orders.find(filt, {"_id": 0})
-    docs = await cursor.to_list(length=2000)
+    # Без потолка. Здесь стояло length=2000 с переезда на Mongo (24 мар 2026,
+    # заказов тогда были десятки) — и без сортировки: на 2001-м заказе самые
+    # свежие молча выпали бы из очереди планшета, бота оператора и экранов
+    # STAR. Найдено 13 ноя 2026 на 1927 заказах, до потолка оставалось 73.
+    docs = await cursor.to_list(length=None)
     out = {o["order_id"]: o for o in docs}
     if office_id is None and test is False:
         _ORDERS_CACHE["docs"] = out
@@ -475,7 +479,9 @@ async def orders_from(since_iso: str, *, test=False) -> dict:
         {"status": {"$in": ["pending", "approved"]}},
     ], **_test_filt(test)}, {"_id": 0, "item_lines": 0, "op_msg_ids": 0, "customer_msg_ids": 0,
          "_delivered_notif_msgs": 0})
-    docs = await cur.to_list(length=2000)
+    # Без потолка, как и get_all_orders: окно в две тысячи заказов обрезалось
+    # бы так же молча (13 ноя 2026).
+    docs = await cur.to_list(length=None)
     out = {o["order_id"]: o for o in docs}
     # Панель открывает несколько экранов сразу, и все спрашивают одно окно.
     # Держим его те же две секунды, что и полный список.

@@ -363,6 +363,19 @@ async def handle_unlock(request):
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 
+async def _as_name(body: dict, uid) -> str:
+    """Кем подписан старший в приёмке: имя с экрана («as»), иначе из базы,
+    иначе «старший» — как в решениях по поставке (supply_routes._owner_name).
+    Безымянный человек в задаче — это «—» в истории приёмки."""
+    имя = str((body or {}).get("as") or "").strip()[:60]
+    if not имя:
+        try:
+            имя = (await _who(uid) or "").strip()
+        except Exception:                            # noqa: BLE001
+            имя = ""
+    return имя if имя and имя != "—" else "старший"
+
+
 @require_owner
 async def handle_scan(request):
     """Записать отсканированную бутылку.
@@ -405,6 +418,40 @@ async def handle_scan(request):
         return web.json_response({"error": "busy",
                                   "by": (holder or {}).get("name") or "другой сотрудник"},
                                  status=409, headers=CORS_HEADERS)
+    # Бутылку этой позиции район ещё ждёт с приёмки — принято без сканирования
+    # или район закрыт с остатком без кодов («QR код не внесён») — вносим её в
+    # ПРИЁМКУ, какой бы кнопкой ни пришли. Владелец, 14 ноя 2026: остатки B2 и
+    # B5 внесли «Внести новый товар» — код лёг приходом src=new мимо приёмки,
+    # остаток остался гореть, а заявка считала бутылку дважды. Строка чек-листа
+    # «QR код не внесён» ведёт именно на этот экран, и первой на нём стоит эта
+    # кнопка. Не про коды по пересчёту (mode cover): там бутылка уже в остатке.
+    if str(body.get("mode") or "") != "cover":
+        цель = None
+        try:
+            import supply_routes as _sup
+            цель = await _sup.nocode_line(district, product_id)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[qr] остаток приёмки не прочитан ({district}, {product_id}): {e}")
+        if цель:
+            кто = await _as_name(body, me)
+            tr = await _sup.task_scan(цель[0], district, product_id, code, кто,
+                                      int(me or 0), owner=True)
+            if tr.get("ok"):
+                log.info(f"[qr] {tr.get('label') or code[:40]} · {p.get('name','')} · {district} — "
+                         f"в приёмку {цель[0]} (остаток без кодов)")
+                return web.json_response({
+                    "ok": True, "new": True, "code": code, "label": tr.get("label") or "",
+                    "qty": tr.get("qty") or 0, "product_id": product_id,
+                    "product_name": p.get("name", ""),
+                    "product_total": await db.qr_count_product(product_id),
+                    "found": None, "intake": цель[0]}, headers=CORS_HEADERS)
+            if tr.get("verdict") == "busy":
+                # Остаток этой приёмки сейчас вносит другой: двух рук на одной
+                # задаче не бывает, а мимо неё — снова второй приход.
+                return web.json_response({"ok": False, "new": False, "error": "busy",
+                                          "by": tr.get("by") or "", "code": code},
+                                         headers=CORS_HEADERS)
+            # «Уже в реестре», «по этой всё» и прочее — обычным путём ниже.
     # Номер берём до вставки: если код окажется занят, потерянный номер не
     # страшен, а вот две бутылки с одним номером — уже беда.
     seq = await db.qr_next_seq(product_id)
@@ -497,6 +544,16 @@ async def handle_undo(request):
     # возвращает в убранные, с прежним названием и приходом (db.qr_scan_undo).
     prev = await db.qr_get(code) or {}
     res = await db.qr_scan_undo(code)
+    if not res.get("ok") and res.get("why") == "supply":
+        # Скан ушёл в приёмку (остаток без кодов, см. handle_scan) — убирает
+        # его приёмка: место в строке возвращается, остаток снова горит.
+        try:
+            import supply_routes as _sup
+            кто = await _as_name(body, request.get("owner_id") or 0)
+            res = await _sup.scan_undo_after(code, кто)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[qr] скан приёмки {code[:40]} не отменён: {e}")
+            res = {"ok": False, "why": "supply"}
     if res.get("ok"):
         log.info(f"[qr] отменён скан {code}"
                  + (" — бутылка снова убрана, как до скана" if res.get("restored") else ""))
@@ -817,7 +874,19 @@ async def handle_found_list(request):
     (25 сен 2026). Сам водитель позицию выбрать не может — он видит мешок, а
     не то, чем его считать."""
     from config_offices import OFFICE_CODES, OFFICE_NAMES
-    rows = await db.qr_found_list("open")
+    rows = []
+    for r in await db.qr_found_list("open"):
+        # Код с тех пор попал в реестр другим путём — приёмкой, например:
+        # водитель проверил бутылку за минуту до того, как её принять
+        # (13 ноя 2026, две Chivas 18Y на B1). Находка решена, показывать нечего.
+        doc = await db.qr_get(r.get("code") or "")
+        if doc and (doc.get("status") or "active") != "deleted":
+            try:
+                await db.qr_found_close(r.get("code") or "", "added", "")
+            except Exception as e:                   # noqa: BLE001
+                log.warning(f"[qr] находка {r.get('code')} не закрыта: {e}")
+            continue
+        rows.append(r)
     return web.json_response({"rows": [{
         "code": r.get("code"), "driver": r.get("driver") or "",
         "district": r.get("district") or "",

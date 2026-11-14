@@ -31918,6 +31918,7 @@ async function qrFoundPut(pid){
     _toast(`Числится на ${r.district_code || r.district_name || 'другом районе'}`);
     return;
   }
+  if(r && r.error === 'busy'){ _toast(`${r.by || 'Старший'} вносит сейчас`); return; }
   if(r && !r.new){ _toast('Этот код уже в реестре'); }
   else{
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -32155,8 +32156,7 @@ async function qrIntake(district, тихо){
       <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
     </div>` : '';
   const many = QR_IN.tasks.length > 1;
-  const заявка = t => (t.day === _dayIsoFor(0) ? 'Сегодняшняя заявка' : t.day === _dayIsoFor(1)
-    ? 'Вчерашняя заявка' : 'Заявка от ' + _dayName(t.day)) + (t.extra && t.base ? ' · ' + t.base : '');
+  const заявка = _qrInOrder;
   // Откуда бутылки (владелец, 4 ноя 2026: «должно быть понятно, что это за
   // бутылка и откуда она взялась»): заявка какого дня, кто принимал, и если
   // район закрыли с остатком без кодов — сколько не отсканировано, кто просил
@@ -32173,9 +32173,87 @@ async function qrIntake(district, тихо){
           <span class="pk-slug">внесено ${fmtQty(l.got)} из ${fmtQty(l.need)}</span></span>
         <span class="pk-n dn">${fmtQty(l.left)}<i>QR код не внесён</i></span></button>`).join('')}</div>`).join('');
   document.getElementById('accMid').innerHTML = банер + body;
+  // Район закрыт с остатком без кодов — рядом со «Сканировать» решение по
+  // тому, чего на полке нет: магазин не дал (владелец, 14 ноя 2026).
+  const закрыт = QR_IN.tasks.some(t => t.finished && (t.lines || []).some(l => l.left > 0));
   document.getElementById('accFoot').innerHTML = h.live ? ''
+    : закрыт ? `<div class="qb-wrap"><div class="qb-row">
+        <button class="qb quiet" onclick="qrInShort()">Недовоз</button>
+        <button class="qb" onclick="qrInNext()">Сканировать</button></div></div>`
     : `<div class="qb-wrap"><button class="qb" onclick="qrInNext()">Сканировать</button></div>`;
   qrPollStart();
+}
+// Заявка, с которой бутылки: словом для сегодняшней и вчерашней, дальше днём.
+function _qrInOrder(t){
+  return (t.day === _dayIsoFor(0) ? 'Сегодняшняя заявка' : t.day === _dayIsoFor(1)
+    ? 'Вчерашняя заявка' : 'Заявка от ' + _dayName(t.day)) + (t.extra && t.base ? ' · ' + t.base : '');
+}
+// Недовоз по остатку закрытого района: бутылки на полке нет — её не дал
+// магазин (владелец, 14 ноя 2026: водитель написал «нету на баракуда» в
+// просьбе завершить без сканирования, район закрыли с остатком, и бутылка,
+// которой никто не привозил, горела «QR код не внесён»). Решение старшего,
+// как у обычного недовоза: остаток уходит в недобор магазину, строка гаснет.
+// Позиций с остатком несколько — сначала выбор, потом вопрос.
+async function qrInShort(){
+  if(!QR_IN) return;
+  const rows = [];
+  (QR_IN.tasks || []).forEach(t => { if(t.finished) (t.lines || []).forEach(l => { if(l.left > 0) rows.push({t, l}); }); });
+  if(!rows.length) return;
+  const x = rows.length > 1 ? await qrInShortPick(rows) : rows[0];
+  if(!x) return;
+  const d = ((ACC_IN && ACC_IN.districts) || []).find(v => v.id === QR_IN.district) || {};
+  const ans = await askChoice('Недовоз?',
+    [x.l.name, fmtQty(x.l.left), `${d.code || ''} ${d.name || ''}`.trim()].filter(Boolean).join(' · '),
+    'Подтвердить', 'Назад', 'go', 'no');
+  if(ans !== 'ok' || !QR_IN) return;
+  const district = QR_IN.district, direct = QR_DIRECT;
+  const одна = !(QR_IN.tasks || []).some(t => t.supply_id !== x.t.supply_id);
+  // Опрос страницы на время решения молчит: он увидел бы пустой район раньше
+  // ответа и увёл бы на первый экран со своим «Здесь всё внесено».
+  qrPollStop();
+  let r = null;
+  try{
+    r = await ownerApi.ownerFetch(`/api/owner/supply/${x.t.supply_id}/task/unscanned-short`,
+      {method: 'POST', body: {district, product_id: x.l.id, as: _meName()}});
+  }catch(e){ _toast('Не удалось'); qrPollStart(); return; }
+  if(!r || r.ok === false){
+    const v = (r || {}).verdict;
+    _toast(v === 'busy' ? `${(r || {}).by || 'Старший'} вносит сейчас`
+         : v === 'short_pending' ? 'Сначала решите недовоз' : 'Не удалось');
+    qrPollStart();
+    return;
+  }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast('Недовоз подтверждён');
+  // Остаток района кончился — страницы района больше нет, возвращаемся туда,
+  // откуда пришли: в чек-лист (строка вела прямо сюда) или на первый экран.
+  if(r.cleared && одна){
+    QR_IN = null;
+    if(direct) qrExit(); else qrHome();
+    return;
+  }
+  qrIntake(district);
+}
+function qrInShortPick(rows){
+  return new Promise(resolve => {
+    closePinPop();
+    const back = document.createElement('div');
+    back.className = 'pin-back ask';
+    back.addEventListener('click', () => { closePinPop(); resolve(null); });
+    const box = document.createElement('div');
+    box.className = 'pin-pop crw-ask crw-pick';
+    box.innerHTML = `<div class="crw-ask-t">Недовоз</div>
+      <div class="crw-ask-box">${rows.map((x, i) => `<button class="crw-ask-r" data-i="${i}">
+        <span class="crw-ask-n"><b>${escS(x.l.name)}</b><i>${escS(_qrInOrder(x.t))}</i></span>
+        <span class="crw-ask-q">${fmtQty(x.l.left)}</span></button>`).join('')}</div>
+      <button class="crw-ask-b no" id="qrShNo">Назад</button>`;
+    document.body.append(back, box);
+    box.querySelectorAll('.crw-ask-r').forEach(b => {
+      b.onclick = () => { closePinPop(); resolve(rows[+b.dataset.i]); };
+    });
+    box.querySelector('#qrShNo').onclick = () => { closePinPop(); resolve(null); };
+    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  });
 }
 function qrInNext(){
   const t = ((QR_IN && QR_IN.tasks) || [])[0];
@@ -33378,7 +33456,7 @@ function qrSave(code){
   // Откуда бутылка: новый товар — приход на склад; из ревизии по «QR не
   // внесён» — код к бутылке, которая в пересчёте уже есть.
   SCANQ.push({path:'/api/owner/qr/scan',
-              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new'}, code});
+              body:{code, product_id: QR_PROD.id, district: QR_DIST, mode: QR_NEED ? 'cover' : 'new', as: _meName()}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {
@@ -33391,6 +33469,13 @@ SCANQ.onDone = (err, r, job) => {
   if(err){ row.state = 'fail'; qrFlash('err'); }
   else if(r.new){ row.state = 'new'; row.label = r.label || ''; if(r.qty) row.qty = r.qty;
     QR_SESS.push({code: job.code, pid: (job.body || {}).product_id}); }
+  else if(r.error === 'busy'){
+    // Бутылку этой позиции район ждёт с приёмки, и её остаток сейчас вносит
+    // другой: сервер скан не принял. Код отпускаем — наведут снова.
+    row.state = 'fail'; row.say = `вносит ${r.by || 'другой'}`;
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
+    qrFlash('err', `вносит ${r.by || 'другой'}`);
+  }
   else if(r.error === 'elsewhere'){
     // Убранная бутылка с поставки числится на другом районе: вернуть её можно
     // только туда, сюда — перемещением (иначе приход остался бы там).

@@ -3599,6 +3599,38 @@ async def supply_unscanned_clear(sid: str, district: str, now) -> bool:
     return r.modified_count > 0
 
 
+async def supply_unscanned_short(sid: str, district: str, miss: dict, gaps: list,
+                                 unscanned: dict, short: dict, rec: dict) -> bool:
+    """Остаток закрытого района, которого на полке нет: магазин не дал
+    (владелец, 14 ноя 2026: Hennessy VSOP, B3 — водитель написал «нету на
+    баракуда» в просьбе завершить без сканирования, район закрыли с остатком,
+    и бутылка, которой нет, горела «QR код не внесён»). Недовоз ложится в miss
+    (сканировать его больше не просят), в gaps (недобор для магазина) и в
+    short (карточка района: «Недовоз подтверждён»); unscanned — что ещё лежит
+    без кодов. Только пока район числится в unscanned_open."""
+    db = _db_or_none()
+    if db is None: return False
+    k = f"tasks.{district}"
+    r = await db.supplies.update_one(
+        {"_id": sid, "unscanned_open": district, f"{k}.done_at": {"$ne": None}},
+        {"$set": {f"{k}.miss": miss, f"{k}.gaps": gaps, f"{k}.unscanned": unscanned,
+                  f"{k}.short": short},
+         "$push": {f"{k}.unscanned_short": rec}})
+    return r.modified_count > 0
+
+
+async def supply_unscanned_reopen(sid: str, district: str) -> bool:
+    """Скан остатка отменили — район снова держит поставку в незавершённом
+    приёме. Только для района, закрытого с остатком без кодов."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.supplies.update_one(
+        {"_id": sid, f"tasks.{district}.unscanned_at": {"$ne": None}},
+        {"$addToSet": {"unscanned_open": district},
+         "$unset": {f"tasks.{district}.unscanned_done_at": ""}})
+    return r.matched_count > 0
+
+
 async def supplies_unscanned(limit: int = 20) -> list:
     """Поставки, где у какого-то района остаток закрыт без сканирования и ещё
     не досканирован, — любого статуса: сама поставка обычно уже done."""
@@ -4906,6 +4938,64 @@ async def qr_readd(code: str, product_id: str, product_name: str, district,
         return {"ok": True, "readd": True, "intake": intake, "renamed": renamed,
                 "was": old.get("product_name") or ""}
     return {"ok": False, "why": "busy"}
+
+
+async def qr_reuse(code: str, product_id: str, product_name: str, district,
+                   by: int, at, label: str = "", extra: dict = None) -> bool:
+    """Убранную из реестра запись занимает приёмка: бутылку с этим кодом
+    принимают сейчас, по этой поставке.
+
+    Владелец, 14 ноя 2026: остаток приёмки («QR код не внесён») внесли кнопкой
+    «Внести новый товар», увидели, что строка горит, и убрали код «Удалить
+    товар». Запись осталась убранной — и приёмка на этот код отвечала «уже в
+    реестре», проверка — «НЕ НАША, нет в реестре», а «Внести новый товар»
+    возвращал его приходом мимо приёмки: три экрана, три ответа про одну
+    наклейку, и строка не гасла ничем.
+
+    Здесь не возврат (qr_readd), а новая жизнь кода: приход — этой поставкой и
+    сейчас, каким бы он ни был раньше. Прежняя запись целиком лежит в
+    reused.prev — отмена скана (qr_reuse_undo) возвращает её как была.
+
+    Не берём: запись, которая ездила между районами (у неё история переездов,
+    и переписать её приходом значило бы оставить переезды без бутылки), и
+    убранную списанную или проданную. True — заняли."""
+    db = _db_or_none()
+    if db is None: return False
+    old = await db.qr_codes.find_one({"_id": code, "status": "deleted"})
+    if not old or (old.get("moves") or []) or (old.get("was") or "active") != "active":
+        return False
+    prev = {k: v for k, v in old.items() if k not in ("_id", "reused")}
+    doc = {"_id": code, "status": "active", "product_id": product_id,
+           "product_name": product_name, "district": district, "label": label,
+           "by": by, "at": at, **(extra or {}), "reused": {"at": at, "prev": prev}}
+    r = await db.qr_codes.replace_one(
+        {"_id": code, "status": "deleted", "del_at": old.get("del_at")}, doc)
+    if r.modified_count:
+        try:
+            import stock_routes as _sr
+            _sr.base_drop()
+        except Exception:
+            pass
+    return r.modified_count > 0
+
+
+async def qr_reuse_undo(code: str) -> bool:
+    """Отмена скана, занявшего убранную запись: запись снова убрана, как была
+    до скана. False — код не из таких или его с тех пор тронули."""
+    db = _db_or_none()
+    if db is None: return False
+    doc = await db.qr_codes.find_one({"_id": code})
+    prev = ((doc or {}).get("reused") or {}).get("prev")
+    if not prev:
+        return False
+    r = await db.qr_codes.replace_one({"_id": code, "status": "active"}, {"_id": code, **prev})
+    if r.modified_count:
+        try:
+            import stock_routes as _sr
+            _sr.base_drop()
+        except Exception:
+            pass
+    return r.modified_count > 0
 
 
 async def qr_scan_undo(code: str, max_age_h: float = 24) -> dict:

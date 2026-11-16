@@ -1939,22 +1939,18 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     from qr_routes import product_slug
     seq = await db.qr_next_seq(pid)
     label = f"{product_slug(pid, item.get('name',''))}#{seq:06d}"
-    # Товар приняли без сканирования раньше, чем район пересчитали, — пересчёт
-    # его уже видел, и код к нему заводится как cover (остаток не растёт).
-    # Иначе — обычный приход. Остаток, закрытый без сканирования с разрешения
-    # старшего, лежит на полке с момента разрешения — та же мерка.
+    # Код приёмки — приход: товар без кодов на складе не числится (владелец,
+    # 12 ноя 2026), и ревизия в снимок его не берёт — камера без кода его не
+    # видит. До 16 ноя код к товару, принятому без сканирования раньше, чем
+    # район пересчитали, ложился cover («пересчёт его уже видел») и остаток
+    # не растил: коробка Heineken, B5, остаток приёмки 11 ноя — ревизия
+    # кончилась 15 ноя в 13:59, коробку внесли в 14:06, на склад она не
+    # встала. cover остался одному случаю: район пересчитали, пока такой товар
+    # ещё числился (stock_routes.count_holds_nocode), — он уже в снимке.
     src = "intake"
     try:
-        ns = task.get("noscan_at") or task.get("unscanned_at")
-        if ns:
-            import stock_routes as _sr
-            cnt = await db.get_last_stock_count(oid, before_day=None)
-            edge = _sr._dt_of((cnt or {}).get("counted_at") or "")
-            ns_dt = ns if hasattr(ns, "tzinfo") else _sr._dt_of(str(ns))
-            if ns_dt is not None and ns_dt.tzinfo is None:
-                ns_dt = ns_dt.replace(tzinfo=timezone.utc)
-            if edge and ns_dt and ns_dt <= edge:
-                src = "cover"
+        if await _sr.count_holds_nocode(oid, task.get("noscan_at") or task.get("unscanned_at")):
+            src = "cover"
     except Exception as e:                                       # noqa: BLE001
         log.warning(f"[supply] не понял, приход это или cover: {e}")
     extra = {"src": src, "supply_id": sid, "driver": me, "origin": oid,
@@ -2916,19 +2912,17 @@ async def nocode_qty() -> dict:
     и не забранное, — иначе купили бы дважды. Тот же список, что во «Внести
     QR коды» (_nocode_tasks).
 
-    Район пересчитали после приёмки — пересчёт эти бутылки уже видел: они в
-    остатке по пересчёту и в долге реестра (qr_routes.unscanned_by_district),
-    их коды заводятся как cover (task_scan). Сюда такие не идут, иначе та же
-    бутылка вычиталась бы из заявки дважды и в «QR код не внесён» считалась
-    бы дважды."""
+    Пересчёт района этого не меняет: в снимок ревизии товар без кодов не
+    входит, он ждёт кода здесь, пока его не внесут или не запишут недовозом.
+    До 16 ноя 2026 пересчитанный район отсюда выпадал — остаток не был ни на
+    складе, ни в «QR код не внесён», и заявка заказала бы его второй раз.
+    Не идут сюда только бутылки, которые пересчёт унёс в снимок, пока товар
+    без кодов ещё числился (stock_routes.count_holds_nocode): они в остатке и
+    в долге реестра (qr_routes.unscanned_by_district), их коды — cover."""
     import stock_routes as _st
-    out, edges = {}, {}
+    out = {}
     for _sid, _sup, oid, t, v in await _nocode_tasks():
-        if oid not in edges:
-            cnt = await db.get_last_stock_count(oid, before_day=None)
-            edges[oid] = _st._dt_of((cnt or {}).get("counted_at") or "")
-        moment = _st._aware(t.get("noscan_at") or t.get("unscanned_at"))
-        if edges[oid] and moment and moment <= edges[oid]:
+        if await _st.count_holds_nocode(oid, t.get("noscan_at") or t.get("unscanned_at")):
             continue
         for l in v["lines"]:
             out[(oid, l["id"])] = out.get((oid, l["id"]), 0.0) + float(l["left"])

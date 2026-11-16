@@ -2082,6 +2082,13 @@ body.xp-on{background:#070A12}
 .dc-drop.mv-miss{margin-top:0;background:rgba(0,0,0,.35)}
 .er.mvd-ch{border-color:rgba(243,180,74,.45)}
 .er.mvd-ch .er-p{color:var(--warn)}
+/* «Не сканируется»: бутылка пришла, а наклейку камера не берёт — она остаётся
+   на районе получателя и отдающему не возвращается. Отмечена — золотая. */
+.mvd-keep{flex:0 0 auto;padding:8px 11px;border-radius:10px;cursor:pointer;white-space:nowrap;
+  border:1px solid rgba(255,255,255,.16);background:transparent;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--sub)}
+.mvd-keep.on{border-color:rgba(201,169,110,.7);background:rgba(201,169,110,.14);color:#E8C98A}
+.mvd-keep:active{transform:scale(.97)}
 .sup-tag{display:inline-block;vertical-align:2px;margin-left:4px;padding:1px 6px;border-radius:6px;
   font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;max-width:110px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -11165,7 +11172,7 @@ function mvqDiffOpen(mid, district, from){
   const t = (MVQ.take || []).find(x => x.move_id === mid && x.district === district && x.from === from);
   if(!t) return;
   MVD_DIFF = {mid, district, from, busy: false,
-              lines: (t.lines || []).map(l => ({id: l.id, name: l.name, unit: l.unit, sent: +l.got || 0, got: +l.recv || 0}))};
+              lines: (t.lines || []).map(l => ({id: l.id, name: l.name, unit: l.unit, sent: +l.got || 0, got: +l.recv || 0, kept: 0}))};
   document.getElementById('mvdS').textContent = `Из ${t.from_code} ${t.from_name}: отсканировано ${
     fmtQty(+t.recv || 0)} из ${fmtQty(+t.got || 0)}. Непришедшее вернётся на ${t.from_code} — на вашем районе оно не останется`;
   document.getElementById('mvdNote').value = '';
@@ -11187,16 +11194,28 @@ function mvqRecvMiss(){
 function mvdClose(){ document.getElementById('mvdSheet').classList.remove('show'); MVD_DIFF = null; }
 function mvdPaint(){
   const D = MVD_DIFF; if(!D) return;
-  document.getElementById('mvdRows').innerHTML = D.lines.map(l => {
-    const u = l.unit > 1 ? 'кор.' : 'шт', miss = l.sent - l.got;
-    return `<div class="er ${miss > 0 ? 'mvd-ch' : ''}">
+  document.getElementById('mvdRows').innerHTML = D.lines.map((l, i) => {
+    const u = l.unit > 1 ? 'кор.' : 'шт', miss = l.sent - l.got, нет = miss - (l.kept || 0);
+    // Пришла, но наклейку камера не берёт: такую бутылку получатель оставляет
+    // себе. Кнопка шагает по одной (пиво — по полкоробки) до всего, чего не
+    // хватает по скану, и снова в ноль.
+    const keep = miss > 0 ? `<button class="mvd-keep${l.kept ? ' on' : ''}" onclick="mvdKeep(${i})">Не сканируется${
+      l.kept ? ' · ' + fmtQty(l.kept) : ''}</button>` : '';
+    return `<div class="er ${нет > 0 ? 'mvd-ch' : ''}">
       <div class="er-b">
         <div class="er-n">${esc(l.name)}</div>
-        <div class="er-p">отдали ${fmtQty(l.sent)} ${u} · отсканировали ${fmtQty(l.got)}${miss > 0 ? ` · нет ${fmtQty(miss)}` : ''}</div>
-      </div>
+        <div class="er-p">отдали ${fmtQty(l.sent)} ${u} · отсканировали ${fmtQty(l.got)}${нет > 0 ? ` · нет ${fmtQty(нет)}` : ''}</div>
+      </div>${keep}
     </div>`;
   }).join('');
   mvdGoState();
+}
+function mvdKeep(i){
+  const D = MVD_DIFF, l = D && D.lines[i]; if(!l || D.busy) return;
+  const miss = l.sent - l.got, шаг = l.unit > 1 ? 0.5 : 1;
+  l.kept = (l.kept || 0) + шаг > miss + 1e-9 ? 0 : (l.kept || 0) + шаг;
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  mvdPaint();
 }
 // Сохранить можно, когда есть что сказать: поправили число или написали, что не так.
 function mvdGoState(){
@@ -11209,11 +11228,13 @@ async function mvdSend(){
   const note = (document.getElementById('mvdNote').value || '').trim();
   D.busy = true; mvdGoState();
   try{
+    const kept = D.lines.filter(l => l.kept > 0).map(l => ({id: l.id, qty: l.kept}));
+    const всёЗдесь = D.lines.every(l => l.sent - l.got - (l.kept || 0) <= 1e-9);
     const r = await drvApi.drvFetch(`/api/driver/move/${D.mid}/accept`, {method:'POST', body:{
-      district: D.district, from: D.from, ok: false, note}});
+      district: D.district, from: D.from, ok: false, note, kept}});
     if(r.ok){
       mvdClose();
-      toast('Принято как есть — старший увидит, чего нет');
+      toast(всёЗдесь ? 'Принято как есть — старший увидит, что не сканируется' : 'Принято как есть — старший увидит, чего нет');
       try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     }else toast(r.error === 'diff_empty' ? 'Всё отсканировано — напишите, что не так'
               : r.error === 'not_given' ? 'Водитель ещё не отдал всё' : 'Заявка закрыта', 'err');

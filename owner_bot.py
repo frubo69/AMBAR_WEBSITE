@@ -258,6 +258,18 @@ async def on_writeoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
         return
+    if ok:
+        # Запись несёт момент, когда бутылку разбили. Район за это время
+        # пересчитали — склад её уже не вычтет, а камера ревизии могла успеть
+        # её посчитать: снимок доводится, как и при согласовании из STAR
+        # (stock_routes.handle_writeoff_decide → snapshot_late).
+        try:
+            import stock_routes as _sr
+            await _sr.snapshot_late(str(doc.get("district") or ""), str(doc.get("item") or ""),
+                                    doc.get("at"), doc.get("qty"), str(doc.get("code") or ""),
+                                    f"списание {wid} согласовано после ревизии")
+        except Exception as e:                              # noqa: BLE001
+            log.warning("списание %s: снимок ревизии не доведён: %s", wid, e)
     await _writeoff_after(context, doc, ok, name, q)
 
 

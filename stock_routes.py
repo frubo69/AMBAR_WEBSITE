@@ -2143,6 +2143,11 @@ def _scan_state(district: str, day: str, counts: dict, odd: list,
     }
 
 
+# Сколько бутылок одного чужого района подряд — повод остановить сканер и
+# спросить, ту ли полку считают.
+AUDIT_FOREIGN_RUN = 5
+
+
 def audit_code(raw) -> str:
     """Код с крышки без пробелов и переносов, не длиннее 120 знаков."""
     import re as _re
@@ -2189,12 +2194,27 @@ async def audit_scan(district: str, day: str, code: str, by: int, by_name: str =
     unit = _unit(p) if p else 1
     if verdict == "alien":
         log.warning(f"[audit] {district}: код не из реестра — {code[:40]}")
+    # Бутылки одного чужого района подряд — считают не ту полку (12 ноя 2026
+    # полку JVC 25 минут сканировали в ревизии B2: 382 скана, программа
+    # молчала). Сколько таких подряд на хвосте прохода — в ответе: сканер
+    # старшего по нему останавливается и спрашивает (owner: audForeign).
+    хвост = 0
+    if verdict == "other" and rec["home"] in OFFICE_IDS:
+        try:
+            хвост = len(await db.audit_foreign_tail(district, day, rec["home"]))
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[audit] хвост чужих сканов не посчитан ({district}): {e}")
+        if хвост == AUDIT_FOREIGN_RUN:
+            log.warning(f"[audit] {district} {day}: подряд {хвост} бутылок с "
+                        f"{OFFICE_CODES.get(rec['home'], rec['home'])} — похоже, считают не ту полку")
     return {
         "ok": True, "new": fresh, "code": code, "verdict": verdict,
         "product_id": pid, "name": (doc or {}).get("product_name") or p.get("name", ""),
         "label": (doc or {}).get("label") or "",
         "home": (doc or {}).get("district") or "",
         "home_code": OFFICE_CODES.get((doc or {}).get("district") or "", ""),
+        "home_name": OFFICE_NAMES.get((doc or {}).get("district") or "", ""),
+        "foreign_run": хвост, "foreign_stop": AUDIT_FOREIGN_RUN,
         # Счёт по позиции — в единицах склада: коды несут qty, у пива это
         # коробки и полкоробки.
         "count": _num(counts.get(pid) or 0),
@@ -2270,6 +2290,37 @@ async def handle_audit_scan_undo(request):
     day = str(body.get("day") or "").strip() or _biz_day()
     code = audit_code(body.get("code"))
     return web.json_response(await audit_scan_undo(district, day, code), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_scan_foreign_drop(request):
+    """Считали не ту полку: убрать из прохода хвост — сканы подряд с одного
+    чужого района. body: {district, day?, home, as?}
+
+    Оставлять их нельзя: чужие коды в итоге ревизии — излишек, и «Внести на
+    район» перевезло бы сюда по бумагам полку соседнего района. Убираем в
+    архив (audit_scans_dropped), не стирая, — как сканы отменённого захода."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district = str(body.get("district") or "").strip()
+    home = str(body.get("home") or "").strip()
+    if district not in OFFICE_IDS or home not in OFFICE_IDS or home == district:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    day = str(body.get("day") or "").strip() or _biz_day()
+    a = await db.audit_get(district, day) or {}
+    if a.get("finished_at"):
+        return web.json_response({"error": "finished"}, status=409, headers=CORS_HEADERS)
+    codes = await db.audit_foreign_tail(district, day, home)
+    n = await db.audit_scans_archive_codes(district, day, codes,
+                                           datetime.now(timezone.utc).isoformat(), "foreign")
+    counts = await db.audit_scan_counts(district, day)
+    log.info(f"[audit] {district} {day}: убран хвост чужой полки — {n} сканов с "
+             f"{OFFICE_CODES.get(home, home)} (кем: {str(body.get('as') or '')[:60]})")
+    return web.json_response({"ok": True, "removed": n, "codes": codes,
+                              "total": _num(sum(counts.values())), "positions": len(counts)},
+                             headers=CORS_HEADERS)
 
 
 @require_owner
@@ -2381,12 +2432,17 @@ async def _audit_expected(district: str, day: str) -> tuple:
     return exp, noqr, False
 
 
-async def _audit_after(district: str, since_dt) -> dict:
+async def _audit_after(district: str, since_dt, seen: set = None) -> dict:
     """{позиция: [(момент, ±единиц), …]} — всё, что случилось с полкой района
     ПОСЛЕ момента: продажи (−), приёмка по кодам (+), внесённое руками (+),
     переезды (±), списания (−).
 
-    Нужно ревизии, чтобы отмотать остаток назад к моменту подсчёта."""
+    Нужно ревизии, чтобы отмотать остаток назад к моменту подсчёта.
+
+    seen — коды, которые камера этой ревизии видела. Приход таким кодом назад
+    не отматывается: бутылка под камерой, она в счёте прохода, и в «числится»
+    ей место — иначе код, принятый по ходу ревизии и тут же отсканированный,
+    выходил излишком."""
     if not since_dt:
         return {}
     ev: dict = {}
@@ -2416,17 +2472,13 @@ async def _audit_after(district: str, since_dt) -> dict:
     except Exception as e:                           # noqa: BLE001
         log.warning(f"[audit] продажи после подсчёта не прочитаны ({district}): {e}")
     try:
-        for pid, rows in (await db.intake_events(district, since_dt)).items():
-            for at, q in rows:
-                add(pid, at, q)
+        # Приёмка по кодам и внесённое руками — поимённо (db.income_codes).
+        for c in await db.income_codes(district, since_dt):
+            if seen and c["code"] in seen:
+                continue
+            add(c["pid"], c["at"], c["qty"])
     except Exception as e:                           # noqa: BLE001
-        log.warning(f"[audit] приёмка после подсчёта не прочитана ({district}): {e}")
-    try:
-        for pid, rows in (await db.qr_manual_events(district, since_dt)).items():
-            for at, q in rows:
-                add(pid, at, q)
-    except Exception as e:                           # noqa: BLE001
-        log.warning(f"[audit] внесённое руками после подсчёта не прочитано ({district}): {e}")
+        log.warning(f"[audit] приход после подсчёта не прочитан ({district}): {e}")
     try:
         counts = {district: await db.get_last_stock_count(district, before_day=None)}
         moved = await _moved_after(counts, {district: since_dt})
@@ -2495,6 +2547,247 @@ async def _guard_pending(district: str, cat: dict) -> dict:
     return out
 
 
+async def _audit_unseen_income(district: str, day: str, marks: dict, scanned: set) -> dict:
+    """{позиция: единиц} — приход кодами после начала ревизии, которого камера
+    не видела, по позициям БЕЗ единого скана: приёмка, «внести новый товар»,
+    переезд по коду на район."""
+    a = await db.audit_get(district, day) or {}
+    started = _aware(a.get("started_at"))
+    if not started or a.get("finished_at") or a.get("dropped_at"):
+        return {}
+    out: dict = {}
+    for c in await db.income_codes(district, started):
+        if c["pid"] in scanned or c["code"] in marks:
+            continue
+        out[c["pid"]] = out.get(c["pid"], 0.0) + float(c["qty"])
+    for m in await db.stock_transfers_after(started.astimezone(timezone.utc).isoformat()):
+        pid, code, at = m.get("product_id"), str(m.get("code") or ""), _dt_of(m.get("at") or "")
+        if m.get("to") != district or not pid or pid in scanned or not code or code in marks:
+            continue
+        if not at or at <= started:
+            continue
+        try:
+            out[pid] = out.get(pid, 0.0) + float(m.get("qty") or 0)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+# ── доводка снимка ──────────────────────────────────────────────────────────
+# Снимок ревизии — что увидела камера, а его момент один на весь район:
+# последний скан ревизии (counted_at). Полку же считают по частям: позицию
+# отсканировали в три ночи, ревизию закончили в девять вечера. Склад после
+# ревизии = снимок + всё, что случилось ПОСЛЕ counted_at, — и то, что случилось
+# с позицией между её сканом и последним сканом ревизии, не попадало никуда:
+# в счёте камеры бутылка есть, а событие «до снимка» склад не применяет.
+# Продали или списали — бутылка числится дальше и выходит недостачей на
+# следующей ревизии; приняли или внесли новым товаром — на склад не встаёт и
+# выходит излишком (JVC, 31 окт 2026: позицию считали в 02:51, ревизия кончилась
+# в 21:22, заказ в 14:54 — Campo Viejo Gran Reserva 2, недостача 2 на ревизии
+# 11 ноя). Поэтому при завершении снимок позиции доводится этими событиями —
+# до того, что лежит на полке в момент counted_at.
+#
+# Правило одно: снимок + то, что склад применит после него сам = полка.
+#   • расход после последнего скана позиции и не позже снимка — из снимка
+#     вычитается (продажа, списание, переезд; по коду — только если камера
+#     видела именно эту бутылку);
+#   • расход, пока позицию считали, сверх зачёта «ушло, пока считали»: эти
+#     бутылки камера успела посчитать до того, как они ушли, — вычитается;
+#   • приход кодом после первого скана позиции и не позже снимка, которого
+#     камера не видела, — прибавляется;
+#   • приход кодом ПОСЛЕ снимка, который камера видела (наклейку внесли в
+#     реестр уже после последнего скана), — вычитается: склад прибавит этот
+#     код сам, а в счёте камеры бутылка уже есть (коробка, принятая на приёмке
+#     без кода: на копии базы выходило 5 вместо 4).
+# Продажа — по времени заказа (бутылку сняли с полки, когда заказ приняли),
+# как и в отмотке _audit_after; заказ, довезённый после снимка, склад вычтет
+# сам — его не трогаем.
+def _zone(spans: dict, pid: str, at) -> str:
+    """Где событие относительно сканов позиции: 'B' — после последнего скана,
+    'A' — пока считали (после первого), '' — до первого или сканов не было."""
+    sp = spans.get(pid)
+    if not sp or not at:
+        return ""
+    return "B" if at > sp[1] else "A" if at > sp[0] else ""
+
+
+async def _audit_drift(district: str, day: str, a: dict, spans: dict, counted_dt,
+                       marks: dict = None) -> dict:
+    """{позиция: {"fix0": ±единиц, "wn": единиц}} — доводка снимка ревизии.
+    fix0 — поправка, не зависящая от зачёта; wn — ушло, пока позицию считали,
+    из того, что склад после снимка сам уже не вычтет (см. _line_fix)."""
+    T = _aware(counted_dt)
+    if not T:
+        return {}
+    marks = marks if marks is not None else await db.audit_scan_marks(district, day)
+    seen = {c: m for c, m in marks.items() if m.get("pid")}
+    started = _aware((a or {}).get("started_at"))
+    края = [sp[0] for sp in spans.values()] + ([started] if started else [])
+    if not края:
+        return {}
+    since = min(края)
+    since_iso = since.astimezone(timezone.utc).isoformat()
+    cat = _catalog()
+    out: dict = {}
+
+    def cell(pid):
+        return out.setdefault(pid, {"fix0": 0.0, "wn": 0.0})
+
+    def ушло(pid, at, q, code=""):
+        """Расход, который склад после снимка сам не вычтет (момент ≤ T)."""
+        z = _zone(spans, pid, at)
+        if not z or not q or at > T:
+            return
+        m = seen.get(code) if code else None
+        видели_после = bool(m and m.get("at") and m["at"] > at)
+        if z == "B":
+            # После последнего скана позиции. По коду — только бутылка, которую
+            # камера видела: невиденной в счёте прохода нет, вычитать нечего.
+            if code and (not m or видели_после):
+                return
+            cell(pid)["fix0"] -= q
+        elif not (code and видели_после):
+            # Пока позицию считали. Бутылка под камерой ПОСЛЕ «расхода» —
+            # стоит на полке (списали не ту, переезд не состоялся).
+            cell(pid)["wn"] += q
+
+    def пришло(pid, at, q, code="", позже_сам=True):
+        """Приход. позже_сам — склад после снимка прибавит его сам (момент > T)."""
+        if not q or not at:
+            return
+        m = seen.get(code) if code else None
+        if m:
+            # Камера видела: бутылка в счёте прохода. Код, который склад
+            # прибавит сам, со снимка снимается — иначе бутылка дважды.
+            if at > T and позже_сам:
+                cell(m.get("pid") or pid)["fix0"] -= q
+            return
+        if at > T:
+            return
+        sp = spans.get(pid)
+        if sp:
+            # Отмотка к первому скану этот приход из «числится» убрала, камера
+            # его не видела — ревизия о нём не судила, на полке он есть. Без
+            # кода (переезд числом) во время счёта неизвестно, считала ли его
+            # камера, — берём только то, что после её ухода с позиции.
+            if at > sp[0] and (code or at > sp[1]):
+                cell(pid)["fix0"] += q
+        elif started and at > started and code:
+            cell(pid)["fix0"] += q
+
+    # Продажи: с полки района, момент — заказ; довезённое после снимка склад
+    # вычтет сам.
+    for o in await db.sold_since(since_iso.replace("+00:00", "")):
+        if _stock_office(o) != district:
+            continue
+        ts, dl = _dt_of(o.get("timestamp") or ""), _dt_of(o.get("delivered_at") or "")
+        снят = min([x for x in (ts, dl) if x] or [None])
+        учёт = dl or ts
+        if not снят or not учёт or учёт > T:
+            continue
+        for it in (o.get("items") or []):
+            pid, q = sale_item(it, cat)
+            if pid and q:
+                ушло(pid, снят, q)
+    for w in await db.writeoff_rows(district, since):
+        ушло(w["pid"], w["at"], float(w["qty"] or 0), w["code"])
+    for m in await db.stock_transfers_after(since_iso):
+        pid, at = m.get("product_id"), _dt_of(m.get("at") or "")
+        try:
+            q = float(m.get("qty") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not pid or not q or not at or at <= since:
+            continue
+        code = str(m.get("code") or "")
+        if m.get("from") == district:
+            ушло(pid, at, q, code)
+        if m.get("to") == district:
+            # Переезд задним числом (день раньше дня пересчёта) склад после
+            # снимка не применяет — см. _moved_after.
+            пришло(pid, at, q, code, позже_сам=not (m.get("day") and str(m["day"]) < day))
+    for c in await db.income_codes(district, since):
+        пришло(c["pid"], c["at"], float(c["qty"]), c["code"])
+    return {pid: v for pid, v in out.items() if v["fix0"] or v["wn"]}
+
+
+def _line_credit(l: dict) -> float:
+    """Зачёт «ушло, пока позицию считали» по сохранённой строке ревизии:
+    числится кодовых − свои под камерой − разница."""
+    c = float(l.get("coded", max(0.0, float(l.get("expected") or 0) - float(l.get("noqr") or 0))))
+    свои = float(l.get("actual") or 0) - float(l.get("other") or 0)
+    return max(0.0, c - свои - float(l.get("diff") or 0))
+
+
+def _line_fix(l: dict, зачёт: float = None) -> float:
+    """Доводка снимка по строке ревизии, в единицах: fix0 (после последнего
+    скана позиции и приход), минус ушедшее, пока позицию считали, сверх зачёта
+    (wn − зачёт: эти бутылки камера успела посчитать), плюс расход,
+    согласованный задним числом уже после завершения (late, snapshot_late)."""
+    wn = float(l.get("wn") or 0)
+    z = _line_credit(l) if зачёт is None else float(зачёт or 0)
+    return float(l.get("fix0") or 0) - max(0.0, wn - min(z, wn)) + float(l.get("late") or 0)
+
+
+async def snapshot_late(district: str, pid: str, at, qty, code: str = "", why: str = "") -> bool:
+    """Расход, который лёг в учёт задним числом: списание водителя согласовали
+    после ревизии, бутылку охране согласовали после неё же — запись несёт
+    момент, когда бутылка ушла с полки, и если он раньше снимка района, склад
+    её уже не вычтет. Была ли бутылка в снимке — решается так же, как при
+    завершении (_audit_drift): по коду — камера видела её до ухода; без кода —
+    расход после последнего скана позиции. Тогда снимок позиции уменьшается.
+    Расход без кода, пока позицию ещё считали, не трогаем: считала ли камера
+    эту бутылку, неизвестно. True — снимок поправлен."""
+    at = _aware(at)
+    try:
+        q = float(qty or 0)
+    except (TypeError, ValueError):
+        q = 0.0
+    if not district or not pid or not at or q <= 0:
+        return False
+    cnt = await db.get_last_stock_count(district, before_day=None)
+    T = _dt_of((cnt or {}).get("counted_at") or "")
+    if not cnt or not T or at > T:
+        return False                               # после снимка — склад вычтет сам
+    day = str(cnt.get("day") or "")
+    a = await db.audit_get(district, day) or {}
+    if not a.get("finished_at") or not a.get("lines"):
+        return False                               # снимок не от ревизии камерой
+    sp = (await db.audit_scan_spans(district, day)).get(pid)
+    if not sp:
+        return False                               # позицию не сканировали — в снимке её нет
+    if code:
+        m = (await db.audit_scan_marks(district, day)).get(str(code))
+        if not m or not m.get("pid") or not m.get("at") or m["at"] > at:
+            return False
+    elif at <= sp[1]:
+        return False
+    lines = [dict(l) for l in a.get("lines") or []]
+    ln = next((l for l in lines if l.get("id") == pid), None)
+    sl = [dict(x) for x in cnt.get("lines") or []]
+    sn = next((x for x in sl if x.get("id") == pid), None)
+    if ln is None or sn is None:
+        return False
+    было = _num(sn.get("actual") or 0)
+    стало = _num(max(0.0, float(было) - q))
+    if стало == было:
+        return False
+    ln["late"] = _num(float(ln.get("late") or 0) - (float(было) - float(стало)))
+    sn["actual"] = стало
+    sn["fix"] = _num(_line_fix(ln))
+    await db.save_stock_count(district, day, {"lines": sl})
+    await db.audit_set(district, day, {"lines": lines})
+    base_drop()
+    try:
+        p = _catalog().get(pid) or {}
+    except Exception:                                # noqa: BLE001  (бот: каталог не прочитался — пишем id)
+        p = {}
+    log.info(f"[audit] {district} {day}: снимок доведён — {p.get('name', pid)} {было} → {стало} "
+             f"({why or 'расход задним числом'}, ушла {at.isoformat(timespec='minutes')}, "
+             f"снимок {T.isoformat(timespec='minutes')})")
+    return True
+
+
 async def _audit_lines(district: str, day: str) -> tuple:
     """Строки ревизии: ожидается / увидела камера / разница — в бутылках.
 
@@ -2516,10 +2809,35 @@ async def _audit_lines(district: str, day: str) -> tuple:
     zero = ((await _district_base(day)).get(district) or {}).get("zero") or {}
     counts = await db.audit_scan_counts(district, day)
     spans = await db.audit_scan_spans(district, day)
+    marks = await db.audit_scan_marks(district, day)
+    seen = {c for c, m in marks.items() if m.get("pid")}
     when = {pid: span[0] for pid, span in spans.items()}
-    after = await _audit_after(district, min(when.values())) if when else {}
+    after = await _audit_after(district, min(when.values()), seen) if when else {}
     cat = _catalog()
     await _loss_load()
+    # Код другого района под камерой — бутылка здесь, а числится там. Своей она
+    # не считается: до 16 ноя 2026 такой скан шёл в общий счёт позиции и молча
+    # закрывал дыру от своей пропавшей бутылки — здесь «сошлось», а недостача
+    # вылезала у района, где бутылка числится и где её нет (Don Julio 1942 и
+    # Clase Azul: стоят на B3, под камерой B3 8 и 11 ноя, списаны недостачей с
+    # B4 на 3400 AED). Чужие считаем отдельно: свои сравниваются с «числится»,
+    # чужие всегда идут в излишек — их вносят на район переездом.
+    чужие: dict = {}
+    откуда: dict = {}
+    for m in marks.values():
+        if m.get("verdict") == "other" and m.get("pid"):
+            чужие[m["pid"]] = чужие.get(m["pid"], 0.0) + float(m.get("qty") or 1)
+            откуда.setdefault(m["pid"], set()).add(OFFICE_CODES.get(m.get("home") or "", ""))
+    # Приехало после начала ревизии и под камеру не попало — позиция, которую
+    # не сканировали вовсе, отматывается только на это: приёмка по ходу
+    # ревизии — не недостача (у отсканированной позиции то же делает отмотка
+    # к её первому скану).
+    поздний: dict = {}
+    if counted:
+        try:
+            поздний = await _audit_unseen_income(district, day, marks, set(spans))
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[audit] приход по ходу ревизии не прочитан ({district}): {e}")
     # Отдано охране и ждёт решения старшего: с полки ушло, когда водитель
     # отсканировал код, а из учёта уйдёт только при согласовании
     # (expense_routes._guard_bottle_gone) — до него ни в снимке, ни в
@@ -2546,10 +2864,25 @@ async def _audit_lines(district: str, day: str) -> tuple:
             ушло = _num(_gone_after(after.get(pid), t, spans[pid][1]))
             охр = _num(sum(q for at, q in (охрана.get(pid) or ()) if at <= spans[pid][1]))
             ушло = _num(ушло + охр)
+        elif поздний.get(pid):
+            e = _num(max(0.0, e - поздний[pid]))
         q = _num(noqr.get(pid) or 0)                   # из них без кодов
         q = _num(min(q, e))                            # без кодов не больше, чем всего
         c = _num(max(0, e - q))                        # видимых камере
-        a = _num(counts.get(pid) or 0)                 # увидела камера (коды по qty)
+        видела = _num(counts.get(pid) or 0)            # увидела камера (коды по qty)
+        чуж = _num(min(видела, чужие.get(pid) or 0))   # из них числятся на другом районе
+        # Початая коробка пива: на коробке две наклейки по полкоробки, и
+        # продажа банками ни одну не гасит. Числится с половиной — значит одна
+        # коробка почата, и камера видит на ней обе наклейки: на полкоробки
+        # больше, чем в ней лежит. До 16 ноя 2026 это шло излишком +0,5, снимок
+        # записывал лишние полкоробки, и следующая ревизия находила −0,5 (B3:
+        # Carlsberg, Corona, Amstel). Вторая наклейка початой коробки — не
+        # товар: в счёт идёт столько, сколько числится.
+        початая = 0
+        if _unit(p) > 1 and (c * 2) % 2 == 1 and _num(видела - чуж - c) == STEP:
+            початая = STEP
+        a = _num(видела - початая)                     # лежит на полке
+        свои = _num(a - чуж)
         # Разница — только по кодовым бутылкам: те, что без кодов, камера
         # увидеть не может, и в недостачу они не идут — их вносят кодами.
         #
@@ -2560,14 +2893,20 @@ async def _audit_lines(district: str, day: str) -> tuple:
         # ушло из посчитанного и ничего не объясняет. Зачёт не больше самой
         # разницы: то, что и так посчитали камерой, второй раз не засчитываем,
         # иначе продажа превращалась бы в излишек.
-        зачёт = _num(min(ушло, max(0.0, c - a)))
-        d = _num(c - a - зачёт)
+        зачёт = _num(min(ушло, max(0.0, c - свои)))
+        d = _num(c - свои - зачёт)
         lines.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
             "no": order_key(pid) + 1, "unit": _unit(p),
             "price": _price(p),                        # прайс за учётную единицу
-            "expected": e, "coded": c, "actual": a, "diff": d,   # diff>0 — не хватает кодовых
+            # diff>0 — не хватает своих кодовых; diff<0 — своих больше, чем числится
+            "expected": e, "coded": c, "actual": a, "diff": d,
             "noqr": q,
+            # Из лежащего — с кодами другого района (всегда излишек, см. выше)
+            # и на каких районах они числятся.
+            "other": чуж, "other_from": ", ".join(sorted(x for x in (откуда.get(pid) or ()) if x)),
+            # Вторая наклейка початой коробки пива: камера её видела, в счёт не идёт.
+            "open": початая,
             "zero": _num(zero.get(pid) or 0),            # списано сверх остатка после пересчёта
             # Ушло заказами (или переездом, боем), пока позицию считали, и
             # потому в недостачу не пошло.
@@ -2598,9 +2937,15 @@ async def _audit_lines(district: str, day: str) -> tuple:
     return lines, counted
 
 
+def _line_over(l: dict) -> float:
+    """Сколько единиц позиции лишние: с кодами другого района (other) и свои
+    сверх числящегося. У строк старых ревизий other нет — там только второе."""
+    return _num(float(l.get("other") or 0) + max(0.0, -float(l.get("diff") or 0)))
+
+
 def _audit_totals(lines: list) -> dict:
     short = [l for l in lines if l["diff"] > 0]
-    over = [l for l in lines if l["diff"] < 0]
+    over = [l for l in lines if _line_over(l) > 0]
     live = [l for l in lines if l["expected"] or l["actual"]]
     return {
         "expected": sum(l["expected"] for l in lines),
@@ -2608,11 +2953,12 @@ def _audit_totals(lines: list) -> dict:
         "actual": sum(l["actual"] for l in lines),
         "short_qty": sum(l["diff"] for l in short),
         "short_aed": sum(l["due"] for l in short),      # по прайсу
-        "over_qty": sum(-l["diff"] for l in over),
+        "over_qty": sum(_line_over(l) for l in over),
         "noqr": sum(l["noqr"] for l in lines),
         "positions": len(live),
-        "matched": sum(1 for l in live if not l["diff"]),
-        "mismatched": len(short) + len(over),
+        "matched": sum(1 for l in live if not l["diff"] and not l.get("other")),
+        # Позиция с недостачей своих и чужой бутылкой разом — одна позиция.
+        "mismatched": sum(1 for l in lines if l["diff"] or l.get("other")),
     }
 
 
@@ -2657,7 +3003,10 @@ def _audit_rows_saved(a: dict) -> list:
 async def _audit_report(district: str, day: str, a: dict = None) -> dict:
     a = a if a is not None else (await db.audit_get(district, day) or {})
     a, alien = await _audit_sync(district, day, a)
-    rows = [r for r in _audit_rows_saved(a) if r.get("diff")]
+    # Строки с расхождением: своих не хватает или больше, чем числится, либо
+    # под камерой бутылка с кодом другого района (other) — она излишек и при
+    # нулевой разнице по своим.
+    rows = [r for r in _audit_rows_saved(a) if r.get("diff") or r.get("other")]
     rows.sort(key=lambda r: (-abs(r.get("loss") or 0), -abs(r["diff"])))
     return {
         "district": district,
@@ -3003,11 +3352,12 @@ def _audit_verdicts(lines: list, codes: list) -> tuple:
                    for l in lines if l["diff"] > 0]
     over_lines = []
     for l in lines:
-        if l["diff"] >= 0:
+        лишние = _line_over(l)
+        if лишние <= 0:
             continue
         odd = by_pid.get(l["id"]) or []
         over_lines.append({
-            "id": l["id"], "name": l["name"], "qty": -l["diff"], "unit": l["unit"],
+            "id": l["id"], "name": l["name"], "qty": лишние, "unit": l["unit"],
             "other": sum(1 for c in odd if c["verdict"] == "other"),
             "written": sum(1 for c in odd if c["verdict"] == "written"),
             "sold": sum(1 for c in odd if c["verdict"] == "sold"),
@@ -3043,6 +3393,23 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
     started = _dt_of(a.get("started_at") or "")
     counted_dt = last_scan or started or now
     counted_iso = counted_dt.astimezone(timezone.utc).isoformat()
+    # Доводка снимка: что случилось с позицией после её скана и до снимка
+    # (см. _audit_drift). Не прочиталось — снимок ложится как увидела камера.
+    try:
+        drift = await _audit_drift(district, day, a, await db.audit_scan_spans(district, day),
+                                   counted_dt)
+    except Exception as e:                           # noqa: BLE001
+        log.error(f"[audit] {district} {day}: доводка снимка не посчитана: {e}")
+        drift = {}
+    for l in lines:
+        dr = drift.get(l["id"]) or {}
+        l["fix0"], l["wn"], l["late"] = _num(dr.get("fix0") or 0), _num(dr.get("wn") or 0), 0
+    доведено = [(l["name"], _num(_line_fix(l, l.get("gone")))) for l in lines
+                if _num(_line_fix(l, l.get("gone")))]
+    if доведено:
+        log.info(f"[audit] {district} {day}: снимок доведён событиями до "
+                 f"{counted_dt.isoformat(timespec='minutes')}: "
+                 + ", ".join(f"{n} {'+' if v > 0 else ''}{v}" for n, v in доведено[:30]))
     # Пересчёт — обычным документом, в учётных единицах: с него дальше живут
     # заявка и стоимость склада, и ревизия для них — просто свежий снимок.
     doc_lines = _audit_snapshot_lines(lines)
@@ -3066,7 +3433,10 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
         "result": {**tot, "scan_qty": int(stats.get("total") or 0), "counted": counted},
         "lines": [{"id": l["id"], "expected": l["expected"], "coded": l["coded"], "actual": l["actual"],
                    "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"],
-                   "went": l.get("went", 0), "guard": l.get("guard", 0)} for l in lines],
+                   "went": l.get("went", 0), "guard": l.get("guard", 0),
+                   "other": l.get("other", 0), "other_from": l.get("other_from", ""),
+                   "open": l.get("open", 0),
+                   "fix0": l.get("fix0", 0), "wn": l.get("wn", 0), "late": 0} for l in lines],
         **(extra or {}),
     }
     # Сошлось и чужих кодов нет — закрыта сразу. Чужие коды — это бутылки без
@@ -3093,11 +3463,18 @@ def _audit_snapshot_lines(lines: list) -> list:
     out = []
     for l in lines:
         u = l["unit"]
-        e, act = _num(l["expected"]), _num(l["actual"] + l["noqr"])   # уже в единицах
-        out.append({"id": l["id"], "name": l["name"], "price": l["price"], "unit": u,
-                    "was": e, "income": 0, "moved_qty": 0, "sold": 0,
-                    "expected": e, "actual": act, "diff": _num(e - act),
-                    "counted": True, "mark": "ok" if not l["diff"] else "diff"})
+        # Камера + без кодов + доводка событиями между сканом позиции и
+        # моментом снимка (_audit_drift): снимок — это полка на counted_at.
+        fix = _num(_line_fix(l, l.get("gone")))
+        e, act = _num(l["expected"]), _num(max(0.0, l["actual"] + l["noqr"] + fix))   # уже в единицах
+        row = {"id": l["id"], "name": l["name"], "price": l["price"], "unit": u,
+               "was": e, "income": 0, "moved_qty": 0, "sold": 0,
+               "expected": e, "actual": act, "diff": _num(e - act),
+               "counted": True,
+               "mark": "ok" if not l["diff"] and not l.get("other") else "diff"}
+        if fix:
+            row["fix"] = fix
+        out.append(row)
     return out
 
 
@@ -3193,17 +3570,22 @@ async def _audit_adjust(district: str, day: str, a: dict, pid: str, dq: float, w
         lines.append(ln)
     c = _num(ln.get("coded", max(0.0, _num(ln.get("expected") or 0) - _num(ln.get("noqr") or 0))))
     a0, d0 = _num(ln.get("actual") or 0), _num(ln.get("diff") or 0)
-    зачёт0 = _num(max(0.0, c - a0 - d0))
+    # Разница — по своим кодам: бутылки с кодами другого района лежат в факте,
+    # но своими не считаются (см. _audit_lines).
+    чуж = _num(ln.get("other") or 0)
+    свои0 = _num(max(0.0, a0 - чуж))
+    зачёт0 = _num(max(0.0, c - свои0 - d0))
     if "went" in ln:
         ушло = _num(ln.get("went") or 0)
     else:
         # Старые ревизии ушедшего не хранили: оно известно точно, если зачёт
         # был меньше разницы; иначе его хватало на всю разницу — хватит и на
         # меньшую.
-        ушло = зачёт0 if зачёт0 + 1e-9 < c - a0 else float("inf")
+        ушло = зачёт0 if зачёт0 + 1e-9 < c - свои0 else float("inf")
     a1 = _num(max(0.0, a0 + dq))
-    зачёт1 = _num(min(ушло, max(0.0, c - a1)))
-    d1 = _num(c - a1 - зачёт1)
+    свои1 = _num(max(0.0, a1 - чуж))
+    зачёт1 = _num(min(ушло, max(0.0, c - свои1)))
+    d1 = _num(c - свои1 - зачёт1)
     ln["actual"], ln["diff"] = a1, d1
     ln["loss"] = _loss_of(pid, d1) if d1 > 0 else 0
     rows = _audit_rows_saved({"lines": lines})
@@ -3223,9 +3605,14 @@ async def _audit_adjust(district: str, day: str, a: dict, pid: str, dq: float, w
                  "was": 0, "income": 0, "moved_qty": 0, "sold": 0, "expected": 0,
                  "actual": 0, "diff": 0, "counted": True, "mark": "ok"}
             sl.append(s)
-        s["actual"] = _num(a1 + _num(ln.get("noqr") or 0))
+        # Факт + без кодов + доводка снимка событиями (зачёт изменился —
+        # изменилась и она, см. _line_fix).
+        fix = _num(_line_fix(ln, зачёт1))
+        s["actual"] = _num(max(0.0, a1 + _num(ln.get("noqr") or 0) + fix))
         s["diff"] = _num(_num(s.get("expected") or 0) - s["actual"])
-        s["mark"] = "ok" if not d1 else "diff"
+        s["mark"] = "ok" if not d1 and not чуж else "diff"
+        if fix or s.get("fix"):
+            s["fix"] = fix
         await db.save_stock_count(district, day, {
             "lines": sl, "short_qty": tot["short_qty"], "short_aed": tot["short_aed"],
             "over_qty": tot["over_qty"], "matched_qty": tot["matched"],
@@ -3378,6 +3765,17 @@ async def handle_audit_short(request):
         return web.json_response({"error": "no_short"}, status=409, headers=CORS_HEADERS)
     if short.get("resolved_at"):
         return web.json_response({"error": "resolved"}, status=409, headers=CORS_HEADERS)
+    # Сначала коды не из реестра. Бутылка с наклейкой, которой реестр не
+    # знает, стояла под камерой, но в счёт не пошла: позицию по такому коду не
+    # узнать. Чаще всего это и есть «пропавшая» — наклейку переклеили. Пока
+    # её не внесли (тогда она засчитывается в эту ревизию, audit_found) или не
+    # убрали как ошибочную, недостачу решать рано: её записали бы списанием, а
+    # бутылка потом вышла бы излишком (B3, 8 ноя 2026: Merlot 4 и Patron Gold
+    # списаны недостачей 11 ноя, внесены 12-го).
+    чужие = await _audit_alien(district, day) if int(a.get("alien") or 0) else None
+    if чужие and чужие["left"]:
+        return web.json_response({"error": "alien_first", "left": чужие["left"]},
+                                 status=409, headers=CORS_HEADERS)
     blame = bool(body.get("blame"))
     who = str(body.get("who") or "").strip()[:60]
     note = str(body.get("note") or "").strip()[:200]
@@ -4675,6 +5073,15 @@ async def handle_writeoff_decide(request):
                                  status=409, headers=CORS_HEADERS)
     if ok:
         base_drop()          # остаток изменился — заявку считать заново
+        # Запись несёт момент, когда бутылку разбили, а не момент согласования.
+        # Район за это время пересчитали — склад её уже не вычтет, а камера
+        # ревизии могла успеть её посчитать: снимок доводится (snapshot_late).
+        try:
+            await snapshot_late(str(doc.get("district") or ""), str(doc.get("item") or ""),
+                                doc.get("at"), doc.get("qty"), str(doc.get("code") or ""),
+                                f"списание {wid} согласовано после ревизии")
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[writeoff] {wid}: снимок ревизии не доведён: {e}")
     log.info(f"[writeoff] {wid}: {'согласовано' if ok else 'отклонено'} "
              f"({who or request.get('owner_id')})")
 
@@ -4903,6 +5310,7 @@ def setup(app):
         ("/api/owner/stock/audit/scan",       handle_audit_scan,       "POST"),
         ("/api/owner/stock/audit/scan/undo",  handle_audit_scan_undo,  "POST"),
         ("/api/owner/stock/audit/scan/reset", handle_audit_scan_reset, "POST"),
+        ("/api/owner/stock/audit/scan/foreign-drop", handle_audit_scan_foreign_drop, "POST"),
         ("/api/owner/stock/audit/sheet",  handle_audit_sheet,  "GET"),
         ("/api/owner/stock/audit/start",  handle_audit_start,  "POST"),
         ("/api/owner/stock/audit/drop",   handle_audit_drop,   "POST"),

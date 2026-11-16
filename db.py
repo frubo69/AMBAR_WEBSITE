@@ -5368,6 +5368,42 @@ async def audit_scans_archive(district: str, day: str, stamp: str) -> int:
     return len(rows)
 
 
+async def audit_foreign_tail(district: str, day: str, home: str, limit: int = 2000) -> list:
+    """Хвост прохода: последние сканы подряд с вердиктом «другой район» и
+    одним и тем же районом home — [код, …], от свежего к старому. Первый же
+    скан другого вида хвост обрывает. Так узнают, что считают чужую полку:
+    бутылки одного чужого района идут под камеру одна за другой."""
+    db = _db_or_none()
+    if db is None or not home: return []
+    out = []
+    async for s in db.audit_scans.find({"district": district, "day": day},
+                                       {"code": 1, "verdict": 1, "home": 1}) \
+                                 .sort("at", -1).limit(int(limit)):
+        if (s.get("verdict") or "") != "other" or (s.get("home") or "") != home:
+            break
+        out.append(str(s.get("code") or ""))
+    return out
+
+
+async def audit_scans_archive_codes(district: str, day: str, codes: list, stamp: str,
+                                    why: str = "") -> int:
+    """Убрать из прохода названные сканы — в тот же архив, что сканы
+    отменённого захода (audit_scans_dropped), не стирая. Сколько убрано."""
+    db = _db_or_none()
+    if db is None or not codes: return 0
+    ids = [_audit_key(district, day, c) for c in codes]
+    rows = await db.audit_scans.find({"_id": {"$in": ids}}).to_list(length=len(ids))
+    if not rows:
+        return 0
+    for r in rows:
+        r["src_id"] = r.pop("_id"); r["dropped"] = stamp
+        if why:
+            r["dropped_why"] = why
+    await db.audit_scans_dropped.insert_many(rows)
+    await db.audit_scans.delete_many({"_id": {"$in": [r["src_id"] for r in rows]}})
+    return len(rows)
+
+
 async def audit_scan_counts(district: str, day: str) -> dict:
     """{позиция: сколько бутылок увидела камера}. Чужие коды сюда не попадают:
     у них нет позиции, и приписать их некуда."""
@@ -5406,6 +5442,73 @@ async def audit_scan_spans(district: str, day: str) -> dict:
 async def audit_scan_times(district: str, day: str) -> dict:
     """{позиция: когда её начали считать} — первый скан каждой позиции."""
     return {pid: span[0] for pid, span in (await audit_scan_spans(district, day)).items()}
+
+
+async def audit_scan_marks(district: str, day: str) -> dict:
+    """{код: {at, pid, verdict, home, qty}} — что и когда увидела камера этой
+    ревизии, по коду. Нужно, чтобы отличить бутылку, которая уже в счёте
+    прохода, от той, которую камера не видела (stock_routes._audit_drift)."""
+    db = _db_or_none()
+    if db is None: return {}
+    out = {}
+    async for s in db.audit_scans.find(
+            {"district": district, "day": day},
+            {"_id": 0, "code": 1, "at": 1, "product_id": 1, "verdict": 1, "home": 1, "qty": 1}):
+        at = s.get("at")
+        if isinstance(at, datetime) and at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        out[str(s.get("code") or "")] = {
+            "at": at if isinstance(at, datetime) else None,
+            "pid": s.get("product_id") or "", "verdict": s.get("verdict") or "",
+            "home": s.get("home") or "", "qty": _qn(s.get("qty") or 1) or 1}
+    return out
+
+
+async def income_codes(district: str, since) -> list:
+    """Коды, которыми товар встал на склад района после момента since:
+    приёмка (src intake) и «внести новый товар» (src new, не убранные и не
+    наклейки на ревизии) — [{code, pid, at, qty, src}], по времени. То же, что
+    intake_since и qr_manual_events считают суммой, но поимённо: ревизии надо
+    знать про каждый код, видела ли его камера."""
+    db = _db_or_none()
+    if db is None or not since: return []
+    out = []
+    async for d in db.qr_codes.find(
+            {"at": {"$gt": since},
+             "$and": [
+                 {"$or": [{"origin": district}, {"origin": {"$exists": False}, "district": district}]},
+                 {"$or": [{"src": "intake"},
+                          {"src": "new", "status": {"$ne": "deleted"}, "found": {"$exists": False}}]}]},
+            {"product_id": 1, "at": 1, "qty": 1, "intake_extra": 1, "src": 1}):
+        pid, at = d.get("product_id") or "", d.get("at")
+        if not pid or not isinstance(at, datetime):
+            continue
+        q = _qn(d.get("qty") or 1) or 1
+        if d.get("src") == "intake":
+            q += _qn(d.get("intake_extra") or 0)
+        out.append({"code": str(d.get("_id") or ""), "pid": pid, "src": d.get("src") or "",
+                    "at": at if at.tzinfo else at.replace(tzinfo=timezone.utc), "qty": q})
+    out.sort(key=lambda e: e["at"])
+    return out
+
+
+async def writeoff_rows(district: str, since) -> list:
+    """Списания района после момента — [{at, pid, qty, code}], без недостач
+    ревизии (src=audit): те уже в её пересчёте. То же, что writeoff_events, но
+    с кодом бутылки, если списывали сканом."""
+    db = _db_or_none()
+    if db is None or not since: return []
+    out = []
+    async for w in db.writeoffs.find(
+            {"district": district, "at": {"$gt": since}, "src": {"$ne": "audit"},
+             **WRITEOFF_COUNTED}, {"_id": 0, "item": 1, "at": 1, "qty": 1, "code": 1}):
+        pid, at = w.get("item") or "", w.get("at")
+        if not pid or not isinstance(at, datetime):
+            continue
+        out.append({"pid": pid, "code": str(w.get("code") or ""), "qty": _qn(w.get("qty") or 0),
+                    "at": at if at.tzinfo else at.replace(tzinfo=timezone.utc)})
+    out.sort(key=lambda e: e["at"])
+    return out
 
 
 async def intake_events(district: str, since) -> dict:

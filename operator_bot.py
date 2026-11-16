@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 import db
+import config_staff as _staff_mod
 from customer_card import render_customer_card
 
 load_dotenv()
@@ -1651,13 +1652,23 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             # (stock_routes._stock_office). Перестановки лежат в базе; без sync
             # бот знал бы только расписание из .env и ставил бы не тот район.
             # Реестр не прочитался — полка остаётся районом заказа, как раньше.
+            #
+            # До 16 ноя 2026 модуль реестра здесь не был подключён: имя
+            # _staff_mod не существовало, NameError глотался этим же except, и
+            # заказ закрывался без полки. Не ставился и момент доставки — склад
+            # тогда берёт время заказа (stock_routes._sold_after), и заказ,
+            # принятый до пересчёта района и закрытый после него, не списывался
+            # вовсе. Полка: 6 ноя 2026, AMB75414C0C — три вина ушли с полки B3,
+            # а списались с B4.
             try:
                 await _staff_mod.sync()
                 stamp = {"stock_office": _staff_mod.stock_office(order.get("driver"), order.get("office_id"))}
             except Exception as e:                                   # noqa: BLE001
                 log.warning(f"[done] реестр не прочитан, полка = район заказа: {e}")
                 stamp = {}
-            await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat(), **stamp)
+            now_iso = datetime.now(timezone.utc).isoformat()
+            await db.update_order(oid, status="delivered", updated_at=now_iso,
+                                  delivered_at=now_iso, **stamp)
             order = await db.get_order(oid)
             total = (order or {}).get("total", 0)
             _tst = bool((order or {}).get("test"))     # тест-заказ: без счётчиков и долгов

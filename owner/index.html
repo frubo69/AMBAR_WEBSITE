@@ -17976,7 +17976,8 @@ function mvhPair(p, day){
         <b>${_mvhAt(p.check.at, day)}</b></div>` : ''}
     </div>
     ${p.accept_ok === false ? `<div class="mvh-note">Приняли неровно: ${
-      (p.accept_lines || []).slice(0, 4).map(l => `${escS(l.name)} ${fmtQty(l.got)} из ${fmtQty(l.sent)}`).join(', ')
+      (p.accept_lines || []).slice(0, 4).map(l => `${escS(l.name)} ${fmtQty(l.got)} из ${fmtQty(l.sent)}${
+        l.kept ? ` · не сканируется ${fmtQty(l.kept)}` : ''}`).join(', ')
       }${p.accept_note ? ` · «${escS(p.accept_note)}»` : ''}${
         p.back_n ? `<br>Непринятое вернулось в ${escS(p.from_code)}: ${fmtQty(p.back_n)} — за него отвечает отдающий` : ''}
       <button class="mvh-even" onclick="mvhEven('${escS(p.mid)}','${escS(p.to)}','${escS(p.from)}')"
@@ -18780,8 +18781,12 @@ function audUnits(rows){
     const u = _audU(r), c = _audCoded(r);
     t.expected += (r.expected || 0) / u; t.coded += c / u; t.actual += (r.actual || 0) / u;
     t.noqr += (r.noqr || 0) / u;
-    const d = c - (r.actual || 0);
+    // Бутылки с кодами другого района лежат здесь, но своими не считаются:
+    // недостача — по своим, чужие — всегда излишек.
+    const чуж = r.other || 0;
+    const d = c - ((r.actual || 0) - чуж);
     if(d > 0) t.short += d / u; else if(d < 0) t.over += -d / u;
+    t.over += чуж / u;
   });
   return t;
 }
@@ -18795,11 +18800,12 @@ function audRow(r, idle){
   //
   // Зелёное — увидели всё, что числится; «излишек» — больше, чем кодовых;
   // остальное нейтрально: бутылки без кодов камера увидеть не может.
-  const cls = dim || idle ? 'dim' : r.actual === r.expected ? 'ok' : r.actual > c ? 'over' : '';
+  const cls = dim || idle ? 'dim' : r.other ? 'over' : r.actual === r.expected ? 'ok' : r.actual > c ? 'over' : '';
   // «сверх остатка» — после пересчёта списали больше, чем числилось: заказ не
   // того района или ошибка пересчёта; строка этого не прячет.
   const sub = (r.noqr ? `<span class="aud-r-s dn">QR код не внесён · ${fmtQty(r.noqr / u)}</span>` : '')
-            + (r.zero ? `<span class="aud-r-s dn">продано сверх остатка · ${fmtQty(r.zero / u)}</span>` : '');
+            + (r.zero ? `<span class="aud-r-s dn">продано сверх остатка · ${fmtQty(r.zero / u)}</span>` : '')
+            + (r.other ? `<span class="aud-r-s dn">числится на ${escS(r.other_from || 'другой точке')} · ${fmtQty(r.other / u)}</span>` : '');
   // Не хватает — значит есть что искать: строка открывает список бутылок,
   // которых камера не видела (владелец, 24 сен 2026: «что теперь с
   // недостачей?»). Без списка «не хватает 1» идти к полке не с чем.
@@ -19136,6 +19142,13 @@ function audReport(rep){
         <b class="aud-tv">${fmtQty(audUnits(rep.rows || []).over)}</b><span class="aud-tu">бут</span></div></div>`}
   </div>`;
   let secs = '';
+  // Коды не из реестра решают первыми: бутылка с такой наклейкой стояла под
+  // камерой, и чаще всего это и есть «пропавшая». Пока её не внесли или не
+  // убрали, недостачу не решают — сервер ответит alien_first. Раздел кодов
+  // поэтому встаёт над недостачей, а у недостачи нет кнопок.
+  const al = rep.alien;
+  const ждётКодов = !!(al && al.left);
+  let secAlien = '';
   if(short){
     const rows = (short.lines || []).map(l => `<div class="aud-r">${img(l.id)}
       <span class="ord-r-n">${escS(l.name)}</span>
@@ -19144,6 +19157,7 @@ function audReport(rep){
       ? `<div class="aud-done">${_AUD_CHECK}<span>${short.blame
           ? `Удержано <b>${fmt(short.amount)} AED</b> · ${escS(short.who || '')}`
           : 'Без виновного · за счёт компании'}</span></div>`
+      : ждётКодов ? ''
       : `<div class="aud-act">
           <button class="aud-b soft" onclick="audShortNone()">Без виновного</button>
           <button class="aud-b go" onclick="audHoldOpen()">Удержать с виновного</button></div>`;
@@ -19175,7 +19189,6 @@ function audReport(rep){
   // Коды не из реестра — свой раздел с решением, как недостача и излишек:
   // бутылка на полке есть, в учёте нет — её вносят как новый товар. Раздел
   // зовётся словами владельца, теми же, что плитка на листе.
-  const al = rep.alien;
   if(al && al.qty){
     const rows = (al.codes || []).map(c => {
       const raw = c.code.length > 26 ? c.code.slice(0, 24) + '…' : c.code;
@@ -19189,10 +19202,10 @@ function audReport(rep){
     const foot = !al.left
       ? `<div class="aud-done">${_AUD_CHECK}<span>Внесено в реестр · <b>${fmt(al.done)}</b></span></div>`
       : `<div class="aud-act"><button class="aud-b go" onclick="audAlienGo()">Внести товар</button></div>`;
-    secs += `<div class="aud-sec warn"><div class="aud-sec-h"><span>QR код не внесён</span>
+    secAlien = `<div class="aud-sec warn"><div class="aud-sec-h"><span>QR код не внесён</span>
       <b>${fmt(al.left || al.done)}<u>бут</u></b></div>${rows}${foot}</div>`;
   }
-  document.getElementById('stkMid').innerHTML = head + secs;
+  document.getElementById('stkMid').innerHTML = head + (ждётКодов ? secAlien + secs : secs + secAlien);
   // Внизу — то, что ждёт человека: принять решение, пока оно не принято, и
   // изменить, когда принято. Назад ведёт стрелка в шапке; сошедшейся ревизии
   // решать нечего, и подвала у неё нет.
@@ -19239,8 +19252,9 @@ function _audRow(main, ico, t, sub, q, u, go){
 function audDecide(){
   const rep = STK.report; if(!rep) return;
   const a = rep.audit || {}, s = a.short, o = a.over;
+  const al = a.alien_codes || rep.alien;
   let html = '';
-  if(s && !s.resolved_at){
+  if(s && !s.resolved_at && !(al && al.left)){
     html += `<div class="crw-ask-g">Недостача · ${fmtQty(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
       <div class="crw-ask-box">${
         _audRow(true, I_AUD_HOLD, 'Удержать с виновного', 'с кого и сколько',
@@ -19253,7 +19267,6 @@ function audDecide(){
         _audRow(true, I_AUD_IN, 'Внести на район', `${rep.district_code} ${rep.district_name}`,
                 fmtQty(o.qty), 'бут', 'audOver()')}</div>`;
   }
-  const al = a.alien_codes || rep.alien;
   if(al && al.left){
     html += `<div class="crw-ask-g">QR код не внесён · ${fmt(al.left)} ${pluralize(al.left, 'бутылка', 'бутылки', 'бутылок')}</div>
       <div class="crw-ask-box">${
@@ -19320,9 +19333,18 @@ async function audShortNone(){
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/short', {method:'POST',
         body:{district: rep.district, day: rep.day, blame: false, as: _meName()}}); }
-  catch(e){ _toast('Не удалось — попробуйте ещё раз'); return; }
+  catch(e){ if(_audAlienFirst(e)) return; _toast('Не удалось — попробуйте ещё раз'); return; }
   _audHap('ok'); _toast('Списано без виновного');
   audReport(r);
+}
+// Сервер не решает недостачу, пока в итоге есть коды не из реестра: страница
+// была открыта раньше, чем такой код появился. Перечитываем отчёт — раздел
+// «QR код не внесён» встанет первым.
+function _audAlienFirst(e){
+  if(((e || {}).payload || {}).error !== 'alien_first') return false;
+  _toast('Сначала QR код не внесён');
+  audReportGo();
+  return true;
 }
 
 async function audOver(){
@@ -19452,7 +19474,11 @@ async function audHoldSave(){
   const go = document.getElementById('audHoldGo'); if(go) go.disabled = true;
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/short', {method:'POST', body}); }
-  catch(e){ _toast('Не удалось — попробуйте ещё раз'); if(go) go.disabled = false; return; }
+  catch(e){
+    if(go) go.disabled = false;
+    if(((e || {}).payload || {}).error === 'alien_first'){ woCompClose(); _audAlienFirst(e); return; }
+    _toast('Не удалось — попробуйте ещё раз'); return;
+  }
   woCompClose(); _audHap('ok');
   _toast(`Удержано ${fmt(amount)} AED · ${names.join(', ')}`);
   audReport(r);
@@ -19578,6 +19604,8 @@ async function audLoadState(){
 
 function audSave(code){
   code = String(code || '').trim(); if(!code) return;
+  // Открыт вопрос «не та полка» — камера ждёт ответа, сканы не берём.
+  if(AUD.hold){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); return; }
   AUD.rows.unshift({code, state: 'sending', verdict: '', label: '', name: ''});
   audPaint();
   // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
@@ -19609,6 +19637,43 @@ function audDone(err, r, job){
   else if(r.verdict !== 'ok') qrFlash(flash, r.verdict === 'other' && r.home_code
     ? `числится на ${r.home_code}` : say);
   audPaint();
+  if(r.new && r.verdict === 'other') audForeign(r);
+}
+
+// Не та полка. Бутылки одного чужого района идут под камеру одна за другой —
+// считают не свой район (12 ноя 2026 полку JVC 25 минут сканировали в ревизии
+// B2, 382 скана, и программа молчала). Сервер шлёт, сколько таких подряд на
+// хвосте прохода; на пятой сканер встаёт и спрашивает. «Убрать и выйти»
+// снимает эти сканы из прохода: оставленные, они ушли бы в излишек, и «Внести
+// на район» перевезло бы сюда чужую полку. «Продолжить» — бутылки и правда
+// здесь; про этот район в этом заходе больше не спрашиваем.
+async function audForeign(r){
+  const n = r.foreign_run || 0, порог = r.foreign_stop || 5;
+  AUD.foreignOk = AUD.foreignOk || {};
+  if(AUD.hold || n < порог || AUD.foreignOk[r.home]) return;
+  AUD.hold = true;
+  const sh = STK.sheet || {};
+  const ответ = await askChoice(`Это полка ${r.home_code} ${r.home_name || ''}`.trim(),
+    `Ревизия ${sh.district_code || ''} ${sh.district_name || ''} · подряд ${n} с ${r.home_code}`,
+    'Убрать и выйти', 'Продолжить', 'bad', 'no');
+  if(ответ !== 'ok'){
+    // «Продолжить» или тап мимо окна: сканы остаются, сканер работает дальше.
+    AUD.foreignOk[r.home] = true; AUD.hold = false;
+    return;
+  }
+  // Очередь могла не успеть отправить последние сканы — ждём её, иначе хвост
+  // на сервере короче, чем на экране.
+  for(let i = 0; i < 40 && (audQ().busy || audQ().items.length); i++) await new Promise(z => setTimeout(z, 150));
+  let res;
+  try{
+    res = await ownerApi.ownerFetch('/api/owner/stock/audit/scan/foreign-drop', {method: 'POST',
+      body: {district: STK.district, day: sh.day || '', home: r.home, as: _meName()}});
+  }catch(e){ _toast('Не удалось убрать'); AUD.hold = false; return; }
+  (res.codes || []).forEach(c => { SCAN.seen.delete(c); SCAN.seenAt.delete(c); });
+  AUD.hold = false;
+  _audHap('warn');
+  await audScanClose();
+  _toast(`Убрано ${fmt(res.removed || 0)} ${pluralize(res.removed || 0, 'скан', 'скана', 'сканов')} с ${r.home_code}`);
 }
 
 function audPaint(){

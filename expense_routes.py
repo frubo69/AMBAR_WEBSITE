@@ -991,6 +991,17 @@ async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) 
         return
     log.info(f"[expenses] охране отдана {item.get('bottle','')} · {code} · {day}"
              f" · списана {min(ушла, now).isoformat(timespec='minutes')}")
+    # Списание легло временем расхода. Район пересчитали между расходом и
+    # решением — склад его уже не вычтет; а если камера ревизии успела
+    # посчитать эту бутылку ДО того, как её отдали, она осталась в снимке.
+    # Тогда снимок доводится (stock_routes.snapshot_late); камера её не видела
+    # — в снимке её нет, и ничего не меняется (случай 9–10 ноя, см. выше).
+    try:
+        await stock_routes.snapshot_late(
+            str(item.get("district") or ""), str(item.get("bottle_id") or ""),
+            min(ушла, now), несёт, code, f"бутылка охране {code} согласована после ревизии")
+    except Exception as e:                           # noqa: BLE001
+        log.warning(f"[expenses] снимок ревизии не доведён ({code}): {e}")
 
 
 @require_owner

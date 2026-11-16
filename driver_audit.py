@@ -90,11 +90,18 @@ def _sheet(sh: dict, a: dict) -> dict:
     кодов (их камера не видит, и в недостачу они не идут)."""
     rows = []
     for r in sh.get("rows") or []:
-        coded, actual, noqr = _coded(r), r.get("actual") or 0, r.get("noqr") or 0
-        if not (coded or actual or noqr):
+        coded, noqr = _coded(r), r.get("noqr") or 0
+        # «Нашли» — свои бутылки района. Бутылка с кодом другого района лежит
+        # здесь же, но своей не считается (SR._audit_lines): в «нашли N из M»
+        # она не идёт, а после завершения стоит в «Лишних» с районом, где
+        # числится.
+        other = r.get("other") or 0
+        actual = max(0, (r.get("actual") or 0) - other)
+        if not (coded or actual or noqr or other):
             continue
         rows.append({"id": r.get("id"), "name": r.get("name", ""), "no": r.get("no"),
-                     "unit": r.get("unit") or 1, "coded": coded, "actual": actual, "noqr": noqr})
+                     "unit": r.get("unit") or 1, "coded": coded, "actual": actual, "noqr": noqr,
+                     "other": other})
     t = {"coded": 0.0, "actual": 0.0, "noqr": 0.0, "short": 0.0, "over": 0.0}
     for r in rows:
         t["coded"] += r["coded"]; t["actual"] += r["actual"]; t["noqr"] += r["noqr"]
@@ -103,6 +110,7 @@ def _sheet(sh: dict, a: dict) -> dict:
             t["short"] += d
         elif d < 0:
             t["over"] += -d
+        t["over"] += r["other"]
     return {
         "district": sh.get("district"), "district_code": sh.get("district_code", ""),
         "district_name": sh.get("district_name", ""), "day": sh.get("day"),

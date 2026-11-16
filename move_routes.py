@@ -352,8 +352,13 @@ async def give_start(mid: str, oid: str, name: str, tgid: int, district: str) ->
     return {"ok": True, "task": give_view(mid, doc, oid, task, district, name)}
 
 
-async def _return_short(mid: str, oid: str, src: str, by: str, tgid: int = 0) -> dict:
+async def _return_short(mid: str, oid: str, src: str, by: str, tgid: int = 0,
+                        keep: dict = None) -> dict:
     """Непринятое возвращаем на район отдающего.
+
+    keep — {позиция: единиц}: пришло, но код не сканируется (получатель
+    отметил сам). Эти бутылки лежат у получателя и остаются за ним — назад
+    уходит только то, чего правда нет.
 
     Владелец, 24 сен 2026: «если водитель пишет, что принял неровно и какой-то
     товар не доехал — где логика?». Логики и не было. Бутылка переезжает в
@@ -376,6 +381,10 @@ async def _return_short(mid: str, oid: str, src: str, by: str, tgid: int = 0) ->
         d = float(l.get("got") or 0) - float(l.get("recv") or 0)
         if d > 1e-9:
             нужно[l.get("id")] = нужно.get(l.get("id"), 0.0) + d
+    for pid, q in (keep or {}).items():
+        if pid in нужно:
+            нужно[pid] = нужно[pid] - float(q or 0)
+    нужно = {pid: q for pid, q in нужно.items() if q > 1e-9}
     if not нужно:
         return {}
     приняты = {str(c) for c in (g.get("recv_codes") or [])}
@@ -414,7 +423,7 @@ async def _return_short(mid: str, oid: str, src: str, by: str, tgid: int = 0) ->
 
 
 async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: str,
-                 ok: bool = True, lines: list = None, note: str = "") -> dict:
+                 ok: bool = True, lines: list = None, note: str = "", kept: list = None) -> dict:
     """Получатель принял передачу src → oid. «Принял» — всё сошлось; «Принял
     неровно» — сколько пришло на самом деле по каждой позиции и что не так.
 
@@ -425,7 +434,15 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
     С 19 сен 2026 получатель сканирует каждую бутылку (receive): «Принял» —
     только когда отсканировано всё (последний скан и принимает сам); «не всё
     пришло» (ok=False) — расхождение считается по сканам: отдали — пришло то,
-    что отсканировал получатель. Числа руками (lines) больше не берутся."""
+    что отсканировал получатель. Числа руками (lines) больше не берутся.
+
+    kept — [{id, qty}]: «пришло, код не сканируется» (с 16 ноя 2026). Наклейка
+    бывает затёрта, и до этого у получателя был один выход — «не всё пришло»:
+    бутылка возвращалась отдающему по бумагам, лежала у получателя и выходила
+    недостачей на ревизии отдающего (5 ноя 2026, B1 → B5: «всё получил, одну
+    не сканируется» — Absolut, недостача B1 11 ноя). Отмеченное остаётся за
+    получателем: назад уходит только то, чего правда нет. Не больше, чем не
+    отсканировано по позиции."""
     if district != oid:
         return {"ok": False, "error": "not_your_district"}
     doc = await db.move_order_get(mid)
@@ -444,11 +461,28 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
         # Не всё отсканировано — «Принял» нельзя: досканировать или «не всё пришло».
         return {"ok": False, "error": "scan_all", "task": g}
     diff = []
+    оставить: dict = {}
     if not ok:
+        хотят: dict = {}
+        for x in kept or []:
+            try:
+                q = float((x or {}).get("qty") or 0)
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if q > 0:
+                хотят[str(x.get("id") or "")] = q
         for l in g["lines"]:
-            if abs(float(l["recv"]) - float(l["got"])) > 1e-9:
-                diff.append({"id": l["id"], "name": l["name"], "unit": l["unit"],
-                             "sent": l["got"], "got": l["recv"]})
+            нет = float(l["got"]) - float(l["recv"])
+            if abs(нет) > 1e-9:
+                row = {"id": l["id"], "name": l["name"], "unit": l["unit"],
+                       "sent": l["got"], "got": l["recv"]}
+                # Шаг — как у кода позиции: бутылка 1, наклейка пива — полкоробки.
+                шаг = 0.5 if int(l["unit"] or 1) > 1 else 1.0
+                q = min(max(0.0, нет), int(хотят.get(l["id"], 0) / шаг + 1e-9) * шаг)
+                if q > 1e-9:
+                    оставить[l["id"]] = q
+                    row["kept"] = sr._num(q)
+                diff.append(row)
         if not diff and not note:
             # «Неровно», но ничего не поменяли и ничего не написали — сказать нечего.
             return {"ok": False, "error": "diff_empty", "task": g}
@@ -461,7 +495,7 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
     if not ok:
         # Недоехавшее — обратно отдающему, чтобы недостача не села на того,
         # кто товар не видел (владелец, 24 сен 2026).
-        back = await _return_short(mid, oid, src, name, tgid)
+        back = await _return_short(mid, oid, src, name, tgid, оставить)
         if back:
             await db.move_give_back(mid, oid, src, back)
     doc = await db.move_order_get(mid)
@@ -472,7 +506,8 @@ async def accept(mid: str, oid: str, src: str, name: str, tgid: int, district: s
         await db.move_order_close_if_done(mid, _now())
         doc = await db.move_order_get(mid)
         task = (doc.get("tasks") or {}).get(oid) or {}
-    log.info(f"[move] {mid}/{oid}: {name} принял из {src}" + ("" if ok else f" неровно: {diff} «{note}»"))
+    log.info(f"[move] {mid}/{oid}: {name} принял из {src}" + ("" if ok else f" неровно: {diff} «{note}»")
+             + (f" · не сканируется, остаётся у получателя: {оставить}" if оставить else ""))
     return {"ok": True, "task": give_view(mid, doc, oid, task, src, name),
             "task_done": bool(task.get("done_at"))}
 
@@ -1164,7 +1199,8 @@ async def handle_drv_accept(request):
                      str(b.get("from") or ""), me["name"], request["tg"].get("id") or 0,
                      me.get("district") or "", ok=b.get("ok") is not False,
                      lines=b.get("lines") if isinstance(b.get("lines"), list) else [],
-                     note=str(b.get("note") or ""))
+                     note=str(b.get("note") or ""),
+                     kept=b.get("kept") if isinstance(b.get("kept"), list) else [])
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
@@ -1391,7 +1427,8 @@ async def handle_own_accept(request):
     oid = str(b.get("district") or "")
     r = await accept(request.match_info.get("mid") or "", oid, str(b.get("from") or ""),
                      _own_name(request, b), int(request.get("owner_id") or 0), oid,
-                     ok=b.get("ok") is not False, lines=[], note=str(b.get("note") or ""))
+                     ok=b.get("ok") is not False, lines=[], note=str(b.get("note") or ""),
+                     kept=b.get("kept") if isinstance(b.get("kept"), list) else [])
     return web.json_response(r, headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 

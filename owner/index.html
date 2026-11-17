@@ -48124,6 +48124,9 @@ function callInit(){
   CALL = new AmbarCall({
     api: ownerApi.AMBAR_API,
     initData: (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || '',
+    // Имя в контактах связи — то же, каким подписаны правки (_meName): сервер
+    // берёт его для тех, кто не назван в настройках, и запоминает.
+    as: _meName(),
     on: callEvent,
   });
   CALL.connect();

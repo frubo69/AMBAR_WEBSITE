@@ -1257,6 +1257,33 @@ async def is_manager(telegram_id: int) -> bool:
     return bool(doc) and not doc.get("blocked", False)
 
 
+# ── Звонки: как зовут тех, у кого нет имени в настройках ────────────────────
+# Имя менеджера, не названного в AMBAR_STAR_NAMES, сервис узнаёт, когда тот
+# открывает приложение. В памяти оно жило до перезапуска: после него человек
+# стоял в контактах безымянной строкой «AMBAR STAR», пока сам не зайдёт
+# (17 ноя 2026: «почему у амбар (владельца) нет меня в списке контактов?»).
+async def call_names_get() -> dict:
+    """{telegram_id: имя} — имена, увиденные при входе в связь."""
+    db = _db_or_none()
+    if db is None: return {}
+    out = {}
+    async for d in db.call_names.find({}, {"name": 1}):
+        try:
+            if d.get("name"):
+                out[int(d["_id"])] = str(d["name"])
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+async def call_name_set(telegram_id: int, name: str) -> None:
+    db = _db_or_none()
+    if db is None or not telegram_id or not name: return
+    await db.call_names.update_one(
+        {"_id": int(telegram_id)},
+        {"$set": {"name": str(name), "at": datetime.now(timezone.utc)}}, upsert=True)
+
+
 async def is_manager_blocked(telegram_id: int) -> bool:
     """True if user has a blocked record in owner_managers."""
     db = _db_or_none()

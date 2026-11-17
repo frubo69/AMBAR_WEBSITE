@@ -89,9 +89,30 @@ def _star_names() -> dict:
 
 STAR_NAMES = _star_names()
 
-# Имена тех, кто вошёл, но в списке выше не назван: телеграм сообщает их сам
-# при входе. Держим, чтобы собеседник видел человека, а не номер.
+# Имена тех, кто вошёл, но в списке выше не назван: приложение сообщает их
+# при входе. Держим, чтобы собеседник видел человека, а не номер, — и храним в
+# базе (db.call_names): в памяти имя жило до перезапуска сервиса, а после него
+# человек стоял в контактах безымянной строкой «AMBAR STAR», пока сам не
+# откроет приложение (17 ноя 2026: «почему у амбар (владельца) нет меня в
+# списке контактов?»).
 _STAR_SEEN: dict = {}
+_NAMES_LOADED = False
+
+
+async def _names_load():
+    """Имена, увиденные до перезапуска, — из базы, один раз."""
+    global _NAMES_LOADED
+    if _NAMES_LOADED:
+        return
+    try:
+        for uid, имя in (await db.call_names_get()).items():
+            if imya_ok(имя):
+                _STAR_SEEN.setdefault(uid, имя)
+        _NAMES_LOADED = True
+        log.info(f"[call] верхний уровень: {len(_star_ids())}, из них звонит только владелец: "
+                 f"{len(_star_ids() - _star_open())}, имён из базы: {len(_STAR_SEEN)}")
+    except Exception as e:
+        log.warning(f"[call] имена верхнего уровня не прочитаны: {e}")
 
 
 def _star_ids() -> set:
@@ -99,6 +120,31 @@ def _star_ids() -> set:
     try:
         from config import OWNER_IDS, MANAGER_IDS
         return set(OWNER_IDS) | set(MANAGER_IDS) | set(STAR_NAMES)
+    except Exception:
+        return set(STAR_NAMES)
+
+
+def _is_owner(uid) -> bool:
+    try:
+        from config import OWNER_IDS
+        return int(uid) in OWNER_IDS
+    except Exception:
+        return False
+
+
+def _star_open() -> set:
+    """Кому из верхнего уровня может позвонить любой: владельцу и тем, кого
+    зовут по имени в настройках (AMBAR_STAR_NAMES — «AMBAR», «Старший»). Это
+    люди из цепочки заказов: им звонят водители и операторы.
+
+    Остальные аккаунты верхнего уровня — менеджер без имени в настройках — в
+    цепочке не стоят. Звонить им может только владелец: у него они в
+    контактах, у старшего, операторов и водителей — нет, и набрать их в обход
+    списка сервер не даст (_may_call). Сами они звонят всем, как и раньше.
+    (17 ноя 2026: «он должен иметь возможность мне позвонить, но только он».)"""
+    try:
+        from config import OWNER_IDS
+        return set(OWNER_IDS) | set(STAR_NAMES)
     except Exception:
         return set(STAR_NAMES)
 
@@ -740,6 +786,7 @@ async def handle_ws(request: web.Request):
             return ws
 
         await refresh_staff()
+        await _names_load()
         peer = await _identify(hello)
         if not peer:
             # Отказ обязан быть виден в логах. Молчаливый отказ выглядит с
@@ -960,9 +1007,23 @@ async def _identify(hello: dict):
         u = validate_owner_init_data(tma)
         uid = int((u or {}).get("id") or 0)
         if uid and (uid in OWNER_IDS or uid in MANAGER_IDS or await db.is_manager(uid)):
-            имя = (u.get("first_name") or "").strip()
-            if imya_ok(имя):
+            # Как человека зовут в приложении: STAR присылает то же имя, каким
+            # подписывает его правки (_meName на странице), — в учёте человек
+            # мог просить называть себя не так, как в телеграме. Чужое имя из
+            # настроек взять нельзя: «AMBAR» и «Старший» — это конкретные люди.
+            имя = (hello.get("as") or "").strip()
+            занято = {n.casefold() for i, n in STAR_NAMES.items() if i != uid}
+            if not imya_ok(имя) or имя.casefold() in занято:
+                # Приложение имени не прислало или прислало негодное: остаётся
+                # то, что уже знали; не знали ничего — имя из телеграма.
+                имя = _STAR_SEEN.get(uid) or (u.get("first_name") or "").strip()
+            if imya_ok(имя) and _STAR_SEEN.get(uid) != имя:
                 _STAR_SEEN[uid] = имя
+                if uid not in STAR_NAMES:
+                    try:
+                        await db.call_name_set(uid, имя)
+                    except Exception as e:
+                        log.warning(f"[call] имя верхнего уровня не записано: {e}")
             name = _star_name(uid)
             return Peer(sid, None, "star", f"star:{uid}", name)
     except Exception as e:
@@ -1029,7 +1090,9 @@ def _roster(peer: Peer) -> list:
     # Голос — не просьба к клиенту, а запрет в _start_call: водитель видео не
     # набирает никому, пара с оператором всегда голосовая.
     def add_stars():
-        for uid in sorted(_star_ids()):
+        # Только те, кому звонят все (_star_open): менеджера без имени в
+        # настройках у водителя и оператора в контактах нет.
+        for uid in sorted(_star_open()):
             add(f"star:{uid}", _star_name(uid), "старший")
 
     if peer.kind == "drv":
@@ -1059,8 +1122,10 @@ def _roster(peer: Peer) -> list:
     if peer.kind == "star":
         # Верхний уровень звонит друг другу: между собой они ровня, и запрет
         # «снизу вверх» их не касается — выше них никого нет.
+        # Владелец видит всех; остальные — только тех, кому звонят все: аккаунт
+        # без имени в настройках набирает один владелец (_star_open).
         me = peer.key.partition(":")[2]
-        for uid in sorted(_star_ids()):
+        for uid in sorted(_star_ids() if _is_owner(me) else _star_open()):
             if str(uid) == me:
                 continue
             add(f"star:{uid}", _star_name(uid), "AMBAR STAR")

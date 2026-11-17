@@ -8009,6 +8009,34 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .scan-frame.ok .c,.scan-frame.dup .c,.scan-frame.again .c,.scan-frame.err .c{animation:none}
 .scan-frame.ok .scan-badge,.scan-frame.dup .scan-badge,
 .scan-frame.again .scan-badge,.scan-frame.err .scan-badge{animation:badgeUp .24s ease-out}
+/* Прицел: приёмка, ревизия, внесение кодов (владелец, 17 ноя 2026: «сканируют
+   водку, а вместе с водкой цепляют вино, и вино заносится как водка»).
+   Читается только окно рамки — SCAN._aimZone берёт его прямо с экрана, — а
+   всё вокруг приглушено: соседнюю бутылку видно, и видно, что она не
+   считается. Затемнение рисует сама рамка, поэтому окно и зона чтения не
+   могут разойтись. На результат «клюют» уголки, а окно стоит на месте: его
+   край — граница чтения, дышать ему нельзя. Уголки идут по скруглению окна. */
+.scan-cam.aim .scan-frame::before{content:'';position:absolute;inset:0;border-radius:inherit;
+  box-shadow:0 0 0 200vmax rgba(0,0,6,.56),inset 0 0 0 1px rgba(255,255,255,.14)}
+.scan-cam.aim .scan-frame .c{width:38px;height:38px}
+.scan-cam.aim .scan-frame .tl{border-radius:28px 0 0 0}
+.scan-cam.aim .scan-frame .tr{border-radius:0 28px 0 0}
+.scan-cam.aim .scan-frame .bl{border-radius:0 0 0 28px}
+.scan-cam.aim .scan-frame .br{border-radius:0 0 28px 0}
+.scan-cam.aim .scan-frame.ok,.scan-cam.aim .scan-frame.dup,
+.scan-cam.aim .scan-frame.again,.scan-cam.aim .scan-frame.err{animation:none}
+@keyframes aimTL{38%{transform:translate(-6px,-6px)}}
+@keyframes aimTR{38%{transform:translate(6px,-6px)}}
+@keyframes aimBL{38%{transform:translate(-6px,6px)}}
+@keyframes aimBR{38%{transform:translate(6px,6px)}}
+.scan-cam.aim .scan-frame.ok .tl,.scan-cam.aim .scan-frame.dup .tl,
+.scan-cam.aim .scan-frame.again .tl,.scan-cam.aim .scan-frame.err .tl{animation:aimTL .42s cubic-bezier(.22,.9,.25,1)}
+.scan-cam.aim .scan-frame.ok .tr,.scan-cam.aim .scan-frame.dup .tr,
+.scan-cam.aim .scan-frame.again .tr,.scan-cam.aim .scan-frame.err .tr{animation:aimTR .42s cubic-bezier(.22,.9,.25,1)}
+.scan-cam.aim .scan-frame.ok .bl,.scan-cam.aim .scan-frame.dup .bl,
+.scan-cam.aim .scan-frame.again .bl,.scan-cam.aim .scan-frame.err .bl{animation:aimBL .42s cubic-bezier(.22,.9,.25,1)}
+.scan-cam.aim .scan-frame.ok .br,.scan-cam.aim .scan-frame.dup .br,
+.scan-cam.aim .scan-frame.again .br,.scan-cam.aim .scan-frame.err .br{animation:aimBR .42s cubic-bezier(.22,.9,.25,1)}
 .scan-strip>*:first-child{animation:chipIn .28s cubic-bezier(.2,.9,.25,1)}
 /* Счётчик выезжает столбиком — прокрутка живёт в JS (scanRoll), а тут только
    обрезаем хвост цифры, чтобы её уход был чистым. */
@@ -19547,7 +19575,7 @@ async function audScanOpen(){
   lay.className = 'aud-cam'; lay.id = 'audCam';
   // Слева — последняя бутылка и «столько из стольких» по ней (появляется с
   // первым сканом), справа перед фонариком — общий счёт по району.
-  lay.innerHTML = `<div class="scan-cam" id="qrCam">
+  lay.innerHTML = `<div class="scan-cam aim" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -31525,7 +31553,7 @@ const SCAN = {
   GAP_MS:900,
   lastDecode:0, lastHit:0, frames:0, t0:0, torchOn:false, alt:false,
   DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
-  CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
+  CROP:0.82,               // экраны без прицела: середина кадра (по краям ловятся чужие коды с полки)
   MAXPX:512,
 
   // Ровно основная камера, а не «задняя вообще».
@@ -31633,6 +31661,41 @@ const SCAN = {
   },
   hasTorch(){ return AmbarTorch.has(this.track()); },
 
+  // Прицел. На экране, где у камеры стоит класс aim, читается только окно
+  // рамки: бутылка рядом с окном в распознавание не попадает вовсе — её точек
+  // там просто нет. Окно берём с экрана, а не из чисел по соседству: что
+  // обведено, то и читается, где бы рамка ни стояла и какого бы размера ни
+  // была. Раньше читался квадрат в 82 % ширины экрана при рамке не шире 64 % — код
+  // рядом с уголками ловился, а код позиции выбран на экране, вот вино и
+  // вставало водкой (владелец, 17 ноя 2026).
+  //   null  — прицела на этом экране нет, читаем середину кадра (CROP);
+  //   false — прицел есть, но окно сейчас не измерить: кадр пропускаем.
+  _aimZone(v){
+    const box = v.parentElement;
+    if(!box || !box.classList.contains('aim')) return null;
+    const f = box.querySelector('.scan-frame');
+    const vr = v.getBoundingClientRect();
+    if(!f || !f.offsetWidth || !f.offsetHeight || !v.offsetWidth || !v.offsetHeight
+       || !vr.width || !vr.height) return false;
+    const fr = f.getBoundingClientRect();
+    // Экран может ехать и сжиматься переходом (камера ревизии выезжает
+    // снизу), поэтому считаем в единицах вёрстки: середина окна — по месту
+    // относительно видео, размер — из вёрстки.
+    const k = vr.width / v.offsetWidth;
+    const cw = v.offsetWidth, ch = v.offsetHeight;
+    const cx = (fr.left + fr.width / 2 - vr.left) / k;
+    const cy = (fr.top + fr.height / 2 - vr.top) / k;
+    // Точка экрана → точка кадра: видео растянуто до краёв и обрезано.
+    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const sw = f.offsetWidth / scale, sh = f.offsetHeight / scale;
+    const sx = (cx + (v.videoWidth * scale - cw) / 2) / scale - sw / 2;
+    const sy = (cy + (v.videoHeight * scale - ch) / 2) / scale - sh / 2;
+    const x0 = Math.max(0, sx), y0 = Math.max(0, sy);
+    const x1 = Math.min(v.videoWidth, sx + sw), y1 = Math.min(v.videoHeight, sy + sh);
+    if(x1 - x0 < 16 || y1 - y0 < 16) return false;
+    return {sx:x0, sy:y0, sw:x1 - x0, sh:y1 - y0};
+  },
+
   _loop(ts){
     if(!this.stream) return;
     // Экран под камерой перерисовали — <video> оторвался от страницы. Человек
@@ -31649,28 +31712,37 @@ const SCAN = {
     const v = this.video;
     if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
 
-    // Распознаём ровно то, что обведено рамкой на экране. Видео показано с
-    // обрезкой по краям (object-fit: cover), поэтому центр кадра и центр
-    // картинки — не одно и то же: без пересчёта человек целится в рамку, а
-    // читается другой кусок, и он не понимает, почему код не ловится.
-    const cw = v.clientWidth || v.videoWidth, ch = v.clientHeight || v.videoHeight;
-    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
-    const visW = cw / scale, visH = ch / scale;          // что реально видно, в пикселях кадра
-    const side = Math.min(visW, visH) * this.CROP;
-    const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
+    // Какой кусок кадра читать. С прицелом — ровно окно рамки и ничего вокруг
+    // (_aimZone). Без него — середина кадра (CROP). Видео показано с обрезкой
+    // по краям (object-fit: cover), поэтому центр кадра и центр картинки — не
+    // одно и то же: без пересчёта человек целится в рамку, а читается другой
+    // кусок, и он не понимает, почему код не ловится.
+    const aim = this._aimZone(v);
+    if(aim === false) return;        // прицел есть, но окно не измерить: шире окна не читаем
+    let sx, sy, sw, sh;
+    if(aim){ sx = aim.sx; sy = aim.sy; sw = aim.sw; sh = aim.sh; }
+    else{
+      const cw = v.clientWidth || v.videoWidth, ch = v.clientHeight || v.videoHeight;
+      const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+      const visW = cw / scale, visH = ch / scale;        // что реально видно, в пикселях кадра
+      const side = Math.min(visW, visH) * this.CROP;
+      sx = (v.videoWidth - side) / 2; sy = (v.videoHeight - side) / 2; sw = sh = side;
+    }
     // Один и тот же кусок читаем попеременно в двух масштабах. Распознавание
     // ищет модули кода по резкости перепада: на смазанном или засвеченном
     // кадре крупная картинка рассыпается в шум, а та же, но вдвое мельче,
     // читается — мелкие детали усредняются, и границы модулей проступают.
     // Обратное тоже верно, поэтому и по очереди, а не всегда мельче.
     this.alt = !this.alt;
-    const full = Math.min(this.MAXPX, Math.round(side));
+    const major = Math.max(sw, sh);
+    const full = Math.min(this.MAXPX, Math.round(major));
     const px = this.alt ? full : Math.max(160, Math.round(full / 2));
-    this.cv.width = px; this.cv.height = px;
-    this.ctx.drawImage(v, sx, sy, side, side, 0, 0, px, px);
-    const img = this.ctx.getImageData(0, 0, px, px);
+    const pw = Math.max(1, Math.round(px * sw / major)), ph = Math.max(1, Math.round(px * sh / major));
+    this.cv.width = pw; this.cv.height = ph;
+    this.ctx.drawImage(v, sx, sy, sw, sh, 0, 0, pw, ph);
+    const img = this.ctx.getImageData(0, 0, pw, ph);
     this.frames++;
-    const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
+    const hit = jsQR(img.data, pw, ph, {inversionAttempts:'attemptBoth'});
     if(hit && hit.data){
       const code = String(hit.data).trim();
       this.lastHit = Date.now();
@@ -33380,7 +33452,7 @@ function qrScreen(mode){
   // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
-    <div class="scan-cam" id="qrCam">
+    <div class="scan-cam aim" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
 
       <div class="scan-frame" id="qrFrame">
@@ -37359,7 +37431,7 @@ function rcvCam(){
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
-    <div class="scan-cam" id="rcvCamBox">
+    <div class="scan-cam aim" id="rcvCamBox">
       <video id="rcvVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>

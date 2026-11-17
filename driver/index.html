@@ -3161,6 +3161,25 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .cam-frame.ok{background:rgba(76,175,125,.3);box-shadow:inset 0 0 0 3px var(--up)}
 .cam-frame.dup{background:rgba(243,180,74,.3);box-shadow:inset 0 0 0 3px var(--warn)}
 .cam-frame.err{background:rgba(224,85,85,.32);box-shadow:inset 0 0 0 3px var(--dn)}
+/* Прицел: приёмка и ревизия (владелец, 17 ноя 2026: «сканируют водку, а вместе
+   с водкой цепляют вино, и вино заносится как водка»). Читается только окно
+   рамки — SCAN._aimZone берёт его прямо с экрана, — а всё вокруг приглушено:
+   соседнюю бутылку видно, и видно, что она не считается. Затемнение рисует
+   сама рамка, поэтому окно и зона чтения не могут разойтись. Окно квадратное,
+   по центру кадра и чуть выше середины: внизу стоит счёт. Уголки идут по
+   скруглению окна. */
+.cam.aim .cam-frame{inset:auto;left:50%;top:48%;width:64%;aspect-ratio:1;border-radius:22px;
+  transform:translate(-50%,-50%)}
+.cam.aim .cam-frame::before{content:'';position:absolute;inset:0;border-radius:inherit;
+  box-shadow:0 0 0 200vmax rgba(0,0,6,.56),inset 0 0 0 1px rgba(255,255,255,.14)}
+.cam.aim .cam-frame .c{width:32px;height:32px}
+.cam.aim .cam-frame .tl{border-radius:22px 0 0 0}
+.cam.aim .cam-frame .tr{border-radius:0 22px 0 0}
+.cam.aim .cam-frame .bl{border-radius:0 0 0 22px}
+.cam.aim .cam-frame .br{border-radius:0 0 22px 0}
+/* Пустая плашка ответа стоит тёмной пилюлей ровно в середине окна — там, куда
+   наводят код. Пока сказать нечего, её нет. */
+.cam.aim .cam-badge:empty{display:none}
 .cam-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   padding:7px 14px;border-radius:11px;background:rgba(0,0,0,.6);font-size:14px;font-weight:700;
   white-space:nowrap;text-align:center}
@@ -10660,7 +10679,7 @@ const SCAN = {
   GAP_MS:900,
   lastDecode:0, lastHit:0, frames:0, t0:0, torchOn:false, alt:false,
   DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
-  CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
+  CROP:0.82,               // экраны без прицела: середина кадра (по краям ловятся чужие коды с полки)
   MAXPX:512,
 
   // Ровно основная камера, а не «задняя вообще».
@@ -10755,6 +10774,40 @@ const SCAN = {
   },
   hasTorch(){ return AmbarTorch.has(this.track()); },
 
+  // Прицел. На экране, где у камеры стоит класс aim, читается только окно
+  // рамки: бутылка рядом с окном в распознавание не попадает вовсе — её точек
+  // там просто нет. Окно берём с экрана, а не из чисел по соседству: что
+  // обведено, то и читается, где бы рамка ни стояла и какого бы размера ни
+  // была. Раньше читался квадрат в 82 % кадра, а уголки стояли выше и уже —
+  // код под ними ловился, а позиция выбрана на экране, вот вино и вставало
+  // водкой (владелец, 17 ноя 2026).
+  //   null  — прицела на этом экране нет, читаем середину кадра (CROP);
+  //   false — прицел есть, но окно сейчас не измерить: кадр пропускаем.
+  _aimZone(v){
+    const box = v.parentElement;
+    if(!box || !box.classList.contains('aim')) return null;
+    const f = box.querySelector('.cam-frame');
+    const vr = v.getBoundingClientRect();
+    if(!f || !f.offsetWidth || !f.offsetHeight || !v.offsetWidth || !v.offsetHeight
+       || !vr.width || !vr.height) return false;
+    const fr = f.getBoundingClientRect();
+    // Экран может ехать и сжиматься переходом, поэтому считаем в единицах
+    // вёрстки: середина окна — по месту относительно видео, размер — из вёрстки.
+    const k = vr.width / v.offsetWidth;
+    const cw = v.offsetWidth, ch = v.offsetHeight;
+    const cx = (fr.left + fr.width / 2 - vr.left) / k;
+    const cy = (fr.top + fr.height / 2 - vr.top) / k;
+    // Точка экрана → точка кадра: видео растянуто до краёв и обрезано.
+    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const sw = f.offsetWidth / scale, sh = f.offsetHeight / scale;
+    const sx = (cx + (v.videoWidth * scale - cw) / 2) / scale - sw / 2;
+    const sy = (cy + (v.videoHeight * scale - ch) / 2) / scale - sh / 2;
+    const x0 = Math.max(0, sx), y0 = Math.max(0, sy);
+    const x1 = Math.min(v.videoWidth, sx + sw), y1 = Math.min(v.videoHeight, sy + sh);
+    if(x1 - x0 < 16 || y1 - y0 < 16) return false;
+    return {sx:x0, sy:y0, sw:x1 - x0, sh:y1 - y0};
+  },
+
   _loop(ts){
     if(!this.stream) return;
     // Экран под камерой перерисовали — <video> оторвался от страницы. Человек
@@ -10768,28 +10821,37 @@ const SCAN = {
     const v = this.video;
     if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
 
-    // Распознаём ровно то, что обведено рамкой на экране. Видео показано с
-    // обрезкой по краям (object-fit: cover), поэтому центр кадра и центр
-    // картинки — не одно и то же: без пересчёта человек целится в рамку, а
-    // читается другой кусок, и он не понимает, почему код не ловится.
-    const cw = v.clientWidth || v.videoWidth, ch = v.clientHeight || v.videoHeight;
-    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
-    const visW = cw / scale, visH = ch / scale;          // что реально видно, в пикселях кадра
-    const side = Math.min(visW, visH) * this.CROP;
-    const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
+    // Какой кусок кадра читать. С прицелом — ровно окно рамки и ничего вокруг
+    // (_aimZone). Без него — середина кадра (CROP). Видео показано с обрезкой
+    // по краям (object-fit: cover), поэтому центр кадра и центр картинки — не
+    // одно и то же: без пересчёта человек целится в рамку, а читается другой
+    // кусок, и он не понимает, почему код не ловится.
+    const aim = this._aimZone(v);
+    if(aim === false) return;        // прицел есть, но окно не измерить: шире окна не читаем
+    let sx, sy, sw, sh;
+    if(aim){ sx = aim.sx; sy = aim.sy; sw = aim.sw; sh = aim.sh; }
+    else{
+      const cw = v.clientWidth || v.videoWidth, ch = v.clientHeight || v.videoHeight;
+      const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+      const visW = cw / scale, visH = ch / scale;        // что реально видно, в пикселях кадра
+      const side = Math.min(visW, visH) * this.CROP;
+      sx = (v.videoWidth - side) / 2; sy = (v.videoHeight - side) / 2; sw = sh = side;
+    }
     // Один и тот же кусок читаем попеременно в двух масштабах. Распознавание
     // ищет модули кода по резкости перепада: на смазанном или засвеченном
     // кадре крупная картинка рассыпается в шум, а та же, но вдвое мельче,
     // читается — мелкие детали усредняются, и границы модулей проступают.
     // Обратное тоже верно, поэтому и по очереди, а не всегда мельче.
     this.alt = !this.alt;
-    const full = Math.min(this.MAXPX, Math.round(side));
+    const major = Math.max(sw, sh);
+    const full = Math.min(this.MAXPX, Math.round(major));
     const px = this.alt ? full : Math.max(160, Math.round(full / 2));
-    this.cv.width = px; this.cv.height = px;
-    this.ctx.drawImage(v, sx, sy, side, side, 0, 0, px, px);
-    const img = this.ctx.getImageData(0, 0, px, px);
+    const pw = Math.max(1, Math.round(px * sw / major)), ph = Math.max(1, Math.round(px * sh / major));
+    this.cv.width = pw; this.cv.height = ph;
+    this.ctx.drawImage(v, sx, sy, sw, sh, 0, 0, pw, ph);
+    const img = this.ctx.getImageData(0, 0, pw, ph);
     this.frames++;
-    const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
+    const hit = jsQR(img.data, pw, ph, {inversionAttempts:'attemptBoth'});
     if(hit && hit.data){
       const code = String(hit.data).trim();
       this.lastHit = Date.now();
@@ -11675,7 +11737,7 @@ function audCamPaint(first){
   v.innerHTML = `${fmtQty(t.found)}<u> / ${fmtQty(t.coded)}</u>`;
   if(first || !document.getElementById('audVid')){
     document.getElementById('audMid').innerHTML = `
-      <div class="cam">
+      <div class="cam aim">
         <video id="audVid" playsinline muted autoplay></video>
         <div class="cam-tools">
           <button class="cam-t ${SFX.on ? '' : 'muted'}" onclick="camSound(this)" aria-label="Звук">
@@ -12510,7 +12572,7 @@ function supRenderCam(){
   // На камере справа — счёт по этой позиции, обходного пути тут нет.
   document.getElementById('supAct').style.display = 'none';
   document.getElementById('supMid').innerHTML = `
-    <div class="cam${RM ? ' rm' : ''}" id="camBox">
+    <div class="cam aim${RM ? ' rm' : ''}" id="camBox">
       <video id="camV" playsinline muted autoplay></video>
       <div class="cam-tools">
         <button class="cam-t ${SFX.on ? '' : 'muted'}" onclick="camSound(this)" aria-label="Звук">

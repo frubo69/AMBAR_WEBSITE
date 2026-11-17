@@ -206,7 +206,8 @@ async def main():
         r = await api_server.handle_create_order(req)
         return r.status, json.loads(r.text)
     calls = []
-    async def spy_send(text, district="", parse_mode="HTML", reply_markup=None, register=True, test=False):
+    # **kw: карточку заказа шлёт op_route.send_order, а она зовёт send с to / wait / chase
+    async def spy_send(text, district="", parse_mode="HTML", reply_markup=None, register=True, test=False, **kw):
         calls.append(("op_route", test)); return {"1": 1} if test else {"7": 1}
     op_route.send = spy_send
     async def spy_new(*a, **k): calls.append(("owner_new", k.get("test", False)))

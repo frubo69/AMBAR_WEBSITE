@@ -38,7 +38,8 @@ SENT = []        # сообщения операторам
 OWNER = []       # notify_new_order kwargs
 async def _none(*a, **k): return None
 async def _tg(token, chat_id, text, *a, **k): return {"ok": True, "result": {"message_id": 1}}
-async def _ops(text, district="", parse_mode="HTML", reply_markup=None, register=True, test=False):
+# **kw: карточку заказа шлёт op_route.send_order, а она зовёт send с to / wait / chase
+async def _ops(text, district="", parse_mode="HTML", reply_markup=None, register=True, test=False, **kw):
     SENT.append(text); return {"7": 1}
 async def _owner_new(*a, **k): OWNER.append(k)
 async def _owners(*a, **k): return []

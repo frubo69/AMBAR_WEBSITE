@@ -1160,11 +1160,14 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         # чужой. Старший и планшет получают всё и всегда. Пока операторам не
         # выданы telegram-id, маршрут вырождается в прежнее «всем сразу».
         import op_route
-        op_msg_ids = await op_route.send(op_text, district=office_id,
-                                         parse_mode="HTML", reply_markup=op_kb, test=test)
-        if op_msg_ids:
-            await db.update_order(oid, op_msg_ids=op_msg_ids)
-        elif OPERATOR_IDS and not test:
+        # Всем сразу и с повтором недошедшего в фоне: 17 ноя 2026 телеграм
+        # одиннадцать раз подряд ответил «Bad Gateway», рассылка шла по очереди,
+        # и заказ простоял здесь 2 мин 50 с — столько же ждало приложение
+        # клиента. Номера карточек send_order пишет в заказ сама, по ключу на
+        # чат: дошедшее позже дописывается.
+        op_msg_ids = await op_route.send_order(oid, op_text, district=office_id,
+                                               reply_markup=op_kb, test=test)
+        if not op_msg_ids and OPERATOR_IDS and not test:
             # Not a single operator got the order — that's an outage, not a log line.
             log.error(f"[order] #{oid} reached NO operator — check OPERATOR_BOT_TOKEN / OPERATOR_IDS")
             try:
@@ -2185,19 +2188,17 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                 combined = bq_alert + "\n\n" + paid_banner + f"🆕 <b>ЗАКАЗ #{oid}</b>"
         except Exception as e:
             log.error(f"[verify-request] message build failed for #{oid} — sending fallback: {e}")
-        op_msg_ids = {}
-        for op_id in (sorted(_TEST_OPERATOR_IDS) if order.get("test") else OPERATOR_IDS):
-            try:
-                resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, parse_mode="HTML", reply_markup=op_kb)
-                if resp and resp.get("ok") and resp.get("result"):
-                    op_msg_ids[str(op_id)] = resp["result"]["message_id"]
-                else:
-                    log.error(f"Verify+order notify {op_id} REJECTED for #{oid}: {resp}")
-            except Exception as e:
-                log.error(f"Verify+order notify {op_id}: {e}")
-        if op_msg_ids:
-            await db.update_order(oid, op_msg_ids=op_msg_ids)
-        elif OPERATOR_IDS:
+        # Тем же путём, что новый заказ: всем сразу, недошедшее повторяется в
+        # фоне, номера карточек пишутся в заказ по ключу на чат (op_route.send_order).
+        try:
+            import op_route
+            op_msg_ids = await op_route.send_order(
+                oid, combined, reply_markup=op_kb, test=bool(order.get("test")),
+                to=(sorted(_TEST_OPERATOR_IDS) if order.get("test") else OPERATOR_IDS))
+        except Exception as e:
+            log.error(f"Verify+order notify for #{oid}: {e}")
+            op_msg_ids = {}
+        if not op_msg_ids and OPERATOR_IDS:
             log.error(f"[verify-request] #{oid} reached NO operator — check OPERATOR_BOT_TOKEN / OPERATOR_IDS")
             try:
                 from owner_routes import notify_owners_force

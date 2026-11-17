@@ -8009,8 +8009,10 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .scan-frame.ok .c,.scan-frame.dup .c,.scan-frame.again .c,.scan-frame.err .c{animation:none}
 .scan-frame.ok .scan-badge,.scan-frame.dup .scan-badge,
 .scan-frame.again .scan-badge,.scan-frame.err .scan-badge{animation:badgeUp .24s ease-out}
-/* Прицел: приёмка, ревизия, внесение кодов (владелец, 17 ноя 2026: «сканируют
-   водку, а вместе с водкой цепляют вино, и вино заносится как водка»).
+/* Прицел — на каждой камере сканера (владелец, 17 ноя 2026: «сканируют
+   водку, а вместе с водкой цепляют вино, и вино заносится как водка»; сначала
+   приёмка, ревизия и внесение кодов, в тот же день — «да, поставь» и на
+   остальные: перемещения, списание, проверка бутылок, бутылка охране).
    Читается только окно рамки — SCAN._aimZone берёт его прямо с экрана, — а
    всё вокруг приглушено: соседнюю бутылку видно, и видно, что она не
    считается. Затемнение рисует сама рамка, поэтому окно и зона чтения не
@@ -20324,7 +20326,7 @@ async function stkMoveCam(){
   _stkHead('Переместить', 'сканируйте бутылку', false);
   const seg = document.getElementById('stkSeg'); if(seg) seg.style.display = 'none';
   document.getElementById('stkMid').innerHTML = `
-    <div class="scan-cam" id="qrCam">
+    <div class="scan-cam aim" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -31553,8 +31555,9 @@ const SCAN = {
   GAP_MS:900,
   lastDecode:0, lastHit:0, frames:0, t0:0, torchOn:false, alt:false,
   DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
-  CROP:0.82,               // экраны без прицела: середина кадра (по краям ловятся чужие коды с полки)
+  CROP:0.82,               // камера без класса aim: середина кадра. Таких с 17 ноя 2026 нет — запас на новый экран
   MAXPX:512,
+  blind:0, BLIND_MAX:12,   // сколько кадров подряд окно прицела не измерить, прежде чем читать по-старому
 
   // Ровно основная камера, а не «задняя вообще».
   //
@@ -31593,7 +31596,7 @@ const SCAN = {
     this.onRepeat = onRepeat; this.onHold = onHold; this.onLost = null;
     this.seen = new Set(); this.seenAt = new Map();
     this.lastCode = null; this.missed = true;
-    this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now(); this.blind = 0;
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
     // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
     // деталей в этом куске. И картинка на экране перестаёт быть мыльной.
@@ -31669,7 +31672,8 @@ const SCAN = {
   // рядом с уголками ловился, а код позиции выбран на экране, вот вино и
   // вставало водкой (владелец, 17 ноя 2026).
   //   null  — прицела на этом экране нет, читаем середину кадра (CROP);
-  //   false — прицел есть, но окно сейчас не измерить: кадр пропускаем.
+  //   false — прицел есть, но окно сейчас не измерить: кадр пропускаем
+  //           (а после BLIND_MAX таких подряд — читаем середину, см. _loop).
   _aimZone(v){
     const box = v.parentElement;
     if(!box || !box.classList.contains('aim')) return null;
@@ -31718,7 +31722,12 @@ const SCAN = {
     // одно и то же: без пересчёта человек целится в рамку, а читается другой
     // кусок, и он не понимает, почему код не ловится.
     const aim = this._aimZone(v);
-    if(aim === false) return;        // прицел есть, но окно не измерить: шире окна не читаем
+    // Окно не измерить — кадр пропускаем: шире окна не читаем. Но если так
+    // секунду подряд, рамки на экране попросту нет (телефон её не нарисовал) —
+    // тогда читаем середину кадра, как раньше: камера, которая не читает
+    // вовсе, хуже камеры без прицела.
+    if(aim === false){ if(++this.blind < this.BLIND_MAX) return; }
+    else this.blind = 0;
     let sx, sy, sw, sh;
     if(aim){ sx = aim.sx; sy = aim.sy; sw = aim.sw; sh = aim.sh; }
     else{
@@ -32744,7 +32753,7 @@ function mvtCam(){
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
-    <div class="scan-cam" id="mvtCamBox">
+    <div class="scan-cam aim" id="mvtCamBox">
       <video id="mvtVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -32866,7 +32875,7 @@ function mvcCam(){
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
-    <div class="scan-cam" id="mvcCamBox">
+    <div class="scan-cam aim" id="mvcCamBox">
       <video id="mvcVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -39412,7 +39421,7 @@ async function gdScan(driver){
   document.getElementById('accAct').innerHTML = '';
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `<div class="qwrap">
-    <div class="scan-cam">
+    <div class="scan-cam aim">
       <video id="gdVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="gdFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -43545,7 +43554,7 @@ async function woScanStart(){
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
-    <div class="scan-cam" id="qrCam">
+    <div class="scan-cam aim" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -44339,7 +44348,7 @@ function chkScreen(){
   _setText('accSub', 'ведите камерой по бутылкам');
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
-    <div class="scan-cam" id="chkCam">
+    <div class="scan-cam aim" id="chkCam">
       <video id="chkVideo" playsinline muted autoplay></video>
       <!-- Имя проверяемого стоит в шапке экрана — второй раз поверх камеры оно
            только закрывает кадр. Здесь остаётся то, что нужно во время съёмки. -->

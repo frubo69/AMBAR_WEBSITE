@@ -3161,8 +3161,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .cam-frame.ok{background:rgba(76,175,125,.3);box-shadow:inset 0 0 0 3px var(--up)}
 .cam-frame.dup{background:rgba(243,180,74,.3);box-shadow:inset 0 0 0 3px var(--warn)}
 .cam-frame.err{background:rgba(224,85,85,.32);box-shadow:inset 0 0 0 3px var(--dn)}
-/* Прицел: приёмка и ревизия (владелец, 17 ноя 2026: «сканируют водку, а вместе
-   с водкой цепляют вино, и вино заносится как водка»). Читается только окно
+/* Прицел — на каждой камере сканера (владелец, 17 ноя 2026: «сканируют водку,
+   а вместе с водкой цепляют вино, и вино заносится как водка»; сначала приёмка
+   и ревизия, в тот же день — «да, поставь» и на остальные: списание, бутылка
+   охране, перемещение, проверка). Читается только окно
    рамки — SCAN._aimZone берёт его прямо с экрана, — а всё вокруг приглушено:
    соседнюю бутылку видно, и видно, что она не считается. Затемнение рисует
    сама рамка, поэтому окно и зона чтения не могут разойтись. Окно квадратное,
@@ -3180,6 +3182,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 /* Пустая плашка ответа стоит тёмной пилюлей ровно в середине окна — там, куда
    наводят код. Пока сказать нечего, её нет. */
 .cam.aim .cam-badge:empty{display:none}
+/* Камера во весь свободный экран (перемещение, проверка): окно по середине и
+   того же размера, что в STAR. Прежняя рамка здесь делалась высотой через
+   поля — у окна высота своя, от ширины. */
+.cam.mv-cam.aim .cam-frame{top:50%;width:min(64%,264px);height:auto;padding-bottom:0}
 .cam-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   padding:7px 14px;border-radius:11px;background:rgba(0,0,0,.6);font-size:14px;font-weight:700;
   white-space:nowrap;text-align:center}
@@ -4182,7 +4188,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
           stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
-    <div class="cam">
+    <div class="cam aim">
       <video id="woV" playsinline muted autoplay></video>
       <div class="cam-frame" id="woF">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -4248,7 +4254,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
           stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
-    <div class="cam">
+    <div class="cam aim">
       <video id="botV" playsinline muted autoplay></video>
       <div class="cam-frame" id="botF">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -7415,7 +7421,7 @@ async function mvScan(){
     : MV.box ? `${fmtQty(MV.box)}<u> ${_mvWord(MV.box, true)}</u>` : '';
   const mid = document.getElementById('mvMid');
   mid.className = 'sup-mid mv-mid scan';
-  mid.innerHTML = `<div class="cam mv-cam">
+  mid.innerHTML = `<div class="cam mv-cam aim">
       <video id="mvV" playsinline muted autoplay></video>
       <div class="cam-frame" id="mvF">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
@@ -10679,8 +10685,9 @@ const SCAN = {
   GAP_MS:900,
   lastDecode:0, lastHit:0, frames:0, t0:0, torchOn:false, alt:false,
   DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
-  CROP:0.82,               // экраны без прицела: середина кадра (по краям ловятся чужие коды с полки)
+  CROP:0.82,               // камера без класса aim: середина кадра. Таких с 17 ноя 2026 нет — запас на новый экран
   MAXPX:512,
+  blind:0, BLIND_MAX:12,   // сколько кадров подряд окно прицела не измерить, прежде чем читать по-старому
 
   // Ровно основная камера, а не «задняя вообще».
   //
@@ -10719,7 +10726,7 @@ const SCAN = {
     this.onRepeat = onRepeat; this.onHold = onHold;
     this.seen = new Set(); this.seenAt = new Map();
     this.lastCode = null; this.missed = true;
-    this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now(); this.blind = 0;
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
     // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
     // деталей в этом куске. И картинка на экране перестаёт быть мыльной.
@@ -10782,7 +10789,8 @@ const SCAN = {
   // код под ними ловился, а позиция выбрана на экране, вот вино и вставало
   // водкой (владелец, 17 ноя 2026).
   //   null  — прицела на этом экране нет, читаем середину кадра (CROP);
-  //   false — прицел есть, но окно сейчас не измерить: кадр пропускаем.
+  //   false — прицел есть, но окно сейчас не измерить: кадр пропускаем
+  //           (а после BLIND_MAX таких подряд — читаем середину, см. _loop).
   _aimZone(v){
     const box = v.parentElement;
     if(!box || !box.classList.contains('aim')) return null;
@@ -10827,7 +10835,12 @@ const SCAN = {
     // одно и то же: без пересчёта человек целится в рамку, а читается другой
     // кусок, и он не понимает, почему код не ловится.
     const aim = this._aimZone(v);
-    if(aim === false) return;        // прицел есть, но окно не измерить: шире окна не читаем
+    // Окно не измерить — кадр пропускаем: шире окна не читаем. Но если так
+    // секунду подряд, рамки на экране попросту нет (телефон её не нарисовал) —
+    // тогда читаем середину кадра, как раньше: камера, которая не читает
+    // вовсе, хуже камеры без прицела.
+    if(aim === false){ if(++this.blind < this.BLIND_MAX) return; }
+    else this.blind = 0;
     let sx, sy, sw, sh;
     if(aim){ sx = aim.sx; sy = aim.sy; sw = aim.sw; sh = aim.sh; }
     else{
@@ -11454,7 +11467,7 @@ function ckOpen(){
 
 async function ckStart(){
   const mid = document.getElementById('ckMid');
-  mid.innerHTML = `<div class="cam mv-cam">
+  mid.innerHTML = `<div class="cam mv-cam aim">
       <video id="ckV" playsinline muted autoplay></video>
       <div class="cam-frame" id="ckF">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>

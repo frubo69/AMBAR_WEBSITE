@@ -7043,6 +7043,51 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .vs-f .chip{height:44px;padding:0 14px}
 .vs-f #vsNote{flex:1 1 100%}
 .vs-f .aud-b{flex:1 1 100%}
+/* Визы: отложить напоминание по человеку (владелец, 17 ноя 2026: «как в
+   будильнике в эпл… скролл-барабан, но не меньше 3 дней»). В раскрытой строке
+   первой стоит ячейка «Напомнить · за N дней»; по нажатию — окно с барабаном.
+   У кого срок свой, в свёрнутой строке рядом с «через N дней» колокольчик с
+   числом. */
+.vs-rm{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 6px 1px 4px;border-radius:7px;
+  text-decoration:none;vertical-align:1px;font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:700;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
+.vs-rm svg{width:10px;height:10px;flex:0 0 auto}
+.vs-rem{flex:1 1 100%;display:flex;align-items:center;gap:10px;height:48px;padding:0 12px 0 9px;border-radius:12px;cursor:pointer;
+  border:1px solid rgba(201,169,110,.28);background:linear-gradient(180deg,#161629,#0F0F20);color:var(--text);
+  font-family:inherit;text-align:left;-webkit-tap-highlight-color:transparent;transition:transform .12s var(--e1)}
+.vs-rem:active{transform:scale(.985)}
+.vs-rem-i{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  color:var(--gold2);background:var(--gold-soft)}
+.vs-rem-i svg{width:16px;height:16px}
+.vs-rem-t{flex:1;min-width:0;font-size:13.5px;font-weight:600}
+.vs-rem-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums}
+.vs-rem > svg{flex:0 0 auto;color:var(--dim)}
+/* Окно с барабаном: пять строк, выбранная — в золотой полосе по центру, «за» и
+   «дней» стоят в полосе и не крутятся; соседние строки уходят вглубь и гаснут. */
+.pin-pop.crw-ask.vsr{width:min(88vw,330px);padding:18px 16px 16px}
+.vsr-h{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+.vsr-s{font-size:12px;color:var(--muted);margin-top:4px;min-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vsr-w{position:relative;height:220px;margin:14px 0 12px;border-radius:16px;overflow:hidden;
+  border:1px solid var(--border2);
+  background:linear-gradient(180deg,rgba(0,0,0,.46) 0,rgba(0,0,0,.20) 34%,rgba(255,255,255,.035) 50%,rgba(0,0,0,.20) 66%,rgba(0,0,0,.46) 100%)}
+.vsr-band{position:absolute;left:8px;right:8px;top:88px;height:44px;border-radius:11px;pointer-events:none;
+  background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.36)}
+.vsr-band span{position:absolute;top:0;height:42px;line-height:42px;font-size:14px;font-weight:600;color:var(--sub)}
+.vsr-band .l{right:calc(50% + 30px)}
+.vsr-band .r{left:calc(50% + 30px)}
+.vsr-list{position:relative;height:220px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  mask-image:linear-gradient(180deg,transparent 0,#000 24%,#000 76%,transparent 100%);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 24%,#000 76%,transparent 100%)}
+.vsr-list::-webkit-scrollbar{display:none}
+.vsr-pad{height:88px}
+.vsr-it{height:44px;line-height:44px;text-align:center;scroll-snap-align:center;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums;
+  transform-origin:50% 50%;will-change:transform,opacity;-webkit-tap-highlight-color:transparent}
+.vsr-it.sel{color:var(--gold2)}
+.vsr-f{min-height:18px;margin-bottom:6px;font-size:12.5px;font-weight:600;color:var(--sub)}
+.vsr-f b{color:var(--text);font-weight:700}
 /* Страница «История»: переключатель закупки / приёмки на всю ширину. */
 .hist-seg{display:flex;margin:2px 0 10px}
 .hist-seg .fb-seg{flex:1 1 auto;display:flex}
@@ -42739,9 +42784,14 @@ function vsPaint(){
     return `<div class="vs-p${open ? ' open' : ''}">
       <button class="vs-r ${кл}" onclick="vsToggle('${escS(p.name)}')">
         <span class="vs-b"><b>${escS(p.name)}</b><i>${[p.role === 'driver' ? 'водитель' : p.role === 'operator' ? 'оператор' : '', p.code, p.note].filter(Boolean).map(escS).join(' · ')}</i></span>
-        <span class="vs-v"><b>${p.until ? escS(_dayName(p.until)) : '—'}</b><i>${слово}</i></span>
+        <span class="vs-v"><b>${p.until ? escS(_dayName(p.until)) : '—'}</b><i>${слово}${
+          p.remind && p.remind < (d.horizon || 14) ? `<u class="vs-rm">${_VS_BELL}${p.remind}</u>` : ''}</i></span>
       </button>
       ${open ? `<div class="vs-f">
+        <button class="vs-rem" onclick="vsRemOpen('${escS(p.name)}')">
+          <span class="vs-rem-i">${_VS_BELL}</span><span class="vs-rem-t">Напомнить</span>
+          <span class="vs-rem-v">за ${p.remind || d.horizon || 14} ${vsRemWord(p.remind || d.horizon || 14)}</span>${_VS_GO}
+        </button>
         <input type="date" class="fb-txt vs-date" id="vsUntil" value="${escS(p.until || '')}">
         <button class="chip${p.abroad ? ' on' : ''}" id="vsAbroad" onclick="this.classList.toggle('on')">За пределами ОАЭ</button>
         <input class="fb-txt" id="vsNote" placeholder="Заметка" maxlength="80" autocomplete="off" value="${escS(p.note || '')}">
@@ -42769,6 +42819,122 @@ async function vsSave(name){
     vsPaint();
     _toast(until ? `${name} — виза до ${_dayName(until)}` : abroad ? `${name} — за пределами ОАЭ` : `${name} — срок снят`);
   }catch(e){ _toast(((e || {}).payload || {}).error === 'bad_date' ? 'Дата не разобрана' : 'Не удалось сохранить'); }
+}
+
+// ── Визы: отложить напоминание по человеку ─────────────────────────────────
+// Владелец, 17 ноя 2026: «настраивать отдельно по каждому человеку, как в
+// будильнике в эпл, snooze… чтобы из-за этого человека виза в чек-лист
+// всплывала не за 10, а за 9 или 8 или 7 или 5… такой скролл-барабан, но не
+// меньше 3 дней». Ячейка «Напомнить» в раскрытой строке открывает окно:
+// барабан от remind_min до общего срока (их отдаёт сервер), выбранное число в
+// золотой полосе между «за» и «дней», под барабаном — с какого дня человек
+// встанет в чек-лист. «Готово» сохраняет сразу, без «Сохранить» у даты: это
+// отдельная ручка, срок визы и заметку она не трогает.
+const _VS_BELL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.6 2.2H4.4z"/><path d="M10 20.6a2 2 0 0 0 4 0"/></svg>`;
+const _VS_GO = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+const VSR_H = 44;
+let VSR = null;
+function vsRemWord(n){ return pluralize(n, 'день', 'дня', 'дней'); }
+function vsRemOpen(name){
+  const p = ((VS || {}).people || []).find(x => x.name === name); if(!p) return;
+  closePinPop();
+  const min = VS.remind_min || 3, max = VS.horizon || 14;
+  const val = Math.min(max, Math.max(min, p.remind || max));
+  VSR = {name, min, max, val, was: val, until: p.until || '', days: p.days, off: !!(p.abroad || p.away),
+         busy: false, raf: 0, shown: false};
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', vsRemClose);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask vsr';
+  // Сверху — общий срок, дальше по дню вниз до трёх: каждый шаг барабана
+  // откладывает напоминание ещё на день.
+  let items = '';
+  for(let n = max; n >= min; n--) items += `<div class="vsr-it" data-n="${n}" onclick="vsRemTo(${n})">${n}</div>`;
+  box.innerHTML = `<div class="vsr-h">Напомнить</div>
+    <div class="vsr-s">${escS(name)}${p.until ? ' · виза до ' + escS(_dayName(p.until)) : ''}</div>
+    <div class="vsr-w">
+      <div class="vsr-band"><span class="l">за</span><span class="r" id="vsrUnit"></span></div>
+      <div class="vsr-list" id="vsrList"><div class="vsr-pad"></div>${items}<div class="vsr-pad"></div></div>
+    </div>
+    <div class="vsr-f" id="vsrFact"></div>
+    <button class="crw-ask-b go" id="vsrGo" onclick="vsRemSave()">Готово</button>
+    <button class="crw-ask-b no" onclick="vsRemClose()">Отмена</button>`;
+  document.body.append(back, box);
+  const list = document.getElementById('vsrList');
+  list.scrollTop = (max - val) * VSR_H;
+  list.addEventListener('scroll', vsRemScroll, {passive: true});
+  vsRemPaint();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function vsRemScroll(){
+  if(!VSR || VSR.raf) return;
+  VSR.raf = requestAnimationFrame(() => { if(VSR){ VSR.raf = 0; vsRemPaint(); } });
+}
+// С какого дня человек встанет в чек-лист при выбранном числе.
+function vsRemFact(S){
+  if(S.off || !S.until || S.days == null) return '';
+  if(S.days <= S.val) return 'В чек-листе <b>сейчас</b>';
+  const d = new Date(S.until + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - S.val);
+  return `В чек-листе <b>с ${escS(_dayName(d.toISOString().slice(0, 10)))}</b>`;
+}
+// Барабан: строка по центру — выбранная; соседние наклоняются вглубь, мельчают
+// и гаснут. Число сменилось — отдача, как у колёсика будильника.
+function vsRemPaint(){
+  const S = VSR, list = document.getElementById('vsrList'); if(!S || !list) return;
+  const pos = list.scrollTop / VSR_H;
+  const val = Math.min(S.max, Math.max(S.min, S.max - Math.round(pos)));
+  list.querySelectorAll('.vsr-it').forEach((el, i) => {
+    const d = i - pos, a = Math.min(Math.abs(d), 3);
+    el.style.transform = `perspective(520px) rotateX(${(-d * 17).toFixed(2)}deg) scale(${(1 - a * .07).toFixed(3)})`;
+    el.style.opacity = (1 - a * .27).toFixed(3);
+    el.classList.toggle('sel', S.max - i === val);
+  });
+  if(S.shown && val === S.val) return;
+  if(S.shown){ try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){} }
+  S.val = val; S.shown = true;
+  _setText('vsrUnit', vsRemWord(val));
+  const f = document.getElementById('vsrFact'); if(f) f.innerHTML = vsRemFact(S);
+}
+function vsRemTo(n){
+  const S = VSR, list = document.getElementById('vsrList'); if(!S || !list) return;
+  list.scrollTo({top: (S.max - n) * VSR_H, behavior: 'smooth'});
+}
+function vsRemClose(){
+  if(VSR && VSR.raf) cancelAnimationFrame(VSR.raf);
+  VSR = null;
+  closePinPop();
+}
+async function vsRemSave(){
+  const S = VSR; if(!S || S.busy) return;
+  if(S.val === S.was){ vsRemClose(); return; }
+  S.busy = true;
+  const go = document.getElementById('vsrGo'); if(go) go.disabled = true;
+  let r;
+  try{
+    r = await ownerApi.ownerFetch('/api/owner/visas/remind',
+      {method: 'POST', body: {name: S.name, days: S.val, as: _meName()}});
+  }catch(e){ S.busy = false; if(go) go.disabled = false; _toast('Не удалось сохранить'); return; }
+  // Строка человека остаётся раскрытой; что успели набрать в дате и заметке и
+  // ещё не сохранили — не теряем при перерисовке.
+  const набрано = VS_OPEN === S.name ? {until: (document.getElementById('vsUntil') || {}).value,
+    note: (document.getElementById('vsNote') || {}).value,
+    abroad: !!((document.getElementById('vsAbroad') || {}).classList || {contains: () => false}).contains('on')} : null;
+  VS = r;
+  const n = S.val, name = S.name;
+  vsRemClose();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  vsPaint();
+  if(набрано){
+    const u = document.getElementById('vsUntil'), t = document.getElementById('vsNote'), a = document.getElementById('vsAbroad');
+    if(u && набрано.until != null) u.value = набрано.until;
+    if(t && набрано.note != null) t.value = набрано.note;
+    if(a) a.classList.toggle('on', набрано.abroad);
+  }
+  _toast(`${name} — напомнить за ${n} ${vsRemWord(n)}`);
 }
 
 async function accNorms(district){

@@ -6623,7 +6623,8 @@ async def writeoffs_between(product_id: str, start, end) -> list:
 
 
 # ── Визы сотрудников (владелец, 6 окт 2026) ────────────────────────────────
-#   staff_visas {_id: имя, until: 'YYYY-MM-DD' | '', abroad: bool, note: str, by, at}
+#   staff_visas {_id: имя, until: 'YYYY-MM-DD' | '', abroad: bool, note: str, by, at,
+#                remind: за сколько дней до срока напомнить (своё; нет — общий), remind_by}
 #   Имя — как в реестре водителей / у операторов; человек не из реестра тоже
 #   может быть здесь (имя как записали).
 async def visas_all() -> list:

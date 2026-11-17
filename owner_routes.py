@@ -6228,6 +6228,30 @@ async def handle_orders(request):
 # в ближайшие две недели или уже вышел.
 VISA_HORIZON_DAYS = 14
 
+# Отложить напоминание по человеку (владелец, 17 ноя 2026: «чтобы можно было
+# настраивать отдельно по каждому человеку, как в будильнике в эпл, snooze,
+# типа отложить… чтобы из-за этого человека виза в чек-лист всплывала не за 10,
+# а за 9 или 8 или 7 или 5, как ему угодно… но не меньше 3 дней можно
+# поставить»). У человека свой срок — за сколько дней до конца визы он встаёт
+# в строку «Визы» чек-листа: от VISA_REMIND_MIN до общего VISA_HORIZON_DAYS.
+# Своего нет — общий. Позже общего напомнить нельзя, раньше трёх дней — тоже:
+# три дня и меньше строка уже красная.
+VISA_REMIND_MIN = 3
+
+
+def _visa_remind(v: dict) -> int:
+    """За сколько дней до конца визы человек встаёт в чек-лист."""
+    try:
+        n = int((v or {}).get("remind") or 0)
+    except (TypeError, ValueError):
+        n = 0
+    return n if VISA_REMIND_MIN <= n < VISA_HORIZON_DAYS else VISA_HORIZON_DAYS
+
+
+def _visas_reply(day: str, people: list, **extra) -> dict:
+    return {**extra, "today": day, "horizon": VISA_HORIZON_DAYS, "remind_min": VISA_REMIND_MIN,
+            "people": people}
+
 
 def _visa_people() -> list:
     """Кто есть в штате: (имя, роль, код района)."""
@@ -6258,7 +6282,10 @@ async def _visas_view(day: str) -> list:
                 until, days = "", None
         out.append({"name": name, "role": role, "code": code, "until": until, "days": days,
                     "abroad": bool(v.get("abroad")), "note": str(v.get("note") or ""),
-                    "away": staff.is_away(name), "by": str(v.get("by") or "")})
+                    "away": staff.is_away(name), "by": str(v.get("by") or ""),
+                    # За сколько дней до срока человек встаёт в чек-лист: свой
+                    # (отложено) или общий.
+                    "remind": _visa_remind(v)})
     # ближайшие сверху; без даты — после; уехавшие и за пределами ОАЭ — в конце
     out.sort(key=lambda x: (x["abroad"] or x["away"], x["days"] is None, x["days"] if x["days"] is not None else 0, x["name"]))
     return out
@@ -6266,12 +6293,13 @@ async def _visas_view(day: str) -> list:
 
 async def _visas_due(day: str, horizon: int = VISA_HORIZON_DAYS) -> list:
     """Кому пора продлевать: срок в ближайшие horizon дней или уже вышел.
-    Уехавшие и «за пределами ОАЭ» не считаются."""
+    Уехавшие и «за пределами ОАЭ» не считаются. У кого напоминание отложено
+    (свой срок, _visa_remind) — встаёт в список за свои дни, не раньше."""
     out = []
     for v in await _visas_view(day):
         if v["days"] is None or v["abroad"] or v["away"]:
             continue
-        if v["days"] <= horizon:
+        if v["days"] <= min(horizon, v["remind"]):
             d = datetime.strptime(v["until"], "%Y-%m-%d")
             out.append({**v, "until_t": d.strftime("%d.%m")})
     out.sort(key=lambda x: x["days"])
@@ -6282,8 +6310,7 @@ async def _visas_due(day: str, horizon: int = VISA_HORIZON_DAYS) -> list:
 async def handle_visas(request):
     """GET /api/owner/visas — все люди со сроками виз."""
     day = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
-    return web.json_response({"today": day, "horizon": VISA_HORIZON_DAYS, "people": await _visas_view(day)},
-                             headers=CORS_HEADERS)
+    return web.json_response(_visas_reply(day, await _visas_view(day)), headers=CORS_HEADERS)
 
 
 @require_owner
@@ -6307,8 +6334,40 @@ async def handle_visas_set(request):
                              "note": str(body.get("note") or "").strip()[:80], "by": who})
     log.info(f"[visa] {name}: до {until or '—'}{' · за пределами ОАЭ' if body.get('abroad') else ''} · {who}")
     day = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
-    return web.json_response({"ok": True, "today": day, "horizon": VISA_HORIZON_DAYS, "people": await _visas_view(day)},
-                             headers=CORS_HEADERS)
+    return web.json_response(_visas_reply(day, await _visas_view(day), ok=True), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_visas_remind(request):
+    """POST /api/owner/visas/remind {name, days, as} — за сколько дней до конца
+    визы человек встаёт в чек-лист. От VISA_REMIND_MIN до общего срока; общий —
+    значит своего срока у человека нет. Срок визы, «за пределами ОАЭ» и
+    заметку не трогает."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    name = str(body.get("name") or "").strip()[:40]
+    if not name:
+        return web.json_response({"error": "no_name"}, status=400, headers=CORS_HEADERS)
+    raw = body.get("days")
+    # Только целое число дней: 7, «7». Дробное, пустое и «да» — не срок.
+    try:
+        days = int(str(raw).strip()) if not isinstance(raw, (bool, float)) else None
+    except (TypeError, ValueError):
+        days = None
+    if days is None:
+        return web.json_response({"error": "bad_days"}, status=400, headers=CORS_HEADERS)
+    if days < VISA_REMIND_MIN:
+        return web.json_response({"error": "too_small", "min": VISA_REMIND_MIN}, status=400, headers=CORS_HEADERS)
+    if days > VISA_HORIZON_DAYS:
+        return web.json_response({"error": "too_big", "max": VISA_HORIZON_DAYS}, status=400, headers=CORS_HEADERS)
+    who = str(body.get("as") or "").strip()[:60] or _owner_name(request)
+    await db.visa_set(name, {"remind": days if days < VISA_HORIZON_DAYS else None, "remind_by": who})
+    log.info(f"[visa] {name}: напомнить за {days} дн"
+             + (" (общий срок)" if days >= VISA_HORIZON_DAYS else "") + f" · {who}")
+    day = _biz_day_start(datetime.now(DUBAI_TZ)).date().isoformat()
+    return web.json_response(_visas_reply(day, await _visas_view(day), ok=True), headers=CORS_HEADERS)
 
 
 def setup(app):
@@ -6359,6 +6418,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/visas", handle_visas)
     app.router.add_get(             "/api/owner/visas", handle_visas)
     app.router.add_post(            "/api/owner/visas", handle_visas_set)
+    app.router.add_route("OPTIONS", "/api/owner/visas/remind", handle_visas_remind)
+    app.router.add_post(            "/api/owner/visas/remind", handle_visas_remind)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/where", handle_where)

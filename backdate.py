@@ -30,6 +30,11 @@ def biz_day(ref: datetime = None) -> str:
     return (ref if ref >= anchor else ref - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
+def cal_day(ref: datetime = None) -> str:
+    """Календарный день Дубая — с полуночи до полуночи."""
+    return (ref or datetime.now(DUBAI_TZ)).strftime("%Y-%m-%d")
+
+
 def _human_day(day: str) -> str:
     """«2026-08-28» → «28 августа, четверг». Дата в отчёте должна читаться
     глазами: по «2026-08-28» человек не понимает, какая это была смена."""
@@ -54,28 +59,39 @@ def _ago(day: str, today: str) -> str:
     return f"{n} дней назад" if n > 2 else ""
 
 
-async def notify(day: str, who: str, what: str, detail: str = "") -> None:
+async def notify(day: str, who: str, what: str, detail: str = "", shown: str = "") -> None:
     """Сказать владельцам, что закрытый день кто-то поправил.
 
     day    — какой день правили (рабочие сутки, YYYY-MM-DD)
     who    — имя человека из телеграма; пусто — «—», но не id
     what   — что за правка одной строкой: «расход водителя», «пересчёт склада»
     detail — подробность, если она есть: сумма, район, позиция
+    shown  — каким днём назвать правку в тексте, если это не рабочие сутки.
+             Ревизия подписана календарным днём начала, а лежит в рабочих
+             сутках (stock_routes.audit_date): слать или нет, решает day, а в
+             тексте стоит shown, и «вчера / N дней назад» считается от
+             календарного сегодня.
 
     Сегодняшний день и будущее пропускаем молча: правка текущей смены — это
-    просто работа."""
+    просто работа. Молчим и тогда, когда shown — сегодняшний календарный день:
+    ревизия, начатая до десяти утра и завершённая после десяти, лежит во
+    вчерашних рабочих сутках, но сделана сегодня, и «задним числом за сегодня»
+    — бессмыслица."""
     today = biz_day()
     if not day or str(day) >= today:
+        return
+    if shown and str(shown) >= cal_day():
         return
     try:
         from owner_routes import notify_owners_force, _md
     except Exception as e:                       # noqa: BLE001
         log.error(f"[backdate] уведомление не отправлено: {e}")
         return
-    когда = _ago(day, today)
+    назван = str(shown or day)
+    когда = _ago(назван, cal_day() if shown else today)
     строки = [
         "🕰 *Правка задним числом*",
-        f"{_md(who or '—')} изменил данные за *{_md(_human_day(day))}*"
+        f"{_md(who or '—')} изменил данные за *{_md(_human_day(назван))}*"
         + (f" ({когда})" if когда else ""),
         "",
         f"• {_md(what)}" + (f" — {_md(detail)}" if detail else ""),

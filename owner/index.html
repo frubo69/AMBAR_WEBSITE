@@ -1023,7 +1023,13 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   padding-top:8px;padding-bottom:8px;-webkit-tap-highlight-color:transparent}
 .hst-cap:active{background:var(--card2)}
 .hst-cap > span i{display:block;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
-  letter-spacing:.2px;text-transform:none;color:var(--muted);margin-top:2px}
+  letter-spacing:.2px;text-transform:none;color:var(--muted);margin-top:2px;
+  max-height:16px;overflow:hidden;
+  transition:opacity .2s var(--e1),max-height .26s var(--e1),margin-top .26s var(--e1)}
+/* Раскрыли район — строка «вчера · ждёт решения» в шапке уходит: то же самое
+   написано в первой строке списка под ней. Свернули — возвращается (владелец,
+   18 ноя 2026). */
+.hst.open .hst-cap > span i{opacity:0;max-height:0;margin-top:0}
 .hst-cap > span i.ok{color:var(--up)} .hst-cap > span i.dn{color:var(--dn)} .hst-cap > span i.warn{color:var(--warn)}
 .hst-cap em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal;
@@ -17750,8 +17756,7 @@ async function stkPicker(тихо){
   _stkHead('Склад', 'остатки / ревизия / перемещение', false);
   // На плитках — сколько раз за последние 30 дней: ревизий и перемещений.
   // Полка «История» — только слово и стрелка: число уже стоит на плитке.
-  const с30 = _dayIsoFor(30);
-  const nAud = (STK.audits || []).filter(a => (a.day || '') >= с30).length;
+  const nAud = (STK.audits || []).filter(a => _audDate(a) >= _calIso(30)).length;   // ревизии — по календарю
   const nMov = (STK.moves30 || []).length;
   // Две колонки, как плитки «Учёта»: сверху главное действие — ревизия и
   // перемещение, — под каждым его история половинкой. Карточки со строками
@@ -17839,6 +17844,28 @@ function _audDayT(day){
   if(day === _dayIsoFor(1)) return 'вчера';
   return `${+day.slice(8, 10)} ${MONTHS_GEN[+day.slice(5, 7) - 1]}`;
 }
+// Ревизия подписана календарным днём — с полуночи до полуночи по Дубаю, — а
+// не учётными сутками с десяти утра: начатая в 06:38 сделана сегодня, а не
+// вчера (владелец, 18 ноя 2026: «это путает, когда он сделал сегодня, а
+// написано вчера»). Сервер присылает этот день полем date (по началу
+// ревизии); day остаётся учётным ключом — им открывают лист и отчёт, и на
+// нём держатся склад, списания и смены.
+function _calIso(off){
+  return new Date(Date.now() + 4 * 3600e3 - (off || 0) * 864e5).toISOString().slice(0, 10);
+}
+function _audDate(a){ return (a && (a.date || a.day)) || ''; }
+function _audCalT(d){
+  if(!d) return '';
+  if(d === _calIso(0)) return 'сегодня';
+  if(d === _calIso(1)) return 'вчера';
+  return `${+d.slice(8, 10)} ${MONTHS_GEN[+d.slice(5, 7) - 1]}`;
+}
+function _hstCal(d){
+  if(d === _calIso(0)) return 'Сегодня';
+  if(d === _calIso(1)) return 'Вчера';
+  const s = _dayName(d), y = String(d || '').slice(0, 4);
+  return y && +y !== +_calIso(0).slice(0, 4) ? `${s} ${y}` : s;
+}
 
 function audDistRow(d, left, без, hist){
   const b = (без || {})[d.id] || 0;
@@ -17863,11 +17890,11 @@ function audDistRow(d, left, без, hist){
     </button>
     ${о ? `<div class="aud-back-w"><button class="stk-dr-h aud-back-row"
         onclick="stkAuditGo('${d.id}', '${escS(о.day)}')">
-      <span>Не завершена ${escS(_audDayT(о.day))}</span>
+      <span>Не завершена ${escS(_audCalT(_audDate(о)))}</span>
       <b>${fmt(о.scans || 0)}<u>${pluralize(о.scans || 0, 'бутылка', 'бутылки', 'бутылок')}</u></b>
       <em>${_SC_CHEV}</em></button>
       <button class="aud-back-x" aria-label="Убрать заход"
-        onclick="stkAuditDrop('${d.id}', '${escS(о.day)}', ${о.scans || 0})">✕</button></div>` : ''}
+        onclick="stkAuditDrop('${d.id}', '${escS(о.day)}', ${о.scans || 0}, '${escS(_audDate(о))}')">✕</button></div>` : ''}
     <button class="stk-dr-h" onclick="stkAudits('${d.id}', 'pick')">
       <span>История</span>${k
         ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>`
@@ -18704,7 +18731,7 @@ async function stkHistPaint(){
       <span class="stk-dr-c">${escS(a.district_code || '')}</span>
       <span class="stk-dr-b">
         <span class="stk-dr-n">${escS(a.district_name || '')}</span>
-        <span class="stk-dr-s ${a.mismatched ? 'dn' : 'ok'}">${escS(a.day || '')} · ${
+        <span class="stk-dr-s ${a.mismatched ? 'dn' : 'ok'}">${escS(_audDate(a))} · ${
           a.mismatched ? `недостача ${fmt(a.short_aed || 0)} AED` : 'всё сошлось'}</span>
       </span>
       <span class="stk-dr-go">›</span>
@@ -18781,11 +18808,11 @@ async function stkAuditGo(id, day){
 // конца, а прежний висит строкой «не завершена» и мешает читать карточку
 // (владелец, 25 сен 2026). Сканы остаются в базе — об этом и говорим в
 // вопросе, чтобы «убрать» не читалось как «стереть».
-async function stkAuditDrop(id, day, scans){
+async function stkAuditDrop(id, day, scans, date){
   const имя = ((STK.districts || []).find(x => x.id === id) || {}).name || id;
   const сколько = scans ? `Под ней ${fmt(scans)} ${pluralize(scans, 'скан', 'скана', 'сканов')} — `
                         + 'они уйдут в архив, не сотрутся.\n\n' : '';
-  if(!await askYes(`Отменить незавершённую ревизию ${имя} за ${_audDayT(day)}?\n\n${сколько}`
+  if(!await askYes(`Отменить незавершённую ревизию ${имя} за ${_audCalT(date || day)}?\n\n${сколько}`
                    + 'Склад не изменится. Что успели насчитать, уйдёт сообщением в бот.')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/audit/drop',
@@ -18962,7 +18989,8 @@ function audPage(){
   const a = sh.audit || {}, st = a.state || 'idle';
   // Не сегодняшнюю подписываем днём: иначе человек не поймёт, почему числа
   // другие, и решит, что склад врёт.
-  const чужой = sh.day && sh.day !== _dayIsoFor(0) ? ` · за ${_audDayT(sh.day)}` : '';
+  const чужой = a.date ? (a.date !== _calIso(0) ? ` · за ${_audCalT(a.date)}` : '')
+              : sh.day && sh.day !== _dayIsoFor(0) ? ` · за ${_audDayT(sh.day)}` : '';
   const sub = st === 'running' ? `идёт с ${fmtHM(a.started_at)}${чужой || (a.started_by ? ' · ' + a.started_by : '')}`
             : st === 'pending' ? 'ждёт решения'
             : st === 'closed'  ? `закрыта ${fmtHM(a.closed_at)}` : 'ревизия' + чужой;
@@ -19108,14 +19136,14 @@ async function audStart(){
   audScanOpen();
 }
 
-// Учётный день последнего скана ревизии (сдвиг смены — как у _mvhAt).
+// Календарный день последнего скана ревизии по Дубаю: ревизия датируется по
+// календарю, а не по смене (см. _calIso).
 function audScanDay(sh){
   const at = ((sh || {}).scan || {}).at; if(!at) return '';
   const d = new Date(String(at).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1') + (/Z$|[+-]\d\d:?\d\d$/.test(String(at)) ? '' : 'Z'));
   if(isNaN(d)) return '';
-  const дуб = new Date(d.toLocaleString('en-US', {timeZone: 'Asia/Dubai'}));
-  if(дуб.getHours() < SHIFT_START_HOUR) дуб.setDate(дуб.getDate() - 1);
-  return дуб.getFullYear() + '-' + String(дуб.getMonth() + 1).padStart(2, '0') + '-' + String(дуб.getDate()).padStart(2, '0');
+  // Календарный день Дубая: до десяти утра это уже сегодня, а не вчера.
+  return new Date(d.getTime() + 4 * 3600e3).toISOString().slice(0, 10);
 }
 function _bizToday_iso(){ return _dayIsoFor(0); }
 async function audFinish(){
@@ -19133,7 +19161,7 @@ async function audFinish(){
         `${fmtQty(u.actual)} из ${fmtQty(u.expected)} · недостача ${fmtQty(u.short)}`
         + ` · излишки ${fmtQty(u.over)}${u.noqr ? ` · без QR ${fmtQty(u.noqr)}, остаются на складе` : ''}`
         // Сканировали не сегодня — пересчёт ляжет днём сканов (владелец, 5 окт 2026)
-        + (audScanDay(sh) && audScanDay(sh) !== _bizToday_iso() ? `<br>Сканы ${escS(_dayName(audScanDay(sh)))} — пересчёт ляжет тем днём` : ''),
+        + (audScanDay(sh) && audScanDay(sh) !== _calIso(0) ? `<br>Сканы ${escS(_dayName(audScanDay(sh)))} — пересчёт ляжет тем днём` : ''),
         'Завершить', 'Не сейчас');
   if(!ok) return;
   const b = document.querySelector('.aud-fin');
@@ -19205,7 +19233,7 @@ function audReport(rep){
       ? '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
       : '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v9"/><path d="M12 18.5v.5"/></svg>'}</div>
     <div class="aud-res-t">${allOk ? 'Всё сошлось' : 'Есть расхождения'}</div>
-    <div class="aud-res-s">${escS(_dayName(rep.day))} · ${fmt(t.positions || 0)} ${
+    <div class="aud-res-s">${escS(_dayName(a.date || rep.day))} · ${fmt(t.positions || 0)} ${
       pluralize(t.positions || 0, 'позиция', 'позиции', 'позиций')} · сканом ${fmtQty(t.scan_qty || 0)}</div>
     ${a.finished_kind === 'driver' ? `<div class="aud-res-s">Провёл водитель ${escS(a.finished_by || '')}</div>` : ''}
     ${a.note ? `<div class="aud-res-note">«${escS(a.note)}»</div>` : ''}
@@ -19822,7 +19850,7 @@ async function stkAudits(district, from){
   STK.audits = list;
   const n = list.length;
   _stkHead('История ревизий', n
-    ? `${n} ${pluralize(n, 'ревизия', 'ревизии', 'ревизий')} · с ${_hstDay(list[n - 1].day)}`
+    ? `${n} ${pluralize(n, 'ревизия', 'ревизии', 'ревизий')} · с ${_hstCal(_audDate(list[n - 1]))}`
     : 'пока пусто', false);
   const районы = [...(STK.districts || [])].sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
   box.innerHTML = `<div class="sc-page">${hstSummary(list)}${
@@ -19856,8 +19884,8 @@ function _hstDur(m){
 // сколько обошлась недостача и сколько ревизий сошлось. Окно — 30 дней, а если
 // в нём пусто, то всё, что было: пустые плитки не отвечают ни на что.
 function hstSummary(list){
-  const since = _dayIsoFor(30);
-  let src = list.filter(a => a.day >= since), окно = 'за 30 дней';
+  const since = _calIso(30);
+  let src = list.filter(a => _audDate(a) >= since), окно = 'за 30 дней';
   if(!src.length){ src = list; окно = 'за всё время'; }
   const n = src.length;
   const short = src.reduce((s, a) => s + (a.short_aed || 0), 0);
@@ -19890,11 +19918,13 @@ function hstDistCard(d, list){
   let итог = '', cls = '';
   if(last){
     const short = +last.short_qty || 0, over = +last.over_qty || 0;
+    // Красным — только то, что ждёт решения. Решённая недостача — жёлтым:
+    // дело закрыто, гореть ей незачем (владелец, 18 ноя 2026).
     if(last.state === 'pending'){ итог = 'ждёт решения'; cls = 'dn'; }
     else if(!short && !over){ итог = 'всё сошлось'; cls = 'ok'; }
-    else if(short){ итог = `недостача ${fmtQty(short)} бут`; cls = 'dn'; }
+    else if(short){ итог = `недостача ${fmtQty(short)} бут`; cls = 'warn'; }
     else{ итог = `излишки ${fmtQty(over)} бут`; cls = 'warn'; }
-    итог = `${_hstDay(last.day)} · ${итог}`;
+    итог = `${_hstCal(_audDate(last))} · ${итог}`;
   }
   return `<div class="sc hst${open ? ' open' : ''}" id="hst-${escS(d.id)}">
     <button class="sc-cap hst-cap" onclick="hstToggle('${escS(d.id)}')" aria-expanded="${open}">
@@ -19935,7 +19965,8 @@ function hstRow(a){
     const p = [];
     if(short) p.push(`недостача ${fmtQty(short)} бут · ${fmt(a.short_aed || 0)} AED`);
     if(over) p.push(`излишки ${fmtQty(over)} бут`);
-    res = p.join(' · '); cls = short ? 'dn' : 'warn';
+    // Красным — пока ждёт решения; решение принято — жёлтым.
+    res = p.join(' · '); cls = short && pend ? 'dn' : 'warn';
   }
   const tail = [];
   if(pend) tail.push('ждёт решения');
@@ -19952,7 +19983,7 @@ function hstRow(a){
   const meta = [a.finished_by || a.started_by || '', a.minutes != null ? _hstDur(a.minutes) : '']
     .filter(Boolean).join(' · ');
   return `<button class="hst-r" onclick="stkAuditOpen(${i})">
-    <span class="hst-b"><b>${escS(_hstDay(a.day))}${meta ? `<s>${escS(meta)}</s>` : ''}</b>
+    <span class="hst-b"><b>${escS(_hstCal(_audDate(a)))}${meta ? `<s>${escS(meta)}</s>` : ''}</b>
       <i class="${cls}">${escS(res)}</i>${tail.length
         ? `<i class="${pend ? 'dn' : ''}">${escS(tail.join(' · '))}</i>` : ''}</span>
     <span class="hst-v"><b>${fmtQty(a.scan_qty || 0)}<u>бут</u></b></span>

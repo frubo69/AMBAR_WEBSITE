@@ -2056,6 +2056,7 @@ async def handle_status(request):
         "audit": _audit_view(auds.get(oid))["state"] if auds.get(oid) else "idle",
         # Незавершённая с прошлых дней — когда начали и сколько уже насчитали.
         **({"audit_open": {"day": old[oid].get("day", ""),
+                           "date": audit_date(old[oid]),
                            "started_at": old[oid].get("started_at", ""),
                            "scans": scans.get(oid, 0)}}
            if oid in old and oid not in auds else {}),
@@ -2962,6 +2963,27 @@ def _audit_totals(lines: list) -> dict:
     }
 
 
+def audit_date(a: dict | None, day: str = "") -> str:
+    """Каким днём ревизия подписана для людей: календарная дата её начала в
+    Дубае, с полуночи до полуночи.
+
+    Ключом ревизии остаются учётные сутки (поле day, граница в десять утра):
+    на них лежит снимок склада, списания по решению о недостаче, переезды по
+    излишку и «одна ревизия района в сутки», и всё это идёт в ногу со сменами
+    — сдвинуть ключ значит сдвинуть учёт. Но показывать его человеку нельзя:
+    ревизию, начатую в 06:38, он подписывал вчерашним числом (владелец, 18 ноя
+    2026: «если он начал ревизию до 10 утра, то она датируется вчерашним
+    днём… для ревизий сутки считаются как обычно, с 12 до 12… это путает,
+    когда он сделал сегодня, а написано вчера»).
+
+    Не начата — отдаём то, что есть: day или пусто."""
+    a = a or {}
+    at = _dt_of(a.get("started_at") or "") or _dt_of(a.get("finished_at") or "")
+    if at is None:
+        return str(day or a.get("day") or "")
+    return at.astimezone(DUBAI_TZ).strftime("%Y-%m-%d")
+
+
 def _audit_view(a: dict | None) -> dict:
     """Состояние ревизии для экрана — одно на лист, отчёт и список районов."""
     a = a or {}
@@ -2973,6 +2995,8 @@ def _audit_view(a: dict | None) -> dict:
              else "running" if a.get("started_at") else "idle")
     return {
         "state": state,
+        # Каким днём ревизию подписывать: календарным (audit_date), а не ключом.
+        "date": audit_date(a) if a.get("started_at") else "",
         "started_at": a.get("started_at", ""), "started_by": a.get("started_by_name", ""),
         "finished_at": a.get("finished_at", ""), "closed_at": a.get("closed_at", ""),
         # Кто завершил: водитель района или старший в STAR, и что написал.
@@ -3223,7 +3247,8 @@ async def _audit_cancel_tell(district: str, day: str, a: dict, sh: dict, by_name
     не_дошли.sort(key=lambda r: coded(r) - found(r), reverse=True)
     scan = sh.get("scan") or {}
     where = f"{OFFICE_CODES.get(district, '')} {OFFICE_NAMES.get(district, district)}".strip()
-    dm = f"{day[8:10]}.{day[5:7]}" if len(day) == 10 else day
+    когда = audit_date(a, day)                  # календарный день начала, а не учётный ключ
+    dm = f"{когда[8:10]}.{когда[5:7]}" if len(когда) == 10 else когда
     строки = [f"🚫 <b>Ревизия отменена — {_h.escape(where)}</b> · за {dm}",
               f"Отменил: {_h.escape(by_name or '—')}"
               + (f" · начал {_h.escape(str(a.get('started_by_name') or ''))}" if a.get("started_by_name") else ""),
@@ -3447,9 +3472,16 @@ async def _audit_finish(district: str, day: str, by: int, who: str, extra: dict 
     log.info(f"[audit] {district} {day}: завершена — не хватает {tot['short_qty']} бут "
              f"/ {tot['short_aed']} AED, излишек {tot['over_qty']}, не в реестре {alien}, "
              f"сканом {stats.get('total', 0)}")
+    # «Задним числом» — как и раньше, когда ревизия легла в уже закрытые
+    # учётные сутки (решает ключ day). Кроме одного случая: начата сегодня до
+    # десяти утра, завершена после десяти — ключ у неё вчерашний, но это та же
+    # сегодняшняя ревизия, а не правка закрытого дня (backdate.notify молчит,
+    # когда shown — сегодня). В тексте ревизия названа своим календарным днём
+    # (audit_date), как и на экранах.
     await backdate.notify(day, who, "ревизия",
                           f"{OFFICE_CODES.get(district, district)} — сканом {stats.get('total', 0)}"
-                          + (f", недостача {tot['short_aed']} AED" if tot["short_aed"] else ""))
+                          + (f", недостача {tot['short_aed']} AED" if tot["short_aed"] else ""),
+                          shown=audit_date(a, day))
     return 200, await _audit_report(district, day, a)
 
 
@@ -4094,6 +4126,10 @@ async def handle_audits(request):
             "district_code": OFFICE_CODES.get(c.get("district"), ""),
             "district_name": OFFICE_NAMES.get(c.get("district"), c.get("district", "")),
             "day": c.get("day", ""),
+            # day — учётный ключ (им открывают отчёт), date — каким днём
+            # ревизия подписана на экране: календарным, по её началу.
+            "date": audit_date({"started_at": a.get("started_at") or started,
+                                "finished_at": a.get("finished_at") or finished}, c.get("day", "")),
             "scan_qty": int(c.get("scan_qty") or 0),
             "started_at": started,
             "finished_at": finished,

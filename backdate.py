@@ -56,7 +56,16 @@ def _ago(day: str, today: str) -> str:
         return ""
     if n == 1: return "вчера"
     if n == 2: return "позавчера"
-    return f"{n} дней назад" if n > 2 else ""
+    return f"{n} {_days_word(n)} назад" if n > 2 else ""
+
+
+def _days_word(n: int) -> str:
+    """«3 дня», «5 дней», «21 день»: было «3 дней назад» (владелец, 18 ноя 2026:
+    «поправь 3 дня назад»)."""
+    n = abs(int(n))
+    if 11 <= n % 100 <= 14:
+        return "дней"
+    return "день" if n % 10 == 1 else "дня" if 2 <= n % 10 <= 4 else "дней"
 
 
 async def notify(day: str, who: str, what: str, detail: str = "", shown: str = "") -> None:

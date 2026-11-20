@@ -6267,6 +6267,17 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .ch-back{display:inline-flex;align-items:center;min-height:30px;margin-top:7px;padding:0 12px;border:1px solid rgba(201,169,110,.35);
   border-radius:9px;background:rgba(201,169,110,.08);color:var(--gold2);font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
 .ch-back:active{transform:scale(.98)}
+/* Фильтр истории по районам (20 ноя 2026): «Все» и районы кодом с названием,
+   выбрать можно несколько; ряд переносится, чтобы ни один район не прятался за
+   обрезом. Вид — как у районов в истории заказов. */
+.ch-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.ch-tab{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;
+  cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);
+  background:var(--card);border:1px solid var(--border2);-webkit-tap-highlight-color:transparent}
+.ch-tab:active{transform:scale(.96)}
+.ch-tab i{font-style:normal;font-size:10.5px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+.ch-tab.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.4)}
+.ch-tab.on i{color:var(--gold2)}
 /* Цены закупки: строка на позицию, поле справа. */
 .xp-head{padding:4px 2px 12px}
 .xp-head b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
@@ -22080,8 +22091,11 @@ function sdcOverview(d){
   const дниПереноса = [...new Set((d.districts || []).flatMap(x => (x.carry || []).map(c => c.day)))].sort();
   // Смена района идёт — его сегодняшних денег в сборе нет (владелец, 4 ноя
   // 2026); о таких районах — первой строкой, чтобы «получать нечего» не
-  // читалось как «смена отработана впустую».
-  const идут = (d.districts || []).filter(x => x.shift === 'open').map(x => x.code);
+  // читалось как «смена отработана впустую». Только те, где получать уже
+  // нечего — всё собрано: у района с несобранным переносом карточка про смену
+  // молчит (владелец, 20 ноя 2026: «пиши смена идёт только там, где выручка
+  // уже собрана и за сегодня деньги забрать ещё нельзя, так как идёт смена»).
+  const идут = (d.districts || []).filter(x => x.shift === 'open' && (x.empty || x.done)).map(x => x.code);
   let слева = d.before ? 'До начала учёта'
     : дниПереноса.length ? `Есть перенос за ${дниПереноса.map(_dayName).join(', ')}`
     : d.later ? `${d.later} ${pluralize(d.later, 'район', 'района', 'районов')} — соберу завтра` : '';
@@ -22158,7 +22172,8 @@ function sdcDistrict(x){
   // 920 дирхам, оно вычитает из выручки те деньги из закрытых смен»):
   // сегодняшних денег на карточке нет — ни суммой, ни днём, ни расходами, —
   // район везёт только перенос. Имена сервер даёт, когда район закрыт и
-  // смену держит кто-то один.
+  // смену держит кто-то один. Слова «смена идёт» — только там, где получать
+  // уже нечего: пустая карточка и «получил» (владелец, 20 ноя 2026).
   const идёт = x.shift === 'open';
   const наСмене = идёт && (x.on || []).length ? `на смене ${(x.on || []).join(', ')}` : '';
   const смена = идёт ? ['смена идёт', наСмене].filter(Boolean).join(' · ') : '';
@@ -22209,11 +22224,14 @@ function sdcDistrict(x){
   else if(ждут) st = `<span class="sc-summary-status sc-warning">${luc('circle-alert')}${
     pendN ? `${pendN} ${pluralize(pendN, 'расход', 'расхода', 'расходов')}` : 'расходы ждут'}</span>`;
   else if(x.later) st = '<span class="sc-summary-status sc-warning">соберу завтра</span>';
-  else if(идёт) st = '<span class="sc-summary-status sc-live">смена идёт</span>';
   const справа = st
     ? `<span class="sc-summary-stack"><span class="sc-closed-money sc-closed-only${net < 0 ? ' sc-negative' : ''}">${sdcMoney(net)} <small>AED</small></span>${st}</span>`
     : `<span class="sc-summary-money sc-closed-only"><strong${net < 0 ? ' class="sc-negative"' : ''}>${sdcMoney(net)}</strong><span>AED</span></span>`;
-  const sub = [team, заСколько, x.done && идёт ? 'смена идёт' : '', наСмене].filter(Boolean).join(' · ');
+  // О смене — только когда получать уже нечего: перенос забран (done), а
+  // сегодняшнее придёт после закрытия. Район с несобранным переносом — просто
+  // сумма к получению, без «смена идёт» и без «на смене …», как у закрытого
+  // (владелец, 20 ноя 2026: «а то сейчас как-то замиксованно смотрится»).
+  const sub = [team, заСколько, x.done ? смена : ''].filter(Boolean).join(' · ');
   const head = `<summary class="sc-district-heading"><span class="sc-code">${code}</span>
     <span class="sc-district-name"><strong>${name}</strong>${sub ? `<span>${escS(sub)}</span>` : ''}<span class="sc-closed-only">Чаевые ${fmt(tips)} AED</span></span>
     ${справа}${luc('chevron-down', 'sc-disclosure')}</summary>`;
@@ -22421,10 +22439,11 @@ function sdcWaiting(){
 // снятие отметки за 30 дней, новые сверху, по дням; у нажатия, которое ещё
 // держит отметки, — «Вернуть»: снимает их, и дни снова едут переносом на
 // текущую страницу сбора.
-let CRH = {open: false, data: null, back: null, page: '', busy: false};
+let CRH = {open: false, data: null, back: null, page: '', busy: false, sel: []};
 async function crHist(){
   const page = CRH.open ? CRH.page : (CR ? CR.day : accDay());
-  CRH = {open: true, data: CRH.open ? CRH.data : null, back: CRH.open ? CRH.back : ACC_BACK, page, busy: false};
+  CRH = {open: true, data: CRH.open ? CRH.data : null, back: CRH.open ? CRH.back : ACC_BACK, page, busy: false,
+         sel: CRH.open ? (CRH.sel || []) : []};
   ACC_BACK = crHistBack;
   document.getElementById('accOv').classList.remove('sdc');   // история — в шапке раздела
   _setText('accTitle', 'История сбора');
@@ -22445,7 +22464,7 @@ async function crHist(){
 function crHistBack(){
   ACC_BACK = CRH.back || null;
   const page = CRH.page;
-  CRH = {open: false, data: null, back: null, page: '', busy: false};
+  CRH = {open: false, data: null, back: null, page: '', busy: false, sel: []};
   CR_DAY = page;
   const mid = document.getElementById('accMid'); if(mid) mid.scrollTop = 0;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -22466,8 +22485,16 @@ function crHistDays(days){
 function crHistRender(){
   const mid = document.getElementById('accMid'), r = CRH.data;
   if(!mid || !CRH.open || !r) return;
-  const ev = r.events || [];
-  if(!ev.length){ mid.innerHTML = '<div class="sc"><div class="fb-none">За 30 дней нажатий не было</div></div>'; return; }
+  const all = r.events || [], sel = CRH.sel || [];
+  const ev = sel.length ? all.filter(e => sel.includes(e.district)) : all;
+  const chips = crHistChips(all);
+  const выбраны = crHistDistricts(all).filter(d => sel.includes(d.id)).map(d => d.code).join(', ');
+  _setText('accSub', выбраны ? `за 30 дней · ${выбраны}` : 'за 30 дней');
+  if(!ev.length){
+    mid.innerHTML = chips + `<div class="sc"><div class="fb-none">${
+      выбраны ? `За 30 дней по ${escS(выбраны)} нажатий не было` : 'За 30 дней нажатий не было'}</div></div>`;
+    return;
+  }
   const days = [], сегодня = _slDay(new Date().toISOString());   // календарный день, не учётный
   ev.forEach(e => {
     const day = _slDay(e.at);
@@ -22475,9 +22502,37 @@ function crHistRender(){
     if(!g){ g = {day, rows: []}; days.push(g); }
     g.rows.push(e);
   });
-  mid.innerHTML = days.map(g => `<div class="sc">
+  mid.innerHTML = chips + days.map(g => `<div class="sc">
     <div class="sc-cap"><span>${escS(g.day === сегодня ? 'Сегодня' : _dayName(g.day))}</span><i>${g.rows.length} ${pluralize(g.rows.length, 'нажатие', 'нажатия', 'нажатий')}</i></div>
     <div class="ch-list">${g.rows.map(crHistRow).join('')}</div></div>`).join('');
+}
+// Район в истории — кодом с названием, как везде: «B1 JVC» (владелец, 20 ноя
+// 2026: «пиши ещё и название района помимо просто букв b1 b2 b3»).
+function crHistDist(e){ return [e.code, e.name].filter(Boolean).join(' '); }
+// Фильтр по районам (владелец, 20 ноя 2026: «добавь в истории фильтр по
+// районам, чтобы можно было выбрать один или несколько и конкретно их историю
+// посмотреть»): ряд «Все» и районы кодом с названием; нажатие добавляет район
+// к выбранным или снимает его, «Все» снимает всё. Районы — те же, что на
+// странице сбора (CR), плюс те, что встретились в истории.
+function crHistDistricts(all){
+  const map = new Map();
+  ((CR && CR.districts) || []).forEach(x => map.set(x.id, {id: x.id, code: x.code || '', name: x.name || ''}));
+  (all || []).forEach(e => { if(e.district && !map.has(e.district)) map.set(e.district, {id: e.district, code: e.code || '', name: e.name || ''}); });
+  return [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
+}
+function crHistChips(all){
+  const ds = crHistDistricts(all), sel = CRH.sel || [];
+  if(!(all || []).length || ds.length < 2) return '';
+  const chip = (id, t, on) => `<button type="button" class="ch-tab${on ? ' on' : ''}" aria-pressed="${on ? 'true' : 'false'}" onclick="crHistPick('${escS(id)}')">${t}</button>`;
+  return `<div class="ch-tabs" role="group" aria-label="Районы">${chip('', 'Все', !sel.length)}${
+    ds.map(d => chip(d.id, `<i>${escS(d.code)}</i>${escS(d.name)}`, sel.includes(d.id))).join('')}</div>`;
+}
+function crHistPick(id){
+  if(!CRH.open) return;
+  const sel = CRH.sel || [];
+  CRH.sel = !id ? [] : sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id];
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  crHistRender();
 }
 function crHistRow(e){
   const got = e.kind === 'got', left = e.left || [], all = (e.days || []).map(d => d.day);
@@ -22493,7 +22548,7 @@ function crHistRow(e){
   const btn = got && e.active
     ? `<button type="button" class="ch-back" onclick="crHistUndo('${escS(e.id)}')">Вернуть</button>` : '';
   return `<div class="ch-r${returned ? ' dim' : ''}${got ? '' : ' back'}"><b class="ch-t">${_hm(e.at)}</b><i class="dot ${dot}"></i>
-    <span class="ch-b"><em>${escS(e.code)} · ${got ? 'Получил' : 'Вернул'}</em><u>${meta}</u>${btn}</span>
+    <span class="ch-b"><em>${escS(crHistDist(e))} · ${got ? 'Получил' : 'Вернул'}</em><u>${meta}</u>${btn}</span>
     <span class="ch-sum"><b${e.net < 0 ? ' class="neg"' : ''}>${sdcMoney(e.net)}</b><small>AED</small></span></div>`;
 }
 // Вернуть — снять отметки «получил», которые это нажатие ещё держит. Деньги
@@ -22504,7 +22559,7 @@ async function crHistUndo(id){
   const left = e.left || [];
   const sum = (e.days || []).filter(d => left.includes(d.day)).reduce((a, d) => a + (d.net || 0), 0);
   const за = crHistDays(left);
-  if(!await askYes(`Вернуть выручку ${e.code} ${за} — ${sdcMoney(sum)} AED?`)) return;
+  if(!await askYes(`Вернуть выручку ${crHistDist(e)} ${за} — ${sdcMoney(sum)} AED?`)) return;
   CRH.busy = true;
   let r;
   try{ r = await ownerApi.ownerFetch('/api/owner/cash-round/back',
@@ -22515,7 +22570,7 @@ async function crHistUndo(id){
   CRH.data = r;
   crHistRender();
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(x){}
-  _toast((r.removed || []).length ? `${e.code} · вернули ${за} — снова к получению` : 'Возвращать уже нечего');
+  _toast((r.removed || []).length ? `${crHistDist(e)} · вернули ${за} — снова к получению` : 'Возвращать уже нечего');
   CKL = null;                       // строка чек-листа и карточка сбора перечитаются
   FB_CR_AT = 0;
 }

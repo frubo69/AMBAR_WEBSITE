@@ -3088,13 +3088,14 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-cash-day .cd-date-today.is-off{visibility:hidden;pointer-events:none}
 /* Состояния, которых в макете нет, — теми же красками макета: поле под
    фокусом и после записи, запертое поле, частичный сбор по районам, нулевой
-   долг, замок в заметке, минус в остатке редактора, пустой день. */
+   долг, минус в остатке редактора, пустой день. Поясняющих текстов пакета на
+   экране нет (владелец, 3 окт 2026, подтверждено 23 ноя). */
 #ambar-cash-day .cd-input-unit:focus-within{border-color:#8c714e}
 #ambar-cash-day .cd-input-unit input.saved{color:var(--cd-green)}
 #ambar-cash-day .cd-input-unit input:disabled{opacity:.5}
 #ambar-cash-day .cd-collection-link.is-partial>span>svg{color:#c6b08a}
 #ambar-cash-day .cd-debt.is-zero>strong{color:#c7b7d3}
-#ambar-cash-day .cd-state-note svg.lucide{display:inline-block;width:14px!important;height:14px!important;vertical-align:-3px;margin-right:6px}
+#ambar-cash-day .cd-confirm-zone>.cd-primary{margin-top:0}
 #ambar-cash-day .cd-field-result strong.cd-negative{color:var(--cd-red)}
 #ambar-cash-day .cd-unavailable{display:flex;flex-direction:column;align-items:center;gap:12px;padding:56px 20px;text-align:center;color:var(--cd-muted)}
 #ambar-cash-day .cd-unavailable h2{color:var(--cd-text)}
@@ -25024,7 +25025,7 @@ function cdyBodyHtml(d, loading){
     <button type="button" data-section="safe"><span>В сейфе</span><strong id="cdOverviewSafe">—</strong></button>
   </div>
   <section id="cd-revenue" class="cd-panel" data-current="true" aria-labelledby="cdRevenueTitle">
-    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 1 из 4">1</span><div class="cd-step-heading"><h2 id="cdRevenueTitle">Проверить выручку</h2><p>Наличные → вычеты → остаток</p></div></div>
+    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 1 из 4">1</span><div class="cd-step-heading"><h2 id="cdRevenueTitle">Проверить выручку</h2></div></div>
     <div class="cd-revenue-calculation">
       <div class="cd-cash-start"><span>Наличными за день</span><strong id="cdCash">— <small>AED</small></strong></div>
       <div class="cd-deductions" id="cdDeductions" aria-label="Удержания из наличных" hidden>
@@ -25035,13 +25036,13 @@ function cdyBodyHtml(d, loading){
       </div>
       <div class="cd-zero-line" id="cdZeroLine" hidden><span>Чай водителям</span><span>0</span></div>
       <div class="cd-net"><div><span>Выручка по приложению</span><strong id="cdHanded">— <small>AED</small></strong></div><span class="cd-equals" aria-hidden="true">=</span></div>
-      <div class="cd-noncash" id="cdNoncash" hidden>${luc('credit-card')}<span>Расходы картой · <b id="cdCardAmt"></b><small>Из наличных не вычитаем</small></span></div>
+      <div class="cd-noncash" id="cdNoncash" hidden>${luc('credit-card')}<span>Расходы картой · <b id="cdCardAmt"></b></span></div>
     </div>
-    <div class="cd-state-note is-warning" id="cdPendingNote" hidden><strong>Расходы ждут решения</strong><br><span id="cdPendingAmt"></span> AED пока не вычтены из наличных.</div>
+    <div class="cd-state-note is-warning" id="cdPendingNote" hidden>Расходы ждут решения · <strong id="cdPendingAmt"></strong></div>
     <button type="button" class="cd-collection-link" id="cdCollection" onclick="fbToCash()" hidden><span id="cdCollectionLbl"></span><strong id="cdCollectionN"></strong>${luc('chevron-right')}</button>
     <div class="cd-actual">
       <label for="cdActual">Собрал по факту</label>${cdyIn('cdActual', 'handed_fact', d, {ph: d ? fbFmt(d.handed) : '0', desc: 'cdActualHint'})}
-      <p id="cdActualHint">Пусто — используем сумму приложения.</p>
+      <p id="cdActualHint" hidden></p>
       <div class="cd-difference" id="cdDifference" hidden><span>Разница с приложением</span><strong id="cdDifferenceValue"></strong></div>
     </div>
     ${next('allocation', 2, 'К распределению')}
@@ -25049,14 +25050,14 @@ function cdyBodyHtml(d, loading){
   ${con}
   <section id="cd-allocation" class="cd-panel" aria-labelledby="cdAllocationTitle">
     <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 2 из 4">2</span><div class="cd-step-heading"><h2 id="cdAllocationTitle">Распределить деньги</h2><span class="cd-status" id="cdAllocationStatus" hidden></span></div></div>
-    <div class="cd-allocation-base"><div><span id="cdBaseSource">По приложению</span><strong id="cdAllocationBase">— <small>AED</small></strong></div><span>В три стопки<br>сейфа</span></div>
+    <div class="cd-allocation-base"><div><span id="cdBaseSource">По приложению</span><strong id="cdAllocationBase">— <small>AED</small></strong></div></div>
     <div class="cd-chart-grid">
       <section id="cdAllocationChart" class="cd-donut" aria-label="Распределение наличной выручки"><div data-cash-donut=""></div></section>
       <div id="cdChartIssue" class="cd-chart-issue" hidden>${luc('circle-alert')}<span id="cdChartIssueText"></span></div>
       <dl class="cd-legend">
-        <div><dt><span class="cd-dot cd-dot-barra"></span>Барракуда</dt><dd id="cdLegendBarra">—</dd><small>На поставщика</small></div>
-        <div><dt><span class="cd-dot cd-dot-rp"></span>РП наличными</dt><dd id="cdLegendRp">—</dd><small>На расходы</small></div>
-        <div><dt><span class="cd-dot cd-dot-profit"></span>ЧП за день</dt><dd id="cdLegendProfit">—</dd><small>Чистая прибыль</small></div>
+        <div><dt><span class="cd-dot cd-dot-barra"></span>Барракуда</dt><dd id="cdLegendBarra">—</dd></div>
+        <div><dt><span class="cd-dot cd-dot-rp"></span>РП наличными</dt><dd id="cdLegendRp">—</dd></div>
+        <div><dt><span class="cd-dot cd-dot-profit"></span>ЧП за день</dt><dd id="cdLegendProfit">—</dd></div>
       </dl>
     </div>
     <details class="cd-edit-distribution" id="cdEditAllocation"><summary>${luc('sliders-horizontal')}<span>Изменить распределение</span>${luc('chevron-down', 'cd-chevron')}</summary>
@@ -25065,48 +25066,46 @@ function cdyBodyHtml(d, loading){
         <!-- Крипта в РП+ — сначала она, наличными только то, чего не хватило до
              нормы (владелец, 2 окт 2026). В сейф не ложится: остаётся на кошельке,
              но числится за РП. Предлагается вся свободная; поправить можно. -->
-        <div class="cd-crypto-fields" id="cdCryptoFields" hidden><div class="cd-field-row"><label for="cdCrypto">РП криптой<small id="cdCryptoSuggestion"></small></label>${cdyIn('cdCrypto', 'collected_cr', d, {dec: true, ph: d ? fbInFmt(d.collected_cr || 0, true) : '0'})}</div><p>${luc('wallet')}Остаётся на кошельке, не входит в наличный круг.</p></div>
+        <div class="cd-crypto-fields" id="cdCryptoFields" hidden><div class="cd-field-row"><label for="cdCrypto">РП криптой<small id="cdCryptoSuggestion"></small></label>${cdyIn('cdCrypto', 'collected_cr', d, {dec: true, ph: d ? fbInFmt(d.collected_cr || 0, true) : '0'})}</div></div>
         <div class="cd-field-row"><label for="cdRp">РП наличными<small id="cdRpSuggestion"></small></label>${cdyIn('cdRp', 'collected', d, {ph: d && d.collected !== null && d.collected !== undefined ? fbFmt(d.collected) : '0'})}</div>
-        <div class="cd-field-result"><span>ЧП — остаток</span><strong id="cdEditorProfit">—</strong></div><p class="cd-field-hint">Очистить поле — вернуть предложение.</p>
+        <div class="cd-field-result"><span>ЧП — остаток</span><strong id="cdEditorProfit">—</strong></div>
       </div>
     </details>
-    <div id="cdRpCombined" class="cd-inline-note" hidden><span>РП+ всего · наличные и крипта</span><strong></strong></div>
+    <div id="cdRpCombined" class="cd-inline-note" hidden><span>РП+ всего</span><strong></strong></div>
     <!-- Фонд отдал Барракуде — в предложение РП+ долг не входит (владелец,
          24 окт 2026: норма в РП+, остальное ЧП); вписали в РП+ больше нормы —
          столько и вернулось, строкой ниже. -->
     <div id="cdRpReturn" class="cd-inline-note" hidden><span>В том числе возврат в РП за Барракуду</span><strong></strong></div>
-    <p class="cd-state-note" id="cdAllocNote" hidden></p>
-    <div class="cd-confirm-zone" id="cdConfirmZone" hidden><p id="cdConfirmationHint">${luc('clock-3')}<span>Эти деньги ещё не вошли в сейф.</span></p><button type="button" id="cdConfirm" class="cd-primary" data-d="" onclick="fbDayOk(this.dataset.d)">Подтвердить распределение${luc('check')}</button></div>
+    <div class="cd-confirm-zone" id="cdConfirmZone" hidden><button type="button" id="cdConfirm" class="cd-primary" data-d="" onclick="fbDayOk(this.dataset.d)">Подтвердить распределение${luc('check')}</button></div>
     ${next('supplier', 3, 'К оплате Барракуде')}
   </section>
   ${con}
   <section id="cd-supplier" class="cd-panel" aria-labelledby="cdSupplierTitle">
-    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 3 из 4">3</span><div class="cd-step-heading"><h2 id="cdSupplierTitle">Оплата Барракуде</h2><p>При необходимости</p></div></div>
+    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 3 из 4">3</span><div class="cd-step-heading"><h2 id="cdSupplierTitle">Оплата Барракуде</h2></div></div>
     <div class="cd-supplier-totals"><div><span>Заказ по приложению</span><strong id="cdOrdered">— <small>AED</small></strong></div><div><span>Оплачено за день</span><strong id="cdPaymentReadout">— <small>AED</small></strong></div></div>
     <div id="cdOtherBases" class="cd-inline-note" hidden><span>Другие базы · заказали</span><strong></strong></div>
     <details id="cdEditPayment" class="cd-payment-edit"><summary>${luc('banknote')}<span>Внести счёт или оплату</span>${luc('chevron-down', 'cd-chevron')}</summary>
       <div class="cd-payment-fields">
-        <div class="cd-field-row"><label for="cdInvoice">По счёту<small>Пусто — сумма приложения</small></label>${cdyIn('cdInvoice', 'ordered_fact', d, {val: d ? d.ordered_fact : null, ph: d ? fbFmt(d.ordered_auto) : '0'})}</div>
-        <div class="cd-field-row"><label for="cdPaid">Оплатили<small>Платёж за этот день</small></label>${cdyIn('cdPaid', 'pay', d, {ph: '0'})}</div>
+        <div class="cd-field-row"><label for="cdInvoice">По счёту</label>${cdyIn('cdInvoice', 'ordered_fact', d, {val: d ? d.ordered_fact : null, ph: d ? fbFmt(d.ordered_auto) : '0'})}</div>
+        <div class="cd-field-row"><label for="cdPaid">Оплатили</label>${cdyIn('cdPaid', 'pay', d, {ph: '0'})}</div>
         <div id="cdPaymentSources" class="cd-payment-sources" hidden></div><p id="cdPaymentWarning" class="cd-warning" hidden></p>
       </div>
     </details>
-    <div class="cd-debt" id="cdDebtRow"><div><span id="cdDebtLabel">Долг Барракуде</span><small>После этого дня</small></div><strong id="cdDebt">— <small>AED</small></strong></div>
+    <div class="cd-debt" id="cdDebtRow"><div><span id="cdDebtLabel">Долг Барракуде</span></div><strong id="cdDebt">— <small>AED</small></strong></div>
     <div id="cdFundDebt" class="cd-inline-note" hidden><span>Взято из РП · ещё не вернулось</span><strong></strong></div>
     ${next('safe', 4, 'Посмотреть итог')}
   </section>
   ${con}
   <section class="cd-readonly-transfers" id="cdTransfers" aria-label="Переводы между счетами за день" hidden><h3>Переводы между счетами</h3><div id="cdTransferRows"></div></section>
   <section id="cd-safe" class="cd-panel" aria-labelledby="cdSafeTitle">
-    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 4 из 4">4</span><div class="cd-step-heading"><h2 id="cdSafeTitle">Остатки в сейфе</h2><p>После операций этого дня</p></div>${luc('vault')}</div>
+    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 4 из 4">4</span><div class="cd-step-heading"><h2 id="cdSafeTitle">Остатки в сейфе</h2></div>${luc('vault')}</div>
     <dl class="cd-safe-rows">
       <div><dt><span class="cd-dot cd-dot-barra"></span>Барракуда</dt><dd id="cdSafeBarra">—</dd></div>
       <div><dt><span class="cd-dot cd-dot-rp"></span>РП</dt><dd id="cdSafeRp">—</dd></div>
       <div><dt><span class="cd-dot cd-dot-profit"></span>ЧП</dt><dd id="cdSafeProfit">—</dd></div>
     </dl>
     <div class="cd-safe-total"><span>Всего наличными</span><strong id="cdSafeTotal">— <small>AED</small></strong></div>
-    <div class="cd-wallet-line" id="cdWalletLine" hidden>${luc('wallet')}<span>РП криптой<small>Отдельно, на кошельке</small></span><strong id="cdWallet">— <small>AED</small></strong></div>
-    <p id="cdSafeHint" class="cd-safe-hint" hidden></p>
+    <div class="cd-wallet-line" id="cdWalletLine" hidden>${luc('wallet')}<span>РП криптой</span><strong id="cdWallet">— <small>AED</small></strong></div>
   </section>`;
 }
 // Нарисовать день: разметка заново (раскрытые редакторы остаются раскрытыми),
@@ -25159,7 +25158,7 @@ function cdySync(d){
   show('cdZeroLine', !(n(d.tips_cash) > 0));
   money('cdHanded', d.handed);
   if(show('cdNoncash', n(d.spend_card) > 0)) text('cdCardAmt', fbFmt(d.spend_card) + ' AED');
-  if(show('cdPendingNote', n(d.spend_pending) > 0)) text('cdPendingAmt', fbFmt(d.spend_pending));
+  if(show('cdPendingNote', n(d.spend_pending) > 0)) text('cdPendingAmt', fbFmt(d.spend_pending) + ' AED');
   if(show('cdCollection', n(d.cash_need) > 0)){
     const full = n(d.cash_got) >= n(d.cash_need);
     html('cdCollectionLbl', `${luc(full ? 'circle-check' : 'clock-3')}Получил по районам`);
@@ -25168,8 +25167,9 @@ function cdySync(d){
   }
   ph('cdActual', fbFmt(d.handed));
   const manualFact = d.handed_src === 'manual', recon = d.handed_src === 'recon';
+  // под полем — только откуда факт, если он со сверки
   const hint = $('cdActualHint');
-  if(hint){ hint.hidden = manualFact || !live; hint.textContent = recon ? `По сверке · ${fbFmt(d.handed_fact)} AED` : 'Пусто — используем сумму приложения.'; }
+  if(hint){ hint.hidden = !recon || !live; hint.textContent = recon ? `По сверке · ${fbFmt(d.handed_fact)} AED` : ''; }
   // в книге gap = приложение − факт; тут знак от факта: собрал больше — плюс
   if(show('cdDifference', own(d.handed_fact))){
     const g = -n(d.gap) || 0;
@@ -25205,15 +25205,6 @@ function cdySync(d){
     st.textContent = d.ok ? `Подтверждено${d.ok_by ? ' · ' + d.ok_by : ''}` : 'Не подтверждено';
   }
   if(show('cdConfirmZone', canOk && !d.ok)) $('cdConfirm').dataset.d = d.day;
-  const note = $('cdAllocNote');
-  if(note){
-    let t = '', cls = '';
-    if(d.before) t = `${luc('lock-keyhole')}До начала учёта`;
-    else if(d.future) t = 'Будущий учётный день. Подтверждение и оплата недоступны.';
-    else if(!(d.base > 0)) t = 'При нулевой или отрицательной выручке в сейф ничего не добавляется.';
-    else if(d.ok){ t = 'Распределение учтено в сейфе. Суммы можно поправить.'; cls = 'is-success'; }
-    note.hidden = !t; note.innerHTML = t; note.className = 'cd-state-note' + (cls ? ' ' + cls : '');
-  }
   cdyDonut(d);
   // 3. Барракуда: заявка, счёт, оплата и из чего она сложилась, долг
   money('cdOrdered', d.ordered_auto);
@@ -25226,12 +25217,12 @@ function cdySync(d){
     srcs.hidden = !rows.length;
     srcs.innerHTML = rows.map(([t, v]) => `<div><span>${t}</span><strong>${fbFmt(v)} AED</strong></div>`).join('');
   }
-  // оплата сверх стопки увела ЧП или РП в минус — сказать, но записи не мешать
+  // оплата сверх стопки увела ЧП или РП в минус — показать остаток, записи не мешать
   const warn = $('cdPaymentWarning');
   if(warn){
     const bad = n(d.pay) > 0 ? [['ЧП', n(d.pay_b_extra) > 0 ? n(d.stack_np) : 0], ['РП', n(d.pay_rp) > 0 ? n(d.stack_rp) : 0]].filter(([, v]) => v < 0) : [];
     warn.hidden = !bad.length;
-    warn.textContent = bad.length ? `После оплаты: ${bad.map(([f, v]) => `${f} ${fbFmt(v)} AED`).join(', ')}. Остаток отрицательный.` : '';
+    warn.textContent = bad.length ? `После оплаты · ${bad.map(([f, v]) => `${f} ${fbFmt(v)} AED`).join(', ')}` : '';
   }
   const debt = n(d.debt_b), over = debt < 0;
   text('cdDebtLabel', over ? 'Переплата Барракуде' : 'Долг Барракуде');
@@ -25249,15 +25240,11 @@ function cdySync(d){
   money('cdSafeProfit', d.stack_np, {bare: true});
   money('cdSafeTotal', d.stack_total);
   if(show('cdWalletLine', !!d.stack_rp_cr)) money('cdWallet', d.stack_rp_cr);
-  const sh = $('cdSafeHint');
-  if(sh){
-    const t = !canOk ? '' : d.ok ? 'С учётом подтверждённого распределения этого дня.' : 'Только подтверждённые распределения. Выручка этого дня ещё не включена.';
-    sh.hidden = !t; sh.textContent = t;
-  }
 }
 // Круг наличного распределения по готовым долям дня: Барракуда / РП наличными /
 // ЧП. Крипта в круг не входит. Нет выручки, минус в ЧП, несогласованные суммы —
-// вместо круга состояние словами; суммы при этом не правятся и не обнуляются.
+// вместо круга состояние одним коротким фактом (владелец, 3 окт 2026: без
+// поясняющих текстов); суммы при этом не правятся и не обнуляются.
 function cdyDonut(d){
   const chart = document.getElementById('cdAllocationChart'), issue = document.getElementById('cdChartIssue'), txt = document.getElementById('cdChartIssueText');
   if(!chart || !issue || !txt) return;
@@ -25267,10 +25254,10 @@ function cdyDonut(d){
     const base = n(d.base), barra = n(d.aside), rp = n(d.collected), profit = n(d.np_plus);
     if(d.before) problem = 'До начала учёта';
     else if(d.future) problem = 'Будущий учётный день';
-    else if(!(base > 0)) problem = 'Нет наличных к распределению.';
-    else if(profit < 0) problem = 'Распределено больше, чем есть. ЧП уходит в минус.';
-    else if(barra < 0 || rp < 0) problem = 'Проверьте суммы распределения.';
-    else if(Math.abs(barra + rp + profit - base) > 0.01) problem = 'Суммы распределения не совпадают с выручкой.';
+    else if(!(base > 0)) problem = 'Нет наличных к распределению';
+    else if(profit < 0) problem = 'Распределено больше выручки';
+    else if(barra < 0 || rp < 0) problem = 'Отрицательная сумма';
+    else if(Math.abs(barra + rp + profit - base) > 0.01) problem = 'Суммы не сходятся с выручкой';
   }
   chart.hidden = !!problem; issue.hidden = !problem; txt.textContent = problem;
   if(!box) return;

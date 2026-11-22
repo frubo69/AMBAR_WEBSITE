@@ -129,7 +129,7 @@ async def main():
         chk = await get("/api/owner/checklist", day=D2)
         row = next(x for x in chk.get("rows", []) if x.get("id") == "cash")
         eq("19-е: не решено, в подписи — прошлые дни", (row["state"] != "done", row["s"]),
-           (True, "получил 1 из 2 · выручка 1 400 AED · из них за прошлые дни 1 000"))
+           (True, "собрал 1 из 2 районов · выручка 1 400 AED · из них за прошлые дни 1 000"))
         await post("/api/owner/cash-round/later", {"day": D2})
         chk = await get("/api/owner/checklist", day=D2)
         row = next(x for x in chk.get("rows", []) if x.get("id") == "cash")

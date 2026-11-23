@@ -2823,111 +2823,114 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    докручивается в центр экрана. */
 html.kb #accOv.sdc .sc-footer{display:none}
 html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
-/* ── «Касса дня» в новом виде (22 ноя 2026, бриф AMBAR-CASH-DAY). Корень
-   #ambar-cash-day; cash-day-visual.css и cash-day-integration.css из пакета
-   дословно, ниже — адаптация к оболочке раздела и состояния, которых в макете
+/* ── «Касса дня» в новом виде (22–23 ноя 2026, пакет AMBAR-CASH-DAY, финальный визуал
+   23 ноя). Корень #ambar-cash-day; cash-day-visual.css и cash-day-integration.css из
+   пакета дословно, ниже — адаптация к оболочке раздела и состояния, которых в макете
    не было. ── */
 #ambar-cash-day{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
-#ambar-cash-day .cd-stage{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 8px}
-#ambar-cash-day .cd-preview-caption{font:11px/17px Manrope,sans-serif;color:light-dark(#776f7c,#ada3b7);text-align:center}
-#ambar-cash-day .cd-app{--cd-width:414px;--cd-text:#eeeae4;--cd-muted:#aaa0b4;--cd-gold:#e2c386;--cd-line:#352d3e;--cd-red:#d69ca5;--cd-green:#9bb6a6;--cd-rp:#a799ba;display:flex;flex-direction:column;position:relative;isolation:isolate;min-width:0;width:var(--cd-width);max-width:100%;height:960px;overflow:hidden;border:1px solid #302937;border-radius:25px;background:#08070d;color:var(--cd-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:cashday / inline-size}
+#ambar-cash-day .cd-stage{display:flex;flex-direction:column;align-items:center;gap:0;padding:0}
+#ambar-cash-day .cd-app{--cd-width:414px;--cd-height:740px;--cd-text:#eeeae4;--cd-muted:#aaa0b4;--cd-gold:#e2c386;--cd-line:#352d3e;--cd-red:#d69ca5;--cd-green:#9bb6a6;--cd-rp:#a799ba;display:flex;flex-direction:column;position:relative;isolation:isolate;box-sizing:border-box;min-width:0;width:var(--cd-width);max-width:100%;height:var(--cd-height);overflow:hidden;border:1px solid #302937;border-radius:25px;background:#08070d;color:var(--cd-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:cashday / inline-size}
 #ambar-cash-day .cd-app *{box-sizing:border-box}
 #ambar-cash-day .cd-app :where(h1,h2,h3,p,dl,dd){margin:0}
 #ambar-cash-day .cd-app :where(button,input){font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 #ambar-cash-day :where(.cd-app button){appearance:none;border:0;background:transparent;padding:0;margin:0;text-align:left}
 #ambar-cash-day .cd-app [hidden]{display:none!important}
 #ambar-cash-day .cd-app svg.lucide{width:18px!important;height:18px!important;display:block;flex:none;stroke-width:1.7}
-#ambar-cash-day .cd-header{display:flex;align-items:center;gap:12px;min-height:72px;padding:13px 14px 11px;background:#0d0a13;flex:none}
+#ambar-cash-day .cd-header{display:flex;align-items:center;gap:12px;min-height:68px;padding:12px 13px;background:#0d0a13;flex:none}
 #ambar-cash-day .cd-icon-button{width:44px;min-height:44px;display:grid;place-items:center;border:1px solid #362c41;border-radius:12px;background:#17121f;color:#b6a6c5}
 #ambar-cash-day .cd-icon-button svg.lucide{width:22px!important;height:22px!important}
 #ambar-cash-day .cd-header h1{font-size:23px;line-height:30px;font-weight:700;letter-spacing:-.035em;flex:1}
 #ambar-cash-day .cd-header>span{font-size:11px;line-height:16px;color:var(--cd-muted);padding-right:3px}
-#ambar-cash-day .cd-datebar{display:grid;grid-template-columns:36px minmax(0,1fr) 36px 38px 38px;align-items:center;gap:3px;padding:4px 13px 10px;position:relative;background:#0d0a13;flex:none}
+#ambar-cash-day .cd-date-zone{position:relative;margin:0 13px 12px;padding:6px 4px;border:1px solid #44364e;border-radius:13px;background:#1b1523;flex:none}
+#ambar-cash-day .cd-date-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px 0 5px;border-bottom:1px solid #372c40}
+#ambar-cash-day .cd-date-tools>span{font-size:11px;line-height:17px;color:#b7a7c2}
+#ambar-cash-day .cd-date-tools>div{display:flex;align-items:center;gap:2px;min-height:44px}
+#ambar-cash-day .cd-datebar{display:flex;align-items:center;gap:0;position:relative}
 #ambar-cash-day .cd-datebar button{min-height:44px}
-#ambar-cash-day .cd-date-arrow,#ambar-cash-day .cd-date-today,#ambar-cash-day .cd-calendar{display:grid;place-items:center;color:#c6b08a;border-radius:10px}
-#ambar-cash-day .cd-date-today{background:#231d29;color:var(--cd-gold)}
-#ambar-cash-day .cd-calendar{border:1px solid #3e3348;background:#1a1423;color:#b6a6c5}
-#ambar-cash-day .cd-date{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;min-width:0}
-#ambar-cash-day .cd-date strong{font-size:14px;line-height:20px;font-weight:600}
+#ambar-cash-day .cd-datebar>.cd-date{flex:1}
+#ambar-cash-day .cd-datebar>:is(.cd-date-arrow,.cd-date-today,.cd-calendar){flex:0 0 44px}
+#ambar-cash-day .cd-date-arrow{display:grid;place-items:center;color:#d9bc87;border:0;border-radius:0;background:transparent}
+#ambar-cash-day .cd-date-today{display:grid;place-items:center;width:44px;min-height:44px;color:var(--cd-gold)}
+#ambar-cash-day .cd-date-today svg.lucide{width:18px!important;height:18px!important}
+#ambar-cash-day .cd-calendar{display:grid;place-items:center;width:44px;min-height:44px;border-left:1px solid #372c40;color:#c0afd0}
+#ambar-cash-day .cd-date{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;min-width:0}
+#ambar-cash-day .cd-date strong{font-size:17px;line-height:23px;font-weight:600}
 #ambar-cash-day .cd-date span{font-size:11px;line-height:16px;color:var(--cd-muted)}
 #ambar-cash-day .cd-native-date{position:absolute;width:1px;height:1px;opacity:0;right:20px;bottom:10px;padding:0;border:0;pointer-events:none}
-#ambar-cash-day .cd-local-nav{display:grid;grid-template-columns:.95fr 1.45fr .8fr .7fr;position:relative;padding:7px 12px 10px;background:#0d0a13;border-bottom:1px solid #352b3e;flex:none}
-#ambar-cash-day .cd-local-nav::before{content:"";position:absolute;left:14%;right:11%;top:20px;height:1px;background:#3d3244;pointer-events:none}
-#ambar-cash-day .cd-local-nav button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;position:relative;min-height:49px;min-width:0;text-align:center;font-size:11px;line-height:17px;color:#a99bb5}
+#ambar-cash-day .cd-local-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:relative;padding:8px 12px;background:#0d0a13;border-bottom:1px solid #352b3e;flex:none}
+#ambar-cash-day .cd-local-nav::before{content:"";position:absolute;left:calc(12.5% + 9px);right:calc(12.5% + 9px);top:21px;height:1px;background:#3d3244;pointer-events:none}
+#ambar-cash-day .cd-local-nav button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;position:relative;min-height:50px;min-width:0;text-align:center;font-size:11px;line-height:17px;color:#a99bb5}
+#ambar-cash-day .cd-step-short{display:none}
 #ambar-cash-day .cd-nav-number{display:grid;place-items:center;width:27px;height:27px;flex:none;border:1px solid #514158;border-radius:50%;background:#16111f;color:#b7a7c4;font:500 13px/18px "Space Grotesk",sans-serif}
-#ambar-cash-day .cd-local-nav button[aria-current="location"]{color:var(--cd-gold)}
-#ambar-cash-day .cd-local-nav button[aria-current="location"] .cd-nav-number{background:var(--cd-gold);border-color:var(--cd-gold);color:#241b0d}
-#ambar-cash-day .cd-scroll{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4e4259 transparent}
-#ambar-cash-day .cd-page{display:flex;flex-direction:column;gap:0;padding:13px 13px 20px}
-#ambar-cash-day .cd-overview{display:grid;grid-template-columns:1fr .9fr 1.15fr;padding:8px 0 10px;margin-bottom:14px}
-#ambar-cash-day .cd-overview button{display:flex;flex-direction:column;gap:5px;min-width:0;padding:0 10px}
-#ambar-cash-day .cd-overview button:first-child{padding-left:2px}
-#ambar-cash-day .cd-overview button+button{border-left:1px solid #302838}
-#ambar-cash-day .cd-overview span{font-size:11px;line-height:17px;color:var(--cd-muted)}
-#ambar-cash-day .cd-overview strong{font:500 24px/30px "Space Grotesk",sans-serif;letter-spacing:-.05em;font-variant-numeric:tabular-nums;white-space:nowrap}
-#ambar-cash-day #cdOverviewProfit{color:var(--cd-gold)}
-#ambar-cash-day .cd-panel{border:1px solid #3b3142;border-radius:18px;overflow:hidden;background:#15111f;scroll-margin-top:12px}
-#ambar-cash-day .cd-panel-head{display:flex;align-items:center;gap:11px;min-height:77px;padding:14px 15px;border-bottom:1px solid #403443;background:#231d2b}
+#ambar-cash-day .cd-local-nav button[aria-current="step"]{color:var(--cd-gold)}
+#ambar-cash-day .cd-local-nav button[aria-current="step"] .cd-nav-number{background:var(--cd-gold);border-color:var(--cd-gold);color:#241b0d}
+#ambar-cash-day .cd-scroll{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4e4259 transparent}
+#ambar-cash-day .cd-page{display:flex;flex-direction:column;flex:1 0 auto;gap:0;padding:8px 13px 10px}
+#ambar-cash-day .cd-panel{display:flex;flex-direction:column;flex:1 0 auto;border:1px solid #3b3142;border-radius:18px;overflow:hidden;background:#15111f;scroll-margin-top:12px}
+#ambar-cash-day .cd-panel>*{flex-shrink:0}
+#ambar-cash-day .cd-panel-head{display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 14px;border-bottom:1px solid #403443;background:#231d2b}
 #ambar-cash-day .cd-panel-head h2{font-size:18px;line-height:25px;font-weight:700;letter-spacing:-.03em;color:#e5c991}
 #ambar-cash-day .cd-step-number{display:grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid #68533c;border-radius:10px;background:#30252c;font:500 17px/22px "Space Grotesk",sans-serif;color:var(--cd-gold)}
 #ambar-cash-day .cd-panel[data-current="true"] .cd-step-number{background:var(--cd-gold);border-color:var(--cd-gold);color:#241b0d}
 #ambar-cash-day .cd-step-heading{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 #ambar-cash-day .cd-step-heading p{font-size:11px;line-height:17px;color:var(--cd-muted)}
 #ambar-cash-day .cd-panel-head>svg{color:#b39c79}
-#ambar-cash-day .cd-flow-connector{display:flex;align-items:center;height:26px;flex:none;padding-left:23px;color:#796678}
-#ambar-cash-day .cd-flow-connector svg.lucide{width:16px!important;height:20px!important;stroke-width:1.3}
-#ambar-cash-day .cd-next-step{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:64px;width:100%;padding:11px 15px;border-top:1px solid #514138;background:#28202a;color:var(--cd-gold)}
-#ambar-cash-day .cd-next-step>span{display:flex;flex-direction:column;gap:2px}
-#ambar-cash-day .cd-next-step small{font-size:11px;line-height:16px;color:#b6a38a}
-#ambar-cash-day .cd-next-step strong{font-size:13px;line-height:20px;font-weight:600}
-#ambar-cash-day .cd-next-step>svg.lucide{width:19px!important;height:19px!important}
-#ambar-cash-day .cd-revenue-calculation{padding:17px 14px 0}
-#ambar-cash-day .cd-cash-start{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
-#ambar-cash-day .cd-cash-start>span{font-size:12px;line-height:18px;color:#d2c9d8;max-width:130px}
+#ambar-cash-day .cd-revenue-calculation{display:flex;flex-direction:column;flex:1;padding:10px 14px 0}
+#ambar-cash-day .cd-arithmetic-group{display:flex;flex-direction:column;flex:1;padding:8px 10px 2px;border:1px solid #403447;border-radius:12px;background:#1e1826}
+#ambar-cash-day .cd-arithmetic-row{display:grid;grid-template-columns:14px minmax(0,1fr) max-content 25px;align-items:center;column-gap:8px}
+#ambar-cash-day .cd-row-label{font-size:12px;line-height:18px;color:#d2c9d8;min-width:0}
+#ambar-cash-day .cd-arithmetic-row strong{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-cash-day .cd-calc-unit{font-size:11px;line-height:17px;color:var(--cd-muted)}
+#ambar-cash-day .cd-operator{font:400 20px/24px "Space Grotesk",sans-serif;text-align:center}
+#ambar-cash-day .cd-cash-start{padding:2px 0 10px}
 #ambar-cash-day .cd-cash-start strong{font:500 27px/34px "Space Grotesk",sans-serif;letter-spacing:-.04em;font-variant-numeric:tabular-nums;white-space:nowrap}
 #ambar-cash-day .cd-app strong small{font:400 11px/17px Manrope,sans-serif;color:var(--cd-muted);letter-spacing:0}
-#ambar-cash-day .cd-deductions{padding:3px 12px;border:1px solid #51323e;border-radius:11px;background:#281a25}
-#ambar-cash-day .cd-deductions>div{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:38px;padding:8px 0}
-#ambar-cash-day .cd-deductions>div+div{border-top:1px solid #4a2b37}
-#ambar-cash-day .cd-deductions span{font-size:12px;line-height:18px;color:#c7adb8}
+#ambar-cash-day .cd-deductions{display:grid;grid-auto-rows:minmax(34px,1fr);flex:1;padding:4px 0;border-top:1px solid #352d3e}
+#ambar-cash-day .cd-deductions>.cd-arithmetic-row{min-height:34px;padding:5px 0}
+#ambar-cash-day .cd-deductions .cd-row-label{color:#c7adb8}
+#ambar-cash-day .cd-deductions .cd-operator{color:#d69ca5}
 #ambar-cash-day .cd-deductions strong{font:500 19px/24px "Space Grotesk",sans-serif;letter-spacing:-.025em;color:#e0a1ab;white-space:nowrap;font-variant-numeric:tabular-nums}
-#ambar-cash-day .cd-zero-line{display:flex;justify-content:space-between;gap:14px;padding:9px 12px 11px;font-size:11px;line-height:16px;color:#a498ae}
-#ambar-cash-day .cd-net{display:flex;flex-direction:row-reverse;align-items:center;justify-content:flex-end;gap:12px;border-top:1px solid #403347;padding:13px 0 14px}
-#ambar-cash-day .cd-net>div{display:flex;flex-direction:column;gap:3px}
-#ambar-cash-day .cd-net>div>span{font-size:11px;line-height:17px;color:var(--cd-muted)}
-#ambar-cash-day .cd-net strong{font:500 32px/38px "Space Grotesk",sans-serif;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:var(--cd-gold)}
-#ambar-cash-day .cd-equals{width:27px;font:400 26px/34px "Space Grotesk",sans-serif;color:#9b8c9e;text-align:center}
-#ambar-cash-day .cd-noncash{display:flex;gap:9px;align-items:flex-start;padding:0 0 15px;color:#a293b0}
-#ambar-cash-day .cd-noncash svg.lucide{width:16px!important;height:16px!important;margin-top:2px}
-#ambar-cash-day .cd-noncash>span{font-size:11px;line-height:17px}
-#ambar-cash-day .cd-noncash b{color:#cbc0d5;font-weight:500}
-#ambar-cash-day .cd-noncash small{display:block;font-size:11px;line-height:16px;color:#978aa6}
-#ambar-cash-day .cd-collection-link{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:11px 14px;border-top:1px solid #342a3e;border-bottom:1px solid #342a3e;background:#1b1624;font-size:12px;line-height:18px}
+#ambar-cash-day .cd-deductions .cd-zero-line :is(strong,.cd-operator,.cd-row-label){color:#a498ae}
+#ambar-cash-day .cd-deductions .cd-zero-line strong{font-size:17px}
+#ambar-cash-day .cd-net{padding:10px 11px;border:0;background:transparent}
+#ambar-cash-day .cd-net .cd-row-label{color:#c4b5c3}
+#ambar-cash-day .cd-net .cd-operator{color:var(--cd-gold)}
+#ambar-cash-day .cd-net strong{font:500 30px/37px "Space Grotesk",sans-serif;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:var(--cd-gold)}
+#ambar-cash-day .cd-collection-link{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:9px 14px;border-top:1px solid #342a3e;border-bottom:1px solid #342a3e;background:#1b1624;font-size:12px;line-height:18px}
 #ambar-cash-day .cd-collection-link>span{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 #ambar-cash-day .cd-collection-link>span>svg{color:#9db6a6}
 #ambar-cash-day .cd-collection-link>strong{font-size:12px;font-weight:500;color:#abc0b3;white-space:nowrap}
 #ambar-cash-day .cd-collection-link>svg.lucide{width:13px!important;height:13px!important;color:#9d8ba8}
-#ambar-cash-day .cd-actual{display:grid;grid-template-columns:minmax(0,1fr) 155px;gap:8px 10px;align-items:center;padding:15px 14px}
+#ambar-cash-day .cd-actual{display:grid;grid-template-columns:minmax(0,1fr) 155px;gap:6px 10px;align-items:center;padding:10px 14px}
 #ambar-cash-day .cd-actual>label{font-size:12px;line-height:18px;font-weight:600}
 #ambar-cash-day .cd-actual>p{grid-column:1/-1;font-size:11px;line-height:17px;color:var(--cd-muted)}
 #ambar-cash-day .cd-input-unit{display:flex;align-items:center;gap:5px;min-width:0;border:1px solid #4c3c55;border-radius:10px;background:#21192b;padding:0 10px;min-height:44px}
-#ambar-cash-day .cd-input-unit input{appearance:textfield;min-width:0;width:100%;border:0;border-radius:0;background:transparent;padding:10px 0;font:500 18px/24px "Space Grotesk",sans-serif;text-align:right;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+#ambar-cash-day .cd-input-unit input{appearance:textfield;min-width:0;width:100%;border:0;border-radius:0;background:transparent;padding:9px 0;font:500 18px/24px "Space Grotesk",sans-serif;text-align:right;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
 #ambar-cash-day .cd-input-unit input::placeholder{color:#9d8bab;opacity:1}
 #ambar-cash-day .cd-input-unit>span{font-size:11px;line-height:15px;color:#b4a6c1;flex:none}
 #ambar-cash-day .cd-difference{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-top:2px;font-size:11px;line-height:17px}
 #ambar-cash-day .cd-difference>span{color:var(--cd-muted)}
 #ambar-cash-day .cd-difference strong{font:500 15px/20px "Space Grotesk",sans-serif;color:var(--cd-red)}
 #ambar-cash-day .cd-difference.is-equal strong{color:var(--cd-green)}
-#ambar-cash-day .cd-panel-head .cd-status{padding:4px 7px;border-radius:7px;background:#332938;color:#d5bc8d;font-size:11px;line-height:16px;white-space:nowrap}
-#ambar-cash-day .cd-panel-head .cd-status.is-confirmed{background:#25312b;color:#a8c1af}
-#ambar-cash-day .cd-allocation-base{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px 0}
+#ambar-cash-day .cd-status{padding:4px 7px;border-radius:7px;background:#332938;color:#d5bc8d;font-size:11px;line-height:16px;white-space:nowrap}
+#ambar-cash-day .cd-status.is-confirmed{background:#25312b;color:#a8c1af}
+#ambar-cash-day .cd-allocation-base{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px 0}
 #ambar-cash-day .cd-allocation-base>div{display:flex;flex-direction:column;gap:3px}
 #ambar-cash-day .cd-allocation-base>div>span{font-size:11px;line-height:16px;color:var(--cd-muted)}
 #ambar-cash-day .cd-allocation-base strong{font:500 25px/31px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
-#ambar-cash-day .cd-allocation-base>span{font-size:11px;line-height:17px;color:#a194ad;text-align:right}
-#ambar-cash-day .cd-chart-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:center;padding:8px 15px 13px}
-#ambar-cash-day .cd-donut{min-width:0}
-#ambar-cash-day .cd-donut [data-viz-container]{min-width:0}
+#ambar-cash-day .cd-allocation-base>span{text-align:right}
+#ambar-cash-day .cd-chart-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);flex:1;gap:14px;align-items:center;padding:8px 15px 13px}
+#ambar-cash-day .cd-donut{position:relative;min-width:0;min-height:180px;display:grid;place-items:center}
+#ambar-cash-day .cd-donut-svg{display:block;width:100%;max-width:180px;height:auto;overflow:visible}
+#ambar-cash-day .cd-arc{stroke-linecap:butt}
+#ambar-cash-day .cd-arc-barra{stroke:var(--cd-gold)}
+#ambar-cash-day .cd-arc-rp{stroke:var(--cd-rp)}
+#ambar-cash-day .cd-arc-profit{stroke:var(--cd-green)}
+#ambar-cash-day .cd-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;pointer-events:none}
+#ambar-cash-day .cd-donut-center strong{font:500 24px/1.1 "Space Grotesk",sans-serif;color:var(--cd-text)}
+#ambar-cash-day .cd-donut-center span{font-size:11px;color:var(--cd-muted)}
+#ambar-cash-day .cd-donut.is-rendered .cd-arc{transition:stroke-dasharray 180ms ease,stroke-dashoffset 180ms ease}
+@media(prefers-reduced-motion:reduce){#ambar-cash-day .cd-donut.is-rendered .cd-arc{transition:none}}
 #ambar-cash-day .cd-legend{display:flex;flex-direction:column;gap:13px;min-width:0;padding:5px 0}
 #ambar-cash-day .cd-legend dt{display:flex;align-items:center;gap:7px;font-size:11px;line-height:17px;color:#bcb0c8}
 #ambar-cash-day .cd-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
@@ -2946,8 +2949,11 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
 #ambar-cash-day summary>svg.lucide{width:15px!important;height:15px!important;color:#af9cba}
 #ambar-cash-day summary>svg.cd-chevron{width:13px!important;height:13px!important}
 #ambar-cash-day details[open]>summary>.cd-chevron{transform:rotate(180deg)}
-#ambar-cash-day .cd-distribution-fields,#ambar-cash-day .cd-payment-fields{padding:3px 14px 14px}
-#ambar-cash-day .cd-field-row{display:grid;grid-template-columns:minmax(0,1fr) 148px;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #32273b}
+#ambar-cash-day .cd-distribution-fields,#ambar-cash-day .cd-payment-fields{display:flex;flex-direction:column;flex:1;padding:3px 14px 9px}
+#ambar-cash-day .cd-distribution-fields>.cd-field-row{flex:1;min-height:64px}
+#ambar-cash-day #cdPaymentAmounts{display:grid;grid-auto-rows:minmax(64px,1fr);flex:1}
+#ambar-cash-day .cd-payment-fields>.cd-extra-source{flex:1}
+#ambar-cash-day .cd-field-row{display:grid;grid-template-columns:minmax(0,1fr) 148px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #32273b}
 #ambar-cash-day .cd-field-row label{font-size:12px;line-height:18px;font-weight:500}
 #ambar-cash-day .cd-field-row label small{display:block;font-size:11px;line-height:16px;font-weight:400;color:#9f90ac;margin-top:3px}
 #ambar-cash-day .cd-field-result{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 0 4px;font-size:12px;line-height:18px}
@@ -2958,16 +2964,16 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
 #ambar-cash-day .cd-crypto-fields>p>svg.lucide{width:14px!important;height:14px!important;margin-top:2px}
 #ambar-cash-day .cd-inline-note{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px;font-size:11px;line-height:17px;color:var(--cd-muted);border-top:1px solid #352b3d}
 #ambar-cash-day .cd-inline-note strong{font:500 14px/20px "Space Grotesk",sans-serif;color:#c7b7d3;white-space:nowrap}
-#ambar-cash-day .cd-confirm-zone{padding:13px 14px 15px;border-top:1px solid #3b3042}
+#ambar-cash-day .cd-confirm-zone{padding:10px 14px;border-top:1px solid #3b3042}
 #ambar-cash-day .cd-confirm-zone>p{display:flex;align-items:center;gap:8px;font-size:11px;line-height:18px;color:#c0ad8d}
 #ambar-cash-day .cd-confirm-zone>p svg.lucide{width:14px!important;height:14px!important}
-#ambar-cash-day .cd-primary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:48px;width:100%;padding:12px;margin-top:12px;border:1px solid #e1bf7f;border-radius:12px;background:#dfbf83;color:#21180d;font-size:13px;line-height:20px;font-weight:700;letter-spacing:-.015em}
+#ambar-cash-day .cd-primary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:46px;width:100%;padding:10px;border:1px solid #e1bf7f;border-radius:12px;background:#dfbf83;color:#21180d;font-size:13px;line-height:20px;font-weight:700;letter-spacing:-.015em}
 #ambar-cash-day .cd-primary>svg.lucide{width:16px!important;height:16px!important;stroke-width:2}
-#ambar-cash-day .cd-supplier-totals{display:grid;grid-template-columns:1fr 1fr;padding:16px 14px}
-#ambar-cash-day .cd-supplier-totals>div{display:flex;flex-direction:column;gap:6px;min-width:0}
+#ambar-cash-day .cd-supplier-totals{display:grid;grid-template-columns:1fr 1fr;flex:1;align-items:center;min-height:130px;padding:22px 14px}
+#ambar-cash-day .cd-supplier-totals>div{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;min-height:100px}
 #ambar-cash-day .cd-supplier-totals>div+div{border-left:1px solid #382c41;padding-left:15px}
 #ambar-cash-day .cd-supplier-totals>div>span{font-size:11px;line-height:17px;color:var(--cd-muted)}
-#ambar-cash-day .cd-supplier-totals strong{font:500 25px/31px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#ambar-cash-day .cd-supplier-totals strong{font:500 32px/39px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 #ambar-cash-day .cd-debt{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;border-top:1px solid #513440;background:#261a27}
 #ambar-cash-day .cd-debt>div{display:flex;flex-direction:column;gap:3px;min-width:0}
 #ambar-cash-day .cd-debt>div>span{font-size:12px;line-height:18px;font-weight:500;color:#cfb6c2}
@@ -2979,31 +2985,46 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
 #ambar-cash-day .cd-source-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:7px}
 #ambar-cash-day .cd-source-buttons button{padding:8px 4px;text-align:center;min-height:42px;border:1px solid #43324c;border-radius:9px;background:#21172b;font-size:12px;line-height:18px;color:#b6a5c3}
 #ambar-cash-day .cd-source-buttons button[aria-pressed="true"]{background:#30232f;border-color:#8c714e;color:var(--cd-gold)}
-#ambar-cash-day .cd-payment-sources{padding-top:12px}
-#ambar-cash-day .cd-payment-sources>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:11px;line-height:17px;padding:5px 0;color:var(--cd-muted)}
+#ambar-cash-day .cd-payment-sources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding-top:10px}
+#ambar-cash-day .cd-payment-sources>div{display:flex;flex-direction:column;gap:3px;font-size:11px;line-height:17px;padding:4px 0;color:var(--cd-muted)}
 #ambar-cash-day .cd-payment-sources strong{font:500 15px/20px "Space Grotesk",sans-serif;color:#d3c0d3}
+#ambar-cash-day .cd-source-editor-link{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:8px 0;color:var(--cd-gold);font-size:12px;line-height:18px}
+#ambar-cash-day .cd-payment-edit[data-sources="true"]>summary .cd-chevron{transform:rotate(90deg)}
 #ambar-cash-day .cd-warning{margin-top:10px!important;padding:10px;border:1px solid #65414b;border-radius:10px;background:#311d29;color:#dfa6b2;font-size:11px;line-height:18px}
-#ambar-cash-day .cd-safe-rows{padding:3px 14px}
-#ambar-cash-day .cd-safe-rows>div{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:47px;padding:11px 0}
+#ambar-cash-day .cd-safe-rows{display:flex;flex-direction:column;flex:1;padding:3px 14px}
+#ambar-cash-day .cd-safe-context{padding:9px 14px 4px;font-size:11px;line-height:17px;color:var(--cd-muted)}
+#ambar-cash-day .cd-safe-rows>div{display:flex;flex:1;justify-content:space-between;align-items:center;gap:10px;min-height:63px;padding:9px 0}
 #ambar-cash-day .cd-safe-rows>div+div{border-top:1px solid #33283d}
-#ambar-cash-day .cd-safe-rows dt{display:flex;align-items:center;gap:9px;font-size:13px;line-height:20px}
-#ambar-cash-day .cd-safe-rows dd{font:500 21px/26px "Space Grotesk",sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+#ambar-cash-day .cd-safe-rows dt{display:flex;align-items:flex-start;gap:9px;min-width:0;font-size:13px;line-height:23px}
+#ambar-cash-day .cd-safe-rows dt>.cd-dot{margin-top:8px}
+#ambar-cash-day .cd-safe-label{display:flex;flex-direction:column;gap:4px;min-width:0}
+#ambar-cash-day .cd-safe-delta{font:500 12px/18px "Space Grotesk",Manrope,sans-serif;font-variant-numeric:tabular-nums;color:var(--cd-green)}
+#ambar-cash-day .cd-safe-delta.is-zero{color:var(--cd-muted)}
+#ambar-cash-day .cd-safe-rows dd{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font:500 21px/26px "Space Grotesk",sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
 #ambar-cash-day .cd-safe-total{padding:15px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#241c2b;border-top:1px solid #4b3a49}
 #ambar-cash-day .cd-safe-total>span{font-size:12px;line-height:18px;color:#cdbed4;max-width:100px}
 #ambar-cash-day .cd-safe-total strong{font:500 29px/35px "Space Grotesk",sans-serif;letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:var(--cd-gold)}
-#ambar-cash-day .cd-wallet-line{display:flex;align-items:center;gap:9px;padding:13px 14px;border-top:1px solid #33293e}
+#ambar-cash-day .cd-wallet-line{display:flex;align-items:center;gap:9px;min-height:44px;padding:9px 14px;border-top:1px solid #33293e}
 #ambar-cash-day .cd-wallet-line>svg{color:#9c89ae}
 #ambar-cash-day .cd-wallet-line>span{flex:1;font-size:12px;line-height:18px}
 #ambar-cash-day .cd-wallet-line>span>small{display:block;font-size:11px;line-height:16px;color:var(--cd-muted);margin-top:2px}
 #ambar-cash-day .cd-wallet-line strong{font:500 18px/24px "Space Grotesk",sans-serif;letter-spacing:-.025em;white-space:nowrap}
 #ambar-cash-day .cd-safe-hint{padding:0 14px 13px;font-size:11px;line-height:17px;color:var(--cd-muted)}
-#ambar-cash-day .cd-bottom-nav{display:grid;grid-template-columns:repeat(5,1fr);padding:10px 8px 13px;border-top:1px solid #302637;background:#0d0a12;flex:none}
-#ambar-cash-day .cd-bottom-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:44px;color:#8b7c9b;font-size:11px;line-height:15px}
-#ambar-cash-day .cd-bottom-nav button>svg.lucide{width:20px!important;height:20px!important}
-#ambar-cash-day .cd-bottom-nav button.is-active{color:var(--cd-gold)}
-#ambar-cash-day .cd-bottom-nav .cd-check{color:#bd8290}
+#ambar-cash-day .cd-page-nav{display:grid;grid-template-columns:minmax(90px,.75fr) minmax(0,1.6fr);align-items:stretch;gap:10px;flex:none;padding:9px 13px 12px;border-top:1px solid #352c3e;background:#100c17}
+#ambar-cash-day .cd-page-nav.is-first{grid-template-columns:minmax(0,1fr)}
+#ambar-cash-day .cd-page-nav button{min-height:48px;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:12px}
+#ambar-cash-day .cd-page-back{justify-content:center;border:1px solid #3c3145;color:#c0b3cc;font-size:13px;line-height:20px}
+#ambar-cash-day .cd-page-forward{justify-content:space-between;border:1px solid var(--cd-gold);background:var(--cd-gold);color:#241b0d}
+#ambar-cash-day .cd-page-forward>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+#ambar-cash-day .cd-page-forward small{font-size:11px;line-height:15px;color:inherit}
+#ambar-cash-day .cd-page-forward strong{font-size:13px;line-height:19px;font-weight:600;overflow-wrap:anywhere}
+#ambar-cash-day .cd-page-nav.is-first .cd-page-forward>span{flex-direction:row;align-items:baseline;justify-content:center;flex:1;gap:5px}
+#ambar-cash-day .cd-page-nav.is-first .cd-page-forward small{font-size:13px;line-height:19px}
+#ambar-cash-day .cd-page-nav button svg.lucide{width:18px!important;height:18px!important}
+#ambar-cash-day .cd-return-allocation{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:47px;padding:10px 14px;border-top:1px solid #3c3044;color:var(--cd-gold);font-size:12px;line-height:18px}
+#ambar-cash-day .cd-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 #ambar-cash-day .cd-negative{color:var(--cd-red)!important}
-#ambar-cash-day .cd-unavailable{display:flex;flex-direction:column;align-items:center;gap:12px;padding:55px 24px;text-align:center}
+#ambar-cash-day .cd-unavailable{display:flex;flex-direction:column;flex:1;align-items:center;justify-content:center;gap:12px;padding:55px 24px;text-align:center}
 #ambar-cash-day .cd-unavailable>svg.lucide{width:32px!important;height:32px!important;color:#bda87f}
 #ambar-cash-day .cd-unavailable h2{font-size:18px;line-height:25px;font-weight:600}
 #ambar-cash-day .cd-unavailable p{font-size:12px;line-height:19px;color:var(--cd-muted)}
@@ -3024,14 +3045,15 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
 @container cashday (max-width:365px){
   #ambar-cash-day .cd-header{padding-inline:10px;gap:10px}
   #ambar-cash-day .cd-header h1{font-size:21px}
-  #ambar-cash-day .cd-datebar{padding-inline:8px;grid-template-columns:32px minmax(0,1fr) 32px 36px 36px;gap:2px}
+  #ambar-cash-day .cd-date-zone{margin-inline:10px}
+  #ambar-cash-day .cd-datebar{gap:0}
+  #ambar-cash-day .cd-step-full{display:none}
+  #ambar-cash-day .cd-step-short{display:block}
   #ambar-cash-day .cd-page{padding-inline:10px}
-  #ambar-cash-day .cd-overview strong{font-size:21px;line-height:27px}
-  #ambar-cash-day .cd-overview button{padding-inline:7px}
   #ambar-cash-day .cd-panel-head{padding-inline:12px}
   #ambar-cash-day .cd-panel-head h2{font-size:17px}
   #ambar-cash-day .cd-revenue-calculation{padding-inline:12px}
-  #ambar-cash-day .cd-cash-start strong{font-size:24px}
+  #ambar-cash-day .cd-cash-start strong{font-size:23px}
   #ambar-cash-day .cd-actual{grid-template-columns:minmax(0,1fr) 137px;padding-inline:12px}
   #ambar-cash-day .cd-field-row{grid-template-columns:minmax(0,1fr) 137px}
   #ambar-cash-day .cd-chart-grid{gap:9px;padding-inline:10px}
@@ -3039,70 +3061,97 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
   #ambar-cash-day .cd-debt>strong{font-size:21px}
   #ambar-cash-day .cd-safe-total strong{font-size:25px}
 }
-@media(pointer:coarse){#ambar-cash-day .cd-datebar{grid-template-columns:44px minmax(0,1fr) 44px 44px 44px}#ambar-cash-day .cd-local-nav button{min-height:44px}}
-/* Load AFTER cash-day-visual.css. The existing app shell owns viewport and safe areas. */
+@media(pointer:coarse){#ambar-cash-day .cd-local-nav button{min-height:47px}}
+/* The frame represents the available phone viewport and stays the same on
+   every step. Only its content regions absorb the remaining height. */
+#ambar-cash-day .cd-app[data-compact="true"] .cd-header{min-height:64px;padding-block:10px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-date-zone{padding-block:3px;margin-bottom:8px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-local-nav{padding-top:4px;padding-bottom:7px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-local-nav::before{top:17px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-local-nav button{min-height:47px;gap:3px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-panel-head{min-height:52px;padding-block:9px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-page{padding-top:6px;padding-bottom:8px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-deductions>.cd-arithmetic-row{min-height:32px;padding-block:4px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-deductions{grid-auto-rows:minmax(32px,1fr)}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-net{padding-block:8px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-actual{padding-block:9px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-chart-grid{padding-block:4px 8px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-safe-context{padding-block:7px 2px}
+#ambar-cash-day .cd-app[data-compact="true"] .cd-safe-rows>div{min-height:61px;padding-block:8px}
+/* Load AFTER cash-day-visual.css. The existing app shell owns a definite
+   available viewport height and safe areas. Never fit the frame to a step. */
 #ambar-cash-day{width:100%;height:var(--cd-available-height,100%);min-height:0}
 #ambar-cash-day .cd-stage{align-items:stretch;height:100%;min-height:0;padding:0;gap:0}
 #ambar-cash-day .cd-app{width:100%;max-width:none;height:100%;min-height:0;border:0;border-radius:0}
 #ambar-cash-day .cd-scroll{min-width:0;min-height:0;overflow-y:auto}
-#ambar-cash-day .cd-bottom-nav{padding-bottom:calc(13px + var(--cd-safe-bottom,0px))}
+#ambar-cash-day .cd-page-nav{padding-bottom:calc(12px + var(--cd-safe-bottom,0px))}
 #ambar-cash-day .cd-app :is(button,summary,input):focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
-#ambar-cash-day .cd-donut [data-cash-donut]{width:100%;height:180px;min-width:0}
-#ambar-cash-day .cd-donut [data-cash-donut]>svg{display:block;width:100%;height:180px}
+#ambar-cash-day .cd-app :is(button,summary){cursor:pointer}
+#ambar-cash-day .cd-app :is(button:disabled,[aria-disabled="true"]){cursor:default}
 #ambar-cash-day .cd-state-note{padding:11px 14px;border-top:1px solid #3b3042;font-size:11px;line-height:18px;color:#aaa0b4}
 #ambar-cash-day .cd-state-note strong{color:#eeeae4;font-weight:500}
 #ambar-cash-day .cd-state-note.is-warning{color:#d5bc8d;background:#272029}
 #ambar-cash-day .cd-state-note.is-success{color:#9bb6a6}
-#ambar-cash-day .cd-readonly-transfers{margin:0 0 12px;border:1px solid #3b3142;border-radius:14px;background:#15111f;padding:12px 14px}
-#ambar-cash-day .cd-readonly-transfers h3{margin:0 0 8px;font-size:14px;line-height:20px;font-weight:600;color:#c9b9d0}
+#ambar-cash-day .cd-safe-delta.is-unknown{color:var(--cd-muted)}
+#ambar-cash-day .cd-readonly-transfers{margin:0;border-top:1px solid #3b3142;background:#15111f;padding:0 14px}
+#ambar-cash-day .cd-readonly-transfers>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 0;font-size:12px;line-height:18px;color:#c9b9d0;cursor:pointer}
+#ambar-cash-day .cd-readonly-transfers>summary::after{content:'+';font-size:18px;color:#aaa0b4}
+#ambar-cash-day .cd-readonly-transfers[open]>summary::after{content:'−'}
 #ambar-cash-day .cd-transfer-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;font-size:12px;line-height:18px}
 #ambar-cash-day .cd-transfer-row+.cd-transfer-row{border-top:1px solid #352d3e}
 #ambar-cash-day .cd-transfer-row small{display:block;font-size:11px;line-height:17px;color:#aaa0b4}
 #ambar-cash-day .cd-transfer-row strong{font:500 17px/23px "Space Grotesk",sans-serif;white-space:nowrap}
 #ambar-cash-day .cd-overpayment{color:#9bb6a6!important}
-#ambar-cash-day .cd-overview strong,#ambar-cash-day .cd-debt>strong,#ambar-cash-day .cd-safe-total strong,#ambar-cash-day .cd-safe-rows dd{white-space:normal;overflow-wrap:anywhere;min-width:0}
+#ambar-cash-day .cd-debt>strong,#ambar-cash-day .cd-safe-total strong,#ambar-cash-day .cd-safe-rows dd{white-space:normal;overflow-wrap:anywhere;min-width:0}
 #ambar-cash-day .cd-debt,#ambar-cash-day .cd-safe-total,#ambar-cash-day .cd-wallet-line{flex-wrap:wrap}
 #ambar-cash-day .cd-legend dd{overflow-wrap:anywhere}
-/* Existing application shell: hide duplicated chrome; keep one back handler and one bottom nav. */
-#ambar-cash-day[data-shell="existing"] .cd-header,#ambar-cash-day[data-shell="existing"] .cd-bottom-nav{display:none}
-/* Оболочка раздела для «Кассы дня» (#accOv.cdy, как у отчёта ДДС): шапка, рейка
-   и подвал оболочки спрятаны — у страницы свои; середина без отступов и без своей
-   прокрутки — прокручивается .cd-scroll. Нижней навигации пакета нет: раздел лежит
-   поверх панели вкладок, safe area снизу несёт сама страница. */
+/* Hide only a duplicated title/back header. The wizard footer always stays. */
+#ambar-cash-day[data-shell="existing"] .cd-header{display:none}
+/* Оболочка раздела для «Кассы дня» (#accOv.cdy, как у отчёта ДДС): шапка, рейка и
+   подвал оболочки спрятаны — у страницы свои; середина без отступов и без своей
+   прокрутки — прокручивается .cd-scroll. Страница занимает всю доступную область:
+   высота одна на всех шагах, нижняя навигация шагов на месте, safe area снизу у неё. */
 #accOv.cdy .stk-top,#accOv.cdy #accRail,#accOv.cdy .stk-foot{display:none}
 #accOv.cdy .stk-mid{display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden}
 #accOv.cdy #ambar-cash-day{--cd-safe-bottom:var(--safe-bottom);flex:1 1 auto;min-height:0}
 #accOv.cdy .cd-header{padding-top:calc(13px + var(--safe-top))}
-#ambar-cash-day .cd-page{padding-bottom:calc(20px + var(--cd-safe-bottom,0px))}
+/* Клавиатура (vendor/ambar-kb.js): нижняя навигация прячется, снизу воздух — поле
+   докручивается в центр экрана и не остаётся за кнопками. */
+html.kb #accOv.cdy .cd-page-nav{display:none}
 html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
-/* Полоса дня — та же, что пилюля дня в разделах: жест daySwipe и полёт
-   _heroFlip (классы day-*), окошко с датой — кнопка «к сегодня». */
+/* Полоса дня — та же, что пилюля дня в разделах: жест daySwipe и полёт _heroFlip
+   (классы day-*), окошко с датой — кнопка «к сегодня». */
 #ambar-cash-day .cd-datebar{touch-action:pan-y}
 #ambar-cash-day .cd-datebar.day-drag{transition:none}
 #ambar-cash-day .cd-datebar.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
 #ambar-cash-day .cd-datebar.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 @media (prefers-reduced-motion:reduce){#ambar-cash-day .cd-datebar.day-move,#ambar-cash-day .cd-datebar.day-back{transition-duration:.01s}}
 #ambar-cash-day .cd-date-arrow:disabled{opacity:.35}
-/* «К сегодня» у сегодняшнего дня не прячется, а гаснет: место в сетке остаётся,
-   и календарь не прыгает (владелец, 3 окт 2026: размеры не прыгают). */
+/* «К сегодня» у сегодняшнего дня не прячется, а гаснет: место остаётся, дата и
+   календарь не сдвигаются (владелец, 3 окт 2026: размеры не прыгают). */
 #ambar-cash-day .cd-date-today.is-off{visibility:hidden;pointer-events:none}
-/* Состояния, которых в макете нет, — теми же красками макета: поле под
-   фокусом и после записи, запертое поле, частичный сбор по районам, нулевой
-   долг, минус в остатке редактора, пустой день. Поясняющих текстов пакета на
-   экране нет (владелец, 3 окт 2026, подтверждено 23 ноя). */
+/* Состояние дня над панелью (до учёта, будущий день) — одним фактом, виден на любом шаге. */
+#ambar-cash-day .cd-page>.cd-state-note{flex:none;border:1px solid #3b3042;border-radius:12px;margin-bottom:8px;text-align:center}
+/* Источники оплаты сверх стопки — состояния цветом, не словами (владелец, 3 окт 2026):
+   выбран — золото с тёмным текстом, можно выбрать — тёмно-синяя плашка, нельзя —
+   приглушённо-красная и не нажимается. */
+#ambar-cash-day .cd-source-buttons button{background:#1a1f36;border-color:#2a3152;color:#dfe3f3}
+#ambar-cash-day .cd-source-buttons button[aria-pressed="true"]{background:var(--cd-gold);border-color:var(--cd-gold);color:#241b0d}
+#ambar-cash-day .cd-source-buttons button.off{background:rgba(224,85,85,.06);border-color:rgba(224,85,85,.22);color:rgba(238,234,228,.55);pointer-events:none}
+/* Состояния, которых в макете нет, — теми же красками: поле под фокусом и после
+   записи, запертое поле, частичный сбор по районам, нулевой долг, минус в остатке
+   редактора, пустой день. Поясняющих текстов пакета на экране нет (владелец,
+   3 окт 2026, подтверждено 23 ноя). */
 #ambar-cash-day .cd-input-unit:focus-within{border-color:#8c714e}
 #ambar-cash-day .cd-input-unit input.saved{color:var(--cd-green)}
 #ambar-cash-day .cd-input-unit input:disabled{opacity:.5}
 #ambar-cash-day .cd-collection-link.is-partial>span>svg{color:#c6b08a}
 #ambar-cash-day .cd-debt.is-zero>strong{color:#c7b7d3}
-#ambar-cash-day .cd-confirm-zone>.cd-primary{margin-top:0}
 #ambar-cash-day .cd-field-result strong.cd-negative{color:var(--cd-red)}
-#ambar-cash-day .cd-unavailable{display:flex;flex-direction:column;align-items:center;gap:12px;padding:56px 20px;text-align:center;color:var(--cd-muted)}
+#ambar-cash-day .cd-unavailable{color:var(--cd-muted)}
 #ambar-cash-day .cd-unavailable h2{color:var(--cd-text)}
-#ambar-cash-day .cd-unavailable>svg.lucide{width:32px!important;height:32px!important;color:#bda87f}
-#ambar-cash-day .cd-readonly-transfers[hidden]{display:none}
 /* длинное имя старшего в плашке «Подтверждено · кто» переносится, а не режется */
-#ambar-cash-day .cd-panel-head .cd-status{white-space:normal;max-width:100%;overflow-wrap:anywhere}
+#ambar-cash-day .cd-allocation-base .cd-status{white-space:normal;max-width:50%;overflow-wrap:anywhere}
 /* ── Отчёт ДДС за день (визуал 2 ноя 2026, бриф AMBAR-CASHFLOW-DAY): cashflow-visual.css и cashflow-integration.css из пакета дословно, ниже — адаптация под оболочку ── */
 #ambar-cashflow-day{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #ambar-cashflow-day .cf-stage{display:flex;justify-content:center;padding:12px 8px}
@@ -24340,6 +24389,7 @@ function fvExpenses(){
 // внутри, а с главной идут закрывать текущую смену.
 function fbOpenToday(){
   if(DAY_OFFSET) accDayGo(0);
+  CDY.from = '';
   accOpen('finday');
 }
 function fbOpenB(){
@@ -24873,31 +24923,36 @@ async function fbEntryDel(id){
 }
 
 // ── Экран «Касса дня» ─────────────────────────────────────────────────────
-// Вид 22 ноя 2026 (владелец, бриф AMBAR-CASH-DAY — пакет ChatGPT, как у отчёта
-// ДДС и сбора выручки): страница #ambar-cash-day целиком в середине раздела,
-// шапка, рейка и подвал оболочки на это время спрятаны (#accOv.cdy). Своя
-// шапка со стрелкой назад (accBack), полоса дня с теми же стрелками,
-// календарём (openDate('finDay')), жестом (bindDayBars → daySwipe) и тапом по
-// окошку «к сегодня» (dayBarHome), рейка четырёх шагов — 1 Выручка →
-// 2 Распределение → 3 Оплата → 4 Итог — и единственная прокрутка .cd-scroll.
-// Шаг — только положение на странице: кнопки шагов, плитки сводки и «Далее»
-// прокручивают и ничего не подтверждают и не записывают. Деньги двигают
-// прежние ручки: поля — fbSave (запись на уходе с поля, вопрос за прошедший
-// день, уведомление владельцу), «Подтвердить распределение» — fbDayOk,
-// оплата Барракуде — fbPayB (нехватка в стопке → окно «откуда взять»).
-// Своей арифметики нет: предложение (половина / норма / вся свободная
-// крипта), замороженные суммы подтверждённого дня, долг и стопки сейфа после
-// дня — из книги (finance_routes.build); круг рисуется по готовым долям
-// Барракуда / РП наличными / ЧП, крипта в круг не входит.
-const CDY = {step: 'revenue', frame: 0};
+// ── «Касса дня» в новом виде (22–23 ноя 2026, пакет ChatGPT AMBAR-CASH-DAY,
+// финальный визуал 23 ноя): страница #ambar-cash-day в середине раздела
+// (#accOv.cdy, как отчёт ДДС). Четыре ОТДЕЛЬНЫХ экрана одной высоты —
+// 1 Выручка → 2 Распределение → 3 Оплата → 4 Итог: в разметке все четыре,
+// виден один; переключают рейка шагов и нижняя навигация «Назад / Далее»
+// (на первом шаге одна «Далее · Распределение», на последнем — возврат туда,
+// откуда пришли). Полоса дня — прежняя (accDayGo/bindDayBars/openDate).
+// Открытое распределение заменяет диаграмму полями, открытая оплата — обзор
+// полями, внутри оплаты подэкран источников заменяет суммы. Переход, раскрытие
+// и подэкран ничего не записывают и не подтверждают. Деньги двигают прежние
+// ручки: поля — fbSave (запись на уходе с поля, вопрос за прошедший день,
+// уведомление владельцу), «Подтвердить распределение» — fbDayOk, оплата
+// Барракуде и её источник — fbPayB (нехватка в стопке → окно «откуда взять»).
+// Своей арифметики нет: предложение (половина / норма / вся свободная крипта),
+// замороженные суммы подтверждённого дня, долг, стопки сейфа после дня и их
+// начало (fbDdcStart) — из книги (finance_routes.build); круг рисуется по
+// готовым долям Барракуда / РП наличными / ЧП, крипта в круг не входит.
+const CDY = {step: 'revenue', from: '', alloc: false, pay: false, srcView: false, canSrc: false, split: false,
+             fundDebt: false, otherBases: false, trOpen: false, ro: null};
 const CDY_STEPS = ['revenue', 'allocation', 'supplier', 'safe'];
+const CDY_T = {revenue: 'Выручка', allocation: 'Распределение', supplier: 'Оплата Барракуде', safe: 'Остатки в сейфе'};
 async function accFinDay(){
   _setText('accTitle', 'Касса дня');
   _setText('accSub', accDayWord());
-  CDY.step = 'revenue'; CDY.frame = 0;
+  Object.assign(CDY, {step: 'revenue', alloc: false, pay: false, srcView: false, trOpen: false});
+  if(CDY.ro){ try{ CDY.ro.disconnect(); }catch(e){} CDY.ro = null; }
   document.getElementById('accMid').innerHTML = cdyShell();
   document.getElementById('accOv').classList.add('cdy');
   cdyBind();
+  cdySetStep('revenue');
   requestAnimationFrame(bindDayBars);        // жест по полосе дня — тот же daySwipe
   await fbDayReload();
 }
@@ -24931,27 +24986,37 @@ async function fbDayReload(){
   }
   cdyPaint(d);
 }
-// Оболочка страницы: шапка, полоса дня, рейка шагов и прокрутка. Нижней
-// навигации пакета нет — раздел лежит поверх панели вкладок.
+// Оболочка страницы: своя шапка, полоса дня в рамке, рейка четырёх шагов, одна
+// прокрутка .cd-scroll и нижняя навигация шагов. Высота — вся доступная область
+// раздела, на каждом шаге одинаковая; растягиваются рабочие зоны внутри карточки.
 function cdyShell(){
-  const nav = [['revenue', '1', 'Выручка'], ['allocation', '2', 'Распределение'], ['supplier', '3', 'Оплата'], ['safe', '4', 'Итог']]
-    .map(([k, n, t]) => `<button type="button" data-section="${k}"${k === 'revenue' ? ' aria-current="location"' : ''}><span class="cd-nav-number">${n}</span><span>${t}</span></button>`).join('');
+  const nav = [['revenue', '1', '<span>Выручка</span>'],
+    ['allocation', '2', '<span class="cd-step-full">Распределение</span><span class="cd-step-short" aria-hidden="true">Раскладка</span>'],
+    ['supplier', '3', '<span>Оплата</span>'], ['safe', '4', '<span>Итог</span>']]
+    .map(([k, n, t]) => `<button type="button" data-section="${k}" aria-controls="cd-${k}"><span class="cd-nav-number">${n}</span>${t}</button>`).join('');
   return `<div id="ambar-cash-day" lang="ru"><div class="cd-stage"><div class="cd-app" aria-label="Касса дня">
-    <header class="cd-header"><button type="button" class="cd-icon-button" aria-label="Назад" onclick="accBack()">${luc('chevron-left')}</button><h1>Касса дня</h1><span>AED</span></header>
-    <div class="cd-datebar" id="finDayCard" data-day="общий" aria-label="Учётный день">
-      <button type="button" class="cd-date-arrow" onclick="dayBarArrow(this,1)" aria-label="Предыдущий день">${luc('chevron-left')}</button>
-      <button type="button" class="cd-date" onclick="dayBarHome(this)"><strong id="cdRelative"></strong><span id="cdDateText"></span></button>
-      <button type="button" class="cd-date-arrow" onclick="dayBarArrow(this,-1)" aria-label="Следующий день">${luc('chevron-right')}</button>
-      <button type="button" id="cdToday" class="cd-date-today is-off" onclick="dayBarHome(this)" aria-label="Вернуться к сегодня">${luc('rotate-ccw')}</button>
-      <button type="button" class="cd-calendar" onclick="openDate('finDay')" aria-label="Выбрать день">${luc('calendar-days')}</button>
+    <header class="cd-header"><button type="button" class="cd-icon-button" aria-label="Назад" onclick="accBack()">${luc('chevron-left')}</button><h1>Касса дня</h1></header>
+    <div class="cd-date-zone" aria-label="Выбор учётного дня">
+      <div class="cd-datebar" id="finDayCard" data-day="общий">
+        <button type="button" class="cd-date-arrow" onclick="dayBarArrow(this,1)" aria-label="Предыдущий день">${luc('chevron-left')}</button>
+        <button type="button" class="cd-date" onclick="dayBarHome(this)"><strong id="cdRelative"></strong><span id="cdDateText"></span></button>
+        <button type="button" class="cd-date-arrow" onclick="dayBarArrow(this,-1)" aria-label="Следующий день">${luc('chevron-right')}</button>
+        <button type="button" id="cdToday" class="cd-date-today is-off" onclick="dayBarHome(this)" aria-label="Вернуться к сегодня">${luc('rotate-ccw')}</button>
+        <button type="button" class="cd-calendar" onclick="openDate('finDay')" aria-label="Выбрать день">${luc('calendar-days')}</button>
+      </div>
     </div>
     <nav class="cd-local-nav" aria-label="Порядок работы с кассой дня">${nav}</nav>
     <main class="cd-scroll" id="cdScroll"><div class="cd-page" id="finDayBody">${cdyBodyHtml(null, true)}</div></main>
+    <nav class="cd-page-nav is-first" id="cdPageNav" aria-label="Переход между шагами">
+      <button type="button" id="cdPageBack" class="cd-page-back" hidden>${luc('chevron-left')}<span id="cdBackLabel">Назад</span></button>
+      <button type="button" id="cdPageNext" class="cd-page-forward" data-section="allocation"><span><small id="cdNextEyebrow">Далее ·</small><strong id="cdNextLabel">Распределение</strong></span>${luc('arrow-right')}</button>
+    </nav>
+    <span id="cdPageAnnouncement" class="cd-sr-only" role="status" aria-live="polite"></span>
   </div></div></div>`;
 }
 // Подписи полосы дня — из dayBarLabels, как у ДДС: «вперёд» заперта на сегодня,
 // «к сегодня» горит только у прошедшего дня (место под ней остаётся, чтобы
-// календарь не прыгал).
+// дата и календарь не сдвигались).
 function cdyDatePaint(){
   const bar = document.getElementById('finDayCard'); if(!bar || !bar.classList.contains('cd-datebar')) return;
   const off = DAY_OFFSET, {имя, дата} = dayBarLabels(off), day = accDay();
@@ -24963,43 +25028,94 @@ function cdyDatePaint(){
   const date = bar.querySelector('.cd-date'); if(date) date.setAttribute('aria-label', `Выбран ${fbDayT(day)}. Нажмите, чтобы вернуться к сегодня`);
   const app = bar.closest('.cd-app'); if(app) app.setAttribute('aria-label', `Касса дня за ${fbDayT(day)} ${day.slice(0, 4)}`);
 }
-// Кнопки шагов, плитки сводки и «Далее» — только прокрутка к блоку; положение
-// при прокрутке отмечается на рейке и номером блока (aria-current / data-current).
+// Один обработчик на страницу: шаги и нижняя навигация, раскрытия редакторов
+// (тело редактора лежит рядом с details, а не внутри, поэтому открывает его не
+// браузер, а cdyEditors), подэкран источников и выбор источника. Деньги здесь
+// не трогаются: подтверждение, поля и полоса дня — на своих прежних обработчиках.
 function cdyBind(){
-  const root = document.getElementById('ambar-cash-day'), scroll = document.getElementById('cdScroll');
-  if(!root || !scroll) return;
+  const root = document.getElementById('ambar-cash-day'); if(!root) return;
   root.addEventListener('click', e => {
-    const b = e.target.closest ? e.target.closest('button[data-section]') : null;
-    if(!b || b.disabled) return;
-    cdySetStep(b.dataset.section, true);
+    const t = e.target.closest ? e.target.closest('button, summary') : null;
+    if(!t || !root.contains(t)) return;
+    if(t.tagName === 'SUMMARY'){
+      const det = t.parentElement, id = det ? det.id : '';
+      if(id === 'cdEditAllocation') CDY.alloc = !CDY.alloc;
+      else if(id === 'cdEditPayment'){ if(CDY.pay && CDY.srcView) CDY.srcView = false; else CDY.pay = !CDY.pay; }
+      else if(id === 'cdTransfers'){ CDY.trOpen = !det.open; return; }      // переводы раскрывает браузер
+      else return;
+      e.preventDefault(); cdyEditors(); return;
+    }
+    if(t.disabled) return;
+    if(t.id === 'cdSourceEditorButton'){ CDY.pay = true; CDY.srcView = true; cdyEditors(); return; }
+    if(t.dataset.source){ cdyPickSrc(t.dataset.source); return; }
+    if(t.dataset.section && CDY_STEPS.includes(t.dataset.section)){
+      cdySetStep(t.dataset.section);
+      try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e2){}
+      return;
+    }
+    if(t.dataset.action === 'back') accBack();
   });
-  scroll.addEventListener('scroll', () => {
-    if(CDY.frame) return;
-    CDY.frame = requestAnimationFrame(() => {
-      CDY.frame = 0;
-      if(!document.getElementById('ambar-cash-day')) return;
-      const top = scroll.getBoundingClientRect().top;
-      let active = CDY_STEPS[0];
-      for(const k of CDY_STEPS){ const p = document.getElementById('cd-' + k); if(p && p.getBoundingClientRect().top <= top + 60) active = k; }
-      // короткий последний блок до верха прокрутки не доезжает
-      if(scroll.scrollHeight > scroll.clientHeight && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 2) active = CDY_STEPS[CDY_STEPS.length - 1];
-      if(active !== CDY.step) cdySetStep(active, false);
-    });
-  }, {passive: true});
+  // Плотный режим по фактической высоте экрана (пакет: 720 px и ниже — меньше
+  // воздуха в шапке и строках); меряется сам экран, а не окно.
+  const app = root.querySelector('.cd-app');
+  const compact = () => { if(!app || !document.body.contains(app)) return; const h = app.getBoundingClientRect().height; if(h > 0) app.dataset.compact = String(h <= 720); };
+  compact();
+  if(typeof ResizeObserver === 'function'){ CDY.ro = new ResizeObserver(compact); CDY.ro.observe(app); }
 }
-function cdySetStep(key, scrollTo){
-  const scroll = document.getElementById('cdScroll'), panel = document.getElementById('cd-' + key);
-  if(!scroll || !panel) return;
+// Показать один шаг: остальные панели спрятаны, рейка и нижние кнопки — по шагу,
+// прокрутка с начала. Переход только показывает шаг: ни записи, ни подтверждения.
+// Нет панелей (за день ничего нет) — шаги заперты, работает только возврат.
+function cdySetStep(key){
+  if(!CDY_STEPS.includes(key)) return;
   CDY.step = key;
-  document.querySelectorAll('#ambar-cash-day .cd-local-nav [data-section]').forEach(b => {
-    if(b.dataset.section === key) b.setAttribute('aria-current', 'location'); else b.removeAttribute('aria-current');
+  const root = document.getElementById('ambar-cash-day'); if(!root) return;
+  const i = CDY_STEPS.indexOf(key), last = i === CDY_STEPS.length - 1, has = !!document.getElementById('cd-' + key);
+  CDY_STEPS.forEach(k => { const p = document.getElementById('cd-' + k); if(p){ p.hidden = k !== key; p.setAttribute('data-current', String(k === key)); } });
+  root.querySelectorAll('.cd-local-nav [data-section]').forEach(b => {
+    b.disabled = !has;
+    if(has && b.dataset.section === key) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
   });
-  CDY_STEPS.forEach(k => { const p = document.getElementById('cd-' + k); if(p) p.setAttribute('data-current', String(k === key)); });
-  if(scrollTo){
-    const top = scroll.scrollTop + panel.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 12;
-    scroll.scrollTo({top: Math.max(0, top), behavior: 'auto'});
-    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const nav = document.getElementById('cdPageNav'), back = document.getElementById('cdPageBack'), next = document.getElementById('cdPageNext');
+  if(nav && back && next){
+    nav.classList.toggle('is-first', i === 0);
+    back.hidden = i === 0; back.disabled = !has;
+    back.dataset.section = i > 0 ? CDY_STEPS[i - 1] : '';
+    back.setAttribute('aria-label', i > 0 ? 'Назад: ' + CDY_T[CDY_STEPS[i - 1]] : 'Назад');
+    next.disabled = !has && !last;
+    next.dataset.section = last ? '' : CDY_STEPS[i + 1];
+    next.dataset.action = last ? 'back' : '';
+    _setText('cdNextEyebrow', last ? 'Вернуться' : i === 0 ? 'Далее ·' : 'Далее');
+    _setText('cdNextLabel', last ? cdyBackTitle() : CDY_T[CDY_STEPS[i + 1]]);
+    next.setAttribute('aria-label', last ? cdyBackTitle() : 'Далее: ' + CDY_T[CDY_STEPS[i + 1]]);
   }
+  const sc = document.getElementById('cdScroll'); if(sc) sc.scrollTop = 0;
+  _setText('cdPageAnnouncement', `Шаг ${i + 1} из 4. ${CDY_T[key]}`);
+}
+// Куда ведёт последняя кнопка — туда, откуда пришли (стрелка «назад» — ровно на
+// шаг): из «Сейфа» — в сейф, с карточки финансов — просто назад.
+function cdyBackTitle(){
+  return {finsafe: 'В сейф', finb: 'В Барракуду', finddcm: 'В отчёт ДДС', book: 'В финансы'}[CDY.from] || 'Назад';
+}
+// Редакторы: открытое распределение заменяет диаграмму полями, открытая оплата —
+// обзор полями; внутри оплаты подэкран источников заменяет суммы. Высота экрана
+// от этого не меняется — меняется только содержимое карточки. Флаги canSrc /
+// split / fundDebt / otherBases считает cdySync по строке дня.
+function cdyEditors(){
+  const $ = id => document.getElementById(id), show = (id, on) => { const el = $(id); if(el) el.hidden = !on; };
+  const a = $('cdEditAllocation'), p = $('cdEditPayment'); if(!a || !p) return;
+  a.open = CDY.alloc; a.querySelector('summary').setAttribute('aria-expanded', String(CDY.alloc));
+  show('cdChartView', !CDY.alloc); show('cdAllocationFields', CDY.alloc);
+  _setText('cdAllocationEditLabel', CDY.alloc ? 'К диаграмме' : 'Изменить распределение');
+  if(!CDY.canSrc) CDY.srcView = false;
+  const sv = CDY.pay && CDY.srcView;
+  p.open = CDY.pay; p.querySelector('summary').setAttribute('aria-expanded', String(CDY.pay));
+  p.setAttribute('data-sources', String(sv));
+  show('cdSupplierView', !CDY.pay); show('cdOtherBases', !CDY.pay && CDY.otherBases);
+  show('cdPaymentFields', CDY.pay);
+  show('cdPaymentDebt', !CDY.pay); show('cdFundDebt', !CDY.pay && CDY.fundDebt);
+  show('cdPaymentAmounts', !sv); show('cdSourceEditorButton', CDY.canSrc && !sv);
+  show('cdExtraSource', sv); show('cdPaymentSources', sv); show('cdSplitRow', sv && CDY.split);
+  _setText('cdPaymentEditLabel', sv ? 'К суммам оплаты' : CDY.pay ? 'Счёт и оплата' : 'Внести счёт или оплату');
 }
 // Поле ввода страницы — с теми же атрибутами, что у fbIn: сохраняет fbSave на
 // уходе с поля (Enter = уйти), пустое поле = предложение системы, data-was —
@@ -25011,48 +25127,45 @@ function cdyIn(id, field, d, o){
       value="${fbInFmt(val, o.dec)}"${d ? ` data-day="${d.day}"` : ' disabled'} data-was="${empty ? '' : val}"${o.dec ? ' data-dec="1"' : ''}${o.desc ? ` aria-describedby="${o.desc}"` : ''}
       onfocus="this.select()" onkeydown="if(event.key==='Enter'){this.blur()}" onblur="fbSave(this)"><span>AED</span></div>`;
 }
-// Тело дня: сводка и четыре блока. Разметка одна на все состояния — числа и
-// условные строки расставляет cdySync, поэтому пока книга едет, блоки стоят
-// на месте с прочерками, а не пропадают.
+// Тело дня: четыре панели одной разметкой на все состояния — числа и условные
+// строки расставляет cdySync, поэтому пока книга едет, панели стоят на месте с
+// прочерками, а не пропадают. Какая панель видна, решает cdySetStep.
 function cdyBodyHtml(d, loading){
-  if(!d && !loading) return `<div class="cd-unavailable">${luc('calendar-days')}<h2>За этот день ничего нет</h2></div>`;
-  const next = (key, n, t) => `<button type="button" class="cd-next-step" data-section="${key}"><span><small>Далее · шаг ${n}</small><strong>${t}</strong></span>${luc('arrow-down')}</button>`;
-  const con = `<div class="cd-flow-connector" aria-hidden="true">${luc('arrow-down')}</div>`;
+  if(!d && !loading) return `<div class="cd-unavailable" id="cdUnavailable">${luc('calendar-days')}<h2>За этот день ничего нет</h2></div>`;
+  const ded = (id, t) => `<div class="cd-arithmetic-row" id="${id}" hidden><span class="cd-operator" aria-label="Минус">−</span><span class="cd-row-label">${t}</span><strong></strong><span aria-hidden="true"></span></div>`;
+  const arc = (id, cls) => `<circle id="${id}" class="cd-arc ${cls}" cx="90" cy="90" r="72.24" pathLength="100" stroke-dasharray="0 100" stroke-dashoffset="0" visibility="hidden"><title></title></circle>`;
+  const srcBtn = (code, t) => `<button type="button" data-source="${code}" aria-pressed="false">${t}</button>`;
+  const dis = d ? '' : ' disabled';
   return `
-  <div class="cd-overview" aria-label="Итоги дня в AED">
-    <button type="button" data-section="revenue"><span>Выручка</span><strong id="cdOverviewRevenue">—</strong></button>
-    <button type="button" data-section="allocation"><span>ЧП за день</span><strong id="cdOverviewProfit">—</strong></button>
-    <button type="button" data-section="safe"><span>В сейфе</span><strong id="cdOverviewSafe">—</strong></button>
-  </div>
+  <div class="cd-state-note" id="cdDayNote" role="status" hidden></div>
   <section id="cd-revenue" class="cd-panel" data-current="true" aria-labelledby="cdRevenueTitle">
     <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 1 из 4">1</span><div class="cd-step-heading"><h2 id="cdRevenueTitle">Проверить выручку</h2></div></div>
     <div class="cd-revenue-calculation">
-      <div class="cd-cash-start"><span>Наличными за день</span><strong id="cdCash">— <small>AED</small></strong></div>
-      <div class="cd-deductions" id="cdDeductions" aria-label="Удержания из наличных" hidden>
-        <div id="cdDedTips" hidden><span>Чай водителям</span><strong></strong></div>
-        <div id="cdDedTea" hidden><span>Чай операторов</span><strong></strong></div>
-        <div id="cdDedSpend" hidden><span>Расходы водителей</span><strong></strong></div>
-        <div id="cdDedKept" hidden><span>Зарплата из выручки</span><strong></strong></div>
+      <div class="cd-arithmetic-group" role="group" aria-label="Наличные за день и вычеты">
+        <div class="cd-cash-start cd-arithmetic-row"><span aria-hidden="true"></span><span class="cd-row-label">Наличными за день</span><strong id="cdCash">—</strong><span class="cd-calc-unit">AED</span></div>
+        <div class="cd-deductions" aria-label="Вычеты из наличных">
+          ${ded('cdDedTips', 'Чай водителям')}${ded('cdDedTea', 'Чай операторам')}${ded('cdDedSpend', 'Расходы водителей')}${ded('cdDedKept', 'Зарплата из выручки')}
+        </div>
       </div>
-      <div class="cd-zero-line" id="cdZeroLine" hidden><span>Чай водителям</span><span>0</span></div>
-      <div class="cd-net"><div><span>Выручка по приложению</span><strong id="cdHanded">— <small>AED</small></strong></div><span class="cd-equals" aria-hidden="true">=</span></div>
-      <div class="cd-noncash" id="cdNoncash" hidden>${luc('credit-card')}<span>Расходы картой · <b id="cdCardAmt"></b></span></div>
+      <div class="cd-net cd-arithmetic-row"><span class="cd-operator" aria-label="Равно">=</span><span class="cd-row-label">Выручка по приложению</span><strong id="cdHanded">—</strong><span class="cd-calc-unit">AED</span></div>
     </div>
-    <div class="cd-state-note is-warning" id="cdPendingNote" hidden>Расходы ждут решения · <strong id="cdPendingAmt"></strong></div>
+    <div class="cd-state-note is-warning" id="cdPendingNote" hidden><span>Расходы ждут решения</span> <strong id="cdPendingAmt"></strong></div>
     <button type="button" class="cd-collection-link" id="cdCollection" onclick="fbToCash()" hidden><span id="cdCollectionLbl"></span><strong id="cdCollectionN"></strong>${luc('chevron-right')}</button>
     <div class="cd-actual">
       <label for="cdActual">Собрал по факту</label>${cdyIn('cdActual', 'handed_fact', d, {ph: d ? fbFmt(d.handed) : '0', desc: 'cdActualHint'})}
       <p id="cdActualHint" hidden></p>
       <div class="cd-difference" id="cdDifference" hidden><span>Разница с приложением</span><strong id="cdDifferenceValue"></strong></div>
     </div>
-    ${next('allocation', 2, 'К распределению')}
   </section>
-  ${con}
-  <section id="cd-allocation" class="cd-panel" aria-labelledby="cdAllocationTitle">
-    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 2 из 4">2</span><div class="cd-step-heading"><h2 id="cdAllocationTitle">Распределить деньги</h2><span class="cd-status" id="cdAllocationStatus" hidden></span></div></div>
-    <div class="cd-allocation-base"><div><span id="cdBaseSource">По приложению</span><strong id="cdAllocationBase">— <small>AED</small></strong></div></div>
-    <div class="cd-chart-grid">
-      <section id="cdAllocationChart" class="cd-donut" aria-label="Распределение наличной выручки"><div data-cash-donut=""></div></section>
+  <section id="cd-allocation" class="cd-panel" aria-labelledby="cdAllocationTitle" hidden>
+    <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 2 из 4">2</span><div class="cd-step-heading"><h2 id="cdAllocationTitle">Распределение</h2></div></div>
+    <div class="cd-allocation-base"><div><span id="cdBaseSource">По приложению</span><strong id="cdAllocationBase">— <small>AED</small></strong></div><span class="cd-status" id="cdAllocationStatus" hidden></span></div>
+    <div class="cd-chart-grid" id="cdChartView">
+      <section id="cdAllocationChart" class="cd-donut" aria-label="Распределение наличной выручки">
+        <svg class="cd-donut-svg" viewBox="0 0 180 180" role="img" aria-labelledby="cdDonutTitle cdDonutDescription"><title id="cdDonutTitle">Распределение наличных</title><desc id="cdDonutDescription"></desc>
+          <g transform="rotate(-90 90 90)" fill="none" stroke-width="23.52">${arc('cdArcBarra', 'cd-arc-barra')}${arc('cdArcRp', 'cd-arc-rp')}${arc('cdArcProfit', 'cd-arc-profit')}</g></svg>
+        <div class="cd-donut-center" aria-hidden="true" hidden><strong>100%</strong><span>наличных</span></div>
+      </section>
       <div id="cdChartIssue" class="cd-chart-issue" hidden>${luc('circle-alert')}<span id="cdChartIssueText"></span></div>
       <dl class="cd-legend">
         <div><dt><span class="cd-dot cd-dot-barra"></span>Барракуда</dt><dd id="cdLegendBarra">—</dd></div>
@@ -25060,64 +25173,67 @@ function cdyBodyHtml(d, loading){
         <div><dt><span class="cd-dot cd-dot-profit"></span>ЧП за день</dt><dd id="cdLegendProfit">—</dd></div>
       </dl>
     </div>
-    <details class="cd-edit-distribution" id="cdEditAllocation"><summary>${luc('sliders-horizontal')}<span>Изменить распределение</span>${luc('chevron-down', 'cd-chevron')}</summary>
-      <div class="cd-distribution-fields">
-        <div class="cd-field-row"><label for="cdBarra">Барракуда<small id="cdBarraSuggestion"></small></label>${cdyIn('cdBarra', 'aside', d, {ph: d && d.aside !== null && d.aside !== undefined ? fbFmt(d.aside) : '0'})}</div>
-        <!-- Крипта в РП+ — сначала она, наличными только то, чего не хватило до
-             нормы (владелец, 2 окт 2026). В сейф не ложится: остаётся на кошельке,
-             но числится за РП. Предлагается вся свободная; поправить можно. -->
-        <div class="cd-crypto-fields" id="cdCryptoFields" hidden><div class="cd-field-row"><label for="cdCrypto">РП криптой<small id="cdCryptoSuggestion"></small></label>${cdyIn('cdCrypto', 'collected_cr', d, {dec: true, ph: d ? fbInFmt(d.collected_cr || 0, true) : '0'})}</div></div>
-        <div class="cd-field-row"><label for="cdRp">РП наличными<small id="cdRpSuggestion"></small></label>${cdyIn('cdRp', 'collected', d, {ph: d && d.collected !== null && d.collected !== undefined ? fbFmt(d.collected) : '0'})}</div>
-        <div class="cd-field-result"><span>ЧП — остаток</span><strong id="cdEditorProfit">—</strong></div>
-      </div>
-    </details>
+    <details class="cd-edit-distribution" id="cdEditAllocation"><summary aria-controls="cdAllocationFields" aria-expanded="false">${luc('sliders-horizontal')}<span id="cdAllocationEditLabel">Изменить распределение</span>${luc('chevron-down', 'cd-chevron')}</summary></details>
+    <div class="cd-distribution-fields" id="cdAllocationFields" hidden>
+      <div class="cd-field-row"><label for="cdBarra">Барракуда<small id="cdBarraSuggestion"></small></label>${cdyIn('cdBarra', 'aside', d, {ph: d && d.aside !== null && d.aside !== undefined ? fbFmt(d.aside) : '0'})}</div>
+      <!-- Крипта в РП+ — сначала она, наличными только то, чего не хватило до
+           нормы (владелец, 2 окт 2026). В сейф не ложится: остаётся на кошельке,
+           но числится за РП. Предлагается вся свободная; поправить можно. -->
+      <div class="cd-crypto-fields" id="cdCryptoFields" hidden><div class="cd-field-row"><label for="cdCrypto">РП криптой<small id="cdCryptoSuggestion"></small></label>${cdyIn('cdCrypto', 'collected_cr', d, {dec: true, ph: d ? fbInFmt(d.collected_cr || 0, true) : '0'})}</div></div>
+      <div class="cd-field-row"><label for="cdRp">РП наличными<small id="cdRpSuggestion"></small></label>${cdyIn('cdRp', 'collected', d, {ph: d && d.collected !== null && d.collected !== undefined ? fbFmt(d.collected) : '0'})}</div>
+      <div class="cd-field-result"><span>ЧП — остаток</span><strong id="cdEditorProfit">—</strong></div>
+    </div>
     <div id="cdRpCombined" class="cd-inline-note" hidden><span>РП+ всего</span><strong></strong></div>
     <!-- Фонд отдал Барракуде — в предложение РП+ долг не входит (владелец,
          24 окт 2026: норма в РП+, остальное ЧП); вписали в РП+ больше нормы —
          столько и вернулось, строкой ниже. -->
     <div id="cdRpReturn" class="cd-inline-note" hidden><span>В том числе возврат в РП за Барракуду</span><strong></strong></div>
     <div class="cd-confirm-zone" id="cdConfirmZone" hidden><button type="button" id="cdConfirm" class="cd-primary" data-d="" onclick="fbDayOk(this.dataset.d)">Подтвердить распределение${luc('check')}</button></div>
-    ${next('supplier', 3, 'К оплате Барракуде')}
   </section>
-  ${con}
-  <section id="cd-supplier" class="cd-panel" aria-labelledby="cdSupplierTitle">
+  <section id="cd-supplier" class="cd-panel" aria-labelledby="cdSupplierTitle" hidden>
     <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 3 из 4">3</span><div class="cd-step-heading"><h2 id="cdSupplierTitle">Оплата Барракуде</h2></div></div>
-    <div class="cd-supplier-totals"><div><span>Заказ по приложению</span><strong id="cdOrdered">— <small>AED</small></strong></div><div><span>Оплачено за день</span><strong id="cdPaymentReadout">— <small>AED</small></strong></div></div>
+    <div class="cd-supplier-totals" id="cdSupplierView"><div><span>Заказ по приложению</span><strong id="cdOrdered">— <small>AED</small></strong></div><div><span>Оплачено за день</span><strong id="cdPaymentReadout">— <small>AED</small></strong></div></div>
     <div id="cdOtherBases" class="cd-inline-note" hidden><span>Другие базы · заказали</span><strong></strong></div>
-    <details id="cdEditPayment" class="cd-payment-edit"><summary>${luc('banknote')}<span>Внести счёт или оплату</span>${luc('chevron-down', 'cd-chevron')}</summary>
-      <div class="cd-payment-fields">
+    <details id="cdEditPayment" class="cd-payment-edit"><summary id="cdPaymentSummary" aria-controls="cdPaymentFields" aria-expanded="false">${luc('banknote')}<span id="cdPaymentEditLabel">Внести счёт или оплату</span>${luc('chevron-down', 'cd-chevron')}</summary></details>
+    <div class="cd-payment-fields" id="cdPaymentFields" hidden>
+      <div id="cdPaymentAmounts">
         <div class="cd-field-row"><label for="cdInvoice">По счёту</label>${cdyIn('cdInvoice', 'ordered_fact', d, {val: d ? d.ordered_fact : null, ph: d ? fbFmt(d.ordered_auto) : '0'})}</div>
         <div class="cd-field-row"><label for="cdPaid">Оплатили</label>${cdyIn('cdPaid', 'pay', d, {ph: '0'})}</div>
-        <div id="cdPaymentSources" class="cd-payment-sources" hidden></div><p id="cdPaymentWarning" class="cd-warning" hidden></p>
       </div>
-    </details>
-    <div class="cd-debt" id="cdDebtRow"><div><span id="cdDebtLabel">Долг Барракуде</span></div><strong id="cdDebt">— <small>AED</small></strong></div>
+      <button type="button" id="cdSourceEditorButton" class="cd-source-editor-link" hidden><span>Источники оплаты</span>${luc('chevron-right')}</button>
+      <!-- Сверх стопки Барракуды платят из ЧП, из РП или понемногу (владелец,
+           3 окт 2026). Выбор при записи оплаты — прежнее окно fbAskBSrc; здесь
+           видно, как сложилось, и можно переложить той же ручкой. -->
+      <div id="cdExtraSource" class="cd-extra-source" hidden><p>Сверх стопки Барракуды <b id="cdExtraAmount"></b></p>
+        <div class="cd-source-buttons" role="group" aria-label="Источник недостающей суммы">${srcBtn('profit', 'Из ЧП')}${srcBtn('rp', 'Из РП')}${srcBtn('both', 'Разделить')}</div>
+        <div class="cd-field-row" id="cdSplitRow" hidden><label for="cdSplitRp">Из РП<small id="cdSplitRest"></small></label><div class="cd-input-unit"><input id="cdSplitRp" data-field="splitRp" type="text" inputmode="decimal" placeholder="0" autocomplete="off"${dis} onfocus="this.select()" onkeydown="if(event.key==='Enter'){this.blur()}" onblur="cdySplitSave(this)"><span>AED</span></div></div>
+      </div>
+      <div id="cdPaymentSources" class="cd-payment-sources" hidden></div><p id="cdPaymentWarning" class="cd-warning" hidden></p>
+    </div>
+    <div class="cd-debt" id="cdPaymentDebt"><div><span id="cdDebtLabel">Долг Барракуде</span></div><strong id="cdDebt">— <small>AED</small></strong></div>
     <div id="cdFundDebt" class="cd-inline-note" hidden><span>Взято из РП · ещё не вернулось</span><strong></strong></div>
-    ${next('safe', 4, 'Посмотреть итог')}
   </section>
-  ${con}
-  <section class="cd-readonly-transfers" id="cdTransfers" aria-label="Переводы между счетами за день" hidden><h3>Переводы между счетами</h3><div id="cdTransferRows"></div></section>
-  <section id="cd-safe" class="cd-panel" aria-labelledby="cdSafeTitle">
+  <section id="cd-safe" class="cd-panel" aria-labelledby="cdSafeTitle" hidden>
     <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 4 из 4">4</span><div class="cd-step-heading"><h2 id="cdSafeTitle">Остатки в сейфе</h2></div>${luc('vault')}</div>
+    <p id="cdSafeDeltaContext" class="cd-safe-context">Изменение за день</p>
     <dl class="cd-safe-rows">
-      <div><dt><span class="cd-dot cd-dot-barra"></span>Барракуда</dt><dd id="cdSafeBarra">—</dd></div>
-      <div><dt><span class="cd-dot cd-dot-rp"></span>РП</dt><dd id="cdSafeRp">—</dd></div>
-      <div><dt><span class="cd-dot cd-dot-profit"></span>ЧП</dt><dd id="cdSafeProfit">—</dd></div>
+      <div><dt><span class="cd-dot cd-dot-barra"></span><span class="cd-safe-label">Барракуда<small id="cdDeltaBarra" class="cd-safe-delta is-unknown">—</small></span></dt><dd><span id="cdSafeBarra">—</span></dd></div>
+      <div><dt><span class="cd-dot cd-dot-rp"></span><span class="cd-safe-label">РП<small id="cdDeltaRp" class="cd-safe-delta is-unknown">—</small></span></dt><dd><span id="cdSafeRp">—</span></dd></div>
+      <div><dt><span class="cd-dot cd-dot-profit"></span><span class="cd-safe-label">ЧП<small id="cdDeltaProfit" class="cd-safe-delta is-unknown">—</small></span></dt><dd><span id="cdSafeProfit">—</span></dd></div>
     </dl>
     <div class="cd-safe-total"><span>Всего наличными</span><strong id="cdSafeTotal">— <small>AED</small></strong></div>
     <div class="cd-wallet-line" id="cdWalletLine" hidden>${luc('wallet')}<span>РП криптой</span><strong id="cdWallet">— <small>AED</small></strong></div>
+    <details class="cd-readonly-transfers" id="cdTransfers" hidden><summary>Переводы · <span id="cdTransferN"></span></summary><div id="cdTransferRows"></div></details>
+    <button type="button" id="cdReturnToAllocation" class="cd-return-allocation" data-section="allocation" hidden><span>К подтверждению распределения</span>${luc('arrow-up-right')}</button>
   </section>`;
 }
-// Нарисовать день: разметка заново (раскрытые редакторы остаются раскрытыми),
-// числа и состояния — cdySync, положение на рейке — прежнее.
+// Нарисовать день: разметка заново, числа и состояния — cdySync (он же
+// возвращает раскрытые редакторы на место), видимый шаг — прежний.
 function cdyPaint(d){
   const body = document.getElementById('finDayBody'); if(!body) return;
-  const open = {};
-  body.querySelectorAll('details[id]').forEach(x => { open[x.id] = x.open; });
   body.innerHTML = cdyBodyHtml(d);
-  for(const id in open){ const x = document.getElementById(id); if(x) x.open = open[id]; }
   cdySync(d);
-  cdySetStep(CDY.step, false);
+  cdySetStep(CDY.step);
 }
 // Числа и состояния на месте — из строки дня книги. Поля ввода не трогаем
 // (там стоит человек), только подсказку пустого поля, и ту не под фокусом.
@@ -25125,7 +25241,7 @@ function cdyPaint(d){
 function cdySync(d){
   if(!document.getElementById('ambar-cash-day')) return;
   if(d === undefined){ const day = accDay(); d = fbDayOf(fbBook(day.slice(0, 7)), day); }
-  const $ = id => document.getElementById(id), n = v => +v || 0;
+  const $ = id => document.getElementById(id), n = v => +v || 0, r2 = v => Math.round(v * 100) / 100;
   const has = v => typeof v === 'number' && !Number.isNaN(v), own = v => v !== null && v !== undefined;
   const text = (id, t) => { const el = $(id); if(el) el.textContent = t; };
   const html = (id, t) => { const el = $(id); if(el) el.innerHTML = t; };
@@ -25137,7 +25253,7 @@ function cdySync(d){
   const show = (id, on) => { const el = $(id); if(el) el.hidden = !on; return !!el && !!on; };
   const strong = (id, on, t) => { if(show(id, on)) $(id).querySelector('strong').textContent = t; };
   const ph = (id, v) => { const el = $(id); if(el && document.activeElement !== el) el.placeholder = v; };
-  if(!d){ cdyDonut(null); return; }
+  if(!d){ cdyDonut(null); cdyEditors(); return; }
   const cr = fbCr(d.day.slice(0, 7));
   // Строка крипты — с того дня, с которого она идёт в РП+, и когда кошелёк прочитан.
   const crOn = !!cr.ready && d.day >= (cr.start_day || '9999') && !d.future && (d.base > 0 || d.collected_cr > 0);
@@ -25145,19 +25261,15 @@ function cdySync(d){
   // до начала учёта и в будущем поля заперты: сервер такую запись не примет
   document.querySelectorAll('#finDayBody input[data-field]').forEach(i => { i.disabled = !live; });
   const m = d.manual || {}, coll = n(d.collected), crAmt = n(d.collected_cr), np = n(d.np_plus);
-  // сводка
-  money('cdOverviewRevenue', d.base, {bare: true});
-  money('cdOverviewProfit', d.np_plus, {bare: true});
-  money('cdOverviewSafe', d.stack_total, {bare: true});
-  // 1. выручка: наличные − чай − расходы водителей наличными − зарплата из наличных
-  money('cdCash', d.cash);
-  const ded = (id, v) => { const el = $(id); if(!el) return false; const on = n(v) > 0; el.hidden = !on;
-    if(on) el.querySelector('strong').textContent = '−' + fbFmt(v); return on; };
-  const anyDed = [ded('cdDedTips', d.tips_cash), ded('cdDedTea', d.tea), ded('cdDedSpend', d.spend_cash ?? d.spend), ded('cdDedKept', d.kept)].some(Boolean);
-  show('cdDeductions', anyDed);
-  show('cdZeroLine', !(n(d.tips_cash) > 0));
-  money('cdHanded', d.handed);
-  if(show('cdNoncash', n(d.spend_card) > 0)) text('cdCardAmt', fbFmt(d.spend_card) + ' AED');
+  // состояние дня над панелью — одним фактом, виден на любом шаге
+  const note = $('cdDayNote'); if(note){ note.hidden = live; note.textContent = d.before ? 'До начала учёта' : d.future ? 'Будущий учётный день' : ''; }
+  // 1. выручка: наличные − чай − расходы водителей наличными − зарплата из наличных;
+  // чай водителям и расходы стоят всегда (ноль — тихой строкой), остальное — когда есть
+  money('cdCash', d.cash, {bare: true});
+  const ded = (id, v, always) => { const el = $(id); if(!el) return; const on = n(v) > 0; el.hidden = !(on || always);
+    el.classList.toggle('cd-zero-line', !on); el.querySelector('strong').textContent = on ? fbFmt(v) : '0'; };
+  ded('cdDedTips', d.tips_cash, true); ded('cdDedTea', d.tea); ded('cdDedSpend', d.spend_cash ?? d.spend, true); ded('cdDedKept', d.kept);
+  money('cdHanded', d.handed, {bare: true});
   if(show('cdPendingNote', n(d.spend_pending) > 0)) text('cdPendingAmt', fbFmt(d.spend_pending) + ' AED');
   if(show('cdCollection', n(d.cash_need) > 0)){
     const full = n(d.cash_got) >= n(d.cash_need);
@@ -25206,21 +25318,44 @@ function cdySync(d){
   }
   if(show('cdConfirmZone', canOk && !d.ok)) $('cdConfirm').dataset.d = d.day;
   cdyDonut(d);
-  // 3. Барракуда: заявка, счёт, оплата и из чего она сложилась, долг
+  // 3. Барракуда: заявка, счёт, оплата, долг
   money('cdOrdered', d.ordered_auto);
   money('cdPaymentReadout', n(d.pay));
   ph('cdInvoice', fbFmt(d.ordered_auto));
-  strong('cdOtherBases', n(d.ordered_extra) > 0, `${fbFmt(d.ordered_extra)} AED`);
+  CDY.otherBases = n(d.ordered_extra) > 0;
+  strong('cdOtherBases', CDY.otherBases, `${fbFmt(d.ordered_extra)} AED`);
+  // Источники: сверх стопки Барракуды взято из ЧП, из РП или понемногу — так
+  // выбрал старший при записи оплаты; подэкран показывает, как сложилось, и
+  // даёт переложить (cdyPickSrc). Какие стопки покрывают — та же проверка, что
+  // в окне выбора (владелец, 3 окт 2026: где не хватает — выбрать нельзя).
+  const payX = n(d.pay_b_extra), payR = n(d.pay_rp), short = r2(payX + payR);
+  CDY.canSrc = live && n(d.pay) > 0 && short > 0;
+  CDY.split = CDY.canSrc && d.pay_src === 'mix';
+  text('cdExtraAmount', fbFmt(short) + ' AED');
+  const cur = {np: 'profit', rp: 'rp', mix: 'both'}[d.pay_src] || (payR > 0 ? (payX > 0 ? 'both' : 'rp') : 'profit');
+  let can = {profit: true, rp: true, both: true};
+  const info = CDY.canSrc ? fbBShort(d.day, n(d.pay)) : null;
+  if(info){
+    const s = r2(info.short), npH = r2(info.np), rpH = r2(info.rp);
+    const cNp = npH + .005 >= s, cRp = rpH + .005 >= s, cMix = npH > .005 && rpH > .005 && npH + rpH + .005 >= s, any = cNp || cRp || cMix;
+    can = {profit: cNp || !any, rp: cRp || !any, both: cMix || !any};
+  }
+  document.querySelectorAll('#cdExtraSource [data-source]').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.source === cur));
+    b.classList.toggle('off', !can[b.dataset.source] && b.dataset.source !== cur);
+  });
+  const sp = $('cdSplitRp');
+  if(sp){ if(document.activeElement !== sp) sp.value = CDY.split ? fbInFmt(payR) : ''; sp.dataset.was = CDY.split ? payR : ''; sp.dataset.day = d.day; sp.dataset.max = short; }
+  text('cdSplitRest', CDY.split ? `Из ЧП · ${fbFmt(Math.max(0, short - payR))}` : '');
   const srcs = $('cdPaymentSources');
   if(srcs){
-    const rows = n(d.pay) > 0 ? [['Из стопки Барракуды', d.pay_b], ['Сверх стопки, из ЧП', d.pay_b_extra], ['Сверх стопки, из РП', d.pay_rp]].filter(([, v]) => n(v) > 0) : [];
-    srcs.hidden = !rows.length;
+    const rows = n(d.pay) > 0 ? [['Барракуда', d.pay_b], ['ЧП', payX], ['РП', payR]].filter(([, v]) => n(v) > 0) : [];
     srcs.innerHTML = rows.map(([t, v]) => `<div><span>${t}</span><strong>${fbFmt(v)} AED</strong></div>`).join('');
   }
   // оплата сверх стопки увела ЧП или РП в минус — показать остаток, записи не мешать
   const warn = $('cdPaymentWarning');
   if(warn){
-    const bad = n(d.pay) > 0 ? [['ЧП', n(d.pay_b_extra) > 0 ? n(d.stack_np) : 0], ['РП', n(d.pay_rp) > 0 ? n(d.stack_rp) : 0]].filter(([, v]) => v < 0) : [];
+    const bad = n(d.pay) > 0 ? [['ЧП', payX > 0 ? n(d.stack_np) : 0], ['РП', payR > 0 ? n(d.stack_rp) : 0]].filter(([, v]) => v < 0) : [];
     warn.hidden = !bad.length;
     warn.textContent = bad.length ? `После оплаты · ${bad.map(([f, v]) => `${f} ${fbFmt(v)} AED`).join(', ')}` : '';
   }
@@ -25228,52 +25363,104 @@ function cdySync(d){
   text('cdDebtLabel', over ? 'Переплата Барракуде' : 'Долг Барракуде');
   money('cdDebt', debt, {abs: true, keep: true});
   if($('cdDebt')) $('cdDebt').classList.toggle('cd-overpayment', over);
-  if($('cdDebtRow')) $('cdDebtRow').classList.toggle('is-zero', debt === 0);
-  strong('cdFundDebt', n(d.rp_owed) > 0, `${fbFmt(d.rp_owed)} AED`);
-  // переводы между стопками — только посмотреть; делаются на экране «Сейф»
-  const mv = d.moves || [];
-  if(show('cdTransfers', mv.length)) html('cdTransferRows', mv.map(x => `<div class="cd-transfer-row"><span>${FB_MV_T[x.from] || '?'} → ${FB_MV_T[x.to] || '?'}${
-    x.comment ? `<small>${escS(x.comment)}</small>` : ''}</span><strong>${fbFmt(x.amount)} AED</strong></div>`).join(''));
-  // 4. сейф после дня
+  if($('cdPaymentDebt')) $('cdPaymentDebt').classList.toggle('is-zero', debt === 0);
+  CDY.fundDebt = n(d.rp_owed) > 0;
+  strong('cdFundDebt', CDY.fundDebt, `${fbFmt(d.rp_owed)} AED`);
+  // 4. сейф после дня: остатки на конец дня и одна чистая дельта на стопку —
+  // конец минус начало (начало — конец прошлого дня или переносы на начало месяца,
+  // fbDdcStart); до учёта и в будущем дельты нет
   money('cdSafeBarra', d.stack_b, {bare: true});
   money('cdSafeRp', d.stack_rp, {bare: true});
   money('cdSafeProfit', d.stack_np, {bare: true});
   money('cdSafeTotal', d.stack_total);
+  const b = fbBook(d.day.slice(0, 7)), start = live && b ? fbDdcStart(b, d.day) : null;
+  const delta = (id, end, from) => { const el = $(id); if(!el) return;
+    const known = !!start && has(from), v = known ? Math.round(n(end) - from) : 0;
+    el.textContent = known ? (v > 0 ? '+' : v < 0 ? '−' : '') + fbFmt(Math.abs(v)) : '—';
+    el.classList.toggle('is-unknown', !known); el.classList.toggle('is-zero', known && v === 0); el.classList.toggle('cd-negative', known && v < 0); };
+  delta('cdDeltaBarra', d.stack_b, start ? +start.b : NaN);
+  delta('cdDeltaRp', d.stack_rp, start ? +start.rp : NaN);
+  delta('cdDeltaProfit', d.stack_np, start ? +start.np : NaN);
+  text('cdSafeDeltaContext', canOk && !d.ok ? 'Изменение за день · без распределения' : 'Изменение за день');
+  show('cdReturnToAllocation', canOk && !d.ok);
   if(show('cdWalletLine', !!d.stack_rp_cr)) money('cdWallet', d.stack_rp_cr);
+  // переводы между стопками — только посмотреть; делаются на экране «Сейф»
+  const mv = d.moves || [];
+  if(show('cdTransfers', mv.length)){
+    text('cdTransferN', String(mv.length));
+    html('cdTransferRows', mv.map(x => `<div class="cd-transfer-row"><span>${FB_MV_T[x.from] || '?'} → ${FB_MV_T[x.to] || '?'}${
+      x.comment ? `<small>${escS(x.comment)}</small>` : ''}</span><strong>${fbFmt(x.amount)} AED</strong></div>`).join(''));
+    $('cdTransfers').open = CDY.trOpen;
+  }
+  cdyEditors();
 }
-// Круг наличного распределения по готовым долям дня: Барракуда / РП наличными /
-// ЧП. Крипта в круг не входит. Нет выручки, минус в ЧП, несогласованные суммы —
-// вместо круга состояние одним коротким фактом (владелец, 3 окт 2026: без
-// поясняющих текстов); суммы при этом не правятся и не обнуляются.
+// Круг наличного распределения по готовым долям дня: три дуги макета (viewBox
+// 180, радиус 72.24, pathLength 100 — доля в процентах) — Барракуда / РП
+// наличными / ЧП. Крипта в круг не входит. Нет выручки, минус в ЧП,
+// несогласованные суммы — вместо круга состояние одним коротким фактом
+// (владелец, 3 окт 2026: без поясняющих текстов); суммы не правятся и не обнуляются.
 function cdyDonut(d){
-  const chart = document.getElementById('cdAllocationChart'), issue = document.getElementById('cdChartIssue'), txt = document.getElementById('cdChartIssueText');
+  const $ = id => document.getElementById(id), chart = $('cdAllocationChart'), issue = $('cdChartIssue'), txt = $('cdChartIssueText');
   if(!chart || !issue || !txt) return;
-  const box = chart.querySelector('[data-cash-donut]'), n = v => +v || 0;
+  const n = v => +v || 0, parts = d ? [n(d.aside), n(d.collected), n(d.np_plus)] : [0, 0, 0], base = d ? n(d.base) : 0;
   let problem = '';
   if(d){
-    const base = n(d.base), barra = n(d.aside), rp = n(d.collected), profit = n(d.np_plus);
     if(d.before) problem = 'До начала учёта';
     else if(d.future) problem = 'Будущий учётный день';
     else if(!(base > 0)) problem = 'Нет наличных к распределению';
-    else if(profit < 0) problem = 'Распределено больше выручки';
-    else if(barra < 0 || rp < 0) problem = 'Отрицательная сумма';
-    else if(Math.abs(barra + rp + profit - base) > 0.01) problem = 'Суммы не сходятся с выручкой';
+    else if(parts[2] < 0) problem = 'Распределено больше выручки';
+    else if(parts[0] < 0 || parts[1] < 0) problem = 'Отрицательная сумма';
+    else if(Math.abs(parts[0] + parts[1] + parts[2] - base) > 0.01) problem = 'Суммы не сходятся с выручкой';
   }
   chart.hidden = !!problem; issue.hidden = !problem; txt.textContent = problem;
-  if(!box) return;
-  if(!d || problem){ box.replaceChildren(); return; }
-  const parts = [['Барракуда', n(d.aside), '#e2c386'], ['РП наличными', n(d.collected), '#a799ba'], ['ЧП', n(d.np_plus), '#9bb6a6']];
-  const total = parts.reduce((s, p) => s + p[1], 0) || 1;
-  const outer = 82, inner = outer * .72, r = (outer + inner) / 2, w = outer - inner, C = 2 * Math.PI * r;
-  let off = 0, arcs = '';
-  for(const [name, amt, color] of parts){
-    if(!(amt > 0)) continue;
-    const len = amt / total * C;
-    arcs += `<circle cx="100" cy="100" r="${r.toFixed(2)}" fill="none" stroke="${color}" stroke-width="${w.toFixed(2)}" stroke-dasharray="${len.toFixed(3)} ${(C - len).toFixed(3)}" stroke-dashoffset="${(-off).toFixed(3)}" transform="rotate(-90 100 100)"><title>${name}: ${fbFmt(amt)} AED</title></circle>`;
-    off += len;
+  const ok = !!d && !problem, names = ['Барракуда', 'РП наличными', 'ЧП за день'], total = parts.reduce((s, v) => s + v, 0) || 1;
+  let off = 0;
+  ['cdArcBarra', 'cdArcRp', 'cdArcProfit'].forEach((id, i) => {
+    const arc = $(id); if(!arc) return;
+    const share = ok ? parts[i] / total * 100 : 0;
+    arc.setAttribute('stroke-dasharray', `${share} ${100 - share}`);
+    arc.setAttribute('stroke-dashoffset', String(-off));
+    arc.setAttribute('visibility', share > 0 ? 'visible' : 'hidden');
+    const t = arc.querySelector('title'); if(t) t.textContent = ok ? `${names[i]}: ${fbFmt(parts[i])} AED` : '';
+    off += share;
+  });
+  const center = chart.querySelector('.cd-donut-center'); if(center) center.hidden = !ok;
+  _setText('cdDonutDescription', ok ? `Барракуда: ${fbFmt(parts[0])} AED; РП наличными: ${fbFmt(parts[1])} AED; ЧП за день: ${fbFmt(parts[2])} AED. Крипта не включена.` : '');
+  chart.classList.toggle('is-rendered', ok);
+}
+// Переложить, откуда взято сверх стопки Барракуды: та же ручка оплаты (fbPayB)
+// с тем же вопросом о прошедшем дне; не хватает в выбранной стопке — спросит
+// прежнее окно, как при первой записи. «Разделить» — из ЧП сколько там есть,
+// остальное из РП (как предлагает окно), дальше правится полем «Из РП».
+async function cdyPickSrc(code){
+  const day = accDay(), d = fbDayOf(fbBook(day.slice(0, 7)), day), n = v => +v || 0, r2 = v => Math.round(v * 100) / 100;
+  const src = {profit: 'np', rp: 'rp', both: 'mix'}[code];
+  if(!d || !src || !(n(d.pay) > 0)) return;
+  let rp = 0;
+  if(src === 'mix'){
+    const info = fbBShort(day, n(d.pay)); if(!info) return;
+    const fromNp = Math.min(info.short, Math.max(0, info.np));
+    rp = r2(info.short - fromNp);
+    if(rp > info.rp + .005) rp = r2(Math.max(0, Math.min(info.short, info.rp)));
+    if(d.pay_src === 'mix' && n(d.pay_rp) > 0) rp = Math.min(info.short, n(d.pay_rp));
   }
-  box.innerHTML = `<svg viewBox="0 0 200 200" width="100%" height="180" role="img" aria-label="Распределение ${fbFmt(d.base)} AED: Барракуда ${fbFmt(parts[0][1])}, РП наличными ${fbFmt(parts[1][1])}, ЧП ${fbFmt(parts[2][1])}. Крипта не включена.">${arcs
-    }<text x="100" y="100" text-anchor="middle" font-size="25" fill="#eeeae4" font-family="Space Grotesk, sans-serif" font-weight="500">100%</text><text x="100" y="120" text-anchor="middle" font-size="12" fill="#aaa0b4" font-family="Manrope, sans-serif" font-weight="500">наличных</text></svg>`;
+  await fbPayB(day, n(d.pay), false, {src, rp});
+}
+// Поле «Из РП» на подэкране источников: записать разделение той же ручкой;
+// без правки в сеть не ходим, больше недостающего не взять.
+async function cdySplitSave(inp){
+  const day = inp.dataset.day, d = day ? fbDayOf(fbBook(day.slice(0, 7)), day) : null, n = v => +v || 0;
+  const was = inp.dataset.was === '' ? null : +inp.dataset.was;
+  const back = () => { inp.value = fbInFmt(was); };
+  if(!d || !(n(d.pay) > 0)){ back(); return; }
+  const raw = String(inp.value).replace(/\s/g, '').replace(',', '.').replace(/−/g, '-');
+  const v = raw === '' ? null : (/^\d*\.?\d+$/.test(raw) ? Math.round(+raw * 100) / 100 : NaN);
+  if(v === null){ back(); return; }
+  if(Number.isNaN(v)){ back(); _toast('Нужно число'); return; }
+  if(was !== null && Math.abs(v - was) < .005){ back(); return; }
+  if(v > n(inp.dataset.max) + .005){ back(); _toast('Из РП больше, чем не хватает'); return; }
+  if(await fbPayB(day, n(d.pay), false, {src: 'mix', rp: v})){ inp.classList.add('saved'); setTimeout(() => inp.classList.remove('saved'), 900); }
+  else back();
 }
 // Сбор выручки — тот же день, отсюда и обратно.
 function fbToCash(){
@@ -25286,6 +25473,7 @@ function fbGoDay(day){
   const т = _bizToday(), в = new Date(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10));
   const off = Math.max(0, Math.round((т - в) / 86400000));
   const from = ACC_VIEW;
+  CDY.from = from;                    // подпись возврата на последнем шаге «Кассы дня»
   if(off !== DAY_OFFSET) accDayGo(off);
   accOpen('finday');
   ACC_BACK = () => accOpen(from);
@@ -26823,11 +27011,15 @@ async function fbBOk(kind, day){
 // Сумма одна; из стопки Барракуды — сколько там есть; не хватило — вопрос.
 // Сервер делит так же и отказывает, если в выбранной стопке столько нет
 // (409 not_enough): тогда вопрос повторяется с его остатками. true — записано.
-async function fbPayB(day, amount, asked){
+async function fbPayB(day, amount, asked, preset){
   if(amount !== null && amount !== undefined && !(amount >= 0)){ _toast('Нужно число'); return false; }
   if(!asked && !await fbAskDay(day, 'Оплатили Барракуде')) return false;
   let pick = {src: '', rp: 0, force: false}, info = amount > 0 ? fbBShort(day, amount) : null;
-  if(info && info.short > 0){ pick = await fbAskBSrc(info); if(!pick) return false; }
+  if(info && info.short > 0){
+    // источник уже выбран на подэкране «Кассы дня» — не спрашивать; не хватит — сервер скажет, спросим окном
+    if(preset && preset.src) pick = {src: preset.src, rp: +preset.rp || 0, force: false};
+    else { pick = await fbAskBSrc(info); if(!pick) return false; }
+  }
   for(let turn = 0; turn < 3; turn++){
     try{
       const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/pay',

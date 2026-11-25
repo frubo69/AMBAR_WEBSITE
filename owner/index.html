@@ -3184,15 +3184,18 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-composition-label{display:flex;align-items:center;gap:12px;padding:0 18px 13px;background:#201a27;font-size:11px;line-height:17px;color:#b8a8c2}
 #ambar-safe .sf-composition-label::after{content:"";height:1px;flex:1;background:#46394d}
 #ambar-safe .sf-pools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:18px;padding:0 18px 21px;background:#201a27}
-#ambar-safe .sf-pools>div{min-width:0;position:relative}
-#ambar-safe .sf-pools>div+div{padding-left:0;border-left:0}
-#ambar-safe .sf-pools>div+div::before{content:"+";position:absolute;left:-16px;top:24px;color:#998aa5;font:400 15px/28px "Space Grotesk",sans-serif}
-#ambar-safe .sf-pools dt{display:flex;align-items:center;gap:5px;font-size:11px;line-height:18px;color:#bfb2ca}
+#ambar-safe .sf-pools>.sf-pool{min-width:0;position:relative;display:block;width:100%}
+#ambar-safe .sf-pools>.sf-pool+.sf-pool{padding-left:0;border-left:0}
+#ambar-safe .sf-pools>.sf-pool+.sf-pool::before{content:"+";position:absolute;left:-16px;top:24px;color:#998aa5;font:400 15px/28px "Space Grotesk",sans-serif}
+#ambar-safe .sf-pool-name{display:flex;align-items:center;gap:5px;font-size:11px;line-height:18px;color:#bfb2ca}
+/* стопки нажимаются (25 ноя 2026, входы с вкладки «Финансы» переехали сюда): стрелка у названия */
+#ambar-safe .sf-pool-name>svg.lucide{width:12px!important;height:12px!important;margin-left:auto;color:#998aa5}
+#ambar-safe .sf-app .sf-pool:active{filter:brightness(1.15)}
 #ambar-safe .sf-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex:none}
 #ambar-safe .sf-barra{background:var(--sf-gold)}
 #ambar-safe .sf-rp{background:var(--sf-rp)}
 #ambar-safe .sf-profit{background:var(--sf-green)}
-#ambar-safe .sf-pools dd{font:500 22px/28px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:6px}
+#ambar-safe .sf-pool>strong{display:block;font:500 22px/28px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:6px}
 #ambar-safe .sf-wallet{display:flex;align-items:center;gap:10px;width:100%;padding:12px 17px;border-top:1px solid #3c3243;background:#15111f}
 #ambar-safe .sf-wallet>svg:first-child{color:#bba780}
 #ambar-safe .sf-wallet-label{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;font-size:12px;font-weight:500}
@@ -3207,6 +3210,7 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-quick-actions button>span{flex:1}
 #ambar-safe .sf-quick-actions svg.lucide{width:14px!important;height:14px!important;color:#a995b5}
 #ambar-safe .sf-quick-actions button>svg:first-child{color:#c4aa79;width:16px!important;height:16px!important}
+#ambar-safe .sf-quick-actions button+button{border-top:1px solid #352b3e}
 #ambar-safe .sf-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
 #ambar-safe .sf-section-heading h2{font-size:19px;line-height:26px;font-weight:700;letter-spacing:-.035em}
 #ambar-safe .sf-pending-heading,#ambar-safe .sf-done-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;font-size:11px;line-height:17px;color:#d4b67e}
@@ -3312,7 +3316,7 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-dialog p{font-size:12px;line-height:20px;color:#c3b5cc;margin:10px 0 18px}
 #ambar-safe .sf-dialog form>div{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 #ambar-safe .sf-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-@container safepage (max-width:370px){#ambar-safe .sf-main{padding-left:11px;padding-right:11px}#ambar-safe .sf-header{padding-left:11px;padding-right:11px}#ambar-safe .sf-month{margin-left:11px;margin-right:11px}#ambar-safe .sf-pools dd{font-size:20px;line-height:27px}#ambar-safe .sf-pools>div+div{padding-left:0}#ambar-safe .sf-pools dt{font-size:11px}#ambar-safe .sf-balance-top{padding:18px 13px 16px}#ambar-safe .sf-pools{padding-left:13px;padding-right:13px}#ambar-safe .sf-composition-label{padding-left:13px;padding-right:13px}#ambar-safe .sf-wallet{padding:11px 13px;gap:8px}#ambar-safe .sf-wallet-label{font-size:11px}#ambar-safe .sf-quick-actions button{padding:8px 13px}#ambar-safe .sf-section-heading h2{font-size:17px}#ambar-safe .sf-edit-row{grid-template-columns:minmax(0,1fr) 126px}#ambar-safe .sf-day-bottom{gap:6px}#ambar-safe .sf-day-bottom .sf-confirm{padding:9px 10px}#ambar-safe .sf-header>span{font-size:11px}}
+@container safepage (max-width:370px){#ambar-safe .sf-main{padding-left:11px;padding-right:11px}#ambar-safe .sf-header{padding-left:11px;padding-right:11px}#ambar-safe .sf-month{margin-left:11px;margin-right:11px}#ambar-safe .sf-pool>strong{font-size:20px;line-height:27px}#ambar-safe .sf-pools>.sf-pool+.sf-pool{padding-left:0}#ambar-safe .sf-pool-name{font-size:11px}#ambar-safe .sf-balance-top{padding:18px 13px 16px}#ambar-safe .sf-pools{padding-left:13px;padding-right:13px}#ambar-safe .sf-composition-label{padding-left:13px;padding-right:13px}#ambar-safe .sf-wallet{padding:11px 13px;gap:8px}#ambar-safe .sf-wallet-label{font-size:11px}#ambar-safe .sf-quick-actions button{padding:8px 13px}#ambar-safe .sf-section-heading h2{font-size:17px}#ambar-safe .sf-edit-row{grid-template-columns:minmax(0,1fr) 126px}#ambar-safe .sf-day-bottom{gap:6px}#ambar-safe .sf-day-bottom .sf-confirm{padding:9px 10px}#ambar-safe .sf-header>span{font-size:11px}}
 /* Load after safe-visual.css. The actual mini-app shell supplies its available
    content height; the 414x844 preview dimensions never constrain production. */
 #ambar-safe{width:100%;height:var(--sf-available-height,100%);min-height:0}
@@ -3329,7 +3333,7 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-row-error{margin:0 15px 14px;padding:9px 10px;border:1px solid #68434d;border-radius:9px;background:#2e1d2a;color:#dda4af;font-size:11px;line-height:18px}
 #ambar-safe .sf-day-crypto{padding:0 15px 8px;font-size:11px;line-height:17px;color:#bcaacb}
 #ambar-safe .sf-app input:focus-visible{outline:2px solid #e2c386;outline-offset:3px}
-#ambar-safe :is(.sf-pools dd,.sf-split dd){white-space:normal;overflow-wrap:anywhere;min-width:0}
+#ambar-safe :is(.sf-pool>strong,.sf-split dd){white-space:normal;overflow-wrap:anywhere;min-width:0}
 #ambar-safe .sf-day-main>span,#ambar-safe .sf-day-bottom>span{min-width:0}
 #ambar-safe .sf-day-value>strong{white-space:normal;overflow-wrap:anywhere;text-align:right}
 #ambar-safe .sf-pending-group[aria-busy="true"] .sf-confirm{opacity:.7}
@@ -3544,254 +3548,236 @@ html.kb #accOv.sfe .sf-scroll{padding-bottom:50vh}
 #star-daily-collection .crd-acts .aud-b{flex:1;padding:14px 10px;border-radius:13px;font-size:14.5px;font-weight:700;text-align:center;cursor:pointer}
 #star-daily-collection .crd-acts .aud-b.go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 #star-daily-collection .crd-acts .aud-b.soft{flex:0 0 auto;padding-left:20px;padding-right:20px;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
-/* ── «Финансы»: утверждённый визуал полной страницы (пакет AMBAR-FINANCE-FINAL,
-   владелец, 2 ноя 2026: «внедри приложенный визуал поверх существующей страницы,
-   логику не трогай»). Сначала точные значения макета как есть (finance-visual.css),
-   затем его же адаптация к мини-аппу (finance-integration.css), затем крючки
-   оболочки и состояния, которых в макете не было. Корень #ambar-finance-polished —
-   один на странице, стили изолированы им. ── */
-#ambar-finance-polished{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
-#ambar-finance-polished .fv-stage{display:flex;justify-content:center;padding:12px 8px}
-#ambar-finance-polished .fv-app{--fv-width:390px;--fv-height:844px;--fv-bg:#07070c;--fv-panel:#12111f;--fv-text:#ece9e3;--fv-muted:#aaa2b4;--fv-gold:#e2c386;--fv-line:#2d2839;display:flex;flex-direction:column;width:var(--fv-width);max-width:100%;height:var(--fv-height);min-width:0;overflow:hidden;box-sizing:border-box;border:1px solid #292532;border-radius:24px;background:var(--fv-bg);color:var(--fv-text);font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container-name:fv-phone;container-type:size}
-#ambar-finance-polished .fv-app *{box-sizing:border-box}
-#ambar-finance-polished :where(.fv-app button){appearance:none;font:inherit;color:inherit;border:0;background:transparent;text-align:left;white-space:normal;-webkit-tap-highlight-color:transparent}
-#ambar-finance-polished .fv-app [hidden]{display:none!important}
-#ambar-finance-polished svg.lucide{display:block;width:18px!important;height:18px!important;flex:none;margin:0!important;stroke-width:1.7}
-#ambar-finance-polished .fv-app-head{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-height:62px;padding:12px;border-bottom:1px solid #24202e;background:#0a090f}
-#ambar-finance-polished .fv-wordmark{margin-right:auto;font-family:Georgia,"Times New Roman",serif;font-size:26px;line-height:1;letter-spacing:.17em;color:#d8bc82;white-space:nowrap}
-#ambar-finance-polished .fv-online{display:flex;gap:5px;align-items:center;padding:4px 7px;border:1px solid #294034;border-radius:20px;background:#132019;color:#92b09a;font-size:10px;line-height:16px;font-weight:600;letter-spacing:.035em;white-space:nowrap}
-#ambar-finance-polished .fv-online>span{width:5px;height:5px;border-radius:50%;background:#92b09a}
-#ambar-finance-polished .fv-tools{display:flex;gap:5px}
-#ambar-finance-polished .fv-tools>button{display:grid;place-items:center;position:relative;width:32px;height:34px;padding:0;border:1px solid #2c2738;border-radius:10px;background:#13111e;color:#a79db3}
-#ambar-finance-polished .fv-tools>button.fv-bell{border-color:#665137;background:#292217;color:var(--fv-gold)}
-#ambar-finance-polished .fv-bell>span{position:absolute;right:-3px;top:-6px;min-width:17px;padding:0 3px;border:2px solid #0a090f;border-radius:8px;background:#e2c386;color:#1b1720;font-size:9px;line-height:13px;font-weight:700;text-align:center}
-#ambar-finance-polished .fv-scroll{position:relative;flex:1 1 0;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#494052 transparent}
-#ambar-finance-polished .fv-content{display:flex;flex-direction:column;gap:12px;min-width:0;padding:12px 12px 18px}
-#ambar-finance-polished .fv-panel{flex:none;min-width:0;border:1px solid #39323f;border-radius:19px;background:linear-gradient(135deg,#191622,var(--fv-panel) 72%)}
-#ambar-finance-polished .fv-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;min-height:58px;padding:15px 14px;border-bottom:1px solid #493d49;border-radius:18px 18px 0 0;background:#221d29}
-#ambar-finance-polished .fv-section-head>div{min-width:0}
-#ambar-finance-polished .fv-section-head h2{margin:0;min-width:0;color:#e7ca92;font-size:20px;line-height:26px;font-weight:700;letter-spacing:-.025em;overflow-wrap:break-word}
-#ambar-finance-polished .fv-unit{font-size:11px;line-height:16px;color:var(--fv-muted);font-weight:500;flex:none}
-#ambar-finance-polished .fv-section-caption{display:block;margin-top:4px;color:var(--fv-muted);font-size:12px;line-height:17px}
-#ambar-finance-polished .fv-month{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;min-height:44px;padding:0 5px;border-bottom:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-month>span{min-width:0;font-size:14px;line-height:20px;font-weight:600;text-align:center}
-#ambar-finance-polished .fv-month>button{display:grid;place-items:center;width:40px;min-height:44px;padding:0;color:#b6a48a}
-#ambar-finance-polished .fv-month>button:disabled{color:#655c74}
-#ambar-finance-polished .fv-metrics{display:grid;grid-template-columns:minmax(0,1fr) 13px minmax(0,1fr) 13px minmax(0,1fr);align-items:stretch;gap:4px;min-width:0;padding:16px 13px 18px;background:linear-gradient(100deg,#1c1824,#17131f)}
-#ambar-finance-polished .fv-metric{display:grid;grid-template-rows:34px auto;align-content:start;gap:10px;min-width:0;padding:0;border-radius:7px}
-#ambar-finance-polished .fv-metric-operator{position:relative;align-self:stretch;padding-top:44px;color:#a89aaf;font-family:"Space Grotesk",sans-serif;font-size:17px;line-height:26px;font-weight:400;text-align:center}
-#ambar-finance-polished .fv-metric-operator::before,#ambar-finance-polished .fv-metric-operator::after{content:"";position:absolute;left:50%;width:1px;background:#3d3447;transform:translateX(-50%);pointer-events:none}
-#ambar-finance-polished .fv-metric-operator::before{top:0;bottom:32px}
-#ambar-finance-polished .fv-metric-operator::after{height:5px;bottom:-7px}
-#ambar-finance-polished .fv-metric-name{display:grid;grid-template-columns:minmax(0,1fr) 10px;gap:3px;align-items:start;min-height:34px;min-width:0;color:var(--fv-muted);font-size:11px;line-height:16px;font-weight:500}
-#ambar-finance-polished .fv-metric-name>svg.lucide{width:11px!important;height:13px!important;color:#85768f}
-#ambar-finance-polished .fv-metric>strong{max-width:100%;font-family:"Space Grotesk","Manrope",sans-serif;font-size:clamp(18px,5.7cqw,24px);line-height:26px;font-weight:500;letter-spacing:-.055em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-profit>strong{color:var(--fv-gold)}
-#ambar-finance-polished .fv-analytics-bottom{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-analytics-bottom>button{display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-width:0;min-height:79px;padding:12px 14px 13px}
-#ambar-finance-polished .fv-analytics-bottom>button+button{border-left:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-cell-label{display:flex;align-items:center;justify-content:space-between;gap:5px;width:100%;min-width:0;color:var(--fv-muted);font-size:11px;line-height:16px;font-weight:500}
-#ambar-finance-polished .fv-cell-label>svg.lucide{width:12px!important;height:14px!important;color:#85768f}
-#ambar-finance-polished .fv-profitability-line{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
-#ambar-finance-polished .fv-profitability-line>strong,#ambar-finance-polished .fv-budget-value>strong{font-family:"Space Grotesk","Manrope",sans-serif;font-size:23px;line-height:26px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:var(--fv-gold)}
-#ambar-finance-polished .fv-profitability-line>strong>span{font-size:15px;margin-left:2px}
-#ambar-finance-polished .fv-meter{display:block;min-width:0;height:4px;background:#30293d;border-radius:8px;overflow:hidden}
-#ambar-finance-polished .fv-meter>span{display:block;height:100%;border-radius:inherit;background:#c8ac72}
-#ambar-finance-polished .fv-profitability-line>.fv-meter{flex:1}
-#ambar-finance-polished .fv-budget-value{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;min-width:0}
-#ambar-finance-polished .fv-budget-value>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-revenue-head{gap:12px;min-height:0;padding-block:12px}
-#ambar-finance-polished .fv-revenue-head h2{flex:1}
-#ambar-finance-polished .fv-revenue-date{flex:none;color:var(--fv-muted);font-size:11px;line-height:16px}
-#ambar-finance-polished .fv-revenue-steps{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:1fr;gap:10px;min-width:0;padding:10px}
-#ambar-finance-polished .fv-collection,#ambar-finance-polished .fv-distribution{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;align-content:start;align-items:start;gap:8px;width:100%;min-width:0;padding:10px 12px;border:1px solid #3b3345;border-radius:12px}
-#ambar-finance-polished .fv-collection{background:#211c29;border-color:#66543c}
-#ambar-finance-polished .fv-revenue-steps .fv-collection:enabled:hover{background-color:#272130;border-color:#8c754b}
-#ambar-finance-polished .fv-revenue-steps .fv-collection:enabled:active{background-color:#2d2635}
-#ambar-finance-polished .fv-step-number{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;background:#e2c38612;color:#d9bd84;font-family:"Space Grotesk",sans-serif;font-size:12px;line-height:16px;font-weight:500}
-#ambar-finance-polished .fv-revenue-step-head{display:grid;grid-template-columns:22px minmax(0,1fr) 16px;align-items:center;gap:10px;min-width:0}
-#ambar-finance-polished .fv-revenue-step-head>strong{font-size:15px;line-height:22px;font-weight:600;overflow-wrap:break-word}
-#ambar-finance-polished .fv-collection .fv-step-number{background:#e2c3861c}
-#ambar-finance-polished .fv-revenue-step-content{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(28px,auto) auto;align-content:start;align-items:start;gap:6px;min-width:0}
-#ambar-finance-polished .fv-collection-money{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 8px;min-width:0;font-variant-numeric:tabular-nums}
-#ambar-finance-polished .fv-collection-money>strong{max-width:100%;color:var(--fv-gold);font-family:"Space Grotesk",sans-serif;font-size:26px;line-height:28px;font-weight:500;letter-spacing:-.035em;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-collection-money>span{color:var(--fv-muted);font-size:12px;line-height:18px;white-space:nowrap}
-#ambar-finance-polished .fv-collection-money b{font-weight:500;color:#d0c8d8}
-#ambar-finance-polished .fv-collection-progress{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;min-width:0;min-height:17px}
-#ambar-finance-polished .fv-collection-progress>span:last-child{color:var(--fv-muted);font-size:11px;line-height:17px;white-space:nowrap}
-#ambar-finance-polished .fv-collection-meter{height:4px}
-#ambar-finance-polished .fv-distribution{background:#13111f}
-#ambar-finance-polished .fv-distribution .fv-step-number{background:#ffffff04;color:#a198ae}
-#ambar-finance-polished .fv-distribution .fv-revenue-step-head>strong{color:#b5acbf}
-#ambar-finance-polished .fv-distribution-message{display:block;color:#9c93a8;font-size:12px;line-height:18px;font-weight:400;overflow-wrap:break-word}
-#ambar-finance-polished .fv-distribution-targets{display:block;color:#9c93a8;font-size:11px;line-height:17px;overflow-wrap:break-word}
-#ambar-finance-polished .fv-distribution-targets>span{padding:0 5px;color:#6e637d}
-#ambar-finance-polished .fv-distribution .fv-revenue-step-head>svg.lucide{width:15px!important;height:15px!important;color:#978caa}
-#ambar-finance-polished .fv-safe-body{display:grid;gap:12px;padding:12px}
-#ambar-finance-polished .fv-cash-total{display:grid;grid-template-columns:minmax(0,1fr) 14px;align-items:center;gap:7px 10px;width:100%;padding:14px;min-width:0;border:1px solid #655239;border-radius:13px;background:#251f2b}
-#ambar-finance-polished .fv-cash-total>span:first-child{font-size:12px;line-height:18px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-cash-total>.fv-row-arrow{grid-column:2;grid-row:1 / 3}
-#ambar-finance-polished .fv-cash-value{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;min-width:0;grid-column:1;grid-row:2}
-#ambar-finance-polished .fv-cash-value>strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:34px;line-height:38px;font-weight:500;letter-spacing:-.04em;color:var(--fv-gold);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-cash-value>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-accounts{min-width:0;border:1px solid #403648;border-radius:13px;background:#191521}
-#ambar-finance-polished .fv-wallet{display:grid;grid-template-columns:20px minmax(0,1fr) auto 14px;align-items:center;gap:9px;width:100%;min-width:0;min-height:66px;padding:12px;border-bottom:1px solid #3a3042;border-radius:12px 12px 0 0;background:#201a29}
-#ambar-finance-polished .fv-stacks>.fv-fin-row:last-child{border-radius:0 0 12px 12px}
-#ambar-finance-polished .fv-wallet>svg:first-child{color:#b8a177}
-#ambar-finance-polished .fv-wallet-title{min-width:0;font-size:12px;line-height:18px;font-weight:500;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-wallet-value{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;font-variant-numeric:tabular-nums}
-#ambar-finance-polished .fv-wallet-value>strong{font-family:"Space Grotesk",sans-serif;font-size:18px;line-height:22px;font-weight:500;white-space:nowrap}
-#ambar-finance-polished .fv-wallet-value small{font-family:"Manrope",sans-serif;font-size:11px;font-weight:500;color:var(--fv-muted)}
-#ambar-finance-polished .fv-wallet-value>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-fin-row{display:grid;grid-template-columns:20px minmax(0,1fr) minmax(0,max-content) 14px;align-items:center;gap:9px;width:100%;min-width:0;min-height:56px;padding:11px 12px}
-#ambar-finance-polished .fv-fin-row+.fv-fin-row{border-top:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-row-icon{color:#ad9875}
-#ambar-finance-polished .fv-row-title{min-width:0;font-size:13px;line-height:19px;font-weight:600;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-row-money{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;text-align:right}
-#ambar-finance-polished .fv-row-money>strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:20px;line-height:24px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:#dfc48d;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-row-money>span{font-size:11px;line-height:16px;color:var(--fv-muted);overflow-wrap:anywhere}
-#ambar-finance-polished svg.lucide.fv-row-arrow{width:14px!important;height:16px!important;color:#9f8c73}
-#ambar-finance-polished .fv-report{display:grid;grid-template-columns:20px minmax(0,1fr) 14px;align-items:center;gap:9px;width:100%;min-height:54px;padding:12px 14px;border:1px solid #403648;border-radius:12px;background:#211b28}
-#ambar-finance-polished .fv-report>svg:first-child{color:#ad9875}
-#ambar-finance-polished .fv-report>span{font-size:13px;line-height:20px;font-weight:500}
-#ambar-finance-polished .fv-payroll-head{min-height:78px}
-#ambar-finance-polished .fv-pay-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,max-content) 14px;align-items:center;gap:10px;width:100%;min-width:0;min-height:64px;padding:12px 14px}
-#ambar-finance-polished .fv-pay-row+.fv-pay-row{border-top:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-rates>summary{display:grid;grid-template-columns:22px minmax(0,1fr) 18px;align-items:center;gap:10px;min-height:76px;padding:15px 14px;border-radius:18px;background:#221d29;list-style:none}
-#ambar-finance-polished .fv-rates[open]>summary{border-radius:18px 18px 0 0}
-#ambar-finance-polished .fv-rates>summary::-webkit-details-marker{display:none}
-#ambar-finance-polished .fv-rates>summary::marker{content:""}
-#ambar-finance-polished .fv-rates>summary>span{display:flex;flex-direction:column;gap:3px;min-width:0}
-#ambar-finance-polished .fv-rates>summary strong{font-size:20px;line-height:26px;font-weight:700;letter-spacing:-.025em;color:#e7ca92}
-#ambar-finance-polished .fv-rates>summary>span>span{font-size:12px;line-height:17px;color:var(--fv-muted);overflow-wrap:break-word}
-#ambar-finance-polished .fv-exchange-icon{color:#baa27a}
-#ambar-finance-polished .fv-rates-chevron{color:#a496ad;transition:transform .15s ease}
-#ambar-finance-polished .fv-rates[open] .fv-rates-chevron{transform:rotate(180deg)}
-#ambar-finance-polished .fv-rates-body{border-top:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-market-rates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:14px 8px 8px}
-#ambar-finance-polished .fv-market-rates>div,#ambar-finance-polished .fv-customer-values>div{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:0 5px;text-align:center}
-#ambar-finance-polished .fv-market-rates>div+div,#ambar-finance-polished .fv-customer-values>div+div{border-left:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-market-rates strong,#ambar-finance-polished .fv-customer-values strong{font-family:"Space Grotesk",sans-serif;font-size:22px;line-height:27px;font-weight:500;letter-spacing:-.035em;color:var(--fv-gold);font-variant-numeric:tabular-nums}
-#ambar-finance-polished .fv-market-rates>div>span,#ambar-finance-polished .fv-customer-values>div>span{font-size:11px;line-height:16px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-rate-caption{padding:0 10px 12px;text-align:center;font-size:11px;line-height:16px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-customer-rates{padding:12px 8px 16px;border-top:1px solid var(--fv-line)}
-#ambar-finance-polished .fv-customer-rates h3{margin:0 6px 12px;font-size:12px;line-height:18px;font-weight:600;color:#d0b785}
-#ambar-finance-polished .fv-customer-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
-#ambar-finance-polished .fv-condensed{display:block;flex:0 0 auto;width:100%;padding:6px 14px 8px!important;border-bottom:1px solid #3a3241!important;background:#191621!important}
-#ambar-finance-polished .fv-condensed-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;line-height:15px;font-weight:500;color:#b7acbf}
-#ambar-finance-polished .fv-condensed-head>svg.lucide{width:13px!important;height:13px!important;color:#b9a37a}
-#ambar-finance-polished .fv-condensed-values{display:grid;grid-template-columns:1.15fr 1.15fr 1.15fr .65fr;gap:6px;margin-top:4px;min-width:0}
-#ambar-finance-polished .fv-condensed-values>span{display:flex;flex-direction:column;gap:1px;min-width:0}
-#ambar-finance-polished .fv-condensed-values>span>span{font-size:11px;line-height:14px;font-weight:400;color:var(--fv-muted)}
-#ambar-finance-polished .fv-condensed-values strong{font-family:"Space Grotesk",sans-serif;font-size:14px;line-height:17px;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-#ambar-finance-polished .fv-condensed-values .fv-gold{color:var(--fv-gold)}
-#ambar-finance-polished .fv-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;flex:0 0 auto;min-height:63px;padding:9px 3px 11px;border-top:1px solid #26212e;background:#0a090f}
-#ambar-finance-polished .fv-nav>button{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;min-width:0;min-height:42px;padding:0;color:#968ba6;font-size:11px;line-height:14px;font-weight:500;text-align:center}
-#ambar-finance-polished .fv-nav>button>svg.lucide{width:20px!important;height:20px!important}
-#ambar-finance-polished .fv-nav>button.is-active{color:var(--fv-gold)}
-#ambar-finance-polished .fv-panel button:enabled:hover{background-color:#e2c38606}
-#ambar-finance-polished .fv-panel button:enabled:active{background-color:#e2c3860c}
-#ambar-finance-polished .fv-safe-body>.fv-cash-total:enabled:hover{background-color:#2e2633}
-#ambar-finance-polished .fv-accounts>.fv-wallet:enabled:hover{background-color:#282130}
-#ambar-finance-polished .fv-safe-body>.fv-report:enabled:hover{background-color:#2a2232}
-@container fv-phone (max-width:350px){
-  #ambar-finance-polished .fv-app-head{gap:7px;padding-inline:10px}
-  #ambar-finance-polished .fv-wordmark{font-size:22px;letter-spacing:.12em}
-  #ambar-finance-polished .fv-tools{gap:4px}
-  #ambar-finance-polished .fv-tools>button{width:29px;height:33px}
-  #ambar-finance-polished .fv-online{padding-inline:5px;font-size:9px}
-  #ambar-finance-polished .fv-content{padding-inline:10px;gap:10px}
-  #ambar-finance-polished .fv-section-head{padding-inline:12px}
-  #ambar-finance-polished .fv-section-head h2,#ambar-finance-polished .fv-rates>summary strong{font-size:18px;line-height:25px}
-  #ambar-finance-polished .fv-metrics{grid-template-columns:minmax(0,1fr) 10px minmax(0,1fr) 10px minmax(0,1fr);gap:3px;padding-inline:10px}
-  #ambar-finance-polished .fv-metric{padding:0}
-  #ambar-finance-polished .fv-analytics-bottom>button{padding-inline:11px}
-  #ambar-finance-polished .fv-cell-label{font-size:11px}
-  #ambar-finance-polished .fv-profitability-line{gap:6px}
-  #ambar-finance-polished .fv-safe-body{padding:10px;gap:10px}
-  #ambar-finance-polished .fv-cash-value>strong{font-size:31px}
-  #ambar-finance-polished .fv-wallet{grid-template-columns:18px minmax(0,1fr) auto 12px;gap:7px}
-  #ambar-finance-polished .fv-collection,#ambar-finance-polished .fv-distribution,#ambar-finance-polished .fv-wallet,#ambar-finance-polished .fv-fin-row,#ambar-finance-polished .fv-report,#ambar-finance-polished .fv-pay-row{padding-left:12px;padding-right:12px}
-  #ambar-finance-polished .fv-row-money>strong{font-size:19px}
-  #ambar-finance-polished .fv-row-title{font-size:12px;line-height:18px}
+/* ── «Финансы»: панель разделов (пакет ChatGPT AMBAR-FINANCE-HUB, владелец,
+   25 ноя 2026: «аналитика месяца пусть остается сверху, но внизу кнопки типо
+   (сбор и распределение), потом (сейф и кошелек), (зарплаты премии и
+   удержания)… курс валют пока оставь как есть»; утверждённый вариант пакета —
+   широкий сейф, ниже зарплаты и сбор). Сначала finance-hub-visual.css пакета
+   как есть, затем finance-hub-integration.css, затем адаптация к оболочке и
+   состояния, которых в макете не было. Корень #ambar-finance-hub — один на
+   странице, стили изолированы им. ── */
+#ambar-finance-hub{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-finance-hub .fh-stage{display:flex;justify-content:center;padding:12px 0}
+#ambar-finance-hub .fh-app{--fh-width:390px;--fh-height:844px;--fh-tile-height:150px;--fh-bg:#08070d;--fh-panel:#14111f;--fh-head:#231e2b;--fh-text:#edeae4;--fh-muted:#aaa1b3;--fh-gold:#e2c386;--fh-line:#39313f;display:flex;flex-direction:column;width:var(--fh-width);max-width:100%;height:var(--fh-height);min-width:0;border:1px solid #292532;border-radius:25px;overflow:hidden;background:var(--fh-bg);color:var(--fh-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container-type:inline-size}
+#ambar-finance-hub .fh-app,#ambar-finance-hub .fh-app *:not(:where([data-existing-component], [data-existing-component] *)){box-sizing:border-box}
+#ambar-finance-hub .fh-app [hidden]:not(:where([data-existing-component], [data-existing-component] *)){display:none!important}
+#ambar-finance-hub .fh-app button:not(:where([data-existing-component], [data-existing-component] *)){appearance:none;font:inherit;color:inherit;border:0;background:none;text-align:left;padding:0;white-space:normal;-webkit-tap-highlight-color:transparent}
+#ambar-finance-hub .fh-app button:active:not(:where([data-existing-component], [data-existing-component] *)){filter:brightness(1.15)}
+#ambar-finance-hub .fh-app svg.lucide:not(:where([data-existing-component], [data-existing-component] *)){display:block;width:18px!important;height:18px!important;margin:0!important;flex-shrink:0;stroke-width:1.7}
+#ambar-finance-hub .fh-header{display:flex;gap:8px;align-items:center;padding:10px 12px;min-height:64px;flex:none;background:#08070c;border-bottom:1px solid #211d29}
+#ambar-finance-hub .fh-brand{font-family:Georgia,"Times New Roman",serif;font-size:25px;line-height:1;letter-spacing:.17em;color:var(--fh-gold);margin-right:auto}
+#ambar-finance-hub .fh-online{display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #244437;background:#10241c;border-radius:20px;font-size:10px;line-height:14px;font-weight:700;letter-spacing:.04em;color:#72b891}
+#ambar-finance-hub .fh-online>span{width:5px;height:5px;border-radius:50%;background:#72b891}
+#ambar-finance-hub .fh-tools{display:flex;gap:5px}
+#ambar-finance-hub .fh-tools button{position:relative;display:grid;place-items:center;width:34px;height:35px;border:1px solid #2c2638;border-radius:11px;background:#13101f;color:#aaa0b9}
+#ambar-finance-hub .fh-tools .fh-bell{background:#2a2116;border-color:#67512e;color:#e3bc72}
+#ambar-finance-hub .fh-bell>span{position:absolute;right:-3px;top:-7px;padding:0 3px;border:2px solid #08070c;border-radius:7px;background:#e2b764;color:#21180f;font-size:9px;font-weight:700;line-height:13px}
+#ambar-finance-hub .fh-scroll{position:relative;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+#ambar-finance-hub .fh-scroll::-webkit-scrollbar{display:none}
+#ambar-finance-hub .fh-content{display:flex;flex-direction:column;gap:12px;padding:12px 11px 14px;min-height:100%}
+#ambar-finance-hub .fh-analytics{flex:none;border:1px solid var(--fh-line);border-radius:18px;background:linear-gradient(135deg,#1b1723,#12101d 80%)}
+#ambar-finance-hub .fh-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:12px 13px;border-bottom:1px solid #493d49;border-radius:17px 17px 0 0;background:var(--fh-head)}
+#ambar-finance-hub .fh-section-head h2{margin:0;font-size:20px;line-height:28px;letter-spacing:-.035em;font-weight:700;color:#e7ca92}
+#ambar-finance-hub .fh-section-head>span{font-size:11px;line-height:16px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-month{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;padding:0 5px;border-bottom:1px solid #302938;min-height:44px}
+#ambar-finance-hub .fh-month>button{display:grid;place-items:center;width:40px;height:44px;color:#b6a48a}
+#ambar-finance-hub .fh-month>button:disabled{color:#655c74}
+#ambar-finance-hub .fh-month>span{text-align:center;font-size:14px;line-height:20px;font-weight:600}
+#ambar-finance-hub .fh-formula{display:grid;grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr);gap:4px;padding:11px 12px 12px;background:linear-gradient(100deg,#1c1824,#17131f)}
+#ambar-finance-hub .fh-metric{display:grid;grid-template-rows:30px auto;gap:4px;min-width:0}
+#ambar-finance-hub .fh-metric>span{display:flex;justify-content:space-between;align-items:flex-start;gap:3px;color:var(--fh-muted);font-size:11px;line-height:15px;font-weight:500}
+#ambar-finance-hub .fh-metric>span>svg.lucide{width:9px!important;height:13px!important;color:#8b7b95}
+#ambar-finance-hub .fh-metric>strong{font-family:"Space Grotesk",Manrope,sans-serif;font-weight:500;font-size:clamp(18px,5.7cqw,24px);line-height:28px;letter-spacing:-.055em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-finance-hub .fh-profit>strong{color:var(--fh-gold)}
+#ambar-finance-hub .fh-operator{position:relative;align-self:stretch;padding-top:34px;text-align:center;font-size:16px;line-height:28px;color:#aaa0b4}
+#ambar-finance-hub .fh-operator:before,#ambar-finance-hub .fh-operator:after{content:"";position:absolute;left:50%;width:1px;background:#3d3447;pointer-events:none}
+#ambar-finance-hub .fh-operator:before{top:0;bottom:32px}
+#ambar-finance-hub .fh-operator:after{height:4px;bottom:-6px}
+#ambar-finance-hub .fh-analytics-bottom{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #302938}
+#ambar-finance-hub .fh-analytics-bottom>button{display:flex;flex-direction:column;gap:8px;justify-content:space-between;padding:11px 13px 13px;min-width:0;min-height:74px}
+#ambar-finance-hub .fh-analytics-bottom>button+button{border-left:1px solid #302938}
+#ambar-finance-hub .fh-cell-label{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;line-height:16px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-cell-label>svg.lucide{width:11px!important;height:13px!important;color:#8b7b95}
+#ambar-finance-hub .fh-margin,#ambar-finance-hub .fh-budget{display:flex;align-items:baseline;gap:7px;min-width:0}
+#ambar-finance-hub .fh-margin{align-items:center}
+#ambar-finance-hub .fh-margin strong,#ambar-finance-hub .fh-budget strong{font-family:"Space Grotesk",Manrope,sans-serif;font-size:23px;line-height:26px;font-weight:500;letter-spacing:-.035em;color:var(--fh-gold)}
+#ambar-finance-hub .fh-margin strong small{font-size:15px;margin-left:2px}
+#ambar-finance-hub .fh-budget small{font-size:11px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-progress{display:block;flex:1;min-width:0;height:4px;background:#30293d;border-radius:4px}
+#ambar-finance-hub .fh-progress>span{display:block;height:100%;border-radius:inherit;background:#c8ac72}
+#ambar-finance-hub .fh-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(var(--fh-tile-height),auto);gap:10px;flex:1 0 auto;align-content:stretch}
+#ambar-finance-hub .fh-tiles>.fh-tile{display:grid;grid-template-rows:44px minmax(44px,1fr) auto;gap:7px;min-width:0;padding:12px;border:1px solid #3a3242;border-radius:17px;background:linear-gradient(135deg,#211c2a,#15111f 88%);text-align:left}
+#ambar-finance-hub .fh-tile-head{position:relative;display:grid;grid-template-columns:27px minmax(0,1fr);align-items:start;gap:7px;min-width:0;padding-top:1px}
+#ambar-finance-hub .fh-icon{width:27px;height:28px;display:grid;place-items:center;border:1px solid #5a4934;border-radius:8px;background:#2d2530;color:#dfbf80}
+#ambar-finance-hub .fh-icon>svg.lucide{width:17px!important;height:17px!important}
+#ambar-finance-hub .fh-tile-title{text-transform:uppercase;font-size:11.5px;line-height:14px;font-weight:700;letter-spacing:.012em;color:#ece7e1;overflow-wrap:normal}
+#ambar-finance-hub .fh-dot{position:absolute;width:5px;height:5px;border-radius:50%;right:-6px;top:-5px;background:var(--fh-gold)}
+#ambar-finance-hub .fh-tile-metric{display:flex;flex-direction:column;justify-content:flex-end;gap:1px;min-width:0}
+#ambar-finance-hub .fh-context{font-size:11px;line-height:14px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-number{display:flex;align-items:baseline;gap:5px;white-space:nowrap;min-width:0;color:var(--fh-gold)}
+#ambar-finance-hub .fh-number>strong{font-family:"Space Grotesk",Manrope,sans-serif;font-size:clamp(24px,7.45cqw,31px);line-height:33px;letter-spacing:-.045em;font-weight:500;font-variant-numeric:tabular-nums}
+#ambar-finance-hub .fh-number>small{font-size:11px;color:#b2a7ba;line-height:14px}
+#ambar-finance-hub .fh-of{font-family:Manrope,sans-serif;font-size:16px;line-height:24px;letter-spacing:-.04em}
+#ambar-finance-hub .fh-of>b{font-weight:500}
+#ambar-finance-hub .fh-caption{font-size:11px;line-height:15px;font-weight:400;color:#b7aabd;letter-spacing:-.035em;white-space:nowrap}
+#ambar-finance-hub .fh-tile[data-tile="collection"] .fh-caption{color:#cdb78d}
+#ambar-finance-hub .fh-tile[data-agreed="true"] .fh-caption{color:#a4bba8}
+#ambar-finance-hub .fh-tiles>.fh-tile-wide{grid-column:1 / -1;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:30px minmax(64px,1fr);column-gap:16px;row-gap:12px;padding:14px 16px}
+#ambar-finance-hub .fh-tile-wide .fh-tile-head{grid-column:1 / -1;align-items:center;gap:9px}
+#ambar-finance-hub .fh-tile-wide .fh-tile-title{font-size:13px;line-height:18px}
+#ambar-finance-hub .fh-tile-wide .fh-tile-metric{justify-content:center;gap:4px}
+#ambar-finance-hub .fh-tile-wide .fh-number>strong{font-size:clamp(26px,8.2cqw,34px);line-height:36px}
+#ambar-finance-hub .fh-safe-wallet{display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;border-left:1px solid #423747;padding-left:16px}
+#ambar-finance-hub .fh-wallet-value{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px}
+#ambar-finance-hub .fh-wallet-value strong{font-family:"Space Grotesk",Manrope,sans-serif;font-size:22px;line-height:27px;font-weight:500;letter-spacing:-.035em;color:var(--fh-text);font-variant-numeric:tabular-nums}
+#ambar-finance-hub .fh-wallet-value small,#ambar-finance-hub .fh-wallet-equivalent{font-size:11px;line-height:15px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-rates{flex:none;border:1px solid var(--fh-line);border-radius:18px;background:#15121f}
+#ambar-finance-hub .fh-rates>summary{list-style:none;display:grid;grid-template-columns:20px minmax(0,1fr) 16px;gap:10px;align-items:center;min-height:66px;padding:10px 13px;border-radius:17px;background:var(--fh-head)}
+#ambar-finance-hub .fh-rates>summary::-webkit-details-marker{display:none}
+#ambar-finance-hub .fh-rates>summary>i,#ambar-finance-hub .fh-rates>summary>svg{color:#c3ac7c}
+#ambar-finance-hub .fh-rates>summary>span{min-width:0;display:flex;flex-direction:column;gap:2px}
+#ambar-finance-hub .fh-rates>summary strong{font-size:20px;line-height:26px;font-weight:700;letter-spacing:-.025em;color:#e7ca92}
+#ambar-finance-hub .fh-rates>summary>span>span{font-size:11px;line-height:15px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-rates .fh-chevron{color:var(--fh-muted)}
+#ambar-finance-hub .fh-rates[open] .fh-chevron{transform:rotate(180deg)}
+#ambar-finance-hub .fh-rates[open]>summary{border-bottom:1px solid var(--fh-line);border-radius:17px 17px 0 0}
+#ambar-finance-hub .fh-rates-body{padding:16px 12px}
+#ambar-finance-hub .fh-rate-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
+#ambar-finance-hub .fh-rate-grid>span{display:flex;flex-direction:column;gap:4px}
+#ambar-finance-hub .fh-rate-grid strong{font-family:"Space Grotesk",Manrope,sans-serif;font-size:23px;line-height:28px;color:var(--fh-gold);font-weight:500}
+#ambar-finance-hub .fh-rate-grid small,#ambar-finance-hub .fh-rate-context{font-size:11px;line-height:16px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-rate-context{display:block;text-align:center;margin-top:12px}
+#ambar-finance-hub .fh-customer-rates{border-top:1px solid var(--fh-line);margin-top:14px;padding-top:14px}
+#ambar-finance-hub .fh-customer-rates h3{margin:0 0 12px;font-size:12px;font-weight:600;color:#cdb78d}
+#ambar-finance-hub .fh-client-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+#ambar-finance-hub .fh-nav{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;align-items:start;min-height:68px;padding:10px 8px 13px;background:#08070c;border-top:1px solid #231e2c}
+#ambar-finance-hub .fh-nav>button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:42px;font-size:9px;line-height:13px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#8e829d}
+#ambar-finance-hub .fh-nav>button>svg.lucide{width:20px!important;height:20px!important}
+#ambar-finance-hub .fh-nav>button[aria-current="page"]{color:var(--fh-gold)}
+#ambar-finance-hub .fh-nav>.fh-check{margin:0 6px;border:1px solid #84404c;border-radius:11px;background:linear-gradient(#191322,#0e0b14);color:#d3656d;letter-spacing:.15em}
+#ambar-finance-hub .fh-app .fh-compact{position:sticky;top:0;z-index:2;display:block;width:100%;height:0;padding:0;overflow:hidden;background:#1d1827;border-bottom:0}
+#ambar-finance-hub .fh-compact:not([hidden]){height:65px;margin-bottom:-65px;padding:7px 12px;border-bottom:1px solid var(--fh-line)}
+#ambar-finance-hub .fh-compact-date{display:flex;align-items:center;gap:4px;font-size:10px;line-height:14px;color:#b6a9c0}
+#ambar-finance-hub .fh-compact-date>svg{margin-left:auto!important;width:13px!important;height:13px!important}
+#ambar-finance-hub .fh-compact-grid{display:grid;grid-template-columns:repeat(3,1fr) .6fr;gap:7px;margin-top:4px}
+#ambar-finance-hub .fh-compact-grid>span{display:flex;flex-direction:column;font-size:10px;line-height:13px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-compact-grid b{font-family:"Space Grotesk",Manrope,sans-serif;font-weight:500;font-size:14px;line-height:17px;letter-spacing:-.03em;color:var(--fh-text)}
+#ambar-finance-hub .fh-compact-grid>span:nth-child(3) b{color:var(--fh-gold)}
+@container (max-width:374px){
+ #ambar-finance-hub .fh-brand{font-size:22px;letter-spacing:.12em}
+ #ambar-finance-hub .fh-header{gap:6px;padding-inline:10px}
+ #ambar-finance-hub .fh-online{padding:4px 5px;font-size:9px}
+ #ambar-finance-hub .fh-tools{gap:4px}
+ #ambar-finance-hub .fh-tools button{width:31px}
+ #ambar-finance-hub .fh-section-head h2{font-size:18px}
+ #ambar-finance-hub .fh-tile-head{grid-template-columns:23px 1fr;gap:5px}
+ #ambar-finance-hub .fh-icon{width:23px;height:25px;border-radius:7px}
+ #ambar-finance-hub .fh-tile-title{font-size:11px;line-height:14px;letter-spacing:-.025em;overflow-wrap:anywhere}
+ #ambar-finance-hub .fh-tiles>.fh-tile{padding:10px;grid-template-rows:minmax(44px,auto) minmax(44px,1fr) auto}
+ #ambar-finance-hub .fh-tiles>.fh-tile-wide{padding:12px;grid-template-rows:30px minmax(64px,1fr);column-gap:10px}
+ #ambar-finance-hub .fh-tile-wide .fh-number{flex-wrap:nowrap}
+ #ambar-finance-hub .fh-safe-wallet{padding-left:10px}
+ #ambar-finance-hub .fh-caption{white-space:normal;overflow-wrap:anywhere}
+ #ambar-finance-hub .fh-number{gap:4px;flex-wrap:wrap}
+ #ambar-finance-hub .fh-rates>summary{gap:7px;padding-inline:11px}
+ #ambar-finance-hub .fh-rates>summary>span>span{font-size:11px}
 }
-@media(prefers-reduced-motion:reduce){#ambar-finance-polished .fv-rates-chevron{transition:none}}
-/* Load after finance-visual.css. Height and safe area come from the existing app shell. */
-#ambar-finance-polished {
-  width: 100%;
-  height: var(--fv-available-height, 100%);
-  min-height: 0;
-}
-#ambar-finance-polished .fv-stage {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-}
-#ambar-finance-polished .fv-app {
-  width: 100%;
-  max-width: none;
-  height: 100%;
-  min-height: 0;
-  border: 0;
-  border-radius: 0;
-  container-type: inline-size;
-}
-#ambar-finance-polished .fv-nav {
-  padding-bottom: calc(11px + var(--fv-safe-bottom, 0px));
-}
-/* Оболочка страницы: «Финансы» стоит fixed от низа шапки до верха панели вкладок,
-   без полей страницы; шапка и панель — общие у приложения, своих у корня нет.
-   Единственный скролл — .fv-scroll; компактная сводка — над ним, в потоке.
-   Safe-area снизу уже учтена панелью, поэтому --fv-safe-bottom = 0. */
+@media (pointer:coarse){#ambar-finance-hub .fh-tools button:before{content:"";position:absolute;inset:-5px -2px}#ambar-finance-hub .fh-month{grid-template-columns:44px minmax(0,1fr) 44px}#ambar-finance-hub .fh-month>button{width:44px}}
+/* Load after finance-hub-visual.css. The host supplies the actual content height. */
+#ambar-finance-hub{width:100%;height:var(--fh-available-height,100%);min-height:0}
+#ambar-finance-hub .fh-stage{width:100%;height:100%;min-height:0;padding:0;align-items:stretch}
+#ambar-finance-hub .fh-app{width:100%;max-width:none;height:100%;min-height:0;border:0;border-radius:0}
+#ambar-finance-hub .fh-scroll{min-height:0;min-width:0;overflow-y:auto}
+#ambar-finance-hub .fh-nav{padding-bottom:calc(13px + var(--fh-safe-bottom,0px))}
+#ambar-finance-hub[data-shell="existing"] :is(.fh-header,.fh-nav){display:none}
+#ambar-finance-hub[data-hide-header="true"] .fh-header{display:none}
+#ambar-finance-hub[data-hide-nav="true"] .fh-nav{display:none}
+#ambar-finance-hub:is([data-shell="existing"],[data-hide-nav="true"]) .fh-content{padding-bottom:calc(14px + var(--fh-safe-bottom,0px))}
+#ambar-finance-hub [data-existing-component="currency-rates"]{flex:none;min-width:0}
+/* Existing FX DOM retains its original classes, rules, events and state.
+   Visual CSS excludes this subtree from its generic resets and icon sizing. */
+#ambar-finance-hub .fh-metric{grid-template-rows:minmax(30px,auto) auto}
+#ambar-finance-hub .fh-metric>strong{white-space:normal;overflow-wrap:anywhere}
+#ambar-finance-hub .fh-tiles .fh-number{flex-wrap:wrap}
+#ambar-finance-hub .fh-tiles .fh-tile-wide .fh-number{flex-wrap:wrap}
+#ambar-finance-hub .fh-number>strong{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#ambar-finance-hub .fh-wallet-value>strong{max-width:100%;overflow-wrap:anywhere}
+#ambar-finance-hub .fh-tiles .fh-tile-head{min-height:44px;height:auto}
+#ambar-finance-hub .fh-tiles>.fh-tile{grid-template-rows:minmax(44px,auto) minmax(44px,1fr) auto}
+#ambar-finance-hub .fh-tiles>.fh-tile-wide{grid-template-rows:minmax(30px,auto) minmax(64px,1fr)}
+#ambar-finance-hub .fh-tile-wide .fh-tile-head{min-height:30px}
+#ambar-finance-hub .fh-caption{white-space:normal;overflow-wrap:anywhere}
+#ambar-finance-hub .fh-loading-value{display:inline-block;min-width:4ch;min-height:1em;border-radius:4px;background:#352c40;color:transparent}
+#ambar-finance-hub .fh-data-error{color:#dba0ae}
+#ambar-finance-hub .fh-negative{color:#dba0ae!important}
+#ambar-finance-hub .fh-meta-unavailable{color:var(--fh-muted)}
+/* Оболочка: «Финансы» стоит fixed от низа шапки до верха панели вкладок, без
+   полей страницы; шапка и панель — общие у приложения, пакетные спрятаны
+   (data-shell="existing"). Единственный скролл — .fh-scroll. Safe-area снизу
+   уже учтена панелью, поэтому --fh-safe-bottom = 0. */
 #pg-finance.active{position:fixed;top:calc(66px + var(--safe-top));bottom:calc(68px + var(--safe-bottom));left:0;right:0;padding:0;overflow:hidden}
-#pg-finance #ambar-finance-polished{--fv-safe-bottom:0px}
-/* Отрисованные секции лежат в #finBook внутри .fv-content — тот же столбец с теми же зазорами. */
-#pg-finance .fv-book{display:flex;flex-direction:column;gap:12px;min-width:0}
-@container fv-phone (max-width:350px){#pg-finance .fv-book{gap:10px}}
+#pg-finance #ambar-finance-hub{--fh-safe-bottom:0px}
+/* Аналитика и плитки лежат в #finBook внутри .fh-content — тот же столбец с теми
+   же зазорами; столбец растёт, чтобы плитки заняли свободную высоту
+   (flex:1 0 auto у .fh-tiles в пакете), курс остаётся внизу. */
+#pg-finance .fh-book{display:flex;flex-direction:column;flex:1 0 auto;gap:12px;min-width:0}
+#pg-finance .fh-book-rest{display:contents}
+#pg-finance .fh-scroll{overflow-x:hidden}
 /* Клавиатура (vendor/ambar-kb.js): панель вкладок прячется, снизу воздух —
    поле докручивается в центр экрана. */
 html.kb #pg-finance.active{bottom:0}
-html.kb #pg-finance .fv-scroll{padding-bottom:50vh}
+html.kb #pg-finance .fh-scroll{padding-bottom:50vh}
 /* Карточка аналитики идёт за пальцем и улетает при смене месяца — как карточка
-   выручки на «Обзоре» (daySwipe / _heroFlip); остальные секции — display:contents,
-   чтобы остаться элементами той же колонки с тем же зазором. */
-#pg-finance .fv-an-card{min-width:0;touch-action:pan-y}
-#pg-finance .fv-an-card.day-drag{transition:none}
-#pg-finance .fv-an-card.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
-#pg-finance .fv-an-card.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
-@media (prefers-reduced-motion:reduce){#pg-finance .fv-an-card.day-move,#pg-finance .fv-an-card.day-back{transition-duration:.01s}}
-#pg-finance .fv-book-rest{display:contents}
-#pg-finance .fv-scroll{overflow-x:hidden}
-/* Состояния, которых в макете нет, — теми же красками: минус красным, прочерк
-   тусклым, «Загрузка…» / «Не удалось загрузить» строкой под формулой, замок на
-   «Распределении» (класс, а не disabled: тап объясняет, чего ждём), подпись
-   «до нормы РП+ не хватает», ряд действий под этапами (собрать / согласовать /
-   изменить / распределить — те же, что были на карточке). */
-#ambar-finance-polished .fv-app strong.dn,#ambar-finance-polished .fv-app b.dn,#ambar-finance-polished .fv-profitability.dn strong{color:var(--dn)}
-#ambar-finance-polished .fv-app strong.fv-none{color:#655c74}
-#ambar-finance-polished .fv-state{padding:0 14px 14px;font-size:12px;line-height:17px;color:var(--fv-muted)}
-#ambar-finance-polished .fv-state.dn{color:var(--dn)}
-#ambar-finance-polished .fv-revenue-steps .fv-distribution.is-locked:enabled:hover{background-color:#13111f}
-#ambar-finance-polished .fv-distribution-targets b{font-family:"Space Grotesk",sans-serif;font-weight:500;color:#d0c8d8;font-variant-numeric:tabular-nums}
-#ambar-finance-polished .fv-revenue-actions{display:flex;gap:8px;padding:0 10px 10px}
-#ambar-finance-polished .fv-act{display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 0;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #cfb17a;border-radius:12px;background:#dfc087;color:#251e27;font-size:13px;line-height:18px;font-weight:600;text-align:center}
-#ambar-finance-polished .fv-revenue-actions .fv-act:enabled:hover{background-color:#e6cd98}
-#ambar-finance-polished .fv-act.fv-act-soft,#ambar-finance-polished .fv-revenue-actions .fv-act.fv-act-soft:enabled:hover{border-color:#66543c;background-color:#211c29;color:#d9bd84}
-#ambar-finance-polished .fv-act.fv-act-fit{flex:0 0 auto;padding-inline:18px}
-#ambar-finance-polished .fv-act:disabled{border-color:#3b3345;background:#13111f;color:#9c93a8}
-#ambar-finance-polished .fv-act>svg.lucide{width:14px!important;height:14px!important}
+   выручки на «Обзоре» (daySwipe / _heroFlip). */
+#pg-finance .fh-an-card{min-width:0;touch-action:pan-y}
+#pg-finance .fh-an-card.day-drag{transition:none}
+#pg-finance .fh-an-card.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
+#pg-finance .fh-an-card.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+@media (prefers-reduced-motion:reduce){#pg-finance .fh-an-card.day-move,#pg-finance .fh-an-card.day-back{transition-duration:.01s}}
+/* Состояния, которых в макете нет, — красками приложения: минус красным (класс
+   dn, как везде), прочерк тусклым, «Загрузка…» / «Не удалось загрузить» строкой
+   под формулой; в плитке сбора отказ сводки — красной подписью. */
+#ambar-finance-hub .fh-app strong.dn,#ambar-finance-hub .fh-app b.dn,#ambar-finance-hub .fh-caption.dn{color:var(--dn)}
+#ambar-finance-hub .fh-compact-grid>span b.dn{color:var(--dn)}
+#ambar-finance-hub .fh-app strong.fh-none{color:#655c74}
+#ambar-finance-hub .fh-state{padding:0 13px 13px;font-size:12px;line-height:17px;color:var(--fh-muted)}
+#ambar-finance-hub .fh-state.dn{color:var(--dn)}
+#ambar-finance-hub .fh-caption>.is-skel{vertical-align:middle}
+/* Курс валют: шапка блока — fh-rates пакета (свёрнутый вид утверждён),
+   раскрытая часть — прежний рабочий блок (2 ноя 2026) под новым корнем: три
+   курса обменника, наш курс для клиентов, редактор, поиск и список.
+   Сворачивание — native details, как было. Блок намеренно оставлен под общими
+   сбросами корня (кнопка, [hidden], svg 18px): он с 2 ноя под такими и живёт. */
+#ambar-finance-hub .fh-rates-slot{flex:none;min-width:0}
+#ambar-finance-hub .fv-market-rates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:14px 8px 8px}
+#ambar-finance-hub .fv-market-rates>div,#ambar-finance-hub .fv-customer-values>div{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:0 5px;text-align:center}
+#ambar-finance-hub .fv-market-rates>div+div,#ambar-finance-hub .fv-customer-values>div+div{border-left:1px solid var(--fh-line)}
+#ambar-finance-hub .fv-market-rates strong,#ambar-finance-hub .fv-customer-values strong{font-family:"Space Grotesk",sans-serif;font-size:22px;line-height:27px;font-weight:500;letter-spacing:-.035em;color:var(--fh-gold);font-variant-numeric:tabular-nums}
+#ambar-finance-hub .fv-market-rates>div>span,#ambar-finance-hub .fv-customer-values>div>span{font-size:11px;line-height:16px;color:var(--fh-muted)}
+#ambar-finance-hub .fv-rate-caption{padding:0 10px 12px;text-align:center;font-size:11px;line-height:16px;color:var(--fh-muted)}
+#ambar-finance-hub .fv-customer-rates{padding:12px 8px 16px;border-top:1px solid var(--fh-line)}
+#ambar-finance-hub .fv-customer-rates h3{margin:0 6px 12px;font-size:12px;line-height:18px;font-weight:600;color:#d0b785}
+#ambar-finance-hub .fv-customer-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 /* Числа «Нашего курса» нажимаются (открывают поле курса, как было). */
-#ambar-finance-polished .fv-customer-values>div{cursor:pointer}
-/* Хвост «Курса валют» из прежнего блока: редактор наших курсов, поиск, список
-   обменника и подпись — под плитками, в том же раскрытии. Заголовок редактора
-   повторял бы h3 макета — его нет. */
-#ambar-finance-polished .fv-rates-more{padding:4px 6px 0}
-#ambar-finance-polished .fv-rates-more .fx-take-h{display:none}
-#ambar-finance-polished .fv-rates-more .fx-q{font-family:inherit}
+#ambar-finance-hub .fv-customer-values>div{cursor:pointer}
+/* Хвост «Курса валют»: редактор наших курсов, поиск, список обменника и
+   подпись — в том же раскрытии. Заголовок редактора повторял бы h3 — его нет. */
+#ambar-finance-hub .fv-rates-more{padding:4px 6px 0}
+#ambar-finance-hub .fv-rates-more .fx-take-h{display:none}
+#ambar-finance-hub .fv-rates-more .fx-q{font-family:inherit}
+/* ── Экран «Зарплаты, премии и удержания» (за плиткой): три строки вкладки в
+   её же языке — название, крупное число с единицей, стрелка. ── */
+#accOv .fhp-panel{margin:0 0 12px;border:1px solid #3a3242;border-radius:17px;background:linear-gradient(135deg,#211c2a,#15111f 88%);overflow:hidden}
+#accOv .fhp-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,max-content) 14px;align-items:center;gap:10px;width:100%;min-width:0;min-height:64px;padding:12px 14px;appearance:none;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#accOv .fhp-row+.fhp-row{border-top:1px solid #39313f}
+#accOv .fhp-row:active{filter:brightness(1.15)}
+#accOv .fhp-title{min-width:0;font-size:13px;line-height:19px;font-weight:600;overflow-wrap:anywhere}
+#accOv .fhp-money{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;text-align:right}
+#accOv .fhp-money>strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:20px;line-height:24px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:#dfc48d;overflow-wrap:anywhere}
+#accOv .fhp-money>strong.dn{color:var(--dn)}
+#accOv .fhp-money>strong.fh-none{color:#655c74}
+#accOv .fhp-money>span{font-size:11px;line-height:16px;color:#aaa1b3;overflow-wrap:anywhere}
+#accOv svg.lucide.fhp-arrow{width:14px;height:16px;color:#9f8c73;flex:none}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -10992,35 +10978,31 @@ html:has(.pg-ov.show.bar-on) .tabbar{z-index:151}
 </div>
 
 <!-- ============ MORE ============ -->
-<!-- Финансы — одна страница по утверждённому визуалу (пакет AMBAR-FINANCE-FINAL,
-     владелец, 2 ноя 2026): корень #ambar-finance-polished, пять секций —
-     аналитика месяца, сбор и распределение, сейф и кошелёк, зарплаты, курс
-     валют. Шапка и панель вкладок — общие у приложения, своих у корня нет.
-     Прокрутка — внутри .fv-scroll; компактная сводка месяца над ним, в потоке,
-     показывается, когда аналитика ушла вверх (fvCondensed). Первые четыре
-     секции рисует fbHubPaint в #finBook (#finAn + #finRest), курс — статичная разметка ниже
-     (fxRender пишет в те же id, что и раньше). -->
+<!-- Финансы — панель разделов (пакет ChatGPT AMBAR-FINANCE-HUB, владелец,
+     25 ноя 2026): корень #ambar-finance-hub, шапка и панель вкладок — общие у
+     приложения (data-shell="existing"). Прокрутка — внутри .fh-scroll; первым в
+     ней — компактная сводка месяца .fh-compact, липнет к верху и показывается,
+     когда аналитика ушла вверх (fhCondensed). Аналитику и три плитки рисует
+     fbHubPaint в #finBook (#finAn + #finRest); курс валют — прежний блок ниже
+     (fxRender пишет в те же id, что и раньше): шапка блока — fh-rates пакета,
+     раскрытая часть — как с 2 ноя. -->
 <div class="page" id="pg-finance">
-  <div id="ambar-finance-polished" lang="ru"><div class="fv-stage"><div class="fv-app" aria-label="AMBAR — Финансы">
-    <button type="button" class="fv-condensed" id="fvCondensed" data-back-to-month hidden aria-label="Вернуться к аналитике" onclick="fbAnTop()">
-      <span class="fv-condensed-head"><span id="fvCondMonth">— · AED</span><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span>
-      <span class="fv-condensed-values">
-        <span><span>Вал</span><strong id="fvCondGross">—</strong></span>
-        <span><span>Расходы</span><strong id="fvCondOut">—</strong></span>
-        <span><span>ЧП</span><strong class="fv-gold" id="fvCondProfit">—</strong></span>
-        <span><span>Рент.</span><strong id="fvCondMargin">—</strong></span>
-      </span>
-    </button>
-    <main class="fv-scroll" id="fvScroll" aria-label="Разделы финансов">
-      <div class="fv-content">
-        <div class="fv-book" id="finBook"></div>
+  <div id="ambar-finance-hub" lang="ru" data-shell="existing"><div class="fh-stage"><div class="fh-app" aria-label="AMBAR — Финансы">
+    <main class="fh-scroll" id="fhScroll" aria-label="Финансы">
+      <button type="button" class="fh-compact" id="fhCompact" data-top hidden aria-label="Вернуться к аналитике месяца" onclick="fbAnTop()">
+        <span class="fh-compact-date"><span id="fhCondMonth">—</span><span>· AED</span><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span>
+        <span class="fh-compact-grid"><span>Вал<b id="fhCondGross">—</b></span><span>Расходы<b id="fhCondOut">—</b></span><span>ЧП<b id="fhCondProfit">—</b></span><span>Рент.<b id="fhCondMargin">—</b></span></span>
+      </button>
+      <div class="fh-content">
+        <div class="fh-book" id="finBook"></div>
         <!-- Курс валют: обменник Al Ansari (rates.py) и наш курс для клиентов
              (fx_take.py). Прайса здесь нет — он внизу карточки «Закупаем» на
              экране заявки (владелец, 19 сен 2026). Раскрывается целиком одной
              шапкой; под плитками — редактор наших курсов, поиск и список
              обменника, как были. -->
-        <details class="fv-panel fv-rates" id="fxBlock" data-section="rates">
-          <summary id="fxBlockHdr"><svg class="lucide lucide-arrow-left-right fv-exchange-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg><span><strong>Курс валют</strong><span class="is-skel" id="fxSub" style="min-width:150px">0000</span></span><svg class="lucide lucide-chevron-down fv-rates-chevron" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="fh-rates-slot">
+        <details class="fh-rates" id="fxBlock" data-section="rates">
+          <summary id="fxBlockHdr"><svg class="lucide lucide-arrow-left-right" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg><span><strong>Курс валют</strong><span class="is-skel" id="fxSub" style="min-width:150px">0000</span></span><svg class="lucide lucide-chevron-down fh-chevron" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
           <div class="fv-rates-body">
             <div class="fv-market-rates" aria-label="Покупка валюты">
               <div><strong class="is-skel" id="fxUsd">0000</strong><span>Доллар</span></div>
@@ -11040,6 +11022,7 @@ html:has(.pg-ov.show.bar-on) .tabbar{z-index:151}
             </div>
           </div>
         </details>
+        </div>
       </div>
     </main>
   </div></div></div>
@@ -22513,6 +22496,8 @@ const LUC = {
   'arrow-down':        '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
   'sliders-horizontal':'<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
   'vault':             '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/><path d="m7.9 7.9 2.7 2.7"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/><path d="m13.4 10.6 2.7-2.7"/><circle cx="7.5" cy="16.5" r=".5" fill="currentColor"/><path d="m7.9 16.1 2.7-2.7"/><circle cx="16.5" cy="16.5" r=".5" fill="currentColor"/><path d="m13.4 13.4 2.7 2.7"/><circle cx="12" cy="12" r="2"/>',
+  'users-round':       '<path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/>',
+  'hand-coins':        '<path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/>',
   // «Сейф» (визуал 23 ноя 2026)
   'arrow-right-left':  '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
   'calculator':        '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
@@ -24197,17 +24182,17 @@ function fbIni(name){ return String(name || '?').trim().slice(0, 2).toUpperCase(
 // туда не только из чек-листа мог заходить»). За сегодня, как «Касса дня» с
 // карточки; справа — сколько районов уже сдали, как в чек-листе. Сводку
 // держим минуту: карточку перерисовывают часто, а сдают раз в несколько часов.
-let FB_CR = null, FB_CR_AT = 0, FB_CR_BUSY = false;
+let FB_CR = null, FB_CR_AT = 0, FB_CR_BUSY = false, FB_CR_ERR = false;
 function fbCashLoad(){
   if(FB_CR_BUSY || Date.now() - FB_CR_AT < 60000) return;
   FB_CR_BUSY = true;
   ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: _dayIsoFor(0)}})
     .then(d => {
-      FB_CR = d; FB_CR_AT = Date.now();
+      FB_CR = d; FB_CR_AT = Date.now(); FB_CR_ERR = false;
       fbCrcBooks();
       fbHubRepaint();
     })
-    .catch(() => {})
+    .catch(() => { FB_CR_ERR = true; fbHubRepaint(); })   // плитка покажет отказ, а не «0 из 0»
     .finally(() => { FB_CR_BUSY = false; });
 }
 // ── Карточка «Ежедневный сбор и распределение выручки» ────────────────────
@@ -24243,56 +24228,57 @@ function fbCrcBooks(){
 }
 function fbHubRepaint(){
   const box = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
-  if(box && mb){ fbHubPaint(mb); fvCondensed(); }
+  if(box && mb){ fbHubPaint(mb); fhCondensed(); }
 }
 // «Аналитика месяца» над прокруткой сжимается до компактной сводки (владелец,
 // 20 сен 2026: «сворачивается до компактного вида и не листается вместе со
-// страницей, а закреплена сверху»; с 2 ноя 2026 — по утверждённому визуалу:
-// полоса .fv-condensed стоит МЕЖДУ шапкой и областью прокрутки .fv-scroll, в
-// потоке, и показывается, когда секция аналитики целиком ушла вверх). Месяц и
-// числа в ней — те же, что в секции: fbAn той же книги, отдельного состояния
-// нет. Граница меряется относительно самой области прокрутки, а не окна.
-let _fvRaf = null;
-function fvCondensed(){
-  const bar = document.getElementById('fvCondensed'), sc = document.getElementById('fvScroll');
+// страницей, а закреплена сверху»; с 25 ноя 2026 — по пакету AMBAR-FINANCE-HUB:
+// полоса .fh-compact — первый узел области прокрутки .fh-scroll, липнет к её
+// верху (sticky, места в потоке не занимает) и показывается, когда секция
+// аналитики целиком ушла вверх). Месяц и числа в ней — те же, что в секции:
+// fbAn той же книги, отдельного состояния нет. Граница меряется относительно
+// самой области прокрутки, а не окна.
+let _fhRaf = null;
+function fhCondensed(){
+  const bar = document.getElementById('fhCompact'), sc = document.getElementById('fhScroll');
   if(!bar || !sc) return;
   const month = FB.month || fbMonthNow(), b = fbBook(month), an = b ? fbAn(b) : null;
-  _setText('fvCondMonth', `${fbMonthT(month)} · AED`);
-  bar.setAttribute('aria-label', `Вернуться к аналитике: ${fbMonthT(month)}`);
+  _setText('fhCondMonth', fbMonthT(month));
+  bar.setAttribute('aria-label', `Вернуться к аналитике месяца: ${fbMonthT(month)}`);
   const put = (id, v, dn) => { const el = document.getElementById(id); if(!el) return;
     el.textContent = v; el.classList.toggle('dn', !!dn); };
-  put('fvCondGross', an ? fbFmt(an.gross) : '—');
-  put('fvCondOut', an ? fbFmt(an.out) : '—');
-  put('fvCondProfit', an ? fbFmt(an.profit) : '—', an && an.profit < 0);
-  put('fvCondMargin', an ? fbFmt(an.margin) + '%' : '—', an && an.margin < 0);
+  put('fhCondGross', an ? fbFmt(an.gross) : '—');
+  put('fhCondOut', an ? fbFmt(an.out) : '—');
+  put('fhCondProfit', an ? fbFmt(an.profit) : '—', an && an.profit < 0);
+  put('fhCondMargin', an ? fbFmt(an.margin) + '%' : '—', an && an.margin < 0);
   // Раздел скрыт (другая вкладка) — высоты нет, мерить нечего: полосу не трогаем.
   if(!sc.clientHeight) return;
-  const sec = sc.querySelector('.fv-analytics');
+  const sec = sc.querySelector('.fh-analytics');
   const gone = !!sec && sec.getBoundingClientRect().bottom <= sc.getBoundingClientRect().top + .5;
   if(bar.hidden !== !gone) bar.hidden = !gone;
 }
-function fvCondensedSoon(){
-  if(_fvRaf) return;
-  _fvRaf = requestAnimationFrame(() => { _fvRaf = null; fvCondensed(); });
+function fhCondensedSoon(){
+  if(_fhRaf) return;
+  _fhRaf = requestAnimationFrame(() => { _fhRaf = null; fhCondensed(); });
 }
 // Тап по сводке возвращает к аналитике: пролистывать вверх пальцем ради этого не надо.
 function fbAnTop(){
-  const sc = document.getElementById('fvScroll'); if(!sc) return;
+  const sc = document.getElementById('fhScroll'); if(!sc) return;
   try{ sc.scrollTo({top: 0, behavior: 'smooth'}); }catch(e){ sc.scrollTop = 0; }
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
-// Прокрутка — своя у .fv-scroll (единственный скролл страницы). Хаб
+// Прокрутка — своя у .fh-scroll (единственный скролл страницы). Хаб
 // перерисовывают из пяти мест (сводка сбора, книга, месяц, правки, кошелёк) —
 // следим за узлом, а не за всеми, кто его трогает. Наблюдатель срабатывает
 // микрозадачей, до кадра: состояние сводки согласовано раньше, чем страница
 // нарисуется с новой высотой, и прокрутка не дёргается. Элементы живут всю
 // сессию, отписываться не от чего.
-(function fvWatch(){
-  const sc = document.getElementById('fvScroll'), box = document.getElementById('finBook');
+(function fhWatch(){
+  const sc = document.getElementById('fhScroll'), box = document.getElementById('finBook');
   if(!sc || !box) return;
-  sc.addEventListener('scroll', fvCondensedSoon, {passive: true});
-  window.addEventListener('resize', fvCondensedSoon);
-  new MutationObserver(() => fvCondensed()).observe(box, {childList: true, subtree: true});
+  sc.addEventListener('scroll', fhCondensedSoon, {passive: true});
+  window.addEventListener('resize', fhCondensedSoon);
+  new MutationObserver(() => fhCondensed()).observe(box, {childList: true, subtree: true});
 })();
 function fbCrcState(){
   const c = FB_CR; if(!c) return null;
@@ -24312,100 +24298,40 @@ function fbCrcState(){
           got: c.need > 0 && !wait.length, locked: !ready.length,
           done: known && real.length > 0 && !pend.length && !waiting.length};
 }
-function fbCrcHtml(){
+// Плитка «Сбор и распределение» (пакет AMBAR-FINANCE-HUB, 25 ноя 2026): учётный
+// день, «N из M районов» и состояние одной строкой — ждёт сбора / ждёт
+// распределения / ждут · N дней / согласовано / получать нечего / до учёта;
+// точка — пока день не согласован. Тап ведёт на страницу обоих шагов: пока
+// ждём районы — на сбор, иначе — на распределение (CR_GO = 2); сам тап ничего
+// не получает и не согласует. Сводки ещё нет — место держим, состояний не
+// выдумываем: «согласовано» и «получать нечего» только по данным.
+function fhCollectionTile(){
   const st = fbCrcState(), today = _dayIsoFor(0);
-  const head = `<div class="fv-section-head fv-revenue-head"><h2 id="fv-revenue-title">Сбор и распределение</h2>
-      <span class="fv-revenue-date">${st && st.c.day !== today ? escS(fbDayT(st.c.day)) : 'Сегодня'}</span></div>`;
-  const sec = inner => `<section class="fv-panel fv-revenue" data-section="revenue" aria-labelledby="fv-revenue-title">${head}${inner}</section>`;
-  const step = (cls, n, title, ico, body, attrs) => `<button type="button" class="${cls}"${attrs || ''}>
-      <span class="fv-revenue-step-head"><span class="fv-step-number">${n}</span><strong>${title}</strong>${ico}</span>
-      <span class="fv-revenue-step-content">${body}</span></button>`;
-  const targetsIdle = 'Барракуда <span>·</span> РП+ <span>·</span> ЧП';
-  if(!st) return sec(`<div class="fv-revenue-steps">
-      ${step('fv-collection', '1', 'Сбор', luc('chevron-right', 'fv-row-arrow'),
-        `<span class="fv-collection-money"><strong class="is-skel" style="min-width:70px">0000</strong></span>
-         <span class="fv-collection-progress"><span class="fv-meter fv-collection-meter"><span style="width:0%"></span></span><span class="is-skel" style="min-width:90px">0000</span></span>`,
-        ' onclick="fbOpenCash()"')}
-      ${step('fv-distribution is-locked', '2', 'Распределение', luc('lock-keyhole'),
-        `<span class="fv-distribution-targets">${targetsIdle}</span>`,
-        ' aria-disabled="true" onclick="fbCrcLocked()"')}
-    </div>`);
-  const {c, ds, wait, known, pend, real} = st;
-  // ① Сбор: сколько на руках из выручки дня и сколько районов получено; «соберу
-  // завтра» — числом в той же подписи. Выручка дня в минусе (одни расходы) —
-  // просто итог красным, «0 из −550» не читается.
-  const pct = c.need ? Math.round(c.done / c.need * 100) : 0;
-  const later = ds.filter(x => !x.empty && x.later && !x.done).length;
-  const s1 = c.before ? 'до учёта' : !c.need ? 'получать нечего' : st.got ? 'получено со всех'
-    : `${c.done} из ${c.need} районов${later ? ` · ${later} завтра` : ''}`;
-  const money = !c.need ? '<strong class="fv-none">—</strong>'
-    : st.got || st.total <= 0 ? `<strong${st.total < 0 ? ' class="dn"' : ''}>${fbFmt(st.total)}</strong><span>AED</span>`
-    : `<strong>${fbFmt(st.inHand)}</strong><span>из <b>${fbFmt(st.total)}</b> AED</span>`;
-  const stage1 = step('fv-collection', st.got ? luc('check') : '1', 'Сбор', luc('chevron-right', 'fv-row-arrow'),
-    `<span class="fv-collection-money">${money}</span>
-     <span class="fv-collection-progress"><span class="fv-meter fv-collection-meter" role="progressbar" aria-label="Сбор выручки" aria-valuenow="${st.got ? 100 : pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${st.got ? 100 : pct}%"></span></span><span>${s1}</span></span>`,
-    ` onclick="fbOpenCash()" aria-label="Сбор выручки: ${escS(s1)}"`);
-  // ② Распределение: пока ждём районы — под замком (тап объясняет, чего ждём);
-  // есть что согласовать — его цифры; всё согласовано — согласованные. Состояние
-  // словами — только в aria-label и в кнопках ниже (владелец, 2 ноя 2026: «убери
-  // надписи ждёт согласования и до нормы РП не хватает»).
-  const shown = pend.length ? pend : real;
-  const sum = f => shown.reduce((a, b) => a + (f(b) || 0), 0);
-  // РП+ — наличными и криптой вместе.
-  const tB = sum(b => b.aside), tR = sum(b => (b.collected || 0) + (b.collected_cr || 0)),
-        tN = sum(b => Math.max(0, b.base) - (b.aside || 0) - (b.collected || 0));
-  const okBy = real.length && real[real.length - 1].ok_by ? ' · ' + escS(real[real.length - 1].ok_by) : '';
-  const nw = st.waiting.length;
-  const s2 = st.locked ? (c.need || nw ? 'После сбора выручки' : 'Нечего распределять')
-    : !known ? 'Загрузка…' : !real.length ? (nw ? 'Ждём сбора' : 'Нечего распределять')
-    : pend.length > 1 ? `Ждут согласования · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}` : pend.length ? 'Ждёт согласования'
-    : nw ? `Ждём ещё ${nw} ${pluralize(nw, 'день', 'дня', 'дней')}` : 'Согласовано' + okBy;
-  const has = known && real.length > 0;
-  const g = (t, v, dn) => `${t} <b${dn ? ' class="dn"' : ''}>${has ? fbFmt(v) : '—'}</b>`;
-  const targets = st.locked ? targetsIdle
-    : `${g('Барракуда', tB)} <span>·</span> ${g('РП+', tR)} <span>·</span> ${g('ЧП', tN, tN < 0)}`;
-  const stage2 = step(`fv-distribution${st.locked ? ' is-locked' : ''}`, !st.locked && st.done ? luc('check') : '2', 'Распределение',
-    st.locked ? luc('lock-keyhole') : luc('chevron-right', 'fv-row-arrow'),
-    `<span class="fv-distribution-targets">${targets}</span>`,
-    st.locked ? ` aria-disabled="true" onclick="fbCrcLocked()" aria-label="Распределение выручки: ${escS(s2)}"`
-              : ` onclick="fbOpenDist()" aria-label="Распределение выручки: ${escS(s2)}"`);
-  // Следующее действие — одно, и оно же главное (те же кнопки, что были на карточке).
-  let act = '';
-  if(c.need){
-    if(wait.length) act = `<button type="button" class="fv-act" onclick="fbOpenCash()">Собрать выручку</button>`;
-    else if(!known) act = `<button type="button" class="fv-act" onclick="fbOpenDist()">Распределить выручку</button>`;
-    else if(!real.length) act = '<button type="button" class="fv-act fv-act-soft" disabled>Распределять нечего</button>';
-    else if(st.done) act = `<button type="button" class="fv-act fv-act-soft" onclick="fbOpenDist()">${luc('check')}Распределено · посмотреть</button>`;
-    else if(pend.length === 1) act = `<button type="button" class="fv-act" onclick="fbCrcOk('${pend[0].day}')">Согласовать</button>
-        <button type="button" class="fv-act fv-act-soft fv-act-fit" onclick="fbOpenDist()">Изменить</button>`;
-    else act = `<button type="button" class="fv-act" onclick="fbOpenDist()">Распределить · ${pend.length} ${pluralize(pend.length, 'день', 'дня', 'дней')}</button>`;
+  const ctx = st && st.c.day !== today ? fbDayT(st.c.day) : 'Сегодня';
+  let cap = '', dot = false, agreed = false, go = 'fbOpenCash()', num;
+  if(!st){
+    num = FB_CR_ERR ? '<strong class="fh-none">—</strong>' : '<strong class="is-skel" style="min-width:34px">00</strong>';
+    cap = FB_CR_ERR ? 'Не удалось загрузить' : '';
+  } else {
+    const {c, wait, known, pend, real, waiting} = st, need = c.need || 0;
+    num = `<strong>${c.done || 0}</strong><span class="fh-of">из <b>${need}</b></span><small>${pluralize(need, 'района', 'районов', 'районов')}</small>`;
+    if(c.before){ cap = 'до учёта'; }
+    else if(!need){ cap = 'получать нечего'; }
+    else if(wait.length){ cap = 'ждёт сбора'; dot = true; }
+    else if(!known){ dot = true; go = 'fbOpenDist()'; }                       // книги дней ещё грузятся
+    else if(!real.length){ cap = waiting.length ? 'ждёт сбора' : 'распределять нечего'; dot = !!waiting.length; }
+    else if(st.done){ cap = 'согласовано'; agreed = true; go = 'fbOpenDist()'; }
+    else if(pend.length === 1){ cap = 'ждёт распределения'; dot = true; go = 'fbOpenDist()'; }
+    else { const n = pend.length || waiting.length; cap = `ждут · ${n} ${pluralize(n, 'день', 'дня', 'дней')}`; dot = true; if(pend.length) go = 'fbOpenDist()'; }
   }
-  return sec(`<div class="fv-revenue-steps">${stage1}${stage2}</div>${act ? `<div class="fv-revenue-actions">${act}</div>` : ''}`);
-}
-function fbCrcLocked(){
-  const st = fbCrcState(); if(!st) return;
-  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-  _toast(st.wait.length ? 'Сначала получите выручку: ' + st.wait.map(x => x.code + (x.later ? ' — завтра' : '')).join(', ')
-                        : 'Распределять нечего — сегодня нечего было получать');
-}
-// «Согласовать» прямо с карточки: день один, и его цифры — ровно те, что на
-// карточке (предложение книги). Править — на странице («Изменить»).
-async function fbCrcOk(day){
-  if(FB.crcBusy) return;
-  const b = fbDayOf(fbBook(day.slice(0, 7)), day); if(!b) return;
-  FB.crcBusy = true;
-  try{
-    const res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok',
-      {method: 'POST', body: {day, aside: b.aside || 0, collected: b.collected || 0, collected_cr: b.collected_cr || 0, as: _meName()}});
-    if(res && res.book) fbApply(res.book);
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    const nb = fbDayOf(fbBook(day.slice(0, 7)), day) || b;
-    _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)}${
-      nb.collected_cr ? ' + криптой ' + fbFmt(nb.collected_cr) : ''} · ЧП ${fbFmt(nb.np_plus)}`);
-  }catch(e){ _toast(fbCrErr(e) || 'Не удалось согласовать'); }
-  FB.crcBusy = false;
-  fbCrcBooks();
-  fbHubRepaint();
+  const later = st ? st.ds.filter(x => !x.empty && x.later && !x.done).length : 0;
+  const lbl = `Сбор и распределение: ${ctx}${st ? `, получено от ${st.c.done || 0} из ${st.c.need || 0} районов` : ''}${later ? `, ${later} завтра` : ''}${cap ? `, ${cap}` : ''}`;
+  const capHtml = cap ? escS(cap) : (!st && FB_CR_ERR ? '' : '<span class="is-skel" style="min-width:60px;height:11px">0000</span>');
+  return `<button type="button" class="fh-tile" data-tile="collection"${agreed ? ' data-agreed="true"' : ''} onclick="${go}" aria-label="${escS(lbl)}">
+    <span class="fh-tile-head"><span class="fh-icon">${luc('hand-coins')}</span><span class="fh-tile-title">Сбор и<br>распределение</span><span class="fh-dot" aria-hidden="true"${dot ? '' : ' hidden'}></span></span>
+    <span class="fh-tile-metric"><span class="fh-context">${escS(ctx)}</span><span class="fh-number">${num}</span></span>
+    <span class="fh-caption${!st && FB_CR_ERR ? ' dn' : ''}" data-caption="collection">${capHtml}</span>
+  </button>`;
 }
 // Сразу на второй этап: страница сбора открывается и, если сбор закончен,
 // переходит к распределению (под замком — остаётся на сборе).
@@ -24436,137 +24362,157 @@ async function fbHub(force){
     fbLoad(m).then(() => { if(FB.month === m) fbRepaint(); }).catch(() => {});
   }
   fbHubPaint(fbBook(FB.month));
-  fvCondensed();
+  fhCondensed();
   fbCrcBooks();
 }
 // Книга рисуется в два гнезда: карточка аналитики #finAn переживает перерисовки
 // — на ней жест листания месяцев (daySwipe, тот же, что у карточки выручки на
 // «Обзоре»: карточка идёт за пальцем, слева направо — месяц назад, обратно —
 // вперёд до текущего, дальше упор), и она же улетает и прилетает при смене
-// месяца (_heroFlip). Остальные секции — в #finRest (владелец, 2 ноя 2026:
-// «точно так же, как тогда, дай возможность листать окошко аналитики месяца»).
+// месяца (_heroFlip). Три плитки — в #finRest (владелец, 2 ноя 2026: «точно
+// так же, как тогда, дай возможность листать окошко аналитики месяца»).
 function fbHubPaint(b, err){
   const box = document.getElementById('finBook'); if(!box) return;
   let an = document.getElementById('finAn');
   if(!an){
-    box.innerHTML = '<div class="fv-an-card" id="finAn"></div><div class="fv-book-rest" id="finRest"></div>';
+    box.innerHTML = '<div class="fh-an-card" id="finAn"></div><div class="fh-book-rest" id="finRest"></div>';
     an = document.getElementById('finAn');
-    daySwipe(an, {день: () => (FB.month || fbMonthNow()) >= fbMonthNow() ? 0 : 1, шаг: d => fvMonthSwipe(d)});
+    daySwipe(an, {день: () => (FB.month || fbMonthNow()) >= fbMonthNow() ? 0 : 1, шаг: d => fhMonthSwipe(d)});
   }
-  an.innerHTML = fvAnalytics(FB.month || fbMonthNow(), b, err);
-  document.getElementById('finRest').innerHTML = fbCrcHtml() + fvSafe(b) + fvPayroll(b) + fvExpenses();
-  fvCondensed();
+  an.innerHTML = fhAnalytics(FB.month || fbMonthNow(), b, err);
+  document.getElementById('finRest').innerHTML = fhTiles(b);
+  fhCondensed();
 }
 // Шаг месяца от жеста: сперва улетает карточка, месяц догоняет — как день на
 // «Обзоре». Вперёд текущего месяца хода нет: false, и жест сам вернёт карточку.
-function fvMonthSwipe(delta){
+function fhMonthSwipe(delta){
   if(fbMonthAdd(FB.month || fbMonthNow(), -delta) > fbMonthNow()) return false;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   _heroFlip(delta, document.getElementById('finAn')).then(() => fbMonthStep(-delta, true));
   return true;
 }
-// Число секции: книги нет — серая полоска (загрузка) или прочерк (отказ);
+// Число плитки: книги нет — серая полоска (загрузка) или прочерк (отказ);
 // минус — красным там, где он возможен (neg).
-function fvNum(v, o){
+function fhNum(v, o){
   o = o || {};
   if(o.skel) return `<strong class="is-skel"${o.w ? ` style="min-width:${o.w}px"` : ''}>0000</strong>`;
-  if(v === null || v === undefined) return '<strong class="fv-none">—</strong>';
+  if(v === null || v === undefined) return '<strong class="fh-none">—</strong>';
   return `<strong${o.neg && v < 0 ? ' class="dn"' : ''}>${fbFmt(v)}</strong>`;
 }
 // «Аналитика месяца»: вал − расходы = чистая прибыль одной связкой, под ней
-// рентабельность и бюджет. Числа — fbAn той же книги, что и везде.
-function fvAnalytics(month, b, err){
+// рентабельность и бюджет. Числа — fbAn той же книги, что и везде. Разметка —
+// fh-analytics пакета AMBAR-FINANCE-HUB (формула уплотнена: подписи 30px,
+// операторы на уровне цифр); переходы прежние — «Анализ» и «Бюджет».
+function fhAnalytics(month, b, err){
   const an = b ? fbAn(b) : null, skel = !b && !err, bu = (b && b.budget) || {};
   const fut = month >= fbMonthNow(), mt = escS(fbMonthT(month));
-  const N = (v, neg, w) => fvNum(v, {skel, neg, w});
+  const N = (v, neg, w) => fhNum(v, {skel, neg, w});
   const m = an ? Math.max(0, Math.min(100, an.margin)) : 0;
-  const metric = (cls, name, v, neg, lbl) => `<button type="button" class="fv-metric${cls ? ' ' + cls : ''}" onclick="fbAnOpen()" aria-label="${lbl}">
-        <span class="fv-metric-name"><span>${name}</span>${luc('chevron-right')}</span>${N(v, neg, 64)}
-      </button>`;
+  const metric = (cls, name, v, neg, lbl) => `<button type="button" class="fh-metric${cls ? ' ' + cls : ''}" onclick="fbAnOpen()" aria-label="${lbl}"><span>${name}${luc('chevron-right')}</span>${N(v, neg, 64)}</button>`;
   const aed = v => an ? `, ${fbFmt(v)} AED` : '';
-  return `<section class="fv-panel fv-analytics" data-section="analytics" aria-labelledby="fv-analytics-title">
-    <div class="fv-section-head"><h2 id="fv-analytics-title">Аналитика месяца</h2><span class="fv-unit">AED</span></div>
-    <div class="fv-month">
+  return `<section class="fh-analytics" data-section="analytics" aria-labelledby="fh-analytics-title">
+    <div class="fh-section-head"><h2 id="fh-analytics-title">Аналитика месяца</h2><span>AED</span></div>
+    <div class="fh-month">
       <button type="button" aria-label="Месяц назад" onclick="fbMonthStep(-1)">${luc('chevron-left')}</button>
       <span>${mt}</span>
       <button type="button" aria-label="${fut ? 'Следующий месяц недоступен' : 'Месяц вперёд'}" onclick="fbMonthStep(1)"${fut ? ' disabled' : ''}>${luc('chevron-right')}</button>
     </div>
-    <div class="fv-metrics" role="group" aria-label="${an ? `Вал ${fbFmt(an.gross)} минус расходы ${fbFmt(an.out)} равняется чистой прибыли ${fbFmt(an.profit)} AED` : 'Вал минус расходы равняется чистой прибыли'}">
+    <div class="fh-formula" role="group" aria-label="${an ? `Вал ${fbFmt(an.gross)} минус расходы ${fbFmt(an.out)} равняется чистой прибыли ${fbFmt(an.profit)} AED` : 'Вал минус расходы равняется чистой прибыли'}">
       ${metric('', 'Вал', an && an.gross, false, 'Вал' + aed(an && an.gross))}
-      <span class="fv-metric-operator" aria-hidden="true">−</span>
+      <span class="fh-operator" aria-hidden="true">−</span>
       ${metric('', 'Расходы', an && an.out, false, 'Расходы' + aed(an && an.out))}
-      <span class="fv-metric-operator" aria-hidden="true">=</span>
-      ${metric('fv-profit', 'Чистая прибыль', an && an.profit, true, 'Чистая прибыль' + aed(an && an.profit))}
+      <span class="fh-operator" aria-hidden="true">=</span>
+      ${metric('fh-profit', 'Чистая прибыль', an && an.profit, true, 'Чистая прибыль' + aed(an && an.profit))}
     </div>
-    <div class="fv-analytics-bottom">
-      <button type="button" class="fv-profitability${an && an.margin < 0 ? ' dn' : ''}" onclick="fbAnOpen()" aria-label="Рентабельность${an ? `, ${fbFmt(an.margin)} процентов` : ''}">
-        <span class="fv-cell-label">Рентабельность${luc('chevron-right')}</span>
-        <span class="fv-profitability-line">${skel ? '<strong class="is-skel" style="min-width:40px">00</strong>'
-          : an ? `<strong>${fbFmt(an.margin)}<span>%</span></strong>` : '<strong class="fv-none">—</strong>'}<span class="fv-meter" role="progressbar" aria-label="Доля чистой прибыли в валу" aria-valuenow="${m}" aria-valuemin="0" aria-valuemax="100"><span style="width:${m}%"></span></span></span>
+    <div class="fh-analytics-bottom">
+      <button type="button" onclick="fbAnOpen()" aria-label="Рентабельность${an ? `, ${fbFmt(an.margin)} процентов` : ''}">
+        <span class="fh-cell-label">Рентабельность${luc('chevron-right')}</span>
+        <span class="fh-margin">${skel ? '<strong class="is-skel" style="min-width:40px">00</strong>'
+          : an ? `<strong${an.margin < 0 ? ' class="dn"' : ''}><span>${fbFmt(an.margin)}</span><small>%</small></strong>` : '<strong class="fh-none">—</strong>'}<span class="fh-progress" role="progressbar" aria-label="Доля чистой прибыли в валу" aria-valuenow="${m}" aria-valuemin="0" aria-valuemax="100"><span style="width:${m}%"></span></span></span>
       </button>
-      <button type="button" class="fv-budget" onclick="accOpen('finbud')" aria-label="Бюджет${b && !bu.empty ? `, ${fbFmt(bu.norm)} AED в день` : b ? ' не заполнен' : ''}">
-        <span class="fv-cell-label">Бюджет${luc('chevron-right')}</span>
-        <span class="fv-budget-value">${skel ? N(null, false, 56) : b && !bu.empty ? `<strong>${fbFmt(bu.norm)}</strong><span>в день</span>`
-          : `<strong class="fv-none">—</strong>${b ? '<span>не заполнен</span>' : ''}`}</span>
+      <button type="button" onclick="accOpen('finbud')" aria-label="Бюджет${b && !bu.empty ? `, ${fbFmt(bu.norm)} AED в день` : b ? ' не заполнен' : ''}">
+        <span class="fh-cell-label">Бюджет${luc('chevron-right')}</span>
+        <span class="fh-budget">${skel ? N(null, false, 56) : b && !bu.empty ? `<strong>${fbFmt(bu.norm)}</strong><small>в день</small>`
+          : b ? '<strong class="fh-none">не заполнен</strong>' : '<strong class="fh-none">—</strong>'}</span>
       </button>
     </div>
-    ${!b ? `<div class="fv-state${err ? ' dn' : ''}">${err ? 'Не удалось загрузить' : 'Загрузка…'}</div>` : ''}
+    ${!b ? `<div class="fh-state${err ? ' dn' : ''}">${err ? 'Не удалось загрузить' : 'Загрузка…'}</div>` : ''}
   </section>`;
 }
-// «Сейф и кошелёк» — ровно три зоны: итог наличных, группа «кошелёк + три
-// стопки» (четыре отдельные кнопки), «Отчёт ДДС». Порядок стопок: Барракуда,
-// РП, ЧП — как на экране «Сейф»; крипта — первой строкой группы, к наличным
-// не прибавляется (владелец, 30 сен 2026: «жёлтыми цифрами пиши только деньги
-// в наличных, не надо пересчитывать их из этих USDT»).
-function fvSafe(b){
-  const wal = fbWal(b), sf = (b && b.safe) || {}, skel = !b;
-  const N = (v, neg, w) => fvNum(v, {skel, neg, w});
-  const all = b ? fbSafeAll(b) : null;
-  const row = (cls, ico, title, money, go, lbl) => `<button type="button" class="fv-fin-row${cls ? ' ' + cls : ''}" onclick="${go}" aria-label="${lbl}">${
-    luc(ico, 'fv-row-icon')}<span class="fv-row-title">${title}</span><span class="fv-row-money">${money}</span>${luc('chevron-right', 'fv-row-arrow')}</button>`;
-  const aed = v => b ? `, в сейфе ${fbFmt(v)} AED` : '';
-  return `<section class="fv-panel" data-section="safe" aria-labelledby="fv-safe-title">
-    <div class="fv-section-head"><h2 id="fv-safe-title">Сейф и кошелёк</h2><span class="fv-unit">Остатки</span></div>
-    <div class="fv-safe-body">
-    <button type="button" class="fv-cash-total" onclick="accOpen('finsafe')" aria-label="Сейф${b ? `, всего ${fbFmt(all)} AED` : ''}"><span>Всего в сейфе</span><span class="fv-cash-value">${N(all, true, 110)}<span>AED</span></span>${luc('chevron-right', 'fv-row-arrow')}</button>
-    <div class="fv-accounts" role="group" aria-label="Криптокошелёк и направления сейфа">
-    <button type="button" class="fv-wallet" onclick="fbOpenWal()" aria-label="Криптокошелёк${wal ? `, ${fmtUsdt(wal.usdt)} USDT, ${walAed(wal.ours)} AED` : ''}">
-      ${luc('wallet')}<span class="fv-wallet-title">Криптокошелёк</span>
-      <span class="fv-wallet-value">${wal ? `<strong>${fmtUsdt(wal.usdt)} <small>USDT</small></strong><span>${walAed(wal.ours)} AED</span>` : '<strong class="fv-none">—</strong>'}</span>
-      ${luc('chevron-right', 'fv-row-arrow')}
-    </button>
-    <div class="fv-stacks" aria-label="Деньги в сейфе по направлениям, AED">
-      ${row('', 'fish', 'Барракуда', N(sf.b), 'fbOpenB()', 'Барракуда' + aed(sf.b))}
-      ${row('fv-rp', 'banknote', 'РП', N(sf.rp, true) + (b && sf.rp_cr ? `<span>криптой ${fbFmt(sf.rp_cr)}</span>` : ''), "accOpen('finrp')",
-            'РП' + aed(sf.rp) + (b && sf.rp_cr ? `; криптой ${fbFmt(sf.rp_cr)}` : ''))}
-      ${row('', 'coins', 'ЧП', N(sf.np, true), "accOpen('finnp')", 'ЧП' + aed(sf.np))}
-    </div>
-    </div>
-    <button type="button" class="fv-report" onclick="accOpen('finddc')">${luc('file-text')}<span>Отчёт ДДС</span>${luc('chevron-right', 'fv-row-arrow')}</button>
-    </div>
-  </section>`;
+// Три плитки под аналитикой (пакет AMBAR-FINANCE-HUB): широкий «Сейф и кошелёк»
+// на обе колонки, ниже «Зарплаты, премии и удержания» слева и «Сбор и
+// распределение» справа. Порядок в DOM — порядок чтения. «Расходы водителей»
+// с вкладки сняты (владелец, 25 ноя 2026: фильтр по водителю и категории —
+// доп. опция «Расходов смены» на «Учёте», а не раздел финансов); страница
+// и ручка расходов остались.
+function fhTiles(b){
+  return `<section class="fh-tiles" aria-label="Разделы финансов">${fhSafeTile(b)}${fhPayrollTile(b)}${fhCollectionTile()}</section>`;
 }
-// «Зарплаты, премии и удержания» — три строки-входа с главным числом каждой.
-// Лист премий считается отдельной ручкой: пока не пришёл — прочерк, не ноль.
-function fvPayroll(b){
+// Широкая плитка «Сейф и кошелёк»: наличные сейфа (три стопки, без кошелька)
+// и рядом тихая зона кошелька — USDT и наши дирхамы по курсу клиента (fbWal);
+// к наличным не прибавляется (владелец, 30 сен 2026: «жёлтыми цифрами пиши
+// только деньги в наличных»). Точка — есть дни, ждущие подтверждения: те же,
+// что в списке «Ждут подтверждения» на странице «Сейф». Вся плитка — одна
+// кнопка в «Сейф»; кошелёк, стопки и ДДС открываются оттуда.
+function fhSafeTile(b){
+  const wal = fbWal(b), skel = !b, all = b ? fbSafeAll(b) : null;
+  const pend = b ? (b.days || []).filter(d => !d.future && !d.before && d.base > 0 && !d.ok).length : 0;
+  const lbl = `Сейф и кошелёк${b ? `. Всего наличными ${fbFmt(all)} AED` : ''}${pend ? `. Ждут подтверждения: ${pend} ${pluralize(pend, 'день', 'дня', 'дней')}` : ''}${wal ? `. Кошелёк ${fmtUsdt(wal.usdt)} USDT, ${walAed(wal.ours)} AED` : ''}`;
+  return `<button type="button" class="fh-tile fh-tile-wide" data-tile="safe" onclick="accOpen('finsafe')" aria-label="${escS(lbl)}">
+    <span class="fh-tile-head"><span class="fh-icon">${luc('vault')}</span><span class="fh-tile-title">Сейф и кошелёк</span><span class="fh-dot" aria-hidden="true"${pend ? '' : ' hidden'}></span></span>
+    <span class="fh-tile-metric"><span class="fh-context">Всего в сейфе</span><span class="fh-number">${fhNum(all, {skel, neg: true, w: 110})}<small>AED</small></span></span>
+    <span class="fh-safe-wallet"><span class="fh-context">Кошелёк</span><span class="fh-wallet-value">${wal ? `<strong>${fmtUsdt(wal.usdt)}</strong><small>USDT</small>` : '<strong class="fh-none">—</strong>'}</span><span class="fh-wallet-equivalent">${wal ? `${walAed(wal.ours)} AED` : '—'}</span></span>
+  </button>`;
+}
+// Плитка «Зарплаты, премии и удержания»: «К выплате» — остаток ведомости
+// месяца (не сумма всего), под ним «премии N · удерж. N»; лист премий —
+// отдельная ручка (TEN): пока не пришёл — прочерк, не ноль. Точка — премии
+// ждут решения (TEN.ready — люди, не сумма). Ведёт на короткую страницу трёх
+// прежних строк.
+function fhPayrollTile(b){
   const t = fbCur(b).totals || {}, skel = !b;
-  const N = (v, neg) => fvNum(v, {skel, neg});
-  const row = (title, money, unit, go, lbl) => `<button type="button" class="fv-pay-row" onclick="${go}" aria-label="${lbl}"><span class="fv-row-title">${title}</span><span class="fv-row-money">${money}<span>${unit}</span></span>${luc('chevron-right', 'fv-row-arrow')}</button>`;
+  const ten = TEN ? (TEN.due || 0) : null, ready = TEN ? (TEN.ready || 0) : 0;
+  const bon = ten == null ? '—' : fbFmt(ten), held = skel || t.minus == null ? '—' : fbFmt(t.minus);
+  const cap = skel ? '<span class="is-skel" style="min-width:90px;height:11px">0000</span>' : `премии ${bon} · удерж. ${held}`;
+  const lbl = `Зарплаты, премии и удержания${!skel && t.left != null ? `. К выплате ${fbFmt(t.left)} AED` : ''}${skel ? '' : `. Премии ${bon}, удержано ${held}`}${ready ? `. ${ready} ${pluralize(ready, 'человек ждёт', 'человека ждут', 'человек ждут')} премии` : ''}`;
+  return `<button type="button" class="fh-tile" data-tile="payroll" onclick="accOpen('finpayroll')" aria-label="${escS(lbl)}">
+    <span class="fh-tile-head"><span class="fh-icon">${luc('users-round')}</span><span class="fh-tile-title">Зарплаты, премии<br>и удержания</span><span class="fh-dot" aria-hidden="true"${ready ? '' : ' hidden'}></span></span>
+    <span class="fh-tile-metric"><span class="fh-context">К выплате</span><span class="fh-number">${fhNum(t.left, {skel, neg: true, w: 90})}<small>AED</small></span></span>
+    <span class="fh-caption" data-caption="payroll">${cap}</span>
+  </button>`;
+}
+// ── Экран «Зарплаты, премии и удержания» ──────────────────────────────────
+// Короткая страница за плиткой (пакет AMBAR-FINANCE-HUB): три прежние строки
+// вкладки «Финансы» с их числами, состояниями и переходами — ведомость, лист
+// премий, штрафы/авансы/долги. Месяц — тот же, что на вкладке, листается
+// стрелками, как в ведомости; назад с любой из трёх страниц — сюда
+// (FB.payFrom), а не на вкладку.
+async function accFinPayroll(){
+  const b = await fbMonthScreen('Зарплаты, премии и удержания'); if(!b) return;
+  if(!TEN && !_tenBusy && window.ownerApi) tenLoad(true);   // лист премий — отдельная ручка; придёт — fbRepaint перерисует
+  document.getElementById('accMid').innerHTML = fhPayrollHtml(b);
+}
+function fhPayrollHtml(b){
+  const t = fbCur(b).totals || {};
   const ten = TEN ? (TEN.due || 0) : null;
   const wait = TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек ждёт', 'человека ждут', 'человек ждут')}` : 'за стаж';
-  return `<section class="fv-panel" data-section="payroll" aria-labelledby="fv-payroll-title">
-    <div class="fv-section-head fv-payroll-head"><h2 id="fv-payroll-title">Зарплаты, премии<br>и удержания</h2><span class="fv-unit">AED</span></div>
-    ${row('Зарплатная ведомость', N(t.left, true), 'к выплате', "accOpen('finpay')", `Зарплатная ведомость${b && t.left != null ? `, ${fbFmt(t.left)} AED к выплате` : ''}`)}
-    ${row('Лист премий', skel ? N(null) : fvNum(ten), wait, "accOpen('finbonus')", `Лист премий${ten != null ? `, ${fbFmt(ten)} AED` : ''} ${wait}`)}
-    ${row('Штрафы / авансы / долги', N(t.minus), 'удержано', "accOpen('finitems')", `Штрафы, авансы, долги${b && t.minus != null ? `; удержано ${fbFmt(t.minus)} AED` : ''}`)}
-  </section>`;
+  const row = (title, money, unit, id, lbl) => `<button type="button" class="fhp-row" onclick="fhpGo('${id}')" aria-label="${escS(lbl)}"><span class="fhp-title">${title}</span><span class="fhp-money">${money}<span>${unit}</span></span>${luc('chevron-right', 'fhp-arrow')}</button>`;
+  return `<div class="sc">${fbCap(b.month, true)}<div class="fhp-panel" role="group" aria-label="Зарплаты, премии и удержания, AED">
+    ${row('Зарплатная ведомость', fhNum(t.left, {neg: true}), 'к выплате', 'finpay', `Зарплатная ведомость${t.left != null ? `, ${fbFmt(t.left)} AED к выплате` : ''}`)}
+    ${row('Лист премий', ten == null ? fhNum(null, {skel: true, w: 60}) : fhNum(ten), wait, 'finbonus', `Лист премий${ten != null ? `, ${fbFmt(ten)} AED` : ''}, ${wait}`)}
+    ${row('Штрафы / авансы / долги', fhNum(t.minus), 'удержано', 'finitems', `Штрафы, авансы, долги${t.minus != null ? `; удержано ${fbFmt(t.minus)} AED` : ''}`)}
+  </div></div>`;
 }
-// «Расходы водителей» — своей секцией под зарплатами (владелец, 4 ноя 2026:
-// «хочу, чтобы в расходах были фильтры по водителям и/или категориям…
-// наверное, делать это надо в финансах»). Лента месяца — своей ручкой
-// (/api/owner/expenses/month), а не из книги: книга несёт по дням только
-// суммы, а здесь нужна каждая запись. Живёт минуту, как книга; число на
-// панели и экран смотрят в одну память.
+function fhpGo(id){
+  FB.payFrom = 'finpayroll';
+  accOpen(id);
+  ACC_BACK = () => accOpen('finpayroll');
+}
+// «Расходы водителей» — лента месяца своей ручкой (/api/owner/expenses/month),
+// а не из книги: книга несёт по дням только суммы, а здесь нужна каждая
+// запись. Живёт минуту, как книга. Секция на вкладке «Финансы» снята 25 ноя
+// 2026 (владелец: фильтр по водителю и категории — доп. опция «Расходов
+// смены» на «Учёте»); экран finexp и ручка остались как были.
 FB.expM = {};
 function fbExpC(month){ return FB.expM[month] || (FB.expM[month] = {data: null, err: false, at: 0, busy: null}); }
 function fbExpData(month){ return fbExpC(month).data; }
@@ -24579,23 +24525,9 @@ function fbExpLoad(month){
     .catch(() => { c.err = true; })
     .finally(() => {
       c.at = Date.now(); c.busy = null;
-      fbHubRepaint();
       if(ACC_VIEW === 'finexp' && (FB.month || fbMonthNow()) === month) fbExpPaint();
     });
   return c.busy;
-}
-function fvExpenses(){
-  const month = FB.month || fbMonthNow(), c = fbExpC(month), d = c.data;
-  if(fbExpStale(month)) fbExpLoad(month);
-  const skel = !d && !c.err;
-  const N = v => fvNum(v, {skel});
-  const row = (title, money, unit, lbl) => `<button type="button" class="fv-pay-row" onclick="accOpen('finexp')" aria-label="${lbl}"><span class="fv-row-title">${title}</span><span class="fv-row-money">${money}<span>${unit}</span></span>${luc('chevron-right', 'fv-row-arrow')}</button>`;
-  const n = d ? (d.pending_n || 0) : 0, nt = `${n} ${pluralize(n, 'запись', 'записи', 'записей')}`;
-  return `<section class="fv-panel" data-section="drivers" aria-labelledby="fv-drv-title">
-    <div class="fv-section-head"><h2 id="fv-drv-title">Расходы водителей</h2><span class="fv-unit">AED</span></div>
-    ${row('Разовые расходы', N(d ? d.extra : null), 'за месяц', `Расходы водителей${d ? `, ${fbFmt(d.extra)} AED за месяц` : ''}`)}
-    ${n ? row('Ждут решения', N(d.pending), nt, `Ждут решения: ${nt}, ${fbFmt(d.pending)} AED`) : ''}
-  </section>`;
 }
 // «Касса дня» с карточки — всегда сегодня: за прошлые дни ходят стрелками
 // внутри, а с главной идут закрывать текущую смену.
@@ -24604,9 +24536,16 @@ function fbOpenToday(){
   CDY.from = '';
   accOpen('finday');
 }
-function fbOpenB(){
-  if(DAY_OFFSET) accDayGo(0);
-  accOpen('finb');
+// Со страницы «Сейф» — на страницы стопок и в отчёт ДДС (пакет AMBAR-FINANCE-HUB,
+// 25 ноя 2026: прежние входы с вкладки «Финансы» переехали сюда). Барракуда и
+// ДДС — экраны дня: открываем сегодняшним, как с карточки. Назад — в «Сейф»:
+// FB.stackFrom говорит экранам стопок ставить стрелку сюда, и после своих
+// подэкранов тоже; снимается, когда раздел закрыт.
+function sfyGo(id){
+  FB.stackFrom = 'finsafe';
+  if((id === 'finb' || id === 'finddc') && DAY_OFFSET) accDayGo(0);
+  accOpen(id);
+  ACC_BACK = () => accOpen('finsafe');
 }
 // Кошелёк — четвёртая стопка сейфа (владелец, 19 сен 2026: «добавь в сейф
 // четвёртым пунктом кошелёк»): крипта, которой платят клиенты, — такие же
@@ -24675,7 +24614,7 @@ async function fbMonthStep(d, quiet){
 // месячный экран. Экран дня месяц не листает — у него свой день.
 const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => accFinNP(), finsafe: () => accFinSafe(),
                   finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson(), finitems: () => accFinItems(), finbonus: () => accFinBonus(),
-                  finddcm: () => accFinDdcM(), finexp: () => accFinExp(true)};
+                  finddcm: () => accFinDdcM(), finexp: () => accFinExp(true), finpayroll: () => accFinPayroll()};
 function fbRepaint(){
   const box = document.getElementById('finBook');
   // Лист премий считается отдельной ручкой — дотягиваем его один раз, чтобы
@@ -25792,13 +25731,13 @@ function sfyShell(){
             ${luc('vault')}
           </div>
           <div class="sf-composition-label" id="sfCompositionLabel"><span>Из них</span></div>
-          <dl class="sf-pools" aria-labelledby="sfBalanceLabel sfCompositionLabel">
-            <div><dt><span class="sf-dot sf-barra"></span>Барракуда</dt><dd id="sfBarra">—</dd></div>
-            <div><dt><span class="sf-dot sf-rp"></span>РП</dt><dd id="sfRp">—</dd></div>
-            <div><dt><span class="sf-dot sf-profit"></span>ЧП</dt><dd id="sfProfit">—</dd></div>
-          </dl>
+          <div class="sf-pools" role="group" aria-labelledby="sfBalanceLabel sfCompositionLabel">
+            <button type="button" class="sf-pool" data-action="barra" onclick="sfyGo('finb')" aria-label="Барракуда — открыть"><span class="sf-pool-name"><span class="sf-dot sf-barra"></span>Барракуда${luc('chevron-right')}</span><strong id="sfBarra">—</strong></button>
+            <button type="button" class="sf-pool" data-action="rp" onclick="sfyGo('finrp')" aria-label="РП — открыть"><span class="sf-pool-name"><span class="sf-dot sf-rp"></span>РП${luc('chevron-right')}</span><strong id="sfRp">—</strong></button>
+            <button type="button" class="sf-pool" data-action="profit" onclick="sfyGo('finnp')" aria-label="ЧП — открыть"><span class="sf-pool-name"><span class="sf-dot sf-profit"></span>ЧП${luc('chevron-right')}</span><strong id="sfProfit">—</strong></button>
+          </div>
           <button type="button" class="sf-wallet" data-action="wallet" onclick="fbOpenWal(() => accOpen('finsafe'))">${luc('wallet')}<span class="sf-wallet-label">Криптокошелёк</span><span class="sf-wallet-amount"><strong><span id="sfWalletAED">—</span> <small>AED</small></strong><small><span id="sfWalletUSDT">—</span> USDT</small></span>${luc('chevron-right')}</button>
-          <div class="sf-quick-actions"><button type="button" data-action="transfer" onclick="sfyTransfer()">${luc('arrow-right-left')}<span>Перевод между счетами</span>${luc('chevron-right')}</button></div>
+          <div class="sf-quick-actions"><button type="button" data-action="transfer" onclick="sfyTransfer()">${luc('arrow-right-left')}<span>Перевод между счетами</span>${luc('chevron-right')}</button><button type="button" data-action="ddc" onclick="sfyGo('finddc')">${luc('file-text')}<span>Отчёт ДДС</span>${luc('chevron-right')}</button></div>
         </section>
         <section class="sf-days" aria-labelledby="sfDaysTitle">
           <div class="sf-section-heading"><h2 id="sfDaysTitle">Распределение по дням</h2></div>
@@ -26054,6 +25993,7 @@ async function fbDayOk(day, quiet){
 // жестом (bindDayBars → daySwipe) и тапом по окошку «к сегодня» (dayBarHome),
 // внизу кнопка месячного отчёта. Смена дня — через accDayGo → fbDdcReload.
 async function accFinDdc(){
+  if(FB.stackFrom === 'finsafe') ACC_BACK = () => accOpen('finsafe');
   _setText('accTitle', 'Отчёт ДДС');
   _setText('accSub', 'Движение денежных средств');
   document.getElementById('accMid').innerHTML = cfdShell();
@@ -27278,6 +27218,7 @@ async function fbBudFill(from){
 
 // ── Экран «База» ──────────────────────────────────────────────────────────
 async function accFinB(){
+  if(FB.stackFrom === 'finsafe') ACC_BACK = () => accOpen('finsafe');
   _setText('accTitle', 'Барракуда');
   _setText('accSub', accDayWord());
   FB.edit = null;
@@ -27593,6 +27534,7 @@ function fbBToSupply(day){
 
 // ── Экран «Расходы» (фонд) ────────────────────────────────────────────────
 async function accFinRP(){
+  if(FB.stackFrom === 'finsafe') ACC_BACK = () => accOpen('finsafe');
   const b = await fbMonthScreen('РП'); if(!b) return;
   const s = b.safe || {};
   FB.shot = null; FB.line = ''; FB.lineSet = false; FB.lpage = null; FB.rentGrp = null;
@@ -28453,6 +28395,7 @@ function fbAnalysis(b){
 
 // ── Экран «Зарплаты» ──────────────────────────────────────────────────────
 async function accFinPay(){
+  if(FB.payFrom === 'finpayroll') ACC_BACK = () => accOpen('finpayroll');
   const b = await fbMonthScreen('Зарплатная ведомость'); if(!b) return;
   const pay = fbCur(b), m = `data-month="${b.month}"`;
   document.getElementById('accMid').innerHTML = `
@@ -28973,6 +28916,7 @@ function tenHtml(){
 }
 
 async function accFinBonus(){
+  if(FB.payFrom === 'finpayroll') ACC_BACK = () => accOpen('finpayroll');
   _setText('accTitle', 'Лист премий');
   _setText('accSub', 'за стаж работы');
   const mid = document.getElementById('accMid');
@@ -29147,6 +29091,7 @@ function fbExpPhoto(id, i){
 // через «Штрафной лист» или «Свободное удержание» (владелец: список людей
 // первым экраном не нужен).
 async function accFinItems(){
+  if(FB.payFrom === 'finpayroll') ACC_BACK = () => accOpen('finpayroll');
   const b = await fbMonthScreen('Штрафы/авансы/долги'); if(!b) return;
   FB.itemWho = null; FB.pen = null;
   document.getElementById('accMid').innerHTML = fbItemsHtml(b);
@@ -30137,6 +30082,7 @@ function fbAskPaySrc(p, amount){
 
 // ── Экран «Прибыль» ───────────────────────────────────────────────────────
 async function accFinNP(){
+  if(FB.stackFrom === 'finsafe') ACC_BACK = () => accOpen('finsafe');
   const b = await fbMonthScreen('ЧП'); if(!b) return;
   // Владелец, 3 окт 2026: «как банковская система: две опции и по механике так
   // же». Счёт с остатком чистой прибыли, под ним две плитки — «Перевести» и
@@ -30444,6 +30390,7 @@ function accOpen(id){
   if(id === 'finperson') accFinPerson();
   if(id === 'finitems') accFinItems();
   if(id === 'finbonus') accFinBonus();
+  if(id === 'finpayroll') accFinPayroll();
   if(id === 'finexp')   accFinExp();
   if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
@@ -30480,6 +30427,7 @@ function accClose(){
 // чек-лист (CKL_RETURN) остаётся за отчётом ревизии, который там лежит.
 function _accClose(keepCkl){
   ACC_BACK = null;
+  FB.payFrom = ''; FB.stackFrom = '';   // стрелки «назад» в список зарплат и в «Сейф» — только пока раздел открыт
   document.getElementById('accOv').classList.remove('pen-ui', 'sdc', 'cfd', 'cdy', 'sfe');
   if(!keepCkl) CKL_RETURN = false;
   SCAN.stop();

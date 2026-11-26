@@ -324,6 +324,15 @@ async def _marks(days: list[str]) -> dict:
     return out
 
 
+async def _cash_wait(day: str, orders: list | None = None, marks: dict | None = None) -> tuple[list, list]:
+    """(ждём, получили) — коды районов, что за день ещё не сдали выручку и что
+    сдали: та же проверка, что готовность дня на странице сбора
+    (owner_routes.cash_wait). Замок сбора — владелец, 27 ноя 2026: «за
+    несобранную смену нельзя давать распределять выручку»."""
+    import owner_routes as _own
+    return await _own.cash_wait(day, orders, marks)
+
+
 # ── Бюджет месяца ────────────────────────────────────────────────────────────
 def norm_auto(total: float, ndays: int) -> int:
     """План месяца / дни месяца, вверх до сотни: 205 000 / 31 → 6 700."""
@@ -1302,6 +1311,23 @@ async def build(month: str, depth: int = 0, light: bool = False) -> dict:
             legacy = bool((mk.get("cash") or {}).get("done"))
             got = sum(1 for oid in need if legacy or (mk.get(f"cash:{oid}") or {}).get("done"))
             r.update(cash_need=len(need), cash_got=got)
+            # Замок сбора (владелец, 27 ноя 2026: «за несобранную смену нельзя
+            # давать распределять выручку», «сделай замок в обоих»): у ждущего
+            # дня — готов ли он, той же проверкой, что готовность дня на
+            # странице сбора (суммы районов и отметки «Получил»). cash_wait —
+            # коды районов, что ещё не сдали, cash_ready — ждать некого; по
+            # ним «Сейф», «Касса дня» и этап «Распределение» прячут
+            # «Подтвердить», а handle_day_ok такой день не принимает. Счёт
+            # «Получил по районам» у такого дня — по той же проверке.
+            # Подтверждённому дню флаг не нужен. Не сосчитали — флага нет:
+            # экран замка не покажет, сервер всё равно проверит.
+            if r["pending"] and depth == 0:
+                try:
+                    wait, got_codes = await _cash_wait(d, None, mk)
+                    r.update(cash_wait=wait, cash_ready=not wait,
+                             cash_need=len(wait) + len(got_codes), cash_got=len(got_codes))
+                except Exception as e:                # noqa: BLE001
+                    log.warning(f"[fin] готовность сбора {d}: {e}")
     book.update(month=month, today=today, first=days[0], last=days[-1],
                 opening=opening["opening"], opening_explicit=opening["explicit"],
                 opening_carried=opening["carried"], month_note=opening["note"],
@@ -1545,7 +1571,8 @@ async def handle_pay_b(request):
 async def handle_day_ok(request):
     """POST {day, aside, collected, as} — старший подтвердил раскладку дня:
     суммы Барракуде и в РП+ замораживаются, день помечен подтверждённым
-    (остаток — ЧП+ — считается сам)."""
+    (остаток — ЧП+ — считается сам). 409 not_collected {wait: [коды]} — за
+    день ещё не сдал район: сначала сбор."""
     try:
         body = await request.json()
         day = _day_arg(body.get("day"))
@@ -1563,6 +1590,15 @@ async def handle_day_ok(request):
     who = _who(body)
     async with _CR_LOCK:
         m = (await db.fin_days_get(day, day)).get(day) or {}
+        # Замок сбора (владелец, 27 ноя 2026: «за несобранную смену нельзя
+        # давать распределять выручку»): пока хоть один район не сдал деньги
+        # за этот день, подтверждения нет — ни из «Сейфа», ни из «Кассы дня»,
+        # ни со страницы сбора; проверка та же, что готовность дня там
+        # (owner_routes.cash_split). Уже подтверждённый день правят свободно.
+        if not m.get("ok"):
+            wait, _got = await _cash_wait(day)
+            if wait:
+                return _json({"error": "not_collected", "wait": wait}, 409)
         # Экран, который про крипту не знает, её не трогает: что лежало в дне —
         # то и остаётся.
         if cr is None:

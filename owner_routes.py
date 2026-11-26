@@ -4590,6 +4590,40 @@ async def _cash_live(day: str) -> dict:
     return out
 
 
+def cash_split(amounts: dict, marks: dict) -> tuple[list, list]:
+    """Готовность дня к распределению — (ждём, получили): коды районов, где за
+    день было что брать (суммы района не empty). Район сдал, когда стоит
+    «Получил» по нему (cash:<oid>) или старая отметка на весь день (cash).
+    День готов, когда ждать некого.
+
+    Одна проверка на всех (владелец, 27 ноя 2026: «за несобранную смену нельзя
+    давать распределять выручку», «сделай замок в обоих»): готовность дней на
+    странице сбора (cash_round → days), флаг cash_ready/cash_wait у ждущего дня
+    в книге (finance_routes.build) и отказ подтвердить такой день откуда бы то
+    ни было (finance_routes.handle_day_ok)."""
+    legacy = bool((marks.get("cash") or {}).get("done"))
+    wait, got = [], []
+    for oid in OFFICE_IDS:
+        p = amounts.get(oid) or {}
+        if not p or p.get("empty"):
+            continue
+        ok = legacy or bool((marks.get(f"cash:{oid}") or {}).get("done"))
+        (got if ok else wait).append(OFFICE_CODES.get(oid, oid))
+    return wait, got
+
+
+async def cash_wait(day: str, orders: list | None = None, marks: dict | None = None) -> tuple[list, list]:
+    """cash_split за один день: суммы районов — _cash_amounts по доставленным
+    заказам этих суток, отметки — чек-лист дня. Заказы и отметки можно отдать
+    готовыми, если они уже прочитаны."""
+    if orders is None:
+        since, until = _bizday.window_utc(day, day)
+        orders = await db.orders_between(since, until)
+    if marks is None:
+        marks = (await db.checklist_many([day])).get(day) or {}
+    return cash_split(await _cash_amounts(day, orders), marks)
+
+
 async def cash_round(day: str) -> dict:
     """Сбор денег по районам за учётный день.
 
@@ -4756,21 +4790,12 @@ async def cash_round(day: str) -> dict:
     # распределить любые собранные суммы»): день готов к распределению, когда
     # все районы, где за него было что брать, его сдали — целиком, «именно за
     # этот день» (solo) или через перенос (via). Сегодняшний день, пока смена
-    # идёт, ждёт — и не держит уже собранные прошлые.
+    # идёт, ждёт — и не держит уже собранные прошлые. Та же проверка
+    # (cash_split) запирает подтверждение дня в книге — см. там.
     days_out = []
     for d in sorted(set(need_days) | {day}):
         amounts = today_amounts if d == day else past[d]
-        wait, got = [], []
-        for oid in OFFICE_IDS:
-            p = amounts[oid]
-            if p["empty"]:
-                continue
-            if d == day:
-                ok = bool((marks.get(f"cash:{oid}") or {}).get("done")) or legacy
-            else:
-                mk = marks_all.get(d) or {}
-                ok = bool((mk.get(f"cash:{oid}") or {}).get("done")) or bool((mk.get("cash") or {}).get("done"))
-            (got if ok else wait).append(OFFICE_CODES.get(oid, oid))
+        wait, got = cash_split(amounts, marks if d == day else (marks_all.get(d) or {}))
         if not wait and not got:
             continue
         days_out.append({"day": d, "ready": not wait, "wait": wait, "got": got,

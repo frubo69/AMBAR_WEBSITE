@@ -88,6 +88,16 @@ for n, f in dict(orders_between=orders_between, get_driver_days_range=get_driver
                  expense_photo_del=expense_photo_del, expense_photo=expense_photo).items():
     setattr(db, n, f)
 stock_value.cost_map = cost_map
+# Замок сбора (27 ноя 2026): готовность дня книга считает тем же, чем страница
+# сбора (owner_routes.cash_wait: суммы районов и отметки «Получил»); районы
+# теста — jbr и marina.
+import owner_routes as own
+own.OFFICE_IDS = ["jbr", "marina"]
+own.OFFICE_CODES = {"jbr": "JBR", "marina": "MAR"}
+own.OFFICE_NAMES = {"jbr": "JBR", "marina": "Marina"}
+async def get_driver_days(day): return [r for r in DRIVER_DAYS if r["day"] == day]
+async def checklist_many(days): return {d: CHECK.get(d, {}) for d in days}
+db.get_driver_days, db.checklist_many = get_driver_days, checklist_many
 stock_routes._catalog = lambda: CATALOG
 config_staff.MEAL_WORKING, config_staff.MEAL_OFF = 80, 40
 config_staff.drivers = lambda: [dict(name="Али", district="jbr")]
@@ -165,6 +175,13 @@ async def main():
     eq("ordered_fact", d4["ordered"], 777); eq("ordered_auto (отменённая мимо)", d4["ordered_auto"], 0)
     eq("payouts_sum", d4["payouts_sum"], 7)
     eq("cash_need (marina + jbr дома, без отметок)", (d4["cash_need"], d4["cash_got"]), (2, 0))
+    eq("замок сбора в книге: ждущий день не готов, ждём оба района", (d4["cash_ready"], d4["cash_wait"]), (False, ["JBR", "MAR"]))
+    eq("подтверждённый день флага не несёт", "cash_ready" in d3, False)
+    eq("cash_split: пустой район не считается; старая отметка на весь день закрывает всех; отметка района — его",
+       (own.cash_split({"jbr": {"empty": True}, "marina": {"empty": False}}, {}),
+        own.cash_split({"jbr": {"empty": False}, "marina": {"empty": False}}, {"cash": {"done": True}}),
+        own.cash_split({"jbr": {"empty": False}, "marina": {"empty": False}}, {"cash:jbr": {"done": True}})),
+       ((["MAR"], []), ([], ["JBR", "MAR"]), (["MAR"], ["JBR"])))
     print("— бегущие остатки и переносы из августа (по факту пересчёта)")
     eq("opening carried: стопки августа (старый carry_np → ЧП), факты пересчёта больше не читаются", b["opening_carried"], dict(carry_np=0, safe_b_open=34500, debt_b_open=110198, rp_open=0, np_open=41030, rp_owed_open=0, dep_open=0))
     eq("opening explicit (storage/факты — не поля)", b["opening_explicit"], {})
@@ -284,6 +301,14 @@ async def main():
     eq("пересчёт сейфа (ЧП) записан с днём пересчёта", (r.status, WRITES[-1][2].get("safe_np_fact"), WRITES[-1][2].get("safe_fact_day")), (200, 2500, "2026-09-10"))
     r = await raw(inner["handle_month_set"])(_req("POST", dict(month="2026-09", field="carry_np", value=1)))
     eq("старое поле переноса → 400", r.status, 400)
+    r = await raw(inner["handle_day_ok"])(_req("POST", dict(day="2026-09-04", aside=90, collected=90, **{"as": "Ст"})))
+    eq("замок сбора: районы не сдали → 409 not_collected с кодами", (r.status, json.loads(r.text)), (409, {"error": "not_collected", "wait": ["JBR", "MAR"]}))
+    CHECK["2026-09-04"] = {"cash:marina": {"done": True}}
+    r = await raw(inner["handle_day_ok"])(_req("POST", dict(day="2026-09-04", aside=90, collected=90, **{"as": "Ст"})))
+    eq("один район сдал, второй нет → всё ещё 409, ждём его", (r.status, json.loads(r.text)["wait"]), (409, ["JBR"]))
+    CHECK["2026-09-04"]["cash"] = {"done": True}        # старая отметка на весь день закрывает остальных
+    bq = await fr.build(M); d4q = next(x for x in bq["days"] if x["day"] == "2026-09-04")
+    eq("книга: сдали → день готов, счёт по районам 2 из 2", (d4q["cash_ready"], d4q["cash_wait"], d4q["cash_need"], d4q["cash_got"]), (True, [], 2, 2))
     r = await raw(inner["handle_day_ok"])(_req("POST", dict(day="2026-09-04", aside=90, collected=90, **{"as": "Ст"})))
     eq("подтверждение дня: суммы заморожены, ok", (r.status, WRITES[-1][0], WRITES[-1][2]["aside"], WRITES[-1][2]["collected"], WRITES[-1][2]["ok"], WRITES[-1][2]["ok_by"]), (200, "day", 90, 90, True, "Ст"))
     r = await raw(inner["handle_day_ok"])(_req("POST", dict(day="2026-09-20", aside=1, collected=1)))

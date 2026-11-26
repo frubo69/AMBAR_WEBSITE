@@ -2955,6 +2955,11 @@ html.kb #accOv.sdc .sc-scroll{padding-bottom:50vh}
 #ambar-cash-day .cd-confirm-zone>p{display:flex;align-items:center;gap:8px;font-size:11px;line-height:18px;color:#c0ad8d}
 #ambar-cash-day .cd-confirm-zone>p svg.lucide{width:14px!important;height:14px!important}
 #ambar-cash-day .cd-primary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:46px;width:100%;padding:10px;border:1px solid #e1bf7f;border-radius:12px;background:#dfbf83;color:#21180d;font-size:13px;line-height:20px;font-weight:700;letter-spacing:-.015em}
+#ambar-cash-day .cd-primary[hidden]{display:none}
+/* Замок сбора (владелец, 27 ноя 2026): районы ещё не сдали за день — вместо «Подтвердить» замок с кодами */
+#ambar-cash-day .cd-wait:not([hidden]){display:flex;align-items:center;justify-content:center;gap:9px;min-height:46px;width:100%;padding:10px;border:1px solid #4a3f52;border-radius:12px;background:#1b1724;color:#b6a3c7;font-size:13px;line-height:20px;font-weight:600}
+#ambar-cash-day .cd-wait svg.lucide{width:16px!important;height:16px!important;color:#9b8ab0}
+#ambar-cash-day .cd-status.is-wait{background:#2a2333;color:#b6a3c7}
 #ambar-cash-day .cd-primary>svg.lucide{width:16px!important;height:16px!important;stroke-width:2}
 #ambar-cash-day .cd-supplier-totals{display:grid;grid-template-columns:1fr 1fr;flex:1;align-items:center;min-height:130px;padding:22px 14px}
 #ambar-cash-day .cd-supplier-totals>div{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;min-height:100px}
@@ -3227,6 +3232,15 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 :is(#ambar-safe,.sf-days-host) .sf-day-bottom>span{font-size:11px;line-height:16px;color:#c0ac91}
 :is(#ambar-safe,.sf-days-host) .sf-confirm{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 14px;border:1px solid #e2c386;border-radius:10px;background:#e2c386;color:#241b0d;font-size:12px;line-height:18px;font-weight:700;white-space:nowrap}
 :is(#ambar-safe,.sf-days-host) .sf-confirm svg.lucide{width:15px!important;height:15px!important;stroke-width:2}
+/* Замок сбора (владелец, 27 ноя 2026): группа «Ждём выручку» и строка дня без кнопки — на месте
+   «Подтвердить» замок с кодами районов; одни и те же в «Сейфе» и на этапе «Распределение» сбора */
+:is(#ambar-safe,.sf-days-host) .sf-wait-group{border-color:#3d3346;background:#15121e}
+:is(#ambar-safe,.sf-days-host) .sf-wait-group>.sf-pending-heading{color:#b6a3c7;background:#1b1724;border-bottom-color:#332c3e}
+:is(#ambar-safe,.sf-days-host) .sf-wait .sf-day-bottom>span{color:#a69dae}
+:is(#ambar-safe,.sf-days-host) .sf-wait-tag{display:flex;align-items:center;gap:7px;min-height:40px;padding:9px 12px;border:1px solid #4a3f52;border-radius:10px;background:#1b1724;color:#b6a3c7;font-size:12px;line-height:18px;font-weight:600;white-space:nowrap}
+:is(#ambar-safe,.sf-days-host) .sf-wait-tag svg.lucide{width:15px!important;height:15px!important;color:#9b8ab0}
+:is(#ambar-safe,.sf-days-host) .sf-wait-codes{padding-bottom:14px;color:#a69dae}
+:is(#ambar-safe,.sf-days-host) .sf-wait-codes svg.lucide{color:#8f82a0}
 #ambar-safe #sfDoneGroup{margin-top:20px}
 :is(#ambar-safe,.sf-days-host) .sf-done-heading{color:#a8bdae}
 :is(#ambar-safe,.sf-days-host) .sf-done-list{overflow:hidden;border:1px solid #352d3e;border-radius:15px;background:#14101e}
@@ -3303,7 +3317,7 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-dialog p{font-size:12px;line-height:20px;color:#c3b5cc;margin:10px 0 18px}
 #ambar-safe .sf-dialog form>div{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 #ambar-safe .sf-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-@container safepage (max-width:370px){#ambar-safe .sf-main{padding-left:11px;padding-right:11px}#ambar-safe .sf-header{padding-left:11px;padding-right:11px}#ambar-safe .sf-month{margin-left:11px;margin-right:11px}#ambar-safe .sf-pool>strong{font-size:20px;line-height:27px}#ambar-safe .sf-pools>.sf-pool+.sf-pool{padding-left:0}#ambar-safe .sf-pool-name{font-size:11px}#ambar-safe .sf-balance-top{padding:18px 13px 16px}#ambar-safe .sf-pools{padding-left:13px;padding-right:13px}#ambar-safe .sf-composition-label{padding-left:13px;padding-right:13px}#ambar-safe .sf-wallet{padding:11px 13px;gap:8px}#ambar-safe .sf-wallet-label{font-size:11px}#ambar-safe .sf-quick-actions button{padding:8px 13px}#ambar-safe .sf-section-heading h2{font-size:17px}#ambar-safe .sf-edit-row{grid-template-columns:minmax(0,1fr) 126px}#ambar-safe .sf-day-bottom{gap:6px}#ambar-safe .sf-day-bottom .sf-confirm{padding:9px 10px}#ambar-safe .sf-header>span{font-size:11px}}
+@container safepage (max-width:370px){#ambar-safe .sf-main{padding-left:11px;padding-right:11px}#ambar-safe .sf-header{padding-left:11px;padding-right:11px}#ambar-safe .sf-month{margin-left:11px;margin-right:11px}#ambar-safe .sf-pool>strong{font-size:20px;line-height:27px}#ambar-safe .sf-pools>.sf-pool+.sf-pool{padding-left:0}#ambar-safe .sf-pool-name{font-size:11px}#ambar-safe .sf-balance-top{padding:18px 13px 16px}#ambar-safe .sf-pools{padding-left:13px;padding-right:13px}#ambar-safe .sf-composition-label{padding-left:13px;padding-right:13px}#ambar-safe .sf-wallet{padding:11px 13px;gap:8px}#ambar-safe .sf-wallet-label{font-size:11px}#ambar-safe .sf-quick-actions button{padding:8px 13px}#ambar-safe .sf-section-heading h2{font-size:17px}#ambar-safe .sf-edit-row{grid-template-columns:minmax(0,1fr) 126px}#ambar-safe .sf-day-bottom{gap:6px}#ambar-safe .sf-day-bottom .sf-confirm,#ambar-safe .sf-day-bottom .sf-wait-tag{padding:9px 10px}#ambar-safe .sf-header>span{font-size:11px}}
 /* Load after safe-visual.css. The actual mini-app shell supplies its available
    content height; the 414x844 preview dimensions never constrain production. */
 #ambar-safe{width:100%;height:var(--sf-available-height,100%);min-height:0}
@@ -3534,10 +3548,6 @@ html.kb #accOv.sfe .sf-scroll{padding-bottom:50vh}
    (:is(#ambar-safe,.sf-days-host)); хозяин даёт цвета пакета «Сейфа» и отступы
    страницы сбора. Дни, за которые районы ещё не сдали, — своя группа «Ждём выручку». */
 #star-daily-collection .sf-days-host{--sf-red:#d69ca5;--sf-green:#9bb6a6;display:flex;flex-direction:column;gap:18px;padding:0 12px 18px}
-#star-daily-collection .sdc-wait-group{border-color:#3d3346;background:#15121e}
-#star-daily-collection .sdc-wait-group>.sf-pending-heading{color:#b6a3c7;background:#1b1724;border-bottom-color:#332c3e}
-#star-daily-collection .sdc-wait .sf-allocation-caption{padding-bottom:14px;color:#a69dae}
-#star-daily-collection .sdc-wait .sf-allocation-caption svg.lucide{color:#8f82a0}
 #star-daily-collection .sdc-none small{color:#a69dae}
 /* ── «Финансы»: панель разделов (пакет ChatGPT AMBAR-FINANCE-HUB, владелец,
    25 ноя 2026: «аналитика месяца пусть остается сверху, но внизу кнопки типо
@@ -23320,7 +23330,7 @@ function crFoot(){
 function crDistState(){
   const wait = crWait();
   const all = crDistDays();
-  const ready = all.filter(crDayReady), waiting = all.filter(d => !crDayReady(d));
+  const ready = all.filter(crDayOpen), waiting = all.filter(d => !crDayOpen(d));
   const days = ready.map(crDistBook);
   const known = days.every(Boolean);
   const pend = days.filter(b => b && b.base > 0 && !b.ok);
@@ -23362,8 +23372,9 @@ function crStage(n){
   const st = crDistState();
   if(st.locked){
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    _toast(st.wait.length ? `Сначала получите выручку: ${crWaitTxt(st.wait)}`.replace(/<[^>]+>/g, '')
-                          : 'Распределять нечего — в этот день нечего было получать');
+    const codes = st.wait.length ? crWaitTxt(st.wait) : [...new Set(st.waiting.flatMap(crDayCodes))].join(', ');
+    _toast(codes ? `Сначала получите выручку: ${codes}`.replace(/<[^>]+>/g, '')
+                 : 'Распределять нечего — в этот день нечего было получать');
     return;
   }
   crDist();
@@ -23400,7 +23411,7 @@ async function crTakeDay(id, day, done){
     CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: CR.day}});
   }catch(e){ _toast('Не удалось отметить'); CR_BUSY = false; return; }
   CR_BUSY = false;
-  crRender();
+  crRender(); crBookDrop();
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(done ? 'success' : 'warning'); }catch(e){}
   _toast(done ? `Получено за ${_dayName(day)}` : `Отметка за ${_dayName(day)} снята`);
 }
@@ -23416,7 +23427,7 @@ async function crToggle(id){
     CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: CR.day}});
   }catch(e){ _toast('Не удалось отметить'); CR_BUSY = false; return; }
   CR_BUSY = false;
-  crRender();
+  crRender(); crBookDrop();
   const all = CR.need > 0 && CR.done >= CR.need;
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(all ? 'success' : 'warning'); }catch(e){}
   if(all && !wasAll) _toast('Выручка получена по всем районам');
@@ -23461,6 +23472,13 @@ function crDayInfo(day){ return ((CR && CR.days) || []).find(x => x.day === day)
 function crDayReady(day){ const x = crDayInfo(day); return x ? !!x.ready : !crWait().length; }
 function crDayWait(day){ const x = crDayInfo(day); return x ? (x.wait || []) : crWait().map(z => z.code); }
 function crDistBook(day){ return fbDayOf(fbBook(day.slice(0, 7)), day); }
+// Замок сбора в книге (владелец, 27 ноя 2026: «сделай замок в обоих»): у
+// ждущего дня сервер считает ту же готовность (cash_ready; cash_wait — коды
+// районов) и такой день не подтверждает. День открыт к распределению, когда
+// готов и по сбору, и по книге; коды — вместе.
+function crDayBookWait(day){ const b = crDistBook(day); return b && b.cash_ready === false ? (b.cash_wait || []) : null; }
+function crDayOpen(day){ return crDayReady(day) && !crDayBookWait(day); }
+function crDayCodes(day){ return [...new Set([...crDayWait(day), ...(crDayBookWait(day) || [])])]; }
 function crDistNorm(day){ return (((fbBook(day.slice(0, 7)) || {}).budget) || {}).norm || 0; }
 // Книгу месяца (двух — перенос через первое число) подтягиваем, пока идёт
 // сбор: к нажатию «Распределить» числа уже на месте.
@@ -23489,6 +23507,15 @@ async function crDist(){
   catch(e){ if(CRD.open && p) p.innerHTML = sdcDistIntro() + loadFail('crDist()'); return; }
   if(CRD.open) crDistRender();
 }
+// Отметка «Получил» меняет готовность дней в книге (cash_ready): книги этих
+// месяцев в памяти больше не свежие — перечитываем, чтобы замок на этапе
+// «Распределение», в «Сейфе» и в «Кассе дня» не отстал от сбора.
+function crBookDrop(){
+  for(const m of new Set(crDistDays().map(d => d.slice(0, 7)))){
+    FB.at[m] = 0;
+    fbLoad(m).then(() => { if(ACC_VIEW !== 'cashround') return; if(CRD.open) crDistRender(); else { crFoot(); crStepsPaint(); } }).catch(() => {});
+  }
+}
 // Назад — к сбору того же дня; дальше «назад» ведёт туда, откуда пришли в сбор.
 function crDistBack(){
   ACC_BACK = CRD.back || null;
@@ -23506,21 +23533,23 @@ function crDistBack(){
 // прежняя crDistOk (книга, уведомление, возврат к сбору, когда всё
 // распределено); строка дня — в «Кассу дня», назад — сюда, на этот же этап.
 // Сверху та же сумма, что в подвале сбора. Новые дни сверху, как в «Сейфе».
-// Чего в «Сейфе» нет: день, за который районы ещё не сдали, здесь ждёт
-// выручку — своя группа без кнопки, с кодами районов; готовый день без
-// выручки — одной строкой без действий.
+// Замок сбора (владелец, 27 ноя 2026: «сделай замок в обоих»): день, за который
+// районы ещё не сдали — по сбору или по книге (cash_ready), — в группе «Ждём
+// выручку» той же строкой, что в «Сейфе»: вместо «Подтвердить» замок с кодами
+// районов; нет строки книги — дата и коды. Готовый день без выручки — одной
+// строкой без действий.
 function crDistRender(){
   const p = document.getElementById('sc-distribution'); if(!p || !CRD.open) return;
   const wait = [], pend = [], done = [], none = [];
   for(const day of crDistDays().slice().reverse()){
-    if(!crDayReady(day)){ wait.push(day); continue; }
     const b = crDistBook(day);
+    if(!crDayOpen(day)){ wait.push(b && b.base > 0 ? sfyPendRow(b, crDayCodes(day)) : sdcWaitRow(day, crDayCodes(day))); continue; }
     if(b && b.base > 0) (b.ok ? done : pend).push(b); else none.push({day, b});
   }
   const grp = (cls, icon, title, rows) => `<div class="sf-pending-group${cls}"><div class="sf-pending-heading"><span>${luc(icon)}${title}</span><span>${rows.length}</span></div><div class="sf-day-list" role="list">${rows.join('')}</div></div>`;
   p.innerHTML = sdcDistIntro() + `<div class="sf-days-host">${
-    wait.length ? grp(' sdc-wait-group', 'lock-keyhole', 'Ждём выручку', wait.map(sdcWaitRow)) : ''}${
-    pend.length ? grp('', 'circle-dot', 'Ждут подтверждения', pend.map(sfyPendRow)) : ''}${
+    wait.length ? grp(' sf-wait-group', 'lock-keyhole', 'Ждём выручку', wait) : ''}${
+    pend.length ? grp('', 'circle-dot', 'Ждут подтверждения', pend.map(b => sfyPendRow(b))) : ''}${
     none.map(sdcNoneRow).join('')}${
     done.length ? `<div><div class="sf-done-heading"><span>${luc('circle-check')}В сейфе</span><span>${done.length}</span></div><div class="sf-done-list">${done.map(sfyDoneRow).join('')}</div></div>` : ''}</div>`;
   crStepsPaint();
@@ -23529,12 +23558,13 @@ function sdcDistIntro(){
   const l = sdcSum();
   return `<div class="sc-distribution-intro"><span>${l.label}</span><strong>${l.sum == null ? '—' : `${sdcMoney(l.sum)} <small>AED</small>`}</strong></div>`;
 }
-// День, за который районы ещё не сдали: дата, «—» вместо выручки, коды районов.
-function sdcWaitRow(day){
+// День, за который районы ещё не сдали, без строки книги: дата, «—» вместо
+// выручки, коды районов.
+function sdcWaitRow(day, codes){
   const {date, wd} = sfyDayLabel(day);
-  return `<article class="sf-day sf-pending sdc-wait" role="listitem" data-day="${day}">
+  return `<article class="sf-day sf-pending sf-wait" role="listitem" data-day="${day}">
     <div class="sf-day-main"><span><strong>${escS(date)}</strong><small>${escS(wd)}</small></span><span class="sf-day-value"><small>Выручка · AED</small><strong>—</strong></span></div>
-    <p class="sf-allocation-caption">${luc('lock-keyhole')}<span>${crDayWait(day).map(escS).join(' · ')}</span></p>
+    <p class="sf-allocation-caption sf-wait-codes">${luc('lock-keyhole')}<span>${(codes || crDayCodes(day)).map(escS).join(' · ') || '—'}</span></p>
   </article>`;
 }
 // Готовый день без выручки или без записи в книге — одной строкой, без действий.
@@ -23596,7 +23626,7 @@ async function crDistOk(day, aside, collected, collected_cr){
   const nb = crDistBook(day) || b;
   _toast(`Распределено: Барракуда ${fbFmt(nb.aside)} · РП+ ${fbFmt(nb.collected)}${
     nb.collected_cr ? ' + криптой ' + fbFmt(nb.collected_cr) : ''} · ЧП ${fbFmt(nb.np_plus)}`);
-  const left = crDistDays().filter(crDayReady).map(crDistBook).filter(x => x && x.base > 0 && !x.ok);
+  const left = crDistDays().filter(crDayOpen).map(crDistBook).filter(x => x && x.base > 0 && !x.ok);
   if(!left.length){ crDistBack(); return; }
   crDistRender();
 }
@@ -24623,7 +24653,7 @@ function fbSafeAll(mb){
 // Книга месяца несёт b.crypto: свободная крипта на кошельке и крипта на счёте
 // РП, обе в наших дирхамах (остаток × 3.5). Считает сервер (crypto_book).
 function fbCr(month){ const b = fbBook(month || FB.month || fbMonthNow()); return (b && b.crypto) || {}; }
-// Отказ сервера по крипте — словами. Пусто — отказ не про крипту.
+// Отказ сервера по крипте и по замку сбора — словами. Пусто — отказ не про них.
 function fbCrErr(e){
   const p = (e && e.payload) || {}, f = v => fmtUsdt(v);
   return p.error === 'no_free' ? `Свободной крипты только ${f(p.free)} AED`
@@ -24632,7 +24662,8 @@ function fbCrErr(e){
     : p.error === 'cr_spent' ? `Из этой крипты уже потрачено — меньше ${f(p.min)} AED не поставить`
     : p.error === 'crypto_unready' ? 'Кошелёк ещё не прочитан — попробуйте через минуту'
     : p.error === 'crypto_early' ? `Крипта в РП+ идёт с ${p.from ? fbDayT(p.from) : '1 октября'}`
-    : p.error === 'before_start' ? `До начала учёта · учёт с ${p.from ? fbDayT(p.from) : '—'}` : '';
+    : p.error === 'before_start' ? `До начала учёта · учёт с ${p.from ? fbDayT(p.from) : '—'}`
+    : p.error === 'not_collected' ? `Ждём выручку · ${(p.wait || []).join(' · ') || 'районы'}` : '';
 }
 // «Чем платили?» — последним вопросом расхода из РП (владелец: «в РП− надо
 // учитывать в конце, чем платили — наличными или криптой»). Крипты на счёте РП
@@ -25390,7 +25421,7 @@ function cdyBodyHtml(d, loading){
          24 окт 2026: норма в РП+, остальное ЧП); вписали в РП+ больше нормы —
          столько и вернулось, строкой ниже. -->
     <div id="cdRpReturn" class="cd-inline-note" hidden><span>В том числе возврат в РП за Барракуду</span><strong></strong></div>
-    <div class="cd-confirm-zone" id="cdConfirmZone" hidden><button type="button" id="cdConfirm" class="cd-primary" data-d="" onclick="fbDayOk(this.dataset.d)">Подтвердить распределение${luc('check')}</button></div>
+    <div class="cd-confirm-zone" id="cdConfirmZone" hidden><button type="button" id="cdConfirm" class="cd-primary" data-d="" onclick="fbDayOk(this.dataset.d)">Подтвердить распределение${luc('check')}</button><div class="cd-wait" id="cdWait" hidden>${luc('lock-keyhole')}<span>Ждём выручку · <span id="cdWaitCodes"></span></span></div></div>
   </section>
   <section id="cd-supplier" class="cd-panel" aria-labelledby="cdSupplierTitle" hidden>
     <div class="cd-panel-head"><span class="cd-step-number" aria-label="Шаг 3 из 4">3</span><div class="cd-step-heading"><h2 id="cdSupplierTitle">Оплата Барракуде</h2></div></div>
@@ -25512,13 +25543,22 @@ function cdySync(d){
   if($('cdEditorProfit')) $('cdEditorProfit').classList.toggle('cd-negative', np < 0);
   strong('cdRpCombined', crOn && crAmt > 0, `${fbFmt(coll + crAmt)} AED`);
   strong('cdRpReturn', n(d.rp_back_plan) > 0, `${fbFmt(d.rp_back_plan)} AED`);
+  // замок сбора (владелец, 27 ноя 2026): районы ещё не сдали за день (книга:
+  // cash_ready false, cash_wait — коды) — вместо «Подтвердить» замок с кодами;
+  // сервер такой день не примет (not_collected)
+  const wait = !d.ok && d.cash_ready === false ? (d.cash_wait || []) : null;
   const st = $('cdAllocationStatus');
   if(st){
     st.hidden = !canOk;
     st.classList.toggle('is-confirmed', !!d.ok);
-    st.textContent = d.ok ? `Подтверждено${d.ok_by ? ' · ' + d.ok_by : ''}` : 'Не подтверждено';
+    st.classList.toggle('is-wait', !!wait);
+    st.textContent = d.ok ? `Подтверждено${d.ok_by ? ' · ' + d.ok_by : ''}` : wait ? 'Ждём выручку' : 'Не подтверждено';
   }
-  if(show('cdConfirmZone', canOk && !d.ok)) $('cdConfirm').dataset.d = d.day;
+  if(show('cdConfirmZone', canOk && !d.ok)){
+    $('cdConfirm').dataset.d = d.day;
+    show('cdConfirm', !wait);
+    if(show('cdWait', !!wait)) text('cdWaitCodes', wait.join(' · ') || '—');
+  }
   cdyDonut(d);
   // 3. Барракуда: заявка, счёт, оплата, долг
   money('cdOrdered', d.ordered_auto);
@@ -25791,6 +25831,10 @@ function sfyShell(){
         <section class="sf-days" aria-labelledby="sfDaysTitle">
           <div class="sf-section-heading"><h2 id="sfDaysTitle">Распределение по дням</h2></div>
           <p id="sfListStatus" class="sf-list-status" hidden role="status" aria-live="polite"></p>
+          <div class="sf-pending-group sf-wait-group" id="sfWaitGroup" hidden>
+            <div class="sf-pending-heading"><span>${luc('lock-keyhole')}Ждём выручку</span><span id="sfWaitCount"></span></div>
+            <div class="sf-day-list" id="sfWaitList" role="list" aria-label="Дни, за которые районы ещё не сдали выручку"></div>
+          </div>
           <div class="sf-pending-group" id="sfPendingGroup" hidden>
             <div class="sf-pending-heading" id="sfPendingHeading"><span>${luc('circle-dot')}Ждут подтверждения</span><span id="sfPendingCount"></span></div>
             <div class="sf-day-list" id="sfPendingList" role="list" aria-label="Дни, ожидающие подтверждения"></div>
@@ -25884,16 +25928,26 @@ function sfySource(d){
   if(d.aside_src === 'half' && d.collected_src === 'norm') return 'Распределение программы';
   return 'Распределение';
 }
-function sfyPendRow(d){
+// Строка ждущего дня. Замок сбора (владелец, 27 ноя 2026: «за несобранную
+// смену нельзя давать распределять выручку», «сделай замок в обоих»): день, за
+// который район ещё не сдал деньги (книга: cash_ready false, cash_wait — коды
+// районов), идёт без «Подтвердить» — на месте кнопки замок с кодами; сервер
+// такой день и не примет. wait можно отдать снаружи: страница сбора знает
+// готовность и по своим данным.
+function sfyPendRow(d, wait){
   const {date, wd} = sfyDayLabel(d.day), busy = SFY.busy.has(d.day);
+  if(!wait && d.cash_ready === false) wait = d.cash_wait || [];
   const cell = (t, v, red) => { const c = sfyDeltaCls(v, red); return `<div><dt>${t}</dt><dd${c ? ` class="${c}"` : ''}>${sfySigned(v)}</dd></div>`; };
-  return `<article class="sf-day sf-pending" role="listitem" data-day="${d.day}">
+  const bottom = wait
+    ? `<div class="sf-day-bottom"><span>В сейф после сбора</span><span class="sf-wait-tag">${luc('lock-keyhole')}<span data-sf="wait">${wait.map(escS).join(' · ') || '—'}</span></span></div>`
+    : `<div class="sf-day-bottom"><span>В сейф после подтверждения</span><button type="button" class="sf-confirm" data-confirm="${d.day}"${busy ? ' disabled' : ''}>${luc('check')}<span data-sf="confirm-label">${busy ? 'Подтверждаем…' : 'Подтвердить'}</span></button></div>
+    <p class="sf-row-error" data-sf="error" hidden role="alert"></p>`;
+  return `<article class="sf-day sf-pending${wait ? ' sf-wait' : ''}" role="listitem" data-day="${d.day}">
     <button type="button" class="sf-day-main" data-open-day="${d.day}" aria-label="Открыть кассу дня за ${escS(date)}"><span><strong data-sf="date">${escS(date)}</strong><small data-sf="weekday">${escS(wd)}</small></span><span class="sf-day-value"><small>Выручка · AED</small><strong data-sf="base">${fbFmt(d.base)}</strong></span>${luc('chevron-right')}</button>
     <p class="sf-allocation-caption">${luc('corner-down-right')}<span data-sf="source">${sfySource(d)}</span></p>
     <dl class="sf-split" aria-label="Изменение наличных в сейфе после подтверждения, AED">${cell('Барракуда', d.aside, false)}${cell('РП', d.collected, true)}${cell('ЧП', d.np_plus, true)}</dl>
     ${d.collected_cr ? `<p class="sf-day-crypto" data-sf="crypto">РП на кошельке · ${sfySigned(d.collected_cr)} AED</p>` : ''}
-    <div class="sf-day-bottom"><span>В сейф после подтверждения</span><button type="button" class="sf-confirm" data-confirm="${d.day}"${busy ? ' disabled' : ''}>${luc('check')}<span data-sf="confirm-label">${busy ? 'Подтверждаем…' : 'Подтвердить'}</span></button></div>
-    <p class="sf-row-error" data-sf="error" hidden role="alert"></p>
+    ${bottom}
   </article>`;
 }
 function sfyDoneRow(d){
@@ -25929,10 +25983,14 @@ function sfySync(b){
   txt('sfWalletAED', wal ? fbFmt(wal.aed) : '—'); txt('sfWalletUSDT', wal ? fmtUsdt(wal.usdt) : '—');
   // дни: положительная выручка, не будущее и не до учёта; новые сверху
   const days = (b.days || []).filter(d => !d.future && !d.before && d.base > 0).reverse();
-  const pend = days.filter(d => !d.ok), done = days.filter(d => d.ok);
+  const open = days.filter(d => !d.ok), done = days.filter(d => d.ok);
+  // замок сбора: день, за который районы ещё не сдали (cash_ready false), — своей группой, без кнопки
+  const wait = open.filter(d => d.cash_ready === false), pend = open.filter(d => d.cash_ready !== false);
   show('sfListStatus', false);
+  show('sfWaitGroup', wait.length > 0); txt('sfWaitCount', String(wait.length));
+  const wl = el('sfWaitList'); if(wl) wl.innerHTML = wait.map(d => sfyPendRow(d)).join('');
   show('sfPendingGroup', pend.length > 0); txt('sfPendingCount', String(pend.length));
-  const pl = el('sfPendingList'); if(pl) pl.innerHTML = pend.map(sfyPendRow).join('');
+  const pl = el('sfPendingList'); if(pl) pl.innerHTML = pend.map(d => sfyPendRow(d)).join('');
   show('sfDoneGroup', done.length > 0); txt('sfDoneCount', String(done.length));
   const dl = el('sfDoneList'); if(dl) dl.innerHTML = done.map(sfyDoneRow).join('');
   show('sfNoDays', days.length === 0);

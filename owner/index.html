@@ -2736,10 +2736,28 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 #star-daily-collection .sc-footer small{font-family:Manrope,sans-serif;font-size:11px;color:var(--sc-muted);font-weight:400}
 #star-daily-collection .sc-distribute{width:100%;min-height:48px;background:#2c2331;border-color:#514258;color:#b9a8c5;font-size:13px;font-weight:600}
 #star-daily-collection .sc-toast{position:absolute;left:13px;right:13px;bottom:118px;z-index:4;padding:12px 14px;border:1px solid #786045;border-radius:12px;background:#30241c;color:#edd6b3;box-shadow:0 8px 25px #00000070;font-size:12px;line-height:18px}
-#star-daily-collection .sc-distribution-intro{display:flex;flex-direction:column;gap:5px;padding:24px 16px 20px}
-#star-daily-collection .sc-distribution-intro>span{font-size:12px;color:var(--sc-muted)}
-#star-daily-collection .sc-distribution-intro>strong{font-family:"Space Grotesk",sans-serif;font-size:32px;line-height:38px;font-weight:500;letter-spacing:-.04em}
-#star-daily-collection .sc-distribution-intro small{font-family:Manrope,sans-serif;font-size:12px;color:var(--sc-muted);font-weight:400}
+/* ── Этап «Распределение»: сводка «К распределению» неподвижно под вкладками (пакет ChatGPT
+   AMBAR-REVENUE-DISTRIBUTION, владелец, 27 ноя 2026). distribution-visual.css и
+   distribution-integration.css пакета как есть под корнем страницы сбора: блок сводки —
+   сосед ленты .sc-scroll после вкладок, вне прокрутки (flex:none), фон страницы; между
+   карточкой и списком 16 px — 8 px низа блока и 8 px верха списка (.sf-days-host ниже).
+   Мягкий край 24 px под блоком виден только при прокрутке (класс rd-has-scroll ставит
+   sdcEdge), нажатий не перехватывает и места не занимает. Строки и группы дней — общие с
+   «Сейфом» (:is(#ambar-safe,.sf-days-host)). ── */
+#star-daily-collection .rd-summary-dock{position:relative;z-index:1;flex:none;min-width:0;padding:16px 12px 8px;background:var(--sc-bg)}
+#star-daily-collection .rd-summary-dock::after{content:"";position:absolute;top:100%;left:0;right:0;height:24px;background:linear-gradient(to bottom,var(--sc-bg),transparent);pointer-events:none;opacity:0;transition:opacity 120ms ease}
+#star-daily-collection .rd-summary-dock.rd-has-scroll::after{opacity:1}
+@media(prefers-reduced-motion:reduce){#star-daily-collection .rd-summary-dock::after{transition:none}}
+#star-daily-collection .rd-summary{padding:14px 16px 15px;border:1px solid #66543e;border-radius:17px;background:#27202b}
+#star-daily-collection .rd-summary-top{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#cbbca4;font-size:12px;line-height:18px}
+#star-daily-collection .rd-summary-top>span:first-child{display:flex;align-items:center;gap:7px}
+#star-daily-collection .rd-summary-top svg.lucide{width:15px!important;height:15px!important;color:#e2c386}
+#star-daily-collection .rd-count{font-size:11px;line-height:17px;color:#c3b1cf;white-space:nowrap}
+#star-daily-collection .rd-summary-total{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px;min-width:0;margin-top:7px;font-variant-numeric:tabular-nums}
+#star-daily-collection .rd-summary-total strong{font:500 36px/42px "Space Grotesk",sans-serif;letter-spacing:-.045em;color:#e2c386;overflow-wrap:anywhere}
+#star-daily-collection .rd-summary-total>span{font-size:12px;line-height:18px;color:var(--sc-muted)}
+#star-daily-collection .rd-message{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;padding:14px 15px;border:1px solid var(--sc-line);border-radius:15px;color:var(--sc-muted);font-size:12px;line-height:18px}
+#star-daily-collection .sc-scroll{scroll-padding-top:24px}
 #star-daily-collection .sc-pending-day{margin:0 12px 12px;padding:16px;border:1px solid var(--sc-line);border-radius:16px;background:var(--sc-surface)}
 #star-daily-collection .sc-pending-day>div{display:grid;grid-template-columns:17px minmax(0,1fr) 17px;gap:10px;align-items:center;color:#b6a3c7}
 #star-daily-collection .sc-pending-day h2{font-size:16px;line-height:22px;font-weight:600;color:var(--sc-text)}
@@ -3284,6 +3302,11 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 :is(#ambar-safe,.sf-days-host) .sf-done small{font-size:11px;font-weight:400;color:#9bb6a6}
 :is(#ambar-safe,.sf-days-host) .sf-done strong{font:500 21px/28px "Space Grotesk",sans-serif;letter-spacing:-.04em}
 :is(#ambar-safe,.sf-days-host) .sf-done>svg.lucide{color:#a99bb6;width:15px!important;height:15px!important}
+/* «В сейфе» — та же поверхность группы с заголовком внутри, что у «Ждут подтверждения» и
+   «Ждём выручку» (пакет AMBAR-REVENUE-DISTRIBUTION, 27 ноя 2026: .rd-done, .rd-done>.rd-group-head) */
+:is(#ambar-safe,.sf-days-host) .sf-done-group{border-color:#352d3e;background:#14101e}
+:is(#ambar-safe,.sf-days-host) .sf-done-group>.sf-pending-heading{color:#a1bdac;background:#1c1723;border-bottom-color:#352d3e}
+:is(#ambar-safe,.sf-days-host) .sf-done-group>.sf-done-list{border:0;border-radius:0;background:transparent}
 #ambar-safe .sf-accounting{display:flex;flex-direction:column;border:1px solid #352d3e;border-radius:17px;background:#14101e;overflow:hidden}
 #ambar-safe .sf-disclosure+ .sf-disclosure,#ambar-safe .sf-cutoff-link{border-top:1px solid #352d3e}
 #ambar-safe .sf-disclosure summary{display:flex;align-items:center;gap:11px;min-height:70px;padding:13px 15px;list-style:none}
@@ -3623,7 +3646,7 @@ html.kb #accOv.sfe .sf-scroll{padding-bottom:50vh}
    «делай как там»). Правила дней «Сейфа» выше действуют и под .sf-days-host
    (:is(#ambar-safe,.sf-days-host)); хозяин даёт цвета пакета «Сейфа» и отступы
    страницы сбора. Дни, за которые районы ещё не сдали, — своя группа «Ждём выручку». */
-#star-daily-collection .sf-days-host{--sf-red:#d69ca5;--sf-green:#9bb6a6;display:flex;flex-direction:column;gap:18px;padding:0 12px 18px}
+#star-daily-collection .sf-days-host{--sf-red:#d69ca5;--sf-green:#9bb6a6;display:flex;flex-direction:column;gap:16px;padding:8px 12px 20px}
 #star-daily-collection .sdc-none small{color:#a69dae}
 /* ── «Финансы»: панель разделов (пакет ChatGPT AMBAR-FINANCE-HUB, владелец,
    25 ноя 2026: «аналитика месяца пусть остается сверху, но внизу кнопки типо
@@ -22663,6 +22686,9 @@ let CRD = {open: false, edit: null, busy: false, back: null};
 // Открыть сразу второй этап (карточка на «Финансах»): 2 — после загрузки сбора
 // перейти к распределению, если сбор закончен.
 let CR_GO = 0;
+// Положение ленты этапа «Распределение» на время «Кассы дня»: назад из кассы —
+// тот же список на том же месте (пакет AMBAR-REVENUE-DISTRIBUTION, 27 ноя 2026).
+let CR_POS = 0;
 // Утверждённый визуал страницы (владелец, 30 окт 2026: макет ChatGPT
 // «STAR-DAILY-COLLECTION», перенос точь-в-точь, логика прежняя). Страница
 // живёт в своей оболочке #star-daily-collection: шапка, два этапа, один
@@ -22714,6 +22740,7 @@ const LUC = {
   'calculator':        '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
   'circle-dot':        '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/>',
   'corner-down-right': '<path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
+  'layers-2':          '<path d="M13 13.74a2 2 0 0 1-2 0L2.5 8.87a1 1 0 0 1 0-1.74L11 2.26a2 2 0 0 1 2 0l8.5 4.87a1 1 0 0 1 0 1.74z"/><path d="m20 14.285 1.5.845a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74l1.5-.845"/>',
   'pencil':            '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
   // «Зарплаты» (визуал 27 ноя 2026)
   'award':             '<path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/><circle cx="12" cy="8" r="6"/>',
@@ -22742,6 +22769,7 @@ async function accCashRound(){
   const day = CR_DAY || (CKL && CKL.day) || accDay();
   CR_DAY = '';
   const go = CR_GO; CR_GO = 0;
+  if(go !== 2) CR_POS = 0;
   try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
   catch(e){
     document.getElementById('accOv').classList.remove('sdc');
@@ -22763,6 +22791,12 @@ function sdcShell(){
       <button type="button" class="sc-hist" aria-label="История сбора" onclick="crHist()">${luc('history')}</button>
     </header>
     <div class="sc-steps" id="sdcSteps" role="tablist" aria-label="Этапы работы с выручкой"></div>
+    <div class="rd-summary-dock" id="sdcDock" hidden>
+      <div class="rd-summary" aria-labelledby="sdcDockTitle">
+        <div class="rd-summary-top"><span id="sdcDockTitle">${luc('layers-2')}К распределению</span><span id="sdcDockCount" class="rd-count">—</span></div>
+        <div class="rd-summary-total" aria-live="polite"><strong id="sdcDockSum">—</strong><span>AED</span></div>
+      </div>
+    </div>
     <main class="sc-scroll" id="sdcScroll">
       <section id="sc-collection" role="tabpanel" aria-labelledby="sc-tab-collection"></section>
       <section id="sc-distribution" role="tabpanel" aria-labelledby="sc-tab-distribution" hidden></section>
@@ -22780,6 +22814,7 @@ function sdcMount(){
     // Раскрытие — родные <details>: браузер показывает сам, мы только
     // запоминаем, что раскрыто (toggle не всплывает — ловим на захвате).
     root.addEventListener('toggle', sdcToggled, true);
+    const sc = document.getElementById('sdcScroll'); if(sc) sc.addEventListener('scroll', sdcEdge, {passive: true});
     root.addEventListener('click', e => {
       if(e.target && e.target.closest && e.target.closest('summary'))
         try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(x){}
@@ -22800,11 +22835,34 @@ function sdcToggled(e){
 // Этап: один из двух разделов виден, второй скрыт; подвал — только у сбора.
 function sdcStage(n){
   const c = document.getElementById('sc-collection'), p = document.getElementById('sc-distribution'),
-        s = document.getElementById('sdcScroll');
+        s = document.getElementById('sdcScroll'), dk = document.getElementById('sdcDock');
   if(c) c.hidden = n === 2;
   if(p) p.hidden = n !== 2;
+  if(dk) dk.hidden = n !== 2;             // сводка «К распределению» — только на втором этапе
   if(s && SDC.stage && SDC.stage !== n) s.scrollTop = 0;
   SDC.stage = n;
+  sdcEdge();
+}
+// Мягкий край под сводкой (пакет AMBAR-REVENUE-DISTRIBUTION, 27 ноя 2026): градиент
+// 24 px от фона страницы виден, только когда лента этапа прокручена; при scrollTop = 0
+// его нет. Зовут прокрутка ленты, смена этапа, перерисовка списка и возврат позиции.
+function sdcEdge(){
+  const dk = document.getElementById('sdcDock'), s = document.getElementById('sdcScroll');
+  if(dk && s) dk.classList.toggle('rd-has-scroll', !dk.hidden && s.scrollTop > 0);
+}
+// Сводка «К распределению» над списком этапа: сумма и число готовых, ещё не
+// подтверждённых дней — из полного набора дней сбора (crDistState: ждущие сбор и
+// уже распределённые не входят, крипта второй раз не прибавляется; тот же итог,
+// что в подписи вкладки). Книга ещё не пришла или пришла не вся — прочерки, не
+// ноль; готовых нет, а ждущие или подтверждённые есть — 0 и «Нет готовых дней».
+// Нажатие на сводку ничего не подтверждает.
+function sdcDock(){
+  const cnt = document.getElementById('sdcDockCount'), sum = document.getElementById('sdcDockSum');
+  if(!cnt || !sum) return;
+  const st = crDistState(), n = st.pend.length;
+  if(!CR || !st.known){ cnt.textContent = '—'; sum.textContent = '—'; return; }
+  cnt.textContent = n ? `${n} ${pluralize(n, 'день', 'дня', 'дней')}` : 'Нет готовых дней';
+  sum.textContent = n ? sdcMoney(st.sum) : '0';
 }
 function sdcHead(){
   const el = document.getElementById('sdcDate'), d = CR; if(!el || !d) return;
@@ -23573,6 +23631,7 @@ function crSteps(stage){
 function crStepsPaint(){
   const el = document.getElementById('sdcSteps');
   if(el) el.innerHTML = crSteps(CRD.open ? 2 : 1);
+  sdcDock();
 }
 function crStage(n){
   if(n === 1){ if(CRD.open) crDistBack(); return; }
@@ -23706,14 +23765,17 @@ async function crDist(){
   sdcMount(); crDistBind();
   crStepsPaint();
   const p = document.getElementById('sc-distribution');
-  if(p) p.innerHTML = sdcDistIntro() + '<div class="exp-empty">Загрузка…</div>';
+  if(p) p.innerHTML = '<div class="sf-days-host"><div class="rd-message" role="status">Загрузка…</div></div>';
   sdcStage(2);
   crFoot();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   const months = [...new Set(crDistDays().map(d => d.slice(0, 7)))];
   try{ await Promise.all(months.map(m => (fbBook(m) && !fbStale(m)) ? null : fbLoad(m))); }
-  catch(e){ if(CRD.open && p) p.innerHTML = sdcDistIntro() + loadFail('crDist()'); return; }
-  if(CRD.open) crDistRender();
+  catch(e){ if(CRD.open && p) p.innerHTML = loadFail('crDist()'); return; }
+  if(!CRD.open) return;
+  crDistRender();
+  // назад из «Кассы дня» — тот же список на том же месте
+  if(CR_POS){ const s = document.getElementById('sdcScroll'); if(s) s.scrollTop = CR_POS; CR_POS = 0; sdcEdge(); }
 }
 // Отметка «Получил» меняет готовность дней в книге (cash_ready): книги этих
 // месяцев в памяти больше не свежие — перечитываем, чтобы замок на этапе
@@ -23754,17 +23816,17 @@ function crDistRender(){
     if(!crDayOpen(day)){ wait.push(b && b.base > 0 ? sfyPendRow(b, crDayCodes(day)) : sdcWaitRow(day, crDayCodes(day))); continue; }
     if(b && b.base > 0) (b.ok ? done : pend).push(b); else none.push({day, b});
   }
-  const grp = (cls, icon, title, rows) => `<div class="sf-pending-group${cls}"><div class="sf-pending-heading"><span>${luc(icon)}${title}</span><span>${rows.length}</span></div><div class="sf-day-list" role="list">${rows.join('')}</div></div>`;
-  p.innerHTML = sdcDistIntro() + `<div class="sf-days-host">${
-    wait.length ? grp(' sf-wait-group', 'lock-keyhole', 'Ждём выручку', wait) : ''}${
-    pend.length ? grp('', 'circle-dot', 'Ждут подтверждения', pend.map(b => sfyPendRow(b))) : ''}${
-    none.map(sdcNoneRow).join('')}${
-    done.length ? `<div><div class="sf-done-heading"><span>${luc('circle-check')}В сейфе</span><span>${done.length}</span></div><div class="sf-done-list">${done.map(sfyDoneRow).join('')}</div></div>` : ''}</div>`;
+  const grp = (cls, icon, title, list, rows) => `<div class="sf-pending-group${cls}"><div class="sf-pending-heading"><span>${luc(icon)}${title}</span><span>${rows.length}</span></div><div class="${list}"${list === 'sf-day-list' ? ' role="list"' : ''}>${rows.join('')}</div></div>`;
+  // Порядок групп (пакет AMBAR-REVENUE-DISTRIBUTION, 27 ноя 2026): готовые → в сейфе →
+  // ждём выручку. Ждущие сбор — всегда внизу, даже если их даты новее готовых; внутри
+  // каждой группы новые дни сверху; пустых групп нет. Тот же порядок на странице дней «Сейфа».
+  const rows = (pend.length ? grp('', 'circle-dot', 'Ждут подтверждения', 'sf-day-list', pend.map(b => sfyPendRow(b))) : '')
+    + (done.length ? grp(' sf-done-group', 'circle-check', 'В сейфе', 'sf-done-list', done.map(sfyDoneRow)) : '')
+    + none.map(sdcNoneRow).join('')
+    + (wait.length ? grp(' sf-wait-group', 'lock-keyhole', 'Ждём выручку', 'sf-day-list', wait) : '');
+  p.innerHTML = `<div class="sf-days-host">${rows || '<div class="rd-message" role="status">Выручки пока нет</div>'}</div>`;
   crStepsPaint();
-}
-function sdcDistIntro(){
-  const l = sdcSum();
-  return `<div class="sc-distribution-intro"><span>${l.label}</span><strong>${l.sum == null ? '—' : `${sdcMoney(l.sum)} <small>AED</small>`}</strong></div>`;
+  sdcEdge();
 }
 // День, за который районы ещё не сдали, без строки книги: дата, «—» вместо
 // выручки, коды районов.
@@ -23798,20 +23860,25 @@ function crDistBind(){
 // crDistOk сам перерисует список или вернёт к сбору.
 async function crDistConfirm(day, btn){
   if(CRD.busy) return;
-  const lab = btn.querySelector('[data-sf="confirm-label"]');
+  const row = btn.closest('.sf-day'), lab = row && row.querySelector('[data-sf="confirm-label"]'), err = row && row.querySelector('[data-sf="error"]');
   btn.disabled = true; btn.setAttribute('aria-busy', 'true'); if(lab) lab.textContent = 'Подтверждаем…';
-  try{ await crDistOk(day); }
+  if(err){ err.hidden = true; err.textContent = ''; }
+  let t = '';
+  try{ t = await crDistOk(day, undefined, undefined, undefined, true) || ''; }
   finally{ if(btn.isConnected){ btn.disabled = false; btn.removeAttribute('aria-busy'); if(lab) lab.textContent = 'Подтвердить'; } }
+  // отказ сервера остаётся у этого дня, суммы не меняются (как в «Сейфе»)
+  if(t && err && err.isConnected){ err.textContent = t; err.hidden = false; }
 }
 function crDistOpenDay(day){
-  const d0 = CR ? CR.day : '';
+  const d0 = CR ? CR.day : '', s = document.getElementById('sdcScroll');
+  CR_POS = s ? s.scrollTop : 0;
   fbGoDay(day);
   ACC_BACK = () => { CR_DAY = d0; CR_GO = 2; accOpen('cashround'); };
 }
 // «Подтвердить» со строки — предложенное как есть (поправить — в «Кассе дня»).
 // Всё распределено — назад к сбору (там внизу «Распределено»); остался ещё
 // день (перенос) — остаёмся, он в списке следующим.
-async function crDistOk(day, aside, collected, collected_cr){
+async function crDistOk(day, aside, collected, collected_cr, quiet){
   if(CRD.busy) return;
   const b = crDistBook(day); if(!b) return;
   if(aside === undefined){ aside = b.aside || 0; collected = b.collected || 0; collected_cr = b.collected_cr || 0; }
@@ -23821,7 +23888,14 @@ async function crDistOk(day, aside, collected, collected_cr){
   let res;
   try{ res = await ownerApi.ownerFetch('/api/owner/finance/book/day/ok',
          {method: 'POST', body: {day, aside, collected, collected_cr, as: _meName()}}); }
-  catch(e){ CRD.busy = false; _toast(fbCrErr(e) || 'Не удалось сохранить распределение'); return; }
+  catch(e){
+    CRD.busy = false;
+    const t = fbCrErr(e) || 'Не удалось сохранить распределение';
+    if(!quiet) _toast(t);
+    // районы ещё не сдали (409 not_collected): книга перечитывается — день уходит в «Ждём выручку» по данным сервера
+    if(((e && e.payload) || {}).error === 'not_collected') crBookDrop();
+    return t;
+  }
   if(res && res.book) fbApply(res.book);
   fbHubRepaint();                   // карточка на «Финансах» под этим экраном — тоже
   // Подтвердили день прошлого месяца (перенос через первое число) — книга
@@ -25655,7 +25729,7 @@ function cdySetStep(key){
 // Куда ведёт последняя кнопка — туда, откуда пришли (стрелка «назад» — ровно на
 // шаг): из «Сейфа» — в сейф, с карточки финансов — просто назад.
 function cdyBackTitle(){
-  return {finsafe: 'В сейф', finsafedays: 'В распределение по дням', finb: 'В Барракуду', finddcm: 'В отчёт ДДС', book: 'В финансы'}[CDY.from] || 'Назад';
+  return {finsafe: 'В сейф', finsafedays: 'В распределение по дням', cashround: 'В распределение выручки', finb: 'В Барракуду', finddcm: 'В отчёт ДДС', book: 'В финансы'}[CDY.from] || 'Назад';
 }
 // Редакторы: открытое распределение заменяет диаграмму полями, открытая оплата —
 // обзор полями; внутри оплаты подэкран источников заменяет суммы. Высота экрана
@@ -26257,17 +26331,20 @@ function sfyShell(){
         </section>
       </section>
       <section class="sf-main sf-days" id="sfDaysPage" aria-label="Распределение по дням" hidden>
-        <div class="sf-pending-group sf-wait-group" id="sfWaitGroup" hidden>
-          <div class="sf-pending-heading"><span>${luc('lock-keyhole')}Ждём выручку</span><span id="sfWaitCount"></span></div>
-          <div class="sf-day-list" id="sfWaitList" role="list" aria-label="Дни, за которые районы ещё не сдали выручку"></div>
-        </div>
         <div id="sfDaysLoadState" class="sf-empty-month" role="status" aria-live="polite" hidden></div>
         <div class="sf-pending-group" id="sfPendingGroup" hidden>
           <div class="sf-pending-heading" id="sfPendingHeading"><span>${luc('circle-dot')}Ждут подтверждения</span><span id="sfPendingCount"></span></div>
           <div class="sf-day-list" id="sfPendingList" role="list" aria-label="Дни, ожидающие подтверждения"></div>
         </div>
         <p id="sfNoDays" class="sf-note" hidden>Выручки в этом месяце ещё нет</p>
-        <div id="sfDoneGroup" hidden><div class="sf-done-heading"><span>${luc('circle-check')}В сейфе</span><span id="sfDoneCount"></span></div><div class="sf-done-list" id="sfDoneList"></div></div>
+        <div class="sf-pending-group sf-done-group" id="sfDoneGroup" hidden>
+          <div class="sf-pending-heading"><span>${luc('circle-check')}В сейфе</span><span id="sfDoneCount"></span></div>
+          <div class="sf-done-list" id="sfDoneList"></div>
+        </div>
+        <div class="sf-pending-group sf-wait-group" id="sfWaitGroup" hidden>
+          <div class="sf-pending-heading"><span>${luc('lock-keyhole')}Ждём выручку</span><span id="sfWaitCount"></span></div>
+          <div class="sf-day-list" id="sfWaitList" role="list" aria-label="Дни, за которые районы ещё не сдали выручку"></div>
+        </div>
       </section>
     </div>
   </section></div></div>`;
@@ -26432,7 +26509,8 @@ function sfySync(b){
   // итог и стопки — только наличные; Барракуда без красного, РП/ЧП/итог в минусе красные
   sfyNum('sfTotal', fbSafeAll(b), true); sfyNum('sfBarra', s.b, false); sfyNum('sfRp', s.rp, true); sfyNum('sfProfit', s.np, true);
   txt('sfWalletAED', wal ? fbFmt(wal.aed) : '—'); txt('sfWalletUSDT', wal ? fmtUsdt(wal.usdt) : '—');
-  // дни: положительная выручка, не будущее и не до учёта; новые сверху
+  // дни: положительная выручка, не будущее и не до учёта; внутри групп новые сверху, порядок
+  // групп задан разметкой (sfyShell): готовые → в сейфе → ждём выручку
   const days = (b.days || []).filter(d => !d.future && !d.before && d.base > 0).reverse();
   const open = days.filter(d => !d.ok), done = days.filter(d => d.ok);
   // замок сбора: день, за который районы ещё не сдали (cash_ready false), — своей группой, без кнопки

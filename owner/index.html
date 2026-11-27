@@ -3807,19 +3807,243 @@ html.kb #accOv .fhr-page{padding-bottom:50vh}
 #accOv .fhr-sec .fv-customer-edit:empty{display:none}
 #accOv .fhr-sec .fx-take-h{display:none}
 #accOv .fhr-sec .fx-take-sep{display:none}
-/* ── Экран «Зарплаты, премии и удержания» (за плиткой): три строки вкладки в
-   её же языке — название, крупное число с единицей, стрелка. ── */
-#accOv .fhp-panel{margin:0 0 12px;border:1px solid #3a3242;border-radius:17px;background:linear-gradient(135deg,#211c2a,#15111f 88%);overflow:hidden}
-#accOv .fhp-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,max-content) 14px;align-items:center;gap:10px;width:100%;min-width:0;min-height:64px;padding:12px 14px;appearance:none;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
-#accOv .fhp-row+.fhp-row{border-top:1px solid #39313f}
-#accOv .fhp-row:active{filter:brightness(1.15)}
-#accOv .fhp-title{min-width:0;font-size:13px;line-height:19px;font-weight:600;overflow-wrap:anywhere}
-#accOv .fhp-money{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;text-align:right}
-#accOv .fhp-money>strong{max-width:100%;font-family:"Space Grotesk",sans-serif;font-size:20px;line-height:24px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:#dfc48d;overflow-wrap:anywhere}
-#accOv .fhp-money>strong.dn{color:var(--dn)}
-#accOv .fhp-money>strong.fh-none{color:#655c74}
-#accOv .fhp-money>span{font-size:11px;line-height:16px;color:#aaa1b3;overflow-wrap:anywhere}
-#accOv svg.lucide.fhp-arrow{width:14px;height:16px;color:#9f8c73;flex:none}
+/* ── Раздел «Зарплаты» (визуал 27 ноя 2026, пакет ChatGPT AMBAR-PAYROLL): payroll-visual.css и
+   payroll-integration.css из пакета дословно (без @import шрифтов — Manrope и Space Grotesk лежат в
+   vendor/fonts.css), ниже — адаптация под оболочку. Главная «Зарплаты», «Зарплатная ведомость»,
+   «Премии за стаж», «Штрафы / авансы / долги», карточка человека зонами — accFinPayroll и далее. ── */
+#ambar-payroll{font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#ambar-payroll .py-stage{display:flex;justify-content:center}
+#ambar-payroll .py-app{--py-width:390px;--py-height:844px;--py-bg:#0b0910;--py-surface:#191520;--py-raised:#211b29;--py-line:#39313f;--py-text:#eeeae6;--py-muted:#afa5b9;--py-gold:#e2c386;--py-green:#a3bbaa;--py-red:#dea5ad;box-sizing:border-box;width:var(--py-width);max-width:100%;height:var(--py-height);min-width:0;display:flex;flex-direction:column;background:var(--py-bg);color:var(--py-text);border:1px solid #342c3b;border-radius:24px;overflow:hidden;position:relative;isolation:isolate;font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:payroll / inline-size}
+#ambar-payroll .py-app *:not(:where([data-existing-component], [data-existing-component] *)){box-sizing:border-box}
+#ambar-payroll .py-app [hidden]:not(:where([data-existing-component], [data-existing-component] *)){display:none!important}
+#ambar-payroll .py-app :where(h1,h2,h3,p,dl,dd):not(:where([data-existing-component], [data-existing-component] *)){margin:0}
+#ambar-payroll .py-app :where(button,input,select,textarea):not(:where([data-existing-component], [data-existing-component] *)){font:inherit;color:inherit}
+#ambar-payroll :where(.py-app button):not(:where([data-existing-component], [data-existing-component] *)){appearance:none;background:none;border:0;padding:0;margin:0;text-align:left;-webkit-tap-highlight-color:transparent}
+#ambar-payroll .py-app button:disabled:not(:where([data-existing-component], [data-existing-component] *)){cursor:default}
+#ambar-payroll .py-app :where(button,input,select,textarea):focus-visible:not(:where([data-existing-component], [data-existing-component] *)){outline:2px solid #b8c9eb;outline-offset:2px}
+#ambar-payroll .py-app svg.lucide:not(:where([data-existing-component], [data-existing-component] *)){width:18px;height:18px;flex:none;stroke-width:1.65}
+#ambar-payroll .py-header{display:flex;align-items:center;gap:8px;padding:5px 12px;flex:none;min-height:54px}
+#ambar-payroll .py-back{display:grid;place-items:center;width:40px;min-height:44px;flex:none;color:#c4b8ce}
+#ambar-payroll .py-back svg{width:24px!important;height:24px!important}
+#ambar-payroll .py-header>div{min-width:0}
+#ambar-payroll .py-header h1{font-size:15px;line-height:21px;letter-spacing:-.02em;font-weight:600}
+#ambar-payroll .py-header p{font-size:11px;line-height:16px;color:var(--py-muted);margin-top:3px}
+#ambar-payroll .py-month{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;margin:2px 16px 12px;padding:0 2px;border:1px solid var(--py-line);border-radius:11px;background:var(--py-surface);flex:none}
+#ambar-payroll .py-month button{display:grid;place-items:center;min-height:44px;color:var(--py-gold)}
+#ambar-payroll .py-month button:disabled{color:#655c70}
+#ambar-payroll .py-month strong{text-align:center;font-size:14px;font-weight:500;line-height:20px}
+#ambar-payroll .py-content{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4c4157 transparent;padding:0 16px 16px}
+#ambar-payroll .py-hub{display:grid;grid-template-rows:repeat(3,minmax(138px,1fr));gap:12px;height:100%;min-height:438px}
+#ambar-payroll .py-entry{position:relative;display:flex;flex-direction:column;justify-content:center;gap:19px;min-width:0;padding:20px 22px;border:1px solid var(--py-line);border-radius:17px;background:var(--py-surface);width:100%}
+#ambar-payroll .py-entry-heading{display:flex;align-items:flex-start;gap:12px;min-width:0}
+#ambar-payroll .py-entry-heading>svg{color:var(--py-gold);margin-top:1px}
+#ambar-payroll .py-entry-heading strong{font-size:14px;line-height:20px;font-weight:600;color:var(--py-text)}
+#ambar-payroll .py-entry-body{display:flex;flex-direction:column;gap:4px;padding-left:30px;padding-right:18px}
+#ambar-payroll .py-entry-caption{color:var(--py-muted);font-size:11px;line-height:17px}
+#ambar-payroll .py-entry-value{font:500 33px/39px "Space Grotesk",sans-serif;letter-spacing:-.04em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ambar-payroll .py-entry-value small{font:400 11px/17px Manrope,sans-serif;letter-spacing:0;color:var(--py-muted);margin-left:3px}
+#ambar-payroll .py-entry .py-entry-arrow{position:absolute;right:20px;bottom:29px;color:#b4a6bf;width:16px;height:16px}
+#ambar-payroll .py-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;align-items:center;padding:12px 10px 14px;border-top:1px solid #2b2531;background:#0b0910;flex:none}
+#ambar-payroll .py-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:42px;color:#a398af;font-size:10px;line-height:14px}
+#ambar-payroll .py-nav button[aria-current]{color:var(--py-gold)}
+#ambar-payroll .py-nav .py-check{min-height:36px;border:1px solid #8c4b54;border-radius:10px;background:#17121e;color:#dc929b;font-weight:600;letter-spacing:.12em;margin:0 2px;font-size:10px}
+#ambar-payroll .py-page{display:flex;flex-direction:column;gap:12px;padding-bottom:8px}
+#ambar-payroll .py-summary{padding:14px;border:1px solid #403547;border-radius:14px;background:#241d2d;overflow:hidden}
+#ambar-payroll .py-summary-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+#ambar-payroll .py-summary-header h2{font-size:12px;line-height:18px;font-weight:500;color:var(--py-muted)}
+#ambar-payroll .py-unit{font-size:11px;color:var(--py-muted)}
+#ambar-payroll .py-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}
+#ambar-payroll .py-metric{min-width:0;position:relative}
+#ambar-payroll .py-metric dt{font-size:11px;line-height:16px;color:var(--py-muted);margin-bottom:7px;white-space:nowrap}
+#ambar-payroll .py-metric dd{font:500 23px/30px "Space Grotesk",sans-serif;letter-spacing:-.05em;white-space:nowrap;font-variant-numeric:tabular-nums}
+#ambar-payroll .py-arithmetic .py-metric:nth-child(2)::before,#ambar-payroll .py-arithmetic .py-metric:nth-child(3)::before{position:absolute;top:26px;left:-15px;color:#9f91aa;font-size:13px;content:"−"}
+#ambar-payroll .py-arithmetic .py-metric:nth-child(3)::before{content:"="}
+#ambar-payroll .py-arithmetic .py-metric:last-child dd{color:var(--py-gold)}
+#ambar-payroll .py-rate{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;margin:14px -14px -14px;border-top:1px solid #403547;background:#191420}
+#ambar-payroll .py-rate label{font-size:12px;line-height:18px}
+#ambar-payroll .py-rate small{display:block;font-size:11px;line-height:15px;color:var(--py-muted);margin-top:2px}
+#ambar-payroll .py-input-unit{display:flex;align-items:center;gap:7px;background:var(--py-raised);border:1px solid #493e53;border-radius:9px;padding:0 10px;min-width:0}
+#ambar-payroll .py-input-unit input{min-width:0;width:100%;padding:10px 0;border:0;background:transparent;font-size:16px;line-height:22px;text-align:right;font-variant-numeric:tabular-nums}
+#ambar-payroll .py-input-unit input::placeholder{color:#b2a6bf;opacity:1}
+#ambar-payroll .py-input-unit>span{font-size:11px;color:var(--py-muted);flex:none}
+#ambar-payroll .py-rate .py-input-unit{width:112px;flex:none}
+#ambar-payroll .py-group-title{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 0 8px;border-bottom:1px solid var(--py-line)}
+#ambar-payroll .py-group-title h2{font-size:13px;line-height:20px;font-weight:600;display:flex;align-items:center;gap:8px}
+#ambar-payroll .py-group-title>span{font-size:11px;color:var(--py-muted)}
+#ambar-payroll .py-list-zone{border:1px solid #3a3042;border-radius:14px;background:#18131f;overflow:hidden}
+#ambar-payroll .py-list-zone>.py-group-title{padding:10px 14px;background:#241d2c;border-bottom:1px solid #403447}
+#ambar-payroll .py-list-zone>.py-group-title h2{min-width:0;font-size:13px;line-height:20px}
+#ambar-payroll .py-list-zone>.py-person,#ambar-payroll .py-list-zone>.py-bonus-row{padding:12px 14px}
+#ambar-payroll .py-list-zone>.py-pending-row,#ambar-payroll .py-list-zone>.py-history-row{padding:14px}
+#ambar-payroll .py-list-zone>.py-history-row:last-child,#ambar-payroll .py-list-zone>.py-pending-row:last-child{border-bottom:0}
+#ambar-payroll .py-list-zone>.py-empty-line{padding:14px}
+#ambar-payroll .py-list-zone>.py-inline-link{padding:0 14px}
+#ambar-payroll .py-add-zone{padding:0 14px;border:1px solid #3a3042;border-radius:12px;background:#18131f}
+#ambar-payroll .py-person{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;width:100%;align-items:center;padding:14px 0;min-height:70px;border-bottom:1px solid #2d2635}
+#ambar-payroll .py-person:last-child{border-bottom:0}
+#ambar-payroll .py-avatar{width:28px;height:30px;display:grid;place-items:center;background:#241e2c;border-radius:7px;font-size:10px;line-height:14px;color:#b8a8c6}
+#ambar-payroll .py-person-name{display:flex;flex-direction:column;gap:4px;min-width:0}
+#ambar-payroll .py-person-name>strong{font-size:12px;line-height:18px;font-weight:600;overflow-wrap:anywhere}
+#ambar-payroll .py-person-name>small{font-size:11px;line-height:16px;color:var(--py-muted)}
+#ambar-payroll .py-person-amount{display:flex;align-items:flex-end;flex-direction:column;gap:3px;min-width:0;padding-left:2px}
+#ambar-payroll .py-person-amount>strong{font:500 18px/23px "Space Grotesk",sans-serif;letter-spacing:-.03em;white-space:nowrap}
+#ambar-payroll .py-person-amount>small{font-size:11px;line-height:15px;color:var(--py-muted)}
+#ambar-payroll .py-app .py-positive{color:var(--py-green)}
+#ambar-payroll .py-app .py-negative{color:var(--py-red)}
+#ambar-payroll .py-arithmetic .py-metric dd.py-negative{color:var(--py-red)}
+#ambar-payroll .py-inline-link{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;font-size:12px;line-height:18px;color:var(--py-text)}
+#ambar-payroll .py-inline-link>span{flex:1}
+#ambar-payroll .py-inline-link>svg{width:16px;height:16px;color:var(--py-gold)}
+#ambar-payroll .py-inline-link>svg:last-child{color:var(--py-muted);width:14px;height:14px}
+#ambar-payroll .py-divider-links{border-top:1px solid var(--py-line);border-bottom:1px solid var(--py-line)}
+#ambar-payroll .py-divider-links .py-inline-link+.py-inline-link{border-top:1px solid #2d2635}
+#ambar-payroll .py-bonus-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 0;border-bottom:1px solid #2d2635}
+#ambar-payroll .py-bonus-row:last-child{border-bottom:0}
+#ambar-payroll .py-bonus-person{min-width:0}
+#ambar-payroll .py-bonus-person strong{font-size:13px;line-height:20px;font-weight:600;display:block}
+#ambar-payroll .py-bonus-person small{display:block;font-size:11px;line-height:17px;color:var(--py-muted);margin-top:3px}
+#ambar-payroll .py-bonus-action{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0}
+#ambar-payroll .py-bonus-action strong{font:500 19px/24px "Space Grotesk",sans-serif;white-space:nowrap;letter-spacing:-.025em}
+#ambar-payroll .py-bonus-action strong small{font:400 11px/16px Manrope,sans-serif;color:var(--py-muted)}
+#ambar-payroll .py-bonus-date{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:11px;line-height:17px;color:#baafc4;min-height:34px;justify-content:center}
+#ambar-payroll .py-bonus-date small{font-size:11px;color:#95889f}
+#ambar-payroll .py-primary,#ambar-payroll .py-secondary,#ambar-payroll .py-danger{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 14px;border-radius:9px;font-size:12px;line-height:18px;font-weight:600;text-align:center}
+#ambar-payroll .py-primary{background:var(--py-gold);color:#271f12}
+#ambar-payroll .py-secondary{background:#231c2d;border:1px solid #493c55;color:var(--py-text)}
+#ambar-payroll .py-danger{background:#30212b;border:1px solid #5b3b49;color:var(--py-red)}
+#ambar-payroll .py-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#ambar-payroll .py-action-tile{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:11px;padding:16px 14px;border:1px solid var(--py-line);border-radius:13px;background:var(--py-surface);min-height:100px;font-size:12px;line-height:18px;font-weight:500}
+#ambar-payroll .py-action-tile svg{color:var(--py-gold)}
+#ambar-payroll .py-actions-zone{border:1px solid #3a3042;border-radius:14px;background:#18131f;overflow:hidden}
+#ambar-payroll .py-actions-zone .py-action-grid{gap:0}
+#ambar-payroll .py-actions-zone .py-action-tile{min-height:88px;padding:14px;border:0;border-radius:0;background:transparent;gap:9px}
+#ambar-payroll .py-actions-zone .py-action-tile+.py-action-tile{border-left:1px solid #3a3042}
+#ambar-payroll .py-actions-zone .py-divider-links{padding:0 14px;border-bottom:0}
+#ambar-payroll .py-empty-line{padding:18px 0 2px;font-size:12px;line-height:18px;color:var(--py-muted)}
+#ambar-payroll .py-group-title select{max-width:128px;border:1px solid #46394e;border-radius:8px;background:#211a29;color:#c5b9cf;padding:7px 9px;font-size:11px;min-height:34px}
+#ambar-payroll .py-history-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;width:100%;padding:15px 0;border-bottom:1px solid #2d2635}
+#ambar-payroll .py-history-row>svg{color:#a99ab4;width:17px;height:17px;margin-top:2px}
+#ambar-payroll .py-history-row>div{min-width:0}
+#ambar-payroll .py-history-row strong{font-size:12px;line-height:19px;font-weight:500;display:block}
+#ambar-payroll .py-history-row p{font-size:11px;line-height:17px;color:var(--py-muted);margin-top:4px}
+#ambar-payroll .py-history-bottom{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:9px}
+#ambar-payroll .py-history-bottom time{color:#a196ac;font-size:11px;line-height:15px}
+#ambar-payroll .py-history-bottom>span{font-size:11px;line-height:17px;text-align:right}
+#ambar-payroll .py-history-bottom b{font:500 15px/21px "Space Grotesk",sans-serif;margin-right:6px;color:var(--py-text)}
+#ambar-payroll .py-muted-row{color:#b0a4bd}
+#ambar-payroll .py-muted-row strong{text-decoration:line-through}
+#ambar-payroll .py-pending-row{padding:16px 0;border-bottom:1px solid var(--py-line)}
+#ambar-payroll .py-pending-row h3{font-size:12px;line-height:20px;font-weight:500}
+#ambar-payroll .py-pending-row p{font-size:11px;line-height:18px;color:var(--py-muted);margin-top:5px}
+#ambar-payroll .py-pending-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0}
+#ambar-payroll .py-pending-meta time{font-size:11px;color:var(--py-muted)}
+#ambar-payroll .py-pending-meta .py-input-unit{width:110px}
+#ambar-payroll .py-pending-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#ambar-payroll .py-form{display:flex;flex-direction:column;gap:12px;padding:16px 0}
+#ambar-payroll .py-form label{font-size:12px;line-height:18px;display:flex;flex-direction:column;gap:7px}
+#ambar-payroll .py-field{border:1px solid #493e53;border-radius:9px;background:var(--py-raised);padding:10px 12px;min-height:44px;min-width:0;width:100%;font-size:16px!important;line-height:22px}
+#ambar-payroll .py-options{display:flex;flex-wrap:wrap;gap:7px}
+#ambar-payroll .py-options button{font-size:11px;line-height:17px;min-height:36px;padding:8px 10px;border:1px solid #493e53;border-radius:8px;color:var(--py-muted)}
+#ambar-payroll .py-options button[aria-pressed="true"]{color:var(--py-gold);background:#2c2530;border-color:#8c7551}
+#ambar-payroll .py-read-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:15px 0;border-bottom:1px solid #302838;font-size:12px;line-height:19px}
+#ambar-payroll .py-read-row strong{font:500 21px/28px "Space Grotesk",sans-serif;white-space:nowrap}
+#ambar-payroll .py-person-payable .py-read-row{padding:5px 0 0;border:0;align-items:center}
+#ambar-payroll .py-person-payable .py-read-row>span{color:var(--py-muted)}
+#ambar-payroll .py-person-payable .py-read-row strong{font-size:28px;line-height:35px;letter-spacing:-.035em;color:var(--py-gold)}
+#ambar-payroll .py-person-payable .py-read-row strong.py-negative{color:var(--py-red)}
+#ambar-payroll .py-salary-link{display:grid;grid-template-columns:minmax(0,1fr) auto 16px;align-items:center;gap:10px;width:100%;min-height:64px;padding:13px 14px}
+#ambar-payroll .py-salary-link>span{font-size:12px;line-height:18px;color:var(--py-muted)}
+#ambar-payroll .py-salary-link>strong{font:500 21px/28px "Space Grotesk",sans-serif;letter-spacing:-.025em;white-space:nowrap}
+#ambar-payroll .py-salary-link small{font:400 11px/18px Manrope,sans-serif;color:var(--py-muted);letter-spacing:0}
+#ambar-payroll .py-salary-link>svg{color:var(--py-muted);width:15px;height:15px}
+#ambar-payroll .py-person-actions>.py-inline-link{min-height:51px}
+#ambar-payroll .py-person-actions>.py-inline-link+.py-inline-link{border-top:1px solid #352c3d}
+#ambar-payroll .py-state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:42px 12px;color:var(--py-muted);font-size:13px}
+#ambar-payroll .py-state>svg{color:var(--py-gold);width:26px;height:26px}
+#ambar-payroll .py-dialog{position:absolute;inset:0;width:calc(100% - 32px);max-width:360px;margin:auto;padding:22px;border:1px solid #62516d;border-radius:18px;background:#241c2d;color:var(--py-text);box-shadow:0 20px 60px #0008}
+#ambar-payroll .py-dialog::backdrop{background:#06050bcc}
+#ambar-payroll .py-dialog h2{font-size:18px;line-height:26px;font-weight:600}
+#ambar-payroll .py-dialog p{font-size:12px;line-height:20px;color:#c4b6d0;margin:12px 0 18px}
+#ambar-payroll .py-dialog form>div{display:flex;flex-direction:column;gap:9px}
+#ambar-payroll .py-toast{position:absolute;z-index:3;left:16px;right:16px;bottom:82px;background:#302637;border:1px solid #63506c;border-radius:11px;padding:12px 14px;font-size:12px;line-height:18px;box-shadow:0 8px 24px #0006}
+#ambar-payroll .py-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#ambar-payroll .py-app[data-density="compact"] .py-header{padding-top:4px;padding-bottom:4px;min-height:52px}
+#ambar-payroll .py-app[data-density="compact"] .py-header h1{font-size:15px;line-height:21px}
+#ambar-payroll .py-app[data-density="compact"] .py-month{margin-bottom:10px}
+#ambar-payroll .py-app[data-density="compact"] .py-hub{grid-template-rows:repeat(3,minmax(116px,1fr));min-height:368px;gap:10px}
+#ambar-payroll .py-app[data-density="compact"] .py-entry{padding:14px 18px;gap:12px}
+#ambar-payroll .py-app[data-density="compact"] .py-entry-value{font-size:29px;line-height:35px}
+#ambar-payroll .py-app[data-density="compact"] .py-entry-heading strong{font-size:13px;line-height:19px}
+#ambar-payroll .py-app[data-density="compact"] .py-entry .py-entry-arrow{bottom:23px}
+#ambar-payroll .py-app[data-density="compact"] .py-nav{padding-top:8px;padding-bottom:9px}
+@container payroll (max-width:350px){#ambar-payroll .py-header{padding-left:11px;padding-right:11px;gap:8px}#ambar-payroll .py-month{margin-left:12px;margin-right:12px}#ambar-payroll .py-content{padding-left:12px;padding-right:12px}#ambar-payroll .py-entry{padding-left:15px;padding-right:15px}#ambar-payroll .py-entry-heading{gap:9px}#ambar-payroll .py-entry-body{padding-left:27px}#ambar-payroll .py-entry-heading strong{font-size:13px}#ambar-payroll .py-entry-value{font-size:29px;line-height:35px}#ambar-payroll .py-metric dd{font-size:20px;line-height:28px}#ambar-payroll .py-metrics{gap:14px}#ambar-payroll .py-arithmetic .py-metric:nth-child(n+2)::before{left:-12px;font-size:11px}#ambar-payroll .py-person{gap:8px;grid-template-columns:24px minmax(0,1fr) auto}#ambar-payroll .py-avatar{width:24px;height:28px}#ambar-payroll .py-person-amount>strong{font-size:17px}#ambar-payroll .py-person-name>strong{font-size:11px}#ambar-payroll .py-person-name>small{font-size:11px}#ambar-payroll .py-bonus-person small{font-size:11px;line-height:16px}}
+/* Load AFTER payroll-visual.css. The existing app owns its header and tab bar.
+   Supply an actual allocated height; safe-bottom is 0 if already reserved. */
+#ambar-payroll{width:100%;height:var(--py-available-height,100%);min-height:0}
+#ambar-payroll .py-stage{width:100%;height:100%;min-height:0;align-items:stretch;padding:0}
+#ambar-payroll .py-app{width:100%;max-width:none;height:100%;min-height:0;border:0;border-radius:0}
+#ambar-payroll .py-content{min-width:0;min-height:0;overflow-y:auto}
+#ambar-payroll[data-shell="existing"] :is(.py-header,.py-nav){display:none}
+#ambar-payroll[data-hide-header="true"] .py-header{display:none}
+#ambar-payroll[data-hide-nav="true"] .py-nav{display:none}
+#ambar-payroll .py-nav{padding-bottom:calc(14px + var(--py-safe-bottom,0px))}
+#ambar-payroll .py-app[data-density="compact"] .py-nav{padding-bottom:calc(9px + var(--py-safe-bottom,0px))}
+#ambar-payroll:is([data-shell="existing"],[data-hide-nav="true"]) .py-content{padding-bottom:calc(16px + var(--py-safe-bottom,0px))}
+#ambar-payroll :is(.py-entry-value,.py-metric dd,.py-person-amount>strong,.py-read-row strong,.py-salary-link>strong,.py-bonus-action strong){max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#ambar-payroll .py-metric dt{white-space:normal;overflow-wrap:anywhere}
+#ambar-payroll .py-salary-link{grid-template-columns:minmax(0,1fr) minmax(0,auto) 16px}
+#ambar-payroll :is(.py-person-name,.py-bonus-person,.py-pending-row h3,.py-history-row strong,.py-history-row p){overflow-wrap:anywhere}
+#ambar-payroll [data-existing-component]{min-width:0}
+/* No reset of retained component children. Only these outer slot boundaries
+   are styled. Existing native forms keep their own classes and handlers. */
+#ambar-payroll .py-existing-content{padding:14px}
+#ambar-payroll .py-state-error{color:var(--py-red)}
+#ambar-payroll .py-inline-status{font-size:11px;line-height:17px;color:var(--py-muted);padding:8px 0}
+#ambar-payroll .py-inline-status[role="alert"]{color:var(--py-red)}
+/* Оболочка раздела (#accOv.pyr): шапка оболочки остаётся (заголовок и стрелка назад), пакетные
+   шапка и навигация спрятаны (data-shell="existing"), рейка и подвал не нужны; середина без отступов
+   и без своей прокрутки — прокручивается .py-content. Таббар виден: нижний отступ под него — на ленте. */
+#accOv.pyr #accRail,#accOv.pyr .stk-foot{display:none}
+#accOv.pyr.show #accMid{display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+#accOv.pyr #ambar-payroll{--py-safe-bottom:0px;flex:1 1 auto;min-height:0}
+#accOv.pyr #ambar-payroll[data-shell="existing"] .py-content{padding-bottom:calc(var(--tbh,80px) + 20px)}
+#accOv.pyr .stk-ttl-s:empty{display:none}
+/* Клавиатура (vendor/ambar-kb.js): снизу воздух — поле докручивается в центр экрана. */
+html.kb #accOv.pyr #ambar-payroll[data-shell="existing"] .py-content{padding-bottom:50vh}
+/* Гнездо перерисовки списка людей (fbPaint) — не узел раскладки: группы встают в колонку страницы с её зазором. */
+#ambar-payroll #fbList-people{display:contents}
+/* Числа на месте (fbPaint): минус — класс dn, как везде в книге; неизвестно — тускло. */
+#ambar-payroll :is(.py-metric dd,.py-read-row strong,.py-entry-value span).dn{color:var(--py-red)}
+#ambar-payroll :is(.py-metric dd,.py-read-row strong).ok{color:var(--py-green)}
+#ambar-payroll .py-entry-value span.none{color:#655c74}
+/* Поле курса: под фокусом, после записи, заперто на время загрузки. */
+#ambar-payroll .py-input-unit:focus-within{border-color:#8c714e}
+#ambar-payroll .py-input-unit input.saved{color:var(--py-green)}
+#ambar-payroll .py-input-unit input:disabled{opacity:.5}
+/* «Показать ещё» внутри зоны истории. */
+#ambar-payroll .py-list-zone>.pyr-more{margin:12px 14px 14px}
+/* Форма «Добавить человека» — под строкой-ссылкой, в её же зоне. */
+#ambar-payroll .py-add-zone>.py-form{border-top:1px solid #2d2635}
+/* Штраф на решении, пока ответ не пришёл. */
+#ambar-payroll .py-pending-row[aria-busy="true"]{opacity:.6}
+/* Кружок «Загрузка…» крутится. */
+#ambar-payroll .py-state>svg.lucide-loader-circle{animation:pyr-spin 1s linear infinite}
+@keyframes pyr-spin{to{transform:rotate(360deg)}}
+/* Карточка человека: под суммой к выплате — начислено и удержано той же сеткой, в две колонки. */
+#ambar-payroll .pyr-person-metrics{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px;padding-top:12px;border-top:1px solid #403547}
+#ambar-payroll .pyr-person-metrics dd{font-size:19px;line-height:26px}
+/* «Убрать из зарплат» — красным. */
+#ambar-payroll .py-inline-link.pyr-danger{color:var(--py-red)}
+#ambar-payroll .py-inline-link.pyr-danger>svg:first-child{color:var(--py-red)}
+/* «Одно имя на двоих»: кто остался в ведомости и кто без зарплаты. */
+#ambar-payroll .pyr-dupe+.pyr-dupe{margin-top:12px;padding-top:12px;border-top:1px solid #2d2635}
+#ambar-payroll .pyr-dupe strong{display:block;font-size:13px;line-height:20px;font-weight:600}
+#ambar-payroll .pyr-dupe p{margin:4px 0 0;font-size:11px;line-height:17px;color:var(--py-muted)}
+#ambar-payroll .pyr-dupe p.pyr-dupe-f{color:var(--py-red)}
+/* Подстраницы человека: прежние блоки (строки sc-r/fb-r, формы fb-add, аванс) в зоне пакета;
+   у строк свои отступы — зона без своих. */
+#ambar-payroll .py-existing-content.pyr-host{padding:4px 0 6px}
+#ambar-payroll .pyr-host>.sc-r:first-child,#ambar-payroll .pyr-host>.fb-gut>.sc-r:first-child,#ambar-payroll .pyr-host .fb-none{border-top:0}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -5792,7 +6016,6 @@ button.path:active{transform:scale(.995)}
   background:linear-gradient(135deg,var(--gold),var(--gold2));font-variant-numeric:tabular-nums}
 .fb-who-s u{text-decoration:none;font-size:9px;font-weight:700;opacity:.75}
 /* «Штрафы и удержания» и шаги штрафного листа — размеры сняты с макета владельца (экран 390) */
-.sc.fb-pen2c{background:linear-gradient(180deg,#151935 0%,#10132b 100%);border-color:rgba(255,255,255,.06)}
 .fb-pen-cap{font-size:14.5px;font-weight:600;color:#E8E8EF;line-height:1.3}
 /* Дисциплина (dsc-): люди строками, как подходы ревизии; раскрытый человек —
    виды нарушений и события по дням. */
@@ -5814,7 +6037,6 @@ button.path:active{transform:scale(.995)}
 .dsc-go{width:100%;height:42px;margin-top:10px;border-radius:11px;border:1px solid var(--border2);background:var(--card2);
   color:var(--gold2);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
 /* Правила штрафов: строка — нарушение и сумма; правка — название, сумма, степени. */
-.fb-rules-go{border-top:1px solid rgba(255,255,255,.06)}
 .fb-rule b{font-size:13.5px;color:var(--gold2);text-align:right;white-space:nowrap}
 .fb-rule b.none{font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:500;color:var(--muted)}
 .fb-rule span{white-space:normal;line-height:1.3;padding:8px 0}
@@ -5827,17 +6049,6 @@ button.path:active{transform:scale(.995)}
 .fb-rule-del{display:block;width:100%;height:48px;margin:4px 0 16px;border-radius:13px;border:1px solid rgba(224,82,82,.4);background:none;
   color:var(--dn);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
 
-.fb-pen2c > .fb-pen-cap{padding:16px 16px 0;font-weight:700;color:#F3F3F7}
-.fb-pen2{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:12px 12px 14px}
-.fb-pen2-b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:114px;padding:14px 4px;
-  border-radius:12px;border:1.5px solid rgba(201,169,110,.55);background:#0f1229;font-family:inherit;text-align:center;cursor:pointer;
-  transition:transform .12s var(--e1)}
-.fb-pen2-b:active{transform:scale(.97);border-color:var(--gold2)}
-.fb-pen2-b em{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-style:normal;
-  color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.fb-pen2-b em svg{width:18px;height:18px;stroke-width:2.3}
-.fb-pen2-b b{font-size:13.5px;font-weight:700;color:#F2F2F6;line-height:1.2;white-space:nowrap}
-.fb-pen2-b i{font-style:normal;font-size:11.5px;line-height:1.35;color:#8b8b98;max-width:142px}
 /* шапка шагов: крупный заголовок, без месяца и без полосы */
 #accOv.pen-ui .stk-top{border-bottom-color:transparent;background:var(--bg)}
 #accOv.pen-ui .stk-top-r{gap:14px}
@@ -5948,80 +6159,9 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-pen-last{margin-bottom:4px}
 .fb-pen-ghi b{display:flex;align-items:center;color:var(--gold2)}
 .fb-pen-rs{margin-left:auto;font-style:normal;font-size:13px;font-weight:500;color:#858592}
-/* история штрафов: карточка с шапкой и фильтром, строки со значком и статусом */
-.sc.fb-ph{padding:14px 12px 6px;background:linear-gradient(180deg,#101024 0%,#0c0c1a 100%);border-color:rgba(255,255,255,.07)}
-.fb-ph-h{display:flex;align-items:center;gap:10px;padding:0 4px 14px}
-.fb-ph-h em{display:flex;color:var(--gold2)}
-.fb-ph-h b{font-size:17px;font-weight:700;color:#F3F3F8}
-.fb-ph-f{display:flex;align-items:center;gap:7px;height:36px;margin-left:auto;padding:0 11px;border-radius:12px;
-  border:1px solid rgba(255,255,255,.13);background:#12122a;color:#E6E6EE;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
-.fb-ph-f svg{color:var(--gold2)}
-.fb-ph-f i{display:flex;color:var(--muted);transform:rotate(90deg)}
-.fb-ph-menu{display:flex;flex-wrap:wrap;gap:7px;padding:0 4px 12px}
-.fb-ph-menu[hidden]{display:none}
-.fb-ph-menu button{padding:7px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#12122a;
-  color:var(--sub);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
-.fb-ph-menu button.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft);color:var(--gold2)}
-.fb-ph-r{display:flex;align-items:flex-start;gap:10px;width:100%;margin:0 0 10px;padding:13px 8px 13px 11px;border-radius:16px;
-  border:1px solid rgba(255,255,255,.05);background:#15152c;font-family:inherit;text-align:left;color:inherit;cursor:pointer}
-.fb-ph-r:active{border-color:rgba(201,169,110,.45)}
-.fb-ph-r[hidden]{display:none}
-.fb-ph-i{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  font-style:normal;color:#B9B9C6;background:#1d1d34}
-.fb-ph-b{flex:1;min-width:0}
-.fb-ph-b b{display:block;font-size:14.5px;font-weight:700;color:#F1F1F6;line-height:1.25;overflow:hidden;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.fb-ph-b i{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:#A9A9B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fb-ph-b s{display:block;margin-top:3px;text-decoration:none;font-size:12px;color:#7E7E8C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fb-ph-r2{flex:0 0 auto;width:92px;text-align:right}
-.fb-ph-r2 u{display:block;text-decoration:none;font-size:10px;color:#8A8A97;white-space:nowrap}
-.fb-ph-r2 b{display:block;margin-top:5px;font-size:14.5px;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.fb-ph-st{display:inline-block;margin-top:6px;padding:3px 8px;border-radius:999px;font-style:normal;font-size:10.5px;font-weight:700;white-space:nowrap}
-.fb-ph-st.live{color:#EFD09B;background:rgba(201,169,110,.16);border:1px solid rgba(201,169,110,.4)}
-.fb-ph-st.paid{color:#6FD79B;background:rgba(58,168,110,.16);border:1px solid rgba(58,168,110,.42)}
-.fb-ph-st.wait{color:#9EA6CE;background:rgba(120,132,188,.14);border:1px solid rgba(120,132,188,.34)}
-.fb-ph-st.off{color:#BCBDC8;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13)}
-.fb-ph-st.skip{color:#BCBDC8;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13)}
-.fb-ph-r.skip{cursor:default}
-.fb-ph-r.skip .fb-ph-b,.fb-ph-r.skip .fb-ph-i{opacity:.6}
-.fb-ph-r.skip .fb-ph-r2 b{color:#8A8A97;text-decoration:line-through}
-.fb-ph-r.cut{cursor:default}
-.fb-ph-st.cut{color:#EFD09B;background:rgba(201,169,110,.16);border:1px solid rgba(201,169,110,.4)}
-.fb-pd-meal{display:flex;flex-direction:column;align-items:flex-end;margin-top:6px}
-.fb-pd-meal i{font-style:normal;font-size:10px;color:#8A8A97}
-.fb-pd-meal b{margin-top:2px;font-size:15px;font-weight:800;color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
-/* штрафы, требующие решения: строка истории + сумма справа и две кнопки */
-.fb-pd-n{margin-left:auto;min-width:26px;height:26px;padding:0 8px;border-radius:999px;display:flex;
-  align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#1a1408;
-  background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.fb-pd-r{margin:0 0 10px;border-radius:16px;border:1px solid rgba(201,169,110,.3);background:#15152c;overflow:hidden}
-.fb-pd-top{display:flex;align-items:flex-start;gap:10px;padding:13px 11px 12px}
-.fb-pd-top .fb-ph-b s{white-space:normal}
-/* за что — одной фразой целиком, без обрезки на второй строке (владелец,
-   22 сен 2026: «сразу полноценную формулировку») */
-.fb-pd-r .fb-ph-b b,.fb-ph-r.auto .fb-ph-b b{display:block;-webkit-line-clamp:unset;overflow:visible}
-.fb-pd-amt{display:flex;align-items:center;justify-content:flex-end;gap:4px;height:36px;margin-top:6px;padding:0 9px 0 6px;
-  border-radius:11px;border:1px solid rgba(201,169,110,.38);background:#101024;cursor:text}
-.fb-pd-amt input{width:100%;min-width:0;padding:0;border:0;background:none;color:var(--gold2);font-family:inherit;
-  font-size:15px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;outline:none}
-.fb-pd-amt input::placeholder{color:#6E6E7C;font-weight:600;font-size:12.5px}
-.fb-pd-amt i{flex:0 0 auto;font-style:normal;font-size:10px;font-weight:700;color:#8A8A97}
-.fb-pd-r .fb-ph-r2{width:96px}
-.fb-pd-act{padding:0 11px 11px;border-top:0}
-.fb-ph-r .fb-chev{width:26px;height:26px;margin:11px 0 0 -2px;color:#F0C97E;
-  background:linear-gradient(135deg,rgba(201,169,110,.34),rgba(201,169,110,.14))}
-.fb-ph-r.off .fb-ph-b,.fb-ph-r.off .fb-ph-i{opacity:.55}
-.fb-ph-r.off .fb-ph-r2 b{color:#8A8A97;text-decoration:line-through}
-.fb-ph-r.off .fb-chev{color:#9A9AA6;background:rgba(255,255,255,.06)}
 .fb-pen-val{font-size:16px;font-weight:700;color:#F1F1F6;font-variant-numeric:tabular-nums}
 .fb-pen-val.sub{font-size:14px;font-weight:500;color:#C4C4CF}
-.fb-ph-none{padding:6px 6px 18px;font-size:13.5px;color:#858592}
-.fb-ph-more{display:block;width:100%;height:46px;margin:2px 0 10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;
-  background:#12122a;color:var(--gold2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
 .fb-nw{white-space:nowrap}
-.fb-ph-none{padding:18px;font-size:13.5px;color:#858592}
-.fb-ph-more{display:block;width:100%;height:46px;margin:0 0 12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;
-  background:#0f0f1f;color:var(--gold2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
 /* «Зарплаты»: сколько сотрудников — золотая таблетка справа в шапке */
 .fb-staffn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px 0 10px;border-radius:999px;
   white-space:nowrap;color:var(--gold2);border:1px solid rgba(201,169,110,.45);
@@ -6092,7 +6232,6 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-e-v.ok{color:var(--up)} .fb-e-v.dn{color:var(--dn)} .fb-e-v.dim{color:var(--dim)}
 .fb-add .aud-b.fb-del{background:var(--dn-soft);color:var(--dn)}
 .fb-add .fb-num[hidden]{display:none}
-.fb-r.fb-hide span{color:var(--muted);font-weight:500}
 .fb-i .fb-num[data-dec]{width:88px}
 #fbList-items .fb-e-b i,#fbList-bud .fb-e-b i{white-space:normal;overflow:visible;text-overflow:clip}
 .fb-hint{flex:0 0 auto;font-style:normal;font-weight:600;font-size:13.5px;letter-spacing:0;
@@ -6179,26 +6318,6 @@ textarea.fb-pen-inp.fb-pen-ta{height:90px;padding:12px 14px;line-height:1.4;resi
 .fb-stay.on > span{color:var(--text)}
 .sc-r.fb-wk-f:active > b{border-color:rgba(201,169,110,.55);background:var(--card)}
 .shl-card.fb-pc.fb-away{opacity:.5}
-/* ── Лист премий ── строки те же, что в зарплатной ведомости; своё здесь
-   только серая кнопка с датой, когда премия откроется. */
-.fb-list{display:flex;flex-direction:column}
-/* Строка премии: слева имя и стаж, справа в одну линию сумма и кнопка. Ставить
-   их столбиком (как у выплат зарплаты) здесь незачем — сумма тут короткая. */
-.ten-e{min-height:54px;align-items:center}
-.ten-v{flex:0 0 auto;display:flex;align-items:center;gap:10px}
-.ten-sum{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
-  white-space:nowrap;font-variant-numeric:tabular-nums}
-.ten-sum u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
-  color:var(--muted);margin-left:3px}
-.fb-paybtn.ten-off{background:none;border:1px solid var(--border2);color:var(--muted);
-  cursor:default;min-width:92px}
-.fb-note{margin:10px 16px 4px;font-size:11px;line-height:1.55;color:var(--dim)}
-/* Одно имя на двоих: карточка та же, но красным — это не строка зарплаты, а
-   сообщение о человеке, которого в ведомости нет. */
-.shl-card.fb-pc.fb-dupe{border-color:rgba(224,85,85,.35);background:rgba(224,85,85,.05)}
-.fb-dupe .shl-code.dn{background:rgba(224,85,85,.16);color:var(--dn);font-size:17px}
-.fb-dupe .shl-b i{white-space:normal;line-height:1.45;color:var(--sub)}
-.fb-dupe-f{padding:0 14px 11px;font-size:11.5px;color:var(--dn)}
 .fb-inname{flex:1 1 auto;min-width:0} .fb-inname .fb-txt{width:100%;height:36px}
 .fb-editing .fb-e-b b{font-size:14px}
 /* Перетягивание людей: строка под пальцем — приподнятая копия, на месте —
@@ -22519,6 +22638,18 @@ const LUC = {
   'circle-dot':        '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/>',
   'corner-down-right': '<path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
   'pencil':            '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  // «Зарплаты» (визуал 27 ноя 2026)
+  'award':             '<path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/><circle cx="12" cy="8" r="6"/>',
+  'bell':              '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  'car':               '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  'circle-minus':      '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>',
+  'clock':             '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  'list-checks':       '<path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>',
+  'loader-circle':     '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  'map-pin-off':       '<path d="M12.75 7.09a3 3 0 0 1 2.16 2.16"/><path d="M17.072 17.072c-1.634 2.17-3.527 3.912-4.471 4.727a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 1.432-4.568"/><path d="m2 2 20 20"/><path d="M8.475 2.818A8 8 0 0 1 20 10c0 1.183-.31 2.377-.81 3.533"/><path d="M9.13 9.13a3 3 0 0 0 3.74 3.74"/>',
+  'plus':              '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  'shield-check':      '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  'sticky-note':       '<path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path d="M15 3v5a1 1 0 0 0 1 1h5"/>',
 };
 function luc(name, cls){
   return `<svg class="lucide lucide-${name}${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUC[name] || ''}</svg>`;
@@ -24525,21 +24656,137 @@ function fhRatesTile(){
 // премий, штрафы/авансы/долги. Месяц — тот же, что на вкладке, листается
 // стрелками, как в ведомости; назад с любой из трёх страниц — сюда
 // (FB.payFrom), а не на вкладку.
-async function accFinPayroll(){
-  const b = await fbMonthScreen('Зарплаты, премии и удержания'); if(!b) return;
-  if(!TEN && !_tenBusy && window.ownerApi) tenLoad(true);   // лист премий — отдельная ручка; придёт — fbRepaint перерисует
-  document.getElementById('accMid').innerHTML = fhPayrollHtml(b);
+// Раздел «Зарплаты» в новом виде (владелец, 27 ноя 2026, пакет ChatGPT
+// AMBAR-PAYROLL): #ambar-payroll > .py-stage > .py-app в середине раздела
+// (#accOv.pyr); шапка оболочки и таббар остаются, пакетные шапка и навигация
+// спрятаны (data-shell="existing"). Страницы одной оболочки: главная — три
+// широкие кнопки на всю высоту, «Зарплатная ведомость», «Премии за стаж»,
+// «Штрафы / авансы / долги», карточка человека зонами и её подстраницы.
+// Данные, расчёты, ручки, подтверждения и переходы — прежние (fbSave,
+// fbPersonAdd, fbPersonOpen, tenPay, fbPendDo, fbPenEdit, fbPaySeg,
+// fbWorkRows, fbAdvGo, fbItemForm, fbPayOut, fbPersonHide). Оболочка строится
+// на вход; та же страница того же месяца при обновлении книги не
+// пересобирается — числа ложатся на место (fbPaint), списки перерисовываются,
+// поле под пальцем не трогаем.
+const PYR_MONTH = {home: 1, payroll: 1, bonuses: 0, deductions: 1, employee: 1, 'employee-sub': 1};   // где есть полоса месяца
+let _pyrRO = null, _pyrRaf = 0;
+function pyrMonthHtml(m){
+  return `<div id="pyMonth" class="py-month">
+    <button type="button" data-action="month-prev" aria-label="Предыдущий месяц" onclick="pyrMonth(-1)">${luc('chevron-left')}</button>
+    <strong id="pyMonthLabel">${escS(fbMonthT(m))}</strong>
+    <button type="button" data-action="month-next" id="pyMonthNext" aria-label="Следующий месяц" onclick="pyrMonth(1)"${m >= fbMonthNow() ? ' disabled' : ''}>${luc('chevron-right')}</button>
+  </div>`;
 }
-function fhPayrollHtml(b){
-  const t = fbCur(b).totals || {};
+function pyrShell(page, m){
+  return `<div id="ambar-payroll" data-shell="existing"><div class="py-stage"><section class="py-app" data-page="${page}" aria-label="Зарплаты">
+    ${PYR_MONTH[page] ? pyrMonthHtml(m) : ''}<main id="pyContent" class="py-content"></main></section></div></div>`;
+}
+function pyrBody(){ return document.getElementById('pyContent'); }
+function pyrPut(html){ const main = pyrBody(); if(main){ main.innerHTML = html; main.scrollTop = 0; pyrDensitySoon(); } }
+// Вход на страницу: шапка оболочки, класс pyr, оболочка пакета. Другая
+// страница — пересобрать; та же — оставить, чтобы не трогать поле под пальцем.
+function pyrOpen(page, title, sub){
+  _setText('accTitle', title); _setText('accSub', sub || '');
+  FB.loanPage = false; FB.movePage = false; FB.depPage = false; FB.rpPage = false; FB.rpOut = false;
+  FB.month = FB.month || fbMonthNow();
+  const ov = document.getElementById('accOv'), mid = document.getElementById('accMid');
+  ov.classList.add('pyr');
+  const app = document.querySelector('#ambar-payroll .py-app');
+  if(!app || app.dataset.page !== page){ mid.innerHTML = pyrShell(page, FB.month); pyrBind(); }
+  pyrMonthBar(FB.month);
+}
+function pyrMonthBar(m){
+  const l = document.getElementById('pyMonthLabel'), n = document.getElementById('pyMonthNext');
+  if(l) l.textContent = fbMonthT(m);
+  if(n) n.disabled = m >= fbMonthNow();
+}
+// Месяц общий для всех финансовых экранов, вперёд — не дальше текущего.
+async function pyrMonth(d){
+  const m = fbMonthAdd(FB.month || fbMonthNow(), d);
+  if(m > fbMonthNow() || m === FB.month) return;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  FB.month = m;
+  pyrMonthBar(m);
+  if(FB_VIEWS[ACC_VIEW]) await FB_VIEWS[ACC_VIEW]();
+  const box = document.getElementById('finBook');            // карточка «Финансы» под разделом листает тот же месяц
+  if(box && FB.month === m && fbBook(m)) fbHubPaint(fbBook(m));
+}
+// Книга месяца для страницы. Нет в памяти — состояние загрузки внутри
+// оболочки (числа прочерками, экран не схлопывается); не пришла — картинка
+// «Не удалось загрузить» в обычной середине; устарела — обновится фоном.
+async function pyrBook(m, gone, retry, loading){
+  if(!fbBook(m)){
+    if(loading) loading();
+    try{ await fbLoad(m); }
+    catch(e){ if(!gone()) pyrFail(retry); return null; }
+    if(gone()) return null;
+  } else if(fbStale(m)){
+    fbLoad(m).then(() => { if(!gone()) fbRepaint(); }).catch(() => {});
+  }
+  return fbBook(m);
+}
+function pyrFail(retry){
+  const ov = document.getElementById('accOv'), mid = document.getElementById('accMid');
+  if(ov) ov.classList.remove('pyr');
+  if(mid) mid.innerHTML = loadFail(retry);
+}
+// Экраны, рисующие в обычной середине (штрафной лист, удержание, правила,
+// дисциплина, пересмотр штрафа), — без оболочки пакета.
+function pyrLeave(){ const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pyr'); }
+function pyrState(text, icon){ return `<div class="py-state" role="status">${icon ? luc(icon) : ''}${text}</div>`; }
+// Плотность — как в payroll-layout.js пакета: высота приложения вместе со
+// спрятанными шапкой и навигацией меньше 740 — compact. Главной, которой не
+// хватает высоты на три кнопки, — тоже compact; длинный список просто
+// прокручивается.
+function pyrDensity(){
+  _pyrRaf = 0;
+  const app = document.querySelector('#ambar-payroll .py-app'), main = pyrBody();
+  if(!app || !main || main.clientHeight <= 0) return;
+  const norm = app.clientHeight + 54 + 68;
+  app.dataset.density = norm < 740 ? 'compact' : 'regular';
+  if(app.dataset.page === 'home' && main.scrollHeight > main.clientHeight + 1) app.dataset.density = 'compact';
+}
+function pyrDensitySoon(){ if(!_pyrRaf) _pyrRaf = requestAnimationFrame(pyrDensity); }
+function pyrBind(){
+  const app = document.querySelector('#ambar-payroll .py-app'), main = pyrBody();
+  if(_pyrRO){ _pyrRO.disconnect(); _pyrRO = null; }
+  if(app && main && window.ResizeObserver){ _pyrRO = new ResizeObserver(pyrDensitySoon); _pyrRO.observe(app); _pyrRO.observe(main); }
+  pyrDensitySoon();
+}
+// ── Главная «Зарплаты»: три кнопки на всю высоту ─────────────────────────
+async function accFinPayroll(force){
+  pyrOpen('home', 'Зарплаты', '');
+  // лист премий — отдельная ручка; придёт — fbRepaint доложит число. force —
+  // «Попробовать ещё раз» после отказа: лист читаем заново, не ждём минуту
+  if(!_tenBusy && window.ownerApi && (force || !_tenAt || Date.now() - _tenAt > FB_TTL)) tenLoad(true);
+  const m = FB.month, gone = () => FB.month !== m || ACC_VIEW !== 'finpayroll' || !document.getElementById('ambar-payroll');
+  const b = await pyrBook(m, gone, 'accFinPayroll(true)', () => pyrHubRender(null));
+  if(b) pyrHubRender(b);
+}
+// Кнопки стоят всегда; числа — по книге: нет книги — прочерки, не нули.
+function pyrHubRender(b){
+  const main = pyrBody(); if(!main) return;
+  const t = b ? (fbCur(b).totals || {}) : {};
   const ten = TEN ? (TEN.due || 0) : null;
   const wait = TEN && TEN.ready ? `${TEN.ready} ${pluralize(TEN.ready, 'человек ждёт', 'человека ждут', 'человек ждут')}` : 'за стаж';
-  const row = (title, money, unit, id, lbl) => `<button type="button" class="fhp-row" onclick="fhpGo('${id}')" aria-label="${escS(lbl)}"><span class="fhp-title">${title}</span><span class="fhp-money">${money}<span>${unit}</span></span>${luc('chevron-right', 'fhp-arrow')}</button>`;
-  return `<div class="sc">${fbCap(b.month, true)}<div class="fhp-panel" role="group" aria-label="Зарплаты, премии и удержания, AED">
-    ${row('Зарплатная ведомость', fhNum(t.left, {neg: true}), 'к выплате', 'finpay', `Зарплатная ведомость${t.left != null ? `, ${fbFmt(t.left)} AED к выплате` : ''}`)}
-    ${row('Лист премий', ten == null ? fhNum(null, {skel: true, w: 60}) : fhNum(ten), wait, 'finbonus', `Лист премий${ten != null ? `, ${fbFmt(ten)} AED` : ''}, ${wait}`)}
-    ${row('Штрафы / авансы / долги', fhNum(t.minus), 'удержано', 'finitems', `Штрафы, авансы, долги${t.minus != null ? `; удержано ${fbFmt(t.minus)} AED` : ''}`)}
-  </div></div>`;
+  if(!document.getElementById('pyHub')){
+    const entry = (k, id, ic, title) => `<button type="button" class="py-entry" data-page="${id}" onclick="fhpGo('${id}')">
+      <span class="py-entry-heading">${luc(ic)}<strong>${title}</strong></span>
+      <span class="py-entry-body"><span class="py-entry-caption" id="pyHubC-${k}"></span><span class="py-entry-value"><span id="pyHubV-${k}"></span> <small>AED</small></span></span>
+      ${luc('chevron-right', 'py-entry-arrow')}</button>`;
+    main.innerHTML = `<div class="py-hub" id="pyHub" aria-label="Разделы зарплат">
+      ${entry('pay', 'finpay', 'users-round', 'Зарплатная ведомость')}
+      ${entry('bonus', 'finbonus', 'award', 'Лист премий')}
+      ${entry('ded', 'finitems', 'circle-minus', 'Штрафы / авансы / долги')}
+    </div>`;
+  }
+  const put = (k, v, neg, cap) => {
+    const el = document.getElementById('pyHubV-' + k), c = document.getElementById('pyHubC-' + k);
+    if(el){ el.textContent = fbFmtN(v); el.className = v === null || v === undefined ? 'none' : neg && v < 0 ? 'dn' : ''; }
+    if(c) c.textContent = cap;
+  };
+  put('pay', t.left, true, 'К выплате'); put('bonus', ten, false, wait); put('ded', t.minus, false, 'Удержано');
+  pyrDensitySoon();
 }
 function fhpGo(id){
   FB.payFrom = 'finpayroll';
@@ -24698,8 +24945,9 @@ const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => a
 function fbRepaint(){
   const box = document.getElementById('finBook');
   // Лист премий считается отдельной ручкой — дотягиваем его один раз, чтобы
-  // на карточке стояло число, а не прочерк.
-  if(!TEN && !_tenBusy && window.ownerApi) tenLoad(true);
+  // на карточке стояло число, а не прочерк. Отказ ручки — не раньше чем через
+  // минуту: tenLoad сам зовёт fbRepaint, без срока это кольцо запросов.
+  if(!TEN && !_tenBusy && window.ownerApi && (!_tenAt || Date.now() - _tenAt > FB_TTL)) tenLoad(true);
   if(box) fbHubPaint(fbBook(FB.month));
   if(!document.getElementById('accOv').classList.contains('show')) return;
   // открыта страница расхода (статья, аренда, зарплаты, история) — месяц
@@ -24798,6 +25046,8 @@ function fbValues(){
     const pay = fbCur(mb);
     for(const k in pay.totals) V['pay.' + k] = pay.totals[k];
     V['pay.usd'] = pay.usd; V['pay.usd_auto'] = pay.usd_auto;
+    V['pay.usd_set_on'] = pay.usd_set ? 1 : 0; V['pay.usd_auto_on'] = pay.usd_set ? 0 : 1;      // подпись у поля курса
+    const its = fbItemSums(pay); V['it.fine'] = its.fine; V['it.advance'] = its.advance; V['it.loan'] = its.loan;
     const wal = fbWal(mb);
     V['safe.wal'] = wal ? wal.aed : null; V['safe.all'] = fbSafeAll(mb);
     const p = FB.person ? (pay.people || []).find(x => x.name === FB.person) : null;
@@ -25074,6 +25324,7 @@ function fbCrHint(){
 function fbAddToggle(book){
   const f = document.getElementById('fbAdd-' + book); if(!f) return;
   f.hidden = !f.hidden;
+  const tg = f.previousElementSibling; if(tg && tg.hasAttribute('aria-expanded')) tg.setAttribute('aria-expanded', String(!f.hidden));
   if(!f.hidden){ const a = document.getElementById('fbAmt-' + book); if(a) a.focus(); }
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -28503,35 +28754,69 @@ function fbAnalysis(b){
 // ── Экран «Зарплаты» ──────────────────────────────────────────────────────
 async function accFinPay(){
   if(FB.payFrom === 'finpayroll') ACC_BACK = () => accOpen('finpayroll');
-  const b = await fbMonthScreen('Зарплатная ведомость'); if(!b) return;
-  const pay = fbCur(b), m = `data-month="${b.month}"`;
-  document.getElementById('accMid').innerHTML = `
-  <div class="sc">
-    ${fbCap(b.month, true)}
-    <div class="aud-g">
-      ${fbTile('К выплате', 'pay.to_pay', pay.totals.to_pay, {mode: 'neg'})}
-      ${fbTile('Выплачено', 'pay.paid', pay.totals.paid)}
-      ${fbTile('Осталось', 'pay.left', pay.totals.left, {mode: 'neg'})}
-    </div>
-    ${fbIn('Курс доллара', 'usd', pay.usd_set ? pay.usd : null, m, {ph: fbFmtN(pay.usd_auto || pay.usd, 1), phk: 'pay.usd_auto', eu: 'по обменнику', unit: 'AED', dec: 1})}
-  </div>
-  <div id="fbList-people">${fbPeopleHtml(b)}</div>`;
+  pyrOpen('payroll', 'Зарплатная ведомость', '');
+  const m = FB.month, gone = () => FB.month !== m || ACC_VIEW !== 'finpay' || !document.getElementById('ambar-payroll');
+  const b = await pyrBook(m, gone, 'accFinPay()', () => pyrPut(pyrPayHtml(null, m)));
+  if(b) pyrPayRender(b);
 }
+// Та же страница того же месяца уже стоит — числа на место (fbPaint), список
+// людей перерисуется там же; форма «Добавить человека» с набранным остаётся.
+function pyrPayRender(b){
+  const main = pyrBody(); if(!main) return;
+  const page = main.querySelector('.py-page[data-month]');
+  if(page && page.dataset.month === b.month && !page.dataset.loading){ fbPaint(); pyrRateSync(b); return; }
+  pyrPut(pyrPayHtml(b, b.month));
+}
+// Поле курса — по книге, если в нём не стоит человек.
+function pyrRateSync(b){
+  const inp = document.getElementById('pyRate'), pay = fbCur(b);
+  if(!inp || document.activeElement === inp) return;
+  inp.disabled = false; inp.dataset.month = b.month;
+  inp.value = pay.usd_set ? fbInFmt(pay.usd, 1) : ''; inp.dataset.was = pay.usd_set ? pay.usd : '';
+}
+// Страница: итог месяца формулой (к выплате − выплачено = осталось), курс
+// доллара прежним полем fbSave (поле usd месяца; пустое — по обменнику), люди
+// по ролям, «Добавить человека» с формой под строкой. Без книги — прочерки,
+// поле заперто, «Загрузка…».
+function pyrPayHtml(b, m){
+  const pay = b ? fbCur(b) : null, t = pay ? (pay.totals || {}) : {}, set = !!(pay && pay.usd_set);
+  const dd = (key, v, neg) => `<dd data-f="${key}"${neg ? ' data-fc="neg"' : ''}${neg && v < 0 ? ' class="dn"' : ''}>${fbFmtN(v)}</dd>`;
+  return `<div class="py-page" data-month="${m}"${b ? '' : ' data-loading="1"'}>
+    <section class="py-summary">
+      <div class="py-summary-header"><h2>За месяц</h2><span class="py-unit">AED</span></div>
+      <dl class="py-metrics py-arithmetic">
+        <div class="py-metric"><dt>К выплате</dt>${dd('pay.to_pay', t.to_pay, true)}</div>
+        <div class="py-metric"><dt>Выплачено</dt>${dd('pay.paid', t.paid)}</div>
+        <div class="py-metric"><dt>Осталось</dt>${dd('pay.left', t.left, true)}</div>
+      </dl>
+      <div class="py-rate">
+        <label for="pyRate">Курс доллара<small id="pyRateSource"><span data-show="pay.usd_auto_on"${set ? ' hidden' : ''}>по обменнику</span><span data-show="pay.usd_set_on"${set ? '' : ' hidden'}>свой курс</span></small></label>
+        <span class="py-input-unit"><input id="pyRate" type="text" inputmode="decimal" autocomplete="off" aria-label="Курс доллара"
+          placeholder="${pay ? fbFmtN(pay.usd_auto || pay.usd, 1) : '—'}" value="${set ? fbInFmt(pay.usd, 1) : ''}"${b ? '' : ' disabled'}
+          data-field="usd" data-month="${m}" data-ph="pay.usd_auto" data-dec="1" data-was="${set ? pay.usd : ''}"
+          onfocus="this.select()" onkeydown="if(event.key==='Enter'){this.blur()}" onblur="fbSave(this)"><span>AED</span></span>
+      </div>
+    </section>
+    ${b ? `<div id="fbList-people">${fbPeopleHtml(b)}</div>
+    <section class="py-add-zone" id="pyAddZone">
+      <button type="button" class="py-inline-link" data-action="toggle-add" aria-expanded="false" aria-controls="fbAdd-person" onclick="fbAddToggle('person')">${luc('plus')}<span>Добавить человека</span>${luc('chevron-down')}</button>
+      <div class="py-form" id="fbAdd-person" hidden>
+        <label>Имя<input class="py-field" id="fbAmt-person" autocomplete="off" maxlength="40" onkeydown="if(event.key==='Enter'){fbPersonAdd()}"></label>
+        <div class="py-options" id="fbRole" aria-label="Роль">${fbRoleChips(true)}</div>
+        <button type="button" class="py-primary" onclick="fbPersonAdd()">Добавить</button>
+      </div>
+    </section>` : pyrState('Загрузка…', 'loader-circle')}
+  </div>`;
+}
+// Люди по ролям — зонами пакета; гнездо #fbList-people перерисовывает fbPaint.
 function fbPeopleHtml(b){
   const pay = fbCur(b);
   let out = fbDupesHtml(pay.dupes);
   out += (pay.roles || []).map(r => {
     const rows = (pay.people || []).filter(p => p.role === r.id);
     if(!rows.length) return '';
-    return `<div class="sc">${fbCapT(r.t, String(rows.length))}<div class="ord-dists fb-days">${rows.map(fbPersonRow).join('')}</div></div>`;
+    return `<section class="py-list-zone"><div class="py-group-title"><h2>${escS(r.t)}</h2><span>${rows.length}</span></div>${rows.map(fbPersonRow).join('')}</section>`;
   }).join('');
-  out += `<div class="sc"><button class="sc-r fb-plus" onclick="fbAddToggle('person')"><span>Добавить человека</span><em>${_FB_PLUS}</em></button>
-    <div class="fb-add" id="fbAdd-person" hidden>
-      <input class="fb-txt" placeholder="Имя" autocomplete="off" maxlength="40" id="fbAmt-person"
-        onkeydown="if(event.key==='Enter'){fbPersonAdd()}">
-      <div class="chip-row fb-chips" id="fbRole">${fbRoleChips()}</div>
-      <button class="aud-b go" onclick="fbPersonAdd()">Добавить</button>
-    </div></div>`;
   return out;
 }
 // Одно имя на двоих. В ведомости человек — это его имя: под именем лежат и
@@ -28542,19 +28827,21 @@ function fbPeopleHtml(b){
 function fbDupesHtml(dupes){
   const d = dupes || [];
   if(!d.length) return '';
-  return `<div class="sc">${fbCapT('Одно имя на двоих', String(d.length))}
-    <div class="ord-dists fb-days">${d.map(x => `
-      <div class="shl-card fb-pc fb-dupe">
-        <div class="shl-h"><span class="shl-code dn">!</span><span class="shl-b">
-          <b>${escS(x.name)}</b>
-          <i>${escS(x.kept_ru)} и ${escS(x.lost_ru)} — это разные люди, а имя одно.
-             В ведомости остался ${escS(x.kept_ru)}: ${escS(x.lost_ru)} зарплату не получит.</i>
-        </span></div>
-        <div class="fb-dupe-f">Переименуйте одного из них в «Водителях» — и оба встанут в ведомость.</div>
-      </div>`).join('')}</div></div>`;
+  return `<section class="py-list-zone"><header class="py-group-title"><h2>Одно имя на двоих</h2><span>${d.length}</span></header>
+    <div class="py-existing-content" data-existing-component="duplicate-name-details">${d.map(x => `
+      <div class="pyr-dupe"><strong>${escS(x.name)}</strong>
+        <p>${escS(x.kept_ru)} и ${escS(x.lost_ru)} — это разные люди, а имя одно. В ведомости остался ${escS(x.kept_ru)}: ${escS(x.lost_ru)} зарплату не получит.</p>
+        <p class="pyr-dupe-f">Переименуйте одного из них в «Водителях» — и оба встанут в ведомость.</p></div>`).join('')}</div></section>`;
 }
 const FB_ROLE_T = {other: 'Офис', senior: 'Старший оператор', operator: 'Операторы', driver: 'Водители'};
-function fbRoleChips(){ return Object.keys(FB_ROLE_T).map(r => `<button class="chip${FB.role === r ? ' on' : ''}" onclick="fbRolePick('${r}')">${FB_ROLE_T[r]}</button>`).join(''); }
+// py — кнопки роли в языке пакета (ведомость); иначе прежние чипы (бюджет).
+function fbRoleChips(py){
+  return Object.keys(FB_ROLE_T).map(r => py
+    ? `<button type="button" data-role="${r}" aria-pressed="${FB.role === r}" onclick="fbRolePick('${r}')">${FB_ROLE_T[r]}</button>`
+    : `<button class="chip${FB.role === r ? ' on' : ''}" onclick="fbRolePick('${r}')">${FB_ROLE_T[r]}</button>`).join('');
+}
+// Строка человека: инициалы, имя, под ним оклад и дни, справа сумма — к
+// выплате или, когда всё выплачено, выплаченное зелёным; минус красным.
 function fbPersonRow(p){
   const sym = p.cur === 'USD' ? '$' : 'AED';
   // Дни: у оклада в месяц — сколько был на работе («с 15.09 · 16 из 30 дн»),
@@ -28563,16 +28850,17 @@ function fbPersonRow(p){
   const sub = p.rate === null ? (wl || 'оклад не задан')
     : [`${fbFmt(p.rate)} ${sym} ${p.unit === 'day' ? 'в день' : 'в месяц'}`, p.unit === 'day' ? `${p.days} дн` : wl,
        p.minus ? `удержано ${fbFmt(p.minus)}` : '', p.plus ? `премия ${fbFmt(p.plus)}` : ''].filter(Boolean).join(' · ');
-  const unit = p.left === 0 && p.paid ? 'выплачено' : 'к выплате';
-  return `<button class="shl-card" data-n="${escS(p.name)}" onclick="fbPersonOpen(this.dataset.n)"><div class="shl-h">
-    <span class="shl-code">${escS(fbIni(p.title || p.name))}</span>
-    <span class="shl-b"><b>${escS(p.title || p.name)}</b><i>${sub}</i></span>
-    <span class="shl-v"><b${p.left < 0 ? ' class="dn"' : p.left === 0 && p.paid ? ' class="up"' : ''}>${fbFmt(p.left === 0 && p.paid ? p.paid : p.left)}</b><i>${unit}</i></span></div></button>`;
+  const paid = p.left === 0 && p.paid;
+  const cls = p.left < 0 ? ' class="py-negative"' : paid ? ' class="py-positive"' : '';
+  return `<button type="button" class="py-person" data-action="open-person" data-n="${escS(p.name)}" onclick="fbPersonOpen(this.dataset.n)">
+    <span class="py-avatar">${escS(fbIni(p.title || p.name))}</span>
+    <span class="py-person-name"><strong>${escS(p.title || p.name)}</strong><small>${sub}</small></span>
+    <span class="py-person-amount"><strong${cls}>${fbFmt(paid ? p.paid : p.left)}</strong><small>${paid ? 'выплачено' : 'к выплате'}</small></span></button>`;
 }
 FB.role = 'other';
 function fbRolePick(r){
   FB.role = r;
-  const box = document.getElementById('fbRole'); if(box) box.innerHTML = fbRoleChips();
+  const box = document.getElementById('fbRole'); if(box) box.innerHTML = fbRoleChips(box.classList.contains('py-options'));
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 async function fbPersonAdd(){
@@ -28583,13 +28871,16 @@ async function fbPersonAdd(){
       {method: 'POST', body: {name, role: FB.role, month: FB.month, as: _meName()}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(res.book){ fbApply(res.book); fbPaint(); }
+    // ведомость в новом виде: форма стоит отдельно от списка — закрыть и очистить самим
+    const f = document.getElementById('fbAdd-person'), inp = document.getElementById('fbAmt-person');
+    if(f && f.classList.contains('py-form')){ f.hidden = true; if(inp) inp.value = ''; const tg = f.previousElementSibling; if(tg && tg.hasAttribute('aria-expanded')) tg.setAttribute('aria-expanded', 'false'); }
     // в бюджете новый человек сразу ждёт оклад: открываем ему строку правки
     if(document.getElementById('fbList-bud')){ FB.edit = {kind: 'rate', id: name}; fbBudRepaint(); }
     else fbBudRepaint();
   }catch(e){ _toast('Не удалось добавить'); }
 }
 function fbPersonOpen(name, from){
-  FB.person = name; FB.personFrom = from || 'finpay';
+  FB.person = name; FB.personFrom = from || 'finpay'; FB.personSub = null;
   accOpen('finperson');
   ACC_BACK = () => accOpen(FB.personFrom);
 }
@@ -28755,29 +29046,72 @@ async function fbWorkSend(body){
 }
 
 // ── Экран человека ────────────────────────────────────────────────────────
+// Карточка зонами (владелец, 27 ноя 2026, пакет AMBAR-PAYROLL): «К выплате»
+// — месяц и сумма, под ней начислено и удержано; «Оклад» — строка-ссылка, тап
+// по сумме открывает оклад; список действий — Аванс · Удержания и премии ·
+// Выплаты · Итог · Заметка, каждое своей подстраницей с прежним блоком
+// целиком (поля, даты, режимы, формы, подтверждения); внизу «Убрать из
+// зарплат». FB.personSub — какая подстраница открыта; стрелка назад с неё —
+// в карточку, из карточки — туда, откуда пришли.
+const PYR_SUB_T = {salary: 'Оклад', advance: 'Аванс', items: 'Удержания и премии', pays: 'Выплаты', total: 'Итог', note: 'Заметка'};
 async function accFinPerson(){
   // Заголовок — по имени человека, а не по ключу ведомости: у оператора с
   // тёзкой-водителем ключ уточнён, а зовут его по-прежнему.
   const _p0 = (fbCur(fbBook(FB.month) || {}) || {}).people;
   const _t = (_p0 || []).find(x => x.name === FB.person);
-  const b = await fbMonthScreen((_t && _t.title) || FB.person || 'Зарплата'); if(!b) return;
+  const sub = PYR_SUB_T[FB.personSub] ? FB.personSub : null, who = (_t && _t.title) || FB.person || 'Зарплата';
+  pyrOpen(sub ? 'employee-sub' : 'employee', sub ? PYR_SUB_T[sub] : who, sub ? who : '');
+  ACC_BACK = sub ? () => { FB.personSub = null; accOpen('finperson'); } : () => accOpen(FB.personFrom || 'finpay');
+  const m = FB.month, gone = () => FB.month !== m || ACC_VIEW !== 'finperson' || !document.getElementById('ambar-payroll');
+  const b = await pyrBook(m, gone, 'accFinPerson()', () => pyrPut(pyrState('Загрузка…', 'loader-circle')));
+  if(!b) return;
   const p = (fbCur(b).people || []).find(x => x.name === FB.person);
-  if(p && p.title && p.title !== p.name) _setText('accTitle', p.title);
-  if(!p){ document.getElementById('accMid').innerHTML = '<div class="exp-empty">В этом месяце его нет в списке</div>'; return; }
-  ACC_BACK = () => accOpen(FB.personFrom || 'finpay');
-  const sc = `data-month="${b.month}" data-name="${escS(p.name)}"`;
+  if(p && p.title && p.title !== p.name) _setText(sub ? 'accSub' : 'accTitle', p.title);
+  const main = pyrBody(); if(!main) return;
+  if(!p){ pyrPut(pyrState('В этом месяце его нет в списке')); return; }
+  // та же страница того же месяца, и человек печатает в поле — числа на место, поле не трогаем
+  const page = main.querySelector('.py-page[data-month]');
+  if(page && page.dataset.month === b.month && page.dataset.sub === (sub || '') && main.contains(document.activeElement)
+     && document.activeElement.tagName === 'INPUT'){ fbPaint(); return; }
+  pyrPut(sub ? pyrPersonSubHtml(p, b, sub) : pyrPersonHtml(p, b));
+}
+function pyrPersonSub(sub){ FB.personSub = sub; accOpen('finperson'); }
+function pyrPersonHtml(p, b){
   const sym = p.cur === 'USD' ? '$' : 'AED';
-  document.getElementById('accMid').innerHTML = `
-  <div class="sc">
-    ${fbCap(b.month, true)}
-    <div class="aud-g">
-      ${fbTile('К выплате', 'p.left', p.left, {mode: 'neg'})}
-      ${fbTile('Начислено', 'p.accrued', p.accrued)}
-      ${fbTile('Удержано', 'p.minus', p.minus)}
-    </div>
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Оклад')}
+  const link = (sub, ic, t) => `<button type="button" class="py-inline-link" data-route-key="employee-${sub}" onclick="pyrPersonSub('${sub}')">${luc(ic)}<span>${t}</span>${luc('chevron-right')}</button>`;
+  const dd = (key, v) => `<dd data-f="${key}">${fbFmtN(v)}</dd>`;
+  return `<div class="py-page" data-month="${b.month}" data-sub="">
+    <section class="py-summary py-person-payable" aria-label="К выплате">
+      <div class="py-summary-header"><h2>К выплате</h2><span class="py-unit">AED</span></div>
+      <div class="py-read-row"><span>${escS(fbMonthT(b.month))}</span><strong data-f="p.left" data-fc="neg"${p.left < 0 ? ' class="dn"' : ''}>${fbFmtN(p.left)}</strong></div>
+      <dl class="py-metrics pyr-person-metrics">
+        <div class="py-metric"><dt>Начислено</dt>${dd('p.accrued', p.accrued)}</div>
+        <div class="py-metric"><dt>Удержано</dt>${dd('p.minus', p.minus)}</div>
+      </dl>
+    </section>
+    <section class="py-list-zone" aria-label="Оклад">
+      <div class="py-group-title"><h2>Оклад</h2><span>${escS(p.unit !== 'day' ? fbWorkLbl(p, true) : (p.days ? `${p.days} дн` : ''))}</span></div>
+      <button type="button" class="py-salary-link" aria-label="Открыть оклад" data-route-key="employee-salary" onclick="pyrPersonSub('salary')">
+        <span>${p.rate === null ? 'Оклад не задан' : p.unit === 'day' ? 'В день' : 'В месяц'}</span>
+        <strong>${p.rate === null ? '—' : fbFmt(p.rate)} <small>${sym}</small></strong>${luc('chevron-right')}</button>
+    </section>
+    <section class="py-list-zone py-person-actions" aria-label="Действия по сотруднику">
+      ${link('advance', 'banknote', 'Аванс')}
+      ${link('items', 'circle-minus', 'Удержания и премии')}
+      ${link('pays', 'wallet', 'Выплаты')}
+      ${link('total', 'calculator', 'Итог')}
+      ${link('note', 'sticky-note', 'Заметка')}
+    </section>
+    <section class="py-list-zone" aria-label="Управление">
+      <button type="button" class="py-inline-link pyr-danger" data-n="${escS(p.name)}" onclick="fbPersonHide(this.dataset.n)">${luc('circle-minus')}<span>Убрать из зарплат</span>${luc('chevron-right')}</button>
+    </section>
+  </div>`;
+}
+// Подстраница: прежний блок карточки целиком в зоне пакета.
+function pyrPersonSubHtml(p, b, sub){
+  const sc = `data-month="${b.month}" data-name="${escS(p.name)}"`, sym = p.cur === 'USD' ? '$' : 'AED';
+  let inner = '';
+  if(sub === 'salary') inner = `<div class="fb-gut">
     ${fbIn('Оклад', 'rate', p.rate, sc, {ph: '0', unit: sym, eu: 'не задан'})}
     <div class="sc-r fb-r"><span>Считать</span>${fbSeg('unit', p.unit, [['month', 'в месяц'], ['day', 'в день']], 'fbPaySeg')}</div>
     <div class="sc-r fb-r"><span>Валюта</span>${fbSeg('cur', p.cur, [['AED', 'AED'], ['USD', '$']], 'fbPaySeg')}</div>
@@ -28787,27 +29121,18 @@ async function accFinPerson(){
     ${p.work_set && p.unit !== 'day' && p.work_days < p.month_days
       ? `<div class="sc-r fb-r sub"><span>На работе${p.work_days ? ' ' + escS(fbWorkSpansT(p)) : ''}</span><b>${p.work_days}<u>из ${p.month_days} дн</u></b></div>` : ''}
     ${fbRow('Начислено', 'p.accrued', p.accrued, {sum: true, sign: '='})}
-    ${fbIn('Премия в месяц', 'bonus', p.bonus_set ? p.bonus_month : null, sc, {ph: '0', unit: 'AED', eu: 'нет', im: 'numeric'})}
-  </div>
-  ${fbAdvHtml(p, b)}
-  <div class="sc fb-gut">
-    ${fbCapT('Удержания и премии')}
-    <div id="fbList-items">${fbItems(p, b.month)}</div>
-    ${fbItemForm(p.name)}
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Выплаты')}
-    <div id="fbList-pays">${fbPays(p)}</div>
+    ${fbIn('Премия в месяц', 'bonus', p.bonus_set ? p.bonus_month : null, sc, {ph: '0', unit: 'AED', eu: 'нет', im: 'numeric'})}</div>`;
+  else if(sub === 'advance') inner = fbAdvHtml(p, b, true);
+  else if(sub === 'items') inner = `<div id="fbList-items">${fbItems(p, b.month)}</div>${fbItemForm(p.name)}`;
+  else if(sub === 'pays') inner = `<div id="fbList-pays">${fbPays(p)}</div>
     <div class="fb-add">
       <input class="fb-num" inputmode="decimal" placeholder="${fbFmt(Math.max(0, p.left))}" autocomplete="off" id="fbAmt-pay" data-ph="p.left_pos"
         onkeydown="if(event.key==='Enter'){document.getElementById('fbCmt-pay').focus()}">
       <input class="fb-txt" placeholder="За что" autocomplete="off" maxlength="120" id="fbCmt-pay" data-n="${escS(p.name)}"
         onkeydown="if(event.key==='Enter'){fbPayOut(this.dataset.n)}">
       <button class="aud-b go" data-n="${escS(p.name)}" onclick="fbPayOut(this.dataset.n)">Выплатить</button>
-    </div>
-  </div>
-  <div class="sc fb-gut">
-    ${fbCapT('Итог')}
+    </div>`;
+  else if(sub === 'total') inner = `<div class="fb-gut">
     ${fbRow('Начислено', 'p.accrued', p.accrued, {sign: '+'})}
     ${fbRow('Премии', 'p.plus', p.plus, {sign: '+'})}
     ${fbRow('Аванс', 'p.advance', p.advance || 0, {sign: '−'})}
@@ -28815,13 +29140,10 @@ async function accFinPerson(){
     ${fbRow('К выплате', 'p.to_pay', p.to_pay, {sum: true, sign: '=', mode: 'neg'})}
     ${fbRow('Выплачено', 'p.paid', p.paid, {sign: '−'})}
     ${fbRow('Осталось', 'p.left', p.left, {sum: true, sign: '=', mode: 'neg'})}
-    ${fbRow('Долг после этого месяца', 'p.debt', p.debt, {sub: true, mode: 'debt'})}
-  </div>
-  <div class="sc">
-    ${fbCapT('Заметка')}
-    ${fbInTxt('Заметка', 'note', p.note, sc)}
-    <button class="sc-r fb-r fb-hide" data-n="${escS(p.name)}" onclick="fbPersonHide(this.dataset.n)" style="cursor:pointer"><span>Убрать из зарплат</span><em>${_SC_CHEV}</em></button>
-  </div>`;
+    ${fbRow('Долг после этого месяца', 'p.debt', p.debt, {sub: true, mode: 'debt'})}</div>`;
+  else if(sub === 'note') inner = fbInTxt('Заметка', 'note', p.note, sc);
+  return `<div class="py-page" data-month="${b.month}" data-sub="${sub}"><section class="py-list-zone"><header class="py-group-title"><h2>${PYR_SUB_T[sub]}</h2></header>
+    <div class="py-existing-content pyr-host" data-existing-component="employee-${sub}">${inner}</div></section></div>`;
 }
 // ── Аванс ───────────────────────────────────────────────────────────────
 // Владелец, 19 сен 2026: «водители могут попросить зарплату наперёд авансом;
@@ -28831,15 +29153,13 @@ async function accFinPerson(){
 // наперёд за следующий или по частям. Под выбором — сколько он получит
 // тогда в этом и в следующем месяце. Деньги выдаются из фонда сегодня.
 const FB_ADV = {mode: 'part'};
-function fbAdvHtml(p, b){
+function fbAdvHtml(p, b, bare){
   const m = b.month, nm = fbMonthAdd(m, 1);
   const opt = (mode, t, sub) => `<button class="fb-adv-o${FB_ADV.mode === mode ? ' on' : ''}" onclick="fbAdvPick('${mode}')">
       <span class="fb-adv-r">${FB_ADV.mode === mode ? IC('check', 13) : ''}</span>
       <span class="fb-adv-b"><b>${t}</b><i>${sub}</i></span></button>`;
   const full = (p.accrued || 0) + (p.bonus_due != null ? p.bonus_due : (p.bonus_month || 0));
-  return `<div class="sc fb-gut" id="fbAdv">
-    ${fbCapT('Аванс')}
-    <div class="fb-adv">
+  const body = `<div class="fb-adv">
       ${opt('part', `Часть зарплаты за ${fbMonthT(m).toLowerCase()}`, `снимется с зарплаты за ${fbMonthT(m).toLowerCase()}`)}
       ${opt('ahead', `Зарплата за ${fbMonthT(nm).toLowerCase()} наперёд`, `в ${fbMonthPrep(nm)} к выплате останется меньше на эту сумму`)}
       ${opt('custom', 'По частям', 'снимать с зарплаты по сумме в месяц')}
@@ -28850,8 +29170,9 @@ function fbAdvHtml(p, b){
       <input class="fb-txt" placeholder="Комментарий" autocomplete="off" maxlength="80" id="fbCmt-adv">
       <div class="fb-adv-p" id="fbAdvP">${fbAdvPreview(p, b)}</div>
       <button class="aud-b go" data-n="${escS(p.name)}" onclick="fbAdvGo(this.dataset.n)">Выдать аванс</button>
-    </div>
-  </div>`;
+    </div>`;
+  // bare — подстраница «Аванс» карточки в новом виде: зона пакета без карточки и заголовка
+  return bare ? `<div class="fb-gut" id="fbAdv" data-bare="1">${body}</div>` : `<div class="sc fb-gut" id="fbAdv">${fbCapT('Аванс')}${body}</div>`;
 }
 function fbAdvAmt(p){
   const v = fbAmt('fbAmt-adv');
@@ -28876,7 +29197,7 @@ function fbAdvPick(mode){
   const box = document.getElementById('fbAdv');
   if(box && p && b){
     const amt = (document.getElementById('fbAmt-adv') || {}).value || '', per = (document.getElementById('fbPer-adv') || {}).value || '';
-    box.outerHTML = fbAdvHtml(p, b);
+    box.outerHTML = fbAdvHtml(p, b, box.dataset.bare === '1');
     const a = document.getElementById('fbAmt-adv'); if(a) a.value = amt;
     const pr = document.getElementById('fbPer-adv'); if(pr) pr.value = per;
     fbAdvCalc();
@@ -28953,7 +29274,10 @@ function fbItemRows(rows, month, del){
 // наработал — стала активной»; «на самой кнопке нужно писать дату, когда она
 // станет доступной». Считает tenure.py: ступень — полгода, ступень 1000,
 // выплаченное вычитается, отъезд обнуляет отсчёт.
-let TEN = null, _tenBusy = null;
+// _tenAt — когда закончилась последняя попытка прочитать лист (удачная или нет):
+// экраны не дёргают ручку чаще FB_TTL, и упавшая загрузка не крутится в петле
+// tenLoad → fbRepaint → accFinBonus → tenLoad.
+let TEN = null, _tenBusy = null, _tenAt = 0;
 
 async function tenLoad(тихо){
   if(!window.ownerApi) return null;          // ещё не поднялись — попросим позже
@@ -28961,14 +29285,14 @@ async function tenLoad(тихо){
   _tenBusy = ownerApi.ownerFetch('/api/owner/finance/bonus')
     .then(d => { TEN = d; })
     .catch(() => {})
-    .finally(() => { _tenBusy = null; if(!тихо) tenPaint(); fbRepaint(); });
+    .finally(() => { _tenAt = Date.now(); _tenBusy = null; if(!тихо) tenPaint(); fbRepaint(); });
   return _tenBusy;
 }
 
 function tenPaint(){
-  if(ACC_VIEW !== 'finbonus') return;
-  const mid = document.getElementById('accMid');
-  if(mid) mid.innerHTML = tenHtml();
+  if(ACC_VIEW !== 'finbonus' || !pyrBody()) return;
+  if(!TEN){ pyrFail('accFinBonus(true)'); return; }     // лист не пришёл — картинка «Не удалось загрузить», «Повторить» читает заново
+  pyrPut(tenHtml());
 }
 
 // «9 месяцев» — как человек это скажет: полгода, год, полтора года.
@@ -28979,71 +29303,64 @@ function tenStaj(m){
   return [г ? `${г} г` : '', ост ? `${ост} мес` : ''].filter(Boolean).join(' ');
 }
 
-// Строка человека — такая же, как в зарплатной ведомости: имя, под ним стаж,
-// справа сумма и кнопка. Своей вёрстки у листа нет намеренно: это тот же
-// список людей, и выглядеть он должен так же.
+// Строка человека: имя, под ним стаж («с 24 октября · 1 мес», «Дата приезда
+// не указана», «Уехал — стаж не идёт»); справа — сумма и «Выплатить», когда
+// премия ждёт, иначе дата следующей (владелец, 23 сен 2026: «на самой кнопке
+// нужно писать дату, когда она станет доступной»).
 function tenRow(p){
   const ждёт = p.due > 0;
-  // Когда премия ждёт — строка про стаж и всё: сумма и так справа, а «получено»
-  // её только обрезало. Когда не ждёт — «получено» объясняет, почему пусто.
   const низ = p.why ? p.why
-    : [`с ${_audDayT(p.start)}`, tenStaj(p.months),
-       !ждёт && p.paid ? `получено ${fmt(p.paid)}` : ''].filter(Boolean).join(' · ');
-  const кнопка = ждёт
-    ? `<button class="aud-b go fb-paybtn" data-n="${escS(p.name)}" onclick="tenPay(this.dataset.n)">Выплатить</button>`
-    : `<button class="fb-paybtn ten-off" disabled>${p.why ? '—' : _audDayT(p.next_at)}</button>`;
-  return `<div class="fb-e ten-e"><span class="fb-e-b"><b>${escS(p.title)}</b><i>${escS(низ)}</i></span>
-    <span class="ten-v">${ждёт ? `<b class="ten-sum">${fmt(p.due)}<u>AED</u></b>` : ''}${кнопка}</span></div>`;
+    : [`с ${_audDayT(p.start)}`, tenStaj(p.months), !ждёт && p.paid ? `получено ${fbFmt(p.paid)}` : ''].filter(Boolean).join(' · ');
+  const право = ждёт
+    ? `<div class="py-bonus-action"><strong>${fbFmt(p.due)} <small>AED</small></strong><button type="button" class="py-primary ten-pay" data-action="pay-bonus" data-n="${escS(p.name)}" onclick="tenPay(this.dataset.n)">Выплатить</button></div>`
+    : `<button type="button" class="py-bonus-date" disabled aria-label="${escS(p.why || `Премия доступна ${_audDayT(p.next_at)}`)}">${
+        p.why ? '—' : `<small>Следующая</small>${escS(_audDayT(p.next_at))}`}</button>`;
+  return `<div class="py-bonus-row"><div class="py-bonus-person"><strong>${escS(p.title)}</strong><small>${escS(низ)}</small></div>${право}</div>`;
 }
 
 function tenHtml(){
-  if(!TEN) return '<div class="exp-empty">Загрузка…</div>';
+  if(!TEN) return pyrState('Загрузка…', 'loader-circle');
   const люди = TEN.people || [];
-  if(!люди.length) return '<div class="exp-empty">Некому — ни водителей, ни операторов</div>';
+  if(!люди.length) return pyrState('Некому — ни водителей, ни операторов');
   // Один список в том же порядке, что люди стоят везде: сверху операторы,
   // потом водители по районам (владелец, 23 сен 2026). Порядок задаёт сервер,
   // здесь только расставляем шапки, когда меняется район.
+  const группа = p => p.role === 'driver' ? (p.district_code ? `${p.district_code} ${p.district_name}` : 'Без района') : 'Операторы';
   let out = '', шапка = null;
   люди.forEach(p => {
-    const своя = p.role === 'driver'
-      ? (p.district_code ? `${p.district_code} ${p.district_name}` : 'Без района')
-      : 'Операторы';
+    const своя = группа(p);
     if(своя !== шапка){
-      if(шапка !== null) out += '</div></div>';
-      const n = люди.filter(x => (x.role === 'driver'
-        ? (x.district_code ? `${x.district_code} ${x.district_name}` : 'Без района') : 'Операторы') === своя).length;
-      out += `<div class="sc">${fbCapT(своя, String(n))}<div class="fb-list">`;
+      if(шапка !== null) out += '</section>';
+      out += `<section class="py-list-zone"><div class="py-group-title"><h2>${escS(своя)}</h2><span>${люди.filter(x => группа(x) === своя).length}</span></div>`;
       шапка = своя;
     }
     out += tenRow(p);
   });
-  if(шапка !== null) out += '</div></div>';
-  return out + `<div class="fb-note">${fmt(TEN.step_aed)} AED за каждые ${TEN.step_months} месяцев
-    работы. Не забрал — копится. Уехал — отсчёт начинается заново с дня возвращения.</div>`;
+  if(шапка !== null) out += '</section>';
+  return `<div class="py-page">${out}</div>`;
 }
 
-async function accFinBonus(){
+// force — «Повторить» с картинки ошибки: читать заново, не дожидаясь FB_TTL.
+async function accFinBonus(force){
   if(FB.payFrom === 'finpayroll') ACC_BACK = () => accOpen('finpayroll');
-  _setText('accTitle', 'Лист премий');
-  _setText('accSub', 'за стаж работы');
-  const mid = document.getElementById('accMid');
-  if(mid && !TEN) mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
-  await tenLoad(true);
+  pyrOpen('bonuses', 'Премии за стаж', '');
+  pyrPut(tenHtml());                                      // прошлый лист сразу (или «Загрузка…»), свежий — когда придёт
+  if(force || !_tenAt || Date.now() - _tenAt > FB_TTL) await tenLoad(true);
   tenPaint();
 }
 
 async function tenPay(name){
   const p = ((TEN || {}).people || []).find(x => x.name === name);
   if(!p || p.due <= 0) return;
-  if(!await askDialog(`Выплатить премию ${fmt(p.due)} AED?`,
+  if(!await askDialog(`Выплатить премию ${fbFmt(p.due)} AED?`,
       `${p.title} — ${tenStaj(p.months)} работы. Премия попадёт в зарплатную ведомость, `
       + `а ему уйдёт поздравление в бот.`, 'Выплатить', 'Вернуться назад')) return;
   const b = document.querySelector(`.ten-pay[data-n="${CSS.escape(name)}"]`);
-  if(b) b.disabled = true;
+  if(b){ b.disabled = true; const row = b.closest('.py-bonus-row'); if(row) row.setAttribute('aria-busy', 'true'); }
   try{
     const r = await ownerApi.ownerFetch('/api/owner/finance/bonus/pay',
       {method: 'POST', body: {name, as: _meName()}});
-    TEN = r.bonus || TEN;
+    TEN = r.bonus || TEN; _tenAt = Date.now();
     if(r.book) fbApply(r.book);        // ведомость сразу с новой премией
   }catch(e){
     if(b) b.disabled = false;
@@ -29199,9 +29516,12 @@ function fbExpPhoto(id, i){
 // первым экраном не нужен).
 async function accFinItems(){
   if(FB.payFrom === 'finpayroll') ACC_BACK = () => accOpen('finpayroll');
-  const b = await fbMonthScreen('Штрафы/авансы/долги'); if(!b) return;
+  pyrOpen('deductions', 'Штрафы / авансы / долги', '');
   FB.itemWho = null; FB.pen = null;
-  document.getElementById('accMid').innerHTML = fbItemsHtml(b);
+  const m = FB.month, gone = () => FB.month !== m || ACC_VIEW !== 'finitems' || !document.getElementById('ambar-payroll');
+  const b = await pyrBook(m, gone, 'accFinItems()', () => pyrPut(fbItemsHtml(null, m)));
+  if(!b) return;
+  pyrItemsRender(b);
   if(FB.goPend){       // пришли кнопкой из бота — сразу к штрафам на решение
     FB.goPend = false;
     const pd = document.getElementById('fbPend');
@@ -29209,36 +29529,61 @@ async function accFinItems(){
   }
   // люди нужны и на шаге выбора, и в истории (район у имени) — подтянуть и перерисовать
   if(!CREW) crewLoad().then(() => {
-    const mid = document.getElementById('accMid'), cur = fbBook(FB.month);
-    if(CREW && mid && cur && ACC_VIEW === 'finitems' && !fbPenOn()) mid.innerHTML = fbItemsHtml(cur);
+    const cur = fbBook(FB.month);
+    if(CREW && cur && ACC_VIEW === 'finitems' && !fbPenOn()) pyrItemsRender(cur);
   });
 }
-function fbItemsHtml(b){
-  const pay = fbCur(b), month = b.month, sums = {fine: 0, advance: 0, loan: 0};
-  (pay.people || []).forEach(p => (p.items || []).forEach(it => {
-    if(it.kind === 'bonus' || !(it.before > 0 || it.start >= month)) return;
-    // свободное удержание — в плитке «Штрафы»: кнопки у них одной карточкой
-    const k = it.kind === 'hold' ? 'fine' : it.kind;
-    sums[k] = (sums[k] || 0) + (it.due || 0);
-  }));
-  return `<div class="sc">
-    ${fbCap(month, true)}
-    <div class="aud-g">
-      ${fbTile('Штрафы', 'it.fine', sums.fine)}
-      ${fbTile('Авансы', 'it.advance', sums.advance)}
-      ${fbTile('Долги', 'it.loan', sums.loan)}
-    </div>
-  </div>
-  <div class="sc fb-pen2c"><div class="fb-pen-cap">Штрафы и удержания</div>
-    <div class="fb-pen2">
-      <button class="fb-pen2-b" onclick="fbPenOpen()"><em>${IC('note', 20)}</em><b>Штрафной лист</b><i>Выбрать нарушение и назначить штраф</i></button>
-      <button class="fb-pen2-b" onclick="fbHoldOpen()"><em>${IC('minus', 20)}</em><b>Свободное удержание</b><i>Указать сумму вручную</i></button>
-    </div>
-    <button class="sc-r fb-r fb-rules-go" style="cursor:pointer" onclick="fbRulesOpen()"><span>Правила и суммы</span><em>${_SC_CHEV}</em></button>
-    <button class="sc-r fb-r fb-rules-go" style="cursor:pointer" onclick="fbDiscOpen()"><span>Дисциплина</span><em>${_SC_CHEV}</em></button>
-  </div>
-  ${fbPendHtml(b)}
-  ${fbPenHistHtml(b)}`;
+// Та же страница того же месяца уже стоит — суммы на место (fbPaint), списки
+// на решение и история перерисовываются; набранную сумму штрафа под пальцем не
+// трогаем (force — после решения перерисовать всё равно).
+function pyrItemsRender(b, force){
+  const main = pyrBody(); if(!main) return;
+  const page = main.querySelector('.py-page[data-month]');
+  if(page && page.dataset.month === b.month && !page.dataset.loading){
+    fbPaint();
+    const typing = !force && main.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+    if(!typing){
+      const pd = document.getElementById('fbPend'); if(pd) pd.outerHTML = fbPendHtml(b);
+      const ph = document.getElementById('pyHistory'); if(ph) ph.outerHTML = fbPenHistHtml(b);
+    }
+    return;
+  }
+  pyrPut(fbItemsHtml(b));
+}
+// Удержания месяца по видам — из разбивки каждого человека на сервере
+// (finance_pay.person_month: fines, holds, advance, loan — уже за этот месяц,
+// отменённые не считаются): штрафы вместе со свободными удержаниями (кнопки у
+// них одной зоной), авансы, долги.
+function fbItemSums(pay){
+  const sums = {fine: 0, advance: 0, loan: 0};
+  (pay.people || []).forEach(p => { sums.fine += (p.fines || 0) + (p.holds || 0); sums.advance += p.advance || 0; sums.loan += p.loan || 0; });
+  return sums;
+}
+function fbItemsHtml(b, m){
+  const month = b ? b.month : m, sums = b ? fbItemSums(fbCur(b), month) : {};
+  const dd = (key, v) => `<dd data-f="${key}">${fbFmtN(v)}</dd>`;
+  return `<div class="py-page" data-month="${month}"${b ? '' : ' data-loading="1"'}>
+    <section class="py-summary">
+      <div class="py-summary-header"><h2>Удержания за месяц</h2><span class="py-unit">AED</span></div>
+      <dl class="py-metrics">
+        <div class="py-metric"><dt>Штрафы</dt>${dd('it.fine', sums.fine)}</div>
+        <div class="py-metric"><dt>Авансы</dt>${dd('it.advance', sums.advance)}</div>
+        <div class="py-metric"><dt>Долги</dt>${dd('it.loan', sums.loan)}</div>
+      </dl>
+    </section>
+    ${b ? `<section class="py-actions-zone">
+      <div class="py-action-grid">
+        <button type="button" class="py-action-tile" data-route-key="fine-wizard" onclick="pyrLeave();fbPenOpen()">${luc('file-text')}<span>Штрафной лист</span></button>
+        <button type="button" class="py-action-tile" data-route-key="free-deduction" onclick="pyrLeave();fbHoldOpen()">${luc('circle-minus')}<span>Свободное удержание</span></button>
+      </div>
+      <div class="py-divider-links">
+        <button type="button" class="py-inline-link" data-route-key="rules" onclick="pyrLeave();fbRulesOpen()">${luc('list-checks')}<span>Правила и суммы</span>${luc('chevron-right')}</button>
+        <button type="button" class="py-inline-link" data-route-key="discipline" onclick="pyrLeave();fbDiscOpen()">${luc('shield-check')}<span>Дисциплина</span>${luc('chevron-right')}</button>
+      </div>
+    </section>
+    ${fbPendHtml(b)}
+    ${fbPenHistHtml(b)}` : pyrState('Загрузка…', 'loader-circle')}
+  </div>`;
 }
 // ── Штрафы, требующие решения ──────────────────────────────────────────────
 // Владелец, 22 сен 2026: их формирует программа (fines_auto.py на сервере), у
@@ -29247,41 +29592,36 @@ function fbItemsHtml(b){
 //     прямо в строке: «Назначить» / «Не назначать»;
 //   • смену открыли позже 18:00 — не деньги, а питание: «Урезать питание»
 //     (40 вместо 80 за тот день) / «Не урезать».
-const FB_AUTO_IC = {late_shift: 'clock', geo_off: 'pin', exp_rejected: 'note', noscan_debt: 'box', shift_left: 'clock'};
+const PYR_AUTO_IC = {late_shift: 'clock', geo_off: 'map-pin-off', exp_rejected: 'file-text', noscan_debt: 'file-text', shift_left: 'clock', cash_short: 'banknote'};
 const FB_MEAL_FROM = 80, FB_MEAL_TO = 40;
 function fbPendHtml(b){
   const list = fbCur(b).pending || [];
-  return `<div class="sc fb-ph fb-pd" id="fbPend">
-    <div class="fb-ph-h"><em>${IC('bell', 19)}</em><b>Штрафы, требующие решения</b>${
-      list.length ? `<span class="fb-pd-n">${list.length}</span>` : ''}</div>
-    ${list.length ? list.map(fbPendRow).join('') : '<div class="fb-ph-none">Решать нечего</div>'}
-  </div>`;
+  return `<section class="py-list-zone" id="fbPend">
+    <div class="py-group-title"><h2>${luc('bell')}Штрафы, требующие решения</h2><span>${list.length || ''}</span></div>
+    ${list.length ? list.map(fbPendRow).join('') : '<p class="py-empty-line">Решать нечего</p>'}
+  </section>`;
 }
 function fbPendRow(p){
   const sub = fbPenSubOf(p.name, true), meal = p.action === 'meal';
-  return `<div class="fb-pd-r" data-id="${escS(p.id)}" data-name="${escS(p.name)}"${meal ? ' data-meal="1"' : ''}>
-    <div class="fb-pd-top">
-      <em class="fb-ph-i">${IC(FB_AUTO_IC[p.kind] || 'note', 22)}</em>
-      <span class="fb-ph-b"><b>${fbPenNb(escS(p.text || p.reason || 'Штраф'))}</b><i>${escS(p.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
-        !p.text && p.note ? `<s>${escS(p.note)}</s>` : ''}</span>
-      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(p.day))}</u>${meal
-        ? `<span class="fb-pd-meal"><i>питание</i><b>${p.meal_from} → ${p.meal_to}</b></span>`
-        : `<label class="fb-pd-amt"><input type="text" inputmode="numeric" enterkeyhint="done" maxlength="6"
-          value="${p.amount || ''}" placeholder="сумма" aria-label="Сумма штрафа"><i>AED</i></label>`}</span>
+  return `<article class="py-pending-row" data-id="${escS(p.id)}" data-name="${escS(p.name)}"${meal ? ' data-meal="1"' : ''}>
+    <h3>${fbPenNb(escS(p.text || p.reason || 'Штраф'))}</h3>
+    <p>${escS(p.name)}${sub ? ` (${escS(sub)})` : ''}${!p.text && p.note ? `<br>${escS(p.note)}` : ''}</p>
+    <div class="py-pending-meta"><time>${escS(fbPenHistDay(p.day))}</time>${meal
+      ? `<span class="py-unit">Питание ${p.meal_from} → ${p.meal_to}</span>`
+      : `<label class="py-input-unit"><input type="text" inputmode="numeric" enterkeyhint="done" maxlength="6" value="${p.amount || ''}" placeholder="сумма" aria-label="Сумма штрафа"><span>AED</span></label>`}</div>
+    <div class="py-pending-buttons">
+      <button type="button" class="py-danger" onclick="fbPendDo(this,'skip')">${meal ? 'Не урезать' : 'Не назначать'}</button>
+      <button type="button" class="py-primary" onclick="fbPendDo(this,'assign')">${meal ? 'Урезать питание' : 'Назначить'}</button>
     </div>
-    <div class="aud-act fb-pd-act">
-      <button class="aud-b soft dn" onclick="fbPendDo(this,'skip')">${meal ? 'Не урезать' : 'Не назначать'}</button>
-      <button class="aud-b go" onclick="fbPendDo(this,'assign')">${meal ? 'Урезать питание' : 'Назначить'}</button>
-    </div>
-  </div>`;
+  </article>`;
 }
 async function fbPendDo(btn, decision){
-  const row = btn.closest('.fb-pd-r'); if(!row || row.dataset.busy) return;
+  const row = btn.closest('.py-pending-row'); if(!row || row.dataset.busy) return;
   const inp = row.querySelector('input'), name = row.dataset.name || '', meal = !!row.dataset.meal;
   const amount = inp ? Math.round(parseFloat(String(inp.value || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0) : 0;
   if(decision === 'assign' && !meal && !(amount > 0)){ _toast('Впишите сумму штрафа'); inp.focus(); return; }
-  row.dataset.busy = '1';
-  row.querySelectorAll('button').forEach(x => { x.disabled = true; });
+  row.dataset.busy = '1'; row.setAttribute('aria-busy', 'true');
+  row.querySelectorAll('button, input').forEach(x => { x.disabled = true; });
   try{
     const res = await ownerApi.ownerFetch('/api/owner/finance/fines/decide', {method: 'POST', body: {
       id: row.dataset.id, decision, amount: decision === 'assign' ? amount : 0, month: FB.month, as: _meName()}});
@@ -29294,14 +29634,14 @@ async function fbPendDo(btn, decision){
       fbApply(e.payload.book);
       _toast('По этому штрафу уже решили');
     }else{
-      delete row.dataset.busy;
-      row.querySelectorAll('button').forEach(x => { x.disabled = false; });
+      delete row.dataset.busy; row.removeAttribute('aria-busy');
+      row.querySelectorAll('button, input').forEach(x => { x.disabled = false; });
       _toast('Не удалось сохранить');
       return;
     }
   }
-  const b = fbBook(FB.month), mid = document.getElementById('accMid');
-  if(b && mid && ACC_VIEW === 'finitems' && !fbPenOn()) mid.innerHTML = fbItemsHtml(b);
+  const b = fbBook(FB.month);
+  if(b && ACC_VIEW === 'finitems' && !fbPenOn()) pyrItemsRender(b, true);
 }
 // История штрафов и удержаний: последние сверху, десять сразу, дальше «Показать ещё».
 // Нажал на штраф — «Пересмотреть»: сумма, способ, комментарий или отмена.
@@ -29323,60 +29663,47 @@ function fbPenHistSt(h){
 function fbPenHistHtml(b){
   const hist = fbCur(b).history || [], f = FB.phF || 'all';
   const rows = hist.filter(h => f === 'all' || fbPenHistSt(h) === f);
-  return `<div class="sc fb-ph">
-    <div class="fb-ph-h"><em>${IC('clock', 19)}</em><b>История штрафов</b>
-      <button class="fb-ph-f" onclick="fbPhMenu()">${IC('filter', 15)}<span>${FB_PH_F[f]}</span><i>${_SC_CHEV}</i></button>
-    </div>
-    <div class="fb-ph-menu" id="fbPhMenu" hidden>${Object.keys(FB_PH_F).map(k =>
-      `<button class="${k === f ? 'on' : ''}" onclick="fbPhPick('${k}')">${FB_PH_F[k]}</button>`).join('')}</div>
+  return `<section class="py-list-zone" id="pyHistory">
+    <div class="py-group-title"><h2>${luc('history')}История штрафов</h2>
+      <select id="pyHistoryFilter" aria-label="Фильтр истории" onchange="fbPhPick(this.value)">${Object.keys(FB_PH_F).map(k =>
+        `<option value="${k}"${k === f ? ' selected' : ''}>${FB_PH_F[k]}</option>`).join('')}</select></div>
     ${rows.length ? rows.map((h, i) => fbPenHistRow(h, i >= 10)).join('')
-      : `<div class="fb-ph-none">${hist.length ? 'В этом наборе пусто' : 'Штрафов ещё не было'}</div>`}
-    ${rows.length > 10 ? '<button class="fb-ph-more" onclick="fbPenHistMore(this)">Показать ещё</button>' : ''}
-  </div>`;
+      : `<p class="py-empty-line">${hist.length ? 'В этом наборе пусто' : 'Штрафов ещё не было'}</p>`}
+    ${rows.length > 10 ? '<button type="button" class="py-secondary pyr-more" onclick="fbPenHistMore(this)">Показать ещё</button>' : ''}
+  </section>`;
 }
 function fbPenHistRow(h, hide){
   const st = fbPenHistSt(h), cat = h.kind === 'hold' ? null : fbPenCatOf(h);
   const vio = cat ? (cat.items || []).find(v => v.t === String(h.reason || '').split(' · ')[0]) : null;
-  const icon = h.auto && FB_AUTO_IC[h.auto] ? IC(FB_AUTO_IC[h.auto], 22)
-    : vio && (vio.svg || vio.ic) ? (vio.svg || IC(vio.ic, 22))
-    : cat ? (cat.svg || IC(cat.ic, 22)) : IC(h.kind === 'hold' ? 'minus' : 'note', 22);
+  const icon = h.auto && PYR_AUTO_IC[h.auto] ? luc(PYR_AUTO_IC[h.auto])
+    : vio && (vio.svg || vio.ic) ? (vio.svg || IC(vio.ic, 17))
+    : cat ? (cat.svg || IC(cat.ic, 17)) : luc(h.kind === 'hold' ? 'circle-minus' : 'file-text');
   const parts = String(h.reason || '').split(' · ');
   const title = parts[0] || (h.kind === 'hold' ? 'Свободное удержание' : 'Штраф');
   const det = [parts.slice(1).join(' · '), h.note].filter(Boolean).join(' · ');
   const sub = fbPenSubOf(h.name, true);
-  // Решение программы без записи в зарплатах — только исход: «Не назначен»,
-  // «Не урезано» или «Урезано» (питание). Пересматривать нечего, строка не нажимается.
+  const кто = `${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}${det ? `<br>${fbPenNb(escS(det))}` : ''}`;
+  const низ = (v, stT) => `<div class="py-history-bottom"><time>${escS(fbPenHistDay(h.day))}</time><span><b>${v}</b>${stT}</span></div>`;
+  // Решение программы без записи в зарплатах — только исход: «Амнистия»
+  // (не назначен, не урезано) или «Урезано» (питание). Пересматривать нечего,
+  // строка не нажимается.
   if(h.declined || h.meal){
-    const v = h.meal ? `${FB_MEAL_FROM} → ${FB_MEAL_TO} AED` : h.amount ? fbFmt(h.amount) + ' AED' : '—';
-    const stT = h.declined ? FB_PH_ST.off : FB_PH_ST.cut;
-    return `<div class="fb-ph-r auto ${h.declined ? 'skip' : 'cut'}"${hide ? ' hidden' : ''}>
-      <em class="fb-ph-i">${icon}</em>
-      <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
-        det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
-      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${v}</b>
-        <i class="fb-ph-st ${h.declined ? 'off' : 'cut'}">${stT}</i></span></div>`;
+    return `<div class="py-history-row${h.declined ? ' py-muted-row' : ''}"${hide ? ' hidden' : ''}>${icon}<div>
+      <strong>${fbPenNb(escS(title))}</strong><p>${кто}</p>${низ(h.meal ? `${FB_MEAL_FROM} → ${FB_MEAL_TO} AED` : h.amount ? fbFmt(h.amount) + ' AED' : '—', h.declined ? FB_PH_ST.off : FB_PH_ST.cut)}</div></div>`;
   }
-  return `<button class="fb-ph-r${h.cancelled ? ' off' : ''}${h.auto ? ' auto' : ''}"${hide ? ' hidden' : ''} onclick="fbPenEdit('${escS(h.id)}')">
-      <em class="fb-ph-i">${icon}</em>
-      <span class="fb-ph-b"><b>${fbPenNb(escS(title))}</b><i>${escS(h.name)}${sub ? ` (${escS(sub)})` : ''}</i>${
-        det ? `<s>${fbPenNb(escS(det))}</s>` : ''}</span>
-      <span class="fb-ph-r2"><u>${escS(fbPenHistDay(h.day))}</u><b>${fbFmt(h.amount)} AED</b>
-        <i class="fb-ph-st ${st}">${st === 'off' ? (h.kind === 'hold' ? 'Отменено' : 'Амнистия') : FB_PH_ST[st]}</i></span>
-      <em class="fb-chev">${_SC_CHEV}</em></button>`;
+  return `<button type="button" class="py-history-row${h.cancelled ? ' py-muted-row' : ''}"${hide ? ' hidden' : ''} data-action="review-history" onclick="pyrLeave();fbPenEdit('${escS(h.id)}')">${icon}<div>
+      <strong>${fbPenNb(escS(title))}</strong><p>${кто}</p>${низ(`${fbFmt(h.amount)} AED`, st === 'off' ? (h.kind === 'hold' ? 'Отменено' : 'Амнистия') : FB_PH_ST[st])}</div></button>`;
 }
 function fbPenHistDay(day){ return day ? `${fbDayT(day)} ${String(day).slice(0, 4)}` : ''; }
-function fbPhMenu(){
-  const m = document.getElementById('fbPhMenu'); if(!m) return;
-  m.hidden = !m.hidden;
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-}
 function fbPhPick(k){
   FB.phF = k;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  const b = fbBook(FB.month); if(b) document.getElementById('accMid').innerHTML = fbItemsHtml(b);
+  const b = fbBook(FB.month); if(!b) return;
+  const ph = document.getElementById('pyHistory');
+  if(ph) ph.outerHTML = fbPenHistHtml(b); else pyrPut(fbItemsHtml(b));
 }
 function fbPenHistMore(btn){
-  const rows = [...document.querySelectorAll('#accMid .fb-ph-r[hidden]')];
+  const rows = [...document.querySelectorAll('#accMid .py-history-row[hidden]')];
   rows.slice(0, 10).forEach(r => { r.hidden = false; });
   if(rows.length <= 10) btn.remove();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -30454,7 +30781,7 @@ async function accLoadSummaries(){
 
 function accOpen(id){
   if(id === 'stock'){ openStock(); return; }          // у склада уже свой экран
-  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui', 'sdc', 'cfd', 'cdy', 'sfe'); }   // шапка штрафного листа, оболочки сбора выручки, отчёта ДДС, «Кассы дня» и «Сейфа»
+  { const ov = document.getElementById('accOv'); if(ov) ov.classList.remove('pen-ui', 'sdc', 'cfd', 'cdy', 'sfe', 'pyr'); }   // шапка штрафного листа, оболочки сбора выручки, отчёта ДДС, «Кассы дня», «Сейфа» и зарплат
   _setRail('accRail', '');
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;

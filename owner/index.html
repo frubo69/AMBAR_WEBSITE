@@ -3144,18 +3144,19 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-cash-day .cd-unavailable h2{color:var(--cd-text)}
 /* длинное имя старшего в плашке «Подтверждено · кто» переносится, а не режется */
 #ambar-cash-day .cd-allocation-base .cd-status{white-space:normal;max-width:50%;overflow-wrap:anywhere}
-/* ── «Сейф» (визуал 23 ноя 2026, пакет AMBAR-SAFE): safe-visual.css и safe-integration.css из пакета дословно, ниже — адаптация под оболочку ── */
+/* ── «Сейф» (визуал 23 ноя 2026, пакет AMBAR-SAFE; 27 ноя 2026 — пакет AMBAR-SAFE-2026-11-27: три страницы в одной оболочке, большая кнопка «Распределение по дням», строка «Временные тех инструменты»): safe-visual.css и safe-integration.css из пакета дословно, ниже — адаптация под оболочку раздела. Правила строк дней стоят как :is(#ambar-safe,.sf-days-host) — те же строки рисует этап «Распределение» сбора выручки (27 ноя 2026). ── */
+
 #ambar-safe{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #ambar-safe .sf-stage{display:flex;justify-content:center;padding:0}
 #ambar-safe .sf-app{--sf-width:414px;--sf-height:844px;--sf-text:#eeeae4;--sf-muted:#aaa0b4;--sf-gold:#e2c386;--sf-line:#352d3e;--sf-green:#9bb6a6;--sf-red:#d69ca5;--sf-rp:#a799ba;position:relative;isolation:isolate;width:var(--sf-width);max-width:100%;height:var(--sf-height);min-width:0;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;border:1px solid #302937;border-radius:24px;background:#08070d;color:var(--sf-text);font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:dark;container:safepage / inline-size}
-#ambar-safe .sf-app *{box-sizing:border-box}
-#ambar-safe .sf-app :where(h1,h2,h3,p,dl,dd){margin:0}
-#ambar-safe .sf-app :where(button,input,select){font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
-#ambar-safe :where(.sf-app button){appearance:none;border:0;background:none;margin:0;padding:0;text-align:left}
-#ambar-safe .sf-app [hidden]{display:none!important}
-#ambar-safe .sf-app button:disabled{opacity:.3}
-#ambar-safe .sf-app :is(button,summary,input,select):focus-visible{outline:2px solid #e2c386;outline-offset:-3px}
-#ambar-safe .sf-app svg.lucide{display:block;flex:none;width:18px!important;height:18px!important;stroke-width:1.7}
+#ambar-safe .sf-app *:not(:where([data-existing-component], [data-existing-component] *)){box-sizing:border-box}
+#ambar-safe .sf-app :where(h1,h2,h3,p,dl,dd):not(:where([data-existing-component], [data-existing-component] *)){margin:0}
+#ambar-safe .sf-app :where(button,input,select):not(:where([data-existing-component], [data-existing-component] *)){font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+#ambar-safe :where(.sf-app button):not(:where([data-existing-component], [data-existing-component] *)){appearance:none;border:0;background:none;margin:0;padding:0;text-align:left}
+#ambar-safe .sf-app [hidden]:not(:where([data-existing-component], [data-existing-component] *)){display:none!important}
+#ambar-safe .sf-app button:disabled:not(:where([data-existing-component], [data-existing-component] *)){opacity:.3}
+#ambar-safe .sf-app :is(button,summary,input,select):focus-visible:not(:where([data-existing-component], [data-existing-component] *)){outline:2px solid #e2c386;outline-offset:-3px}
+#ambar-safe .sf-app svg.lucide:not(:where([data-existing-component], [data-existing-component] *)){display:block;flex:none;width:18px!important;height:18px!important;stroke-width:1.7}
 #ambar-safe .sf-header{display:flex;align-items:center;gap:12px;padding:13px 14px 10px;min-height:68px;flex:none;background:#0d0a13}
 #ambar-safe .sf-back{display:grid;place-items:center;width:42px;height:42px;border:1px solid #362c41;border-radius:12px;background:#17121f;color:#b6a6c5;flex:none}
 #ambar-safe .sf-back svg.lucide{width:22px!important;height:22px!important}
@@ -3176,18 +3177,18 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-composition-label{display:flex;align-items:center;gap:12px;padding:0 18px 13px;background:#201a27;font-size:11px;line-height:17px;color:#b8a8c2}
 #ambar-safe .sf-composition-label::after{content:"";height:1px;flex:1;background:#46394d}
 #ambar-safe .sf-pools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:18px;padding:0 18px 21px;background:#201a27}
-#ambar-safe .sf-pools>.sf-pool{min-width:0;position:relative;display:block;width:100%}
-#ambar-safe .sf-pools>.sf-pool+.sf-pool{padding-left:0;border-left:0}
-#ambar-safe .sf-pools>.sf-pool+.sf-pool::before{content:"+";position:absolute;left:-16px;top:24px;color:#998aa5;font:400 15px/28px "Space Grotesk",sans-serif}
-#ambar-safe .sf-pool-name{display:flex;align-items:center;gap:5px;font-size:11px;line-height:18px;color:#bfb2ca}
-/* стопки нажимаются (25 ноя 2026, входы с вкладки «Финансы» переехали сюда): стрелка у названия */
-#ambar-safe .sf-pool-name>svg.lucide{width:12px!important;height:12px!important;margin-left:auto;color:#998aa5}
-#ambar-safe .sf-app .sf-pool:active{filter:brightness(1.15)}
+#ambar-safe .sf-pools>div{min-width:0;position:relative}
+#ambar-safe .sf-pools>div+div{padding-left:0;border-left:0}
+#ambar-safe .sf-pools>div+div::before{content:"+";position:absolute;left:-16px;top:24px;color:#998aa5;font:400 15px/28px "Space Grotesk",sans-serif}
+#ambar-safe .sf-pools dt{display:flex;align-items:center;gap:5px;font-size:11px;line-height:18px;color:#bfb2ca}
+#ambar-safe .sf-pool-link{display:flex;align-items:center;gap:5px;width:100%;min-width:0}
+#ambar-safe .sf-pool-link::after{content:"";position:absolute;inset:0}
+#ambar-safe .sf-pool-link svg.lucide{margin-left:auto;width:11px!important;height:11px!important;color:#a798b4}
 #ambar-safe .sf-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex:none}
 #ambar-safe .sf-barra{background:var(--sf-gold)}
 #ambar-safe .sf-rp{background:var(--sf-rp)}
 #ambar-safe .sf-profit{background:var(--sf-green)}
-#ambar-safe .sf-pool>strong{display:block;font:500 22px/28px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:6px}
+#ambar-safe .sf-pools dd{font:500 22px/28px "Space Grotesk",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:6px}
 #ambar-safe .sf-wallet{display:flex;align-items:center;gap:10px;width:100%;padding:12px 17px;border-top:1px solid #3c3243;background:#15111f}
 #ambar-safe .sf-wallet>svg:first-child{color:#bba780}
 #ambar-safe .sf-wallet-label{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;font-size:12px;font-weight:500}
@@ -3203,6 +3204,39 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-quick-actions svg.lucide{width:14px!important;height:14px!important;color:#a995b5}
 #ambar-safe .sf-quick-actions button>svg:first-child{color:#c4aa79;width:16px!important;height:16px!important}
 #ambar-safe .sf-quick-actions button+button{border-top:1px solid #352b3e}
+#ambar-safe .sf-days-entry{position:relative;display:flex;flex-direction:column;justify-content:center;gap:16px;width:100%;min-height:166px;padding:20px 22px;border:1px solid #3c3243;border-radius:17px;background:#191520}
+#ambar-safe .sf-days-entry-title{display:flex;align-items:flex-start;gap:12px}
+#ambar-safe .sf-days-entry-title>svg.lucide{color:#b6a5c2;margin-top:1px}
+#ambar-safe .sf-days-entry-title>strong{font-size:14px;line-height:20px;font-weight:600;color:var(--sf-text)}
+#ambar-safe .sf-days-entry-body{display:flex;flex-direction:column;gap:10px;padding-left:30px;padding-right:18px;min-width:0}
+#ambar-safe .sf-days-state{display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:12px;line-height:18px;color:var(--sf-muted)}
+#ambar-safe .sf-days-state svg.lucide,#ambar-safe .sf-days-waiting svg.lucide{width:13px!important;height:13px!important}
+#ambar-safe #sfDaysCount{white-space:nowrap;font-variant-numeric:tabular-nums}
+#ambar-safe .sf-days-amount{display:flex;flex-direction:column;gap:2px}
+#ambar-safe .sf-days-amount>span{font-size:11px;line-height:17px;color:var(--sf-muted)}
+#ambar-safe .sf-days-amount>strong{font:500 30px/36px "Space Grotesk",sans-serif;letter-spacing:-.035em;color:var(--sf-text);overflow-wrap:anywhere}
+#ambar-safe .sf-days-amount small{font:400 11px/17px Manrope,sans-serif;letter-spacing:0;color:var(--sf-muted)}
+#ambar-safe .sf-days-waiting{display:flex;align-items:center;gap:6px;font-size:11px;line-height:17px;color:var(--sf-muted)}
+#ambar-safe .sf-days-entry>.sf-days-entry-arrow{position:absolute;right:20px;bottom:24px;color:#b4a6bf;width:16px!important;height:16px!important}
+#ambar-safe .sf-days-entry[data-status="pending"] :is(.sf-days-state,.sf-days-amount>strong,.sf-days-entry-title>svg){color:var(--sf-gold)}
+#ambar-safe .sf-app .sf-days-entry:disabled{opacity:1}
+#ambar-safe .sf-days-entry[data-status="error"] .sf-days-state{color:var(--sf-red)}
+#ambar-safe .sf-app:is([data-view="days"],[data-view="tools"]) .sf-header{display:grid;grid-template-columns:42px minmax(0,1fr);column-gap:12px;row-gap:1px}
+#ambar-safe .sf-app:is([data-view="days"],[data-view="tools"]) .sf-back{grid-row:1 / 3}
+#ambar-safe .sf-app:is([data-view="days"],[data-view="tools"]) .sf-header h1{font-size:16px;line-height:22px;letter-spacing:-.02em;align-self:end}
+#ambar-safe .sf-app:is([data-view="days"],[data-view="tools"]) #sfHeaderContext{display:block;grid-column:2;align-self:start;font-size:11px;line-height:16px}
+#ambar-safe #sfDaysPage{gap:20px}
+#ambar-safe .sf-pending-group.sf-waiting-group{border-color:#4c4059;background:#191420}
+#ambar-safe .sf-pending-group.sf-waiting-group>.sf-pending-heading{color:#b4a7c0;background:#211a29;border-color:#3c3045}
+#ambar-safe .sf-waiting-group .sf-day-bottom>span{color:var(--sf-muted)}
+#ambar-safe .sf-collection-lock{display:flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:6px 9px;background:#2b2234;border-radius:8px;font-size:11px;color:#c1b1ce}
+#ambar-safe .sf-collection-lock svg.lucide{width:13px!important;height:13px!important}
+#ambar-safe .sf-day-error{padding:0 15px 14px;color:var(--sf-red);font-size:11px;line-height:17px}
+#ambar-safe .sf-rp-wallet{padding:0 15px 9px;font-size:11px;line-height:17px;color:var(--sf-muted)}
+#ambar-safe .sf-book-status{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--sf-muted)}
+#ambar-safe .sf-dds-date{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;border:1px solid #3d3146;border-radius:13px;background:#1b1523}
+#ambar-safe .sf-dds-date button{display:grid;place-items:center;min-height:44px;color:var(--sf-gold)}
+#ambar-safe .sf-dds-date input{width:100%;min-width:0;min-height:44px;border:0;background:transparent;padding:8px;font-size:14px;color:var(--sf-text)}
 #ambar-safe .sf-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
 #ambar-safe .sf-section-heading h2{font-size:19px;line-height:26px;font-weight:700;letter-spacing:-.035em}
 :is(#ambar-safe,.sf-days-host) .sf-pending-heading,:is(#ambar-safe,.sf-days-host) .sf-done-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;font-size:11px;line-height:17px;color:#d4b67e}
@@ -3232,6 +3266,8 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 :is(#ambar-safe,.sf-days-host) .sf-day-bottom>span{font-size:11px;line-height:16px;color:#c0ac91}
 :is(#ambar-safe,.sf-days-host) .sf-confirm{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 14px;border:1px solid #e2c386;border-radius:10px;background:#e2c386;color:#241b0d;font-size:12px;line-height:18px;font-weight:700;white-space:nowrap}
 :is(#ambar-safe,.sf-days-host) .sf-confirm svg.lucide{width:15px!important;height:15px!important;stroke-width:2}
+#ambar-safe #sfDoneGroup{margin-top:20px}
+:is(#ambar-safe,.sf-days-host) .sf-done-heading{color:#a8bdae}
 /* Замок сбора (владелец, 27 ноя 2026): группа «Ждём выручку» и строка дня без кнопки — на месте
    «Подтвердить» замок с кодами районов; одни и те же в «Сейфе» и на этапе «Распределение» сбора */
 :is(#ambar-safe,.sf-days-host) .sf-wait-group{border-color:#3d3346;background:#15121e}
@@ -3241,8 +3277,6 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 :is(#ambar-safe,.sf-days-host) .sf-wait-tag svg.lucide{width:15px!important;height:15px!important;color:#9b8ab0}
 :is(#ambar-safe,.sf-days-host) .sf-wait-codes{padding-bottom:14px;color:#a69dae}
 :is(#ambar-safe,.sf-days-host) .sf-wait-codes svg.lucide{color:#8f82a0}
-#ambar-safe #sfDoneGroup{margin-top:20px}
-:is(#ambar-safe,.sf-days-host) .sf-done-heading{color:#a8bdae}
 :is(#ambar-safe,.sf-days-host) .sf-done-list{overflow:hidden;border:1px solid #352d3e;border-radius:15px;background:#14101e}
 :is(#ambar-safe,.sf-days-host) .sf-done{display:flex;align-items:center;gap:12px;justify-content:space-between;width:100%;padding:13px 14px;min-height:69px}
 :is(#ambar-safe,.sf-days-host) .sf-done+.sf-done{border-top:1px solid #352d3e}
@@ -3317,26 +3351,30 @@ html.kb #accOv.cdy .cd-scroll{padding-bottom:50vh}
 #ambar-safe .sf-dialog p{font-size:12px;line-height:20px;color:#c3b5cc;margin:10px 0 18px}
 #ambar-safe .sf-dialog form>div{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 #ambar-safe .sf-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-@container safepage (max-width:370px){#ambar-safe .sf-main{padding-left:11px;padding-right:11px}#ambar-safe .sf-header{padding-left:11px;padding-right:11px}#ambar-safe .sf-month{margin-left:11px;margin-right:11px}#ambar-safe .sf-pool>strong{font-size:20px;line-height:27px}#ambar-safe .sf-pools>.sf-pool+.sf-pool{padding-left:0}#ambar-safe .sf-pool-name{font-size:11px}#ambar-safe .sf-balance-top{padding:18px 13px 16px}#ambar-safe .sf-pools{padding-left:13px;padding-right:13px}#ambar-safe .sf-composition-label{padding-left:13px;padding-right:13px}#ambar-safe .sf-wallet{padding:11px 13px;gap:8px}#ambar-safe .sf-wallet-label{font-size:11px}#ambar-safe .sf-quick-actions button{padding:8px 13px}#ambar-safe .sf-section-heading h2{font-size:17px}#ambar-safe .sf-edit-row{grid-template-columns:minmax(0,1fr) 126px}#ambar-safe .sf-day-bottom{gap:6px}#ambar-safe .sf-day-bottom .sf-confirm,#ambar-safe .sf-day-bottom .sf-wait-tag{padding:9px 10px}#ambar-safe .sf-header>span{font-size:11px}}
-/* Load after safe-visual.css. The actual mini-app shell supplies its available
-   content height; the 414x844 preview dimensions never constrain production. */
+@container safepage (max-width:370px){#ambar-safe .sf-main{padding-left:11px;padding-right:11px}#ambar-safe .sf-header{padding-left:11px;padding-right:11px}#ambar-safe .sf-month{margin-left:11px;margin-right:11px}#ambar-safe .sf-pools dd{font-size:20px;line-height:27px}#ambar-safe .sf-pools>div+div{padding-left:0}#ambar-safe .sf-pools dt{font-size:11px}#ambar-safe .sf-balance-top{padding:18px 13px 16px}#ambar-safe .sf-pools{padding-left:13px;padding-right:13px}#ambar-safe .sf-composition-label{padding-left:13px;padding-right:13px}#ambar-safe .sf-wallet{padding:11px 13px;gap:8px}#ambar-safe .sf-wallet-label{font-size:11px}#ambar-safe .sf-quick-actions button{padding:8px 13px}#ambar-safe .sf-section-heading h2{font-size:17px}#ambar-safe .sf-edit-row{grid-template-columns:minmax(0,1fr) 126px}#ambar-safe .sf-day-bottom{gap:6px}#ambar-safe .sf-day-bottom .sf-confirm,#ambar-safe .sf-day-bottom .sf-wait-tag{padding:9px 10px}#ambar-safe .sf-header>span{font-size:11px}}
+/* Load after safe-visual.css. Host supplies actual middle-of-screen height.
+   The host also owns header/tabbar and any already reserved safe area. */
 #ambar-safe{width:100%;height:var(--sf-available-height,100%);min-height:0}
 #ambar-safe .sf-stage{width:100%;height:100%;min-height:0;align-items:stretch}
 #ambar-safe .sf-app{width:100%;max-width:none;height:100%;min-height:0;border:0;border-radius:0}
 #ambar-safe .sf-scroll{min-width:0;min-height:0;overflow:auto}
-#ambar-safe .sf-bottom-nav{padding-bottom:calc(12px + var(--sf-safe-bottom,0px))}
 #ambar-safe[data-shell="existing"] :is(.sf-header,.sf-bottom-nav){display:none}
 #ambar-safe[data-hide-header="true"] .sf-header{display:none}
 #ambar-safe[data-hide-nav="true"] .sf-bottom-nav{display:none}
+#ambar-safe .sf-bottom-nav{padding-bottom:calc(12px + var(--sf-safe-bottom,0px))}
 #ambar-safe:is([data-shell="existing"],[data-hide-nav="true"]) .sf-main{padding-bottom:calc(20px + var(--sf-safe-bottom,0px))}
-#ambar-safe .sf-status{margin:0 14px 12px;padding:10px 12px;border:1px solid #493a53;border-radius:10px;background:#211a2b;color:#c9b8d0;font-size:12px;line-height:18px}
-#ambar-safe .sf-list-status{margin:0 0 10px;padding:10px 12px;border:1px solid #493a53;border-radius:10px;background:#211a2b;color:#c9b8d0;font-size:12px;line-height:18px}
+:is(#ambar-safe,.sf-days-host) :is(.sf-pools dd,.sf-split dd,.sf-days-amount>strong,.sf-day-value>strong){min-width:0;white-space:normal;overflow-wrap:anywhere}
+:is(#ambar-safe,.sf-days-host) :is(.sf-day-main>span,.sf-day-bottom>span){min-width:0}
+:is(#ambar-safe,.sf-days-host) .sf-day-bottom{flex-wrap:wrap}
+:is(#ambar-safe,.sf-days-host) .sf-day-value>strong{text-align:right}
+#ambar-safe .sf-app input:focus-visible{outline:2px solid #e2c386;outline-offset:3px}
+:is(#ambar-safe,.sf-days-host) .sf-confirm:disabled{opacity:1}
+:is(#ambar-safe,.sf-days-host) .sf-confirm[aria-busy="true"]{background:#c8b17f;border-color:#c8b17f}
+#ambar-safe [data-existing-component]{min-width:0}
+/* Keep complete existing child components and their own inner styles. */
+/* Строки дней общие со страницей сбора: ошибка под строкой, «РП на кошельке», группа на время записи (23–27 ноя 2026). */
 :is(#ambar-safe,.sf-days-host) .sf-row-error{margin:0 15px 14px;padding:9px 10px;border:1px solid #68434d;border-radius:9px;background:#2e1d2a;color:#dda4af;font-size:11px;line-height:18px}
 :is(#ambar-safe,.sf-days-host) .sf-day-crypto{padding:0 15px 8px;font-size:11px;line-height:17px;color:#bcaacb}
-#ambar-safe .sf-app input:focus-visible{outline:2px solid #e2c386;outline-offset:3px}
-:is(#ambar-safe,.sf-days-host) :is(.sf-pool>strong,.sf-split dd){white-space:normal;overflow-wrap:anywhere;min-width:0}
-:is(#ambar-safe,.sf-days-host) .sf-day-main>span,:is(#ambar-safe,.sf-days-host) .sf-day-bottom>span{min-width:0}
-:is(#ambar-safe,.sf-days-host) .sf-day-value>strong{white-space:normal;overflow-wrap:anywhere;text-align:right}
 :is(#ambar-safe,.sf-days-host) .sf-pending-group[aria-busy="true"] .sf-confirm{opacity:.7}
 /* Оболочка раздела для «Сейфа» (#accOv.sfe): шапка оболочки остаётся (заголовок и
    стрелка назад), пакетные шапка и нижняя навигация спрятаны (data-shell="existing"),
@@ -3355,12 +3393,13 @@ html.kb #accOv.sfe .sf-scroll{padding-bottom:50vh}
 #ambar-safe .sf-cutoff-input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
 #ambar-safe .sf-cutoff-input:disabled{pointer-events:none}
 /* Состояния, которых в макете нет, — теми же красками: поле под фокусом и после
-   записи, запертое поле на время загрузки месяца, список «В сейфе» без ожидающих.
+   записи, запертое поле на время загрузки месяца.
    Поясняющих текстов пакета на экране нет (владелец, 3 окт 2026, подтверждено 23 ноя). */
 #ambar-safe .sf-input-unit:focus-within{border-color:#8c714e}
 #ambar-safe .sf-input-unit input.saved{color:var(--sf-green)}
 #ambar-safe .sf-input-unit input:disabled{opacity:.5}
-#ambar-safe #sfPendingGroup[hidden]~#sfDoneGroup{margin-top:0}
+/* Строка состояния месяца (.sf-book-status): значок и текст рядом, не по краям. */
+#ambar-safe .sf-book-status>span{flex:1}
 /* ── Отчёт ДДС за день (визуал 2 ноя 2026, бриф AMBAR-CASHFLOW-DAY): cashflow-visual.css и cashflow-integration.css из пакета дословно, ниже — адаптация под оболочку ── */
 #ambar-cashflow-day{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #ambar-cashflow-day .cf-stage{display:flex;justify-content:center;padding:12px 8px}
@@ -22613,6 +22652,7 @@ const LUC = {
   // Страница «Финансы» (визуал 2 ноя 2026)
   'arrow-up':         '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
   'wallet':           '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  'wrench':           '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/>',
   'fish':             '<path d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.47-3.44 6-7 6s-7.56-2.53-8.5-6Z"/><path d="M18 12v.5"/><path d="M16 17.93a9.77 9.77 0 0 1 0-11.86"/><path d="M7 10.67C7 8 5.58 5.97 2.73 5.5c-1 1.5-1 5 .23 6.5-1.24 1.5-1.24 5-.23 6.5C5.58 18.03 7 16 7 13.33"/><path d="M10.46 7.26C10.2 5.88 9.17 4.24 8 3h5.8a2 2 0 0 1 1.98 1.67l.23 1.4"/><path d="m16.01 17.93-.23 1.4A2 2 0 0 1 13.8 21H9.5a5.96 5.96 0 0 0 1.49-3.98"/>',
   'banknote':         '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
   'coins':            '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
@@ -23722,9 +23762,9 @@ function crDistBind(){
 async function crDistConfirm(day, btn){
   if(CRD.busy) return;
   const lab = btn.querySelector('[data-sf="confirm-label"]');
-  btn.disabled = true; if(lab) lab.textContent = 'Подтверждаем…';
+  btn.disabled = true; btn.setAttribute('aria-busy', 'true'); if(lab) lab.textContent = 'Подтверждаем…';
   try{ await crDistOk(day); }
-  finally{ if(btn.isConnected){ btn.disabled = false; if(lab) lab.textContent = 'Подтвердить'; } }
+  finally{ if(btn.isConnected){ btn.disabled = false; btn.removeAttribute('aria-busy'); if(lab) lab.textContent = 'Подтвердить'; } }
 }
 function crDistOpenDay(day){
   const d0 = CR ? CR.day : '';
@@ -23849,7 +23889,7 @@ function walBlockRender(){
   try{ const fb = document.getElementById('finBook'), mb = fbBook(FB.month || fbMonthNow());
        if(fb && mb) fbHubPaint(mb); }catch(e){}
   // строка кошелька на странице «Сейф» — по свежему остатку
-  try{ if(ACC_VIEW === 'finsafe' && document.getElementById('ambar-safe')) sfySync(); }catch(e){}
+  try{ if(/^finsafe/.test(ACC_VIEW) && document.getElementById('ambar-safe')) sfySync(); }catch(e){}
   // Отдельного блока «Кошелёк» на «Финансах» больше нет (владелец, 19 сен
   // 2026: «убери вот эти конкретно окна»), остальное — только если он есть.
   const block = document.getElementById('walBlock'); if(!block) return;
@@ -24939,7 +24979,7 @@ async function fbMonthStep(d, quiet){
 }
 // Перерисовать всё, что смотрит на месяц: карточку на странице и открытый
 // месячный экран. Экран дня месяц не листает — у него свой день.
-const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => accFinNP(), finsafe: () => accFinSafe(),
+const FB_VIEWS = {finb: () => accFinB(), finrp: () => accFinRP(), finnp: () => accFinNP(), finsafe: () => accFinSafe('finsafe'), finsafedays: () => accFinSafe('finsafedays'), finsafetools: () => accFinSafe('finsafetools'),
                   finbud: () => accFinBud(true), finpay: () => accFinPay(), finperson: () => accFinPerson(), finitems: () => accFinItems(), finbonus: () => accFinBonus(),
                   finddcm: () => accFinDdcM(), finexp: () => accFinExp(true), finpayroll: () => accFinPayroll()};
 function fbRepaint(){
@@ -25100,7 +25140,7 @@ function fbPaint(){
   // «Касса дня»: круг, подписи предложений и состояние дня — по свежей книге
   if(ACC_VIEW === 'finday' && document.getElementById('ambar-cash-day')) cdySync();
   // «Сейф»: суммы, списки дней, подсказки полей — по свежей книге
-  if(ACC_VIEW === 'finsafe' && document.getElementById('ambar-safe')) sfySync();
+  if(/^finsafe/.test(ACC_VIEW) && document.getElementById('ambar-safe')) sfySync();
 }
 
 // ── Записи: расходы из фонда, приход в фонд, выплаты из прибыли ───────────
@@ -25578,7 +25618,7 @@ function cdySetStep(key){
 // Куда ведёт последняя кнопка — туда, откуда пришли (стрелка «назад» — ровно на
 // шаг): из «Сейфа» — в сейф, с карточки финансов — просто назад.
 function cdyBackTitle(){
-  return {finsafe: 'В сейф', finb: 'В Барракуду', finddcm: 'В отчёт ДДС', book: 'В финансы'}[CDY.from] || 'Назад';
+  return {finsafe: 'В сейф', finsafedays: 'В распределение по дням', finb: 'В Барракуду', finddcm: 'В отчёт ДДС', book: 'В финансы'}[CDY.from] || 'Назад';
 }
 // Редакторы: открытое распределение заменяет диаграмму полями, открытая оплата —
 // обзор полями; внутри оплаты подэкран источников заменяет суммы. Высота экрана
@@ -26005,46 +26045,93 @@ async function fbMonthScreen(title){
   return fbBook(FB.month);
 }
 // ── Экран «Сейф» ──────────────────────────────────────────────────────────
-// Страница в новом виде (владелец, 23 ноя 2026, пакет ChatGPT AMBAR-SAFE):
+// Страница в новом виде (владелец, 23 ноя 2026, пакет ChatGPT AMBAR-SAFE; 27 ноя
+// 2026 — пакет AMBAR-SAFE-2026-11-27: три страницы в одной оболочке):
 // #ambar-safe > .sf-stage > .sf-app в середине раздела (#accOv.sfe); шапка
 // оболочки и таббар остаются, пакетные шапка и навигация спрятаны
-// (data-shell="existing"). Сверху итог наличных и три стопки, кошелёк
-// отдельной строкой, перевод; дни одним списком «Ждут подтверждения» и ниже
-// «В сейфе»; пересчёт и открытие раскрываются отдельно, «Учёт с» внизу.
+// (data-shell="existing"). Главная (#sfHome, раздел finsafe): итог наличных и
+// три стопки, кошелёк, перевод, ДДС и строка «Временные тех инструменты»; под
+// карточкой большая кнопка «Распределение по дням» — только вход, сама ничего
+// не подтверждает (владелец, 27 ноя 2026: «распределение выручки сделать
+// кнопкой большой вместо списка, список открывается по нажатии в новом окне»).
+// Список дней — своя страница (#sfDaysPage, finsafedays): «Ждём выручку» /
+// «Ждут подтверждения» / «В сейфе». Пересчёт, открытие и «Учёт с» — своя
+// страница (#sfToolsPage, finsafetools), один комплект полей. Страницы —
+// секции одной ленты .sf-scroll, переключает sfyView: заголовок оболочки,
+// ACC_VIEW и стрелка «назад» (ровно на шаг: день → список → сейф → вкладка),
+// у каждой страницы своя позиция прокрутки (SFY.pos).
 // Деньги — прежними ручками: fbSave (восемь месячных полей), fbDayOk
 // (подтверждение дня), fbStartSave (день старта), fbMovePage, fbOpenWal.
 // Оболочка строится один раз на вход, дальше sfySync перекладывает числа и
 // состояния на месте — поле под пальцем не трогаем.
-const SFY = {busy: new Set()};
-async function accFinSafe(){
-  _setText('accTitle', 'Сейф'); _setText('accSub', 'Финансы');
+const SFY = {busy: new Set(), view: 'home', pos: {home: 0, days: 0, tools: 0}};
+const SFY_ID = {home: 'finsafe', days: 'finsafedays', tools: 'finsafetools'},
+      SFY_PAGE = {finsafe: 'home', finsafedays: 'days', finsafetools: 'tools'},
+      SFY_TITLE = {home: ['Сейф', 'Финансы'], days: ['Распределение по дням', 'Сейф'], tools: ['Временные тех инструменты', 'Сейф']};
+// Вход на любую из трёх страниц: id раздела (finsafe / finsafedays /
+// finsafetools) говорит, какую показать; без id — ту, что открыта (повторная
+// отрисовка fbRepaint, смена месяца, возврат со страницы перевода). Оболочка
+// общая: строится, если её нет (вход с вкладки, возврат из «Кассы дня» и
+// кошелька), и тогда позиция прокрутки страницы возвращается после первой
+// синхронизации — когда список уже на месте.
+async function accFinSafe(id){
+  const page = SFY_PAGE[id] || SFY_PAGE[ACC_VIEW] || 'home';
   FB.loanPage = false; FB.movePage = false; FB.depPage = false; FB.rpPage = false; FB.rpOut = false;
   FB.month = FB.month || fbMonthNow();
   const ov = document.getElementById('accOv'), mid = document.getElementById('accMid');
   ov.classList.add('sfe');
-  if(!document.getElementById('ambar-safe')){ mid.innerHTML = sfyShell(); sfyBind(); }
+  const fresh = !document.getElementById('ambar-safe');
+  if(fresh){ mid.innerHTML = sfyShell(); sfyBind(); SFY.view = page; }
+  sfyView(page, {scroll: !fresh});
   const m = FB.month;
   sfyMonthBar(m);
-  const gone = () => FB.month !== m || ACC_VIEW !== 'finsafe' || !document.getElementById('ambar-safe');
+  const gone = () => FB.month !== m || !SFY_PAGE[ACC_VIEW] || !document.getElementById('ambar-safe');
   if(!fbBook(m)){
     sfyLoading();
     try{ await fbLoad(m); }
     catch(e){
       if(gone()) return;
-      ov.classList.remove('sfe');                 // картинка «Не удалось загрузить» — в обычной середине
-      mid.innerHTML = loadFail('accFinSafe()');
+      ov.classList.remove('sfe');                 // картинка «Не удалось загрузить» — в обычной середине; повтор — на ту же страницу
+      mid.innerHTML = loadFail(`accFinSafe('${ACC_VIEW}')`);
       return;
     }
     if(gone()) return;
   } else if(fbStale(m)){
-    fbLoad(m).then(() => { if(FB.month === m && ACC_VIEW === 'finsafe') fbRepaint(); }).catch(() => {});
+    fbLoad(m).then(() => { if(FB.month === m && SFY_PAGE[ACC_VIEW]) fbRepaint(); }).catch(() => {});
   }
   sfySync(fbBook(m));
+  if(fresh){ const sc = document.getElementById('sfScroll'); if(sc) sc.scrollTop = SFY.pos[SFY.view] || 0; }
 }
-// Разметка страницы — safe-reference.html пакета без шапки и нижней навигации
-// (их даёт оболочка) и без поясняющих подписей (правило 3 окт 2026). Значки —
-// luc(), восемь месячных полей — с теми же data-field, что и раньше, чтобы
-// их вела fbSave.
+// Переключение страницы внутри оболочки: секции одной ленты, видна одна.
+// Заголовок и подзаголовок оболочки, ACC_VIEW (маршрут уходит в ambar_nav и
+// после перезагрузки открывается та же страница) и стрелка «назад»: с
+// дочерних страниц — на главную, с главной — закрыть раздел. Позиция
+// прокрутки уходящей страницы запоминается (её же ведёт слушатель scroll),
+// приходящей — возвращается, перерисовка той же страницы ленту не двигает;
+// назад из инструментов — фокус на их строке.
+function sfyView(page, o){
+  o = o || {};
+  const root = document.getElementById('ambar-safe'); if(!root || !SFY_ID[page]) return;
+  const prev = SFY.view, sc = document.getElementById('sfScroll');
+  if(sc && prev !== page) SFY.pos[prev] = sc.scrollTop;
+  SFY.view = page;
+  for(const [k, pid] of [['home', 'sfHome'], ['days', 'sfDaysPage'], ['tools', 'sfToolsPage']]){ const p = document.getElementById(pid); if(p) p.hidden = k !== page; }
+  const app = root.querySelector('.sf-app'); if(app) app.dataset.view = page;
+  ACC_VIEW = SFY_ID[page];
+  _setText('accTitle', SFY_TITLE[page][0]); _setText('accSub', SFY_TITLE[page][1]);
+  ACC_BACK = page === 'home' ? null : () => accFinSafe('finsafe');
+  _navSave();
+  if(o.scroll !== false && prev !== page && sc) sc.scrollTop = SFY.pos[page] || 0;   // та же страница перерисована — ленту не трогаем
+  if(page === 'home' && prev === 'tools'){ const b = document.getElementById('sfToolsButton'); if(b){ try{ b.focus({preventScroll: true}); }catch(e){} } }
+  if(prev !== page){ try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){} }
+}
+// Разметка — safe-reference.html пакета без шапки и нижней навигации (их даёт
+// оболочка) и без поясняющих подписей (правило 3 окт 2026): три страницы одной
+// ленты, видна одна ([hidden]). Значки — luc(), восемь месячных полей — с теми
+// же data-field, что и раньше, чтобы их вела fbSave. Группа «Ждём выручку» и
+// строки дней — свои (sf-wait-group, sf-wait-tag, sf-row-error, sf-day-crypto):
+// те же рисует этап «Распределение» сбора (пакетные sf-waiting-group,
+// sf-collection-lock, sf-day-error, sf-rp-wallet в разметке не используются).
 function sfyRow(grp, key, label, field){
   return `<div class="sf-edit-row" data-field-row="${grp}-${key}"><label for="sf-${grp}-${key}">${label}<small id="sf-${grp}-${key}-note" hidden></small></label><div class="sf-input-unit"><input id="sf-${grp}-${key}" type="text" inputmode="decimal" autocomplete="off" placeholder="—" data-field="${field}" data-key="${key}" data-month="" data-was="" aria-describedby="sf-${grp}-${key}-feedback" onfocus="this.select()" onkeydown="if(event.key==='Enter'){this.blur()}" onblur="fbSave(this)"><span>AED</span></div><div id="sf-${grp}-${key}-feedback" class="sf-field-feedback" hidden aria-live="polite"></div></div>`;
 }
@@ -26056,43 +26143,45 @@ function sfyOpeningRows(){
        + sfyRow('opening', 'debt', 'Долг Барракуде', 'debt_b_open') + sfyRow('opening', 'crypto', 'РП криптой', 'rp_cr_open');
 }
 function sfyShell(){
-  return `<div id="ambar-safe" data-shell="existing"><div class="sf-stage"><section class="sf-app" aria-label="Сейф">
+  return `<div id="ambar-safe" data-shell="existing"><div class="sf-stage"><section class="sf-app" aria-label="Сейф" data-view="home">
     <div class="sf-month" id="sfMonthBar">
       <button type="button" data-action="previous-month" aria-label="Предыдущий месяц" onclick="sfyMonth(-1)">${luc('chevron-left')}</button>
       <strong id="sfMonthLabel"></strong>
       <button type="button" data-action="next-month" id="sfNextMonth" aria-label="Следующий месяц" onclick="sfyMonth(1)">${luc('chevron-right')}</button>
     </div>
     <div class="sf-scroll" id="sfScroll">
-      <p id="sfStatus" class="sf-status" hidden role="status" aria-live="polite"></p>
       <main class="sf-main" id="sfHome">
+        <div id="sfBookStatus" class="sf-book-status" role="status" aria-live="polite" hidden></div>
         <section class="sf-balance" aria-labelledby="sfBalanceLabel">
           <div class="sf-balance-top">
             <div><span id="sfBalanceLabel">Всего в сейфе</span><p class="sf-total"><strong id="sfTotal">—</strong><span>AED</span></p></div>
             ${luc('vault')}
           </div>
           <div class="sf-composition-label" id="sfCompositionLabel"><span>Из них</span></div>
-          <div class="sf-pools" role="group" aria-labelledby="sfBalanceLabel sfCompositionLabel">
-            <button type="button" class="sf-pool" data-action="barra" onclick="sfyGo('finb')" aria-label="Барракуда — открыть"><span class="sf-pool-name"><span class="sf-dot sf-barra"></span>Барракуда${luc('chevron-right')}</span><strong id="sfBarra">—</strong></button>
-            <button type="button" class="sf-pool" data-action="rp" onclick="sfyGo('finrp')" aria-label="РП — открыть"><span class="sf-pool-name"><span class="sf-dot sf-rp"></span>РП${luc('chevron-right')}</span><strong id="sfRp">—</strong></button>
-            <button type="button" class="sf-pool" data-action="profit" onclick="sfyGo('finnp')" aria-label="ЧП — открыть"><span class="sf-pool-name"><span class="sf-dot sf-profit"></span>ЧП${luc('chevron-right')}</span><strong id="sfProfit">—</strong></button>
-          </div>
+          <dl class="sf-pools" aria-labelledby="sfBalanceLabel sfCompositionLabel">
+            <div><dt><button type="button" class="sf-pool-link" data-action="pool-barra" onclick="sfyGo('finb')" aria-label="Барракуда — открыть"><span class="sf-dot sf-barra"></span>Барракуда${luc('chevron-right')}</button></dt><dd id="sfBarra">—</dd></div>
+            <div><dt><button type="button" class="sf-pool-link" data-action="pool-rp" onclick="sfyGo('finrp')" aria-label="РП — открыть"><span class="sf-dot sf-rp"></span>РП${luc('chevron-right')}</button></dt><dd id="sfRp">—</dd></div>
+            <div><dt><button type="button" class="sf-pool-link" data-action="pool-profit" onclick="sfyGo('finnp')" aria-label="ЧП — открыть"><span class="sf-dot sf-profit"></span>ЧП${luc('chevron-right')}</button></dt><dd id="sfProfit">—</dd></div>
+          </dl>
           <button type="button" class="sf-wallet" data-action="wallet" onclick="fbOpenWal(() => accOpen('finsafe'))">${luc('wallet')}<span class="sf-wallet-label">Криптокошелёк</span><span class="sf-wallet-amount"><strong><span id="sfWalletAED">—</span> <small>AED</small></strong><small><span id="sfWalletUSDT">—</span> USDT</small></span>${luc('chevron-right')}</button>
-          <div class="sf-quick-actions"><button type="button" data-action="transfer" onclick="sfyTransfer()">${luc('arrow-right-left')}<span>Перевод между счетами</span>${luc('chevron-right')}</button><button type="button" data-action="ddc" onclick="sfyGo('finddc')">${luc('file-text')}<span>Отчёт ДДС</span>${luc('chevron-right')}</button></div>
-        </section>
-        <section class="sf-days" aria-labelledby="sfDaysTitle">
-          <div class="sf-section-heading"><h2 id="sfDaysTitle">Распределение по дням</h2></div>
-          <p id="sfListStatus" class="sf-list-status" hidden role="status" aria-live="polite"></p>
-          <div class="sf-pending-group sf-wait-group" id="sfWaitGroup" hidden>
-            <div class="sf-pending-heading"><span>${luc('lock-keyhole')}Ждём выручку</span><span id="sfWaitCount"></span></div>
-            <div class="sf-day-list" id="sfWaitList" role="list" aria-label="Дни, за которые районы ещё не сдали выручку"></div>
+          <div class="sf-quick-actions">
+            <button type="button" data-action="transfer" onclick="sfyTransfer()">${luc('arrow-right-left')}<span>Перевод между счетами</span>${luc('chevron-right')}</button>
+            <button type="button" data-action="dds" onclick="sfyGo('finddc')">${luc('file-text')}<span>Отчёт ДДС</span>${luc('chevron-right')}</button>
+            <button type="button" id="sfToolsButton" data-action="tools" onclick="sfyView('tools')">${luc('wrench')}<span>Временные тех инструменты</span>${luc('chevron-right')}</button>
           </div>
-          <div class="sf-pending-group" id="sfPendingGroup" hidden>
-            <div class="sf-pending-heading" id="sfPendingHeading"><span>${luc('circle-dot')}Ждут подтверждения</span><span id="sfPendingCount"></span></div>
-            <div class="sf-day-list" id="sfPendingList" role="list" aria-label="Дни, ожидающие подтверждения"></div>
-          </div>
-          <p id="sfNoDays" class="sf-note" hidden>Выручки в этом месяце ещё нет</p>
-          <div id="sfDoneGroup" hidden><div class="sf-done-heading"><span>${luc('circle-check')}В сейфе</span><span id="sfDoneCount"></span></div><div class="sf-done-list" id="sfDoneList"></div></div>
         </section>
+        <button type="button" class="sf-days-entry" id="sfDaysButton" data-action="days" data-status="loading" aria-busy="true" aria-label="Распределение по дням · —" disabled onclick="sfyView('days')">
+          <span class="sf-days-entry-title">${luc('calendar-days')}<strong>Распределение по дням</strong></span>
+          <span class="sf-days-entry-body">
+            <span class="sf-days-state"><span id="sfDaysStateIcon" hidden></span><span id="sfDaysStatus">—</span><span id="sfDaysCount" hidden></span></span>
+            <span class="sf-days-amount" id="sfDaysAmount"><span>К распределению</span><strong><span id="sfDaysAmountValue">—</span> <small>AED</small></strong></span>
+            <span class="sf-days-waiting" id="sfDaysWaiting" hidden>${luc('lock-keyhole')}<span id="sfDaysWaitingText"></span></span>
+          </span>
+          ${luc('chevron-right', 'sf-days-entry-arrow')}
+        </button>
+      </main>
+      <section class="sf-main" id="sfToolsPage" aria-label="Временные тех инструменты" hidden>
+        <div id="sfToolsStatus" class="sf-book-status" role="status" aria-live="polite" hidden></div>
         <section class="sf-accounting" aria-label="Сверка и начальные остатки">
           <details id="sfRecount" class="sf-disclosure">
             <summary>${luc('calculator')}<span><strong>Пересчёт сейфа</strong><small id="sfRecountSummary" hidden></small></span>${luc('chevron-down')}</summary>
@@ -26104,12 +26193,27 @@ function sfyShell(){
           </details>
           <div class="sf-cutoff-host"><button type="button" class="sf-cutoff-link" data-action="cutoff" tabindex="-1">${luc('calendar-range')}<span>Учёт с</span><strong id="sfCutoffReadout">—</strong>${luc('chevron-right')}</button><input class="sf-cutoff-input" id="sfCutoffInput" type="date" aria-label="Учёт с" data-was="" onchange="fbStartSave(this)"></div>
         </section>
-      </main>
+      </section>
+      <section class="sf-main sf-days" id="sfDaysPage" aria-label="Распределение по дням" hidden>
+        <div class="sf-pending-group sf-wait-group" id="sfWaitGroup" hidden>
+          <div class="sf-pending-heading"><span>${luc('lock-keyhole')}Ждём выручку</span><span id="sfWaitCount"></span></div>
+          <div class="sf-day-list" id="sfWaitList" role="list" aria-label="Дни, за которые районы ещё не сдали выручку"></div>
+        </div>
+        <div id="sfDaysLoadState" class="sf-empty-month" role="status" aria-live="polite" hidden></div>
+        <div class="sf-pending-group" id="sfPendingGroup" hidden>
+          <div class="sf-pending-heading" id="sfPendingHeading"><span>${luc('circle-dot')}Ждут подтверждения</span><span id="sfPendingCount"></span></div>
+          <div class="sf-day-list" id="sfPendingList" role="list" aria-label="Дни, ожидающие подтверждения"></div>
+        </div>
+        <p id="sfNoDays" class="sf-note" hidden>Выручки в этом месяце ещё нет</p>
+        <div id="sfDoneGroup" hidden><div class="sf-done-heading"><span>${luc('circle-check')}В сейфе</span><span id="sfDoneCount"></span></div><div class="sf-done-list" id="sfDoneList"></div></div>
+      </section>
     </div>
   </section></div></div>`;
 }
-// Один слушатель на страницу: «Подтвердить» — прежняя ручка fbDayOk и не
-// открывает день; строка дня — в настоящую «Кассу дня», назад — сюда.
+// Один слушатель на оболочку: «Подтвердить» — прежняя ручка fbDayOk и не
+// открывает день; строка дня — в настоящую «Кассу дня», назад — на страницу
+// дней (fbGoDay запоминает ACC_VIEW). Лента одна на три страницы — её
+// прокрутка пишется в позицию открытой страницы.
 function sfyBind(){
   const root = document.getElementById('ambar-safe'); if(!root) return;
   root.addEventListener('click', e => {
@@ -26118,6 +26222,8 @@ function sfyBind(){
     const o = e.target.closest('[data-open-day]');
     if(o){ e.preventDefault(); fbGoDay(o.dataset.openDay); }
   });
+  const sc = document.getElementById('sfScroll');
+  if(sc) sc.addEventListener('scroll', () => { SFY.pos[SFY.view] = sc.scrollTop; }, {passive: true});
 }
 function sfyMonthBar(m){
   const l = document.getElementById('sfMonthLabel'), n = document.getElementById('sfNextMonth');
@@ -26126,12 +26232,13 @@ function sfyMonthBar(m){
 }
 // Месяц общий для всех финансовых экранов, вперёд — не дальше текущего.
 // Поля пересоздаются: запись старого месяца, долетевшая позже, не ляжет в
-// поле нового.
+// поле нового. Открытая страница остаётся, её лента — с начала.
 async function sfyMonth(d){
   const m = fbMonthAdd(FB.month || fbMonthNow(), d);
   if(m > fbMonthNow() || m === FB.month) return;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   FB.month = m;
+  SFY.pos[SFY.view] = 0; { const sc = document.getElementById('sfScroll'); if(sc) sc.scrollTop = 0; }
   const r = document.getElementById('sfRecountFields'), o = document.getElementById('sfOpeningFields');
   if(r) r.innerHTML = sfyRecountRows();
   if(o) o.innerHTML = sfyOpeningRows();
@@ -26144,17 +26251,39 @@ function sfyTransfer(){
   document.getElementById('accOv').classList.remove('sfe');   // страница перевода — в обычной середине раздела
   fbMovePage(accFinSafe);
 }
-// Месяц грузится: суммы «—», списков нет, поля заперты. Пустого месяца из
-// неизвестной книги не выдумываем.
+// Месяц грузится: суммы «—», списков нет, поля заперты, большая кнопка
+// заперта с прочерками; «Загрузка месяца…» — у каждой страницы своя строка
+// (видна та, что открыта). Пустого месяца из неизвестной книги не выдумываем.
 function sfyLoading(){
   const el = id => document.getElementById(id);
-  const st = el('sfStatus'); if(st){ st.textContent = 'Загрузка месяца…'; st.hidden = false; }
+  for(const id of ['sfBookStatus', 'sfToolsStatus', 'sfDaysLoadState']){ const x = el(id); if(x){ x.innerHTML = `${luc('loader-circle')}<span>Загрузка месяца…</span>`; x.hidden = false; } }
   for(const id of ['sfTotal', 'sfBarra', 'sfRp', 'sfProfit', 'sfWalletAED', 'sfWalletUSDT']){ const x = el(id); if(x){ x.textContent = '—'; x.classList.remove('sf-negative'); } }
-  for(const id of ['sfPendingGroup', 'sfDoneGroup', 'sfNoDays', 'sfListStatus', 'sfRecountSummary']){ const x = el(id); if(x) x.hidden = true; }
+  for(const id of ['sfWaitGroup', 'sfPendingGroup', 'sfDoneGroup', 'sfNoDays', 'sfRecountSummary']){ const x = el(id); if(x) x.hidden = true; }
+  sfyEntry('loading', 0, 0, 0);
   const root = el('ambar-safe'); if(!root) return;
   for(const inp of root.querySelectorAll('.sf-input-unit input, .sf-cutoff-input')){ inp.disabled = true; inp.value = ''; inp.dataset.was = ''; }
   for(const fb of root.querySelectorAll('.sf-field-feedback')){ fb.hidden = true; fb.innerHTML = ''; }
   const t = el('sfCutoffReadout'); if(t) t.textContent = '—';
+}
+// Большая кнопка «Распределение по дням» — по полному набору дней месяца
+// (выручка > 0, не будущее, не до учёта), не по видимому списку: загрузка →
+// ждут подтверждения (золото; «К распределению» — выручка только готовых к
+// подтверждению дней; второй строкой замок «Ждём выручку · N», если есть и
+// несобранные) → ждём выручку (замок, без суммы) → всё в сейфе («N дней») →
+// выручки нет. Отказ книги — картинкой «Не удалось загрузить» на всю середину
+// (правило экрана), до кнопки не доходит. Нажатие только открывает список.
+function sfyEntry(st, n, sum, w){
+  const el = id => document.getElementById(id), btn = el('sfDaysButton'); if(!btn) return;
+  const txt = (id, t) => { const x = el(id); if(x) x.textContent = t; }, show = (id, on) => { const x = el(id); if(x) x.hidden = !on; };
+  const loading = st === 'loading', mixed = st === 'pending' && w > 0;
+  btn.dataset.status = st; btn.disabled = loading; btn.setAttribute('aria-busy', String(loading));
+  const status = {loading: '—', pending: 'Ждут подтверждения', waiting: 'Ждём выручку', done: 'Всё в сейфе', empty: 'Выручки в этом месяце ещё нет'}[st] || '—';
+  const count = st === 'pending' || st === 'waiting' ? `· ${n}` : st === 'done' ? `· ${n} ${pluralize(n, 'день', 'дня', 'дней')}` : '';
+  txt('sfDaysStatus', status); txt('sfDaysCount', count); show('sfDaysCount', !!count);
+  const ic = el('sfDaysStateIcon'); if(ic){ ic.innerHTML = st === 'waiting' ? luc('lock-keyhole') : ''; ic.hidden = st !== 'waiting'; }
+  txt('sfDaysAmountValue', st === 'pending' ? fbFmt(sum) : '—'); show('sfDaysAmount', st === 'pending' || loading);
+  txt('sfDaysWaitingText', mixed ? `Ждём выручку · ${w}` : ''); show('sfDaysWaiting', mixed);
+  btn.setAttribute('aria-label', ['Распределение по дням', count ? `${status} ${count}` : status, st === 'pending' ? `К распределению ${fbFmt(sum)} AED` : '', mixed ? `Ждём выручку · ${w}` : ''].filter(Boolean).join(' · '));
 }
 function sfyDayLabel(day){
   const wd = ACC_WDF[new Date(day + 'T12:00:00Z').getUTCDay()] || '';
@@ -26227,7 +26356,7 @@ function sfySync(b){
   const el = id => document.getElementById(id);
   const show = (id, on) => { const x = el(id); if(x) x.hidden = !on; };
   const txt = (id, t) => { const x = el(id); if(x) x.textContent = t; };
-  show('sfStatus', false);
+  for(const id of ['sfBookStatus', 'sfToolsStatus', 'sfDaysLoadState']) show(id, false);
   sfyMonthBar(b.month);
   // итог и стопки — только наличные; Барракуда без красного, РП/ЧП/итог в минусе красные
   sfyNum('sfTotal', fbSafeAll(b), true); sfyNum('sfBarra', s.b, false); sfyNum('sfRp', s.rp, true); sfyNum('sfProfit', s.np, true);
@@ -26237,7 +26366,6 @@ function sfySync(b){
   const open = days.filter(d => !d.ok), done = days.filter(d => d.ok);
   // замок сбора: день, за который районы ещё не сдали (cash_ready false), — своей группой, без кнопки
   const wait = open.filter(d => d.cash_ready === false), pend = open.filter(d => d.cash_ready !== false);
-  show('sfListStatus', false);
   show('sfWaitGroup', wait.length > 0); txt('sfWaitCount', String(wait.length));
   const wl = el('sfWaitList'); if(wl) wl.innerHTML = wait.map(d => sfyPendRow(d)).join('');
   show('sfPendingGroup', pend.length > 0); txt('sfPendingCount', String(pend.length));
@@ -26245,6 +26373,8 @@ function sfySync(b){
   show('sfDoneGroup', done.length > 0); txt('sfDoneCount', String(done.length));
   const dl = el('sfDoneList'); if(dl) dl.innerHTML = done.map(sfyDoneRow).join('');
   show('sfNoDays', days.length === 0);
+  // большая кнопка на главной — по тем же наборам; «К распределению» — выручка готовых к подтверждению дней
+  sfyEntry(pend.length ? 'pending' : wait.length ? 'waiting' : done.length ? 'done' : 'empty', pend.length || wait.length || done.length, pend.reduce((s, d) => s + (+d.base || 0), 0), wait.length);
   // пересчёт: факт против книги на день пересчёта; пустое поле — стопку не считали
   const rs = el('sfRecountSummary'); if(rs){ rs.textContent = f.day ? `${fbDayT(f.day)} · пересчитано` : ''; rs.hidden = !f.day; }
   for(const [k, sk] of [['barra', 'b'], ['rp', 'rp'], ['profit', 'np']]){
@@ -26278,7 +26408,7 @@ async function sfyConfirm(day, btn){
   SFY.busy.add(day);
   const row = btn.closest('.sf-day'), lab = row && row.querySelector('[data-sf="confirm-label"]'),
         err = row && row.querySelector('[data-sf="error"]'), grp = document.getElementById('sfPendingGroup');
-  btn.disabled = true; if(lab) lab.textContent = 'Подтверждаем…';
+  btn.disabled = true; btn.setAttribute('aria-busy', 'true'); if(lab) lab.textContent = 'Подтверждаем…';
   if(err){ err.hidden = true; err.textContent = ''; }
   if(grp) grp.setAttribute('aria-busy', 'true');
   try{
@@ -26286,7 +26416,7 @@ async function sfyConfirm(day, btn){
     if(t && err && err.isConnected){ err.textContent = t; err.hidden = false; }
   } finally {
     SFY.busy.delete(day);
-    if(btn.isConnected){ btn.disabled = false; if(lab) lab.textContent = 'Подтвердить'; }
+    if(btn.isConnected){ btn.disabled = false; btn.removeAttribute('aria-busy'); if(lab) lab.textContent = 'Подтвердить'; }
     if(grp && grp.isConnected && !SFY.busy.size) grp.removeAttribute('aria-busy');
   }
 }
@@ -30816,7 +30946,7 @@ function accOpen(id){
   if(id === 'finb')     accFinB();
   if(id === 'finrp')    accFinRP();
   if(id === 'finnp')    accFinNP();
-  if(id === 'finsafe')  accFinSafe();
+  if(id === 'finsafe' || id === 'finsafedays' || id === 'finsafetools') accFinSafe(id);   // три страницы «Сейфа» в одной оболочке
   if(id === 'finddc')   accFinDdc();
   if(id === 'finddcm')  accFinDdcM();
   if(id === 'finbud')   accFinBud();
@@ -30864,6 +30994,7 @@ function accClose(){
 function _accClose(keepCkl){
   ACC_BACK = null;
   FB.payFrom = ''; FB.stackFrom = ''; FB.rpOutFrom = '';   // стрелки «назад» в список зарплат, в «Сейф» и на вкладку из РП− — только пока раздел открыт
+  SFY.view = 'home'; SFY.pos = {home: 0, days: 0, tools: 0};   // «Сейф» при следующем входе — с главной и с начала
   document.getElementById('accOv').classList.remove('pen-ui', 'sdc', 'cfd', 'cdy', 'sfe');
   if(!keepCkl) CKL_RETURN = false;
   SCAN.stop();

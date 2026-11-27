@@ -2609,17 +2609,15 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 #star-daily-collection .sc-steps small{display:flex;align-items:center;gap:4px;font-size:11px;line-height:16px;color:var(--sc-muted)}
 #star-daily-collection .sc-steps small>svg.lucide{width:11px!important;height:11px!important}
 #star-daily-collection .sc-scroll{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4a3d57 transparent}
-#star-daily-collection .sc-overview{padding:16px 14px 14px}
-#star-daily-collection .sc-overview-line{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12px;color:#d0c7d8}
-#star-daily-collection .sc-overview-line>strong{color:var(--sc-text);font-family:"Space Grotesk",sans-serif;font-size:19px;line-height:23px;font-weight:500}
-#star-daily-collection .sc-overview-line>strong>span{color:#8e829d;font-size:13px}
-#star-daily-collection .sc-progress{height:4px;margin:10px 0 4px;background:#2e2638;border-radius:4px;overflow:hidden}
-#star-daily-collection .sc-progress>span{display:block;height:100%;background:var(--sc-gold)}
-#star-daily-collection .sc-overview-bottom{display:flex;justify-content:space-between;align-items:center;gap:8px}
-#star-daily-collection .sc-overview-bottom>span{font-size:11px;line-height:16px;color:var(--sc-muted)}
-#star-daily-collection .sc-text-action{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-height:44px;flex:none;color:#b8a689;font-size:11px;font-weight:500}
-#star-daily-collection .sc-text-action>svg.lucide{width:13px!important;height:13px!important}
-#star-daily-collection .sc-districts{display:flex;flex-direction:column;gap:10px;padding:0 12px}
+#star-daily-collection .sc-districts{display:flex;flex-direction:column;gap:10px;padding:16px 12px 0}
+#star-daily-collection #sc-collection{padding-bottom:16px}
+/* «Заберу всё завтра» — широкая кнопка внизу списка районов, в языке их кнопок (владелец, 27 ноя 2026:
+   блок сверху со счётчиком, полосой и ссылкой «Всё завтра» «выглядит инородно и дёшево — придумай
+   просто внизу кнопку, заберу всё завтра»); пока у района ждут решения расходы — заперта, с замком. */
+#star-daily-collection .sc-later-all{display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);min-height:48px;margin:14px 12px 0;padding:10px 12px;border:1px solid #3c3147;border-radius:12px;background:#1c1526;color:#b7a8c3;font-size:12px;line-height:18px;font-weight:600;text-align:center}
+#star-daily-collection .sc-later-all[aria-disabled="true"]{border-color:#3a3140;color:#8d819b}
+#star-daily-collection .sc-later-all>svg.lucide{width:14px!important;height:14px!important}
+#star-daily-collection .sc-before{margin:18px 12px 0;text-align:center;font-size:12px;line-height:18px;color:var(--sc-muted)}
 #star-daily-collection .sc-district{min-width:0;border:1px solid #342b3e;border-radius:17px;background:var(--sc-surface)}
 #star-daily-collection .sc-district[open]{border-color:#534336;background:linear-gradient(145deg,#1b1623,#12101b 70%)}
 #star-daily-collection .sc-district-heading{display:grid;grid-template-columns:34px minmax(0,1fr) auto 14px;align-items:center;gap:9px;min-width:0;min-height:76px;padding:13px 12px}
@@ -2724,7 +2722,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 #star-daily-collection .sc-primary.sc-unavailable{border-color:#655137;background:#33291f;color:#c6ae86}
 #star-daily-collection .sc-primary>svg.lucide{width:14px!important;height:14px!important}
 #star-daily-collection .sc-secondary{min-height:46px;min-width:0;padding:10px 8px;border:1px solid #3c3147;border-radius:12px;background:#1c1526;color:#b7a8c3;font-size:11px;line-height:17px;font-weight:500;text-align:center}
-#star-daily-collection .sc-waiting{margin:14px 14px 18px;padding:0 0 8px;color:var(--sc-muted)}
+#star-daily-collection .sc-waiting{margin:14px 14px 4px;padding:0 0 8px;color:var(--sc-muted)}
 #star-daily-collection .sc-waiting>summary{display:grid;grid-template-columns:16px minmax(0,1fr) 14px;align-items:center;gap:8px;min-height:44px;font-size:11px}
 #star-daily-collection .sc-waiting>summary>svg:first-child{width:14px!important;height:14px!important}
 #star-daily-collection .sc-waiting>div{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;padding:6px 0;font-size:11px;line-height:17px}
@@ -22886,7 +22884,7 @@ function crRender(){
   // нечего: это приходит с сервера и от нажатий не меняется.
   const list = [...d.districts].sort((a, b) => a.empty - b.empty);
   const col = document.getElementById('sc-collection');
-  if(col) col.innerHTML = sdcOverview(d) + `<div class="sc-districts">${list.map(sdcDistrict).join('')}</div>` + sdcWaiting();
+  if(col) col.innerHTML = `<div class="sc-districts">${list.map(sdcDistrict).join('')}</div>` + sdcLaterAll(d) + sdcWaiting();
   sdcStage(CRD.open ? 2 : 1);
   crFoot();
   crDistPrefetch();
@@ -22899,43 +22897,26 @@ function crRender(){
   }
 }
 
-// Шапка этапа: сколько районов получено, полоса, перенос; справа — общий
-// перенос на завтра.
-function sdcOverview(d){
-  const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
-  const дниПереноса = [...new Set((d.districts || []).flatMap(x => (x.carry || []).map(c => c.day)))].sort();
-  // Смена района идёт — его сегодняшних денег в сборе нет (владелец, 4 ноя
-  // 2026); о таких районах — первой строкой, чтобы «получать нечего» не
-  // читалось как «смена отработана впустую». Только те, где получать уже
-  // нечего — всё собрано: у района с несобранным переносом карточка про смену
-  // молчит (владелец, 20 ноя 2026: «пиши смена идёт только там, где выручка
-  // уже собрана и за сегодня деньги забрать ещё нельзя, так как идёт смена»).
-  const идут = (d.districts || []).filter(x => x.shift === 'open' && (x.empty || x.done)).map(x => x.code);
-  let слева = d.before ? 'До начала учёта'
-    : дниПереноса.length ? `Есть перенос за ${дниПереноса.map(_dayName).join(', ')}`
-    : d.later ? `${d.later} ${pluralize(d.later, 'район', 'района', 'районов')} — соберу завтра` : '';
-  if(!d.before && идут.length) слева = [`Смена идёт · ${идут.join(', ')}`, слева].filter(Boolean).join(' · ');
-  else if(!слева && !d.need) слева = 'Получать нечего';
-  const кнопка = crLaterAllBtn();
-  return `<div class="sc-overview">
-    <div class="sc-overview-line"><span>Получено от районов</span><strong>${d.done} <span>/ ${d.need}</span></strong></div>
-    <div class="sc-progress" role="progressbar" aria-label="Районы, от которых получена выручка" aria-valuemin="0" aria-valuemax="${d.need}" aria-valuenow="${d.done}"><span style="width:${доля}%"></span></div>
-    ${слева || кнопка ? `<div class="sc-overview-bottom"><span>${escS(слева)}</span>${кнопка}</div>` : ''}
-  </div>`;
-}
-
-// «Всё завтра» — одной кнопкой на все районы, которые сегодня не получили
-// (владелец, 20 сен 2026: «вместо наличных и расхода сделай общую кнопку
-// заберу всё завтра, чтобы можно было одной кнопкой все районы завтра
-// собрать»). Нечего откладывать — кнопки нет; у района расходы ещё не
-// согласованы — сначала они, то же правило, что у кнопок района.
-function crLaterAllBtn(){
-  const d = CR; if(!d || d.day !== d.today) return '';
+// «Заберу всё завтра» — одной кнопкой на все районы, которые сегодня не
+// получили (владелец, 20 сен 2026: «вместо наличных и расхода сделай общую
+// кнопку заберу всё завтра, чтобы можно было одной кнопкой все районы завтра
+// собрать»). Внизу списка районов, широкой кнопкой в языке их кнопок
+// (владелец, 27 ноя 2026: блок сверху со счётчиком «Получено от районов»,
+// полосой, строкой переноса и ссылкой «Всё завтра» «выглядит инородно и
+// дёшево — придумай просто внизу кнопку, заберу всё завтра»; счётчик и так
+// стоит на вкладке «Сбор», перенос, «соберу завтра» и «смена идёт» — на
+// карточках районов). Нечего откладывать — кнопки нет; у района расходы ещё
+// не согласованы — заперта, то же правило, что у кнопок района. До начала
+// учёта — одна подпись вместо кнопки.
+function sdcLaterAll(d){
+  if(d.before) return '<p class="sc-before">До начала учёта</p>';
+  if(d.day !== d.today) return '';
   const можно = (d.districts || []).filter(x => !x.empty && !x.done && !x.later);
   if(!можно.length) return '';
   const ждут = можно.filter(x => +x.spend_pending > 0);
-  return `<button type="button" class="sc-text-action"${ждут.length ? ' aria-disabled="true" data-blocked' : ''} onclick="${
-    ждут.length ? `crNeedExp('${escS(ждут.map(x => x.code).join(', '))}')` : 'crLaterAll()'}">Всё завтра${luc('corner-up-right')}</button>`;
+  return ждут.length
+    ? `<button type="button" class="sc-later-all" aria-disabled="true" data-blocked onclick="crNeedExp('${escS(ждут.map(x => x.code).join(', '))}')">${luc('lock-keyhole')}Заберу всё завтра</button>`
+    : `<button type="button" class="sc-later-all" onclick="crLaterAll()">Заберу всё завтра</button>`;
 }
 async function crLaterAll(){
   if(!CR || CR_BUSY) return;

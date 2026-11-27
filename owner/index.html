@@ -3400,6 +3400,43 @@ html.kb #accOv.sfe .sf-scroll{padding-bottom:50vh}
 #ambar-safe .sf-input-unit input:disabled{opacity:.5}
 /* Строка состояния месяца (.sf-book-status): значок и текст рядом, не по краям. */
 #ambar-safe .sf-book-status>span{flex:1}
+/* Главная без прокрутки (владелец, 27 ноя 2026: «страница сейфа не должна
+   скроллиться»): не влезли карточка и кнопка в ленту над таббаром — sfyDensity
+   ставит .sf-app[data-density="compact"], не влезло и так — "tight": полоса
+   месяца, зазоры, отступы и шрифты короче, всё на месте; только вертикальные
+   размеры — боковые отступы и контейнерный запрос узкого экрана не трогаем.
+   Страницы дней и инструментов прокручиваются как раньше. */
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-month{margin-bottom:8px;padding-top:3px;padding-bottom:3px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) #sfHome{gap:12px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-balance-top{padding-top:14px;padding-bottom:12px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-total{margin-top:4px!important}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-total strong{font-size:36px;line-height:42px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-composition-label{padding-bottom:8px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-pools{padding-bottom:14px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-pools dd{font-size:20px;line-height:26px;margin-top:4px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-pools>div+div::before{top:22px;line-height:26px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-wallet{padding-top:9px;padding-bottom:9px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-quick-actions button{min-height:42px;padding-top:6px;padding-bottom:6px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-days-entry{min-height:132px;padding-top:14px;padding-bottom:14px;gap:10px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-days-entry-body{gap:7px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-days-amount>strong{font-size:26px;line-height:32px}
+#ambar-safe .sf-app:is([data-density="compact"],[data-density="tight"]) .sf-days-entry>.sf-days-entry-arrow{bottom:18px}
+#accOv.sfe #ambar-safe[data-shell="existing"] .sf-app:is([data-density="compact"],[data-density="tight"]) #sfHome{padding-bottom:calc(var(--tbh,80px) + 10px)}
+#ambar-safe .sf-app[data-density="tight"] .sf-month{margin-bottom:6px;padding-top:2px;padding-bottom:2px}
+#ambar-safe .sf-app[data-density="tight"] #sfHome{gap:10px}
+#ambar-safe .sf-app[data-density="tight"] .sf-balance-top{padding-top:12px;padding-bottom:10px}
+#ambar-safe .sf-app[data-density="tight"] .sf-total strong{font-size:34px;line-height:40px}
+#ambar-safe .sf-app[data-density="tight"] .sf-composition-label{padding-bottom:6px}
+#ambar-safe .sf-app[data-density="tight"] .sf-pools{padding-bottom:10px}
+#ambar-safe .sf-app[data-density="tight"] .sf-pools dd{font-size:19px;line-height:24px;margin-top:3px}
+#ambar-safe .sf-app[data-density="tight"] .sf-pools>div+div::before{top:21px;line-height:24px}
+#ambar-safe .sf-app[data-density="tight"] .sf-wallet{padding-top:8px;padding-bottom:8px}
+#ambar-safe .sf-app[data-density="tight"] .sf-quick-actions button{min-height:40px;padding-top:5px;padding-bottom:5px}
+#ambar-safe .sf-app[data-density="tight"] .sf-days-entry{min-height:120px;padding-top:12px;padding-bottom:12px;gap:8px}
+#ambar-safe .sf-app[data-density="tight"] .sf-days-entry-body{gap:6px}
+#ambar-safe .sf-app[data-density="tight"] .sf-days-amount>strong{font-size:26px;line-height:30px}
+#ambar-safe .sf-app[data-density="tight"] .sf-days-entry>.sf-days-entry-arrow{bottom:16px}
+#accOv.sfe #ambar-safe[data-shell="existing"] .sf-app[data-density="tight"] #sfHome{padding-bottom:calc(var(--tbh,80px) + 8px)}
 /* ── Отчёт ДДС за день (визуал 2 ноя 2026, бриф AMBAR-CASHFLOW-DAY): cashflow-visual.css и cashflow-integration.css из пакета дословно, ниже — адаптация под оболочку ── */
 #ambar-cashflow-day{font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #ambar-cashflow-day .cf-stage{display:flex;justify-content:center;padding:12px 8px}
@@ -26064,7 +26101,7 @@ async function fbMonthScreen(title){
 // (подтверждение дня), fbStartSave (день старта), fbMovePage, fbOpenWal.
 // Оболочка строится один раз на вход, дальше sfySync перекладывает числа и
 // состояния на месте — поле под пальцем не трогаем.
-const SFY = {busy: new Set(), view: 'home', pos: {home: 0, days: 0, tools: 0}};
+const SFY = {busy: new Set(), view: 'home', pos: {home: 0, days: 0, tools: 0}, density: 'regular'};
 const SFY_ID = {home: 'finsafe', days: 'finsafedays', tools: 'finsafetools'},
       SFY_PAGE = {finsafe: 'home', finsafedays: 'days', finsafetools: 'tools'},
       SFY_TITLE = {home: ['Сейф', 'Финансы'], days: ['Распределение по дням', 'Сейф'], tools: ['Временные тех инструменты', 'Сейф']};
@@ -26123,8 +26160,33 @@ function sfyView(page, o){
   _navSave();
   if(o.scroll !== false && prev !== page && sc) sc.scrollTop = SFY.pos[page] || 0;   // та же страница перерисована — ленту не трогаем
   if(page === 'home' && prev === 'tools'){ const b = document.getElementById('sfToolsButton'); if(b){ try{ b.focus({preventScroll: true}); }catch(e){} } }
+  sfyDensitySoon();
   if(prev !== page){ try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){} }
 }
+// Главная без прокрутки (владелец, 27 ноя 2026: «страница сейфа не должна
+// скроллиться»): карточка и кнопка «Распределение по дням» целиком над таббаром.
+// Меряем в обычной плотности; лента главной переполнена — .sf-app получает
+// data-density="compact", не влезло и так — "tight" (CSS: полоса месяца, зазоры,
+// отступы и шрифты короче, всё на месте), как fhDensity у «Финансов» и
+// pyrDensity у «Зарплат». Порог — только
+// факт переполнения главной: страницы дней и инструментов прокручиваются и не
+// меряются (скрытая главная нулевой высоты — плотность не трогаем, sfyView на
+// возврате померит заново). Очередь через rAF; зовут sfySync, sfyView,
+// ResizeObserver области, ленты и главной (отступ под таббар --tbh приходит позже
+// разметки), resize окна и visualViewport (раскрытие окна Telegram, поворот).
+// Плотность помнится в SFY.density: новая оболочка сразу строится в ней, без
+// прыжка после прихода книги. Если не влезло и так (очень низкий экран) — остаток
+// идёт прокруткой, ничего не режется.
+let _sfyRaf = 0, _sfyRO = null, _sfyWin = false;
+function sfyDensity(){
+  _sfyRaf = 0;
+  const app = document.querySelector('#ambar-safe .sf-app'), sc = document.getElementById('sfScroll'), home = document.getElementById('sfHome');
+  if(!app || !sc || !home || home.hidden || sc.clientHeight <= 0) return;   // главная скрыта или раздел не виден — мерить нечего
+  app.dataset.density = 'regular';
+  for(const d of ['compact', 'tight']){ if(sc.scrollHeight > sc.clientHeight + 1) app.dataset.density = d; else break; }
+  SFY.density = app.dataset.density;
+}
+function sfyDensitySoon(){ if(!_sfyRaf) _sfyRaf = requestAnimationFrame(sfyDensity); }
 // Разметка — safe-reference.html пакета без шапки и нижней навигации (их даёт
 // оболочка) и без поясняющих подписей (правило 3 окт 2026): три страницы одной
 // ленты, видна одна ([hidden]). Значки — luc(), восемь месячных полей — с теми
@@ -26143,7 +26205,7 @@ function sfyOpeningRows(){
        + sfyRow('opening', 'debt', 'Долг Барракуде', 'debt_b_open') + sfyRow('opening', 'crypto', 'РП криптой', 'rp_cr_open');
 }
 function sfyShell(){
-  return `<div id="ambar-safe" data-shell="existing"><div class="sf-stage"><section class="sf-app" aria-label="Сейф" data-view="home">
+  return `<div id="ambar-safe" data-shell="existing"><div class="sf-stage"><section class="sf-app" aria-label="Сейф" data-view="home" data-density="${SFY.density || 'regular'}">
     <div class="sf-month" id="sfMonthBar">
       <button type="button" data-action="previous-month" aria-label="Предыдущий месяц" onclick="sfyMonth(-1)">${luc('chevron-left')}</button>
       <strong id="sfMonthLabel"></strong>
@@ -26224,6 +26286,15 @@ function sfyBind(){
   });
   const sc = document.getElementById('sfScroll');
   if(sc) sc.addEventListener('scroll', () => { SFY.pos[SFY.view] = sc.scrollTop; }, {passive: true});
+  if(_sfyRO) _sfyRO.disconnect();
+  if(window.ResizeObserver){
+    _sfyRO = new ResizeObserver(sfyDensitySoon);
+    const app = root.querySelector('.sf-app'), home = document.getElementById('sfHome');
+    if(app) _sfyRO.observe(app);
+    if(sc) _sfyRO.observe(sc);
+    if(home) _sfyRO.observe(home, {box: 'border-box'});
+  }
+  if(!_sfyWin){ _sfyWin = true; window.addEventListener('resize', sfyDensitySoon); if(window.visualViewport) visualViewport.addEventListener('resize', sfyDensitySoon, {passive: true}); }
 }
 function sfyMonthBar(m){
   const l = document.getElementById('sfMonthLabel'), n = document.getElementById('sfNextMonth');
@@ -26375,6 +26446,7 @@ function sfySync(b){
   show('sfNoDays', days.length === 0);
   // большая кнопка на главной — по тем же наборам; «К распределению» — выручка готовых к подтверждению дней
   sfyEntry(pend.length ? 'pending' : wait.length ? 'waiting' : done.length ? 'done' : 'empty', pend.length || wait.length || done.length, pend.reduce((s, d) => s + (+d.base || 0), 0), wait.length);
+  sfyDensitySoon();   // главная перерисована — не выросла ли лента за таббар
   // пересчёт: факт против книги на день пересчёта; пустое поле — стопку не считали
   const rs = el('sfRecountSummary'); if(rs){ rs.textContent = f.day ? `${fbDayT(f.day)} · пересчитано` : ''; rs.hidden = !f.day; }
   for(const [k, sk] of [['barra', 'b'], ['rp', 'rp'], ['profit', 'np']]){
@@ -30994,7 +31066,7 @@ function accClose(){
 function _accClose(keepCkl){
   ACC_BACK = null;
   FB.payFrom = ''; FB.stackFrom = ''; FB.rpOutFrom = '';   // стрелки «назад» в список зарплат, в «Сейф» и на вкладку из РП− — только пока раздел открыт
-  SFY.view = 'home'; SFY.pos = {home: 0, days: 0, tools: 0};   // «Сейф» при следующем входе — с главной и с начала
+  SFY.view = 'home'; SFY.pos = {home: 0, days: 0, tools: 0}; if(_sfyRO){ _sfyRO.disconnect(); _sfyRO = null; }   // «Сейф» при следующем входе — с главной и с начала
   document.getElementById('accOv').classList.remove('pen-ui', 'sdc', 'cfd', 'cdy', 'sfe');
   if(!keepCkl) CKL_RETURN = false;
   SCAN.stop();

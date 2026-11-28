@@ -5986,11 +5986,18 @@ async def handle_checklist(request):
 
     # Визы (владелец, 6 окт 2026): строка есть, пока у кого-то срок в ближайшие
     # две недели или уже вышел. Вышел или три дня — красным, иначе жёлтым.
-    try:
-        визы = await _visas_due(day)
-    except Exception as e:                       # noqa: BLE001
-        log.warning(f"[chk] визы не прочитаны: {e}")
+    # «Отложить до завтра» (владелец, 28 ноя 2026): отметка visas_later на этих
+    # рабочих сутках убирает строку до их конца; с новых суток она возвращается
+    # сама, если срок у кого-то всё ещё в зоне. Сами визы и их напоминания
+    # отметка не трогает.
+    if (marks.get("visas_later") or {}).get("done"):
         визы = []
+    else:
+        try:
+            визы = await _visas_due(day)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[chk] визы не прочитаны: {e}")
+            визы = []
     if визы:
         hint = " · ".join(f"{v['name']} {v['until_t']}" for v in визы[:4]) + (f" · ещё {len(визы) - 4}" if len(визы) > 4 else "")
         row = _chk_row("visas", "Визы", hint, False, now, day, plan, go="visas", n=len(визы))
@@ -6089,7 +6096,9 @@ async def handle_checklist_mark(request):
         body = {}
     day = (body.get("day") or "").strip()
     item = (body.get("item") or "").strip()
-    ok_item = item in CHK_MANUAL | {"recon", "order_skip"} or (
+    # visas_later — «Отложить до завтра» на карточке виз (28 ноя 2026): та же
+    # отметка на рабочих сутках, что и order_skip.
+    ok_item = item in CHK_MANUAL | {"recon", "order_skip", "visas_later"} or (
         item.startswith("cash:") and item[5:] in OFFICE_IDS)
     if not day or not ok_item:
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)

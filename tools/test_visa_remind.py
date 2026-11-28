@@ -15,6 +15,9 @@
      друга не стирают.
   E. Настоящий чек-лист (owner_routes.handle_checklist): строка «Визы», её
      подпись, счёт и цвет — до и после.
+  F. «Отложить до завтра» на карточке (владелец, 28 ноя 2026): отметка
+     visas_later общей ручкой чек-листа убирает строку за эти рабочие сутки,
+     остальное и сами визы не трогает, за другие сутки не действует.
 
     python3 tools/test_visa_remind.py
 """
@@ -147,6 +150,34 @@ async def main():
     await call(orr.handle_visas_remind, "POST", {"name": A, "days": 14, "as": "Т"})
     r = await chk()
     eq("A вернули общий срок — снова в строке", (r["n"], A in r["s"]), (2, True))
+
+    print("\nF. «Отложить до завтра» на карточке виз (владелец, 28 ноя 2026)")
+    st, full = await call(orr.handle_checklist, "GET", path="/api/owner/checklist")
+    было = (len(full["rows"]), full["counts"]["late"])
+    eq("перед этим строка «Визы» есть: двое, красная", (r["n"], r["state"]), (2, "late"))
+    st, r2 = await call(orr.handle_checklist_mark, "POST", {"day": today, "item": "visas_later", "done": True})
+    eq("отметка visas_later принята общей ручкой чек-листа", (st, r2.get("ok")), (200, True))
+    eq("строки «Визы» за сегодня нет", await chk(), None)
+    st, full = await call(orr.handle_checklist, "GET", path="/api/owner/checklist")
+    eq("остальные строки на месте, счёт без виз: строк на одну меньше, красных на одну меньше",
+       (len(full["rows"]), full["counts"]["late"]), (было[0] - 1, было[1] - 1))
+    doc = await db._db.checklist.find_one({"day": today})
+    eq("отметка лежит на рабочих сутках чек-листа, как остальные",
+       bool((((doc or {}).get("items") or {}).get("visas_later") or {}).get("done")), True)
+    p = {x["name"]: x for x in await orr._visas_view(today)}
+    eq("сами визы не тронуты: сроки и напоминания прежние",
+       (p[A]["until"], p[B]["until"], p[A]["remind"], p[B]["remind"]), (plus(today, 10), plus(today, 3), 14, 5))
+    eq("за завтра отметки нет, а срок у обоих всё ещё в зоне — строка вернётся сама",
+       ((await db.checklist_get(plus(today, 1))).get("visas_later"),
+        [v["name"] for v in await orr._visas_due(plus(today, 1))]), (None, [B, A]))
+    await call(orr.handle_checklist_mark, "POST", {"day": plus(today, -1), "item": "visas_later", "done": True})
+    st, r3 = await call(orr.handle_checklist_mark, "POST", {"day": today, "item": "visas_later", "done": False})
+    eq("сняли отметку за сегодня — строка снова есть", (st, bool(await chk())), (200, True))
+    st, yday = await call(orr.handle_checklist, "GET", path=f"/api/owner/checklist?day={plus(today, -1)}")
+    eq("отложено за вчера: во вчерашнем чек-листе строки нет, в сегодняшнем — есть",
+       (any(x["id"] == "visas" for x in yday["rows"]), bool(await chk())), (False, True))
+    st, r4 = await call(orr.handle_checklist_mark, "POST", {"day": today, "item": "visas_tomorrow", "done": True})
+    eq("чужое имя отметки ручка не берёт", st, 400)
 
     print("\nИТОГ:", "все прошли" if not FAIL else f"провалено {len(FAIL)}: {FAIL}")
     return 1 if FAIL else 0

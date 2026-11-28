@@ -4196,6 +4196,12 @@ html.kb #accOv.pyr #ambar-payroll[data-shell="existing"] .py-content{padding-bot
 .ck-r .ck-act{pointer-events:auto;display:inline-flex;align-items:center;min-height:28px;padding:0 11px;border-radius:9px;
   font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.32);cursor:pointer}
 .ck-r .ck-act:active{transform:scale(.97)}
+/* Одно действие на карточке — широкой кнопкой во всю полку (владелец, 28 ноя
+   2026, визы: «кнопку отложить до завтра конкретно на этой карточке»): 44
+   ростом и на 12 скруглена, как кнопки-переходы (.rep-go), цвет — тот же,
+   что у плашек-действий. */
+.ck-r .ck-act.wide{flex:1 1 100%;justify-content:center;min-height:44px;padding:0 14px;border-radius:12px;
+  border-color:rgba(201,169,110,.45);font-size:13.5px;letter-spacing:0}
 .ck-r.done .ck-act{color:var(--sub);background:var(--card2);border-color:var(--border2)}
 .ck-r.done{opacity:.72}
 /* Два цвета в квадрате (владелец, 5 ноя 2026: «либо требует внимания, либо
@@ -22417,8 +22423,13 @@ function chkRow(r, i){
 // Отправленная снимается «Снять отметку»: «Не отправляли» рядом с
 // «отправлена» читалось как состояние (4 ноя 2026).
 function chkRowAct(r){
-  if(r.id !== 'order_sent' || !CKL) return '';
-  const act = (t, fn) => `<span class="ck-act" role="button" onclick="event.stopPropagation(); ${fn}">${t}</span>`;
+  if(!CKL) return '';
+  const act = (t, fn, cls) => `<span class="ck-act${cls ? ' ' + cls : ''}" role="button" onclick="event.stopPropagation(); ${fn}">${t}</span>`;
+  // Визы (владелец, 28 ноя 2026: «в чек листе предупреждение по визам —
+  // кнопку конкретно на этой карточке, отложить до завтра»): широкая кнопка
+  // во всю полку. Только за сегодня — у прошедшего дня откладывать нечего.
+  if(r.id === 'visas') return CKL_OFF ? '' : act('Отложить до завтра', 'chkVisasLater()', 'wide');
+  if(r.id !== 'order_sent') return '';
   if(CKL.order_skip) return act('Вернуть заявку', 'chkOrderSkip(false)');
   if(CKL.order_answered) return '';
   if(CKL.order_sent) return act('Снять отметку', 'chkOrderSent(false)');
@@ -22443,6 +22454,29 @@ async function chkOrderSkip(on){
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred(on ? 'warning' : 'success'); }catch(e){}
   _toast(on ? 'Сегодня заявку в магазин не отправляем' : 'Заявка в магазин снова в плане');
   accChecklist();
+}
+
+// «Отложить до завтра» на карточке виз (владелец, 28 ноя 2026). Карточка
+// уходит сразу, счёт в шапке и значок вкладки пересчитываются по оставшимся
+// строкам, и только потом отметка visas_later уезжает на сервер — на рабочие
+// сутки чек-листа, как остальные отметки: с другого телефона карточки тоже не
+// будет, а с новых суток она вернётся сама, если срок у кого-то всё ещё в
+// зоне. Сами визы отметка не трогает. Сервер не принял — перечитываем день,
+// и карточка возвращается на место.
+async function chkVisasLater(){
+  if(!CKL || CKL_OFF || !(CKL.rows || []).some(r => r.id === 'visas')) return;
+  const day = CKL.day;
+  CKL.rows = CKL.rows.filter(r => r.id !== 'visas');
+  const counts = {};
+  for(const k of ['late', 'now', 'soon', 'done']) counts[k] = CKL.rows.filter(r => r.state === k).length;
+  CKL.counts = counts; CKL_CNT = counts; cklMark(counts);
+  chkRender();
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day, item:'visas_later', done: true}});
+  }catch(e){ _toast('Не удалось отложить'); accChecklist(true); return; }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast('Визы отложены до завтра');
 }
 
 // Каждая строка ведёт туда, где дело делают, — и возвращает обратно в пульт.
